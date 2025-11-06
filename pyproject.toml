@@ -59,10 +59,10 @@ dev = [
 odibi = "odibi.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/henryodibi/Odibi"
-Documentation = "https://github.com/henryodibi/Odibi/tree/main/docs"
-Repository = "https://github.com/henryodibi/Odibi"
-Issues = "https://github.com/henryodibi/Odibi/issues"
+Homepage = "https://github.com/henryodibi11/Odibi"
+Documentation = "https://github.com/henryodibi11/Odibi/tree/main/docs"
+Repository = "https://github.com/henryodibi11/Odibi"
+Issues = "https://github.com/henryodibi11/Odibi/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
