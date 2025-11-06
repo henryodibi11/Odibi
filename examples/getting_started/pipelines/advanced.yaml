@@ -1,0 +1,71 @@
+# Advanced Pipeline - Multiple Sources, SQL, Aggregation
+# This pipeline demonstrates SQL queries, joins, and aggregation
+
+pipeline: advanced_etl
+description: "Advanced features: joins, SQL, aggregation"
+
+nodes:
+  # Step 1: Load sales data
+  - name: load_sales
+    description: "Load sales data"
+    read:
+      connection: local_data
+      format: csv
+      path: sales.csv
+  
+  # Step 2: Load customer data
+  - name: load_customers
+    description: "Load customer data"
+    read:
+      connection: local_data
+      format: csv
+      path: customers.csv
+  
+  # Step 3: Calculate revenue using SQL
+  - name: sales_with_revenue
+    description: "Add revenue column using SQL"
+    depends_on: [load_sales]
+    transform:
+      steps:
+        - "SELECT *, quantity * price as revenue FROM load_sales"
+  
+  # Step 4: Enrich with customer data
+  - name: enriched_sales
+    description: "Join sales with customer information"
+    depends_on: [sales_with_revenue, load_customers]
+    transform:
+      steps:
+        - function: enrich_with_customer_data
+          params:
+            sales_table: sales_with_revenue
+            customers_table: load_customers
+  
+  # Step 5: Aggregate by product
+  - name: product_summary
+    description: "Summarize sales by product"
+    depends_on: [enriched_sales]
+    transform:
+      steps:
+        - function: aggregate_by_product
+          params:
+            source: enriched_sales
+  
+  # Step 6a: Save enriched data
+  - name: save_enriched
+    description: "Save enriched sales data"
+    depends_on: [enriched_sales]
+    write:
+      connection: local_output
+      format: csv
+      path: enriched_sales.csv
+      mode: overwrite
+  
+  # Step 6b: Save product summary (parallel with 6a)
+  - name: save_summary
+    description: "Save product summary"
+    depends_on: [product_summary]
+    write:
+      connection: local_output
+      format: csv
+      path: product_summary.csv
+      mode: overwrite

@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "odibi"
+version = "1.0.0"
+description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
+authors = [
+    {name = "Henry Odibi", email = "henry.odibi@ingredion.com"}
+]
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+keywords = ["data-engineering", "pipeline", "etl", "workflow", "orchestration"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "pandas>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+spark = [
+    "pyspark>=3.4.0",
+]
+pandas = [
+    "duckdb>=0.9.0",
+    "deltalake>=0.13.0",
+]
+azure = [
+    "azure-storage-blob>=12.0.0",
+    "azure-identity>=1.14.0",
+]
+all = [
+    "odibi[spark,pandas,azure]",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.4.0",
+]
+
+[project.scripts]
+odibi = "odibi.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/henryodibi/Odibi"
+Documentation = "https://github.com/henryodibi/Odibi/tree/main/docs"
+Repository = "https://github.com/henryodibi/Odibi"
+Issues = "https://github.com/henryodibi/Odibi/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["odibi*"]
+exclude = ["tests*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --cov=odibi --cov-report=term-missing"

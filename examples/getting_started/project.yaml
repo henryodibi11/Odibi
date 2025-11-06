@@ -1,0 +1,33 @@
+# ODIBI Project Configuration
+# This is the main project file that defines connections and settings
+
+project: Getting Started Example
+version: "1.0.0"
+description: "Learn ODIBI basics with a simple sales pipeline"
+owner: your.email@example.com
+engine: pandas  # Use Pandas engine
+
+# Connections define where to read/write data
+connections:
+  # Local filesystem connection
+  local_data:
+    type: local
+    base_path: ./data
+  
+  # Output connection
+  local_output:
+    type: local
+    base_path: ./output
+
+# Global settings
+defaults:
+  retry:
+    enabled: false  # Disable retries for learning
+    max_attempts: 1
+  
+  logging:
+    level: INFO
+  
+  story:
+    auto_generate: false  # Not implemented yet
+    output_path: ./stories/

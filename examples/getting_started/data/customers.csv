@@ -1,0 +1,8 @@
+customer_id,name,region,tier
+101,Alice Smith,North,Gold
+102,Bob Johnson,South,Silver
+103,Carol White,East,Gold
+104,David Brown,West,Bronze
+105,Eve Davis,North,Silver
+106,Frank Wilson,South,Gold
+107,Grace Lee,East,Bronze

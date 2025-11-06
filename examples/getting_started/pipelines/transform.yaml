@@ -1,0 +1,46 @@
+# Transform Pipeline - With Transform Functions
+# This pipeline loads data, transforms it, and saves results
+
+pipeline: transform_etl
+description: "Load, transform, and save sales data"
+
+nodes:
+  # Step 1: Load sales data
+  - name: load_sales
+    description: "Load sales data from CSV"
+    read:
+      connection: local_data
+      format: csv
+      path: sales.csv
+    cache: true  # Cache for downstream nodes
+  
+  # Step 2: Calculate revenue
+  - name: add_revenue
+    description: "Add revenue column (quantity * price)"
+    depends_on: [load_sales]
+    transform:
+      steps:
+        - function: calculate_revenue
+          params:
+            source: load_sales
+  
+  # Step 3: Filter electronics
+  - name: electronics_only
+    description: "Filter for electronics products"
+    depends_on: [add_revenue]
+    transform:
+      steps:
+        - function: filter_by_category
+          params:
+            source: add_revenue
+            category: "Electronics"
+  
+  # Step 4: Save results
+  - name: save_electronics
+    description: "Save electronics sales"
+    depends_on: [electronics_only]
+    write:
+      connection: local_output
+      format: csv
+      path: electronics_sales.csv
+      mode: overwrite
