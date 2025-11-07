@@ -94,6 +94,17 @@ stories/
 examples/getting_started/output/
 examples/getting_started/stories/
 
+# Walkthrough generated data (from notebook execution)
+data/
+!examples/**/data/
+walkthroughs/data/
+
+# Exploration notebooks (temporary)
+test_exploration*.ipynb
+
+# Ruff cache
+.ruff_cache/
+
 # Temporary files
 *.tmp
 *.log
