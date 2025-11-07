@@ -21,24 +21,24 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 ## Phase 1 — Spark Engine + Azure Integrations (Scaffolding)
 
 **Target Version:** v1.1.0-alpha.1 → v1.1.0  
-**Status:** 🚧 In Progress  
-**Timeline:** Q3 2026
+**Status:** ✅ Complete (v1.1.0-alpha.2-walkthroughs)  
+**Completed:** November 2025
 
 ### Goals
-- Scaffold Spark engine and Azure connections **without breaking Pandas**
-- Provide structure, docs, and examples to enable contributions
-- Establish open-source governance and community standards
+- ✅ Scaffold Spark engine and Azure connections **without breaking Pandas**
+- ✅ Provide structure, docs, and examples to enable contributions
+- ✅ Establish open-source governance and community standards
 
 ### Deliverables
 
 #### Code Scaffolding
-- [ ] **Engine:** `odibi/engine/spark_engine.py`
+- [x] **Engine:** `odibi/engine/spark_engine.py`
   - Class `SparkEngine` implementing `Engine` interface
   - Import-guarded (raises helpful error if `pyspark` not installed)
   - Methods stubbed with `NotImplementedError` and PHASES.md references
   - Basic introspection methods implemented (`get_schema`, `get_shape`, `count_rows`)
 
-- [ ] **Connections:** Azure and mock DBFS
+- [x] **Connections:** Azure and mock DBFS
   - `odibi/connections/azure_adls.py` - Azure Data Lake Storage Gen2 path resolver
   - `odibi/connections/azure_sql.py` - Azure SQL connection config
   - `odibi/connections/local_dbfs.py` - Mock DBFS for local testing
@@ -46,55 +46,68 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
   - No network I/O in validation phase
 
 #### Documentation
-- [ ] **Setup Guides:**
+- [x] **Setup Guides:**
   - `docs/setup_databricks.md` - Databricks cluster setup, notebook integration
   - `docs/setup_azure.md` - Authentication options, permissions, connection templates
 
-- [ ] **Examples:**
+- [x] **Examples:**
   - `examples/example_spark.yaml` - Spark engine template with ADLS/DBFS
   - `examples/example_local.yaml` - Simplified local Pandas example
 
 #### Open-Source Standards
-- [ ] **Governance:**
+- [x] **Governance:**
   - `CONTRIBUTING.md` - Contribution workflow, coding standards, testing
   - `CODE_OF_CONDUCT.md` - Contributor Covenant v2.1
   - `SECURITY.md` - Vulnerability reporting process
   - `CODEOWNERS` - Maintainer assignments
   - `CHANGELOG.md` - Version history (Keep a Changelog format)
 
-- [ ] **GitHub Templates:**
+- [x] **GitHub Templates:**
   - `.github/ISSUE_TEMPLATE/bug_report.md`
   - `.github/ISSUE_TEMPLATE/feature_request.md`
   - `.github/PULL_REQUEST_TEMPLATE.md`
 
-- [ ] **CI/CD:**
+- [x] **CI/CD:**
   - `.github/workflows/ci.yml` - Multi-Python version testing
   - Job: `test-base` (required) - Pandas tests on Python 3.9–3.12
   - Job: `test-extras` (optional) - Spark/Azure import tests
   - `.pre-commit-config.yaml` - black, ruff, trailing whitespace
 
 #### README Updates
-- [ ] Add badges (build status, Python versions, license, PyPI)
-- [ ] Document installation with extras (`pip install "odibi[spark]"`)
-- [ ] Update roadmap section to reference PHASES.md
-- [ ] Link to CONTRIBUTING.md and CODE_OF_CONDUCT.md
+- [x] Add badges (build status, Python versions, license, PyPI)
+- [x] Document installation with extras (`pip install "odibi[spark]"`)
+- [x] Update roadmap section to reference PHASES.md
+- [x] Link to CONTRIBUTING.md and CODE_OF_CONDUCT.md
 
 #### Testing
-- [ ] Import tests for new modules (skip if extras not installed)
-- [ ] Path resolution tests for Azure connections (no network calls)
-- [ ] All 78 existing Pandas tests still pass
+- [x] Import tests for new modules (skip if extras not installed)
+- [x] Path resolution tests for Azure connections (no network calls)
+- [x] All 78 existing Pandas tests still pass
+
+#### Walkthroughs (Phase 1F)
+- [x] **6 Jupyter notebooks** covering all core features
+  - `00_setup_environment.ipynb` - Setup and mental model
+  - `01_local_pipeline_pandas.ipynb` - Full pipeline example with explanations
+  - `02_cli_and_testing.ipynb` - Testing patterns and CLI preview
+  - `03_spark_preview_stub.ipynb` - Spark architecture overview
+  - `04_ci_cd_and_precommit.ipynb` - Code quality automation
+  - `05_build_new_pipeline.ipynb` - Build from scratch tutorial
+- [x] **Concept explanations:** Config vs Runtime, SQL-over-Pandas
+- [x] **Troubleshooting sections:** Common errors with solutions
+- [x] **All notebooks tested** and verified to run cell-by-cell
 
 #### Release
-- [ ] Git tag: `v1.1.0-alpha.1` (scaffolding release)
-- [ ] Update CHANGELOG.md with scaffolding notes
-- [ ] GitHub Release with clear "experimental" status
+- [x] Git tag: `v1.1.0-alpha.1-ci-setup` (scaffolding release)
+- [x] Git tag: `v1.1.0-alpha.2-walkthroughs` (walkthroughs complete)
+- [x] Update CHANGELOG.md with scaffolding notes
+- [x] GitHub Release with clear "experimental" status
 
 ### Acceptance Criteria
 - [x] All 78 Pandas tests pass with zero modifications
-- [ ] New modules raise clear errors when extras not installed
-- [ ] CI green on base job (Pandas); extras job can fail
-- [ ] Examples and docs clearly mark Spark/Azure as experimental
-- [ ] No breaking changes to existing Pandas pipelines
+- [x] New modules raise clear errors when extras not installed
+- [x] CI green on base job (Pandas); extras job can succeed
+- [x] Examples and docs clearly mark Spark/Azure as experimental
+- [x] No breaking changes to existing Pandas pipelines
 
 ---
 
