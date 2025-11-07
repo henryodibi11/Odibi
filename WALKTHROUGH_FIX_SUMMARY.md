@@ -246,13 +246,93 @@ print('✅ All tests passed')
 - Example: `examples/getting_started/demo_story.py` (correct usage)
 - Tests: `tests/test_pipeline.py` (shows test patterns)
 
+## Pedagogical Improvements (Commit d89a684)
+
+After fixing the technical issues, comprehensive explanations were added to help users understand ODIBI's patterns:
+
+### Notebook 00 - Setup Environment
+**Added:** ODIBI Mental Model section
+- Explains configuration (YAML) vs runtime objects (Python)
+- Clarifies why connections are instantiated at runtime
+- Covers engines and SQL execution model
+- Provides the foundational understanding for all other notebooks
+
+### Notebook 01 - Local Pipeline Pandas
+**Added:**
+1. **Config vs Runtime Concept Box**
+   - Explains why `LocalConnection` objects are needed
+   - Clarifies the separation between declarative config and executable objects
+   - Shows the benefits: validation, testing, security
+
+2. **SQL Over Pandas Explanation**
+   - How DuckDB enables SQL queries on Pandas DataFrames
+   - Why node names become SQL table names
+   - Example SQL with node name references
+
+3. **Troubleshooting Section**
+   - Table of 6 most common errors with solutions
+   - Debug checklist for systematic problem-solving
+   - Code snippet showing how to inspect pipeline failures
+
+### Notebook 02 - CLI and Testing
+**Added:**
+1. **Current Debugging Guidance**
+   - How to debug pipelines in notebooks (Phase 1)
+   - Code pattern for inspecting `results.failed`
+   - References to notebooks 01 and 05 for examples
+
+2. **Prerequisites Notes**
+   - Explicit instruction to install dev dependencies
+   - Clear `pip install -e .[dev]` command
+
+3. **Testing Troubleshooting**
+   - pytest installation issues
+   - Test discovery problems
+   - Import error solutions
+
+### Notebook 05 - Build New Pipeline
+**Added:**
+1. **Config vs Runtime Explanation**
+   - Repeated at first pipeline creation for reinforcement
+   - Enhanced code comments explaining connection instantiation
+
+2. **SQL Node Naming Explanation**
+   - How node names become SQL views
+   - Why this enables natural joins and transformations
+
+3. **Troubleshooting Section**
+   - Workshop-specific error scenarios
+   - Path and directory issues
+   - SQL node name mismatches
+
+### Impact of Improvements
+
+**Before:** Users saw HOW to use ODIBI but not WHY patterns existed
+- Led to confusion about connection objects vs dicts
+- "Magic" SQL behavior was unexplained
+- No guidance when things failed
+
+**After:** Users understand the mental model
+- Clear explanation of config/runtime separation
+- SQL-over-Pandas demystified
+- Troubleshooting tables for self-service debugging
+- Debug code patterns to inspect failures
+
+**Effort:** ~2 hours of targeted additions
+**Result:** Reduced cognitive load, improved self-sufficiency, better onboarding experience
+
 ## Commit Details
 
-**Commit:** b8e5fed  
+**Initial Fix Commit:** b8e5fed  
+**Documentation Commit:** d89a684  
 **Branch:** main  
-**Files Changed:** 6 (2 notebooks + 1 config + 2 data files + 1 doc)  
-**Insertions:** +220  
-**Deletions:** -8
+**Total Commits:** 6
+- b8e5fed: Fix connection instantiation and CSV header
+- 9fcce05: Add fix summary documentation
+- 3dcb030: Fix notebook 03 pipeline key
+- 10a2acb: Fix notebook 04 YAML 'on' keyword
+- 87e833d: Fix notebook 04 UTF-8 encoding
+- d89a684: Add comprehensive explanations
 
 **Commit Message:**
 ```
