@@ -23,7 +23,7 @@ pipelines:
           path: bronze/sales.csv
           format: csv
           options:
-            header: true
+            header: 0
             dtype:
               transaction_id: str
               amount: float
