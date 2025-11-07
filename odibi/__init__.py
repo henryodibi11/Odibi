@@ -13,9 +13,11 @@ __all__ = [
     "__version__",
 ]
 
+
 # Lazy imports for components not yet implemented
 def __getattr__(name):
     if name == "Pipeline":
         from odibi.pipeline import Pipeline
+
         return Pipeline
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

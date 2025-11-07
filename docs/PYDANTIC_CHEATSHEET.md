@@ -54,7 +54,7 @@ class Config(BaseModel):
     # Required - MUST be provided
     name: str
     port: int
-    
+
     # Optional - can be None
     description: Optional[str] = None
     timeout: Optional[int] = None
@@ -113,14 +113,14 @@ class NodeConfig(BaseModel):
     name: str = Field(
         description="Unique node identifier"
     )
-    
+
     retry_count: int = Field(
         default=3,
         ge=1,           # Greater than or equal to 1
         le=10,          # Less than or equal to 10
         description="Number of retry attempts"
     )
-    
+
     cache: bool = Field(
         default=False,
         description="Cache node results"
@@ -293,7 +293,7 @@ from pydantic import BaseModel, field_validator
 class NodeConfig(BaseModel):
     name: str
     depends_on: List[str] = []
-    
+
     @field_validator('name')
     @classmethod
     def name_must_not_be_empty(cls, v):
@@ -322,7 +322,7 @@ class ReadConfig(BaseModel):
     connection: str
     table: Optional[str] = None
     path: Optional[str] = None
-    
+
     @model_validator(mode='after')
     def check_table_or_path(self):
         """Ensure either table or path is provided."""
@@ -352,7 +352,7 @@ from typing import Union
 class TransformStep(BaseModel):
     sql: Optional[str] = None
     function: Optional[str] = None
-    
+
     @model_validator(mode='after')
     def check_exactly_one(self):
         if not any([self.sql, self.function]):
@@ -381,15 +381,15 @@ class NodeConfig(BaseModel):
     name: str = Field(description="Unique node name")
     description: Optional[str] = Field(default=None, description="Human-readable description")
     depends_on: List[str] = Field(default_factory=list, description="List of node dependencies")
-    
+
     # Operations (at least one required)
     read: Optional[ReadConfig] = None
     transform: Optional[TransformConfig] = None
     write: Optional[WriteConfig] = None
-    
+
     # Optional features
     cache: bool = Field(default=False, description="Cache result for reuse")
-    
+
     @model_validator(mode='after')
     def check_at_least_one_operation(self):
         """Ensure at least one operation is defined."""
@@ -418,7 +418,7 @@ class ReadConfig(BaseModel):
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based sources")
     options: Dict[str, Any] = Field(default_factory=dict, description="Format-specific options")
-    
+
     @model_validator(mode='after')
     def check_table_or_path(self):
         """Ensure either table or path is provided."""
@@ -493,7 +493,7 @@ description: Optional[str] = Field(default=None, description="Human-readable des
 depends_on: List[str] = Field(default_factory=list, description="Dependencies")
 ```
 
-**Why `default_factory=list`?** 
+**Why `default_factory=list`?**
 - ✅ Each instance gets its own list
 - ❌ `default=[]` would share the same list across instances (dangerous!)
 
@@ -600,7 +600,7 @@ try:
     config = NodeConfig(**data)
 except ValidationError as e:
     print("Validation failed!")
-    
+
     # Get all errors
     for error in e.errors():
         print(f"Field: {error['loc']}")      # Which field

@@ -1,0 +1,23 @@
+# ODIBI Code Owners
+# These users will be automatically requested for review when PRs modify these paths
+
+# Default owner for everything
+* @henryodibi11
+
+# Core engine components
+/odibi/engine/ @henryodibi11
+/odibi/core/ @henryodibi11
+
+# Connections and integrations
+/odibi/connections/ @henryodibi11
+
+# Documentation
+/docs/ @henryodibi11
+*.md @henryodibi11
+
+# Tests
+/tests/ @henryodibi11
+
+# CI/CD and tooling
+/.github/ @henryodibi11
+/pyproject.toml @henryodibi11

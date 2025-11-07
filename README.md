@@ -70,13 +70,13 @@ nodes:
       path: input.csv
       format: csv
     cache: true
-  
+
   - name: clean_data
     depends_on: [load_data]
     transform:
       steps:
         - "SELECT * FROM load_data WHERE amount > 0"
-  
+
   - name: save_result
     depends_on: [clean_data]
     write:
@@ -121,10 +121,10 @@ Nodes execute in the right order, with automatic parallelization:
 nodes:
   - name: ref_1
     read: {...}
-  
+
   - name: ref_2
     read: {...}
-  
+
   - name: combine
     depends_on: [ref_1, ref_2]  # Waits for both
     transform: {...}
@@ -137,10 +137,10 @@ When things fail, you know exactly where and why:
 ✗ Node execution failed: clean_data
   Location: pipelines/simple.yaml:15
   Step: 1 of 1
-  
+
   Error: Column 'amount' not found
   Available columns: ['timestamp', 'value', 'status']
-  
+
   Suggestions:
     1. Check input data schema: odibi run-node load_data --show-output
     2. Verify column name in SQL query

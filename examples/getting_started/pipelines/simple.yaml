@@ -12,7 +12,7 @@ nodes:
       connection: local_data
       format: csv
       path: sales.csv
-  
+
   # Step 2: Save as Parquet
   - name: save_parquet
     description: "Save sales data as Parquet"

@@ -13,11 +13,11 @@ description: "What this pipeline does"
 nodes:
   - name: node1
     read: ...
-  
+
   - name: node2
     depends_on: [node1]
     transform: ...
-  
+
   - name: node3
     depends_on: [node2]
     write: ...
@@ -277,7 +277,7 @@ connections:
   input_data:
     type: local
     base_path: ./input
-  
+
   output_data:
     type: local
     base_path: ./output
@@ -292,14 +292,14 @@ connections:
 nodes:
   - name: extract
     read: {connection: source, format: csv, path: data.csv}
-  
+
   - name: transform
     depends_on: [extract]
     transform:
       steps:
         - function: clean_data
           params: {source: extract}
-  
+
   - name: load
     depends_on: [transform]
     write: {connection: target, format: parquet, path: output.parquet}
@@ -310,10 +310,10 @@ nodes:
 nodes:
   - name: load_fact
     read: ...
-  
+
   - name: load_dim
     read: ...
-  
+
   - name: join
     depends_on: [load_fact, load_dim]
     transform:
@@ -329,14 +329,14 @@ nodes:
 nodes:
   - name: load_all
     read: ...
-  
+
   - name: filter_electronics
     depends_on: [load_all]
     transform:
       steps:
         - function: filter_by_category
           params: {source: load_all, category: "Electronics"}
-  
+
   - name: filter_home
     depends_on: [load_all]
     transform:

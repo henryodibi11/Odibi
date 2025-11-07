@@ -12,7 +12,7 @@ nodes:
       connection: local_data
       format: csv
       path: sales.csv
-  
+
   # Step 2: Load customer data
   - name: load_customers
     description: "Load customer data"
@@ -20,7 +20,7 @@ nodes:
       connection: local_data
       format: csv
       path: customers.csv
-  
+
   # Step 3: Calculate revenue using SQL
   - name: sales_with_revenue
     description: "Add revenue column using SQL"
@@ -28,7 +28,7 @@ nodes:
     transform:
       steps:
         - "SELECT *, quantity * price as revenue FROM load_sales"
-  
+
   # Step 4: Enrich with customer data
   - name: enriched_sales
     description: "Join sales with customer information"
@@ -39,7 +39,7 @@ nodes:
           params:
             sales_table: sales_with_revenue
             customers_table: load_customers
-  
+
   # Step 5: Aggregate by product
   - name: product_summary
     description: "Summarize sales by product"
@@ -49,7 +49,7 @@ nodes:
         - function: aggregate_by_product
           params:
             source: enriched_sales
-  
+
   # Step 6a: Save enriched data
   - name: save_enriched
     description: "Save enriched sales data"
@@ -59,7 +59,7 @@ nodes:
       format: csv
       path: enriched_sales.csv
       mode: overwrite
-  
+
   # Step 6b: Save product summary (parallel with 6a)
   - name: save_summary
     description: "Save product summary"

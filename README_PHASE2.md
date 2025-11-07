@@ -14,7 +14,7 @@ We built the **complete orchestration layer** that makes ODIBI pipelines actuall
    - Topological sort for execution order
    - Cycle detection
    - Parallel execution planning
-   
+
 2. **Pipeline Executor** (`pipeline.py`) - 222 lines
    - Orchestrates node execution
    - Handles failures gracefully

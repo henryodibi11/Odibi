@@ -13,7 +13,7 @@ connections:
   local_data:
     type: local
     base_path: ./data
-  
+
   # Output connection
   local_output:
     type: local
@@ -24,10 +24,10 @@ defaults:
   retry:
     enabled: false  # Disable retries for learning
     max_attempts: 1
-  
+
   logging:
     level: INFO
-  
+
   story:
     auto_generate: false  # Not implemented yet
     output_path: ./stories/

@@ -13,7 +13,7 @@ nodes:
       format: csv
       path: sales.csv
     cache: true  # Cache for downstream nodes
-  
+
   # Step 2: Calculate revenue
   - name: add_revenue
     description: "Add revenue column (quantity * price)"
@@ -23,7 +23,7 @@ nodes:
         - function: calculate_revenue
           params:
             source: load_sales
-  
+
   # Step 3: Filter electronics
   - name: electronics_only
     description: "Filter for electronics products"
@@ -34,7 +34,7 @@ nodes:
           params:
             source: add_revenue
             category: "Electronics"
-  
+
   # Step 4: Save results
   - name: save_electronics
     description: "Save electronics sales"

@@ -66,12 +66,12 @@ transform:
 def _execute_function_step(self, function_name, params, current_df):
     func = FunctionRegistry.get(function_name)
     sig = inspect.signature(func)
-    
+
     if 'current' in sig.parameters:
         result = func(self.context, current=current_df, **params)
     else:
         result = func(self.context, **params)
-    
+
     return result
 
 # Usage:
@@ -155,7 +155,7 @@ class LocalConnection(BaseConnection):
         """
         self.base_path = Path(base_path)
         self.mode = mode
-    
+
     def validate(self) -> None:
         """Validate connection based on mode."""
         if "r" in self.mode:
@@ -168,7 +168,7 @@ class LocalConnection(BaseConnection):
                         "Ensure data files are in the correct location"
                     ]
                 )
-        
+
         if "w" in self.mode:
             # For writing, create if needed
             self.base_path.mkdir(parents=True, exist_ok=True)
@@ -225,7 +225,7 @@ if missing_deps:
     errors = []
     for node, dep in missing_deps:
         errors.append(f"Node '{node}' depends on '{dep}' which doesn't exist")
-        
+
         # Suggest similar names (fuzzy matching)
         similar = [
             name for name in self.nodes.keys()
@@ -233,7 +233,7 @@ if missing_deps:
         ]
         if similar:
             errors.append(f"  Did you mean: {', '.join(similar)}?")
-    
+
     raise DependencyError(
         f"Missing dependencies found:\n  " + "\n  ".join(errors)
     )
@@ -394,7 +394,7 @@ def read(self, connection, format, table=None, path=None, options=None):
     Note:
         For file-based connections (LocalConnection), use 'path'.
         For database connections (SQLConnection, DeltaConnection), use 'table'.
-        
+
         Currently, both work the same for file-based connections.
     """
     # Could add warning if both provided
@@ -436,7 +436,7 @@ class Pipeline:
         self.config = pipeline_config
         self.config_file = config_file  # ← Store it
         # ...
-    
+
     def run(self):
         # ...
         node = Node(
@@ -539,14 +539,14 @@ pipeline_description = "Process sales data with revenue and category analysis"
 node_metadata = {
     "load_sales": {
         "purpose": "Load raw sales transactions from CSV source",
-        
+
         "details": dedent("""
             - Reads from local filesystem: data/sales.csv
             - Expected columns: id, date, product, category, quantity, price, customer_id
             - Data frequency: Transaction-level (multiple per day)
             - No transformations applied (raw load)
         """),
-        
+
         "expected_schema": [
             ("id", "int", "Unique transaction ID"),
             ("date", "string", "Transaction date (YYYY-MM-DD)"),
@@ -556,31 +556,31 @@ node_metadata = {
             ("price", "float", "Unit price (USD)"),
             ("customer_id", "int", "Customer identifier"),
         ],
-        
+
         "result": "Raw sales dataset ready for transformation",
     },
-    
+
     "add_revenue": {
         "purpose": "Calculate total revenue for each transaction",
-        
+
         # For complex formulas, use markdown tables (like Energy Efficiency)
         "formulas": dedent("""
             | **Column** | **Formula** | **Description** |
             |------------|-------------|-----------------|
             | `revenue` | `quantity × price` | Standard revenue calculation |
         """),
-        
+
         "details": dedent("""
             - Multiplies quantity by unit price for each transaction
             - Handles decimal precision for currency (2 decimal places)
             - Validates no negative quantities or prices
             - Rounds to nearest cent
         """),
-        
+
         "added_columns": [
             ("revenue", "float", "Total revenue per transaction (USD)"),
         ],
-        
+
         "data_quality": {
             "validations": [
                 "No negative values in revenue column",
@@ -588,7 +588,7 @@ node_metadata = {
                 "No null values in calculated column"
             ],
         },
-        
+
         "result": "Sales dataset enriched with revenue column for financial analysis",
     },
 }
@@ -598,7 +598,7 @@ node_metadata = {
 complex_calculation_example = {
     "calc_dryer_metrics": {
         "purpose": "Calculate gas dryer efficiency and thermodynamic metrics",
-        
+
         # Large formula table (markdown preserved in dedent)
         "formulas": dedent("""
             | **Column** | **Formula** |
@@ -617,14 +617,14 @@ complex_calculation_example = {
             | `Dryer Efficiency` | `(KPI at Max × Target) ÷ KPI at Actual` |
             # ... 15+ more formulas
         """),
-        
+
         "details": dedent("""
             - Uses IAPWS-97 standard for steam properties
             - Applies psychrometric equations for humidity calculations
             - All polynomial fits empirically derived for product type
             - Conversion factors applied: Product Rate (2200 ton/hr → lb/hr)
         """),
-        
+
         "result": "Complete thermodynamic analysis with 27 derived KPI columns",
     }
 }
@@ -640,74 +640,74 @@ complex_calculation_example = {
 class HTMLStoryGenerator:
     def _html_node_section(self, node_name, node_result, metadata, context):
         """Generate HTML for node with metadata."""
-        
+
         # Convert markdown formula table to HTML
         formulas_html = self._markdown_table_to_html(
             metadata.get('formulas', '')
         )
-        
+
         return f"""
         <div class="node-card">
             <div class="node-header">
                 <h3>✅ Node: {node_name}</h3>
                 <span class="duration">{node_result.duration:.4f}s</span>
             </div>
-            
+
             <div class="node-body">
                 <div class="purpose">
                     <strong>Purpose:</strong> {metadata.get('purpose', '')}
                 </div>
-                
+
                 {formulas_html}
-                
+
                 <div class="details">
                     <h4>Details:</h4>
                     {self._markdown_to_html(metadata.get('details', ''))}
                 </div>
-                
+
                 {self._html_added_columns(metadata.get('added_columns', []))}
-                
+
                 {self._html_data_comparison(node_name, context)}
-                
+
                 {self._html_data_quality(metadata.get('data_quality', {}))}
-                
+
                 <div class="result">
                     <strong>Result:</strong> {metadata.get('result', '')}
                 </div>
             </div>
         </div>
         """
-    
+
     def _markdown_table_to_html(self, markdown_table: str) -> str:
         """Convert markdown table to styled HTML table."""
         if not markdown_table:
             return ""
-        
+
         lines = [line.strip() for line in markdown_table.strip().split('\n') if line.strip()]
-        
+
         if len(lines) < 3:  # Need header, separator, at least one row
             return ""
-        
+
         # Parse header
         header = [cell.strip() for cell in lines[0].split('|')[1:-1]]
-        
+
         # Parse rows (skip separator line)
         rows = []
         for line in lines[2:]:
             cells = [cell.strip() for cell in line.split('|')[1:-1]]
             rows.append(cells)
-        
+
         # Generate HTML
         html = ['<div class="formulas">']
         html.append('<h4>Formulas (Exact Column Names):</h4>')
         html.append('<table class="formula-table">')
-        
+
         # Header
         html.append('<thead><tr>')
         for h in header:
             html.append(f'<th>{h}</th>')
         html.append('</tr></thead>')
-        
+
         # Body
         html.append('<tbody>')
         for row in rows:
@@ -720,10 +720,10 @@ class HTMLStoryGenerator:
                     html.append(f'<td>{cell}</td>')
             html.append('</tr>')
         html.append('</tbody>')
-        
+
         html.append('</table>')
         html.append('</div>')
-        
+
         return '\n'.join(html)
 ```
 
@@ -734,11 +734,11 @@ class HTMLStoryGenerator:
 ```html
 <div class="node-card">
     <h3>✅ Node: calc_dryer_metrics</h3>
-    
+
     <div class="purpose">
         <strong>Purpose:</strong> Calculate gas dryer efficiency and thermodynamic metrics
     </div>
-    
+
     <div class="formulas">
         <h4>Formulas (Exact Column Names):</h4>
         <table class="formula-table">
@@ -761,7 +761,7 @@ class HTMLStoryGenerator:
             </tbody>
         </table>
     </div>
-    
+
     <div class="details">
         <h4>Details:</h4>
         <ul>
@@ -770,7 +770,7 @@ class HTMLStoryGenerator:
             <li>All polynomial fits empirically derived</li>
         </ul>
     </div>
-    
+
     <div class="result">
         <strong>Result:</strong> Complete thermodynamic analysis with 27 derived KPI columns
     </div>
@@ -853,7 +853,7 @@ class HTMLStoryGenerator:
 function toggleFormulas(nodeId) {
     const section = document.getElementById(`formulas-${nodeId}`);
     section.classList.toggle('collapsed');
-    
+
     const icon = document.getElementById(`icon-${nodeId}`);
     icon.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
 }
@@ -862,13 +862,13 @@ function toggleFormulas(nodeId) {
 function sortTable(tableId, columnIndex) {
     const table = document.getElementById(tableId);
     const rows = Array.from(table.querySelectorAll('tbody tr'));
-    
+
     rows.sort((a, b) => {
         const aVal = a.cells[columnIndex].textContent;
         const bVal = b.cells[columnIndex].textContent;
         return aVal.localeCompare(bVal);
     });
-    
+
     const tbody = table.querySelector('tbody');
     rows.forEach(row => tbody.appendChild(row));
 }
@@ -912,7 +912,7 @@ from textwrap import dedent
 node_metadata = {
     "calc_dryer_efficiency": {
         "purpose": "Calculate gas dryer thermal efficiency and energy metrics",
-        
+
         # Large formula table (25+ rows) - matches Energy Efficiency pattern
         "formulas": dedent("""
             | **Column** | **Formula** |
@@ -946,14 +946,14 @@ node_metadata = {
             | `Gap Efficiency Net` | `Target Efficiency Net - Actual Efficiency Net` |
             | `Energy Loss Net` | `((Actual Efficiency Net - Target Efficiency Net) ÷ Target Efficiency Net) × Energy Consumption` |
         """),
-        
+
         "details": dedent("""
             - Uses IAPWS-97 standard for saturated steam enthalpy
             - Applies psychrometric equations for air-moisture calculations
             - All polynomial fits are empirically derived for product type
             - Conversion factors: Product Rate (2200 ton/hr → lb/hr), Moisture (% → fraction)
         """),
-        
+
         "added_columns": [
             ("Product Rate Dry Basis", "float", "Dry basis product rate (lb/hr)"),
             ("Heat of Vaporization", "float", "Latent heat of water (BTU/lb)"),
@@ -961,7 +961,7 @@ node_metadata = {
             ("Energy Loss", "float", "Energy loss (BTU/hr)"),
             # ... 23 more columns
         ],
-        
+
         "result": "Complete thermodynamic analysis with efficiency metrics for performance benchmarking",
     }
 }
@@ -1078,7 +1078,7 @@ connections:
     type: local
     base_path: ./input
     mode: read  # ← Validate exists
-  
+
   output_data:
     type: local
     base_path: ./output

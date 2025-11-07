@@ -67,7 +67,7 @@ nodes:
       connection: local_data
       format: csv
       path: sales.csv
-  
+
   - name: save_parquet
     depends_on: [load_sales]
     write:

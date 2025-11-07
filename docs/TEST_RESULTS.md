@@ -254,7 +254,7 @@ info = FunctionRegistry.get_function_info("example")
 ✅ **Error messages show available functions**
 ```python
 get_registered_function("does_not_exist")
-# ❌ "Transform function 'does_not_exist' not registered. 
+# ❌ "Transform function 'does_not_exist' not registered.
 #     Available functions: my_transform, process, example"
 ```
 

@@ -124,18 +124,18 @@ A Node is the fundamental unit of work. Every node follows the pattern:
 ```yaml
 - name: node_name           # Required (for lineage)
   depends_on: [...]         # Optional (explicit dependencies)
-  
+
   read:                     # Optional (what it reads)
     connection: name
     table/path: ...
-  
+
   transform:                # Optional (what it does)
     steps: [...]
-  
+
   write:                    # Optional (what it creates)
     connection: name
     table/path: ...
-  
+
   cache: true/false         # Optional (explicit optimization)
 ```
 
@@ -158,11 +158,11 @@ pipeline: nkc_dryer_1
 nodes:
   - name: aspentags
     read: {...}
-  
+
   - name: process_data
     depends_on: [aspentags]
     transform: {...}
-  
+
   - name: save_result
     depends_on: [process_data]
     write: {...}
@@ -188,7 +188,7 @@ connections:
     type: azure_blob
     account: ${AZURE_ACCOUNT}
     container: bronze
-  
+
   delta_silver:
     type: delta
     catalog: main
@@ -258,14 +258,14 @@ connections:
     container: bronze
     auth:
       key: ${AZURE_KEY}
-  
+
   azure_silver:
     type: azure_blob
     account_name: ${AZURE_ACCOUNT}
     container: silver
     auth:
       key: ${AZURE_KEY}
-  
+
   sql_warehouse:
     type: sql_server
     host: db.company.com
@@ -281,10 +281,10 @@ pipelines:
   # Glob patterns to find all pipeline configs
   - path: pipelines/bronze/**/*.yaml
     layer: bronze
-  
+
   - path: pipelines/silver/**/*.yaml
     layer: silver
-  
+
   - path: pipelines/gold/**/*.yaml
     layer: gold
 
@@ -295,15 +295,15 @@ layers:
   bronze:
     depends_on: []
     parallel: true  # All bronze pipelines run in parallel
-  
+
   silver_1:
     depends_on: [bronze]
     parallel: true
-  
+
   silver_2:
     depends_on: [silver_1]
     parallel: true
-  
+
   gold:
     depends_on: [silver_2]
     parallel: false  # Run sequentially
@@ -316,14 +316,14 @@ defaults:
     enabled: true
     max_attempts: 3
     backoff: exponential  # 1s, 2s, 4s
-  
+
   logging:
     level: INFO  # DEBUG, INFO, WARNING, ERROR
     structured: false  # JSON logs if true
     metadata:  # Optional: added to all logs
       project: Energy Efficiency
       environment: prod
-  
+
   story:
     auto_generate: true
     max_sample_rows: 10
@@ -337,7 +337,7 @@ environments:
     database_prefix: qat_
     logging:
       level: DEBUG
-  
+
   prod:
     database_prefix: prod_
     logging:
@@ -368,7 +368,7 @@ nodes:
       path: delta/aspentags
       format: delta  # Delta is a format, not a connection
     cache: true  # Used by many downstream nodes
-  
+
   # Node 2: Load bronze data
   - name: dryer_bronze
     description: "Load raw dryer sensor data"
@@ -376,7 +376,7 @@ nodes:
       connection: azure_bronze
       path: delta/nkc_dryer_1_bronze
       format: delta
-  
+
   # Node 3: Enrich and transform
   - name: dryer_cleaned
     description: "Join with tags, pivot, calculate metrics"
@@ -385,7 +385,7 @@ nodes:
       steps:
         # SQL step
         - "SELECT * FROM dryer_bronze"
-        
+
         # Pivot operation (config)
         - operation: pivot
           params:
@@ -393,19 +393,19 @@ nodes:
             pivot_column: Description
             value_column: Value
             agg_func: first
-        
+
         # Python function with params (tuple)
         - function: get_asset_constants
           params:
             tags_table: aspentags
             plant: NKC
             asset: "Germ Dryer 1"
-        
+
         # Another Python function
         - function: calc_efficiency
           params:
             enthalpy_col: Dryer_Steam_h
-    
+
     # Optional validation
     validate:
       schema:
@@ -413,7 +413,7 @@ nodes:
         types:
           Efficiency: float
       not_empty: true
-  
+
   # Node 4: Write to silver
   - name: dryer_output
     description: "Persist cleaned data to silver layer"
@@ -462,16 +462,16 @@ class NodeConfig(BaseModel):
     name: str  # Required for lineage
     description: Optional[str] = None
     depends_on: List[str] = []
-    
+
     # At least one required
     read: Optional[ReadConfig] = None
     transform: Optional[TransformConfig] = None
     write: Optional[WriteConfig] = None
-    
+
     # Optional
     cache: bool = False
     validate: Optional[ValidationConfig] = None
-    
+
     @validator('name')
     def validate_at_least_one_operation(cls, v, values):
         if not any([values.get('read'), values.get('transform'), values.get('write')]):
@@ -538,10 +538,10 @@ def execute_pipeline(nodes, context):
     completed = set()
     failed = set()
     skipped = set()
-    
+
     # Build dependency map
     deps = {node.name: node.depends_on for node in nodes}
-    
+
     with ThreadPoolExecutor(max_workers=10) as executor:
         while len(completed) + len(failed) + len(skipped) < len(nodes):
             # Find ready nodes
@@ -552,17 +552,17 @@ def execute_pipeline(nodes, context):
                 and node.name not in skipped
                 and all(dep in completed for dep in node.depends_on)
             ]
-            
+
             if not ready and not running:
                 # No more nodes can run
                 break
-            
+
             # Submit ready nodes
             futures = {
                 executor.submit(execute_node, node, context): node
                 for node in ready
             }
-            
+
             # Wait for completion
             for future in as_completed(futures):
                 node = futures[future]
@@ -577,7 +577,7 @@ def execute_pipeline(nodes, context):
                 except Exception as e:
                     failed.add(node.name)
                     skip_dependents(node, deps, skipped)
-    
+
     return completed, failed, skipped
 ```
 
@@ -607,10 +607,10 @@ def should_skip_node(node, context, resume=False):
     """Check if node output already exists and is recent"""
     if not resume:
         return False
-    
+
     if not node.write:
         return False  # Transform-only nodes always run
-    
+
     # Check if output exists
     if node.write.table:
         exists = context.check_table_exists(
@@ -620,7 +620,7 @@ def should_skip_node(node, context, resume=False):
         if exists:
             logger.info(f"  ⊙ {node.name} SKIPPED (output exists)")
             return True
-    
+
     return False
 ```
 
@@ -1108,12 +1108,12 @@ class Node(ABC):
         self.config = config
         self.context = context
         self.metadata = {}
-    
+
     @abstractmethod
     def execute(self) -> NodeResult:
         """Execute node logic"""
         pass
-    
+
     def capture_metadata(self, result: Any):
         """Capture execution metadata"""
         self.metadata = {
@@ -1132,7 +1132,7 @@ class Context:
         self.data = {}  # For Pandas
         self.views = {}  # For Spark
         self.spark = None
-    
+
     def register(self, name: str, data: Any):
         """Register data for downstream nodes"""
         if self.engine == "spark":
@@ -1140,7 +1140,7 @@ class Context:
             self.views[name] = data
         else:
             self.data[name] = data
-    
+
     def get(self, name: str) -> Any:
         """Get data by name"""
         if self.engine == "spark":
@@ -1156,21 +1156,21 @@ class PipelineExecutor:
         self.pipeline = pipeline_config
         self.project = project_config
         self.context = Context(project_config.engine)
-    
+
     def execute(self):
         # Build graph
         graph = DependencyGraph(self.pipeline.nodes)
-        
+
         # Execute
         results = execute_parallel(
             nodes=graph.topological_sort(),
             context=self.context,
             retry_config=self.project.defaults.retry
         )
-        
+
         # Generate story
         story = StoryGenerator(results).generate()
-        
+
         return results, story
 ```
 
@@ -1306,13 +1306,13 @@ nodes:
     read:
       connection: local
       path: data/input.csv
-  
+
   - name: filter_data
     depends_on: [read_csv]
     transform:
       steps:
         - "SELECT * FROM read_csv WHERE amount > 0"
-  
+
   - name: save_result
     depends_on: [filter_data]
     write:
@@ -1470,10 +1470,10 @@ class PipelineResults:
     metadata: Dict[str, Dict]   # Metadata per node
     story_path: str             # Path to generated story
     duration: float             # Total execution time
-    
+
     def get_node_result(self, name: str) -> NodeResult:
         """Get detailed result for specific node"""
-        
+
     def to_dict(self) -> Dict:
         """Convert to dictionary"""
 ```
@@ -1668,7 +1668,7 @@ connections:
   Account: myaccount
   Container: bronze
   Error: AuthenticationError: Invalid credentials
-  
+
   Check:
   1. Environment variable AZURE_KEY is set
   2. Key has correct permissions for container 'bronze'
@@ -1712,7 +1712,7 @@ def test_simple_pipeline():
     """Test: CSV read → transform → Parquet write"""
     pipeline = Pipeline.from_yaml("tests/fixtures/simple.yaml")
     results = pipeline.run()
-    
+
     assert len(results.completed) == 3
     assert len(results.failed) == 0
     assert output_file_exists("output.parquet")
@@ -1722,7 +1722,7 @@ def test_parallel_execution():
     start = time.time()
     results = pipeline.run()
     duration = time.time() - start
-    
+
     # Should take ~1x time, not 10x (parallel)
     assert duration < 2.0  # Each node takes 1s
     assert len(results.completed) == 10
@@ -1730,7 +1730,7 @@ def test_parallel_execution():
 def test_retry_and_skip():
     """Test: Node fails → retries → skips dependents"""
     results = pipeline.run()
-    
+
     assert "failing_node" in results.failed
     assert "dependent_node" in results.skipped
     assert results.metadata["failing_node"]["attempts"] == 3
@@ -1760,7 +1760,7 @@ def test_azure_connection():
     """Test connection without actual Azure credentials"""
     mock_conn = Mock(spec=AzureBlobConnection)
     mock_conn.get_file_path.return_value = "abfss://container/path"
-    
+
     node = ReadNode(connection=mock_conn, path="data.csv")
     # Test node logic without real Azure
 ```
@@ -1796,13 +1796,13 @@ nodes:
       path: delta/aspentags
       format: delta
     cache: true
-  
+
   - name: dryer_bronze
     read:
       connection: azure_bronze
       path: delta/nkc_germ_dryer_1_bronze
       format: delta
-  
+
   - name: dryer_enriched
     depends_on: [aspentags, dryer_bronze]
     transform:
@@ -1815,7 +1815,7 @@ nodes:
           params: {...}
         - function: get_asset_constants
           params: {...}
-  
+
   - name: dryer_output
     depends_on: [dryer_enriched]
     write:
@@ -1920,13 +1920,13 @@ If needed later, layers can be added as a visualization/grouping feature without
 ```python
 class Context:
     """Unified data context for node execution."""
-    
+
     def register(self, name: str, df: Union[SparkDF, PandasDF]) -> None:
         """Register DataFrame for use in downstream nodes."""
-        
+
     def get(self, name: str) -> Union[SparkDF, PandasDF]:
         """Retrieve registered DataFrame."""
-        
+
     def has(self, name: str) -> bool:
         """Check if DataFrame exists in context."""
 ```
@@ -1997,19 +1997,19 @@ def get_asset_constants(
     default_efficiency: Optional[float] = 0.85
 ) -> pd.DataFrame:
     """Get constant values for specific asset from tags table.
-    
+
     Args:
         tags_table: Name of registered tags DataFrame
         plant: Plant code (e.g., 'NKC')
         asset: Asset name (e.g., 'Germ Dryer 1')
         default_efficiency: Fallback efficiency value
-        
+
     Returns:
         DataFrame with asset constants
     """
     tags = context.get(tags_table)
     filtered = tags[
-        (tags['Plant'] == plant) & 
+        (tags['Plant'] == plant) &
         (tags['Asset'] == asset)
     ]
     return filtered
@@ -2035,22 +2035,22 @@ transform:
 ```python
 class FunctionRegistry:
     """Global registry of transform functions."""
-    
+
     _functions: Dict[str, Callable] = {}
-    
+
     @classmethod
     def register(cls, func: Callable) -> Callable:
         """Register transform function."""
         cls._functions[func.__name__] = func
         return func
-    
+
     @classmethod
     def get(cls, name: str) -> Callable:
         """Retrieve registered function."""
         if name not in cls._functions:
             raise ValueError(f"Transform function '{name}' not found")
         return cls._functions[name]
-    
+
     @classmethod
     def validate_params(cls, name: str, params: Dict) -> None:
         """Validate params against function signature."""
@@ -2147,25 +2147,25 @@ class ExecutionContext:
 ✗ Node execution failed: dryer_cleaned
   Location: pipelines/silver/dryer_1.yaml:382
   Step: 2 of 4 (pivot operation)
-  
+
   Error: KeyError: 'Description'
   Column 'Description' not found in DataFrame
-  
+
   Available columns: ['Time_Stamp', 'Plant', 'Asset', 'Value']
-  
+
   Context:
     Input shape: (1000, 4)
     Previous step: "SELECT * FROM dryer_bronze" ✓
-    Failed step: 
+    Failed step:
       operation: pivot
       params:
         pivot_column: Description  ← Missing column
-        
+
   Suggestions:
     1. Check that dryer_bronze contains 'Description' column
     2. Verify previous step output: odibi run-node dryer_bronze --show-output
     3. Enable debug mode: odibi run --log-level DEBUG
-    
+
   Story: stories/nkc_dryer_1_2025-11-05_14-30-22.md
 ```
 
@@ -2173,7 +2173,7 @@ class ExecutionContext:
 ```python
 class NodeExecutionError(Exception):
     """Enhanced error with execution context."""
-    
+
     def __init__(
         self,
         message: str,
@@ -2184,7 +2184,7 @@ class NodeExecutionError(Exception):
         self.context = context
         self.suggestions = suggestions or []
         super().__init__(self._format_error())
-    
+
     def _format_error(self) -> str:
         """Generate rich error message."""
         # Format with context, suggestions, etc.

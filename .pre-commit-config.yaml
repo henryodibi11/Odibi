@@ -1,0 +1,141 @@
+# Pre-commit hooks for ODIBI Framework
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# See: https://pre-commit.com
+
+# Fail fast: Stop running hooks on first failure
+fail_fast: false
+
+# Repositories containing the hooks we want to use
+repos:
+  # ============================================================================
+  # GENERAL FILE QUALITY CHECKS
+  # Built-in hooks from pre-commit for basic file hygiene
+  # ============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0  # Use latest stable version
+    hooks:
+      # Ensures all files end with exactly one newline
+      # Why: Prevents "No newline at end of file" messages in diffs
+      - id: end-of-file-fixer
+        name: Fix end-of-file newlines
+        description: Ensures files end with a newline
+
+      # Removes trailing whitespace from lines
+      # Why: Prevents unnecessary diff noise and formatting issues
+      - id: trailing-whitespace
+        name: Remove trailing whitespace
+        description: Strips trailing spaces from line endings
+        args: [--markdown-linebreak-ext=md]  # Preserve MD double-space linebreaks
+
+      # Prevents commits directly to protected branches (disabled for now)
+      # Why: Enforces PR workflow for main/master branches
+      # - id: no-commit-to-branch
+      #   name: Protect main branch
+      #   description: Prevents direct commits to main
+      #   args: [--branch=main, --branch=master]
+
+      # Checks YAML files for syntax errors
+      # Why: Catches malformed YAML configs before they break CI
+      - id: check-yaml
+        name: Check YAML syntax
+        description: Validates YAML file structure
+
+      # Checks TOML files for syntax errors
+      # Why: Validates pyproject.toml and other TOML configs
+      - id: check-toml
+        name: Check TOML syntax
+        description: Validates TOML file structure
+
+      # Prevents large files from being committed (>500KB by default)
+      # Why: Keeps repo size manageable, prevents accidental data commits
+      - id: check-added-large-files
+        name: Check for large files
+        description: Prevents files >500KB from being committed
+        args: [--maxkb=500]
+
+      # Checks for files that would conflict on case-insensitive filesystems
+      # Why: Prevents issues when cloning on Windows/macOS
+      - id: check-case-conflict
+        name: Check filename case conflicts
+        description: Detects case-sensitivity issues
+
+      # Prevents merge conflict markers from being committed
+      # Why: Catches unresolved merge conflicts
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+        description: Detects <<<<<<< markers in files
+
+  # ============================================================================
+  # PYTHON CODE FORMATTING
+  # Black - The uncompromising Python code formatter
+  # ============================================================================
+  - repo: https://github.com/psf/black
+    rev: 24.1.1  # Use latest stable Black version
+    hooks:
+      # Automatically formats Python code to Black's style
+      # Why: Enforces consistent code style across all contributors
+      # Config: Uses settings from pyproject.toml (line-length=100)
+      - id: black
+        name: Format Python code (Black)
+        description: Auto-format Python files
+        types: [python]
+
+  # ============================================================================
+  # PYTHON LINTING
+  # Ruff - Extremely fast Python linter (replaces flake8, pylint, isort)
+  # ============================================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.2.0  # Use latest stable Ruff version
+    hooks:
+      # Lints Python code for errors, style issues, and best practices
+      # Why: Catches bugs, enforces PEP 8, detects unused imports/variables
+      # Config: Uses settings from pyproject.toml (line-length=100)
+      - id: ruff
+        name: Lint Python code (Ruff)
+        description: Fast Python linter
+        args: [--fix, --exit-non-zero-on-fix]  # Auto-fix issues when possible
+        types: [python]
+
+      # Formats imports according to best practices
+      # Why: Consistent import ordering (stdlib → third-party → local)
+      - id: ruff-format
+        name: Format imports (Ruff)
+        description: Sort and format Python imports
+        types: [python]
+
+  # ============================================================================
+  # TYPE CHECKING (OPTIONAL - Only runs on typed modules)
+  # Mypy - Static type checker for Python
+  # Note: Disabled in Phase 1 due to dependency issues
+  # Will be enabled in Phase 2 with proper type stub configuration
+  # ============================================================================
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.8.0
+  #   hooks:
+  #     - id: mypy
+  #       name: Type check Python code (mypy)
+  #       files: ^odibi/
+  #       exclude: ^odibi/engine/spark_engine\.py|^odibi/connections/azure_.*\.py
+
+# ============================================================================
+# CONFIGURATION NOTES
+# ============================================================================
+#
+# Installation (first time):
+#   pip install pre-commit
+#   pre-commit install
+#
+# Manual run (all files):
+#   pre-commit run --all-files
+#
+# Manual run (specific files):
+#   pre-commit run --files odibi/config.py tests/test_config.py
+#
+# Skip hooks (emergency only):
+#   git commit --no-verify
+#
+# Update hook versions:
+#   pre-commit autoupdate
+#
+# ============================================================================

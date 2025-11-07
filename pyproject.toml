@@ -7,7 +7,7 @@ name = "odibi"
 version = "1.0.0"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
-    {name = "Henry Odibi", email = "henry.odibi@ingredion.com"}
+    {name = "Henry Odibi", email = "henryodibi@outlook.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.9"
@@ -44,7 +44,11 @@ azure = [
     "azure-identity>=1.14.0",
 ]
 all = [
-    "odibi[spark,pandas,azure]",
+    "pyspark>=3.4.0",
+    "duckdb>=0.9.0",
+    "deltalake>=0.13.0",
+    "azure-storage-blob>=12.0.0",
+    "azure-identity>=1.14.0",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -55,8 +59,8 @@ dev = [
     "pre-commit>=3.4.0",
 ]
 
-[project.scripts]
-odibi = "odibi.cli:main"
+# [project.scripts]
+# odibi = "odibi.cli:main"  # CLI coming in Phase 2
 
 [project.urls]
 Homepage = "https://github.com/henryodibi11/Odibi"
