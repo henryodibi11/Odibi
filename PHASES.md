@@ -181,8 +181,8 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 
 #### Spark Engine Implementation
 - [ ] `SparkEngine.execute_sql()` - Register temp views from context, execute SQL
-- [ ] `SparkEngine.read()` - Parquet, CSV from DBFS/ADLS
-- [ ] `SparkEngine.write()` - Parquet, CSV with modes (overwrite/append)
+- [ ] `SparkEngine.read()` - Parquet, CSV, Avro, JSON from DBFS/ADLS
+- [ ] `SparkEngine.write()` - Parquet, CSV, Avro, JSON with modes (overwrite/append)
 - [ ] Integration tests with local Spark session
 
 #### New Connectors (Scaffolded → Implemented)

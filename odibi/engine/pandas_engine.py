@@ -55,6 +55,19 @@ class PandasEngine(Engine):
             return pd.read_json(full_path, **options)
         elif format == "excel":
             return pd.read_excel(full_path, **options)
+        elif format == "avro":
+            try:
+                import fastavro
+            except ImportError:
+                raise ImportError(
+                    "Avro support requires 'pip install odibi[pandas]' or 'pip install fastavro'. "
+                    "See README.md for installation instructions."
+                )
+
+            with open(full_path, "rb") as f:
+                reader = fastavro.reader(f)
+                records = [record for record in reader]
+            return pd.DataFrame(records)
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
@@ -104,6 +117,21 @@ class PandasEngine(Engine):
             df.to_json(full_path, orient="records", **options)
         elif format == "excel":
             df.to_excel(full_path, index=False, **options)
+        elif format == "avro":
+            try:
+                import fastavro
+            except ImportError:
+                raise ImportError(
+                    "Avro support requires 'pip install odibi[pandas]' or 'pip install fastavro'. "
+                    "See README.md for installation instructions."
+                )
+
+            records = df.to_dict("records")
+            schema = self._infer_avro_schema(df)
+
+            write_mode = "wb" if mode == "overwrite" else "ab"
+            with open(full_path, write_mode) as f:
+                fastavro.writer(f, schema, records)
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
@@ -290,3 +318,35 @@ class PandasEngine(Engine):
                     )
 
         return failures
+
+    def _infer_avro_schema(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Infer Avro schema from pandas DataFrame.
+
+        Args:
+            df: DataFrame to infer schema from
+
+        Returns:
+            Avro schema dictionary
+        """
+        type_mapping = {
+            "int64": "long",
+            "int32": "int",
+            "float64": "double",
+            "float32": "float",
+            "bool": "boolean",
+            "object": "string",
+            "string": "string",
+        }
+
+        fields = []
+        for col in df.columns:
+            dtype_str = str(df[col].dtype)
+            avro_type = type_mapping.get(dtype_str, "string")
+
+            # Handle nullable columns
+            if df[col].isnull().any():
+                avro_type = ["null", avro_type]
+
+            fields.append({"name": col, "type": avro_type})
+
+        return {"type": "record", "name": "DataFrame", "fields": fields}

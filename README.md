@@ -48,24 +48,25 @@ pre-commit install
 
 Perfect for learning and local development.
 
-1. **Install ODIBI:**
-   ```bash
-   pip install odibi
-   ```
+```python
+from odibi.pipeline import Pipeline
 
-2. **Try the example:**
-   ```bash
-   # Uses the local Pandas engine with sample data
-   python -m odibi.cli run examples/example_local.yaml
-   ```
+# Load and run all pipelines from YAML
+manager = Pipeline.from_yaml("examples/example_local.yaml")
+results = manager.run()  # Runs all defined pipelines
 
-3. **What it does:**
-   - Loads CSV from `data/bronze/`
-   - Cleans and validates data (SQL transforms)
-   - Saves Parquet to `data/silver/`
-   - Generates execution story
+# Or run specific pipeline
+result = manager.run('bronze_to_silver')
+print(f"✅ {len(result.completed)} nodes completed")
+```
 
-See [examples/example_local.yaml](examples/example_local.yaml) for the full configuration.
+**What it does:**
+- Loads CSV/Parquet/Avro from configured locations
+- Cleans and validates data (SQL transforms)
+- Saves output in desired format
+- Generates execution story automatically
+
+See [examples/template_full.yaml](examples/template_full.yaml) for all configuration options.
 
 ### Option 2: Spark + Azure Pipeline (Production)
 

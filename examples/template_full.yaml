@@ -1,0 +1,243 @@
+# ============================================
+# ODIBI Pipeline Configuration Template
+# ============================================
+# This template shows ALL available configuration options.
+# Copy and customize for your project.
+
+# ============================================
+# PROJECT METADATA (Required)
+# ============================================
+
+project: My Data Pipeline  # Required: Project name
+engine: pandas  # Required: 'pandas' or 'spark'
+
+# ============================================
+# STORY GENERATION (Optional)
+# ============================================
+# Controls where and how pipeline execution reports are generated
+
+story:
+  auto_generate: true  # Generate story after each run
+  max_sample_rows: 10  # Number of rows to show in data previews
+  output_path: ./stories/  # Directory for story files (absolute or relative)
+
+# ============================================
+# CONNECTIONS (Required)
+# ============================================
+# Define where your data lives. You can have multiple connections.
+# Each connection has a unique name used in read/write operations.
+
+connections:
+  # Example: Local filesystem connection
+  local_data:
+    type: local
+    base_path: ./data  # Base directory for all paths using this connection
+    # Paths in read/write nodes are relative to this base_path
+    # Example: If base_path = ./data and path = bronze/sales.csv
+    #          Final path = ./data/bronze/sales.csv
+
+  # Example: Another local connection for different location
+  raw_files:
+    type: local
+    base_path: D:/raw_data  # Can be on different drive
+
+  # Example: Azure Data Lake Storage (Phase 3 - not yet implemented)
+  # azure_lake:
+  #   type: azure_adls
+  #   account: mystorageaccount
+  #   container: data
+  #   path_prefix: /project1
+  #   auth_mode: managed_identity
+
+# ============================================
+# PIPELINES (Required)
+# ============================================
+# A project can have multiple pipelines. Each runs independently.
+
+pipelines:
+  # ----------------------------------------
+  # Pipeline 1: Bronze to Silver
+  # ----------------------------------------
+  - pipeline: bronze_to_silver  # Required: Unique pipeline name
+    layer: transformation  # Optional: Logical layer (bronze/silver/gold)
+    description: "Clean and validate raw data"  # Optional: Description
+
+    nodes:
+      # ======================================
+      # Node: Read from file
+      # ======================================
+      - name: load_raw_sales  # Required: Unique node name within pipeline
+        read:  # Read operation
+          connection: local_data  # Connection name from connections section
+          path: bronze/sales.csv  # Path relative to connection's base_path
+          format: csv  # csv, parquet, json, excel, avro
+          options:  # Format-specific options (passed to pandas/spark)
+            header: 0
+            dtype:
+              transaction_id: str
+              amount: float
+        cache: true  # Cache result in memory for downstream nodes
+
+      # ======================================
+      # Node: Transform with SQL
+      # ======================================
+      - name: clean_sales
+        depends_on: [load_raw_sales]  # Wait for these nodes to complete
+        transform:  # Transform operation
+          steps:  # List of SQL queries or function calls
+            # SQL queries run against cached DataFrames
+            - |
+              SELECT
+                transaction_id,
+                customer_id,
+                product_id,
+                amount,
+                transaction_date
+              FROM load_raw_sales
+              WHERE amount > 0
+                AND transaction_date IS NOT NULL
+
+            # You can chain multiple SQL transforms
+            # - |
+            #   SELECT * FROM clean_sales
+            #   WHERE customer_id IS NOT NULL
+
+      # ======================================
+      # Node: Write to file
+      # ======================================
+      - name: save_silver
+        depends_on: [clean_sales]
+        write:  # Write operation
+          connection: local_data
+          path: silver/sales.parquet
+          format: parquet  # csv, parquet, json, excel, avro
+          mode: overwrite  # 'overwrite' or 'append'
+          options:  # Format-specific options
+            compression: snappy
+
+      # ======================================
+      # Node: Custom transform function
+      # ======================================
+      - name: add_custom_metrics
+        depends_on: [clean_sales]
+        transform:
+          steps:
+            # Call registered Python function
+            - function: calculate_metrics
+              params:
+                metric_type: revenue
+                window_days: 30
+
+  # ----------------------------------------
+  # Pipeline 2: Silver to Gold
+  # ----------------------------------------
+  - pipeline: silver_to_gold
+    layer: aggregation
+    nodes:
+      - name: load_silver
+        read:
+          connection: local_data
+          path: silver/sales.parquet
+          format: parquet
+        cache: true
+
+      - name: aggregate_by_customer
+        depends_on: [load_silver]
+        transform:
+          steps:
+            - |
+              SELECT
+                customer_id,
+                COUNT(*) as transaction_count,
+                SUM(amount) as total_spent,
+                AVG(amount) as avg_transaction,
+                MAX(transaction_date) as last_purchase_date
+              FROM load_silver
+              GROUP BY customer_id
+              HAVING total_spent > 100
+
+      - name: save_gold
+        depends_on: [aggregate_by_customer]
+        write:
+          connection: local_data
+          path: gold/customer_summary.parquet
+          format: parquet
+          mode: overwrite
+
+# ============================================
+# SUPPORTED FORMATS
+# ============================================
+# Read/Write formats:
+# - csv: Comma-separated values
+# - parquet: Columnar format (recommended for large data)
+# - json: JSON format
+# - excel: Excel spreadsheets (.xlsx)
+# - avro: Avro binary format (requires odibi[pandas])
+
+# ============================================
+# HOW TO USE THIS FILE
+# ============================================
+#
+# Method 1: Run ALL Pipelines (Default - Recommended)
+# ----------------------------------------------------
+# from odibi.pipeline import Pipeline
+#
+# # Load config and run ALL pipelines defined in YAML
+# manager = Pipeline.from_yaml("config.yaml")
+# results = manager.run()  # Dict of all pipeline results
+#
+# # Access individual results
+# for pipeline_name, result in results.items():
+#     print(f"{pipeline_name}: {len(result.completed)} nodes completed")
+#
+#
+# Method 2: Run Specific Pipeline(s)
+# -----------------------------------
+# from odibi.pipeline import Pipeline
+#
+# manager = Pipeline.from_yaml("config.yaml")
+#
+# # Run single pipeline by name
+# result = manager.run('bronze_to_silver')
+# print(f"Completed: {len(result.completed)} nodes")
+#
+# # Run multiple specific pipelines
+# results = manager.run(['bronze_to_silver', 'silver_to_gold'])
+#
+# # List available pipelines
+# print("Available:", manager.list_pipelines())
+#
+#
+# Method 3: Direct PipelineManager Access
+# ----------------------------------------
+# from odibi.pipeline import PipelineManager
+#
+# manager = PipelineManager.from_yaml("config.yaml")
+# results = manager.run()  # Same as Pipeline.from_yaml()
+#
+#
+# Method 4: Manual Setup (Advanced - for custom integrations)
+# ------------------------------------------------------------
+# import yaml
+# from odibi.pipeline import Pipeline
+# from odibi.config import PipelineConfig, ProjectConfig
+# from odibi.connections import LocalConnection
+#
+# with open("config.yaml") as f:
+#     config = yaml.safe_load(f)
+#
+# pipeline_config = PipelineConfig(**config['pipelines'][0])
+# project_config = ProjectConfig(**{k: v for k, v in config.items() if k != 'pipelines'})
+#
+# connections = {
+#     'local_data': LocalConnection(base_path=config['connections']['local_data']['base_path'])
+# }
+#
+# pipeline = Pipeline(
+#     pipeline_config=pipeline_config,
+#     engine=project_config.engine,
+#     connections=connections,
+#     story_config=config.get('story', {})
+# )
+#
+# results = pipeline.run()

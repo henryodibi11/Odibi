@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Avro format support** in PandasEngine for read/write operations
+- **PipelineManager** class for multi-pipeline orchestration from YAML
+- **Pipeline.from_yaml()** now returns PipelineManager (backward-compatible)
+- Comprehensive `examples/template_full.yaml` documenting all YAML options
+- `fastavro>=1.8.0` dependency for Avro support
+- `pandasql>=0.7.3` dependency for SQL fallback
+
+### Changed
+- **API Improvement**: `Pipeline.from_yaml()` returns manager with `run()`, `run('name')`, `run(['names'])` methods
+- Run all pipelines by default, specify by name (not index) for clarity
+- Updated PHASES.md to include Avro in SparkEngine Phase 3 roadmap
+
+### Fixed
+- Dependency scanning across entire odibi module (all external deps captured)
+
 ## [1.1.0-alpha.1-ci-setup] - 2025-11-06
 
 ### Added
