@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0-alpha.1-ci-setup] - 2025-11-06
+
+### Added
+- Continuous Integration workflow (`.github/workflows/ci.yml`) for multi-Python (3.9–3.12) testing
+- Pre-commit configuration (`.pre-commit-config.yaml`) for Black, Ruff, and file hygiene checks
+- Pip caching and Codecov coverage integration for faster, visible builds
+
+### Improved
+- All 89 tests passing (78 Pandas core, 8 Azure connection, 3 Spark imports)
+- Codebase reformatted and linted automatically
+- Code quality gates now active on every commit (local) and push (remote)
+
+### Notes
+- Phase 1D complete: CI/CD infrastructure now active on every commit and push
+- CI runs on Ubuntu with Python 3.9, 3.10, 3.11, 3.12
+- Pre-commit hooks enforce Black formatting, Ruff linting, YAML/TOML validation
+
 ## [1.1.0-alpha.1] - TBD
 
 ### Added
