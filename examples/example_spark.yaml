@@ -36,7 +36,7 @@ connections:
 
 # Multi-source ETL pipeline
 pipelines:
-  - name: manufacturing_etl
+  - pipeline: manufacturing_etl
     layer: transformation
     nodes:
       # Load sensor data from ADLS (Parquet format)
@@ -115,7 +115,7 @@ pipelines:
             compression: snappy
 
   # Aggregation pipeline (Silver → Gold)
-  - name: manufacturing_analytics
+  - pipeline: manufacturing_analytics
     layer: aggregation
     nodes:
       # Load enriched sensor data

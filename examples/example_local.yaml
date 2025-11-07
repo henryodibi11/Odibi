@@ -13,7 +13,7 @@ connections:
 
 # Pipelines contain the actual data transformation logic
 pipelines:
-  - name: bronze_to_silver
+  - pipeline: bronze_to_silver
     layer: transformation
     nodes:
       # Node 1: Load raw data from CSV (Bronze layer)
@@ -56,7 +56,7 @@ pipelines:
           mode: overwrite
 
   # Second pipeline: Aggregation (Silver → Gold)
-  - name: silver_to_gold
+  - pipeline: silver_to_gold
     layer: aggregation
     nodes:
       # Node 1: Load cleaned data
