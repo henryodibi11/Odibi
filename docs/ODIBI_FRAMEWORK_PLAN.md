@@ -7,6 +7,20 @@
 
 ---
 
+## 📋 **Document Status**
+
+**⚠️ This document describes the original Phase 1 implementation (v1.0.0 Pandas MVP) - now complete.**
+
+- **Original Phase 1:** ✅ Complete (v1.0.0) - Pandas MVP implementation
+- **Current Status:** See [PHASES.md](../PHASES.md) for ongoing roadmap (v1.1.0+)
+- **Purpose:** This document serves as historical design documentation and architecture reference
+
+**For current project status and roadmap:**
+- See [STATUS.md](../STATUS.md) - Current phase completion status  
+- See [PHASES.md](../PHASES.md) - Phases 1-5 roadmap for open-source evolution
+
+---
+
 ## Table of Contents
 
 1. [Vision & Principles](#vision--principles)
@@ -946,48 +960,52 @@ odibi/logging/
 
 ---
 
-## Phase 1 Scope
+## Phase 1 Scope (Original - v1.0.0)
+
+**Status:** ✅ Complete  
+**Version:** v1.0.0  
+**Completion Date:** October 2025
 
 ### **Deliverables**
 
 **Week 1-2: Foundation**
-- [ ] Pydantic schemas (ProjectConfig, PipelineConfig, NodeConfig)
-- [ ] YAML loader with validation
-- [ ] Environment variable resolution
-- [ ] Project manifest loading
-- [ ] Connection validation (on load + lazy validation)
-- [ ] Format handling (explicit format required)
-- [ ] Basic unit tests (schemas, loader, validation)
+- [x] Pydantic schemas (ProjectConfig, PipelineConfig, NodeConfig)
+- [x] YAML loader with validation
+- [x] Environment variable resolution
+- [x] Project manifest loading
+- [x] Connection validation (on load + lazy validation)
+- [x] Format handling (explicit format required)
+- [x] Basic unit tests (schemas, loader, validation)
 
 **Week 3-4: Orchestration**
-- [ ] Dependency graph builder
-- [ ] Topological sort
-- [ ] Circular dependency detection
-- [ ] Node abstraction (base class)
-- [ ] Context implementation (Spark temp views + Pandas DuckDB)
-- [ ] Unit tests (graph, nodes, context)
+- [x] Dependency graph builder
+- [x] Topological sort
+- [x] Circular dependency detection
+- [x] Node abstraction (base class)
+- [x] Context implementation (Spark temp views + Pandas DuckDB)
+- [x] Unit tests (graph, nodes, context)
 
 **Week 5-6: Execution**
-- [ ] Node execution logic (read/transform/write)
-- [ ] Provider integration (reuse v2 readers/savers)
-- [ ] PandasWorkflowNode (with DuckDB for SQL)
-- [ ] Parallel executor (ThreadPoolExecutor)
-- [ ] Retry logic
-- [ ] Skip logic (dependency failures)
-- [ ] Resume logic (skip completed)
-- [ ] Integration tests (end-to-end pipelines)
+- [x] Node execution logic (read/transform/write)
+- [x] Provider integration (reuse v2 readers/savers)
+- [x] PandasWorkflowNode (with DuckDB for SQL)
+- [x] Parallel executor (ThreadPoolExecutor)
+- [x] Retry logic
+- [x] Skip logic (dependency failures)
+- [x] Resume logic (skip completed)
+- [x] Integration tests (end-to-end pipelines)
 
 **Week 7-8: Stories & Polish**
-- [ ] Extend TransformationStory for full pipeline
-- [ ] Read/Write node story visualization
-- [ ] Retry/Skip visualization in stories
-- [ ] Logging integration (Python logging)
-- [ ] Error messages (clear, actionable)
-- [ ] Python API (complete interface)
-- [ ] Test with Energy Efficiency project (full migration)
-- [ ] Package setup (setup.py, dependencies)
-- [ ] Documentation (README, examples)
-- [ ] Final testing (unit + integration)
+- [x] Extend TransformationStory for full pipeline
+- [x] Read/Write node story visualization
+- [x] Retry/Skip visualization in stories
+- [x] Logging integration (Python logging)
+- [x] Error messages (clear, actionable)
+- [x] Python API (complete interface)
+- [x] Test with Energy Efficiency project (full migration)
+- [x] Package setup (setup.py, dependencies)
+- [x] Documentation (README, examples)
+- [x] Final testing (unit + integration)
 
 ### **Success Criteria**
 
