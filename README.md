@@ -1,8 +1,13 @@
 # ODIBI Framework
 
+[![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 **Explicit over implicit. Stories over magic. Simple over clever.**
 
-ODIBI is a declarative data engineering framework that makes data pipelines transparent, traceable, and teachable.
+ODIBI is a declarative data engineering framework that makes data pipelines transparent, traceable, and teachable. Whether you're learning data engineering or building production systems, ODIBI helps you write pipelines that are easy to understand, debug, and evolve.
 
 ## Core Philosophy
 
@@ -13,22 +18,80 @@ ODIBI is a declarative data engineering framework that makes data pipelines tran
 - **Stories Automatic**: Every run is documented
 - **Engine Agnostic**: Same config works on Spark or Pandas
 
-## Quick Start
-
-### Installation
+## Installation
 
 ```bash
-# Install from source (development)
-cd d:/odibi
-pip install -e .
-
-# Or install from PyPI (when published)
+# Basic installation (Pandas engine only)
 pip install odibi
+
+# With Spark support (for Databricks and large-scale processing)
+pip install "odibi[spark]"
+
+# With Azure connectors (ADLS Gen2, Azure SQL)
+pip install "odibi[azure]"
+
+# All extras (Spark + Azure + advanced features)
+pip install "odibi[all]"
+
+# Development installation (includes testing and linting tools)
+git clone https://github.com/henryodibi11/Odibi.git
+cd Odibi
+pip install -e .[dev]
+pre-commit install
 ```
 
-### 🎓 Learn by Example
+---
 
-**👉 START HERE:** Complete interactive tutorial in `examples/getting_started/walkthrough.ipynb`
+## Quick Start
+
+### Option 1: Local Pandas Pipeline (Simplest)
+
+Perfect for learning and local development.
+
+1. **Install ODIBI:**
+   ```bash
+   pip install odibi
+   ```
+
+2. **Try the example:**
+   ```bash
+   # Uses the local Pandas engine with sample data
+   python -m odibi.cli run examples/example_local.yaml
+   ```
+
+3. **What it does:**
+   - Loads CSV from `data/bronze/`
+   - Cleans and validates data (SQL transforms)
+   - Saves Parquet to `data/silver/`
+   - Generates execution story
+
+See [examples/example_local.yaml](examples/example_local.yaml) for the full configuration.
+
+### Option 2: Spark + Azure Pipeline (Production)
+
+For large-scale data processing on Databricks.
+
+1. **Install with extras:**
+   ```bash
+   pip install "odibi[spark,azure]"
+   ```
+
+2. **Configure Azure connections:**
+   - See [docs/setup_azure.md](docs/setup_azure.md) for authentication setup
+   - See [docs/setup_databricks.md](docs/setup_databricks.md) for cluster configuration
+
+3. **Run Spark pipeline:**
+   ```bash
+   python -m odibi.cli run examples/example_spark.yaml
+   ```
+
+See [examples/example_spark.yaml](examples/example_spark.yaml) for the full configuration.
+
+---
+
+### 🎓 Interactive Tutorial
+
+**Complete walkthrough:** `examples/getting_started/walkthrough.ipynb`
 
 ```bash
 cd examples/getting_started
@@ -44,7 +107,7 @@ jupyter notebook walkthrough.ipynb
 
 ---
 
-### Your First Pipeline (Quick Example)
+### Your First Pipeline (From Scratch)
 
 **1. Create project.yaml**
 
@@ -194,38 +257,64 @@ Connection Layer (Azure/Local/Delta/SQL)
 - [Quick Reference](examples/getting_started/QUICK_REFERENCE.md) - Common patterns
 - [Pydantic Guide](docs/PYDANTIC_CHEATSHEET.md) - Config validation
 
-**📖 Technical Docs:**
-- [Framework Plan](docs/ODIBI_FRAMEWORK_PLAN.md) - Complete architecture and design
-- [Phase 1 Results](docs/TEST_RESULTS.md) - Foundation tests
-- [Phase 2 Results](docs/PHASE2_RESULTS.md) - Orchestration tests
-- [Improvements](docs/IMPROVEMENTS.md) - Known issues & roadmap
+**📖 Setup Guides:**
+- [Databricks Setup](docs/setup_databricks.md) - Community + Azure Databricks configuration
+- [Azure Integration](docs/setup_azure.md) - ADLS Gen2 + Azure SQL authentication
 
 **🧪 Examples:**
-- [Examples Overview](examples/README.md) - All examples
-- [Getting Started](examples/getting_started/) - Complete tutorial with sample data
+- [Local Pandas Example](examples/example_local.yaml) - Simple Bronze→Silver→Gold pipeline
+- [Spark Azure Example](examples/example_spark.yaml) - Multi-source ETL with Azure
+- [Getting Started Tutorial](examples/getting_started/) - Complete walkthrough with sample data
 
-## Project Status
+**🔧 Project Info:**
+- [PHASES.md](PHASES.md) - Roadmap and feature timeline
+- [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
+- [CHANGELOG.md](CHANGELOG.md) - Version history and release notes
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - Community guidelines
 
-**Version:** 1.0.0 (Phase 1 - MVP)  
-**Status:** In Development
+---
 
-### Current Implementation
-- ⏳ Core config schemas (Pydantic)
-- ⏳ Unified Context API
-- ⏳ Node execution engine
-- ⏳ Function registry
-- ⏳ Dependency graph builder
-- ⏳ Pipeline executor
+## Roadmap
 
-### Roadmap
-- v1.0: Core engine, Pandas/Spark, basic CLI
-- v1.1: Smart format inference, graph visualization
-- v1.2: More connections (AWS S3, GCP, SQL Server)
-- v2.0: Advanced features, performance optimizations
+ODIBI is being developed in deliberate phases:
+
+- ✅ **Phase 1 (Current):** Pandas MVP, Spark scaffolding, Azure connections, CI/CD
+- ⏳ **Phase 2 (Q1 2026):** CLI tools, testing utilities, developer experience
+- ⏳ **Phase 3 (Q2 2026):** Story generation, Spark engine implementation, AWS/GCP connectors
+- ⏳ **Phase 4 (Q3 2026):** Performance optimization, production hardening
+- ⏳ **Phase 5 (2026+):** Community ecosystem, plugin system
+
+See [PHASES.md](PHASES.md) for detailed roadmap.
+
+---
 
 ## Contributing
 
-This is currently a private framework. Contact the maintainers for contribution guidelines.
+We welcome contributions! ODIBI is designed to be community-driven from the start.
+
+**Before contributing:**
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
+2. Check [PHASES.md](PHASES.md) for available work
+3. Review [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+
+**Quick start for contributors:**
+```bash
+git clone https://github.com/henryodibi11/Odibi.git
+cd Odibi
+pip install -e .[dev]
+pre-commit install
+pytest -v  # All 89 tests should pass
+```
+
+---
+
+## Contact & Support
+
+- **GitHub Issues:** https://github.com/henryodibi11/Odibi/issues
+- **Email:** henryodibi@outlook.com
+- **LinkedIn:** [Henry Odibi](https://www.linkedin.com/in/henry-odibi)
+
+---
 
 ## License
 
