@@ -7,9 +7,19 @@ engine: pandas  # Uses Pandas for all operations (default)
 
 # Connections define where data lives
 connections:
-  local:
+  data:
     type: local
-    base_path: ./data  # Relative to where you run odibi
+    base_path: ./data  # Where data files live
+  
+  outputs:
+    type: local
+    base_path: ./outputs  # Where observability artifacts (stories) live
+
+# Story generation (mandatory - ODIBI's core value)
+story:
+  connection: outputs
+  path: stories/  # Stories saved to ./outputs/stories/
+  max_sample_rows: 10
 
 # Pipelines contain the actual data transformation logic
 pipelines:
@@ -19,7 +29,7 @@ pipelines:
       # Node 1: Load raw data from CSV (Bronze layer)
       - name: load_raw_sales
         read:
-          connection: local
+          connection: data
           path: bronze/sales.csv
           format: csv
           options:
@@ -50,7 +60,7 @@ pipelines:
       - name: save_silver
         depends_on: [clean_sales]
         write:
-          connection: local
+          connection: data
           path: silver/sales.parquet
           format: parquet
           mode: overwrite
@@ -62,7 +72,7 @@ pipelines:
       # Node 1: Load cleaned data
       - name: load_silver_sales
         read:
-          connection: local
+          connection: data
           path: silver/sales.parquet
           format: parquet
         cache: true
@@ -87,7 +97,7 @@ pipelines:
       - name: save_gold
         depends_on: [customer_summary]
         write:
-          connection: local
+          connection: data
           path: gold/customer_summary.parquet
           format: parquet
           mode: overwrite

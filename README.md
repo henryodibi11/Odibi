@@ -254,7 +254,9 @@ Connection Layer (Azure/Local/Delta/SQL)
 ## Documentation
 
 **📚 Learning Resources:**
-- [Getting Started Tutorial](examples/getting_started/walkthrough.ipynb) - 👈 **START HERE!**
+- [Configuration System Explained](docs/CONFIGURATION_EXPLAINED.md) - ⭐ **NEW: Complete config guide** ⭐
+- [Getting Started Tutorial](examples/getting_started/walkthrough.ipynb) - Interactive walkthrough
+- [Documentation Index](docs/README.md) - All guides and references
 - [Quick Reference](examples/getting_started/QUICK_REFERENCE.md) - Common patterns
 - [Pydantic Guide](docs/PYDANTIC_CHEATSHEET.md) - Config validation
 

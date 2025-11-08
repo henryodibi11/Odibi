@@ -1,91 +1,167 @@
 # ============================================
-# ODIBI Pipeline Configuration Template
+# ODIBI Complete Configuration Reference
 # ============================================
-# This template shows ALL available configuration options.
-# Copy and customize for your project.
+# This template shows ALL available options.
+# Mandatory fields are marked with (Required).
+# Optional fields show their defaults explicitly.
+# 
+# For minimal example, see: examples/example_local.yaml
+# For documentation, see: docs/CONFIGURATION_EXPLAINED.md
 
 # ============================================
-# PROJECT METADATA (Required)
+# PROJECT METADATA
 # ============================================
 
-project: My Data Pipeline  # Required: Project name
-engine: pandas  # Required: 'pandas' or 'spark'
+project: My Data Pipeline  # (Required) Project name
+description: "Complete ETL pipeline for sales data"  # (Optional) Human-readable description
+version: "1.0.0"  # (Optional) Project version (default: "1.0.0")
+owner: "data-engineering@company.com"  # (Optional) Project owner/contact
+engine: pandas  # (Required) Execution engine: 'pandas' or 'spark'
 
 # ============================================
-# STORY GENERATION (Optional)
+# CONNECTIONS (Required - at least one)
 # ============================================
-# Controls where and how pipeline execution reports are generated
-
-story:
-  auto_generate: true  # Generate story after each run
-  max_sample_rows: 10  # Number of rows to show in data previews
-  output_path: ./stories/  # Directory for story files (absolute or relative)
-
-# ============================================
-# CONNECTIONS (Required)
-# ============================================
-# Define where your data lives. You can have multiple connections.
-# Each connection has a unique name used in read/write operations.
+# Every read/write/story operation uses a connection.
+# Connections define WHERE data/artifacts live.
 
 connections:
-  # Example: Local filesystem connection
-  local_data:
+  # Example: Local filesystem for data (Phase 1 - Available Now)
+  data:
     type: local
-    base_path: ./data  # Base directory for all paths using this connection
-    # Paths in read/write nodes are relative to this base_path
-    # Example: If base_path = ./data and path = bronze/sales.csv
-    #          Final path = ./data/bronze/sales.csv
-
-  # Example: Another local connection for different location
-  raw_files:
+    base_path: ./data  # Base directory for all data paths
+  
+  # Example: Separate connection for outputs/observability
+  outputs:
     type: local
-    base_path: D:/raw_data  # Can be on different drive
-
-  # Example: Azure Data Lake Storage (Phase 3 - not yet implemented)
+    base_path: ./outputs  # Stories, logs, metadata
+  
+  # Example: Azure Data Lake Storage Gen2 (Phase 3 - Coming Soon)
   # azure_lake:
   #   type: azure_adls
   #   account: mystorageaccount
   #   container: data
   #   path_prefix: /project1
+  #   auth_mode: managed_identity  # or 'service_principal', 'account_key'
+  
+  # Example: Azure SQL Database (Phase 3 - Coming Soon)
+  # azure_db:
+  #   type: azure_sql
+  #   host: myserver.database.windows.net
+  #   database: analytics
+  #   port: 1433  # default
   #   auth_mode: managed_identity
 
 # ============================================
-# PIPELINES (Required)
+# STORY GENERATION (Required)
 # ============================================
-# A project can have multiple pipelines. Each runs independently.
+# Stories are ODIBI's core value - execution reports with lineage.
+# Must specify WHERE stories are saved (using a connection).
+
+story:
+  connection: outputs  # (Required) Connection name for story output
+  path: stories/  # (Required) Path relative to connection base_path
+                  # Result: ./outputs/stories/ (using 'outputs' connection)
+  max_sample_rows: 10  # (Optional) Rows in data previews (default: 10, range: 0-100)
+  auto_generate: true  # (Optional) Generate after each run (default: true)
+
+# ============================================
+# RETRY CONFIGURATION (Optional)
+# ============================================
+# Global retry settings for all operations.
+# Can be overridden at node level in Phase 2.
+
+retry:
+  enabled: true  # (Optional) Enable retry logic (default: true)
+  max_attempts: 3  # (Optional) Max retries (default: 3, range: 1-10)
+  backoff: exponential  # (Optional) Strategy: 'exponential', 'linear', 'constant'
+
+# ============================================
+# LOGGING CONFIGURATION (Optional)
+# ============================================
+# Global logging settings.
+
+logging:
+  level: INFO  # (Optional) Log level: 'DEBUG', 'INFO', 'WARNING', 'ERROR' (default: INFO)
+  structured: false  # (Optional) Output JSON logs for machine parsing (default: false)
+  metadata:  # (Optional) Extra metadata in all log entries
+    environment: development
+    team: data-engineering
+
+# ============================================
+# ENVIRONMENT OVERRIDES (Phase 3 - Not Implemented)
+# ============================================
+# Override configurations per environment (dev/staging/prod).
+# Attempting to use this will raise NotImplementedError.
+# Uncomment when Phase 3 is released.
+
+# environments:
+#   dev:
+#     story:
+#       connection: outputs
+#       path: dev_stories/
+#     logging:
+#       level: DEBUG
+#   
+#   prod:
+#     story:
+#       connection: azure_lake
+#       path: prod/observability/stories/
+#     logging:
+#       level: WARNING
+#       structured: true
+
+# ============================================
+# PIPELINES (Required - at least one)
+# ============================================
+# Define data transformation workflows.
 
 pipelines:
-  # ----------------------------------------
+  # ========================================
   # Pipeline 1: Bronze to Silver
-  # ----------------------------------------
-  - pipeline: bronze_to_silver  # Required: Unique pipeline name
-    layer: transformation  # Optional: Logical layer (bronze/silver/gold)
-    description: "Clean and validate raw data"  # Optional: Description
-
+  # ========================================
+  - pipeline: bronze_to_silver  # (Required) Unique pipeline name
+    description: "Clean and validate raw sales data"  # (Optional) Human-readable
+    layer: transformation  # (Optional) Logical layer identifier
+    
     nodes:
-      # ======================================
-      # Node: Read from file
-      # ======================================
-      - name: load_raw_sales  # Required: Unique node name within pipeline
+      # ====================================
+      # Node: Read from CSV
+      # ====================================
+      - name: load_raw_sales  # (Required) Unique node name within pipeline
+        description: "Load raw sales transactions"  # (Optional) Node description
+        
         read:  # Read operation
-          connection: local_data  # Connection name from connections section
-          path: bronze/sales.csv  # Path relative to connection's base_path
-          format: csv  # csv, parquet, json, excel, avro
-          options:  # Format-specific options (passed to pandas/spark)
-            header: 0
-            dtype:
+          connection: data  # (Required) Connection name from connections section
+          path: bronze/sales.csv  # (Required) Path relative to connection base_path
+                                  # Result: ./data/bronze/sales.csv
+          format: csv  # (Required) Format: 'csv', 'parquet', 'json', 'excel', 'avro'
+          
+          # Format-specific options (passed to pandas.read_csv or spark.read)
+          options:  # (Optional)
+            header: 0  # CSV has header row
+            dtype:  # Specify column types
               transaction_id: str
               amount: float
-        cache: true  # Cache result in memory for downstream nodes
-
-      # ======================================
+            encoding: utf-8
+        
+        cache: true  # (Optional) Cache result in memory for reuse (default: false)
+        
+        # Validation (Optional) - Phase 2 feature
+        # validation:
+        #   not_empty: true
+        #   no_nulls:
+        #     - transaction_id
+      
+      # ====================================
       # Node: Transform with SQL
-      # ======================================
+      # ====================================
       - name: clean_sales
-        depends_on: [load_raw_sales]  # Wait for these nodes to complete
+        description: "Filter and clean sales data"
+        depends_on: [load_raw_sales]  # (Optional) Wait for these nodes first
+        
         transform:  # Transform operation
-          steps:  # List of SQL queries or function calls
-            # SQL queries run against cached DataFrames
+          steps:  # (Required) List of SQL queries or function calls
+            # SQL query - references cached DataFrames by node name
             - |
               SELECT
                 transaction_id,
@@ -96,52 +172,67 @@ pipelines:
               FROM load_raw_sales
               WHERE amount > 0
                 AND transaction_date IS NOT NULL
-
+            
             # You can chain multiple SQL transforms
+            # Each operates on the result of the previous
             # - |
-            #   SELECT * FROM clean_sales
-            #   WHERE customer_id IS NOT NULL
-
-      # ======================================
-      # Node: Write to file
-      # ======================================
-      - name: save_silver
+            #   SELECT *,
+            #     amount * 1.1 as amount_with_tax
+            #   FROM clean_sales
+      
+      # ====================================
+      # Node: Custom Python Transform
+      # ====================================
+      - name: add_metrics
+        description: "Add custom business metrics"
         depends_on: [clean_sales]
-        write:  # Write operation
-          connection: local_data
-          path: silver/sales.parquet
-          format: parquet  # csv, parquet, json, excel, avro
-          mode: overwrite  # 'overwrite' or 'append'
-          options:  # Format-specific options
-            compression: snappy
-
-      # ======================================
-      # Node: Custom transform function
-      # ======================================
-      - name: add_custom_metrics
-        depends_on: [clean_sales]
+        
         transform:
           steps:
             # Call registered Python function
-            - function: calculate_metrics
-              params:
-                metric_type: revenue
+            # Register with: @odibi.transform decorator
+            - function: calculate_revenue_metrics
+              params:  # Function parameters
                 window_days: 30
+                metric_type: revenue
+        
+        cache: true
+      
+      # ====================================
+      # Node: Write to Parquet
+      # ====================================
+      - name: save_silver
+        description: "Save cleaned data to silver layer"
+        depends_on: [add_metrics]
+        
+        write:  # Write operation
+          connection: data  # (Required) Connection name
+          path: silver/sales.parquet  # (Required) Path relative to connection
+                                      # Result: ./data/silver/sales.parquet
+          format: parquet  # (Required) Format: 'csv', 'parquet', 'json', 'excel', 'avro'
+          mode: overwrite  # (Required) Write mode: 'overwrite' or 'append'
+          
+          # Format-specific options
+          options:  # (Optional)
+            compression: snappy  # Parquet: snappy, gzip, brotli
+            # partition_by: ['year', 'month']  # Spark only (Phase 3)
 
-  # ----------------------------------------
+  # ========================================
   # Pipeline 2: Silver to Gold
-  # ----------------------------------------
+  # ========================================
   - pipeline: silver_to_gold
+    description: "Aggregate and enrich for analytics"
     layer: aggregation
+    
     nodes:
       - name: load_silver
         read:
-          connection: local_data
+          connection: data
           path: silver/sales.parquet
           format: parquet
         cache: true
-
-      - name: aggregate_by_customer
+      
+      - name: customer_summary
         depends_on: [load_silver]
         transform:
           steps:
@@ -155,89 +246,59 @@ pipelines:
               FROM load_silver
               GROUP BY customer_id
               HAVING total_spent > 100
-
+      
       - name: save_gold
-        depends_on: [aggregate_by_customer]
+        depends_on: [customer_summary]
         write:
-          connection: local_data
+          connection: data
           path: gold/customer_summary.parquet
           format: parquet
           mode: overwrite
 
 # ============================================
-# SUPPORTED FORMATS
+# SUPPORTED FORMATS (Reference)
 # ============================================
-# Read/Write formats:
+# Phase 1 (Available Now):
 # - csv: Comma-separated values
-# - parquet: Columnar format (recommended for large data)
+# - parquet: Columnar format (recommended for large datasets)
 # - json: JSON format
 # - excel: Excel spreadsheets (.xlsx)
 # - avro: Avro binary format (requires odibi[pandas])
+#
+# Phase 3 (Coming Soon):
+# - delta: Delta Lake tables (requires odibi[spark])
+# - sql: SQL database tables (requires connection-specific drivers)
 
 # ============================================
-# HOW TO USE THIS FILE
+# NODE OPERATIONS REFERENCE
+# ============================================
+# Every node must have at least ONE of:
+# - read: Load data from connection
+# - transform: Transform data (SQL or function)
+# - write: Save data to connection
+#
+# A node can have ALL THREE:
+# - read → transform → write (ETL pattern)
+#
+# Or combinations:
+# - read only (load data, cache for downstream)
+# - transform only (operate on depends_on data)
+# - write only (save depends_on data)
+# - read + transform (load and clean)
+# - transform + write (clean and save)
+
+# ============================================
+# HOW TO USE THIS TEMPLATE
 # ============================================
 #
-# Method 1: Run ALL Pipelines (Default - Recommended)
-# ----------------------------------------------------
-# from odibi.pipeline import Pipeline
+# 1. Copy this file to your project
+# 2. Update project metadata (name, description, owner)
+# 3. Configure connections (where your data lives)
+# 4. Configure story output (where reports go)
+# 5. Define pipelines (your transformation logic)
+# 6. Remove optional sections you don't need
+# 7. Run: python -c "from odibi.pipeline import Pipeline; Pipeline.from_yaml('config.yaml').run()"
 #
-# # Load config and run ALL pipelines defined in YAML
-# manager = Pipeline.from_yaml("config.yaml")
-# results = manager.run()  # Dict of all pipeline results
-#
-# # Access individual results
-# for pipeline_name, result in results.items():
-#     print(f"{pipeline_name}: {len(result.completed)} nodes completed")
-#
-#
-# Method 2: Run Specific Pipeline(s)
-# -----------------------------------
-# from odibi.pipeline import Pipeline
-#
-# manager = Pipeline.from_yaml("config.yaml")
-#
-# # Run single pipeline by name
-# result = manager.run('bronze_to_silver')
-# print(f"Completed: {len(result.completed)} nodes")
-#
-# # Run multiple specific pipelines
-# results = manager.run(['bronze_to_silver', 'silver_to_gold'])
-#
-# # List available pipelines
-# print("Available:", manager.list_pipelines())
-#
-#
-# Method 3: Direct PipelineManager Access
-# ----------------------------------------
-# from odibi.pipeline import PipelineManager
-#
-# manager = PipelineManager.from_yaml("config.yaml")
-# results = manager.run()  # Same as Pipeline.from_yaml()
-#
-#
-# Method 4: Manual Setup (Advanced - for custom integrations)
-# ------------------------------------------------------------
-# import yaml
-# from odibi.pipeline import Pipeline
-# from odibi.config import PipelineConfig, ProjectConfig
-# from odibi.connections import LocalConnection
-#
-# with open("config.yaml") as f:
-#     config = yaml.safe_load(f)
-#
-# pipeline_config = PipelineConfig(**config['pipelines'][0])
-# project_config = ProjectConfig(**{k: v for k, v in config.items() if k != 'pipelines'})
-#
-# connections = {
-#     'local_data': LocalConnection(base_path=config['connections']['local_data']['base_path'])
-# }
-#
-# pipeline = Pipeline(
-#     pipeline_config=pipeline_config,
-#     engine=project_config.engine,
-#     connections=connections,
-#     story_config=config.get('story', {})
-# )
-#
-# results = pipeline.run()
+# For minimal example: examples/example_local.yaml
+# For documentation: docs/CONFIGURATION_EXPLAINED.md
+# For walkthroughs: walkthroughs/01_local_pipeline_pandas.ipynb

@@ -282,36 +282,52 @@ class PipelineManager:
 
     def __init__(
         self,
-        yaml_config: Dict[str, Any],
-        engine: str = "pandas",
-        connections: Optional[Dict[str, Any]] = None,
-        story_config: Optional[Dict[str, Any]] = None,
+        project_config: ProjectConfig,
+        connections: Dict[str, Any],
     ):
         """Initialize pipeline manager.
 
         Args:
-            yaml_config: Full YAML configuration dictionary
-            engine: Engine type
-            connections: Pre-configured connections
-            story_config: Story generation configuration
+            project_config: Validated project configuration
+            connections: Connection objects (already instantiated)
         """
-        self.config = yaml_config
-        self.engine = engine
-        self.connections = connections or {}
-        self.story_config = story_config or {}
+        self.project_config = project_config
+        self.connections = connections
         self._pipelines: Dict[str, Pipeline] = {}
 
-        # Create all pipeline instances
-        for pipeline_config_dict in yaml_config.get("pipelines", []):
-            pipeline_config = PipelineConfig(**pipeline_config_dict)
+        # Get story configuration
+        story_config = self._get_story_config()
+
+        # Create all pipeline instances from project_config.pipelines
+        for pipeline_config in project_config.pipelines:
             pipeline_name = pipeline_config.pipeline
 
             self._pipelines[pipeline_name] = Pipeline(
                 pipeline_config=pipeline_config,
-                engine=engine,
+                engine=project_config.engine,
                 connections=connections,
                 story_config=story_config,
             )
+
+    def _get_story_config(self) -> Dict[str, Any]:
+        """Build story config from project_config.story.
+
+        Resolves story output path using connection.
+
+        Returns:
+            Dictionary for StoryGenerator initialization
+        """
+        story_cfg = self.project_config.story
+
+        # Resolve story path using connection
+        story_conn = self.connections[story_cfg.connection]
+        output_path = story_conn.get_path(story_cfg.path)
+
+        return {
+            "auto_generate": story_cfg.auto_generate,
+            "max_sample_rows": story_cfg.max_sample_rows,
+            "output_path": output_path,
+        }
 
     @classmethod
     def from_yaml(cls, yaml_path: str) -> "PipelineManager":
@@ -335,12 +351,32 @@ class PipelineManager:
         with open(yaml_path_obj, "r") as f:
             config = yaml.safe_load(f)
 
-        # Parse project config
-        project_config = ProjectConfig(**{k: v for k, v in config.items() if k != "pipelines"})
+        # Parse and validate entire YAML as ProjectConfig (single source of truth)
+        project_config = ProjectConfig(**config)
 
-        # Auto-create connections from config
+        # Build connections from project_config.connections
+        connections = cls._build_connections(project_config.connections)
+
+        return cls(
+            project_config=project_config,
+            connections=connections,
+        )
+
+    @staticmethod
+    def _build_connections(conn_configs: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Convert connection configs to connection objects.
+
+        Args:
+            conn_configs: Connection configurations from ProjectConfig
+
+        Returns:
+            Dictionary of connection name -> connection object
+
+        Raises:
+            ValueError: If connection type is not supported
+        """
         connections = {}
-        for conn_name, conn_config in config.get("connections", {}).items():
+        for conn_name, conn_config in conn_configs.items():
             conn_type = conn_config.get("type", "local")
 
             if conn_type == "local":
@@ -348,17 +384,13 @@ class PipelineManager:
                     base_path=conn_config.get("base_path", "./data")
                 )
             else:
-                raise ValueError(f"Unsupported connection type: {conn_type}")
+                raise ValueError(
+                    f"Unsupported connection type: {conn_type}. "
+                    f"Supported types: local (Phase 1). "
+                    f"Azure/Spark connections coming in Phase 3."
+                )
 
-        # Extract story config
-        story_config = config.get("story", {})
-
-        return cls(
-            yaml_config=config,
-            engine=project_config.engine,
-            connections=connections,
-            story_config=story_config,
-        )
+        return connections
 
     def run(
         self, pipelines: Optional[Union[str, List[str]]] = None

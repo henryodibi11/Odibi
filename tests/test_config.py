@@ -230,41 +230,127 @@ class TestProjectConfig:
     """Test ProjectConfig validation."""
 
     def test_minimal_project_config(self):
-        """Minimal valid project config."""
-        config = ProjectConfig(project="My Project")
+        """Minimal valid project config requires connections, pipelines, story."""
+        from odibi.config import StoryConfig
+
+        config = ProjectConfig(
+            project="My Project",
+            connections={"data": {"type": "local", "base_path": "./data"}},
+            pipelines=[
+                PipelineConfig(
+                    pipeline="test_pipeline",
+                    nodes=[
+                        NodeConfig(
+                            name="test_node",
+                            read=ReadConfig(connection="data", path="test.csv", format="csv"),
+                        )
+                    ],
+                )
+            ],
+            story=StoryConfig(connection="data", path="stories/"),
+        )
         assert config.project == "My Project"
         assert config.engine == EngineType.PANDAS  # Default
         assert config.version == "1.0.0"  # Default
 
     def test_project_with_connections(self):
         """Project can define connections."""
+        from odibi.config import StoryConfig
+
         config = ProjectConfig(
-            project="Test", connections={"local": {"type": "local", "base_path": "./data"}}
+            project="Test",
+            connections={"local": {"type": "local", "base_path": "./data"}},
+            pipelines=[
+                PipelineConfig(
+                    pipeline="test",
+                    nodes=[
+                        NodeConfig(
+                            name="test_node",
+                            read=ReadConfig(connection="local", path="test.csv", format="csv"),
+                        )
+                    ],
+                )
+            ],
+            story=StoryConfig(connection="local", path="stories/"),
         )
         assert "local" in config.connections
         assert config.connections["local"]["type"] == "local"
 
     def test_project_default_engine_is_pandas(self):
         """Default engine should be Pandas."""
-        config = ProjectConfig(project="Test")
+        from odibi.config import StoryConfig
+
+        config = ProjectConfig(
+            project="Test",
+            connections={"data": {"type": "local"}},
+            pipelines=[
+                PipelineConfig(
+                    pipeline="test",
+                    nodes=[
+                        NodeConfig(
+                            name="node",
+                            read=ReadConfig(connection="data", path="test.csv", format="csv"),
+                        )
+                    ],
+                )
+            ],
+            story=StoryConfig(connection="data", path="stories/"),
+        )
         assert config.engine == EngineType.PANDAS
 
     def test_project_can_set_spark_engine(self):
         """Can set engine to Spark."""
-        config = ProjectConfig(project="Test", engine=EngineType.SPARK)
+        from odibi.config import StoryConfig
+
+        config = ProjectConfig(
+            project="Test",
+            engine=EngineType.SPARK,
+            connections={"data": {"type": "local"}},
+            pipelines=[
+                PipelineConfig(
+                    pipeline="test",
+                    nodes=[
+                        NodeConfig(
+                            name="node",
+                            read=ReadConfig(connection="data", path="test.csv", format="csv"),
+                        )
+                    ],
+                )
+            ],
+            story=StoryConfig(connection="data", path="stories/"),
+        )
         assert config.engine == EngineType.SPARK
 
-    def test_project_with_defaults(self):
-        """Project has default settings for retry, logging, story."""
-        config = ProjectConfig(project="Test")
+    def test_project_with_global_settings(self):
+        """Project has settings for retry, logging at top level."""
+        from odibi.config import StoryConfig
 
-        # Check defaults exist
-        assert config.defaults is not None
-        assert config.defaults.retry.enabled is True
-        assert config.defaults.retry.max_attempts == 3
-        assert config.defaults.logging.level.value == "INFO"
-        assert config.defaults.story.auto_generate is True
-        assert config.defaults.story.max_sample_rows == 10
+        config = ProjectConfig(
+            project="Test",
+            connections={"data": {"type": "local"}},
+            pipelines=[
+                PipelineConfig(
+                    pipeline="test",
+                    nodes=[
+                        NodeConfig(
+                            name="node",
+                            read=ReadConfig(connection="data", path="test.csv", format="csv"),
+                        )
+                    ],
+                )
+            ],
+            story=StoryConfig(connection="data", path="stories/"),
+        )
+
+        # Check top-level settings exist (no more nested defaults)
+        assert config.retry is not None
+        assert config.retry.enabled is True
+        assert config.retry.max_attempts == 3
+        assert config.logging.level.value == "INFO"
+        assert config.story is not None
+        assert config.story.connection == "data"
+        assert config.story.auto_generate is True
+        assert config.story.max_sample_rows == 10
 
 
 class TestConnectionConfigs:

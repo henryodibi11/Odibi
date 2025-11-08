@@ -241,51 +241,73 @@ class LoggingConfig(BaseModel):
 
 
 class StoryConfig(BaseModel):
-    """Story generation configuration."""
+    """Story generation configuration.
 
-    auto_generate: bool = True
+    Stories are ODIBI's core value - execution reports with lineage.
+    They must use a connection for consistent, traceable output.
+    """
+
+    connection: str = Field(
+        description="Connection name for story output (uses connection's path resolution)"
+    )
+    path: str = Field(description="Path for stories (relative to connection base_path)")
     max_sample_rows: int = Field(default=10, ge=0, le=100)
-    output_path: str = Field(default="stories/", description="Directory for story output")
+    auto_generate: bool = True
 
 
-class DefaultsConfig(BaseModel):
-    """Global default settings."""
-
-    retry: RetryConfig = Field(default_factory=RetryConfig)
-    logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    story: StoryConfig = Field(default_factory=StoryConfig)
-
-
-class PipelineDiscoveryConfig(BaseModel):
-    """Pipeline discovery configuration."""
-
-    path: str = Field(description="Glob pattern for pipeline files")
-    layer: Optional[str] = Field(default=None, description="Assign layer to discovered pipelines")
+# DefaultsConfig deleted - settings moved to top-level ProjectConfig
+# PipelineDiscoveryConfig deleted - Phase 2 feature (file discovery)
 
 
 class ProjectConfig(BaseModel):
-    """Root project configuration."""
+    """Complete project configuration from YAML.
 
+    Represents the entire YAML structure with validation.
+    All settings are top-level (no nested defaults).
+    """
+
+    # === MANDATORY ===
     project: str = Field(description="Project name")
-    version: str = Field(default="1.0.0", description="Project version")
-    description: Optional[str] = Field(default=None, description="Project description")
-    owner: Optional[str] = Field(default=None, description="Project owner/contact")
-    engine: EngineType = Field(default=EngineType.PANDAS, description="Default execution engine")
-
-    # Infrastructure
+    engine: EngineType = Field(default=EngineType.PANDAS, description="Execution engine")
     connections: Dict[str, Dict[str, Any]] = Field(
-        default_factory=dict, description="Named connections"
+        description="Named connections (at least one required)"
     )
-
-    # Pipeline discovery
-    pipelines: Optional[List[PipelineDiscoveryConfig]] = Field(
-        default=None, description="Patterns for discovering pipeline files"
+    pipelines: List[PipelineConfig] = Field(
+        description="Pipeline definitions (at least one required)"
     )
+    story: StoryConfig = Field(description="Story generation configuration (mandatory)")
 
-    # Global settings
-    defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
+    # === OPTIONAL (with sensible defaults) ===
+    description: Optional[str] = Field(default=None, description="Project description")
+    version: str = Field(default="1.0.0", description="Project version")
+    owner: Optional[str] = Field(default=None, description="Project owner/contact")
 
-    # Environment overrides
+    # Global settings (optional with defaults in Pydantic)
+    retry: RetryConfig = Field(default_factory=RetryConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+
+    # === PHASE 3 ===
     environments: Optional[Dict[str, Dict[str, Any]]] = Field(
-        default=None, description="Environment-specific overrides"
+        default=None,
+        description="Environment-specific overrides (Phase 3 - not implemented)",
     )
+
+    @model_validator(mode="after")
+    def validate_story_connection_exists(self):
+        """Ensure story.connection is defined in connections."""
+        if self.story.connection not in self.connections:
+            available = ", ".join(self.connections.keys())
+            raise ValueError(
+                f"Story connection '{self.story.connection}' not found. "
+                f"Available connections: {available}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_environments_not_implemented(self):
+        """Block environments config until Phase 3."""
+        if self.environments:
+            raise NotImplementedError(
+                "Environment overrides are planned for Phase 3. " "See PHASES.md for roadmap."
+            )
+        return self
