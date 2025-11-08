@@ -111,16 +111,83 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 
 ---
 
-## Phase 2 — CLI Tools + Testing Utilities
+## Phase 2 — Spark Engine + Azure ADLS (Production-Ready)
 
 **Target Version:** v1.2.0  
-**Status:** ⏳ Planned  
+**Status:** 📋 Planning Complete → Ready for Implementation  
 **Timeline:** Q1 2026
+
+**Design Document:** [docs/PHASE2_DESIGN_DECISIONS.md](docs/PHASE2_DESIGN_DECISIONS.md)
+
+### Goals
+- Implement production-ready Spark engine (read, write, transform)
+- Complete Azure ADLS integration with Key Vault authentication
+- Enable multi-account storage scenarios (Databricks production use case)
+- Provide seamless Databricks onboarding experience
+
+### Deliverables
+
+#### Spark Engine Implementation
+- [ ] `SparkEngine.read()` - Parquet, CSV, Delta from ADLS/DBFS
+- [ ] `SparkEngine.write()` - Parquet, CSV, Delta with modes (overwrite/append)
+- [ ] `SparkEngine.execute_sql()` - SQL transforms with temp view registration
+- [ ] Connection configuration at engine init (all storage accounts)
+- [ ] Integration tests with local Spark session
+
+#### Azure ADLS Authentication
+- [ ] **Two auth modes:** `key_vault` (default) and `direct_key` (fallback)
+- [ ] Key Vault integration using `DefaultAzureCredential` (Databricks managed identity)
+- [ ] Credential caching (fetch once per connection)
+- [ ] Storage options injection for Pandas (`pandas_storage_options()`)
+- [ ] Spark config setup for all accounts (`configure_spark()`)
+- [ ] Eager validation (fail fast on connection init)
+- [ ] Production warning when using `direct_key` mode
+
+#### User Onboarding Tools
+- [ ] `setup/databricks_setup.ipynb` - Interactive Databricks + Key Vault setup
+- [ ] `odibi/utils/setup_helpers.py` - Programmatic setup utilities
+  - `get_databricks_identity_info()` - Get workspace managed identity
+  - `print_keyvault_setup_instructions()` - Generate setup commands
+- [ ] Automated identity detection and command generation
+
+#### PandasEngine Enhancements
+- [ ] `_merge_storage_options()` - Inject connection credentials
+- [ ] Update `read()` to support ADLS with storage_options
+- [ ] Update `write()` to support ADLS with storage_options
+- [ ] Skip `mkdir` for remote URIs (abfss://, s3://, etc.)
+
+#### Documentation
+- [ ] `docs/PHASE2_DESIGN_DECISIONS.md` - Complete design rationale ✅
+- [ ] `docs/databricks_setup.md` - Databricks + Key Vault setup guide
+- [ ] Update `examples/template_full.yaml` - Show Key Vault auth
+- [ ] Update `README.md` - Databricks quick start section
+- [ ] Update `docs/CONFIGURATION_EXPLAINED.md` - Auth modes section
+
+#### Examples
+- [ ] `examples/example_spark_databricks.yaml` - Multi-account Spark pipeline
+- [ ] `examples/example_azure_pandas.yaml` - Pandas with ADLS
+
+### Acceptance Criteria
+- [ ] Spark engine executes real pipelines in Databricks
+- [ ] Multi-account storage works (3+ storage accounts simultaneously)
+- [ ] Key Vault auth works with workspace managed identity
+- [ ] Setup notebook guides users through one-time setup (< 5 minutes)
+- [ ] All tests pass (Spark integration tests require pyspark installed)
+- [ ] Documentation clear and tested in real Databricks environment
+
+---
+
+## Phase 3 — CLI Tools + Advanced Features
+
+**Target Version:** v1.3.0  
+**Status:** ⏳ Planned  
+**Timeline:** Q2 2026
 
 ### Goals
 - Improve developer experience with polished CLI tools
-- Add testing utilities and fixtures for easier test authoring
-- Stabilize Spark/Azure scaffolding based on feedback
+- Enhance story/report generation for pipeline runs
+- Add more cloud connectors (AWS S3, GCP)
+- Add testing utilities and fixtures
 
 ### Deliverables
 
@@ -139,51 +206,13 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 - [ ] `odibi.testing.assertions` - DataFrame equality helpers (engine-agnostic)
 - [ ] Example datasets compatible with both Pandas and Spark
 
-#### Quality Gates
-- [ ] Coverage reporting in CI (target: 90%+ on core modules)
-- [ ] `ruff` linting enforced in CI
-- [ ] `mypy` type checking on core modules
-- [ ] Pre-commit hooks documented in CONTRIBUTING.md
-
-#### Documentation
-- [ ] CLI reference guide (`docs/cli_reference.md`)
-- [ ] Testing guide (`docs/testing_guide.md`)
-- [ ] Troubleshooting FAQ (`docs/troubleshooting.md`)
-
-### Acceptance Criteria
-- [ ] CLI commands work with all existing examples
-- [ ] Test utilities simplify fixture creation
-- [ ] Coverage remains above 90% on core
-- [ ] All linting and type checking passes
-
----
-
-## Phase 3 — Advanced Features (Story Generation, More Connectors)
-
-**Target Version:** v1.3.0  
-**Status:** ⏳ Planned  
-**Timeline:** Q2 2026
-
-### Goals
-- Implement story/report generation for pipeline runs
-- Add more cloud connectors (AWS S3, GCP)
-- Begin implementing Spark engine read/write operations
-
-### Deliverables
-
-#### Story Generator
+#### Story Generator Enhancements
 - [ ] `odibi.story` module enhancement
 - [ ] Capture run metadata: timestamps, node durations, success/failure
 - [ ] Sample data snapshots (first N rows per node)
 - [ ] Schema tracking (detect schema changes between nodes)
 - [ ] Export formats: Markdown, JSON, HTML (basic)
 - [ ] Configurable verbosity levels
-
-#### Spark Engine Implementation
-- [ ] `SparkEngine.execute_sql()` - Register temp views from context, execute SQL
-- [ ] `SparkEngine.read()` - Parquet, CSV, Avro, JSON from DBFS/ADLS
-- [ ] `SparkEngine.write()` - Parquet, CSV, Avro, JSON with modes (overwrite/append)
-- [ ] Integration tests with local Spark session
 
 #### New Connectors (Scaffolded → Implemented)
 - [ ] `connections/s3.py` - AWS S3 using `boto3` (scaffold + docs)

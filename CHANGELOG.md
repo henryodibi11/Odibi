@@ -14,14 +14,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive `examples/template_full.yaml` documenting all YAML options
 - `fastavro>=1.8.0` dependency for Avro support
 - `pandasql>=0.7.3` dependency for SQL fallback
+- **Story configuration** now requires explicit connection reference
+- Validation that story connection exists in connections section
+- Complete documentation: `docs/CONFIGURATION_EXPLAINED.md` (500+ lines)
 
 ### Changed
+- **BREAKING**: `ProjectConfig` now requires `story`, `connections`, and `pipelines` fields (no defaults)
+- **BREAKING**: Stories now use connection pattern - `story.connection` is mandatory
+- **BREAKING**: Removed `DefaultsConfig` and `PipelineDiscoveryConfig` classes
+- **BREAKING**: Settings flattened to top-level (retry, logging, story instead of nested defaults)
 - **API Improvement**: `Pipeline.from_yaml()` returns manager with `run()`, `run('name')`, `run(['names'])` methods
 - Run all pipelines by default, specify by name (not index) for clarity
+- Single source of truth: `ProjectConfig` represents entire YAML (no raw dict parsing)
 - Updated PHASES.md to include Avro in SparkEngine Phase 3 roadmap
+
+### Migration Guide (v1.0 → v1.1)
+
+**Before (v1.0):**
+```yaml
+connections:
+  local:
+    type: local
+    base_path: ./data
+
+# Story path was implicit/floating
+```
+
+**After (v1.1):**
+```yaml
+connections:
+  data:
+    type: local
+    base_path: ./data
+  outputs:
+    type: local
+    base_path: ./outputs
+
+story:
+  connection: outputs  # Required: explicit connection
+  path: stories/       # Resolved to ./outputs/stories/
+  enabled: true
+
+retry:
+  max_attempts: 3
+  backoff_seconds: 2.0
+
+logging:
+  level: INFO
+
+pipelines:
+  - name: my_pipeline
+    # ... rest of config
+```
+
+**Key Changes:**
+1. Add `story.connection` field pointing to an existing connection
+2. Move retry/logging settings to top-level (remove `defaults` wrapper)
+3. All three sections (`story`, `connections`, `pipelines`) are now mandatory
+
+**Why:** Stories now follow the same explicit connection pattern as data, providing clear traceability and single source of truth.
 
 ### Fixed
 - Dependency scanning across entire odibi module (all external deps captured)
+- Config validation now prevents missing story connections
+- Eliminated dual parsing (ProjectConfig is single source of truth)
 
 ## [1.1.0-alpha.1-ci-setup] - 2025-11-06
 

@@ -1,20 +1,20 @@
 # ODIBI Project Status
 
-**Last Updated:** 2025-11-07  
+**Last Updated:** 2025-11-08  
 **Current Version:** v1.1.0-alpha.2-walkthroughs
 
 ---
 
-## 📊 Current Status: Phase 1 Complete ✅
+## 📊 Current Status: Phase 2 Planning Complete ✅
 
 ### Phase Summary
 
 | Phase | Status | Version | Completion |
 |-------|--------|---------|------------|
 | **Phase 1: Scaffolding** | ✅ Complete | v1.1.0-alpha.2 | Nov 2025 |
-| **Phase 1F: Walkthroughs** | ✅ Complete | v1.1.0-alpha.2 | Nov 2025 |
-| **Phase 2: CLI & Testing** | 📋 Planned | v1.2.0 | Q1 2026 |
-| **Phase 3: Spark Implementation** | 📋 Planned | v2.0.0 | Q2 2026 |
+| **Phase 1G: Config Refactor** | ✅ Complete | v1.1.0 (unreleased) | Nov 2025 |
+| **Phase 2: Spark + Azure** | 📋 Design Complete | v1.2.0 | Q1 2026 |
+| **Phase 3: CLI & Advanced** | 📋 Planned | v1.3.0 | Q2 2026 |
 
 ---
 
@@ -73,16 +73,37 @@
 
 ---
 
-## 🎯 What's Next: Phase 2 - CLI & Testing Utilities
+## 📝 Recent Completion: Config Refactor (Phase 1G)
+
+**Completed:** Nov 2025  
+**Status:** Code complete, docs updated, tests passing
+
+### What Changed
+- ✅ Deleted `DefaultsConfig` and `PipelineDiscoveryConfig`
+- ✅ Made `story`, `connections`, `pipelines` mandatory in ProjectConfig
+- ✅ Stories now use connection pattern (`story.connection` required)
+- ✅ Single source of truth (ProjectConfig = entire YAML)
+- ✅ Updated CHANGELOG.md with migration guide
+- ✅ Updated all walkthroughs and documentation
+- ✅ All 86 tests passing
+
+---
+
+## 🎯 What's Next: Phase 2 Implementation - Spark Engine & Azure ADLS
 
 **Target:** Q1 2026  
-**See:** `PHASES.md` for detailed specifications
+**Design Status:** ✅ Complete  
+**Design Document:** `docs/PHASE2_DESIGN_DECISIONS.md`
 
 ### Planned Deliverables
-- [ ] CLI commands: `odibi validate`, `odibi run`, `odibi graph`
-- [ ] Testing utilities and fixtures
-- [ ] Enhanced error messages and debugging
-- [ ] CLI documentation and guides
+- [ ] Spark engine (read, write, transform)
+- [ ] Azure ADLS with Key Vault authentication
+- [ ] Multi-account storage support
+- [ ] Databricks integration (managed identity)
+- [ ] Setup notebook + onboarding tools
+- [ ] PandasEngine ADLS support
+
+**See:** `PHASES.md` and `docs/PHASE2_DESIGN_DECISIONS.md` for complete specifications
 
 ---
 

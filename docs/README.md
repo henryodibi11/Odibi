@@ -54,6 +54,14 @@ Located in [`walkthroughs/`](../walkthroughs/)
 
 ## 📖 Reference
 
+### Architecture & Design
+- **[Phase 2 Design Decisions](PHASE2_DESIGN_DECISIONS.md)** 🆕
+  - Transform pattern (no connections needed)
+  - Multi-account storage strategy
+  - Azure authentication modes (Key Vault vs direct key)
+  - Databricks integration approach
+  - Complete implementation plan
+
 ### Configuration Templates
 - **[Complete YAML Template](../examples/template_full.yaml)**
   - All available options documented
@@ -79,8 +87,14 @@ Located in [`walkthroughs/`](../walkthroughs/)
 
 ### Project Structure
 - **[Phase Roadmap](../PHASES.md)**
-  - Current phase: Phase 1 Complete
-  - Phase 2-5 planned features
+  - Phase 1: ✅ Complete (Scaffolding + Config Refactor)
+  - Phase 2: 📋 Design Complete (Spark + Azure ADLS)
+  - Phase 3-5: Planned features
+
+- **[Phase 2 Design Decisions](PHASE2_DESIGN_DECISIONS.md)**
+  - Complete design rationale
+  - Implementation checklist
+  - Design principles
 
 - **[Changelog](../CHANGELOG.md)**
   - Version history
@@ -154,5 +168,5 @@ See walkthroughs for troubleshooting sections with common errors and solutions.
 ---
 
 **Current Version:** v1.1.0-alpha.2-walkthroughs  
-**Status:** Phase 1 Complete, Phase 2 Planned  
-**Last Updated:** 2025-11-07
+**Status:** Phase 1 Complete, Phase 2 Design Complete  
+**Last Updated:** 2025-11-08

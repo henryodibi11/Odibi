@@ -213,8 +213,11 @@ class ProjectConfig(BaseModel):
     project: str  # Required
     version: str = "1.0.0"  # Default
     engine: EngineType = EngineType.PANDAS  # Default
-    connections: Dict[str, Dict[str, Any]] = {}
-    defaults: DefaultsConfig = DefaultsConfig()
+    connections: Dict[str, Dict[str, Any]]  # Required
+    story: StoryConfig  # Required
+    pipelines: List[Dict[str, Any]]  # Required
+    retry: RetryConfig = RetryConfig()  # Default
+    logging: LoggingConfig = LoggingConfig()  # Default
 ```
 
 **Maps to YAML:**
@@ -223,8 +226,24 @@ project: My Pipeline      # → project
 version: "2.0.0"          # → version
 engine: pandas            # → engine (validated as EngineType.PANDAS)
 connections:
-  local:                  # → connections["local"]
+  data:                   # → connections["data"]
     type: local
+    base_path: ./data
+  outputs:                # → connections["outputs"]
+    type: local
+    base_path: ./outputs
+story:
+  connection: outputs     # → story.connection (required)
+  path: stories/          # → story.path
+  enabled: true           # → story.enabled
+retry:
+  max_attempts: 3         # → retry.max_attempts
+  backoff_seconds: 2.0    # → retry.backoff_seconds
+logging:
+  level: INFO             # → logging.level
+pipelines:                # → pipelines (list of pipeline configs)
+  - pipeline: example
+    nodes: [...]
 ```
 
 #### PipelineConfig (Line 203)
@@ -368,6 +387,13 @@ connections:
   local:
     type: local
     base_path: ./data
+  outputs:
+    type: local
+    base_path: ./outputs
+story:
+  connection: outputs
+  path: stories/
+  enabled: true
 pipelines:
   - pipeline: example
     nodes:
@@ -415,13 +441,12 @@ with open("simple.yaml") as f:
 #     "pipelines": [{"pipeline": "example", "nodes": [...]}]
 # }
 
-# Validate project config
-project_config = ProjectConfig(
-    project="Simple Pipeline",
-    engine="pandas",
-    connections={"local": {"type": "local", "base_path": "./data"}}
-)
-# ✅ Validation passed
+# Validate project config (entire YAML - single source of truth)
+project_config = ProjectConfig(**config)
+# ✅ Validation passed - checks:
+#    - Required fields: project, connections, story, pipelines
+#    - story.connection exists in connections
+#    - engine is valid (pandas or spark)
 
 # Create connections
 connections = {
@@ -430,10 +455,9 @@ connections = {
 
 # Create PipelineManager
 manager = PipelineManager(
-    yaml_config=config,
+    project_config=project_config,
     engine="pandas",
-    connections=connections,
-    story_config={}
+    connections=connections
 )
 ```
 
@@ -807,7 +831,53 @@ transform:
 - `options` → passed to **engine** (Pandas/Spark I/O functions)
 - `params` → passed to **your function**
 
-### Confusion #5: "How does SQL find the DataFrames?"
+### Confusion #5: "Where do stories get written?"
+
+**Answer:** Stories use the connection pattern, just like data!
+
+**Story configuration (required):**
+```yaml
+connections:
+  outputs:
+    type: local
+    base_path: ./outputs
+
+story:
+  connection: outputs  # ← References connection name
+  path: stories/       # ← Path within connection
+  enabled: true
+```
+
+**Resolved path:** `./outputs/stories/pipeline_name_20251107_143025.md`
+
+**Why this pattern?**
+- **Explicit:** Clear where stories are written (no hidden defaults)
+- **Traceable:** Connection-based paths preserve truth
+- **Consistent:** Same pattern as `read.connection` and `write.connection`
+- **Flexible:** Stories can go to ADLS, DBFS, or local storage
+
+**Before v1.1 (confusing):**
+```yaml
+# Story path was implicit - where is "stories/" relative to?
+connections:
+  local:
+    type: local
+    base_path: ./data
+```
+
+**After v1.1 (explicit):**
+```yaml
+connections:
+  outputs:
+    type: local
+    base_path: ./outputs
+
+story:
+  connection: outputs  # Required - must exist in connections
+  path: stories/
+```
+
+### Confusion #6: "How does SQL find the DataFrames?"
 
 **Answer:** The engine looks them up in the context!
 

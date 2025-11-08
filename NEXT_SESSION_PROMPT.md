@@ -1,182 +1,151 @@
-# Next Session: Complete Config Refactor Documentation
+# Next Session: Phase 2 Implementation - Spark Engine & Azure ADLS
 
-**Previous Session:** Config system refactor - core code complete  
-**Commit:** `211895c` - "refactor: clean up config system - single source of truth"  
-**Thread:** T-590a644c-cf0d-49ab-ba46-626ece748c03
+**Previous Session:** Phase 2 Design Planning Complete  
+**Status:** ✅ Planning complete → Ready for implementation  
+**Thread:** T-63b2eb6f-87f4-4630-830c-07f26db2aa71
 
 ---
 
 ## ✅ What Was Completed
 
-### Code Refactor (100% Complete)
-- ✅ Deleted `DefaultsConfig` and `PipelineDiscoveryConfig`
-- ✅ Made `story`, `connections`, `pipelines` mandatory in ProjectConfig
-- ✅ Added `story.connection` field (stories use connection pattern)
-- ✅ Flattened settings to top-level (retry, logging, story)
-- ✅ Refactored `PipelineManager` to use `ProjectConfig` everywhere
-- ✅ Single source of truth - no raw dict parsing
-- ✅ Added validators (story.connection exists, environments blocked)
+### Config Refactor Documentation (Complete)
+- ✅ Updated CHANGELOG.md with breaking changes & migration guide
+- ✅ Fixed CONFIGURATION_EXPLAINED.md (removed dual-parsing, added story.connection confusion point)
+- ✅ Updated walkthroughs 01 and 05 for v1.1
+- ✅ Ran end-to-end pipeline test with example_local.yaml (both pipelines successful)
+- ✅ All 86 tests passing, formatting/linting clean
 
-### Examples & Tests (100% Complete)
-- ✅ Updated `example_local.yaml` (data + outputs connections, story config)
-- ✅ Created `template_full.yaml` (comprehensive reference with all options)
-- ✅ Fixed all ProjectConfig tests
-- ✅ **All 86 tests passing** (Spark tests skipped - Java issue)
-- ✅ Examples load successfully
-
-### Initial Documentation (Partial)
-- ✅ Created `docs/CONFIGURATION_EXPLAINED.md` (500+ line guide)
-- ✅ Created `docs/README.md` (documentation index)
-- ✅ Updated `README.md` (added links to config guide)
+### Phase 2 Design Planning (Complete)
+- ✅ **Transform pattern decided**: No connections needed (operates on data in context)
+- ✅ **Multi-account storage strategy**: Spark (global config) vs Pandas (per-operation injection)
+- ✅ **Authentication modes**: `key_vault` (default) and `direct_key` (fallback)
+- ✅ **Databricks integration validated**: Workspace managed identity + DefaultAzureCredential works
+- ✅ **User onboarding plan**: Setup notebook + utility helpers (no manual docs)
+- ✅ **Validation strategy**: Eager validation (fail fast on connection init)
+- ✅ **Out of scope defined**: SAS tokens, service principal, cross-tenant KV, etc.
+- ✅ **Complete design document created**: `docs/PHASE2_DESIGN_DECISIONS.md`
+- ✅ **PHASES.md updated**: Phase 2 redefined with new scope and deliverables
 
 ---
 
-## 🎯 What Needs To Be Done
+## 🎯 Phase 2 Implementation Ready
 
-### High Priority (Session Goal)
+**Design Document:** [docs/PHASE2_DESIGN_DECISIONS.md](docs/PHASE2_DESIGN_DECISIONS.md)
 
-**1. Update CHANGELOG.md**
-- [ ] Add breaking changes under `[Unreleased]`
-- [ ] Document what changed, why, and migration path
-- [ ] Example before/after YAML snippets
+### Implementation Checklist
 
-**2. Update CONFIGURATION_EXPLAINED.md**
-- [ ] Remove "dual parsing" confusion sections (no longer relevant)
-- [ ] Update execution trace to show new `ProjectConfig` flow
-- [ ] Simplify "Common Confusion Points" (some fixed by refactor)
-- [ ] Update code examples to show story.connection pattern
+**See the design document for complete checklist.** Key areas:
 
-**3. Update Key Walkthroughs**
-- [ ] `walkthroughs/01_local_pipeline_pandas.ipynb` (CRITICAL - main tutorial)
-  - Update config explanations (ProjectConfig is complete YAML)
-  - Update YAML examples (add story.connection)
-  - Update "Config vs Runtime" section
-- [ ] `walkthroughs/05_build_new_pipeline.ipynb`
-  - Update step-by-step YAML building
-  - Add story configuration step
+#### Code Changes
+1. **`odibi/connections/azure_adls.py`**
+   - Add auth modes (`key_vault`, `direct_key`)
+   - Add `get_storage_key()`, `pandas_storage_options()`, `configure_spark()`
+   - Eager validation
 
-**4. Update HANDOFF.md**
-- [ ] Add section: "Post-Phase 1 Config Cleanup"
-- [ ] Document breaking changes
-- [ ] Update status
+2. **`odibi/engine/spark_engine.py`**
+   - Implement `read()`, `write()`, `execute_sql()`
+   - Configure all connections at init
 
-**5. Run Actual Pipeline Test**
-- [ ] Create test data (data/bronze/sales.csv)
-- [ ] Run `example_local.yaml` end-to-end
-- [ ] Verify stories generated in outputs/stories/
-- [ ] Verify data written to silver/ and gold/
+3. **`odibi/engine/pandas_engine.py`**
+   - Add `_merge_storage_options()`
+   - Inject credentials into read/write
 
-### Medium Priority (If Time)
+4. **`odibi/utils/setup_helpers.py`** (NEW)
+   - `get_databricks_identity_info()`
+   - `print_keyvault_setup_instructions()`
 
-**6. Update Other Walkthroughs**
-- [ ] `walkthroughs/00_setup_environment.ipynb` - Update mental model
-- [ ] `walkthroughs/02_cli_and_testing.ipynb` - Check config references
-- [ ] `walkthroughs/03_spark_preview_stub.ipynb` - Update Spark config
+#### Setup Tools
+5. **`setup/databricks_setup.ipynb`** (NEW)
+   - Interactive Databricks + Key Vault setup
+   - Auto-detect identity, generate commands, test connection
 
-**7. Update Setup Guides**
-- [ ] `docs/setup_azure.md` - Add story config examples
-- [ ] `docs/setup_databricks.md` - Update config structure
+#### Documentation
+6. **`docs/databricks_setup.md`** (NEW)
+7. Update `README.md`, `examples/template_full.yaml`, `docs/CONFIGURATION_EXPLAINED.md`
 
-**8. Framework Scan**
-- [ ] Search for "DefaultsConfig" references: `grep -r "DefaultsConfig" .`
-- [ ] Search for "PipelineDiscoveryConfig": `grep -r "PipelineDiscoveryConfig" .`
-- [ ] Search for old story patterns: `grep -r "output_path.*stories" .`
+#### Examples
+8. **`examples/example_spark_databricks.yaml`** (NEW)
+9. **`examples/example_azure_pandas.yaml`** (NEW)
 
-### Final Steps
-
-**9. Quality Assurance**
-- [ ] Format all code: `black odibi/ tests/`
-- [ ] Lint: `ruff check odibi/ tests/`
-- [ ] Run full test suite: `pytest -v -m "not extras"`
-- [ ] Execute all walkthroughs cell-by-cell
-
-**10. Final Verification**
-- [ ] Load both examples: `Pipeline.from_yaml("examples/...")`
-- [ ] Run simple pipeline end-to-end
-- [ ] Generate and review story output
-- [ ] Verify no regressions
+#### Testing
+10. Unit tests for auth modes, Key Vault mocking, Spark config
+11. Integration tests (optional - requires Azure resources)
 
 ---
 
-## 📝 Key Design Decisions to Maintain
+## 🔑 Key Design Decisions Summary
 
-**Principles Applied:**
-1. **Explicit over implicit** - Story requires connection (no hidden defaults)
-2. **Truth-preserving** - Stories use connection-based paths (traceable)
-3. **Single source of truth** - ProjectConfig represents entire YAML
-4. **Consistent patterns** - Connections for everything (data + observability)
-5. **No duplicate locations** - Settings in one place only
+### 1. Transforms Don't Need Connections
+- Read brings data INTO context → Transform operates on data IN context → Write sends data OUT
+- Works for Pandas (in-memory) and Spark (lazy execution)
 
-**What Changed:**
-```yaml
-# BEFORE (confusing)
-connections:
-  local:
-    type: local
-    base_path: ./data
+### 2. Multi-Account Storage
+- **Spark**: Set all account configs globally at engine init (no clashes - keys scoped by account)
+- **Pandas**: Inject `storage_options` per-operation from connection
 
-# Story had no connection - floating path!
-# (Where is "stories/" relative to?)
+### 3. Two Auth Modes
+- **`key_vault`** (default): Fetch keys from Key Vault using DefaultAzureCredential
+- **`direct_key`** (fallback): User provides key directly (env var, testing)
 
-# AFTER (explicit)
-connections:
-  data:
-    type: local
-    base_path: ./data
-  outputs:
-    type: local
-    base_path: ./outputs
+### 4. Databricks Integration
+- Workspace managed identity + DefaultAzureCredential works! ✅
+- One-time setup: Grant workspace identity access to Key Vault
+- Setup notebook automates the process
 
-story:
-  connection: outputs  # Explicit connection
-  path: stories/       # Clear: ./outputs/stories/
-```
+### 5. User Onboarding
+- **Primary**: Setup notebook (interactive, automated)
+- **Secondary**: Utility helpers (programmatic)
+- **No**: Azure CLI docs, portal screenshots (automated tools better)
 
-**Code Changes:**
-```python
-# BEFORE (dual parsing)
-project_config = ProjectConfig(**{k: v for k in config if k != "pipelines"})
-story_config = config.get("story", {})  # Raw dict!
-
-# AFTER (single source)
-project_config = ProjectConfig(**config)  # Complete YAML
-story_config = project_config.story  # Use validated object
-```
+### 6. Validation
+- **Eager** (on connection init) not lazy (on first use)
+- Fail fast with clear error messages
 
 ---
 
-## 🔍 Files to Review/Update
+## 📋 Suggested Implementation Order
 
-**Must Update:**
-1. `CHANGELOG.md` - Breaking changes
-2. `docs/CONFIGURATION_EXPLAINED.md` - Simplify flow
-3. `walkthroughs/01_local_pipeline_pandas.ipynb` - Main tutorial
-4. `walkthroughs/05_build_new_pipeline.ipynb` - Build guide
-5. `HANDOFF.md` - Project status
+### Phase 1: Core Authentication (Week 1)
+1. Implement `AzureADLS` with both auth modes
+2. Add validation and warning logic
+3. Add Key Vault integration with caching
+4. Unit tests for auth modes
 
-**Check/Update if Needed:**
-6. `docs/setup_azure.md`
-7. `docs/setup_databricks.md`
-8. `PHASES.md` - Note PipelineDiscoveryConfig → Phase 2
-9. `CONTRIBUTING.md` - Config examples
+### Phase 2: Pandas Integration (Week 1)
+1. Implement `pandas_storage_options()` in `AzureADLS`
+2. Add `_merge_storage_options()` in `PandasEngine`
+3. Update `read()` and `write()` to inject credentials
+4. Skip mkdir for remote URIs
+5. Integration tests with real/mocked ADLS
 
-**Scan for References:**
-- `DefaultsConfig` (should be 0 outside of this doc)
-- `PipelineDiscoveryConfig` (should be 0 outside of this doc)
-- `config.get("story"` (should be 0 - use project_config.story)
+### Phase 3: Spark Engine (Week 2-3)
+1. Implement `_configure_all_connections()` in `SparkEngine`
+2. Implement `configure_spark()` in `AzureADLS`
+3. Implement `SparkEngine.read()` for Parquet, CSV, Delta
+4. Implement `SparkEngine.write()` for Parquet, CSV, Delta
+5. Implement `SparkEngine.execute_sql()` with temp views
+6. Integration tests with local Spark session
 
----
+### Phase 4: User Onboarding (Week 3)
+1. Create `setup/databricks_setup.ipynb`
+2. Create `odibi/utils/setup_helpers.py`
+3. Test in real Databricks workspace
+4. Create `docs/databricks_setup.md`
 
-## 💡 Session Success Criteria
+### Phase 5: Documentation & Examples (Week 4)
+1. Update `README.md` with Databricks quick start
+2. Create `examples/example_spark_databricks.yaml`
+3. Create `examples/example_azure_pandas.yaml`
+4. Update `examples/template_full.yaml`
+5. Update `docs/CONFIGURATION_EXPLAINED.md`
 
-**You know you're done when:**
-- [ ] CHANGELOG.md documents all breaking changes
-- [ ] Walkthrough 01 executes without errors
-- [ ] Walkthrough 05 teaches new pattern
-- [ ] All tests still passing
-- [ ] Example pipeline runs end-to-end and generates story
-- [ ] No leftover `DefaultsConfig` or `PipelineDiscoveryConfig` references
-- [ ] Documentation consistent with new design
+### Phase 6: QA & Polish (Week 4)
+1. Run full test suite
+2. Test in real Databricks environment
+3. Validate multi-account scenarios
+4. Check formatting, linting
+5. Update CHANGELOG.md
+6. Tag release (v1.2.0-alpha.1)
 
 ---
 
@@ -185,42 +154,32 @@ story_config = project_config.story  # Use validated object
 Copy and paste this:
 
 ```
-Continue the ODIBI config refactor documentation update.
+Start Phase 2 implementation - Spark Engine & Azure ADLS authentication.
 
-The core code refactor is complete (commit 211895c). All tests passing, examples load successfully.
+Design is complete (see docs/PHASE2_DESIGN_DECISIONS.md).
 
-Now I need to:
-1. Update CHANGELOG.md with breaking changes
-2. Fix CONFIGURATION_EXPLAINED.md (remove dual-parsing sections)
-3. Update walkthroughs 01 and 05 (critical tutorials)
-4. Run actual pipeline test with example_local.yaml
-5. Final QA (formatting, linting, full test run)
+Begin with:
+1. Implement azure_adls.py with key_vault and direct_key auth modes
+2. Add validation, Key Vault integration, caching
+3. Add pandas_storage_options() and configure_spark() methods
 
-Key changes to document:
-- ProjectConfig now requires story.connection (uses connection pattern)
-- Deleted DefaultsConfig and PipelineDiscoveryConfig
-- Single source of truth (no raw dict parsing)
-- Story uses connections like data does (explicit, traceable)
+Follow the implementation checklist in docs/PHASE2_DESIGN_DECISIONS.md.
 
-See NEXT_SESSION_PROMPT.md for full context.
-
-Start with CHANGELOG.md, then move through the high-priority docs/walkthroughs systematically.
+Let's start with AzureADLS connection class - implement the full authentication pattern.
 ```
 
 ---
 
 ## 📊 Progress Tracking
 
-**Phase 1-2: Core Refactor** ✅ 100% Complete  
-**Phase 3: Documentation** ⏳ 30% Complete  
-**Phase 4: QA & Verification** ⏳ 0% Complete
+**Phase 1:** ✅ Complete (Scaffolding + Config Refactor)  
+**Phase 2 Planning:** ✅ Complete  
+**Phase 2 Implementation:** ⏳ Ready to start  
 
-**Estimated Time Remaining:** 2-3 hours
-- Documentation updates: 1-2 hours
-- QA & testing: 30-60 minutes
+**Estimated Time:** 4 weeks for full Phase 2 implementation
 
 ---
 
-**Last Updated:** 2025-11-07  
-**Status:** Ready for documentation completion  
-**Next Focus:** CHANGELOG.md → walkthroughs → final testing
+**Last Updated:** 2025-11-08  
+**Status:** Phase 2 design complete, ready for implementation  
+**Next Focus:** Implement AzureADLS authentication with Key Vault
