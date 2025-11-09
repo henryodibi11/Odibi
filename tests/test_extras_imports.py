@@ -22,9 +22,12 @@ def test_spark_engine_import_without_pyspark(monkeypatch):
 )
 def test_spark_engine_import_with_pyspark():
     """SparkEngine should initialize when pyspark is available."""
+    from unittest.mock import MagicMock
     from odibi.engine.spark_engine import SparkEngine
 
-    engine = SparkEngine()
+    # Mock SparkSession to avoid Java dependency
+    mock_spark = MagicMock()
+    engine = SparkEngine(spark_session=mock_spark)
     assert engine.name == "spark"
     assert hasattr(engine, "get_schema")
     assert hasattr(engine, "get_shape")
@@ -32,17 +35,19 @@ def test_spark_engine_import_with_pyspark():
 
 @pytest.mark.extras
 def test_spark_engine_methods_not_implemented():
-    """SparkEngine stubs should raise NotImplementedError with helpful messages."""
+    """SparkEngine methods should work for Phase 2A."""
     pytest.importorskip("pyspark")
+    from unittest.mock import MagicMock
     from odibi.engine.spark_engine import SparkEngine
 
-    engine = SparkEngine()
+    # Mock SparkSession to avoid Java dependency
+    mock_spark = MagicMock()
+    engine = SparkEngine(spark_session=mock_spark)
 
-    with pytest.raises(NotImplementedError, match="Phase 3"):
-        engine.read()
+    # Phase 2A: read/write/execute_sql are implemented
+    # Only execute_transform and execute_operation should raise NotImplementedError
+    with pytest.raises(NotImplementedError, match="Phase 2B"):
+        engine.execute_transform()
 
-    with pytest.raises(NotImplementedError, match="Phase 3"):
-        engine.write()
-
-    with pytest.raises(NotImplementedError, match="Phase 3"):
-        engine.execute_sql()
+    with pytest.raises(NotImplementedError, match="Phase 2B"):
+        engine.execute_operation()

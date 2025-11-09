@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Optional
 import pandas as pd
 from pathlib import Path
+from urllib.parse import urlparse
 
 from odibi.engine.base import Engine
 from odibi.context import Context, PandasContext
@@ -15,6 +16,33 @@ class PandasEngine(Engine):
     def __init__(self):
         """Initialize Pandas engine."""
         pass
+
+    def _merge_storage_options(
+        self, connection: Any, options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Merge connection storage options with user options.
+
+        Args:
+            connection: Connection object (may have pandas_storage_options method)
+            options: User-provided options
+
+        Returns:
+            Merged options dictionary
+        """
+        options = options or {}
+
+        # If connection provides storage_options (e.g., AzureADLS), merge them
+        if hasattr(connection, "pandas_storage_options"):
+            conn_storage_opts = connection.pandas_storage_options()
+            user_storage_opts = options.get("storage_options", {})
+
+            # User options override connection options
+            merged_storage_opts = {**conn_storage_opts, **user_storage_opts}
+
+            # Return options with merged storage_options
+            return {**options, "storage_options": merged_storage_opts}
+
+        return options
 
     def read(
         self,
@@ -46,15 +74,18 @@ class PandasEngine(Engine):
         else:
             raise ValueError("Either path or table must be provided")
 
+        # Merge storage options for cloud connections
+        merged_options = self._merge_storage_options(connection, options)
+
         # Read based on format
         if format == "csv":
-            return pd.read_csv(full_path, **options)
+            return pd.read_csv(full_path, **merged_options)
         elif format == "parquet":
-            return pd.read_parquet(full_path, **options)
+            return pd.read_parquet(full_path, **merged_options)
         elif format == "json":
-            return pd.read_json(full_path, **options)
+            return pd.read_json(full_path, **merged_options)
         elif format == "excel":
-            return pd.read_excel(full_path, **options)
+            return pd.read_excel(full_path, **merged_options)
         elif format == "avro":
             try:
                 import fastavro
@@ -64,10 +95,23 @@ class PandasEngine(Engine):
                     "See README.md for installation instructions."
                 )
 
-            with open(full_path, "rb") as f:
-                reader = fastavro.reader(f)
-                records = [record for record in reader]
-            return pd.DataFrame(records)
+            # Use fsspec for remote URIs (abfss://, s3://, etc.)
+            parsed = urlparse(full_path)
+            if parsed.scheme and parsed.scheme not in ["file", ""]:
+                # Remote file - use fsspec
+                import fsspec
+
+                storage_opts = merged_options.get("storage_options", {})
+                with fsspec.open(full_path, "rb", **storage_opts) as f:
+                    reader = fastavro.reader(f)
+                    records = [record for record in reader]
+                return pd.DataFrame(records)
+            else:
+                # Local file - use standard open
+                with open(full_path, "rb") as f:
+                    reader = fastavro.reader(f)
+                    records = [record for record in reader]
+                return pd.DataFrame(records)
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
@@ -102,21 +146,26 @@ class PandasEngine(Engine):
         else:
             raise ValueError("Either path or table must be provided")
 
-        # Ensure parent directory exists
-        Path(full_path).parent.mkdir(parents=True, exist_ok=True)
+        # Merge storage options for cloud connections
+        merged_options = self._merge_storage_options(connection, options)
+
+        # Only create local directories (skip for remote URIs like abfss://, s3://)
+        parsed = urlparse(full_path)
+        if not parsed.scheme or parsed.scheme == "file":
+            Path(full_path).parent.mkdir(parents=True, exist_ok=True)
 
         # Write based on format
         if format == "csv":
             mode_param = "w" if mode == "overwrite" else "a"
-            df.to_csv(full_path, mode=mode_param, index=False, **options)
+            df.to_csv(full_path, mode=mode_param, index=False, **merged_options)
         elif format == "parquet":
             # Parquet doesn't support append easily
-            df.to_parquet(full_path, index=False, **options)
+            df.to_parquet(full_path, index=False, **merged_options)
         elif format == "json":
             mode_param = "w" if mode == "overwrite" else "a"
-            df.to_json(full_path, orient="records", **options)
+            df.to_json(full_path, orient="records", **merged_options)
         elif format == "excel":
-            df.to_excel(full_path, index=False, **options)
+            df.to_excel(full_path, index=False, **merged_options)
         elif format == "avro":
             try:
                 import fastavro
@@ -129,9 +178,21 @@ class PandasEngine(Engine):
             records = df.to_dict("records")
             schema = self._infer_avro_schema(df)
 
-            write_mode = "wb" if mode == "overwrite" else "ab"
-            with open(full_path, write_mode) as f:
-                fastavro.writer(f, schema, records)
+            # Use fsspec for remote URIs (abfss://, s3://, etc.)
+            parsed = urlparse(full_path)
+            if parsed.scheme and parsed.scheme not in ["file", ""]:
+                # Remote file - use fsspec
+                import fsspec
+
+                storage_opts = merged_options.get("storage_options", {})
+                write_mode = "wb" if mode == "overwrite" else "ab"
+                with fsspec.open(full_path, write_mode, **storage_opts) as f:
+                    fastavro.writer(f, schema, records)
+            else:
+                # Local file - use standard open
+                write_mode = "wb" if mode == "overwrite" else "ab"
+                with open(full_path, write_mode) as f:
+                    fastavro.writer(f, schema, records)
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 

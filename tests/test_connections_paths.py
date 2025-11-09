@@ -7,7 +7,12 @@ from odibi.connections.local_dbfs import LocalDBFS
 
 def test_azure_adls_uri_basic():
     """Test ADLS URI generation."""
-    conn = AzureADLS(account="myaccount", container="data")
+    conn = AzureADLS(
+        account="myaccount",
+        container="data",
+        auth_mode="direct_key",
+        account_key="test-key",
+    )
     uri = conn.uri("folder/file.csv")
 
     assert uri == "abfss://data@myaccount.dfs.core.windows.net/folder/file.csv"
@@ -15,7 +20,13 @@ def test_azure_adls_uri_basic():
 
 def test_azure_adls_uri_with_prefix():
     """Test ADLS URI with path prefix."""
-    conn = AzureADLS(account="myaccount", container="data", path_prefix="raw/")
+    conn = AzureADLS(
+        account="myaccount",
+        container="data",
+        path_prefix="raw/",
+        auth_mode="direct_key",
+        account_key="test-key",
+    )
     uri = conn.uri("file.csv")
 
     assert uri == "abfss://data@myaccount.dfs.core.windows.net/raw/file.csv"
@@ -23,7 +34,12 @@ def test_azure_adls_uri_with_prefix():
 
 def test_azure_adls_uri_with_leading_slash():
     """Test ADLS URI strips leading slashes correctly."""
-    conn = AzureADLS(account="myaccount", container="data")
+    conn = AzureADLS(
+        account="myaccount",
+        container="data",
+        auth_mode="direct_key",
+        account_key="test-key",
+    )
     uri = conn.uri("/folder/file.csv")
 
     assert uri == "abfss://data@myaccount.dfs.core.windows.net/folder/file.csv"

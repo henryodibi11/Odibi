@@ -1,0 +1,76 @@
+# ODIBI Configuration - Multi-Account ADLS Example (Phase 2A)
+# This example demonstrates reading from one storage account and writing to another
+
+# Connection definitions - multi-account ADLS support
+connections:
+  # Bronze layer - raw data
+  bronze:
+    type: azure_adls
+    account: mystorageaccount1
+    container: bronze
+    path_prefix: raw  # Optional: all paths will be prefixed with "raw/"
+    auth_mode: key_vault  # Recommended for production
+    key_vault_name: company-keyvault
+    secret_name: bronze-storage-key
+
+  # Silver layer - cleaned data
+  silver:
+    type: azure_adls
+    account: mystorageaccount2  # Different storage account
+    container: silver
+    path_prefix: cleaned
+    auth_mode: key_vault
+    key_vault_name: company-keyvault
+    secret_name: silver-storage-key
+
+  # Local development (alternative - direct_key mode)
+  # Uncomment for local testing
+  # bronze_local:
+  #   type: azure_adls
+  #   account: mystorageaccount1
+  #   container: bronze
+  #   auth_mode: direct_key
+  #   account_key: "${BRONZE_STORAGE_KEY}"  # From environment variable
+
+# Execution engine
+engine: pandas  # or 'spark'
+
+# Pipeline definitions
+pipelines:
+  - pipeline: ingest_and_clean
+    nodes:
+      # Read CSV from bronze (account 1)
+      - name: load_raw_sales
+        read:
+          connection: bronze
+          path: sales/2024/sales_raw.csv
+          format: csv
+          options:
+            sep: ","
+            header: true
+
+      # Transform - clean the data
+      - name: clean_sales
+        depends_on: [load_raw_sales]
+        transform:
+          steps:
+            - "SELECT * FROM load_raw_sales WHERE amount > 0"
+            - "SELECT *, UPPER(customer_name) AS customer FROM clean_temp"
+
+      # Write Parquet to silver (account 2)
+      - name: save_clean_sales
+        depends_on: [clean_sales]
+        write:
+          connection: silver
+          path: sales/2024/sales_cleaned.parquet
+          format: parquet
+          mode: overwrite
+          options:
+            compression: snappy
+
+# Supported Formats with ADLS:
+# - csv: Comma-separated values
+# - parquet: Columnar format (recommended for data lakes)
+# - json: JSON lines format
+# - excel: Excel files (.xlsx)
+# - avro: Apache Avro binary format

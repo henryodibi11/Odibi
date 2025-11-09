@@ -1,8 +1,10 @@
 # Phase 2 Design Decisions
 
-**Status:** ✅ Planning Complete  
+**Status:** ✅ Design Refinement Complete  
 **Last Updated:** 2025-11-08  
-**Session:** Config Refactor + Azure Auth Strategy Planning
+**Sessions:**
+- Config Refactor + Azure Auth Strategy Planning
+- Design Refinement - Critical Implementation Details (Testing, Delta, Performance, Session Management)
 
 ---
 
@@ -22,8 +24,14 @@ This document captures the architectural decisions made during Phase 2 planning.
 4. [Databricks Integration](#4-databricks-integration)
 5. [User Onboarding Tools](#5-user-onboarding-tools)
 6. [Validation Strategy](#6-validation-strategy)
-7. [Out of Scope](#7-out-of-scope-phase-2)
-8. [Implementation Checklist](#8-implementation-checklist)
+7. [Delta Lake Strategy](#7-delta-lake-strategy)
+8. [Spark Session Management](#8-spark-session-management)
+9. [Testing Strategy](#9-testing-strategy)
+10. [Key Vault Performance](#10-key-vault-performance)
+11. [Local Development Experience](#11-local-development-experience)
+12. [Out of Scope](#12-out-of-scope-phase-2)
+13. [Implementation Roadmap](#13-implementation-roadmap)
+14. [Implementation Checklist](#14-implementation-checklist)
 
 ---
 
@@ -581,7 +589,518 @@ conn = AzureADLS(account="...", ..., validate=False)
 
 ---
 
-## 7. Out of Scope (Phase 2)
+## 7. Delta Lake Strategy
+
+### Decision
+
+**Delta Lake is the default file format** for all write operations. Enforce best practices while supporting legacy formats when needed.
+
+### Why Delta as Default
+
+Delta Lake provides critical features over Parquet/CSV:
+- ✅ **ACID transactions** - No partial writes if job fails
+- ✅ **Schema evolution** - Add columns without breaking readers
+- ✅ **Time travel** - Audit trail, rollback, debugging
+- ✅ **Better updates/deletes** - Don't rewrite entire dataset
+- ✅ **Data quality** - Built-in validation and consistency
+- ✅ **Same performance** - Still Parquet underneath
+
+### Implementation Strategy
+
+**Both Engines Support Delta:**
+
+| Engine | Delta Library | Capabilities |
+|--------|---------------|--------------|
+| **Pandas** | `deltalake` (delta-rs) | Read, write, VACUUM, time travel, partitioning |
+| **Spark** | `delta-spark` | Full Delta features (all Pandas features + OPTIMIZE, MERGE) |
+
+### Configuration
+
+```yaml
+nodes:
+  - name: write_output
+    write:
+      connection: silver
+      path: sales.delta
+      # format: delta  # ← Default, can be omitted
+      mode: append
+```
+
+### Warn on Non-Delta Formats
+
+```python
+# Production environment
+if format in ["parquet", "csv"] and os.getenv("ODIBI_ENV") == "production":
+    warnings.warn(
+        f"⚠️  Writing to {format} format. "
+        f"Consider using format='delta' for ACID transactions, "
+        f"schema evolution, and time travel.",
+        UserWarning
+    )
+```
+
+### Phase 2 Delta Features
+
+**Core Operations (Both Engines):**
+- ✅ Read/Write Delta tables
+- ✅ Delta as default format
+- ✅ Append/Overwrite modes
+- ✅ Time travel (read specific versions via `versionAsOf`)
+- ✅ VACUUM (cleanup old files, save storage costs)
+- ✅ History (list all versions/commits)
+- ✅ Restore (rollback to previous version)
+- ✅ Schema evolution (automatic)
+- ✅ Works with ADLS/S3/GCS
+
+**Partitioning (Optional, Not Enforced):**
+```yaml
+# Optional partitioning for large datasets
+write:
+  path: sensors.delta
+  partition_by: [year, month]  # ← Optional
+```
+
+**Warning on partitioning anti-patterns:**
+```python
+# Warn if too many partitions (> 1000)
+# Warn if partitions too small (< 1000 rows per partition)
+```
+
+### Phase 3 Advanced Features (Deferred)
+
+❌ **OPTIMIZE** - File compaction (Spark only, medium complexity)  
+❌ **MERGE/UPSERT** - Update existing records (Spark only, complex)  
+❌ **Z-ORDER** - Clustering optimization (Spark only, advanced)  
+❌ **Streaming writes** - Structured Streaming to Delta (complex)
+
+### Dependencies
+
+```toml
+[project.dependencies]
+deltalake = ">=0.15.0"  # Delta for Pandas (core dependency)
+
+[project.optional-dependencies]
+spark = [
+    "pyspark>=3.3.0",
+    "delta-spark>=2.3.0",  # Delta for Spark
+]
+```
+
+### Examples
+
+**Read Delta (with time travel):**
+```yaml
+read:
+  connection: bronze
+  path: sales.delta
+  format: delta
+  options:
+    versionAsOf: 5  # Read version 5
+```
+
+**Write Delta (with partitioning):**
+```yaml
+write:
+  connection: silver
+  path: sensors.delta
+  format: delta
+  partition_by: [year, month]
+  mode: append
+```
+
+**Maintenance (VACUUM):**
+```python
+# Cleanup old files (save storage costs)
+engine.vacuum_delta(
+    connection="silver",
+    path="sales.delta",
+    retention_hours=168  # Keep last 7 days
+)
+```
+
+---
+
+## 8. Spark Session Management
+
+### Decision
+
+SparkEngine accepts **optional `spark_session` parameter** with intelligent fallback.
+
+### Implementation
+
+```python
+class SparkEngine:
+    def __init__(self, connections, spark_session=None):
+        from pyspark.sql import SparkSession
+        
+        if spark_session:
+            # User provided session - use it
+            self.spark = spark_session
+        else:
+            # Get existing session or create new one
+            self.spark = SparkSession.builder \
+                .appName("ODIBI") \
+                .getOrCreate()
+        
+        # Configure all ADLS storage accounts
+        self._configure_all_connections(connections)
+```
+
+### How It Works
+
+**Databricks (existing session):**
+```python
+# Databricks has active session
+engine = SparkEngine(connections)
+# Uses existing Databricks session via getOrCreate()
+```
+
+**Local development (auto-create):**
+```python
+# No active session
+engine = SparkEngine(connections)
+# Creates new local session via getOrCreate()
+```
+
+**Custom session (advanced):**
+```python
+# User creates session with custom config
+spark = SparkSession.builder \
+    .config("spark.executor.memory", "8g") \
+    .getOrCreate()
+
+engine = SparkEngine(connections, spark_session=spark)
+# Uses user's custom session
+```
+
+### Rationale
+
+**Simple approach:**
+- `getOrCreate()` handles both Databricks and local scenarios
+- No need to track session ownership
+- No need for PySpark version detection
+- Python handles cleanup automatically
+
+**Can optimize later** if needed (session pooling, explicit stop, etc.).
+
+---
+
+## 9. Testing Strategy
+
+### Decision
+
+**Mock everything for automated tests**, use Databricks Community Edition for manual verification.
+
+### Automated Testing (CI/CD)
+
+**Test locally without cloud resources:**
+
+| Test Layer | Approach | Tools |
+|------------|----------|-------|
+| **Spark logic** | Local Spark session (`master("local[1]")`) | pytest + pyspark |
+| **Azure credentials** | Mock Azure SDK | pytest + unittest.mock |
+| **Key Vault** | Mock SecretClient | pytest + monkeypatch |
+| **Cloud I/O** | Skip in CI (test manually) | pytest.mark.skip |
+
+### Example: Mock Key Vault
+
+```python
+@pytest.fixture
+def mock_key_vault(monkeypatch):
+    """Mock Azure Key Vault SecretClient."""
+    from unittest.mock import MagicMock
+    
+    mock_secret = MagicMock()
+    mock_secret.value = "test-storage-key-12345"
+    
+    mock_client = MagicMock()
+    mock_client.get_secret.return_value = mock_secret
+    
+    monkeypatch.setattr(
+        "azure.keyvault.secrets.SecretClient",
+        lambda **kwargs: mock_client
+    )
+    return mock_client
+
+def test_key_vault_auth_mode(mock_key_vault):
+    """Test Key Vault authentication fetches and caches key."""
+    conn = AzureADLS(
+        account="testaccount",
+        container="test",
+        auth_mode="key_vault",
+        key_vault_name="test-kv",
+        secret_name="test-secret"
+    )
+    
+    key1 = conn.get_storage_key()
+    key2 = conn.get_storage_key()  # Should use cache
+    
+    assert key1 == "test-storage-key-12345"
+    assert key2 == key1
+    mock_key_vault.get_secret.assert_called_once()
+```
+
+### Example: Test Spark Config
+
+```python
+def test_spark_multi_account_config():
+    """Test SparkEngine configures multiple storage accounts."""
+    conn1 = AzureADLS(
+        account="account1",
+        container="c1",
+        auth_mode="direct_key",
+        account_key="fake-key-1",
+        validate=False
+    )
+    conn2 = AzureADLS(
+        account="account2",
+        container="c2",
+        auth_mode="direct_key",
+        account_key="fake-key-2",
+        validate=False
+    )
+    
+    engine = SparkEngine(connections={"bronze": conn1, "silver": conn2})
+    
+    # Verify Spark config was set correctly
+    key1 = engine.spark.conf.get(
+        "fs.azure.account.key.account1.dfs.core.windows.net"
+    )
+    key2 = engine.spark.conf.get(
+        "fs.azure.account.key.account2.dfs.core.windows.net"
+    )
+    
+    assert key1 == "fake-key-1"
+    assert key2 == "fake-key-2"
+```
+
+### Manual Testing (Databricks CE)
+
+**When to test manually:**
+- End-to-end pipeline runs
+- Real Key Vault integration
+- Real ADLS read/write
+- Delta table operations on cloud storage
+
+**Not for CI/CD** - too slow, requires Azure resources, network-dependent.
+
+### What We're Testing
+
+✅ **Our code's logic** (configuration, validation, caching)  
+✅ **Integration patterns** (does our code call Azure SDK correctly?)  
+❌ **Not testing Azure** (Key Vault works, Spark works - Microsoft's job)
+
+---
+
+## 10. Key Vault Performance
+
+### Decision
+
+**Parallel credential fetching** with proper error handling and timeouts.
+
+### Performance Characteristics
+
+**Key Vault latency:**
+- Same region: 50-150ms per secret
+- Cross-region: 150-500ms per secret
+
+**Sequential vs Parallel:**
+```
+Sequential (5 connections): 5 × 100ms = 500ms
+Parallel (5 connections):   ~150ms total
+```
+
+### Implementation
+
+```python
+import concurrent.futures
+
+def _configure_all_connections(self, connections, timeout=30):
+    """Fetch all Key Vault secrets in parallel."""
+    adls_connections = [
+        (name, conn) for name, conn in connections.items()
+        if isinstance(conn, AzureADLS)
+    ]
+    
+    if not adls_connections:
+        return
+    
+    errors = {}
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        # Submit all fetch tasks
+        future_to_conn = {
+            executor.submit(conn.get_storage_key): (name, conn)
+            for name, conn in adls_connections
+        }
+        
+        # Wait for all with timeout
+        done, not_done = concurrent.futures.wait(
+            future_to_conn.keys(),
+            timeout=timeout,
+            return_when=concurrent.futures.ALL_COMPLETED
+        )
+        
+        # Handle timeouts
+        if not_done:
+            for future in not_done:
+                name, conn = future_to_conn[future]
+                future.cancel()
+                errors[name] = TimeoutError(
+                    f"Key Vault fetch timed out after {timeout}s"
+                )
+        
+        # Collect results and errors
+        for future in done:
+            name, conn = future_to_conn[future]
+            try:
+                future.result()
+            except Exception as e:
+                errors[name] = e
+    
+    # Fail fast if any errors
+    if errors:
+        error_details = "\n".join([
+            f"  - {name}: {str(e)}"
+            for name, e in errors.items()
+        ])
+        raise RuntimeError(
+            f"Failed to fetch storage keys for {len(errors)} connection(s):\n"
+            f"{error_details}"
+        )
+    
+    # Configure Spark with cached keys
+    for name, conn in adls_connections:
+        conn.configure_spark(self.spark)
+```
+
+### Error Handling
+
+**All errors reported clearly:**
+```
+RuntimeError: Failed to fetch storage keys for 2 connection(s):
+  - bronze: Secret 'bronze-key' not found in vault 'company-kv'
+  - gold: Access denied to vault 'company-kv' (403 Forbidden)
+```
+
+### Additional Optimizations
+
+**1. Shared DefaultAzureCredential:**
+```python
+# Global credential (reused across connections)
+_azure_credential = None
+
+def get_azure_credential():
+    global _azure_credential
+    if not _azure_credential:
+        from azure.identity import DefaultAzureCredential
+        _azure_credential = DefaultAzureCredential()
+    return _azure_credential
+```
+
+**2. Shared SecretClient per Key Vault:**
+```python
+# Cache clients by vault name
+_secret_clients = {}
+
+def get_secret_client(key_vault_name):
+    if key_vault_name not in _secret_clients:
+        credential = get_azure_credential()
+        vault_url = f"https://{key_vault_name}.vault.azure.net"
+        _secret_clients[key_vault_name] = SecretClient(
+            vault_url=vault_url,
+            credential=credential
+        )
+    return _secret_clients[key_vault_name]
+```
+
+### Expected Performance
+
+| Connections | Startup Time |
+|-------------|--------------|
+| 1 | ~100ms |
+| 5 | ~150ms (parallel) |
+| 10 | ~200ms (parallel) |
+
+**Good enough for Phase 2.** Can optimize further in Phase 3 if needed.
+
+---
+
+## 11. Local Development Experience
+
+### Decision
+
+**Explicit config files** for local vs production environments. No magic auto-detection.
+
+### Pattern: Separate Config Files
+
+```yaml
+# config.prod.yaml (committed to git)
+connections:
+  bronze:
+    type: azure_adls
+    account: storageaccount
+    container: bronze
+    auth_mode: key_vault  # ← Explicit
+    key_vault_name: company-kv
+    secret_name: bronze-key
+```
+
+```yaml
+# config.local.yaml (in .gitignore, developer creates)
+connections:
+  bronze:
+    type: azure_adls
+    account: storageaccount
+    container: bronze
+    auth_mode: direct_key  # ← Explicit
+    account_key: "${BRONZE_KEY}"  # From .env file
+```
+
+### Developer Setup
+
+**One-time setup:**
+1. Copy `config.prod.yaml` to `config.local.yaml`
+2. Change `auth_mode: key_vault` to `auth_mode: direct_key`
+3. Add `account_key: "${BRONZE_KEY}"`
+4. Create `.env` file with storage keys
+5. Add `config.local.yaml` and `.env` to `.gitignore`
+
+**Daily usage:**
+```bash
+# Local development
+python run_pipeline.py --config config.local.yaml
+
+# Production (Databricks)
+python run_pipeline.py --config config.prod.yaml
+```
+
+### Rationale
+
+**Why explicit configs:**
+- ✅ No magic behavior (ODIBI_ENV auto-detection rejected)
+- ✅ Clear intent (can see which auth mode from YAML)
+- ✅ Simple to understand
+- ✅ Safe (can't accidentally run prod config locally)
+
+**Why direct_key for local dev:**
+- ✅ Simpler setup than Azure CLI auth
+- ✅ Works on any laptop
+- ✅ No Azure permissions needed
+- ✅ Faster (no Key Vault calls)
+
+### .gitignore
+
+```
+# Local development configs (contain secrets)
+config.local.yaml
+.env
+*.local.yaml
+```
+
+---
+
+## 12. Out of Scope (Phase 2)
 
 ### Explicitly NOT Implementing
 
@@ -628,29 +1147,176 @@ The following were considered but **excluded from Phase 2** to keep scope manage
 
 ---
 
-## 8. Implementation Checklist
+## 13. Implementation Roadmap
 
-### Code Changes
+### Decision: 3-Phase Delivery (3 Weeks)
+
+Phase 2 is divided into 3 mini-phases for incremental delivery and clear milestones.
+
+**Phase 2A: Foundation (Week 1)**
+- Goal: Get ADLS working with Key Vault auth
+- Deliverable: Multi-account ADLS integration with Parquet/CSV support
+
+**Phase 2B: Delta Lake (Week 2)**
+- Goal: Add modern data engineering capabilities
+- Deliverable: Production-ready Delta Lake support
+
+**Phase 2C: Performance & Polish (Week 3)**
+- Goal: Production-grade performance and documentation
+- Deliverable: Enterprise-ready ODIBI
+
+---
+
+## 14. Implementation Checklist
+
+### Phase 2A: Foundation (Week 1)
+
+#### Code Changes
 
 #### `odibi/connections/azure_adls.py`
 - [ ] Add parameters: `auth_mode`, `key_vault_name`, `secret_name`, `account_key`
 - [ ] Set `auth_mode="key_vault"` as default
 - [ ] Add `validate()` method (eager validation)
-- [ ] Add `get_storage_key()` method (Key Vault fetch + caching)
+- [ ] Add `get_storage_key()` method (Key Vault fetch + caching - sequential for 2A)
 - [ ] Add `pandas_storage_options()` method (returns dict for fsspec)
 - [ ] Add `configure_spark()` method (sets Spark config)
 - [ ] Add warning when `direct_key` used in production (`ODIBI_ENV` check)
 
 #### `odibi/engine/pandas_engine.py`
 - [ ] Add `_merge_storage_options()` helper
-- [ ] Update `read()` to call `_merge_storage_options()` before pandas read
-- [ ] Update `write()` to call `_merge_storage_options()` before pandas write
+- [ ] Update `read()` to support Parquet and CSV formats
+- [ ] Update `write()` to support Parquet and CSV formats
+- [ ] Call `_merge_storage_options()` before all reads/writes
 - [ ] Skip `mkdir` for remote URIs (`abfss://`, `s3://`, etc.)
 
 #### `odibi/engine/spark_engine.py`
-- [ ] Add `_configure_all_connections()` method
+- [ ] Add `spark_session` parameter to `__init__` (optional)
+- [ ] Use `getOrCreate()` if no session provided
+- [ ] Add `_configure_all_connections()` method (sequential for 2A)
 - [ ] Call `_configure_all_connections()` in `__init__`
 - [ ] Loop through connections, call `configure_spark()` on each ADLS connection
+- [ ] Support Parquet and CSV read/write
+
+#### Testing (Phase 2A)
+
+- [ ] `tests/test_azure_adls_auth.py` (NEW):
+  - Test validation for both auth modes
+  - Test Key Vault fetch (mocked, sequential)
+  - Test `pandas_storage_options()` returns correct dict
+  - Test `configure_spark()` sets correct Spark config
+  - Test caching behavior
+  - Test production warning for `direct_key`
+
+- [ ] `tests/test_spark_session.py` (NEW):
+  - Test session parameter acceptance
+  - Test getOrCreate() fallback
+  - Test multi-account configuration
+
+- [ ] Manual test in Databricks CE:
+  - Basic pipeline with Key Vault
+  - Multi-account Parquet read/write
+
+#### Documentation (Phase 2A)
+
+- [ ] `examples/template_full.yaml` - Basic ADLS example with Key Vault
+- [ ] `README.md` - Quick start guide for ADLS + Key Vault
+- [ ] `docs/LOCAL_DEVELOPMENT.md` (NEW) - config.local.yaml setup
+
+#### Dependencies (Phase 2A)
+
+- [ ] Add to `pyproject.toml`:
+  ```toml
+  [project.optional-dependencies]
+  azure = [
+      "azure-identity>=1.12.0",
+      "azure-keyvault-secrets>=4.7.0",
+      "adlfs>=2023.1.0",
+  ]
+  ```
+
+---
+
+### Phase 2B: Delta Lake (Week 2)
+
+#### Code Changes
+
+#### `odibi/engine/pandas_engine.py`
+- [ ] Add Delta support: `read()` with `deltalake.DeltaTable`
+- [ ] Add Delta support: `write()` with `write_deltalake()`
+- [ ] Add `vacuum_delta()` method
+- [ ] Add `get_delta_history()` method
+- [ ] Add `restore_delta()` method
+- [ ] Support `partition_by` parameter for Delta writes
+- [ ] Support `filters` parameter for partition pruning
+- [ ] Warn on partitioning anti-patterns (>1000 partitions, tiny partitions)
+- [ ] Default format to `delta` in `write()` method
+- [ ] Warn when using Parquet/CSV in production
+
+#### `odibi/engine/spark_engine.py`
+- [ ] Add Delta support: `read()`, `write()` with delta format
+- [ ] Add `vacuum_delta()` method
+- [ ] Add `get_delta_history()` method
+- [ ] Add `restore_delta()` method
+- [ ] Support `partition_by` parameter for Delta writes
+- [ ] Support `filters` parameter for partition pruning
+- [ ] Default format to `delta` in `write()` method
+
+#### Testing (Phase 2B)
+
+- [ ] `tests/test_delta_support.py` (NEW):
+  - Test Delta read/write (both engines, mocked)
+  - Test VACUUM operation
+  - Test history and restore
+  - Test partitioning support
+  - Test partition filtering
+  - Test warnings on partitioning anti-patterns
+  - Test default format is Delta
+
+- [ ] Manual test in Databricks CE:
+  - Delta read/write/VACUUM on ADLS
+  - Partitioned Delta tables
+  - Time travel, history, restore
+
+#### Documentation (Phase 2B)
+
+- [ ] `docs/FILE_FORMATS.md` (NEW):
+  - Explain Delta Lake vs Parquet vs CSV
+  - When to use each format
+  - Delta best practices
+  - Partitioning guide (when to use, anti-patterns)
+  - Examples of Delta operations (VACUUM, history, restore)
+
+- [ ] Update `examples/template_full.yaml` - Delta examples with partitioning
+
+#### Dependencies (Phase 2B)
+
+- [ ] Add to `pyproject.toml`:
+  ```toml
+  [project.dependencies]
+  deltalake = ">=0.15.0"  # Delta for Pandas
+  
+  [project.optional-dependencies]
+  spark = [
+      "pyspark>=3.3.0",
+      "delta-spark>=2.3.0",
+  ]
+  ```
+
+---
+
+### Phase 2C: Performance & Polish (Week 3)
+
+#### Code Changes
+
+#### `odibi/connections/azure_adls.py`
+- [ ] Implement shared `DefaultAzureCredential` (global singleton)
+- [ ] Implement shared `SecretClient` per Key Vault (cache clients)
+
+#### `odibi/engine/spark_engine.py`
+- [ ] Refactor `_configure_all_connections()` to parallel fetching
+- [ ] Implement timeout protection (30s default)
+- [ ] Collect all errors and report clearly
+- [ ] Add comprehensive error messages
 
 #### `odibi/utils/setup_helpers.py` (NEW)
 - [ ] Create file
@@ -659,79 +1325,59 @@ The following were considered but **excluded from Phase 2** to keep scope manage
 - [ ] Add docstrings with examples
 - [ ] Handle errors gracefully (not in Databricks, identity unavailable, etc.)
 
-### Setup Tools
+#### Setup Tools (Phase 2C)
 
-#### `setup/databricks_setup.ipynb` (NEW)
-- [ ] Create notebook
-- [ ] Cell 1: Install dependencies (`%pip install azure-identity azure-keyvault-secrets`)
-- [ ] Cell 2: Get and display workspace identity info
-- [ ] Cell 3: Generate Azure CLI command with user's Key Vault name
-- [ ] Cell 4: Test Key Vault connection
-- [ ] Cell 5: List available secrets (validate setup)
-- [ ] Add markdown explanations between cells
-- [ ] Add troubleshooting section
+- [ ] `setup/databricks_setup.ipynb` (NEW):
+  - Cell 1: Install dependencies
+  - Cell 2: Get and display workspace identity info
+  - Cell 3: Generate Azure CLI command with user's Key Vault name
+  - Cell 4: Test Key Vault connection
+  - Cell 5: List available secrets (validate setup)
+  - Add markdown explanations between cells
+  - Add troubleshooting section
 
-### Documentation
+#### Testing (Phase 2C)
 
-#### `examples/template_full.yaml`
-- [ ] Update connections section to show `key_vault` auth mode (primary example)
-- [ ] Comment out `direct_key` example with note "For dev/test only"
-- [ ] Add comments explaining Key Vault pattern
+- [ ] Add to `tests/test_azure_adls_auth.py`:
+  - Test parallel Key Vault fetching
+  - Test error handling (missing secrets, timeout)
+  - Test shared credential/client caching
 
-#### `README.md`
-- [ ] Add "Databricks Setup" section (5-minute setup)
-- [ ] Link to `setup/databricks_setup.ipynb`
-- [ ] Show `key_vault` configuration example
-- [ ] Add note about `direct_key` fallback for local dev
+- [ ] Performance testing:
+  - Measure startup time with 5 connections (target: <200ms)
+  - Test timeout protection (simulate hung Key Vault)
 
-#### `docs/databricks_setup.md` (NEW)
-- [ ] Create comprehensive setup guide
-- [ ] Explain why Key Vault (security, rotation, audit)
-- [ ] Document setup notebook usage
-- [ ] Document utility helper usage
-- [ ] Add troubleshooting section
-- [ ] Link to Azure Key Vault documentation
+- [ ] End-to-end test in Databricks CE:
+  - Full pipeline with all features
+  - Multi-account, Delta, partitioned
+  - Setup notebook walkthrough
 
-#### `docs/CONFIGURATION_EXPLAINED.md`
-- [ ] Add section on Azure authentication modes
-- [ ] Explain Key Vault vs direct_key trade-offs
-- [ ] Add examples with both modes
-- [ ] Link to databricks_setup.md
+#### Documentation (Phase 2C)
 
-### Testing
+- [ ] `docs/databricks_setup.md` (NEW):
+  - Comprehensive setup guide
+  - Explain why Key Vault (security, rotation, audit)
+  - Document setup notebook usage
+  - Document utility helper usage
+  - Add troubleshooting section
+  - Link to Azure Key Vault documentation
 
-#### Unit Tests
-- [ ] `tests/test_azure_adls_auth.py` (NEW):
-  - Test validation for both auth modes
-  - Test Key Vault fetch (mocked)
-  - Test `pandas_storage_options()` returns correct dict
-  - Test `configure_spark()` sets correct Spark config
-  - Test caching behavior
-  - Test production warning for `direct_key`
+- [ ] `docs/CONFIGURATION_EXPLAINED.md`:
+  - Add section on Azure authentication modes
+  - Explain Key Vault vs direct_key trade-offs
+  - Add examples with both modes
+  - Link to databricks_setup.md
 
-#### Integration Tests (Optional - requires Azure resources)
-- [ ] `tests/integration/test_azure_auth.py`:
-  - Test real Key Vault access (if test environment available)
-  - Test multi-account Spark config
-  - Test Pandas read/write with storage_options
+- [ ] Update `README.md`:
+  - Databricks Setup section (5-minute setup)
+  - Link to setup notebook
+  - Key Vault configuration example
+  - Note about direct_key fallback
 
-### Dependencies
-
-- [ ] Add to `pyproject.toml` under `[project.optional-dependencies]`:
-  ```toml
-  azure = [
-      "azure-identity>=1.12.0",
-      "azure-keyvault-secrets>=4.7.0",
-      "adlfs>=2023.1.0",
-  ]
-  ```
-
-### Examples
-
-- [ ] Update `examples/example_spark.yaml`:
-  - Use `key_vault` auth mode
-  - Add comments explaining pattern
-  - Show multi-account example
+- [ ] Create example pipelines:
+  - `examples/example_multi_account.yaml`
+  - `examples/example_delta_pipeline.yaml`
+  - `examples/example_partitioned_delta.yaml`
 
 ---
 
@@ -740,31 +1386,95 @@ The following were considered but **excluded from Phase 2** to keep scope manage
 **Phase 2 design is complete when:**
 
 - ✅ All design decisions documented in this file
-- ✅ Implementation checklist created
+- ✅ Implementation roadmap created (3 phases)
 - ✅ Dependencies identified
 - ✅ User onboarding plan defined
 - ✅ Testing strategy outlined
 - ✅ Out-of-scope items explicitly listed
+- ✅ Critical implementation details addressed (testing, Delta, performance, sessions)
 
-**Phase 2 implementation will be complete when:**
+**Phase 2A complete when:**
+- ADLS connection working with Key Vault auth
+- Multi-account support (Spark + Pandas)
+- Parquet/CSV read/write functional
+- Basic tests passing
+- Can deploy basic pipelines to Databricks
 
-- All checklist items implemented
-- All tests passing
-- Setup notebook tested in real Databricks workspace
-- Documentation complete and accurate
-- Examples work end-to-end
+**Phase 2B complete when:**
+- Delta Lake support in both engines
+- VACUUM, history, restore working
+- Partitioning supported with warnings
+- Delta-specific tests passing
+- Can deploy production Delta pipelines
+
+**Phase 2C complete when:**
+- Parallel Key Vault fetching implemented
+- Startup time <200ms for 5 connections
+- Setup notebook tested in Databricks
+- Comprehensive documentation complete
+- Example pipelines work end-to-end
+- All Phase 2 features production-ready
+
+---
+
+## Design Decisions Summary
+
+**Core Decisions:**
+1. ✅ **Transforms never need connections** - operate on data in context
+2. ✅ **Multi-account support** - Spark global config, Pandas per-operation injection
+3. ✅ **Key Vault auth default** - with direct_key fallback for local dev
+4. ✅ **Delta Lake default format** - enforce best practices, support legacy formats
+5. ✅ **Mock everything for tests** - Databricks CE for manual verification only
+6. ✅ **Parallel Key Vault fetching** - 150ms vs 500ms for 5 connections
+7. ✅ **Explicit configs** - no ODIBI_ENV magic, separate local/prod files
+8. ✅ **Simple Spark session** - accept optional param, getOrCreate() fallback
+
+**Key Features Added in Refinement:**
+- Delta support in both engines (deltalake + delta-spark)
+- VACUUM, history, restore operations
+- Optional partitioning with anti-pattern warnings
+- Parallel credential fetching with error handling
+- Timeout protection for Key Vault calls
+- Comprehensive test mocking strategy
+
+---
+
+## Implementation Timeline
+
+**Week 1 (Phase 2A): Foundation**
+- Day 1-2: Azure ADLS connection + Key Vault auth
+- Day 3-4: Multi-account support + Spark session management
+- Day 5: Testing + basic documentation
+- **Deliverable:** Working ADLS integration
+
+**Week 2 (Phase 2B): Delta Lake**
+- Day 1-2: Delta read/write (both engines)
+- Day 3: VACUUM, history, restore
+- Day 4: Partitioning support
+- Day 5: Testing + Delta documentation
+- **Deliverable:** Production-ready Delta support
+
+**Week 3 (Phase 2C): Performance & Polish**
+- Day 1-2: Parallel Key Vault fetching + error handling
+- Day 3: Setup notebook + utilities
+- Day 4: Comprehensive documentation
+- Day 5: End-to-end testing + examples
+- **Deliverable:** Enterprise-ready ODIBI
+
+**Total:** 3 weeks (15 days)
 
 ---
 
 ## Next Steps
 
-1. **Review this document** with stakeholders
-2. **Prioritize checklist items** (what's MVP vs nice-to-have)
-3. **Create implementation tasks** (GitHub issues)
-4. **Begin Phase 2 execution**
+1. **Week 1 Start:** Begin Phase 2A implementation
+2. **Daily testing:** Run mocked tests locally
+3. **Weekly milestones:** Test in Databricks CE at end of each phase
+4. **Ship incrementally:** Each phase delivers value
 
 ---
 
-**Status:** ✅ Planning Complete - Ready for Implementation  
+**Status:** ✅ Design Refinement Complete - 3-Phase Roadmap Defined  
 **Document Owner:** @henryodibi11  
-**Approvers:** [TBD]
+**Last Review:** 2025-11-08  
+**Implementation Start:** TBD
