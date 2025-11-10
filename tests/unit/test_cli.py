@@ -31,7 +31,7 @@ class TestCLIMain:
 
     def test_cli_main_no_args_shows_help(self, capsys):
         """CLI should show help when no args provided."""
-        with patch.object(sys, 'argv', ['odibi']):
+        with patch.object(sys, "argv", ["odibi"]):
             result = main()
             assert result == 1  # Returns 1 (failure) when no command
 
@@ -41,7 +41,7 @@ class TestCLIMain:
 
     def test_cli_main_help_flag(self, capsys):
         """CLI should show help with --help flag."""
-        with patch.object(sys, 'argv', ['odibi', '--help']):
+        with patch.object(sys, "argv", ["odibi", "--help"]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -53,7 +53,7 @@ class TestCLIMain:
 
     def test_cli_main_invalid_command(self, capsys):
         """CLI should show help with invalid command."""
-        with patch.object(sys, 'argv', ['odibi', 'invalid']):
+        with patch.object(sys, "argv", ["odibi", "invalid"]):
             with pytest.raises(SystemExit):
                 main()
 
@@ -68,25 +68,25 @@ class TestRunCommand:
     def test_run_command_missing_file(self):
         """Run command should fail gracefully with missing file."""
         args = Mock()
-        args.config = 'nonexistent.yaml'
-        
+        args.config = "nonexistent.yaml"
+
         result = run_command(args)
         assert result == 1  # Failure exit code
 
     def test_run_command_with_mock_manager(self):
         """Run command should work with valid config."""
         args = Mock()
-        args.config = 'test.yaml'
-        
+        args.config = "test.yaml"
+
         mock_manager = Mock()
         mock_manager.run.return_value = []
-        
-        with patch('odibi.cli.run.PipelineManager') as MockManager:
+
+        with patch("odibi.cli.run.PipelineManager") as MockManager:
             MockManager.from_yaml.return_value = mock_manager
             result = run_command(args)
-            
+
             assert result == 0  # Success
-            MockManager.from_yaml.assert_called_once_with('test.yaml')
+            MockManager.from_yaml.assert_called_once_with("test.yaml")
             mock_manager.run.assert_called_once()
 
 
@@ -96,8 +96,8 @@ class TestValidateCommand:
     def test_validate_command_missing_file(self):
         """Validate command should fail gracefully with missing file."""
         args = Mock()
-        args.config = 'nonexistent.yaml'
-        
+        args.config = "nonexistent.yaml"
+
         result = validate_command(args)
         assert result == 1  # Failure exit code
 
@@ -105,17 +105,18 @@ class TestValidateCommand:
         """Validate command should fail with invalid YAML."""
         config_file = tmp_path / "invalid.yaml"
         config_file.write_text("invalid: yaml: content: ][")
-        
+
         args = Mock()
         args.config = str(config_file)
-        
+
         result = validate_command(args)
         assert result == 1  # Failure exit code
 
     def test_validate_command_valid_config(self, tmp_path):
         """Validate command should succeed with valid config."""
         config_file = tmp_path / "valid.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 project: Test Project
 engine: pandas
 connections:
@@ -133,10 +134,11 @@ pipelines:
           connection: local
           path: test.csv
           format: csv
-""")
-        
+"""
+        )
+
         args = Mock()
         args.config = str(config_file)
-        
+
         result = validate_command(args)
         assert result == 0  # Success

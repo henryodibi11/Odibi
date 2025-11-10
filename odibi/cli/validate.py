@@ -7,11 +7,11 @@ def validate_command(args):
     """Validate config file."""
     try:
         # Load and validate YAML
-        with open(args.config, 'r') as f:
+        with open(args.config, "r") as f:
             config_data = yaml.safe_load(f)
-        
+
         # Validate against ProjectConfig
-        config = ProjectConfig(**config_data)
+        ProjectConfig(**config_data)
         print("Config is valid")
         return 0
     except Exception as e:

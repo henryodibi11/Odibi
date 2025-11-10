@@ -19,6 +19,7 @@ from odibi.exceptions import TransformError
 
 class FakeConnection:
     """Fake connection with pandas_storage_options method."""
+
     def __init__(self, base_path, storage_options=None):
         self.base_path = Path(base_path)
         self._storage_options = storage_options or {}
@@ -35,6 +36,7 @@ class FakeConnection:
 
 class FakeConnectionNoStorage:
     """Fake connection without pandas_storage_options method."""
+
     def __init__(self, base_path):
         self.base_path = Path(base_path)
 
@@ -47,6 +49,7 @@ class FakeConnectionNoStorage:
 
 class FakePandasContext:
     """Fake PandasContext for SQL testing."""
+
     def __init__(self, dataframes):
         self._dfs = dict(dataframes)
 
@@ -76,6 +79,7 @@ def tmp_conn_no_storage(tmp_path):
 # Storage Options Merging
 # ========================
 
+
 class TestMergeStorageOptions:
     """Test _merge_storage_options helper method."""
 
@@ -99,6 +103,7 @@ class TestMergeStorageOptions:
 # ========================
 # Read Operations
 # ========================
+
 
 class TestPandasEngineRead:
     """Test read operations for all formats."""
@@ -127,10 +132,10 @@ class TestPandasEngineRead:
             return pd.DataFrame({"ok": [1]})
 
         monkeypatch.setattr(pd, func_name, fake_reader)
-        
+
         # Create connection with storage options
         conn = FakeConnection(tmp_path, storage_options={"from_conn": "C1"})
-        
+
         df = engine.read(
             conn,
             fmt,
@@ -164,16 +169,16 @@ class TestPandasEngineRead:
     def test_read_delta_success(self, engine, tmp_conn, monkeypatch):
         """Read Delta with version and storage options."""
         captured = {}
-        
+
         class FakeDeltaTable:
             def __init__(self, path, storage_options=None, version=None):
                 captured["path"] = path
                 captured["storage_options"] = storage_options
                 captured["version"] = version
-                
+
             def to_pandas(self):
                 return pd.DataFrame({"a": [1]})
-        
+
         fake_mod = types.SimpleNamespace(DeltaTable=FakeDeltaTable)
         monkeypatch.setitem(sys.modules, "deltalake", fake_mod)
 
@@ -192,12 +197,12 @@ class TestPandasEngineRead:
     def test_read_avro_import_error(self, engine, tmp_conn, monkeypatch):
         """Avro read without fastavro raises ImportError."""
         orig_import = builtins.__import__
-        
+
         def blocker(name, *args, **kwargs):
             if name == "fastavro":
                 raise ImportError("no fastavro")
             return orig_import(name, *args, **kwargs)
-        
+
         monkeypatch.setattr(builtins, "__import__", blocker)
         with pytest.raises(ImportError, match="Avro support requires"):
             engine.read(tmp_conn, "avro", path="x.avro")
@@ -206,10 +211,10 @@ class TestPandasEngineRead:
         """Read Avro from local file."""
         p = tmp_path / "data.avro"
         p.write_bytes(b"\x00\x00")
-        
+
         fake_fastavro = types.SimpleNamespace(reader=lambda f: [{"x": 1}, {"x": 2}])
         monkeypatch.setitem(sys.modules, "fastavro", fake_fastavro)
-        
+
         df = engine.read(tmp_conn, "avro", path="data.avro")
         assert df.to_dict("list")["x"] == [1, 2]
 
@@ -220,23 +225,24 @@ class TestPandasEngineRead:
         monkeypatch.setitem(sys.modules, "fastavro", fake_fastavro)
 
         captured = {}
-        
+
         class FakeCM:
             def __enter__(self):
                 return io.BytesIO(b"")
+
             def __exit__(self, *args):
                 return False
-        
+
         def fake_fsspec_open(path, mode, **kwargs):
             captured["path"] = path
             captured["mode"] = mode
             captured["kwargs"] = kwargs
             return FakeCM()
-        
+
         fake_fsspec = types.SimpleNamespace(open=fake_fsspec_open)
         monkeypatch.setitem(sys.modules, "fsspec", fake_fsspec)
 
-        df = engine.read(
+        engine.read(
             tmp_conn,
             "avro",
             path="s3://bucket/data.avro",
@@ -251,6 +257,7 @@ class TestPandasEngineRead:
 # ========================
 # Write Operations
 # ========================
+
 
 class TestPandasEngineWrite:
     """Test write operations for all formats."""
@@ -295,7 +302,7 @@ class TestPandasEngineWrite:
 
         engine.write(df, tmp_conn, "csv", path="file.csv", mode="overwrite")
         engine.write(df, tmp_conn, "csv", path="file.csv", mode="append", options={"opt": 2})
-        
+
         assert calls[0][1] == "w"
         assert calls[1][1] == "a"
         assert calls[1][2]["opt"] == 2
@@ -338,21 +345,24 @@ class TestPandasEngineWrite:
 
         def write_deltalake(path, df, mode=None, partition_by=None, storage_options=None):
             calls.setdefault("writes", []).append(
-                dict(path=path, mode=mode, partition_by=partition_by, storage_options=storage_options)
+                dict(
+                    path=path, mode=mode, partition_by=partition_by, storage_options=storage_options
+                )
             )
 
         fake_mod = types.SimpleNamespace(write_deltalake=write_deltalake)
         monkeypatch.setitem(sys.modules, "deltalake", fake_mod)
 
         df = pd.DataFrame({"x": [1]})
-        
+
         # overwrite mode
         engine.write(df, tmp_conn, "delta", path="d1", mode="overwrite")
-        
+
         # append with partition_by warns
         with pytest.warns(UserWarning, match="Partitioning can cause performance"):
-            engine.write(df, tmp_conn, "delta", path="d2", mode="append", 
-                        options={"partition_by": ["x"]})
+            engine.write(
+                df, tmp_conn, "delta", path="d2", mode="append", options={"partition_by": ["x"]}
+            )
 
         assert calls["writes"][0]["mode"] == "overwrite"
         assert calls["writes"][1]["mode"] == "append"
@@ -383,9 +393,8 @@ class TestPandasEngineWrite:
         fake_fastavro = types.SimpleNamespace(writer=fake_writer)
         monkeypatch.setitem(sys.modules, "fastavro", fake_fastavro)
 
-        p = tmp_path / "a.avro"
         engine.write(df, tmp_conn, "avro", path="a.avro", mode="overwrite")
-        
+
         assert captured["schema"]["type"] == "record"
         i_field = [f for f in captured["schema"]["fields"] if f["name"] == "i"][0]
         assert isinstance(i_field["type"], list) and "null" in i_field["type"]
@@ -415,8 +424,14 @@ class TestPandasEngineWrite:
 
         df = pd.DataFrame({"x": [1]})
         engine.write(df, tmp_conn, "avro", path="s3://b/a.avro", mode="overwrite")
-        engine.write(df, tmp_conn, "avro", path="s3://b/a.avro", mode="append",
-                    options={"storage_options": {"from_user": "U1"}})
+        engine.write(
+            df,
+            tmp_conn,
+            "avro",
+            path="s3://b/a.avro",
+            mode="append",
+            options={"storage_options": {"from_user": "U1"}},
+        )
 
         assert captured["calls"][0]["mode"] == "wb"
         assert captured["calls"][1]["mode"] == "ab"
@@ -428,24 +443,26 @@ class TestPandasEngineWrite:
 # SQL Execution
 # ========================
 
+
 class TestPandasEngineExecuteSQL:
     """Test SQL execution with DuckDB and PandasSQL."""
 
     def test_execute_sql_requires_pandas_context(self, engine, monkeypatch):
         """Execute SQL requires PandasContext type."""
         from odibi.engine import pandas_engine as mod
-        
+
         class MyPandasContext:
             pass
 
         monkeypatch.setattr(mod, "PandasContext", MyPandasContext)
-        
+
         with pytest.raises(TypeError, match="PandasEngine requires PandasContext"):
             engine.execute_sql("SELECT 1", context=object())
 
     def test_execute_sql_duckdb_success(self, engine, monkeypatch):
         """Execute SQL using DuckDB."""
         from odibi.engine import pandas_engine as mod
+
         monkeypatch.setattr(mod, "PandasContext", FakePandasContext)
 
         registers = []
@@ -472,13 +489,14 @@ class TestPandasEngineExecuteSQL:
 
         ctx = FakePandasContext({"t1": pd.DataFrame({"a": [1]}), "t2": pd.DataFrame({"b": [2]})})
         out = engine.execute_sql("select * from t1", context=ctx)
-        
+
         assert isinstance(out, pd.DataFrame)
         assert set(registers) == {"t1", "t2"}
 
     def test_execute_sql_fallback_to_pandasql(self, engine, monkeypatch):
         """Execute SQL falls back to pandasql when duckdb unavailable."""
         from odibi.engine import pandas_engine as mod
+
         monkeypatch.setattr(mod, "PandasContext", FakePandasContext)
 
         orig_import = builtins.__import__
@@ -502,13 +520,14 @@ class TestPandasEngineExecuteSQL:
 
         ctx = FakePandasContext({"t": pd.DataFrame({"x": [1]})})
         out = engine.execute_sql("select * from t", context=ctx)
-        
+
         assert "t" in captured["locals"]
         assert isinstance(out, pd.DataFrame)
 
     def test_execute_sql_no_engines_raises(self, engine, monkeypatch):
         """Execute SQL without duckdb or pandasql raises TransformError."""
         from odibi.engine import pandas_engine as mod
+
         monkeypatch.setattr(mod, "PandasContext", FakePandasContext)
 
         orig_import = builtins.__import__
@@ -519,7 +538,7 @@ class TestPandasEngineExecuteSQL:
             return orig_import(name, *a, **k)
 
         monkeypatch.setattr(builtins, "__import__", blocker)
-        
+
         with pytest.raises(TransformError, match="SQL execution requires"):
             engine.execute_sql("select 1", context=FakePandasContext({"t": pd.DataFrame()}))
 
@@ -528,17 +547,23 @@ class TestPandasEngineExecuteSQL:
 # Operations
 # ========================
 
+
 class TestPandasEngineOperations:
     """Test execute_operation method."""
 
     def test_execute_operation_pivot(self, engine):
         """Execute pivot operation."""
         df = pd.DataFrame({"g": [1, 1, 2, 2], "p": ["A", "B", "A", "B"], "v": [10, 20, 30, 40]})
-        
+
         out = engine.execute_operation(
             "pivot",
-            {"group_by": ["g"], "pivot_column": "p", "value_column": "v", "agg_func": ["sum", "mean"]},
-            df
+            {
+                "group_by": ["g"],
+                "pivot_column": "p",
+                "value_column": "v",
+                "agg_func": ["sum", "mean"],
+            },
+            df,
         )
         assert "g" in out.columns
 
@@ -551,6 +576,7 @@ class TestPandasEngineOperations:
 # ========================
 # Schema Operations
 # ========================
+
 
 class TestPandasEngineSchemaOperations:
     """Test schema introspection methods."""
@@ -588,6 +614,7 @@ class TestPandasEngineSchemaOperations:
 # Schema Validation
 # ========================
 
+
 class TestPandasEngineValidateSchema:
     """Test schema validation."""
 
@@ -599,7 +626,7 @@ class TestPandasEngineValidateSchema:
             "types": {"id": "int", "val": "int", "absent": "str"},
         }
         failures = engine.validate_schema(df, rules)
-        
+
         assert any("Missing required columns" in f for f in failures)
         assert any("has type" in f for f in failures)
         assert any("not found for type validation" in f for f in failures)
@@ -609,25 +636,28 @@ class TestPandasEngineValidateSchema:
 # Avro Schema Inference
 # ========================
 
+
 class TestPandasEngineAvroSchema:
     """Test Avro schema inference."""
 
     def test_infer_avro_schema(self, engine):
         """Infer Avro schema from DataFrame."""
-        df = pd.DataFrame({
-            "i": pd.Series([1, None], dtype="float64"),
-            "i64": pd.Series([1, 2], dtype="int64"),
-            "f64": pd.Series([1.0, 2.0], dtype="float64"),
-            "b": pd.Series([True, False], dtype="bool"),
-            "s": pd.Series(["a", "b"], dtype="object"),
-            "s2": pd.Series(["a", None], dtype="string"),
-        })
-        
+        df = pd.DataFrame(
+            {
+                "i": pd.Series([1, None], dtype="float64"),
+                "i64": pd.Series([1, 2], dtype="int64"),
+                "f64": pd.Series([1.0, 2.0], dtype="float64"),
+                "b": pd.Series([True, False], dtype="bool"),
+                "s": pd.Series(["a", "b"], dtype="object"),
+                "s2": pd.Series(["a", None], dtype="string"),
+            }
+        )
+
         schema = engine._infer_avro_schema(df)
-        
+
         assert schema["type"] == "record"
         assert schema["name"] == "DataFrame"
-        
+
         name_to_type = {f["name"]: f["type"] for f in schema["fields"]}
         assert isinstance(name_to_type["i"], list) and "null" in name_to_type["i"]
         assert name_to_type["i64"] == "long"
@@ -640,6 +670,7 @@ class TestPandasEngineAvroSchema:
 # ========================
 # Delta Lake Utilities
 # ========================
+
 
 class TestPandasEngineDeltaUtilities:
     """Test Delta Lake utility methods."""
@@ -654,12 +685,13 @@ class TestPandasEngineDeltaUtilities:
             return orig_import(name, *a, **k)
 
         monkeypatch.setattr(builtins, "__import__", blocker)
-        
+
         with pytest.raises(ImportError, match="Delta Lake support requires"):
             engine.vacuum_delta(tmp_conn, "table_path")
 
     def test_vacuum_delta_success(self, engine, tmp_conn, monkeypatch):
         """Vacuum Delta table successfully."""
+
         class FakeDeltaTable:
             def __init__(self, path, storage_options=None):
                 self.path = path
@@ -673,9 +705,10 @@ class TestPandasEngineDeltaUtilities:
 
         fake_mod = types.SimpleNamespace(DeltaTable=FakeDeltaTable)
         monkeypatch.setitem(sys.modules, "deltalake", fake_mod)
-        
-        out = engine.vacuum_delta(tmp_conn, "x", retention_hours=24, dry_run=True, 
-                                 enforce_retention_duration=False)
+
+        out = engine.vacuum_delta(
+            tmp_conn, "x", retention_hours=24, dry_run=True, enforce_retention_duration=False
+        )
         assert out == {"files_deleted": 3}
 
     def test_get_delta_history_success(self, engine, tmp_conn, monkeypatch):
@@ -691,8 +724,10 @@ class TestPandasEngineDeltaUtilities:
                 history_called["limit"] = limit
                 return [{"version": 1}]
 
-        monkeypatch.setitem(sys.modules, "deltalake", types.SimpleNamespace(DeltaTable=FakeDeltaTable))
-        
+        monkeypatch.setitem(
+            sys.modules, "deltalake", types.SimpleNamespace(DeltaTable=FakeDeltaTable)
+        )
+
         hist = engine.get_delta_history(tmp_conn, "p", limit=5)
         assert hist == [{"version": 1}]
         assert history_called["limit"] == 5
@@ -709,8 +744,10 @@ class TestPandasEngineDeltaUtilities:
             def restore(self, version):
                 called["version"] = version
 
-        monkeypatch.setitem(sys.modules, "deltalake", types.SimpleNamespace(DeltaTable=FakeDeltaTable))
-        
+        monkeypatch.setitem(
+            sys.modules, "deltalake", types.SimpleNamespace(DeltaTable=FakeDeltaTable)
+        )
+
         engine.restore_delta(tmp_conn, "p", version=3)
         assert called["version"] == 3
         assert "p" in called["path"]

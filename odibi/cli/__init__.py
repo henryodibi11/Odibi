@@ -7,4 +7,4 @@ Available commands:
 """
 from odibi.cli.main import main
 
-__all__ = ['main']
+__all__ = ["main"]

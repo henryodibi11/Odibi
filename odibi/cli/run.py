@@ -6,7 +6,7 @@ def run_command(args):
     """Execute pipeline from config file."""
     try:
         manager = PipelineManager.from_yaml(args.config)
-        results = manager.run()
+        manager.run()
         print("Pipeline completed successfully")
         return 0
     except Exception as e:
