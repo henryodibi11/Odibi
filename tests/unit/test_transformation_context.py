@@ -1,6 +1,5 @@
 """Tests for context passing system."""
 
-import pytest
 from odibi.transformations import TransformationContext, build_context_from_config
 
 
