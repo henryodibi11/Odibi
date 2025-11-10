@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odibi"
-version = "1.2.0-alpha.4-phase2.5"
+version = "1.2.0a4"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
     {name = "Henry Odibi", email = "henryodibi@outlook.com"}
