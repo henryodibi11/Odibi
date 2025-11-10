@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odibi"
-version = "1.2.0-alpha.3"
+version = "1.2.0-alpha.4-phase2.5"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
     {name = "Henry Odibi", email = "henryodibi@outlook.com"}
@@ -29,6 +29,8 @@ dependencies = [
     "pyyaml>=6.0",
     "pandas>=2.0.0",
     "python-dotenv>=1.0.0",
+    "markdown2>=2.4.0",
+    "Jinja2>=3.1.0",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +51,10 @@ azure = [
     "azure-keyvault-secrets>=4.7.0",
     "adlfs>=2023.1.0",
 ]
+sql = [
+    "pyodbc>=5.0.0",
+    "sqlalchemy>=2.0.0",
+]
 all = [
     "pyspark>=3.4.0",
     "delta-spark>=2.3.0",
@@ -61,6 +67,8 @@ all = [
     "azure-identity>=1.14.0",
     "azure-keyvault-secrets>=4.7.0",
     "adlfs>=2023.1.0",
+    "pyodbc>=5.0.0",
+    "sqlalchemy>=2.0.0",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -79,8 +87,8 @@ dev = [
     "pandasql>=0.7.3",
 ]
 
-# [project.scripts]
-# odibi = "odibi.cli:main"  # CLI coming in Phase 2
+[project.scripts]
+odibi = "odibi.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/henryodibi11/Odibi"

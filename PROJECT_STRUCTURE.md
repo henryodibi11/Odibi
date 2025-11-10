@@ -1,255 +1,291 @@
-# ODIBI Project Structure
+# Odibi Project Structure
 
-**Complete overview of the codebase.**
+**Updated:** 2025-11-10 (Phase 2.5)  
+**Version:** v1.2.0-alpha.3-phase2c → v1.2.0-alpha.4-phase2.5
 
 ---
 
-## 📁 Directory Layout
+## Directory Layout
 
 ```
-d:/odibi/
-├── odibi/                          # Core framework code
-│   ├── __init__.py                 # Package exports
-│   ├── config.py                   # Pydantic config models (348 lines)
-│   ├── context.py                  # Unified Context API (191 lines)
-│   ├── registry.py                 # Transform function registry (188 lines)
-│   ├── exceptions.py               # Custom exceptions (183 lines)
-│   ├── node.py                     # Node execution engine (437 lines)
-│   ├── graph.py                    # Dependency graph builder (318 lines)
-│   ├── pipeline.py                 # Pipeline orchestrator (222 lines)
-│   ├── engine/                     # Execution engines
-│   │   ├── __init__.py
-│   │   ├── base.py                 # Engine interface (140 lines)
-│   │   └── pandas_engine.py        # Pandas implementation (237 lines)
-│   └── connections/                # Data connections
-│       ├── __init__.py
-│       ├── base.py                 # Connection interface (25 lines)
-│       └── local.py                # Local filesystem (35 lines)
+odibi/
+├── __init__.py              # Main package exports
+├── __main__.py              # CLI entry point (NEW - Phase 2.5)
+├── config.py                # Configuration loading (ProjectConfig, PipelineConfig, etc.)
+├── pipeline.py              # Pipeline orchestration (Pipeline, PipelineManager)
+├── context.py               # Context for DataFrame management
+├── registry.py              # Transform function registry
+├── graph.py                 # Dependency graph
+├── node.py                  # Node execution
+├── story.py                 # Story generation
+├── exceptions.py            # Custom exceptions
+├── py.typed                 # Type hints marker
 │
-├── tests/                          # Test suite (78 tests)
+├── cli/                     # NEW (Phase 2.5)
 │   ├── __init__.py
-│   ├── test_config.py              # Config validation tests (25 tests)
-│   ├── test_context.py             # Context API tests (12 tests)
-│   ├── test_registry.py            # Registry tests (18 tests)
-│   ├── test_graph.py               # Graph tests (13 tests)
-│   └── test_pipeline.py            # Pipeline tests (10 tests)
+│   ├── main.py              # CLI entry point
+│   ├── run.py               # odibi run command
+│   └── validate.py          # odibi validate command
 │
-├── examples/                       # Learning examples
-│   ├── README.md                   # Examples overview
-│   └── getting_started/            # 👈 START HERE
-│       ├── README.md               # Tutorial guide
-│       ├── QUICK_REFERENCE.md      # Cheat sheet
-│       ├── walkthrough.ipynb       # Interactive tutorial
-│       ├── transforms.py           # Sample transform functions
-│       ├── project.yaml            # Project config
-│       ├── pipelines/
-│       │   ├── simple.yaml         # Basic read/write
-│       │   ├── transform.yaml      # With transforms
-│       │   └── advanced.yaml       # SQL, joins, aggregation
-│       ├── data/
-│       │   ├── sales.csv           # Sample sales data
-│       │   └── customers.csv       # Sample customer data
-│       └── output/                 # Generated outputs
+├── engine/                  # Execution engines
+│   ├── __init__.py
+│   ├── base.py              # BaseEngine interface
+│   ├── pandas_engine.py     # Pandas implementation
+│   └── spark_engine.py      # Spark implementation
 │
-├── docs/                           # Documentation
-│   ├── ODIBI_FRAMEWORK_PLAN.md     # Complete design (2,278 lines)
-│   ├── PYDANTIC_CHEATSHEET.md      # Pydantic guide
-│   ├── PROGRESS.md                 # Implementation progress
-│   ├── TEST_RESULTS.md             # Phase 1 test results
-│   ├── PHASE2_RESULTS.md           # Phase 2 test results
-│   └── IMPROVEMENTS.md             # Known issues & roadmap
+├── connections/             # Data connectors
+│   ├── __init__.py
+│   ├── base.py              # BaseConnection interface
+│   ├── local.py             # Local filesystem
+│   ├── local_dbfs.py        # Local DBFS mock
+│   ├── azure_adls.py        # Azure Data Lake Storage
+│   └── azure_sql.py         # Azure SQL (stub - Phase 3D)
 │
-├── test_exploration.ipynb          # Interactive tests (Phase 1)
-├── test_exploration_phase2.ipynb   # Interactive tests (Phase 2)
-├── pyproject.toml                  # Package configuration
-├── pytest.ini                      # Pytest configuration
-├── README.md                       # Main README
-├── README_PHASE2.md                # Phase 2 summary
-└── PROJECT_STRUCTURE.md            # This file
+├── utils/                   # Utilities
+│   ├── __init__.py
+│   └── setup_helpers.py     # Setup utilities (parallel Key Vault, etc.)
+│
+├── operations/              # NEW (Phase 2.5) - Scaffolding for Phase 3
+│   └── __init__.py          # Built-in operations (pivot, join, etc.)
+│
+├── transformations/         # NEW (Phase 2.5) - Scaffolding for Phase 3
+│   └── __init__.py          # Transformation registry
+│
+├── validation/              # NEW (Phase 2.5) - Scaffolding for Phase 3
+│   └── __init__.py          # Quality enforcement
+│
+└── testing/                 # NEW (Phase 2.5) - Scaffolding for Phase 3
+    └── __init__.py          # Testing utilities
+
+
+tests/                       # Test suite (125 passing + 12 skipped)
+├── test_config.py           # Configuration tests
+├── test_context.py          # Context tests
+├── test_registry.py         # Registry tests
+├── test_graph.py            # Dependency graph tests
+├── test_pipeline.py         # Pipeline tests
+├── test_azure_adls_auth.py  # Azure ADLS authentication tests
+├── test_connections_paths.py # Connection path resolution
+├── test_delta_pandas.py     # Delta Lake tests (skipped - optional dep)
+├── test_extras_imports.py   # Import guard tests
+└── test_setup_helpers.py    # Setup utilities tests
+
+
+examples/                    # Example configurations
+├── example_local.yaml       # Local Pandas pipeline
+├── example_spark.yaml       # Spark pipeline template
+├── example_delta_pipeline.yaml  # Delta Lake example
+├── template_full.yaml       # Full template
+├── template_full_adls.yaml  # Azure ADLS template
+├── getting_started/         # Getting started examples
+└── README.md
+
+
+setup/                       # Setup notebooks
+└── databricks_setup.ipynb   # Databricks setup guide
+
+
+walkthroughs/                # Learning walkthroughs
+├── 00_setup_environment.ipynb
+├── 01_local_pipeline_pandas.ipynb
+├── 02_cli_and_testing.ipynb
+├── 03_spark_preview_stub.ipynb
+├── 04_ci_cd_and_precommit.ipynb
+└── 05_build_new_pipeline.ipynb
+
+
+docs/                        # Documentation
+├── setup_databricks.md
+└── setup_azure.md
+
+
+.github/workflows/           # CI/CD
+└── ci.yml                   # GitHub Actions
 ```
 
 ---
 
-## 📊 Code Statistics
+## Module Responsibilities
 
-**Core Framework:**
-- Total lines: ~2,800
-- Files: 14
-- Languages: Python
+### Core Modules (Phase 1-2)
 
-**Tests:**
-- Total tests: 78 (all passing)
-- Test files: 5
-- Coverage: Excellent (all core components)
+**cli/**
+- Command-line interface (Phase 2.5)
+- User-facing commands (`run`, `validate`)
+- Argument parsing and dispatch
 
-**Documentation:**
-- Markdown files: 12
-- Notebooks: 3
-- Total docs: ~8,000 lines
+**config.py**
+- Pydantic models for YAML configuration
+- `ProjectConfig`, `PipelineConfig`, `NodeConfig`
+- `ReadConfig`, `WriteConfig`, `TransformConfig`
+- Validation and type safety
 
-**Examples:**
-- Pipelines: 3 (simple, transform, advanced)
-- Transform functions: 5
-- Sample datasets: 2
+**pipeline.py**
+- `Pipeline`: Single pipeline executor
+- `PipelineManager`: Multi-pipeline orchestrator from YAML
+- Story generation integration
+- Execution orchestration
 
----
+**engine/**
+- Data processing engines
+- `PandasEngine`: Pandas implementation (read, write, execute SQL)
+- `SparkEngine`: Spark implementation
+- Delta Lake support (VACUUM, history, restore)
 
-## 🗺️ Component Map
+**connections/**
+- Data source/sink connectors
+- `LocalConnection`: Local filesystem
+- `AzureADLS`: Azure Data Lake Storage with Key Vault auth
+- `AzureSQLConnection`: Azure SQL (stub)
+- Path resolution and authentication
 
-### Layer 1: User Interface
-```
-examples/getting_started/
-├── pipelines/*.yaml        # User writes these
-└── transforms.py           # User writes these
-```
+**context.py**
+- DataFrame context management
+- Register, retrieve, and cache DataFrames
+- Isolation between pipelines
 
-### Layer 2: Configuration
-```
-odibi/config.py             # Validates YAML → Python objects
-```
+**registry.py**
+- `@transform` decorator for user functions
+- Function registry and parameter validation
+- Function metadata and introspection
 
-### Layer 3: Orchestration
-```
-odibi/pipeline.py           # Coordinates execution
-odibi/graph.py              # Analyzes dependencies
-```
+**graph.py**
+- Dependency graph construction
+- Topological sorting for execution order
+- Cycle detection
+- Execution layer computation
 
-### Layer 4: Execution
-```
-odibi/node.py               # Executes read/transform/write
-odibi/context.py            # Passes data between nodes
-odibi/registry.py           # Manages transform functions
-```
+**node.py**
+- Node execution logic
+- Read, transform, write operations
+- Error handling and reporting
 
-### Layer 5: Engines
-```
-odibi/engine/
-├── base.py                 # Engine interface
-└── pandas_engine.py        # Pandas implementation
-```
+**story.py**
+- Story generation for pipeline runs
+- Execution documentation
+- Sample data capture
 
-### Layer 6: Connections
-```
-odibi/connections/
-├── base.py                 # Connection interface
-└── local.py                # Local filesystem
-```
+**utils/**
+- `setup_helpers.py`: Parallel Key Vault fetching, Databricks validation
 
----
+### Phase 3 Modules (Scaffolding Only - Phase 2.5)
 
-## 🎯 Entry Points
+**operations/**
+- Built-in transformations (pivot, unpivot, join, sql, aggregate)
+- Each operation includes `execute()` and `explain()` methods
+- Self-documenting operations
+- **Status:** Scaffolding only (v0.0.0)
 
-### For Users:
-1. **Start:** `examples/getting_started/walkthrough.ipynb`
-2. **Reference:** `examples/getting_started/QUICK_REFERENCE.md`
-3. **Build:** Create your own `pipelines/*.yaml`
+**transformations/**
+- User transformation registry
+- `@transformation` decorator
+- Context passing infrastructure
+- Explanation system
+- **Status:** Scaffolding only (v0.0.0)
 
-### For Developers:
-1. **Understand:** Start with `context.py`, then `registry.py`
-2. **Contribute:** Check `docs/IMPROVEMENTS.md`
-3. **Test:** Run `pytest tests/ -v`
+**validation/**
+- Explanation quality linting
+- Config validation
+- Pre-run checks
+- Quality scoring
+- **Status:** Scaffolding only (v0.0.0)
 
-### For Documentation:
-1. **Architecture:** `docs/ODIBI_FRAMEWORK_PLAN.md`
-2. **Results:** `docs/PHASE2_RESULTS.md`
-3. **Pydantic:** `docs/PYDANTIC_CHEATSHEET.md`
-
----
-
-## 🔄 Data Flow
-
-```
-1. User writes YAML
-   └─> pipelines/my_pipeline.yaml
-
-2. Config validation
-   └─> PipelineConfig (config.py validates)
-
-3. Pipeline creation
-   └─> Pipeline(config, connections, engine)
-       ├─> Creates Context (context.py)
-       ├─> Creates Engine (pandas_engine.py)
-       └─> Builds Graph (graph.py)
-
-4. Execution
-   └─> Pipeline.run()
-       ├─> Graph.topological_sort() → execution order
-       └─> For each node:
-           ├─> Node.execute() (node.py)
-           ├─> Engine.read/transform/write
-           └─> Context.register() → data for next node
-
-5. Results
-   └─> PipelineResults
-       ├─> completed: [node1, node2, ...]
-       ├─> failed: []
-       └─> duration: 1.23s
-```
+**testing/**
+- Test fixtures and helpers
+- DataFrame assertions (engine-agnostic)
+- Mock objects
+- Common testing patterns
+- **Status:** Scaffolding only (v0.0.0)
 
 ---
 
-## 🧪 Testing Strategy
+## Import Patterns
 
-### Unit Tests (`tests/`)
-- **test_config.py** - Pydantic validation
-- **test_context.py** - Data passing
-- **test_registry.py** - Function registration
-- **test_graph.py** - Dependency analysis
-- **test_pipeline.py** - End-to-end execution
+### User Imports (Stable)
+```python
+from odibi import Pipeline, PipelineManager
+from odibi import transform, Context
+from odibi.engine import PandasEngine, SparkEngine
+from odibi.connections import AzureADLS, LocalConnection
+```
 
-### Interactive Tests
-- **test_exploration.ipynb** - Phase 1 components
-- **test_exploration_phase2.ipynb** - Phase 2 components
+### CLI Usage
+```bash
+# Validate configuration
+python -m odibi validate config.yaml
+odibi validate config.yaml  # After install
 
-### Examples
-- **walkthrough.ipynb** - Real-world usage
+# Run pipeline
+python -m odibi run config.yaml
+odibi run config.yaml  # After install
 
----
+# Get help
+python -m odibi --help
+```
 
-## 📈 Project Stats
-
-**Development Time:** ~6 hours  
-**Tests Written:** 78 (all passing)  
-**Test Execution:** 0.35 seconds  
-**Code Quality:** Well-tested, documented  
-**Status:** MVP Complete ✅
-
----
-
-## 🚀 Next Steps
-
-### For Production:
-1. CLI tools (`odibi run`, `odibi validate`)
-2. More formats (Avro, Delta, SQL)
-3. Story generator (documentation)
-4. Spark engine implementation
-
-### For Enhancement:
-1. Fix critical issues (see `IMPROVEMENTS.md`)
-2. Add unpivot operation
-3. Better error messages
-4. Connection factory (YAML → Connection objects)
+### Phase 3 Imports (Coming Soon)
+```python
+from odibi import transformation
+from odibi.operations import pivot, unpivot, join
+from odibi.story import generate_story
+from odibi.validation import validate_explanations
+from odibi.testing import fixtures, assertions
+```
 
 ---
 
-## 📞 Support
+## Development Guidelines
 
-**Learning:**
-- Start with `examples/getting_started/walkthrough.ipynb`
-- Check `QUICK_REFERENCE.md` for patterns
-- Read `PYDANTIC_CHEATSHEET.md` for config help
-
-**Contributing:**
-- Review `IMPROVEMENTS.md`
-- Write tests for new features
-- Follow existing code patterns
-
-**Issues:**
-- Check test files for examples
-- Review error messages (they're helpful!)
-- Run `pipeline.validate()` first
+1. **Module Independence**: Each module should have minimal dependencies
+2. **Clear Interfaces**: Use abstract base classes for extensibility
+3. **Test Coverage**: Maintain ≥68% coverage (target: 100%)
+4. **Documentation**: Every module needs comprehensive docstrings
+5. **Backward Compatibility**: No breaking changes without major version bump
 
 ---
 
-**Last Updated:** 2025-11-05  
-**Version:** 1.0.0-MVP
+## Test Coverage (Baseline: Phase 2.5 Day 1)
+
+| Module | Statements | Miss | Cover |
+|--------|------------|------|-------|
+| odibi/__init__.py | 12 | 7 | 42% |
+| odibi/config.py | 144 | 5 | 97% |
+| odibi/connections/azure_adls.py | 69 | 5 | 93% |
+| odibi/graph.py | 120 | 4 | 97% |
+| odibi/registry.py | 60 | 2 | 97% |
+| odibi/story.py | 106 | 5 | 95% |
+| odibi/pipeline.py | 168 | 73 | 57% |
+| odibi/node.py | 156 | 40 | 74% |
+| odibi/context.py | 68 | 24 | 65% |
+| odibi/engine/pandas_engine.py | 220 | 174 | 21% |
+| odibi/engine/spark_engine.py | 95 | 62 | 35% |
+| **TOTAL** | **1534** | **487** | **68%** |
+
+**Goal:** Increase to 100% coverage by end of Phase 3
+
+---
+
+## Version History
+
+### v1.2.0-alpha.4-phase2.5 (In Progress)
+- ✅ CLI module created (`odibi/cli/`)
+- ✅ Phase 3 scaffolding (4 empty modules)
+- ✅ All tests passing (125/137)
+- ✅ PROJECT_STRUCTURE.md updated
+
+### v1.2.0-alpha.3-phase2c (Complete)
+- Parallel Key Vault fetching
+- Setup utilities
+- Databricks validation
+
+### v1.2.0-alpha.2-phase2b (Complete)
+- Delta Lake support
+- VACUUM, history, restore operations
+
+### v1.2.0-alpha.1-phase2a (Complete)
+- Azure ADLS with Key Vault auth
+- Multi-account storage support
+
+---
+
+**For detailed roadmap, see [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md)**

@@ -106,6 +106,52 @@ jobs:
       - name: Run extras tests
         run: pytest -v -k "extras" --cov=odibi --cov-report=term-missing
 
+  # SQL JOB (OPTIONAL) - Tests SQL dependencies (Phase 2.5)
+  # This job verifies SQL dependencies install correctly
+  test-sql:
+    name: Test SQL Dependencies (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    # This job is allowed to fail without failing the entire build
+    continue-on-error: true
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: 'pyproject.toml'
+
+      # Install with SQL extras
+      - name: Install with SQL extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[sql,dev]
+
+      # Test SQL imports work
+      - name: Test SQL imports
+        run: |
+          python -c "import pyodbc; print(f'pyodbc {pyodbc.version} OK')"
+          python -c "import sqlalchemy; print(f'SQLAlchemy {sqlalchemy.__version__} OK')"
+
+      # Test markdown2 and Jinja2 (core deps for Phase 3)
+      - name: Test Phase 3 core dependencies
+        run: |
+          python -c "import markdown2; print(f'markdown2 {markdown2.__version__} OK')"
+          python -c "import jinja2; print(f'Jinja2 {jinja2.__version__} OK')"
+
+      # Run full test suite to ensure SQL deps don't break anything
+      - name: Run tests
+        run: pytest -v
+
   # BUILD STATUS CHECK - Overall build health indicator
   build-status:
     name: Build Status

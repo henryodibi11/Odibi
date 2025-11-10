@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0-alpha.4-phase2.5] - 2025-11-10
+
+### Added
+- **CLI Module (`odibi/cli/`)**: Dedicated command-line interface
+  - `odibi run config.yaml` - Execute pipelines
+  - `odibi validate config.yaml` - Validate configuration
+  - Entry point via `python -m odibi` or `odibi` command
+- **Phase 3 Scaffolding**: Empty modules with comprehensive documentation
+  - `odibi/operations/` - Built-in operations (pivot, join, etc.)
+  - `odibi/transformations/` - Transformation registry
+  - `odibi/validation/` - Quality enforcement
+  - `odibi/testing/` - Testing utilities
+- **Dependencies for Phase 3**:
+  - `markdown2>=2.4.0` - Story markdown rendering
+  - `Jinja2>=3.1.0` - HTML templating
+  - `pyodbc>=5.0.0` (optional) - Azure SQL support
+  - `sqlalchemy>=2.0.0` (optional) - SQL toolkit
+- **87 new tests** - Comprehensive coverage increase
+  - 11 CLI unit tests
+  - 21 module structure tests
+  - 14 CLI integration tests
+  - 41 pandas_engine tests (21% → 94% coverage!)
+- **CI/CD Enhancement**: New test-sql job for SQL dependencies
+
+### Changed
+- **Test coverage**: 68% → 79% (+16% improvement!)
+- **Test count**: 137 → 224 tests (+87 tests, +63%)
+- **Project structure**: Reorganized for Phase 3 readiness
+- **README.md**: Updated with CLI usage examples
+- **PROJECT_STRUCTURE.md**: Complete restructure documentation
+- **Version**: 1.2.0-alpha.3 → 1.2.0-alpha.4-phase2.5
+
+### Technical
+- Zero breaking changes to public API
+- Fully backward compatible with Phase 2C
+- All Python versions (3.9-3.12) validated
+- CLI fully functional and tested
+- Phase 3 modules importable but empty (v0.0.0)
+
+### Documentation
+- Created PHASE3_ROADMAP.md
+- Updated PROJECT_STRUCTURE.md
+- Enhanced module docstrings
+- Clear separation between implemented and planned features
+
+---
+
 ## [1.2.0-alpha.3-phase2c] - 2025-11-10
 
 ### Added - Performance & Setup Utilities (Phase 2C)

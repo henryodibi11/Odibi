@@ -44,19 +44,30 @@ pre-commit install
 
 ## Quick Start
 
-### Option 1: Local Pandas Pipeline (Simplest)
+### Command-Line Interface (Recommended)
 
-Perfect for learning and local development.
+```bash
+# Validate your configuration
+odibi validate pipeline.yaml
+
+# Run your pipeline
+odibi run pipeline.yaml
+
+# Get help
+odibi --help
+```
+
+### Python API
 
 ```python
-from odibi.pipeline import Pipeline
+from odibi.pipeline import PipelineManager
 
 # Load and run all pipelines from YAML
-manager = Pipeline.from_yaml("examples/example_local.yaml")
+manager = PipelineManager.from_yaml("examples/example_local.yaml")
 results = manager.run()  # Runs all defined pipelines
 
 # Or run specific pipeline
-result = manager.run('bronze_to_silver')
+result = manager.run_pipeline('bronze_to_silver')
 print(f"✅ {len(result.completed)} nodes completed")
 ```
 
@@ -83,7 +94,7 @@ For large-scale data processing on Databricks.
 
 3. **Run Spark pipeline:**
    ```bash
-   python -m odibi.cli run examples/example_spark.yaml
+   odibi run examples/example_spark.yaml
    ```
 
 See [examples/example_spark.yaml](examples/example_spark.yaml) for the full configuration.
@@ -252,17 +263,15 @@ Every run generates a story showing:
 # Validate config without running
 odibi validate project.yaml
 
-# Run single node with test data
-odibi run-node clean_data \
-  --mock load_data=test_data.csv \
-  --show-output
+# Run pipeline
+odibi run project.yaml
 
-# View dependency graph
-odibi graph --pipeline simple_etl
-
-# Debug mode
-odibi run project.yaml --log-level DEBUG
+# Use Python module syntax
+python -m odibi run project.yaml
+python -m odibi validate project.yaml
 ```
+
+**Note:** Advanced CLI commands (run-node, graph, etc.) coming in Phase 3.
 
 ## Architecture
 

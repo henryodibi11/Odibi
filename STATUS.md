@@ -1,11 +1,11 @@
 # ODIBI Project Status
 
 **Last Updated:** 2025-11-10  
-**Current Version:** v1.2.0-alpha.3-phase2c
+**Current Version:** v1.2.0-alpha.4-phase2.5
 
 ---
 
-## 📊 Current Status: Phase 2C Complete ✅ - Ready for v1.2.0
+## 📊 Current Status: Phase 2.5 Complete ✅ - Ready for Phase 3
 
 ### Phase Summary
 
@@ -15,8 +15,9 @@
 | **Phase 1G: Config Refactor** | ✅ Complete | v1.1.0 | Nov 2025 |
 | **Phase 2A: ADLS + Key Vault** | ✅ Complete | v1.2.0-alpha.1 | Nov 2025 |
 | **Phase 2B: Delta Lake** | ✅ Complete | v1.2.0-alpha.2 | Nov 2025 |
-| **Phase 2C: Performance** | ✅ **Complete** | v1.2.0-alpha.3 | Nov 2025 |
-| **Phase 3: CLI & Advanced** | 🔜 Next | v1.3.0 | Q1 2026 |
+| **Phase 2C: Performance** | ✅ Complete | v1.2.0-alpha.3 | Nov 2025 |
+| **Phase 2.5: Reorganization** | ✅ **Complete** | v1.2.0-alpha.4 | Nov 2025 |
+| **Phase 3: Transparency** | 🔜 Next | v1.3.0 | Q1 2026 |
 
 ---
 
@@ -214,10 +215,11 @@
 ## 🚀 Quick Links
 
 - **CI Status:** [![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
-- **Tests:** 137 total (84 core + 26 ADLS + 12 Delta + 15 Setup)
+- **Tests:** 224 total (208 passing, 16 skipped)
+- **Coverage:** 79% (up from 68%)
 - **Python:** 3.9, 3.10, 3.11, 3.12
 - **License:** MIT
-- **Latest:** Phase 2C Complete - Performance & Setup Utilities
+- **Latest:** Phase 2.5 Complete - CLI & Phase 3 Foundation
 
 ---
 
