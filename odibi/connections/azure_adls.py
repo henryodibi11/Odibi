@@ -86,14 +86,18 @@ class AzureADLS(BaseConnection):
                 f"Unsupported auth_mode: '{self.auth_mode}'. " f"Use 'key_vault' or 'direct_key'."
             )
 
-    def get_storage_key(self) -> str:
+    def get_storage_key(self, timeout: float = 30.0) -> str:
         """Get storage account key (cached).
+
+        Args:
+            timeout: Timeout for Key Vault operations in seconds (default: 30.0)
 
         Returns:
             Storage account key
 
         Raises:
             ImportError: If azure libraries not installed (key_vault mode)
+            TimeoutError: If Key Vault fetch exceeds timeout
             Exception: If Key Vault access fails
         """
         # Return cached key if available
@@ -104,6 +108,7 @@ class AzureADLS(BaseConnection):
             try:
                 from azure.identity import DefaultAzureCredential
                 from azure.keyvault.secrets import SecretClient
+                import concurrent.futures
             except ImportError as e:
                 raise ImportError(
                     "Key Vault authentication requires 'azure-identity' and 'azure-keyvault-secrets'. "
@@ -115,10 +120,21 @@ class AzureADLS(BaseConnection):
             kv_uri = f"https://{self.key_vault_name}.vault.azure.net"
             client = SecretClient(vault_url=kv_uri, credential=credential)
 
-            # Fetch secret and cache
-            secret = client.get_secret(self.secret_name)
-            self._cached_key = secret.value
-            return self._cached_key
+            # Fetch secret with timeout protection
+            def _fetch():
+                secret = client.get_secret(self.secret_name)
+                return secret.value
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_fetch)
+                try:
+                    self._cached_key = future.result(timeout=timeout)
+                    return self._cached_key
+                except concurrent.futures.TimeoutError:
+                    raise TimeoutError(
+                        f"Key Vault fetch timed out after {timeout}s for "
+                        f"vault '{self.key_vault_name}', secret '{self.secret_name}'"
+                    )
 
         elif self.auth_mode == "direct_key":
             return self.account_key
