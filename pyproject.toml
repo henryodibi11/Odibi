@@ -41,6 +41,7 @@ pandas = [
     "pandasql>=0.7.3",
     "deltalake>=0.13.0",
     "fastavro>=1.8.0",
+    "pyarrow>=10.0.0",
 ]
 azure = [
     "azure-storage-blob>=12.0.0",
@@ -55,6 +56,7 @@ all = [
     "pandasql>=0.7.3",
     "deltalake>=0.13.0",
     "fastavro>=1.8.0",
+    "pyarrow>=10.0.0",
     "azure-storage-blob>=12.0.0",
     "azure-identity>=1.14.0",
     "azure-keyvault-secrets>=4.7.0",
