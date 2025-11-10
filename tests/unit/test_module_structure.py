@@ -42,24 +42,26 @@ class TestTransformationsModule:
         assert odibi.transformations is not None
 
     def test_transformations_version(self):
-        """Transformations module should have version 0.0.0 (scaffolding)."""
+        """Transformations module should have version (Phase 3A)."""
         import odibi.transformations
 
         assert hasattr(odibi.transformations, "__version__")
-        assert odibi.transformations.__version__ == "0.0.0"
+        assert odibi.transformations.__version__ == "1.3.0-alpha.1"
 
     def test_transformations_all_empty(self):
-        """Transformations module should export nothing yet."""
+        """Transformations module should export registry and decorator."""
         import odibi.transformations
 
-        assert odibi.transformations.__all__ == []
+        assert "TransformationRegistry" in odibi.transformations.__all__
+        assert "get_registry" in odibi.transformations.__all__
+        assert "transformation" in odibi.transformations.__all__
 
     def test_transformations_docstring(self):
         """Transformations module should have comprehensive documentation."""
         import odibi.transformations
 
         assert odibi.transformations.__doc__ is not None
-        assert "Transformation Registry" in odibi.transformations.__doc__
+        assert "transformation" in odibi.transformations.__doc__.lower()
         assert "@transformation" in odibi.transformations.__doc__
 
 
