@@ -16,6 +16,13 @@ Example:
 
 from .registry import TransformationRegistry, get_registry
 from .decorators import transformation
+from .context import TransformationContext, build_context_from_config
 
-__all__ = ["TransformationRegistry", "get_registry", "transformation"]
+__all__ = [
+    "TransformationRegistry",
+    "get_registry",
+    "transformation",
+    "TransformationContext",
+    "build_context_from_config",
+]
 __version__ = "1.3.0-alpha.1"
