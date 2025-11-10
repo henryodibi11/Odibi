@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0-alpha.2-phase2b] - 2025-11-09
+
+### Added - Delta Lake Support (Phase 2B)
+- **Delta Lake read/write** support in PandasEngine using `deltalake` package
+- **Delta Lake read/write** support in SparkEngine using `delta-spark` package
+- **Time travel** with `versionAsOf` option for reading specific Delta versions
+- **VACUUM operation** (`vacuum_delta()`) to clean old files and save storage
+- **History tracking** (`get_delta_history()`) to list all Delta table versions
+- **Restore operation** (`restore_delta()`) to rollback to previous versions
+- **Partitioning support** with performance anti-pattern warnings
+- **12 comprehensive Delta tests** in `tests/test_delta_pandas.py`
+- `delta-spark>=2.3.0` dependency added to `spark` extras
+
+### Changed
+- SparkEngine now auto-configures Delta Lake support when `delta-spark` is available
+- Both engines now emit warnings when using partitioning to prevent performance issues
+- Updated STATUS.md to reflect Phase 2B completion
+- Updated PHASES.md with Phase 2B deliverables marked complete
+
+### Notes
+- Delta Lake is now fully integrated with both Pandas and Spark engines
+- All Delta operations work seamlessly with ADLS connections
+- Tests pass with 122 total tests (84 core + 26 ADLS + 12 Delta)
+- Phase 2B complete - moving to Phase 2C (Performance & Polish)
+
+## [1.2.0-alpha.1-phase2a] - 2025-11-09
+
 ### Added
 - **Avro format support** in PandasEngine for read/write operations
 - **PipelineManager** class for multi-pipeline orchestration from YAML

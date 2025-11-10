@@ -1,7 +1,6 @@
-"""Spark execution engine (Phase 2A: Basic read/write + ADLS support).
+"""Spark execution engine (Phase 2B: Delta Lake support).
 
-Status: Phase 2A implemented - Basic read/write with multi-account ADLS support
-Delta Lake support planned for Phase 2B.
+Status: Phase 2B implemented - Delta Lake read/write, VACUUM, history, restore
 """
 
 from typing import Any, Dict, List, Tuple, Optional
@@ -41,11 +40,20 @@ class SparkEngine(Engine):
                 "See docs/setup_databricks.md for setup instructions."
             ) from e
 
-        self.spark = spark_session or SparkSession.builder.appName("odibi").getOrCreate()
+        # Configure Delta Lake support
+        try:
+            from delta import configure_spark_with_delta_pip
+
+            builder = SparkSession.builder.appName("odibi")
+            self.spark = spark_session or configure_spark_with_delta_pip(builder).getOrCreate()
+        except ImportError:
+            # Delta not available - use regular Spark
+            self.spark = spark_session or SparkSession.builder.appName("odibi").getOrCreate()
+
         self.config = config or {}
         self.connections = connections or {}
 
-        # Configure all ADLS connections upfront (Phase 2A: sequential)
+        # Configure all ADLS connections upfront
         self._configure_all_connections()
 
     def _configure_all_connections(self) -> None:
@@ -82,10 +90,10 @@ class SparkEngine(Engine):
 
         Args:
             connection: Connection object (with get_path method)
-            format: Data format (csv, parquet, json)
+            format: Data format (csv, parquet, json, delta)
             table: Table name
             path: File path
-            options: Format-specific options
+            options: Format-specific options (including versionAsOf for Delta time travel)
 
         Returns:
             Spark DataFrame
@@ -124,11 +132,11 @@ class SparkEngine(Engine):
         Args:
             df: Spark DataFrame to write
             connection: Connection object
-            format: Output format (csv, parquet, json)
+            format: Output format (csv, parquet, json, delta)
             table: Table name
             path: File path
             mode: Write mode (overwrite, append, error, ignore)
-            options: Format-specific options
+            options: Format-specific options (including partition_by for partitioning)
         """
         options = options or {}
 
@@ -140,10 +148,30 @@ class SparkEngine(Engine):
         else:
             raise ValueError("Either path or table must be provided")
 
+        # Extract partition_by option
+        partition_by = options.pop("partition_by", None)
+
+        # Warn about partitioning anti-patterns
+        if partition_by:
+            import warnings
+
+            warnings.warn(
+                "⚠️  Partitioning can cause performance issues if misused. "
+                "Only partition on low-cardinality columns (< 1000 unique values) "
+                "and ensure each partition has > 1000 rows.",
+                UserWarning,
+            )
+
         # Write based on format
         writer = df.write.format(format).mode(mode)
 
-        # Apply options
+        # Apply partitioning if specified
+        if partition_by:
+            if isinstance(partition_by, str):
+                partition_by = [partition_by]
+            writer = writer.partitionBy(*partition_by)
+
+        # Apply other options
         for key, value in options.items():
             writer = writer.option(key, value)
 
@@ -186,3 +214,76 @@ class SparkEngine(Engine):
             "SparkEngine.validate_schema() will be implemented in Phase 3. "
             "See PHASES.md for implementation plan."
         )
+
+    def vacuum_delta(
+        self,
+        connection: Any,
+        path: str,
+        retention_hours: int = 168,
+    ) -> None:
+        """VACUUM a Delta table to remove old files.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            retention_hours: Retention period (default 168 = 7 days)
+        """
+        try:
+            from delta.tables import DeltaTable
+        except ImportError:
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[spark]' with delta-spark. "
+                "See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path)
+        delta_table = DeltaTable.forPath(self.spark, full_path)
+        delta_table.vacuum(retention_hours / 24.0)  # Convert hours to days
+
+    def get_delta_history(
+        self, connection: Any, path: str, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Get Delta table history.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            limit: Maximum number of versions to return
+
+        Returns:
+            List of version metadata dictionaries
+        """
+        try:
+            from delta.tables import DeltaTable
+        except ImportError:
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[spark]' with delta-spark. "
+                "See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path)
+        delta_table = DeltaTable.forPath(self.spark, full_path)
+        history_df = delta_table.history(limit) if limit else delta_table.history()
+
+        # Convert to list of dictionaries
+        return [row.asDict() for row in history_df.collect()]
+
+    def restore_delta(self, connection: Any, path: str, version: int) -> None:
+        """Restore Delta table to a specific version.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            version: Version number to restore to
+        """
+        try:
+            from delta.tables import DeltaTable
+        except ImportError:
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[spark]' with delta-spark. "
+                "See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path)
+        delta_table = DeltaTable.forPath(self.spark, full_path)
+        delta_table.restoreToVersion(version)

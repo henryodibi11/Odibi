@@ -86,6 +86,24 @@ class PandasEngine(Engine):
             return pd.read_json(full_path, **merged_options)
         elif format == "excel":
             return pd.read_excel(full_path, **merged_options)
+        elif format == "delta":
+            try:
+                from deltalake import DeltaTable
+            except ImportError:
+                raise ImportError(
+                    "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
+                    "See README.md for installation instructions."
+                )
+
+            # Merge storage options for cloud connections
+            storage_opts = merged_options.get("storage_options", {})
+
+            # Handle version parameter for time travel
+            version = merged_options.get("versionAsOf")
+
+            # Read Delta table
+            dt = DeltaTable(full_path, storage_options=storage_opts, version=version)
+            return dt.to_pandas()
         elif format == "avro":
             try:
                 import fastavro
@@ -166,6 +184,43 @@ class PandasEngine(Engine):
             df.to_json(full_path, orient="records", **merged_options)
         elif format == "excel":
             df.to_excel(full_path, index=False, **merged_options)
+        elif format == "delta":
+            try:
+                from deltalake import write_deltalake
+            except ImportError:
+                raise ImportError(
+                    "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
+                    "See README.md for installation instructions."
+                )
+
+            import warnings
+
+            # Merge storage options for cloud connections
+            storage_opts = merged_options.get("storage_options", {})
+
+            # Get partition columns if specified
+            partition_by = merged_options.get("partition_by")
+
+            # Warn about partitioning anti-patterns
+            if partition_by:
+                warnings.warn(
+                    "⚠️  Partitioning can cause performance issues if misused. "
+                    "Only partition on low-cardinality columns (< 1000 unique values) "
+                    "and ensure each partition has > 1000 rows.",
+                    UserWarning,
+                )
+
+            # Convert mode to Delta mode
+            delta_mode = "overwrite" if mode == "overwrite" else "append"
+
+            # Write Delta table
+            write_deltalake(
+                full_path,
+                df,
+                mode=delta_mode,
+                partition_by=partition_by,
+                storage_options=storage_opts,
+            )
         elif format == "avro":
             try:
                 import fastavro
@@ -411,3 +466,106 @@ class PandasEngine(Engine):
             fields.append({"name": col, "type": avro_type})
 
         return {"type": "record", "name": "DataFrame", "fields": fields}
+
+    def vacuum_delta(
+        self,
+        connection: Any,
+        path: str,
+        retention_hours: int = 168,
+        dry_run: bool = False,
+        enforce_retention_duration: bool = True,
+    ) -> Dict[str, Any]:
+        """VACUUM a Delta table to remove old files.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            retention_hours: Retention period (default 168 = 7 days)
+            dry_run: If True, only show files to be deleted
+            enforce_retention_duration: If False, allows retention < 168 hours (testing only)
+
+        Returns:
+            Dictionary with files_deleted count
+        """
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
+                "See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path)
+
+        # Get storage options if connection provides them
+        storage_opts = {}
+        if hasattr(connection, "pandas_storage_options"):
+            storage_opts = connection.pandas_storage_options()
+
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        deleted_files = dt.vacuum(
+            retention_hours=retention_hours,
+            dry_run=dry_run,
+            enforce_retention_duration=enforce_retention_duration,
+        )
+
+        return {"files_deleted": len(deleted_files)}
+
+    def get_delta_history(
+        self, connection: Any, path: str, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Get Delta table history.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            limit: Maximum number of versions to return
+
+        Returns:
+            List of version metadata dictionaries
+        """
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
+                "See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path)
+
+        # Get storage options if connection provides them
+        storage_opts = {}
+        if hasattr(connection, "pandas_storage_options"):
+            storage_opts = connection.pandas_storage_options()
+
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        history = dt.history(limit=limit)
+
+        return history
+
+    def restore_delta(self, connection: Any, path: str, version: int) -> None:
+        """Restore Delta table to a specific version.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            version: Version number to restore to
+        """
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
+                "See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path)
+
+        # Get storage options if connection provides them
+        storage_opts = {}
+        if hasattr(connection, "pandas_storage_options"):
+            storage_opts = connection.pandas_storage_options()
+
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        dt.restore(version)

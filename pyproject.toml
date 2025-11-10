@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odibi"
-version = "1.0.0"
+version = "1.2.0-alpha.2"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
     {name = "Henry Odibi", email = "henryodibi@outlook.com"}
@@ -34,6 +34,7 @@ dependencies = [
 [project.optional-dependencies]
 spark = [
     "pyspark>=3.4.0",
+    "delta-spark>=2.3.0",
 ]
 pandas = [
     "duckdb>=0.9.0",
@@ -49,6 +50,7 @@ azure = [
 ]
 all = [
     "pyspark>=3.4.0",
+    "delta-spark>=2.3.0",
     "duckdb>=0.9.0",
     "pandasql>=0.7.3",
     "deltalake>=0.13.0",

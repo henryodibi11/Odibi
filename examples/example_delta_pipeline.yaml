@@ -1,0 +1,213 @@
+# ODIBI Delta Lake Pipeline Example
+# Phase 2B: Delta Lake Support
+# Version: v1.2.0-alpha.2-phase2b
+
+connections:
+  # Local storage for testing
+  local:
+    type: local
+    base_path: ./data
+
+  # Azure ADLS for production (update with your values)
+  bronze:
+    type: azure_adls
+    account: YOUR_STORAGE_ACCOUNT
+    container: bronze
+    path_prefix: raw
+    auth_mode: key_vault
+    key_vault_name: YOUR_KEY_VAULT
+    secret_name: bronze-storage-key
+
+  silver:
+    type: azure_adls
+    account: YOUR_STORAGE_ACCOUNT
+    container: silver
+    path_prefix: clean
+    auth_mode: key_vault
+    key_vault_name: YOUR_KEY_VAULT
+    secret_name: silver-storage-key
+
+story:
+  connection: local
+  path: stories/
+  enabled: true
+
+retry:
+  max_attempts: 3
+  backoff_seconds: 2.0
+
+logging:
+  level: INFO
+
+pipelines:
+  # Pipeline 1: Local Delta Testing
+  - pipeline: local_delta_test
+    name: Local Delta Testing
+    description: Test Delta Lake features locally
+    nodes:
+      # Read CSV
+      - name: load_raw_sales
+        read:
+          connection: local
+          path: input/sales.csv
+          format: csv
+
+      # Transform
+      - name: clean_sales
+        depends_on: [load_raw_sales]
+        transform:
+          steps:
+            - SELECT * FROM load_raw_sales WHERE amount > 0
+            - SELECT *, UPPER(customer) as customer_upper FROM __result__
+
+      # Write to Delta (local)
+      - name: save_delta
+        depends_on: [clean_sales]
+        write:
+          connection: local
+          path: output/sales.delta
+          format: delta  # ← Delta Lake!
+          mode: append
+
+  # Pipeline 2: Delta with Time Travel
+  - pipeline: delta_time_travel
+    name: Delta Time Travel Demo
+    description: Read specific Delta versions
+    nodes:
+      # Read latest version
+      - name: read_latest
+        read:
+          connection: local
+          path: output/sales.delta
+          format: delta
+
+      # Read version 0 (time travel)
+      - name: read_v0
+        read:
+          connection: local
+          path: output/sales.delta
+          format: delta
+          options:
+            versionAsOf: 0  # ← Time travel to version 0!
+
+      # Compare versions
+      - name: compare_versions
+        depends_on: [read_latest, read_v0]
+        transform:
+          steps:
+            - |
+              SELECT
+                'Latest' as version_type,
+                COUNT(*) as row_count,
+                SUM(amount) as total_amount
+              FROM read_latest
+              UNION ALL
+              SELECT
+                'Version 0' as version_type,
+                COUNT(*) as row_count,
+                SUM(amount) as total_amount
+              FROM read_v0
+
+      # Save comparison
+      - name: save_comparison
+        depends_on: [compare_versions]
+        write:
+          connection: local
+          path: output/version_comparison.csv
+          format: csv
+
+  # Pipeline 3: Delta with Partitioning
+  - pipeline: delta_partitioned
+    name: Delta with Partitioning
+    description: Write partitioned Delta table
+    nodes:
+      # Read source
+      - name: load_large_dataset
+        read:
+          connection: local
+          path: input/large_sales.csv
+          format: csv
+
+      # Write partitioned Delta
+      - name: save_partitioned
+        depends_on: [load_large_dataset]
+        write:
+          connection: local
+          path: output/sales_partitioned.delta
+          format: delta
+          mode: overwrite
+          options:
+            partition_by:
+              - year
+              - month  # ← Partition by year and month
+
+  # Pipeline 4: Production Delta on ADLS
+  - pipeline: production_delta_etl
+    name: Production Delta ETL
+    description: Bronze → Silver with Delta on ADLS
+    nodes:
+      # Read from Bronze (CSV)
+      - name: read_bronze
+        read:
+          connection: bronze
+          path: events/raw_events.csv
+          format: csv
+
+      # Clean and transform
+      - name: clean_events
+        depends_on: [read_bronze]
+        transform:
+          steps:
+            # Remove nulls
+            - SELECT * FROM read_bronze WHERE event_id IS NOT NULL
+            # Add processing timestamp
+            - SELECT *, CURRENT_TIMESTAMP() as processed_at FROM __result__
+            # Filter valid events
+            - SELECT * FROM __result__ WHERE event_type IN ('click', 'view', 'purchase')
+
+      # Write to Silver (Delta)
+      - name: write_silver
+        depends_on: [clean_events]
+        write:
+          connection: silver
+          path: events/clean_events.delta
+          format: delta  # ← Delta on ADLS!
+          mode: append
+          options:
+            partition_by:
+              - event_type  # Low cardinality - good for partitioning
+
+  # Pipeline 5: Delta Maintenance
+  - pipeline: delta_maintenance
+    name: Delta Maintenance
+    description: VACUUM old files (run separately with Python)
+    # Note: VACUUM is not a pipeline operation, run with Python:
+    #
+    # from odibi.engine.pandas_engine import PandasEngine
+    # from odibi.connections.azure_adls import AzureADLS
+    #
+    # engine = PandasEngine()
+    # conn = AzureADLS(...)
+    #
+    # # VACUUM (keep last 7 days)
+    # result = engine.vacuum_delta(
+    #     connection=conn,
+    #     path="events/clean_events.delta",
+    #     retention_hours=168
+    # )
+    # print(f"Deleted {result['files_deleted']} files")
+    #
+    # # Get history
+    # history = engine.get_delta_history(conn, "events/clean_events.delta", limit=10)
+    # for entry in history:
+    #     print(f"Version {entry['version']}: {entry['operation']}")
+    #
+    # # Restore if needed
+    # engine.restore_delta(conn, "events/clean_events.delta", version=5)
+
+# Notes:
+# 1. Delta is the recommended format for production data
+# 2. Use partition_by carefully - only low-cardinality columns
+# 3. Run VACUUM regularly to clean old files
+# 4. Use time travel for debugging and recovery
+# 5. Delta works seamlessly with ADLS storage

@@ -61,9 +61,9 @@ print(f"✅ {len(result.completed)} nodes completed")
 ```
 
 **What it does:**
-- Loads CSV/Parquet/Avro from configured locations
+- Loads CSV/Parquet/Avro/Delta from configured locations
 - Cleans and validates data (SQL transforms)
-- Saves output in desired format
+- Saves output in Delta Lake format (ACID transactions)
 - Generates execution story automatically
 
 See [examples/template_full.yaml](examples/template_full.yaml) for all configuration options.
@@ -164,6 +164,33 @@ That's it! ODIBI will:
 
 ## Features
 
+### Delta Lake Support (Phase 2B) ✨ NEW
+Production-ready Delta Lake integration with ACID transactions and time travel:
+
+```python
+# Write Delta table
+engine.write(df, connection=conn, format="delta", path="sales.delta", mode="append")
+
+# Read with time travel
+df_v5 = engine.read(conn, format="delta", path="sales.delta", options={"versionAsOf": 5})
+
+# VACUUM old files
+result = engine.vacuum_delta(conn, "sales.delta", retention_hours=168)
+
+# Restore to previous version
+engine.restore_delta(conn, "sales.delta", version=5)
+```
+
+**Features:**
+- ✅ ACID transactions (no partial writes)
+- ✅ Time travel (audit trail, debugging)
+- ✅ Schema evolution (add columns safely)
+- ✅ VACUUM operations (optimize storage)
+- ✅ Works with Pandas and Spark engines
+- ✅ Full Azure ADLS integration
+
+See [docs/DELTA_LAKE_GUIDE.md](docs/DELTA_LAKE_GUIDE.md) for complete guide.
+
 ### Unified Context API
 Transform functions work on both Spark and Pandas without changes:
 
@@ -254,7 +281,8 @@ Connection Layer (Azure/Local/Delta/SQL)
 ## Documentation
 
 **📚 Learning Resources:**
-- [Configuration System Explained](docs/CONFIGURATION_EXPLAINED.md) - ⭐ **NEW: Complete config guide** ⭐
+- [Configuration System Explained](docs/CONFIGURATION_EXPLAINED.md) - Complete config guide
+- [Delta Lake Guide](docs/DELTA_LAKE_GUIDE.md) - ⭐ **NEW: Delta Lake quick reference** ⭐
 - [Getting Started Tutorial](examples/getting_started/walkthrough.ipynb) - Interactive walkthrough
 - [Documentation Index](docs/README.md) - All guides and references
 - [Quick Reference](examples/getting_started/QUICK_REFERENCE.md) - Common patterns
@@ -263,11 +291,18 @@ Connection Layer (Azure/Local/Delta/SQL)
 **📖 Setup Guides:**
 - [Databricks Setup](docs/setup_databricks.md) - Community + Azure Databricks configuration
 - [Azure Integration](docs/setup_azure.md) - ADLS Gen2 + Azure SQL authentication
+- [Local Development](docs/LOCAL_DEVELOPMENT.md) - Local testing setup
 
 **🧪 Examples:**
 - [Local Pandas Example](examples/example_local.yaml) - Simple Bronze→Silver→Gold pipeline
+- [Delta Lake Pipeline](examples/example_delta_pipeline.yaml) - ⭐ **NEW: Production Delta pipelines** ⭐
 - [Spark Azure Example](examples/example_spark.yaml) - Multi-source ETL with Azure
 - [Getting Started Tutorial](examples/getting_started/) - Complete walkthrough with sample data
+
+**📓 Walkthroughs:**
+- [Phase 2B: Delta Lake](walkthroughs/phase2b_delta_lake.ipynb) - Delta features (12 parts)
+- [Phase 2B: Production Pipelines](walkthroughs/phase2b_production_pipeline.ipynb) - YAML + Key Vault (15 parts)
+- [Phase 2A: ADLS Testing](walkthroughs/phase2a_adls_test.ipynb) - Azure integration
 
 **🔧 Project Info:**
 - [PHASES.md](PHASES.md) - Roadmap and feature timeline
@@ -281,10 +316,12 @@ Connection Layer (Azure/Local/Delta/SQL)
 
 ODIBI is being developed in deliberate phases:
 
-- ✅ **Phase 1 (Current):** Pandas MVP, Spark scaffolding, Azure connections, CI/CD
-- ⏳ **Phase 2 (Q1 2026):** CLI tools, testing utilities, developer experience
-- ⏳ **Phase 3 (Q2 2026):** Story generation, Spark engine implementation, AWS/GCP connectors
-- ⏳ **Phase 4 (Q3 2026):** Performance optimization, production hardening
+- ✅ **Phase 1:** Pandas MVP, Spark scaffolding, Azure connections, CI/CD
+- ✅ **Phase 2A:** Azure ADLS + Key Vault authentication
+- ✅ **Phase 2B (Current):** Delta Lake support (read/write, VACUUM, time travel)
+- 🔜 **Phase 2C (Next):** Performance optimization, parallel Key Vault fetching
+- ⏳ **Phase 3 (Q1 2026):** CLI tools, testing utilities, advanced features
+- ⏳ **Phase 4 (Q2 2026):** Production hardening, performance tuning
 - ⏳ **Phase 5 (2026+):** Community ecosystem, plugin system
 
 See [PHASES.md](PHASES.md) for detailed roadmap.

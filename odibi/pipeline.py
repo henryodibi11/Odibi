@@ -383,11 +383,31 @@ class PipelineManager:
                 connections[conn_name] = LocalConnection(
                     base_path=conn_config.get("base_path", "./data")
                 )
+            elif conn_type == "azure_adls":
+                # Import here to avoid dependency issues
+                try:
+                    from odibi.connections.azure_adls import AzureADLS
+                except ImportError:
+                    raise ImportError(
+                        "Azure ADLS support requires 'pip install odibi[azure]'. "
+                        "See README.md for installation instructions."
+                    )
+
+                connections[conn_name] = AzureADLS(
+                    account=conn_config["account"],
+                    container=conn_config["container"],
+                    path_prefix=conn_config.get("path_prefix", ""),
+                    auth_mode=conn_config.get("auth_mode", "key_vault"),
+                    key_vault_name=conn_config.get("key_vault_name"),
+                    secret_name=conn_config.get("secret_name"),
+                    account_key=conn_config.get("account_key"),
+                    validate=conn_config.get("validate", True),
+                )
             else:
                 raise ValueError(
                     f"Unsupported connection type: {conn_type}. "
-                    f"Supported types: local (Phase 1). "
-                    f"Azure/Spark connections coming in Phase 3."
+                    f"Supported types: local, azure_adls. "
+                    f"See docs for connection setup."
                 )
 
         return connections
