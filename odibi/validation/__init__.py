@@ -4,7 +4,7 @@ Quality Enforcement and Validation
 
 This module enforces Odibi's quality standards through automated validation.
 
-Planned features (Phase 3):
+Features:
 - Explanation linting: Ensure transformations are documented
 - Quality scoring: Detect generic/lazy documentation
 - Schema validation: Verify config structure
@@ -13,5 +13,7 @@ Planned features (Phase 3):
 Principle: Enforce excellence, don't hope for it.
 """
 
-__all__ = []
-__version__ = "0.0.0"
+from .explanation_linter import ExplanationLinter, LintIssue
+
+__all__ = ["ExplanationLinter", "LintIssue"]
+__version__ = "1.3.0-alpha.1"

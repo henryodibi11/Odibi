@@ -75,17 +75,18 @@ class TestValidationModule:
         assert odibi.validation is not None
 
     def test_validation_version(self):
-        """Validation module should have version 0.0.0 (scaffolding)."""
+        """Validation module should have version 1.3.0-alpha.1 (Phase 3A)."""
         import odibi.validation
 
         assert hasattr(odibi.validation, "__version__")
-        assert odibi.validation.__version__ == "0.0.0"
+        assert odibi.validation.__version__ == "1.3.0-alpha.1"
 
-    def test_validation_all_empty(self):
-        """Validation module should export nothing yet."""
+    def test_validation_exports_linter(self):
+        """Validation module should export ExplanationLinter and LintIssue."""
         import odibi.validation
 
-        assert odibi.validation.__all__ == []
+        assert "ExplanationLinter" in odibi.validation.__all__
+        assert "LintIssue" in odibi.validation.__all__
 
     def test_validation_docstring(self):
         """Validation module should have comprehensive documentation."""
