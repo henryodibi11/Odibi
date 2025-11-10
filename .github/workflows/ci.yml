@@ -35,11 +35,11 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'pyproject.toml'
 
-      # Step 3: Install base dependencies (Pandas engine only)
+      # Step 3: Install base dependencies (including Azure for Phase 2A)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
+          pip install -e .[azure]
           pip install pytest pytest-cov black ruff
 
       # Step 4: Run code formatting check with Black
