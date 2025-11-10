@@ -11,17 +11,20 @@ class TestOperationsModule:
         assert odibi.operations is not None
 
     def test_operations_version(self):
-        """Operations module should have version 0.0.0 (scaffolding)."""
+        """Operations module should have version 1.3.0-alpha.1 (Phase 3A)."""
         import odibi.operations
 
         assert hasattr(odibi.operations, "__version__")
-        assert odibi.operations.__version__ == "0.0.0"
+        assert odibi.operations.__version__ == "1.3.0-alpha.1"
 
-    def test_operations_all_empty(self):
-        """Operations module should export nothing yet."""
+    def test_operations_exports(self):
+        """Operations module should export built-in operations."""
         import odibi.operations
 
-        assert odibi.operations.__all__ == []
+        assert "pivot" in odibi.operations.__all__
+        assert "unpivot" in odibi.operations.__all__
+        assert "join" in odibi.operations.__all__
+        assert "sql" in odibi.operations.__all__
 
     def test_operations_docstring(self):
         """Operations module should have comprehensive documentation."""
