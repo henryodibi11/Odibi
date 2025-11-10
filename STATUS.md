@@ -178,16 +178,25 @@
 
 ---
 
-## 🎯 What's Next: Phase 3 - CLI & Advanced Features
+## 🎯 What's Next: Phase 3 - CLI & Advanced Features (Azure-First)
 
-**Target:** Q1 2026  
-**Focus:** Developer experience and advanced features
+**Target:** Q1-Q2 2026  
+**Focus:** Developer experience and Azure ecosystem completion  
+**Strategy:** Focus on production platform (Azure), defer other clouds to Phase 5
 
 ### Planned Deliverables
 - [ ] Enhanced CLI tools (validate, run, graph, config doctor)
 - [ ] Testing utilities and fixtures
-- [ ] Story generator enhancements
-- [ ] Additional cloud connectors (S3, GCS)
+- [ ] Story generator enhancements with metadata
+- [ ] Azure SQL connector implementation
+- [ ] Azure-focused examples and best practices
+
+### Deferred to Phase 5 (Community)
+- AWS S3 connector (no production use case yet)
+- Google Cloud Storage (no production use case yet)
+- Other cloud platforms (as needed or via community)
+
+**Rationale:** Build what you use. S3/GCS can be community contributions when needed.
 
 **See:** `PHASES.md` for complete Phase 3 specifications
 

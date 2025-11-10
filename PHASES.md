@@ -183,17 +183,18 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 
 ---
 
-## Phase 3 — CLI Tools + Advanced Features
+## Phase 3 — CLI Tools + Advanced Features (Azure-First)
 
 **Target Version:** v1.3.0  
 **Status:** ⏳ Planned  
-**Timeline:** Q2 2026
+**Timeline:** Q1-Q2 2026
 
 ### Goals
 - Improve developer experience with polished CLI tools
 - Enhance story/report generation for pipeline runs
-- Add more cloud connectors (AWS S3, GCP)
 - Add testing utilities and fixtures
+- Complete Azure SQL connector implementation
+- **Defer:** AWS S3, GCP (Phase 5 - when needed/community contributions)
 
 ### Deliverables
 
@@ -220,22 +221,30 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 - [ ] Export formats: Markdown, JSON, HTML (basic)
 - [ ] Configurable verbosity levels
 
-#### New Connectors (Scaffolded → Implemented)
-- [ ] `connections/s3.py` - AWS S3 using `boto3` (scaffold + docs)
-- [ ] `connections/gcs.py` - Google Cloud Storage using `gcsfs` (scaffold + docs)
+#### Azure Connector Completion
 - [ ] `connections/azure_sql.py` - Implement read/write via SQLAlchemy + ODBC
+- [ ] Azure-specific error handling improvements
+- [ ] Azure connection examples and best practices
 - [ ] Connection factory: YAML `type` field → class instantiation
+
+#### Cloud Connectors (Deferred to Phase 5)
+- [ ] `connections/s3.py` - AWS S3 (deferred - no production use case)
+- [ ] `connections/gcs.py` - Google Cloud Storage (deferred - no production use case)
+- **Rationale:** Focus on Azure (production platform). Add S3/GCS when needed or via community contributions.
 
 #### Examples
 - [ ] `examples/spark_sql_pipeline/` - End-to-end Spark SQL transformation
 - [ ] `examples/azure_etl/` - ADLS read → transform → Azure SQL write
 - [ ] `examples/story_demo/` - Pipeline showcasing story generation
+- [ ] `examples/medallion_architecture/` - Complete Bronze/Silver/Gold example
 
 ### Acceptance Criteria
-- [ ] Stories generated for Pandas runs; Spark marked experimental
-- [ ] At least one connector fully implemented with tests
-- [ ] Spark engine can execute simple SQL transforms
-- [ ] ~20 new tests for stories and connectors
+- [ ] CLI tools functional and documented
+- [ ] Stories generated with useful metadata
+- [ ] Testing utilities available for users
+- [ ] Azure SQL connector implemented with tests
+- [ ] ~25 new tests for CLI, stories, and Azure SQL
+- [ ] Zero breaking changes to Phase 2 features
 
 ---
 
@@ -295,6 +304,7 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 - Grow community contributions and extensions
 - Establish plugin ecosystem
 - Create comprehensive documentation site
+- Add cloud connectors via community (AWS S3, GCP, etc.)
 
 ### Deliverables
 
@@ -317,6 +327,7 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 - [ ] Release automation (Release Drafter, PyPI publish on tag)
 - [ ] Discussion forum or GitHub Discussions enabled
 - [ ] Examples gallery with community contributions
+- [ ] Community-contributed connectors (AWS S3, GCP, Snowflake, etc.)
 
 #### Advanced Features
 - [ ] YAML schema validation (JSON Schema for autocomplete in IDEs)
