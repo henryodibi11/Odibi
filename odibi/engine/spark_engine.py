@@ -182,11 +182,15 @@ class SparkEngine(Engine):
 
         Args:
             sql: SQL query string
-            context: Execution context (not used for Spark, uses temp views)
+            context: Dict of table_name -> DataFrame
 
         Returns:
             Result DataFrame
         """
+        # Register all DataFrames as temporary views
+        for table_name, df in context.items():
+            df.createOrReplaceTempView(table_name)
+
         return self.spark.sql(sql)
 
     def execute_transform(self, *args, **kwargs):
