@@ -44,6 +44,8 @@ pandas = [
 azure = [
     "azure-storage-blob>=12.0.0",
     "azure-identity>=1.14.0",
+    "azure-keyvault-secrets>=4.7.0",
+    "adlfs>=2023.1.0",
 ]
 all = [
     "pyspark>=3.4.0",
@@ -53,6 +55,8 @@ all = [
     "fastavro>=1.8.0",
     "azure-storage-blob>=12.0.0",
     "azure-identity>=1.14.0",
+    "azure-keyvault-secrets>=4.7.0",
+    "adlfs>=2023.1.0",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -96,4 +100,3 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --cov=odibi --cov-report=term-missing"
