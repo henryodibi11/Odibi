@@ -6,6 +6,15 @@ from unittest.mock import MagicMock, patch
 
 from odibi.connections.azure_adls import AzureADLS
 
+# Check if Azure packages are available for Key Vault tests
+try:
+    import azure.identity
+    import azure.keyvault.secrets
+
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+
 
 class TestAzureADLSValidation:
     """Test validation for both auth modes."""
@@ -134,6 +143,7 @@ class TestAzureADLSDirectKeyAuth:
             assert conn.auth_mode == "direct_key"
 
 
+@pytest.mark.skipif(not AZURE_AVAILABLE, reason="Azure packages not installed")
 class TestAzureADLSKeyVaultAuth:
     """Test Key Vault authentication mode (mocked)."""
 
@@ -217,6 +227,7 @@ class TestAzureADLSPandasIntegration:
 
         assert opts == {"account_name": "myaccount", "account_key": "test-key-123"}
 
+    @pytest.mark.skipif(not AZURE_AVAILABLE, reason="Azure packages not installed")
     @patch("azure.keyvault.secrets.SecretClient")
     @patch("azure.identity.DefaultAzureCredential")
     def test_pandas_storage_options_key_vault(self, mock_cred, mock_client):
@@ -262,6 +273,7 @@ class TestAzureADLSSparkIntegration:
         expected_key = "fs.azure.account.key.myaccount.dfs.core.windows.net"
         mock_spark.conf.set.assert_called_once_with(expected_key, "test-key-123")
 
+    @pytest.mark.skipif(not AZURE_AVAILABLE, reason="Azure packages not installed")
     @patch("azure.keyvault.secrets.SecretClient")
     @patch("azure.identity.DefaultAzureCredential")
     def test_configure_spark_key_vault(self, mock_cred, mock_client):
