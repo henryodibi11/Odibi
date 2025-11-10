@@ -1,5 +1,6 @@
 """Tests for odibi.utils.setup_helpers (Phase 2C)."""
 
+import pytest
 from unittest.mock import Mock, patch
 from odibi.utils.setup_helpers import (
     fetch_keyvault_secret,
@@ -335,12 +336,14 @@ class TestValidateDatabricksEnvironment:
         assert result["runtime_version"] == "12.2.x-scala2.12"
 
     @patch.dict("os.environ", {"DATABRICKS_RUNTIME_VERSION": "12.2.x-scala2.12"})
-    @patch("pyspark.sql.SparkSession")
-    def test_spark_available(self, mock_spark):
-        mock_session = Mock()
-        mock_spark.getActiveSession.return_value = mock_session
+    def test_spark_available(self):
+        pytest.importorskip("pyspark")
 
-        result = validate_databricks_environment(verbose=False)
+        with patch("pyspark.sql.SparkSession") as mock_spark:
+            mock_session = Mock()
+            mock_spark.getActiveSession.return_value = mock_session
 
-        assert result["is_databricks"] is True
-        assert result["spark_available"] is True
+            result = validate_databricks_environment(verbose=False)
+
+            assert result["is_databricks"] is True
+            assert result["spark_available"] is True

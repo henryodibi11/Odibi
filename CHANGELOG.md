@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0-alpha.3-phase2c] - 2025-11-10
+
+### Added - Performance & Setup Utilities (Phase 2C)
+- **Parallel Key Vault fetching** - 3x+ faster startup with `configure_connections_parallel()`
+- **Timeout protection** - 30s default timeout for Key Vault operations prevents hanging
+- **Setup utilities module** - `odibi.utils.setup_helpers` with programmatic configuration
+- **Databricks validation** - `validate_databricks_environment()` checks runtime/Spark/dbutils
+- **Interactive setup notebook** - `setup/databricks_setup.ipynb` with step-by-step guide
+- **Performance walkthrough** - `walkthroughs/phase2c_performance_keyvault.ipynb`
+- **Multi-account test notebook** - `walkthroughs/databricks_multiaccount_test.ipynb`
+- **Complete Databricks test** - `walkthroughs/databricks_complete_test.ipynb`
+- **15 new tests** for setup utilities (`tests/test_setup_helpers.py`)
+- `KeyVaultFetchResult` dataclass for detailed error reporting
+- `pyarrow>=10.0.0` added to dependencies for Delta Lake support
+
+### Fixed
+- **CRITICAL:** `SparkEngine.execute_sql()` now registers context DataFrames as temp views
+  - Was causing "table not found" errors in SQL transformations
+  - All SQL queries with context now work correctly
+- **CRITICAL:** `SparkEngine` now properly exported from `odibi.engine` module
+  - Can now import with `from odibi.engine import SparkEngine`
+- Added timeout protection to `AzureADLS.get_storage_key()` to prevent indefinite hanging
+
+### Changed
+- CI workflow now installs `.[all,dev]` for complete test coverage
+- Version bumped to `1.2.0-alpha.3`
+- Dev dependencies now include PySpark, Delta Spark, and Azure packages
+- Updated PHASES.md and STATUS.md to reflect Phase 2C completion
+
+### Databricks Validation
+- ✅ Multi-account ADLS (2 storage accounts configured and verified)
+- ✅ Cross-account data transfer (medallion architecture: Bronze → Silver)
+- ✅ Delta Lake time travel (versionAsOf tested)
+- ✅ Schema introspection (get_schema, get_shape, count_rows)
+- ✅ SQL transformations with temp view registration
+- ✅ Complete pipeline execution
+- ✅ All Phase 2 features validated in production Databricks environment
+
+### Performance
+- 3x faster startup with 3 Key Vault connections
+- 4.4x faster startup with 5 Key Vault connections
+- Timeout protection prevents indefinite waits
+- Detailed per-connection timing metrics
+
+### Tests
+- 137 total tests passing (was 122)
+- 15 new setup utility tests
+- All Phase 2A and 2B tests still pass
+- Zero breaking changes
+
 ## [1.2.0-alpha.2-phase2b] - 2025-11-09
 
 ### Added - Delta Lake Support (Phase 2B)

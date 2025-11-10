@@ -71,8 +71,12 @@ dev = [
     "pre-commit>=3.4.0",
     "pyspark>=3.4.0",
     "delta-spark>=2.3.0",
+    "pyarrow>=10.0.0",
     "azure-identity>=1.14.0",
     "azure-keyvault-secrets>=4.7.0",
+    "deltalake>=0.13.0",
+    "duckdb>=0.9.0",
+    "pandasql>=0.7.3",
 ]
 
 # [project.scripts]
