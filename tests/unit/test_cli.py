@@ -1,4 +1,5 @@
 """Tests for CLI module (Phase 2.5)."""
+
 import pytest
 import sys
 from unittest.mock import Mock, patch

@@ -12,12 +12,12 @@ Planned features (Phase 3):
 
 Example (future):
     from odibi import transformation
-    
+
     @transformation("my_custom_calc")
     def my_custom_calc(df, threshold):
         '''Filter records above threshold.'''
         return df[df.value > threshold]
-    
+
     @my_custom_calc.explain
     def explain(threshold, **context):
         plant = context.get('plant')

@@ -1,4 +1,5 @@
 """Integration tests for CLI (Phase 2.5)."""
+
 import subprocess
 import pytest
 from pathlib import Path

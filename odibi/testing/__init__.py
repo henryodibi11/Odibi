@@ -12,7 +12,7 @@ Planned features (Phase 3):
 
 Example (future):
     from odibi.testing import fixtures, assertions
-    
+
     def test_my_pipeline():
         with fixtures.temp_workspace() as ws:
             df = fixtures.sample_data(rows=100)

@@ -1,4 +1,5 @@
 """Main CLI entry point."""
+
 import sys
 import argparse
 from odibi.cli.run import run_command
