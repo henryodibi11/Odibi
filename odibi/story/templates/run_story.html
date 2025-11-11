@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ metadata.pipeline_name }} - Pipeline Run Story</title>
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --warning-color: #ffc107;
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #dddddd;
+            --code-bg: #f5f5f5;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --code-font: Consolas, Monaco, "Courier New", monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            line-height: 1.6;
+            color: var(--text-color);
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--bg-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background: var(--primary-color);
+            color: white;
+            padding: 30px;
+        }
+
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header-meta {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .header-meta span {
+            margin-right: 20px;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .status-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .status-failed {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .status-partial {
+            background: var(--warning-color);
+            color: #333;
+        }
+
+        /* Summary Section */
+        .summary {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .summary h2 {
+            margin-bottom: 20px;
+            color: var(--primary-color);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .stat-card.success { border-left-color: var(--success-color); }
+        .stat-card.error { border-left-color: var(--error-color); }
+        .stat-card.warning { border-left-color: var(--warning-color); }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* Node Details */
+        .nodes {
+            padding: 30px;
+        }
+
+        .node-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .node-header {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .node-header:hover {
+            background: #e9ecef;
+        }
+
+        .node-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .node-status-icon {
+            font-size: 20px;
+        }
+
+        .node-content {
+            padding: 20px;
+        }
+
+        .node-content.collapsed {
+            display: none;
+        }
+
+        .node-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .meta-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .meta-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .meta-value {
+            font-size: 16px;
+            color: var(--text-color);
+            margin-top: 5px;
+        }
+
+        .meta-value.positive {
+            color: var(--success-color);
+        }
+
+        .meta-value.negative {
+            color: var(--error-color);
+        }
+
+        /* Schema Changes */
+        .schema-changes {
+            margin-top: 15px;
+        }
+
+        .schema-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin: 2px;
+        }
+
+        .schema-added {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .schema-removed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Sample Data Table */
+        .sample-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .sample-table th {
+            background: var(--primary-color);
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .sample-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sample-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        /* Error Display */
+        .error-box {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .error-title {
+            color: var(--error-color);
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .error-message {
+            font-family: var(--code-font);
+            font-size: 13px;
+            white-space: pre-wrap;
+            color: #721c24;
+        }
+
+        /* Code Blocks */
+        code {
+            font-family: var(--code-font);
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+
+        pre {
+            background: var(--code-bg);
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+
+        /* Footer */
+        footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* Utilities */
+        .text-muted {
+            color: #6c757d;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success { background: var(--success-color); color: white; }
+        .badge-error { background: var(--error-color); color: white; }
+        .badge-warning { background: var(--warning-color); color: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>📊 {{ metadata.pipeline_name }}</h1>
+            <div class="header-meta">
+                <span>⏱️ Started: {{ metadata.started_at }}</span>
+                <span>✅ Completed: {{ metadata.completed_at or 'Running...' }}</span>
+                <span>⏲️ Duration: {{ "%.2f"|format(metadata.duration) }}s</span>
+            </div>
+
+            {% if metadata.failed_nodes > 0 %}
+            <div class="status-badge status-failed">
+                ❌ Failed ({{ metadata.failed_nodes }} node{{ 's' if metadata.failed_nodes != 1 else '' }})
+            </div>
+            {% elif metadata.completed_nodes == metadata.total_nodes %}
+            <div class="status-badge status-success">
+                ✅ Success ({{ metadata.completed_nodes }}/{{ metadata.total_nodes }} nodes)
+            </div>
+            {% else %}
+            <div class="status-badge status-partial">
+                ⚠️ Partial ({{ metadata.completed_nodes }}/{{ metadata.total_nodes }} completed)
+            </div>
+            {% endif %}
+        </header>
+
+        <!-- Summary -->
+        <section class="summary">
+            <h2>Pipeline Summary</h2>
+
+            {% if metadata.pipeline_layer %}
+            <p><strong>Layer:</strong> {{ metadata.pipeline_layer }}</p>
+            {% endif %}
+
+            {% if metadata.project %}
+            <p>
+                <strong>Project:</strong> {{ metadata.project }}
+                {% if metadata.plant %} | <strong>Plant:</strong> {{ metadata.plant }}{% endif %}
+                {% if metadata.asset %} | <strong>Asset:</strong> {{ metadata.asset }}{% endif %}
+            </p>
+            {% endif %}
+
+            <div class="stats-grid">
+                <div class="stat-card success">
+                    <div class="stat-value">{{ metadata.completed_nodes }}</div>
+                    <div class="stat-label">✅ Completed Nodes</div>
+                </div>
+
+                {% if metadata.failed_nodes > 0 %}
+                <div class="stat-card error">
+                    <div class="stat-value">{{ metadata.failed_nodes }}</div>
+                    <div class="stat-label">❌ Failed Nodes</div>
+                </div>
+                {% endif %}
+
+                {% if metadata.skipped_nodes > 0 %}
+                <div class="stat-card warning">
+                    <div class="stat-value">{{ metadata.skipped_nodes }}</div>
+                    <div class="stat-label">⏭️ Skipped Nodes</div>
+                </div>
+                {% endif %}
+
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.1f"|format(metadata.get_success_rate()) }}%</div>
+                    <div class="stat-label">Success Rate</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-value">{{ "{:,}".format(metadata.get_total_rows_processed()) }}</div>
+                    <div class="stat-label">Total Rows Processed</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Node Details -->
+        <section class="nodes">
+            <h2 style="margin-bottom: 20px; color: var(--primary-color);">Node Execution Details</h2>
+
+            {% for node in metadata.nodes %}
+            <div class="node-card">
+                <div class="node-header" onclick="toggleNode('node-{{ loop.index }}')">
+                    <div class="node-title">
+                        <span class="node-status-icon">
+                            {% if node.status == 'success' %}✅{% elif node.status == 'failed' %}❌{% else %}⏭️{% endif %}
+                        </span>
+                        {{ node.node_name }}
+                        <span class="badge">{{ node.operation }}</span>
+                    </div>
+                    <span class="text-muted">{{ "%.3f"|format(node.duration) }}s</span>
+                </div>
+
+                <div class="node-content" id="node-{{ loop.index }}">
+                    <!-- Metadata -->
+                    <div class="node-meta">
+                        <div class="meta-item">
+                            <div class="meta-label">Duration</div>
+                            <div class="meta-value">{{ "%.4f"|format(node.duration) }}s</div>
+                        </div>
+
+                        {% if node.rows_in is not none %}
+                        <div class="meta-item">
+                            <div class="meta-label">Rows In</div>
+                            <div class="meta-value">{{ "{:,}".format(node.rows_in) }}</div>
+                        </div>
+                        {% endif %}
+
+                        {% if node.rows_out is not none %}
+                        <div class="meta-item">
+                            <div class="meta-label">Rows Out</div>
+                            <div class="meta-value">{{ "{:,}".format(node.rows_out) }}</div>
+                        </div>
+                        {% endif %}
+
+                        {% if node.rows_change is not none %}
+                        <div class="meta-item">
+                            <div class="meta-label">Row Change</div>
+                            <div class="meta-value {% if node.rows_change > 0 %}positive{% elif node.rows_change < 0 %}negative{% endif %}">
+                                {% if node.rows_change > 0 %}+{% endif %}{{ "{:,}".format(node.rows_change) }}
+                                ({{ "%.1f"|format(node.rows_change_pct) }}%)
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Schema Changes -->
+                    {% if node.columns_added or node.columns_removed %}
+                    <div class="schema-changes">
+                        <strong>Schema Changes:</strong><br>
+                        {% for col in node.columns_added %}
+                        <span class="schema-badge schema-added">+ {{ col }}</span>
+                        {% endfor %}
+                        {% for col in node.columns_removed %}
+                        <span class="schema-badge schema-removed">- {{ col }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Error -->
+                    {% if node.error_message %}
+                    <div class="error-box">
+                        <div class="error-title">Error: {{ node.error_type or 'Exception' }}</div>
+                        <div class="error-message">{{ node.error_message }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <p>Generated by Odibi v1.3.0-alpha.5 | {{ metadata.started_at }}</p>
+        </footer>
+    </div>
+
+    <script>
+        function toggleNode(nodeId) {
+            const content = document.getElementById(nodeId);
+            content.classList.toggle('collapsed');
+        }
+
+        // Collapse all nodes except failed ones by default
+        document.addEventListener('DOMContentLoaded', function() {
+            {% for node in metadata.nodes %}
+            {% if node.status != 'failed' %}
+            document.getElementById('node-{{ loop.index }}').classList.add('collapsed');
+            {% endif %}
+            {% endfor %}
+        });
+    </script>
+</body>
+</html>
