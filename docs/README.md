@@ -5,62 +5,91 @@ Welcome to the ODIBI documentation! This guide will help you understand and use 
 ## 📚 Core Guides
 
 ### Getting Started
-- **[Configuration System Explained](CONFIGURATION_EXPLAINED.md)** ⭐ **START HERE** ⭐
+- **[Quick Start Guide](guides/01_QUICK_START.md)** ⭐ **START HERE** ⭐
+  - Get up and running in 5 minutes
+  - First pipeline example
+  - Common patterns
+
+- **[Configuration System Explained](CONFIGURATION_EXPLAINED.md)**
   - Understand how YAML, Pydantic models, and runtime classes work together
   - Complete walkthrough from config to execution
-  - Answers common confusion points
   - Decision trees and quick reference
+
+- **[User Guide](guides/02_USER_GUIDE.md)**
+  - Building pipelines
+  - Configuration patterns
+  - Best practices
+
+### Feature Guides
+- **[Delta Lake Guide](DELTA_LAKE_GUIDE.md)** 🆕
+  - ACID transactions
+  - Time travel
+  - VACUUM and maintenance
+  - Complete Delta Lake reference
+
+- **[Transformation Guide](guides/05_TRANSFORMATION_GUIDE.md)**
+  - Custom Python transforms
+  - SQL transformations
+  - Context API usage
+
+- **[Supported Formats](SUPPORTED_FORMATS.md)**
+  - CSV, Parquet, JSON, Excel, Avro, Delta
+  - Format-specific options
+  - Cloud storage support
 
 ### Setup Guides
 - **[Setup Azure Connections](setup_azure.md)**
   - Azure Data Lake Storage Gen2
   - Azure SQL Database
-  - Authentication options
+  - Authentication options (Key Vault, Managed Identity)
 
 - **[Setup Databricks](setup_databricks.md)**
   - Cluster configuration
   - Notebook integration
   - Spark engine setup
 
+- **[Local Development](LOCAL_DEVELOPMENT.md)**
+  - Local testing setup
+  - Development workflow
+
 ## 🎓 Interactive Learning
 
-### Walkthroughs (Jupyter Notebooks)
+### Current Walkthroughs
 Located in [`walkthroughs/`](../walkthroughs/)
 
-1. **[00 - Setup & Environment](../walkthroughs/00_setup_environment.ipynb)**
-   - Installation and ODIBI mental model
-   - First pipeline walkthrough
+1. **[Delta Lake Deep Dive](../walkthroughs/phase2b_delta_lake.ipynb)** 🆕
+   - All Delta Lake features
+   - Time travel examples
+   - Production patterns
 
-2. **[01 - Local Pipeline (Pandas)](../walkthroughs/01_local_pipeline_pandas.ipynb)**
-   - Complete pipeline with explanations
-   - Config vs Runtime concepts
-   - SQL-over-Pandas deep dive
-
-3. **[02 - CLI and Testing](../walkthroughs/02_cli_and_testing.ipynb)**
-   - Testing patterns
-   - CLI preview (Phase 2)
-
-4. **[03 - Spark Preview](../walkthroughs/03_spark_preview_stub.ipynb)**
-   - Spark architecture overview
-   - Phase 3 roadmap
-
-5. **[04 - CI/CD & Pre-commit](../walkthroughs/04_ci_cd_and_precommit.ipynb)**
-   - Code quality automation
-   - GitHub Actions setup
-
-6. **[05 - Build New Pipeline](../walkthroughs/05_build_new_pipeline.ipynb)**
-   - Build from scratch tutorial
+2. **[Production Pipeline](../walkthroughs/phase2b_production_pipeline.ipynb)**
+   - YAML configuration
+   - Key Vault integration
    - Best practices
+
+3. **[ADLS Integration](../walkthroughs/phase2a_adls_test.ipynb)** (if available)
+   - Azure storage setup
+   - Multi-account patterns
+
+4. **[Performance & Key Vault](../walkthroughs/phase2c_performance_keyvault.ipynb)**
+   - Parallel Key Vault fetching
+   - Performance optimization
+
+### Archived Walkthroughs
+Historical learning materials are available in [`_archive/walkthroughs/`](_archive/walkthroughs/)
 
 ## 📖 Reference
 
 ### Architecture & Design
-- **[Phase 2 Design Decisions](PHASE2_DESIGN_DECISIONS.md)** 🆕
-  - Transform pattern (no connections needed)
-  - Multi-account storage strategy
-  - Azure authentication modes (Key Vault vs direct key)
-  - Databricks integration approach
-  - Complete implementation plan
+- **[Architecture Guide](guides/04_ARCHITECTURE_GUIDE.md)**
+  - System design
+  - Component overview
+  - Data flow patterns
+
+- **[Developer Guide](guides/03_DEVELOPER_GUIDE.md)**
+  - Contributing to ODIBI
+  - Code structure
+  - Testing guidelines
 
 ### Configuration Templates
 - **[Complete YAML Template](../examples/template_full.yaml)**
@@ -85,20 +114,27 @@ Located in [`walkthroughs/`](../walkthroughs/)
   - Testing requirements
   - Pull request process
 
-### Project Structure
+### Project Information
 - **[Phase Roadmap](../PHASES.md)**
-  - Phase 1: ✅ Complete (Scaffolding + Config Refactor)
-  - Phase 2: 📋 Design Complete (Spark + Azure ADLS)
-  - Phase 3-5: Planned features
-
-- **[Phase 2 Design Decisions](PHASE2_DESIGN_DECISIONS.md)**
-  - Complete design rationale
-  - Implementation checklist
-  - Design principles
+  - Current status: Phase 3 Complete
+  - All phases with completion details
+  - Future roadmap
 
 - **[Changelog](../CHANGELOG.md)**
   - Version history
-  - Recent changes
+  - Recent changes and features
+
+- **[Troubleshooting Guide](guides/06_TROUBLESHOOTING.md)**
+  - Common errors and solutions
+  - Debugging tips
+  - FAQ
+
+### Historical Documents
+- **[Archived Materials](_archive/README.md)**
+  - Phase planning documents
+  - Design decisions
+  - Historical walkthroughs
+  - Test reports
 
 ## 🎯 Common Tasks
 
@@ -106,11 +142,11 @@ Located in [`walkthroughs/`](../walkthroughs/)
 
 **Run a pipeline from YAML?**
 ```python
-from odibi.pipeline import Pipeline
-manager = Pipeline.from_yaml("config.yaml")
+from odibi.pipeline import PipelineManager
+manager = PipelineManager.from_yaml("config.yaml")
 results = manager.run()
 ```
-See: [Configuration Explained](CONFIGURATION_EXPLAINED.md#example-tracing-a-pipeline-from-yaml-to-execution)
+See: [Quick Start Guide](guides/01_QUICK_START.md)
 
 **Add a new connection?**
 ```yaml
@@ -119,7 +155,7 @@ connections:
     type: local
     base_path: /path/to/data
 ```
-See: [Configuration Explained - Connections](CONFIGURATION_EXPLAINED.md#layer-1-yaml-files-declarative)
+See: [Configuration Guide](CONFIGURATION_EXPLAINED.md)
 
 **Transform data with SQL?**
 ```yaml
@@ -129,44 +165,39 @@ nodes:
       steps:
         - "SELECT * FROM previous_node WHERE amount > 0"
 ```
-See: [Walkthrough 01](../walkthroughs/01_local_pipeline_pandas.ipynb)
+See: [User Guide](guides/02_USER_GUIDE.md)
 
-**Debug a failing node?**
-```python
-# Run single node with mock data
-result = pipeline.run_node('node_name', mock_data={'dep': df})
+**Use Delta Lake?**
+```yaml
+write:
+  format: delta
+  mode: append
+  options:
+    versionAsOf: 5  # Time travel!
 ```
-See: [Walkthrough 02 - Testing](../walkthroughs/02_cli_and_testing.ipynb)
+See: [Delta Lake Guide](DELTA_LAKE_GUIDE.md)
 
 ## 🆘 Troubleshooting
 
-### Configuration Issues
-- **"ValidationError: field required"**
-  → Check [Configuration Explained](CONFIGURATION_EXPLAINED.md#layer-2-pydantic-models-validation) for required fields
+See the complete **[Troubleshooting Guide](guides/06_TROUBLESHOOTING.md)** for:
+- Configuration errors
+- Execution issues
+- Common pitfalls
+- Debugging strategies
 
-- **"Pipeline 'X' not found"**
-  → Verify pipeline names with `manager.list_pipelines()`
-
-- **"Connection 'X' not configured"**
-  → Ensure connection is defined in `connections:` section
-
-### Execution Issues
-- **SQL references wrong table**
-  → SQL table names must match node names (see [Context](CONFIGURATION_EXPLAINED.md#5-context---the-data-bus))
-
-- **Node dependencies circular**
-  → Check dependency graph with `pipeline.visualize()`
-
-See walkthroughs for troubleshooting sections with common errors and solutions.
+Quick fixes:
+- **"ValidationError: field required"** → Check [Configuration Guide](CONFIGURATION_EXPLAINED.md)
+- **"Pipeline 'X' not found"** → Verify pipeline names in YAML
+- **"Connection 'X' not configured"** → Add to `connections:` section
+- **SQL errors** → Table names must match node names
 
 ## 📞 Support
 
 - **Issues:** [GitHub Issues](https://github.com/henryodibi11/Odibi/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/henryodibi11/Odibi/discussions)
 - **Email:** henryodibi@outlook.com
 
 ---
 
-**Current Version:** v1.1.0-alpha.2-walkthroughs  
-**Status:** Phase 1 Complete, Phase 2 Design Complete  
-**Last Updated:** 2025-11-08
+**Current Version:** v1.3.0-alpha.5-phase3  
+**Status:** Phase 3 Complete - Production Ready  
+**Last Updated:** November 11, 2025
