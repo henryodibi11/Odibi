@@ -1,165 +1,335 @@
-# ODIBI Examples
+# ODIBI Examples & Templates
 
-**Learn by doing!** Complete examples and tutorials for ODIBI framework.
-
----
-
-## 📚 Available Examples
-
-### 1. Getting Started (👈 **START HERE**)
-**Path:** `getting_started/`  
-**Time:** 30 minutes  
-**Level:** Beginner
-
-**Learn:**
-- Basic pipelines (read/write)
-- Transform functions
-- SQL transforms
-- Multi-source pipelines
-- Debugging techniques
-
-**Start:** Open `getting_started/walkthrough.ipynb`
+**Complete guide to ODIBI configuration files and examples**
 
 ---
 
-## 🗺️ Learning Path
+## 📚 Quick Navigation
 
-```
-1. getting_started/       ← Start here!
-   └── Complete walkthrough with sample data
-
-2. (Future) real_world/
-   └── Production-ready examples
-
-3. (Future) advanced/
-   └── Complex patterns and optimizations
-```
+| File | Purpose | Best For |
+|------|---------|----------|
+| **[QUICK_START_GUIDE.md](QUICK_START_GUIDE.md)** | 5-minute quick reference | First-time users |
+| **[MASTER_TEMPLATE.yaml](MASTER_TEMPLATE.yaml)** | Complete feature reference | Understanding all capabilities |
+| **[example_local.yaml](example_local.yaml)** | Simple local pipeline | Learning & development |
+| **[template_full.yaml](template_full.yaml)** | Full local configuration | Production local pipelines |
+| **[template_full_adls.yaml](template_full_adls.yaml)** | Azure multi-account setup | Azure cloud deployments |
+| **[example_delta_pipeline.yaml](example_delta_pipeline.yaml)** | Delta Lake examples | Time travel & ACID transactions |
+| **[example_spark.yaml](example_spark.yaml)** | Spark engine setup | Large-scale data processing |
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started
+
+### Step 1: Install ODIBI
 
 ```bash
-# 1. Install ODIBI
-cd d:/odibi
-pip install -e .
+# Basic installation
+pip install odibi
 
-# 2. Go to getting started
-cd examples/getting_started
+# With all features
+pip install "odibi[all]"
+```
 
-# 3. Open the tutorial
-jupyter notebook walkthrough.ipynb
+### Step 2: Pick Your Starting Point
 
-# 4. Run all cells!
+**Never used ODIBI before?**
+→ Start with [QUICK_START_GUIDE.md](QUICK_START_GUIDE.md)
+
+**Want a working example?**
+→ Try [example_local.yaml](example_local.yaml)
+
+**Need to understand all options?**
+→ Read [MASTER_TEMPLATE.yaml](MASTER_TEMPLATE.yaml)
+
+**Setting up Azure?**
+→ Use [template_full_adls.yaml](template_full_adls.yaml)
+
+**Using Delta Lake?**
+→ Check [example_delta_pipeline.yaml](example_delta_pipeline.yaml)
+
+### Step 3: Run Your First Pipeline
+
+```bash
+# Validate your config
+odibi validate example_local.yaml
+
+# Run the pipeline
+odibi run example_local.yaml
 ```
 
 ---
 
-## 📁 Example Structure
+## 📖 Templates Explained
 
-Each example includes:
-- ✅ **Walkthrough notebook** - Interactive tutorial
-- ✅ **Sample data** - Ready to use
-- ✅ **YAML configs** - Pipeline definitions
-- ✅ **Transform functions** - Python code examples
-- ✅ **README** - Quick reference
+### 🟢 QUICK_START_GUIDE.md
 
----
+**5-minute quick reference guide**
 
-## 🎯 What You'll Build
+- Installation instructions
+- Common patterns (read/transform/write)
+- File format examples
+- Connection setup
+- Delta Lake basics
+- Troubleshooting tips
 
-### Getting Started Example:
-
-**Pipeline 1: Simple**
-```
-Load CSV → Save Parquet
-```
-
-**Pipeline 2: Transform**
-```
-Load → Calculate Revenue → Filter → Save
-```
-
-**Pipeline 3: Advanced**
-```
-Load Sales + Customers → Join → Aggregate → Save 2 outputs
-```
+**Best for:** Getting up to speed quickly
 
 ---
 
-## 💡 Tips
+### 🔵 MASTER_TEMPLATE.yaml
 
-### For Learning:
-1. **Start with getting_started** - Don't skip it!
-2. **Run cells one by one** - Understand each step
-3. **Modify the examples** - Break things and fix them
-4. **Read the generated files** - See what ODIBI creates
+**Comprehensive reference showing ALL features**
 
-### For Building:
-1. **Copy an example** - Use as a template
-2. **Replace the data** - Use your own CSV/Parquet files
-3. **Write transforms** - Add your business logic
-4. **Test incrementally** - Use `run_node()` for debugging
+Includes:
+- ✅ All connection types (local, ADLS, Azure SQL)
+- ✅ All authentication modes (Key Vault, managed identity, service principal)
+- ✅ All file formats (CSV, Parquet, JSON, Excel, Avro, Delta)
+- ✅ Delta Lake with time travel
+- ✅ Multi-source joins
+- ✅ Python transforms with Context API
+- ✅ Multi-step SQL transformations
+- ✅ Bronze → Silver → Gold patterns
 
----
-
-## 🔗 Additional Resources
-
-**Documentation:**
-- [Framework Plan](../docs/ODIBI_FRAMEWORK_PLAN.md) - Complete design
-- [Pydantic Guide](../docs/PYDANTIC_CHEATSHEET.md) - Config validation
-- [Improvements](../docs/IMPROVEMENTS.md) - Known issues & enhancements
-
-**Test Examples:**
-- [Phase 1 Tests](../test_exploration.ipynb) - Config, Context, Registry
-- [Phase 2 Tests](../test_exploration_phase2.ipynb) - Graph, Pipeline, Execution
-
-**Source Code:**
-- Start with `context.py` (simplest)
-- Then `registry.py`, `config.py`
-- Finally `node.py`, `graph.py`, `pipeline.py`
+**Best for:** Reference when building complex pipelines
 
 ---
 
-## 🤝 Contributing Examples
+### 🟡 example_local.yaml
 
-Have a great example? Add it!
+**Simple local pipeline - perfect starting point**
 
-**Structure:**
+```yaml
+# Load CSV → Clean with SQL → Save as Parquet
+project: Local Pandas Example
+engine: pandas
+
+connections:
+  local:
+    type: local
+    base_path: ./data
+
+pipelines:
+  - pipeline: bronze_to_silver
+    nodes:
+      - name: load_raw_sales
+        read:
+          connection: local
+          path: bronze/sales.csv
+          format: csv
+        cache: true
+      
+      - name: clean_sales
+        depends_on: [load_raw_sales]
+        transform:
+          steps:
+            - "SELECT * FROM load_raw_sales WHERE amount > 0"
+      
+      - name: save_silver
+        depends_on: [clean_sales]
+        write:
+          connection: local
+          path: silver/sales.parquet
+          format: parquet
+          mode: overwrite
 ```
-examples/
-└── your_example/
-    ├── README.md
-    ├── walkthrough.ipynb
-    ├── project.yaml
-    ├── pipelines/
-    ├── data/
-    └── transforms.py
+
+**Best for:** Learning ODIBI basics
+
+---
+
+### 🟠 template_full.yaml
+
+**Complete local configuration reference**
+
+Includes:
+- Project metadata
+- Local + Azure connections (with examples)
+- Story generation config
+- Retry and logging settings
+- Bronze → Silver → Gold pipelines
+- Delta Lake with time travel
+- Azure SQL integration
+- Python transforms with Context API
+- All supported formats
+
+**Best for:** Production-ready local pipelines
+
+**Updated Features:**
+- ✅ Delta Lake examples with time travel
+- ✅ Azure SQL connection examples
+- ✅ Context API usage in Python transforms
+- ✅ Schema evolution options
+
+---
+
+### 🔴 template_full_adls.yaml
+
+**Azure multi-account ADLS setup**
+
+Includes:
+- Multi-account ADLS connections
+- Key Vault authentication
+- Bronze → Silver multi-account pattern
+- Delta Lake on ADLS
+- All authentication modes documented
+- Format support matrix
+
+**Best for:** Azure cloud deployments
+
+**Recent Fixes:**
+- ✅ Fixed SQL chaining bug (clean_temp → clean_sales)
+- ✅ Added Delta Lake examples
+- ✅ Added authentication mode reference
+- ✅ Added story configuration
+
+---
+
+### 🟣 example_delta_pipeline.yaml
+
+**Delta Lake deep dive**
+
+Includes:
+- Local Delta testing
+- Time travel examples
+- Version comparison
+- Partitioned Delta tables
+- Production Delta on ADLS
+- Maintenance operations (VACUUM, RESTORE)
+
+**Best for:** Learning Delta Lake capabilities
+
+---
+
+### ⚫ example_spark.yaml
+
+**Spark engine configuration**
+
+Includes:
+- Spark engine setup
+- ADLS with managed identity
+- Azure SQL integration
+- Multi-source ETL
+- Window functions
+- Partitioned writes
+- Delta Lake on Spark
+
+**Best for:** Large-scale data processing on Databricks
+
+---
+
+## 🎯 Common Use Cases
+
+### Use Case 1: Local Development
+
+**Start with:** [example_local.yaml](example_local.yaml)
+
+```bash
+odibi run example_local.yaml
 ```
 
-**Guidelines:**
-- Include sample data (small files)
-- Explain each step
-- Show common patterns
-- Document gotchas
+### Use Case 2: Azure Production
+
+**Start with:** [template_full_adls.yaml](template_full_adls.yaml)
+
+1. Update storage account names
+2. Configure Key Vault
+3. Update paths
+4. Run: `odibi run template_full_adls.yaml`
+
+### Use Case 3: Delta Lake ACID Transactions
+
+**Start with:** [example_delta_pipeline.yaml](example_delta_pipeline.yaml)
+
+Benefits:
+- ✅ ACID transactions (no partial writes)
+- ✅ Time travel (read any version)
+- ✅ Schema evolution (add columns safely)
+- ✅ VACUUM old files
+
+### Use Case 4: Multi-Source Integration
+
+**Start with:** [MASTER_TEMPLATE.yaml](MASTER_TEMPLATE.yaml) - Pipeline 4
+
+Load from:
+- ADLS (transactions)
+- Azure SQL (dimensions)
+- Join and write to Delta
+
+### Use Case 5: Custom Python Logic
+
+**Start with:** [MASTER_TEMPLATE.yaml](MASTER_TEMPLATE.yaml) - Pipeline 3
+
+Define transforms:
+```python
+from odibi import transform
+
+@transform
+def my_logic(context, param: float):
+    df = context.get('node_name')
+    # Your logic here
+    return df
+```
 
 ---
 
-## ❓ Need Help?
+## 🔧 Configuration Checklist
 
-**Common Issues:**
+Before running a pipeline, ensure:
 
-1. **Import errors** → Install: `pip install -e d:/odibi`
-2. **DuckDB missing** → Install: `pip install duckdb`
-3. **File not found** → Check you're in the right directory
-4. **Transform not registered** → Import your transforms module
-
-**Getting Help:**
-- Check example READMEs
-- Review the walkthrough notebook
-- Read error messages carefully (they're helpful!)
-- Look at test files for patterns
+- [ ] `project` name is set
+- [ ] `engine` is specified ('pandas' or 'spark')
+- [ ] At least one `connection` is defined
+- [ ] `story` connection and path are configured
+- [ ] At least one `pipeline` with nodes is defined
+- [ ] Each node has read, transform, or write (or combination)
+- [ ] `depends_on` references valid node names
+- [ ] Connection names in nodes match defined connections
 
 ---
 
-**Ready to learn?** Open `getting_started/walkthrough.ipynb`! 🚀
+## 📚 Additional Resources
+
+### Documentation
+- [../docs/CONFIGURATION_EXPLAINED.md](../docs/CONFIGURATION_EXPLAINED.md) - Complete config guide
+- [../docs/DELTA_LAKE_GUIDE.md](../docs/DELTA_LAKE_GUIDE.md) - Delta Lake reference
+- [../docs/setup_azure.md](../docs/setup_azure.md) - Azure authentication
+- [../docs/setup_databricks.md](../docs/setup_databricks.md) - Databricks setup
+
+### Walkthroughs
+- [../walkthroughs/01_local_pipeline_pandas.ipynb](../walkthroughs/01_local_pipeline_pandas.ipynb) - Interactive tutorial
+- [../walkthroughs/phase2b_delta_lake.ipynb](../walkthroughs/phase2b_delta_lake.ipynb) - Delta Lake features
+- [../walkthroughs/phase2b_production_pipeline.ipynb](../walkthroughs/phase2b_production_pipeline.ipynb) - Production patterns
+
+### Getting Started
+- [getting_started/](getting_started/) - Complete tutorial with sample data
+
+---
+
+## 🆘 Getting Help
+
+**Found a bug or have a question?**
+- GitHub Issues: https://github.com/henryodibi11/Odibi/issues
+- Email: henryodibi@outlook.com
+
+**Want to contribute?**
+- See [../CONTRIBUTING.md](../CONTRIBUTING.md)
+
+---
+
+## 📝 Template Summary
+
+| Template | Lines | Features | Complexity |
+|----------|-------|----------|------------|
+| QUICK_START_GUIDE.md | 400+ | Patterns & examples | ⭐ Easy |
+| example_local.yaml | 122 | Basic ETL | ⭐ Easy |
+| template_full.yaml | 400+ | All local features | ⭐⭐ Medium |
+| template_full_adls.yaml | 178 | Azure multi-account | ⭐⭐ Medium |
+| example_delta_pipeline.yaml | 213 | Delta Lake | ⭐⭐ Medium |
+| example_spark.yaml | 177 | Spark engine | ⭐⭐⭐ Advanced |
+| MASTER_TEMPLATE.yaml | 700+ | Everything! | ⭐⭐⭐ Advanced |
+
+---
+
+**Happy pipeline building! 🚀**
+
+For the most up-to-date information, see the main [README.md](../README.md)

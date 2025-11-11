@@ -35,21 +35,27 @@ connections:
     type: local
     base_path: ./outputs  # Stories, logs, metadata
   
-  # Example: Azure Data Lake Storage Gen2 (Phase 3 - Coming Soon)
-  # azure_lake:
-  #   type: azure_adls
-  #   account: mystorageaccount
-  #   container: data
-  #   path_prefix: /project1
-  #   auth_mode: managed_identity  # or 'service_principal', 'account_key'
+  # Example: Azure Data Lake Storage Gen2 (Phase 2A ✅)
+  azure_lake:
+    type: azure_adls
+    account: mystorageaccount
+    container: data
+    path_prefix: /project1
+    auth_mode: key_vault  # Recommended: 'key_vault', or 'managed_identity', 'service_principal'
+    key_vault_name: company-keyvault  # Required for key_vault mode
+    secret_name: storage-account-key  # Required for key_vault mode
+    # For managed_identity: no additional fields needed (uses cluster identity)
+    # For service_principal: add tenant_id, client_id, client_secret
   
-  # Example: Azure SQL Database (Phase 3 - Coming Soon)
-  # azure_db:
-  #   type: azure_sql
-  #   host: myserver.database.windows.net
-  #   database: analytics
-  #   port: 1433  # default
-  #   auth_mode: managed_identity
+  # Example: Azure SQL Database (Phase 2A ✅)
+  azure_db:
+    type: azure_sql
+    host: myserver.database.windows.net
+    database: analytics
+    port: 1433  # default
+    auth_mode: key_vault  # or 'managed_identity', 'service_principal'
+    key_vault_name: company-keyvault  # For key_vault mode
+    secret_name: sql-connection-string  # For key_vault mode
 
 # ============================================
 # STORY GENERATION (Required)
@@ -184,13 +190,20 @@ pipelines:
       # Node: Custom Python Transform
       # ====================================
       - name: add_metrics
-        description: "Add custom business metrics"
+        description: "Add custom business metrics using Context API"
         depends_on: [clean_sales]
         
         transform:
           steps:
-            # Call registered Python function
-            # Register with: @odibi.transform decorator
+            # Call registered Python function with Context API
+            # Register with: @transform decorator
+            # Example function:
+            #   from odibi import transform
+            #   @transform
+            #   def calculate_revenue_metrics(context, window_days: int, metric_type: str):
+            #       df = context.get('clean_sales')  # Get cached DataFrame by name
+            #       # Your transformation logic here
+            #       return enriched_df
             - function: calculate_revenue_metrics
               params:  # Function parameters
                 window_days: 30
@@ -218,10 +231,10 @@ pipelines:
             # partition_by: ['year', 'month']  # Spark only (Phase 3)
 
   # ========================================
-  # Pipeline 2: Silver to Gold
+  # Pipeline 2: Silver to Gold with Delta Lake
   # ========================================
   - pipeline: silver_to_gold
-    description: "Aggregate and enrich for analytics"
+    description: "Aggregate and enrich for analytics with Delta Lake"
     layer: aggregation
     
     nodes:
@@ -248,26 +261,122 @@ pipelines:
               HAVING total_spent > 100
       
       - name: save_gold
+        description: "Write to Delta Lake for ACID transactions & time travel"
         depends_on: [customer_summary]
         write:
           connection: data
-          path: gold/customer_summary.parquet
-          format: parquet
+          path: gold/customer_summary.delta  # Delta format (recommended for production)
+          format: delta  # Provides ACID transactions, time travel, schema evolution
+          mode: append  # Safe append with ACID guarantees
+          options:
+            mergeSchema: true  # Allow schema evolution (add new columns)
+            # partition_by: ['year']  # Optional: partition for large datasets
+
+  # ========================================
+  # Pipeline 3: Delta Lake Time Travel Example
+  # ========================================
+  - pipeline: delta_time_travel
+    description: "Read and compare Delta Lake versions"
+    layer: analytics
+    
+    nodes:
+      # Read latest version
+      - name: read_latest_gold
+        read:
+          connection: data
+          path: gold/customer_summary.delta
+          format: delta
+        cache: true
+      
+      # Read specific version (time travel)
+      - name: read_version_5
+        read:
+          connection: data
+          path: gold/customer_summary.delta
+          format: delta
+          options:
+            versionAsOf: 5  # Time travel to version 5
+        cache: true
+      
+      # Compare versions
+      - name: compare_versions
+        depends_on: [read_latest_gold, read_version_5]
+        transform:
+          steps:
+            - |
+              SELECT
+                'Latest' as version_type,
+                COUNT(*) as customer_count,
+                SUM(total_spent) as total_revenue
+              FROM read_latest_gold
+              UNION ALL
+              SELECT
+                'Version 5' as version_type,
+                COUNT(*) as customer_count,
+                SUM(total_spent) as total_revenue
+              FROM read_version_5
+      
+      - name: save_comparison
+        depends_on: [compare_versions]
+        write:
+          connection: data
+          path: analytics/version_comparison.csv
+          format: csv
           mode: overwrite
+
+  # ========================================
+  # Pipeline 4: Azure SQL Integration
+  # ========================================
+  - pipeline: azure_sql_integration
+    description: "Load dimension data from Azure SQL"
+    layer: integration
+    
+    nodes:
+      # Read from Azure SQL
+      - name: load_customer_dimension
+        description: "Load customer master data from Azure SQL"
+        read:
+          connection: azure_db
+          format: sql  # Required format field
+          table: dim_customer  # SQL table name
+          # Alternatively use query:
+          # query: "SELECT * FROM dim_customer WHERE active = 1"
+        cache: true
+      
+      # Join with local data
+      - name: enrich_with_dimensions
+        depends_on: [load_customer_dimension, load_silver]
+        transform:
+          steps:
+            - |
+              SELECT
+                s.*,
+                c.customer_name,
+                c.customer_segment,
+                c.region
+              FROM load_silver s
+              LEFT JOIN load_customer_dimension c
+                ON s.customer_id = c.customer_id
+      
+      - name: save_enriched
+        depends_on: [enrich_with_dimensions]
+        write:
+          connection: data
+          path: gold/enriched_sales.delta
+          format: delta
+          mode: append
 
 # ============================================
 # SUPPORTED FORMATS (Reference)
 # ============================================
-# Phase 1 (Available Now):
+# Available Now (Phase 2B+):
 # - csv: Comma-separated values
 # - parquet: Columnar format (recommended for large datasets)
-# - json: JSON format
+# - json: JSON format (newline-delimited)
 # - excel: Excel spreadsheets (.xlsx)
 # - avro: Avro binary format (requires odibi[pandas])
-#
-# Phase 3 (Coming Soon):
-# - delta: Delta Lake tables (requires odibi[spark])
-# - sql: SQL database tables (requires connection-specific drivers)
+# - delta: Delta Lake tables with ACID & time travel (Phase 2B ✅)
+# - sql: SQL database tables via Azure SQL or other connections
 
 # ============================================
 # NODE OPERATIONS REFERENCE

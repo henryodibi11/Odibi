@@ -289,35 +289,40 @@ Connection Layer (Azure/Local/Delta/SQL)
 
 ## Documentation
 
-**📚 Learning Resources:**
-- [Configuration System Explained](docs/CONFIGURATION_EXPLAINED.md) - Complete config guide
-- [Delta Lake Guide](docs/DELTA_LAKE_GUIDE.md) - ⭐ **NEW: Delta Lake quick reference** ⭐
-- [Getting Started Tutorial](examples/getting_started/walkthrough.ipynb) - Interactive walkthrough
-- [Documentation Index](docs/README.md) - All guides and references
-- [Quick Reference](examples/getting_started/QUICK_REFERENCE.md) - Common patterns
-- [Pydantic Guide](docs/PYDANTIC_CHEATSHEET.md) - Config validation
-
-**📖 Setup Guides:**
-- [Databricks Setup](docs/setup_databricks.md) - Community + Azure Databricks configuration
-- [Azure Integration](docs/setup_azure.md) - ADLS Gen2 + Azure SQL authentication
-- [Local Development](docs/LOCAL_DEVELOPMENT.md) - Local testing setup
-
-**🧪 Examples:**
+**🚀 Getting Started:**
+- [Quick Start Guide](docs/guides/01_QUICK_START.md) - Get up and running in 5 minutes
+- [Getting Started Tutorial](examples/getting_started/) - Complete interactive walkthrough
 - [Local Pandas Example](examples/example_local.yaml) - Simple Bronze→Silver→Gold pipeline
-- [Delta Lake Pipeline](examples/example_delta_pipeline.yaml) - ⭐ **NEW: Production Delta pipelines** ⭐
-- [Spark Azure Example](examples/example_spark.yaml) - Multi-source ETL with Azure
-- [Getting Started Tutorial](examples/getting_started/) - Complete walkthrough with sample data
 
-**📓 Walkthroughs:**
-- [Phase 2B: Delta Lake](walkthroughs/phase2b_delta_lake.ipynb) - Delta features (12 parts)
-- [Phase 2B: Production Pipelines](walkthroughs/phase2b_production_pipeline.ipynb) - YAML + Key Vault (15 parts)
-- [Phase 2A: ADLS Testing](walkthroughs/phase2a_adls_test.ipynb) - Azure integration
+**📚 Core Guides:**
+- [Configuration Guide](docs/CONFIGURATION_EXPLAINED.md) - Complete config reference
+- [Delta Lake Guide](docs/DELTA_LAKE_GUIDE.md) - ACID transactions & time travel
+- [User Guide](docs/guides/02_USER_GUIDE.md) - Building pipelines
+- [Transformation Guide](docs/guides/05_TRANSFORMATION_GUIDE.md) - Custom transforms
+- [Troubleshooting](docs/guides/06_TROUBLESHOOTING.md) - Common issues
+
+**📖 Setup & Deployment:**
+- [Databricks Setup](docs/setup_databricks.md) - Community + Azure Databricks
+- [Azure Integration](docs/setup_azure.md) - ADLS Gen2 + Azure SQL
+- [Local Development](docs/LOCAL_DEVELOPMENT.md) - Local testing
+- [Supported Formats](docs/SUPPORTED_FORMATS.md) - File format guide
+
+**💡 Templates & Examples:**
+- [template_full.yaml](examples/template_full.yaml) - Complete feature reference
+- [template_full_adls.yaml](examples/template_full_adls.yaml) - Azure multi-account
+- [example_delta_pipeline.yaml](examples/example_delta_pipeline.yaml) - Delta Lake patterns
+- [example_spark.yaml](examples/example_spark.yaml) - Spark on Databricks
+
+**🎓 Advanced Walkthroughs:**
+- [Delta Lake Deep Dive](walkthroughs/phase2b_delta_lake.ipynb) - All Delta features
+- [Production Pipelines](walkthroughs/phase2b_production_pipeline.ipynb) - YAML + Key Vault
+- [ADLS Integration](walkthroughs/phase2a_adls_test.ipynb) - Azure storage
 
 **🔧 Project Info:**
-- [PHASES.md](PHASES.md) - Roadmap and feature timeline
+- [PHASES.md](PHASES.md) - Roadmap & current status
 - [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
-- [CHANGELOG.md](CHANGELOG.md) - Version history and release notes
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - Community guidelines
+- [CHANGELOG.md](CHANGELOG.md) - Version history
+- [Documentation Index](docs/README.md) - All docs organized
 
 ---
 
