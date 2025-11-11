@@ -13,11 +13,18 @@ Each notebook is independently runnable from a clean repo clone and includes aut
 | 00 | [Setup Environment](00_setup_environment.ipynb) | Installation, imports, sanity checks | 2 min | ✅ Phase 1 |
 | 01 | [Local Pipeline Pandas](01_local_pipeline_pandas.ipynb) | Bronze→Silver→Gold pipeline | 2 min | ✅ Phase 1 |
 | 02 | [CLI and Testing](02_cli_and_testing.ipynb) | CLI preview, testing patterns | 2 min | ⏳ Phase 2 |
-| 03 | [Spark Preview](03_spark_preview_stub.ipynb) | Spark architecture, Azure config | 3 min | ⏳ Phase 3 |
+| 03 | [Spark Preview](03_spark_preview_stub.ipynb) | Spark architecture, Azure config | 3 min | ⏳ Phase 2 |
 | 04 | [CI/CD and Pre-Commit](04_ci_cd_and_precommit.ipynb) | Code quality automation | 3 min | ✅ Phase 1 |
 | 05 | [Build New Pipeline](05_build_new_pipeline.ipynb) | Create custom pipeline from scratch | 5 min | ✅ Phase 1 |
+| **06** | **[Transformation Registry](06_transformation_registry_basics.ipynb)** | **Registry discover/register/list** | **30 sec** | **✅ Phase 3** |
+| **07** | **[Transformation Decorator](07_transformation_decorator_and_composition.ipynb)** | **@transformation metadata + composition** | **30 sec** | **✅ Phase 3** |
+| **08** | **[Explanation System](08_explanation_system_explain_decorator.ipynb)** | **@func.explain and context** | **30 sec** | **✅ Phase 3** |
+| **09** | **[Story Generation](09_story_generation_metadata_renderers.ipynb)** | **Story metadata + renderers** | **30 sec** | **✅ Phase 3** |
+| **10** | **[Story Themes](10_story_themes_and_custom_renderers.ipynb)** | **Theming + custom renderers** | **30 sec** | **✅ Phase 3** |
+| **11** | **[CLI Story Tools](11_cli_story_tools_generate_diff_list.ipynb)** | **generate, list, diff commands** | **30 sec** | **✅ Phase 3** |
+| **12** | **[Azure SQL Connector](12_azure_sql_connector_quickstart.ipynb)** | **Offline-safe connector quickstart** | **30 sec** | **✅ Phase 3** |
 
-**Total time:** ~17 minutes for complete series
+**Total time:** ~21 minutes for complete series (Phase 1-3)
 
 ---
 
@@ -59,6 +66,18 @@ Understand enterprise features:
 1. **03 - Spark Preview** → Spark architecture
 2. **01 - Local Pipeline Pandas** → Pandas patterns
 3. **05 - Build New Pipeline** → Design patterns
+
+### For Phase 3 Deep Dive (NEW!)
+Master ODIBI internals and advanced features:
+1. **06 - Transformation Registry** → How operations are discovered
+2. **07 - Transformation Decorator** → Build custom operations
+3. **08 - Explanation System** → Self-documenting pipelines
+4. **09 - Story Generation** → Automatic reporting
+5. **10 - Story Themes** → Customize output
+6. **11 - CLI Story Tools** → Generate, diff, and list stories
+7. **12 - Azure SQL Connector** → Database integration
+
+**Complete this path to understand everything from registry to stories!**
 
 ---
 
@@ -119,18 +138,25 @@ done
 
 ## 📦 Phase Status
 
-**Phase 1 (Current):**
+**Phase 1 (Complete):**
 - ✅ Notebooks 00, 01, 04, 05 fully functional
 - ✅ Pandas engine examples working
 - ✅ CI/CD infrastructure demonstrated
 
-**Phase 2 (Q1 2026):**
-- ⏳ Notebook 02 will show real CLI commands
-- ⏳ Testing utilities examples
+**Phase 2 (Complete):**
+- ✅ Spark engine scaffolding (Notebook 03)
+- ✅ Azure ADLS integration
+- ✅ Delta Lake support
 
-**Phase 3 (Q2 2026):**
-- ⏳ Notebook 03 will execute Spark pipelines
-- ⏳ Azure ADLS read/write examples
+**Phase 3 (Complete - November 2025):**
+- ✅ **Notebooks 06-12 fully functional** (NEW!)
+- ✅ Transformation registry and decorator system
+- ✅ Explanation system with context passing
+- ✅ Story generation with metadata tracking
+- ✅ Multiple renderers (HTML, Markdown, JSON)
+- ✅ Theme system with 4 built-in themes
+- ✅ CLI story tools (generate, list, diff)
+- ✅ Azure SQL connector with offline fallback
 
 ---
 
