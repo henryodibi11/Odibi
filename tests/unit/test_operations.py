@@ -3,17 +3,16 @@
 import pandas as pd
 import pytest
 
-# Import all operations at module level to register them
-import odibi.operations.pivot  # noqa: F401
-import odibi.operations.unpivot  # noqa: F401
-import odibi.operations.join  # noqa: F401
-import odibi.operations.sql  # noqa: F401
-
 from odibi.transformations import get_registry
 
 
 class TestPivotOperation:
     """Tests for pivot operation."""
+
+    @classmethod
+    def setup_class(cls):
+        """Import operations once per class."""
+        import odibi.operations.pivot  # noqa: F401
 
     def test_pivot_basic(self):
         """Should pivot DataFrame from long to wide format."""
@@ -52,6 +51,11 @@ class TestPivotOperation:
 class TestUnpivotOperation:
     """Tests for unpivot operation."""
 
+    @classmethod
+    def setup_class(cls):
+        """Import operations once per class."""
+        import odibi.operations.unpivot  # noqa: F401
+
     def test_unpivot_basic(self):
         """Should unpivot DataFrame from wide to long format."""
         df = pd.DataFrame({"ID": ["A", "B"], "Sales": [100, 150], "Revenue": [200, 250]})
@@ -81,6 +85,11 @@ class TestUnpivotOperation:
 class TestJoinOperation:
     """Tests for join operation."""
 
+    @classmethod
+    def setup_class(cls):
+        """Import operations once per class."""
+        import odibi.operations.join  # noqa: F401
+
     def test_join_inner(self):
         """Should perform inner join."""
         left_df = pd.DataFrame({"ID": ["A", "B"], "Value": [100, 150]})
@@ -108,6 +117,11 @@ class TestJoinOperation:
 
 class TestSqlOperation:
     """Tests for SQL operation."""
+
+    @classmethod
+    def setup_class(cls):
+        """Import operations once per class."""
+        import odibi.operations.sql  # noqa: F401
 
     def test_sql_select(self):
         """Should execute SELECT query."""
@@ -139,6 +153,14 @@ class TestSqlOperation:
 
 class TestOperationMetadata:
     """Tests for operation registration metadata."""
+
+    @classmethod
+    def setup_class(cls):
+        """Import all operations once per class."""
+        import odibi.operations.pivot  # noqa: F401
+        import odibi.operations.unpivot  # noqa: F401
+        import odibi.operations.join  # noqa: F401
+        import odibi.operations.sql  # noqa: F401
 
     def test_all_operations_registered(self):
         """Should register all four operations."""
