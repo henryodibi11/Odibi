@@ -25,15 +25,15 @@ Examples:
   odibi story list                         List story files
         """,
     )
-    
+
     # Global arguments
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
-        help="Set logging verbosity (default: INFO)"
+        help="Set logging verbosity (default: INFO)",
     )
-    
+
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # odibi run
@@ -59,10 +59,10 @@ Examples:
     graph_parser.add_argument("config", help="Path to YAML config file")
     graph_parser.add_argument("--pipeline", help="Pipeline name (optional)")
     graph_parser.add_argument(
-        "--format", 
-        choices=["ascii", "dot", "mermaid"], 
-        default="ascii", 
-        help="Output format (default: ascii)"
+        "--format",
+        choices=["ascii", "dot", "mermaid"],
+        default="ascii",
+        help="Output format (default: ascii)",
     )
     graph_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
 
@@ -70,13 +70,14 @@ Examples:
     add_story_parser(subparsers)
 
     args = parser.parse_args()
-    
+
     # Configure logging
     import logging
+
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     if args.command == "run":

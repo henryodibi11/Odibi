@@ -145,9 +145,7 @@ class StoryGenerator:
             schema_in = result.metadata["schema_in"]
             lines.append("")
             lines.append("**Input schema:**")
-            lines.append(
-                f"- Columns ({len(schema_in)}): {', '.join(schema_in)}"
-            )
+            lines.append(f"- Columns ({len(schema_in)}): {', '.join(schema_in)}")
 
             # Add input sample
             if "sample_data_in" in result.metadata:

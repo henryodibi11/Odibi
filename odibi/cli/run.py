@@ -21,14 +21,14 @@ def run_command(args):
             # Single pipeline
             if results.failed:
                 failed = True
-      
+
         if failed:
             print("\n❌ Pipeline execution failed")
             return 1
         else:
             print("\n✅ Pipeline completed successfully")
             return 0
-         
+
     except Exception as e:
         print(f"Pipeline failed: {e}")
         return 1

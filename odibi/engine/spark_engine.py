@@ -220,9 +220,7 @@ class SparkEngine(Engine):
         # Validate columns exist
         missing = set(columns) - set(df.columns)
         if missing:
-            raise ValueError(
-                f"Columns not found in DataFrame: {', '.join(missing)}"
-            )
+            raise ValueError(f"Columns not found in DataFrame: {', '.join(missing)}")
 
         # Build aggregation expression
         aggs = [count(when(col(c).isNull(), c)).alias(c) for c in columns]
@@ -342,9 +340,7 @@ class SparkEngine(Engine):
 
         full_path = connection.get_path(path)
         delta_table = DeltaTable.forPath(self.spark, full_path)
-        history_df = (
-            delta_table.history(limit) if limit else delta_table.history()
-        )
+        history_df = delta_table.history(limit) if limit else delta_table.history()
 
         # Convert to list of dictionaries
         return [row.asDict() for row in history_df.collect()]

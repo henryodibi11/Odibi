@@ -69,30 +69,33 @@ class Node:
             NodeResult with execution details
         """
         start_time = time.time()
-        
+
         if self.dry_run:
             # Dry run execution
             self._execution_steps.append("Dry run: Skipping actual execution")
-            
+
             # Simulate steps
             if self.config.read:
-                self._execution_steps.append(f"Dry run: Would read from {self.config.read.connection}")
-            
+                self._execution_steps.append(
+                    f"Dry run: Would read from {self.config.read.connection}"
+                )
+
             if self.config.transform:
-                self._execution_steps.append(f"Dry run: Would apply {len(self.config.transform.steps)} transform steps")
-                
+                self._execution_steps.append(
+                    f"Dry run: Would apply {len(self.config.transform.steps)} transform steps"
+                )
+
             if self.config.write:
-                self._execution_steps.append(f"Dry run: Would write to {self.config.write.connection}")
-                
+                self._execution_steps.append(
+                    f"Dry run: Would write to {self.config.write.connection}"
+                )
+
             return NodeResult(
                 node_name=self.config.name,
                 success=True,
                 duration=0.0,
                 rows_processed=0,
-                metadata={
-                    "dry_run": True,
-                    "steps": self._execution_steps
-                }
+                metadata={"dry_run": True, "steps": self._execution_steps},
             )
 
         input_df = None
@@ -115,7 +118,7 @@ class Node:
             # Capture input schema before transformation
             if input_df is not None:
                 input_schema = self._get_schema(input_df)
-                
+
                 if self.max_sample_rows > 0:
                     try:
                         input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
@@ -128,7 +131,7 @@ class Node:
                 if result_df is None and input_df is not None:
                     # Use input_df if available (from dependency)
                     result_df = input_df
-                
+
                 result_df = self._execute_transform(result_df)
                 self._execution_steps.append(
                     f"Applied {len(self.config.transform.steps)} transform steps"
@@ -161,17 +164,17 @@ class Node:
             # Collect metadata
             duration = time.time() - start_time
             metadata = self._collect_metadata(result_df)
-            
+
             # Calculate schema changes if we have both input and output schemas
             if input_schema and metadata.get("schema"):
                 output_schema = metadata["schema"]
                 set_in = set(input_schema)
                 set_out = set(output_schema)
-                
+
                 metadata["schema_in"] = input_schema
                 metadata["columns_added"] = list(set_out - set_in)
                 metadata["columns_removed"] = list(set_in - set_out)
-                
+
                 if input_sample:
                     metadata["sample_data_in"] = input_sample
 

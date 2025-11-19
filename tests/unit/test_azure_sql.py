@@ -243,7 +243,7 @@ class TestAzureSQLErrorHandling:
     def test_get_engine_without_sqlalchemy(self):
         """Should raise error if SQLAlchemy not installed."""
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
-        
+
         from odibi.exceptions import ConnectionError
 
         with patch.dict("sys.modules", {"sqlalchemy": None}):
@@ -258,7 +258,7 @@ class TestAzureSQLErrorHandling:
         mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
         mock_read_sql.side_effect = Exception("Connection failed")
-        
+
         from odibi.exceptions import ConnectionError
 
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")

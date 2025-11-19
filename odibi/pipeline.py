@@ -444,7 +444,7 @@ class PipelineManager:
                 auth_config = conn_config.get("auth", {})
                 username = auth_config.get("username") or conn_config.get("username")
                 password = auth_config.get("password") or conn_config.get("password")
-                
+
                 connections[conn_name] = AzureSQL(
                     server=conn_config["server"],
                     database=conn_config["database"],
@@ -465,9 +465,7 @@ class PipelineManager:
         return connections
 
     def run(
-        self, 
-        pipelines: Optional[Union[str, List[str]]] = None,
-        dry_run: bool = False
+        self, pipelines: Optional[Union[str, List[str]]] = None, dry_run: bool = False
     ) -> Union[PipelineResults, Dict[str, PipelineResults]]:
         """Run one, multiple, or all pipelines.
 

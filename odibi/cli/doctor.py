@@ -5,12 +5,13 @@ from pathlib import Path
 from odibi.config import ProjectConfig
 from odibi.pipeline import PipelineManager
 
+
 def doctor_command(args):
     """Diagnose configuration and environment issues."""
     print("🩺 Running Odibi Doctor...\n")
-    
+
     issues_found = 0
-    
+
     # 1. Check File Existence
     config_path = Path(args.config)
     if not config_path.exists():
@@ -22,7 +23,7 @@ def doctor_command(args):
     try:
         with open(config_path, "r") as f:
             config_data = yaml.safe_load(f)
-        
+
         # This validates against Pydantic schema
         project_config = ProjectConfig(**config_data)
         print("✅ YAML schema is valid")
@@ -36,11 +37,12 @@ def doctor_command(args):
     if engine == "spark":
         try:
             import pyspark
+
             print("✅ pyspark installed")
         except ImportError:
             print("❌ pyspark not installed. Run: pip install odibi[spark]")
             issues_found += 1
-            
+
     # 4. Check Connections
     print("\nTesting Connections:")
     try:
@@ -48,7 +50,7 @@ def doctor_command(args):
         # We wrap this in try/except because from_yaml might fail if imports are missing
         try:
             manager = PipelineManager.from_yaml(str(config_path))
-            
+
             for name, connection in manager.connections.items():
                 try:
                     connection.validate()
@@ -57,17 +59,17 @@ def doctor_command(args):
                     print(f"  ❌ {name}: Failed validation - {e}")
                     issues_found += 1
         except ImportError as e:
-             print(f"❌ Failed to load connections due to missing dependencies: {e}")
-             issues_found += 1
+            print(f"❌ Failed to load connections due to missing dependencies: {e}")
+            issues_found += 1
         except Exception as e:
-             print(f"❌ Failed to initialize connections: {e}")
-             issues_found += 1
+            print(f"❌ Failed to initialize connections: {e}")
+            issues_found += 1
 
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         issues_found += 1
 
-    print("\n" + "="*30)
+    print("\n" + "=" * 30)
     if issues_found == 0:
         print("✨ All systems go! Configuration looks good.")
         return 0

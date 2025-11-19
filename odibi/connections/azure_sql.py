@@ -121,8 +121,8 @@ class AzureSQL(BaseConnection):
                 reason="Required packages 'sqlalchemy' or 'pyodbc' not found.",
                 suggestions=[
                     "Install required packages: pip install sqlalchemy pyodbc",
-                    "Or install odibi with azure extras: pip install 'odibi[azure]'"
-                ]
+                    "Or install odibi with azure extras: pip install 'odibi[azure]'",
+                ],
             )
 
         try:
@@ -137,11 +137,11 @@ class AzureSQL(BaseConnection):
                 pool_recycle=3600,  # Recycle connections after 1 hour
                 echo=False,
             )
-            
+
             # Test connection
             with self._engine.connect() as conn:
                 pass
-                
+
             return self._engine
 
         except Exception as e:
@@ -149,7 +149,7 @@ class AzureSQL(BaseConnection):
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason=f"Failed to create engine: {str(e)}",
-                suggestions=suggestions
+                suggestions=suggestions,
             )
 
     def read_sql(self, query: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
@@ -162,7 +162,7 @@ class AzureSQL(BaseConnection):
 
         Returns:
             Query results as pandas DataFrame
-            
+
         Raises:
             ConnectionError: If execution fails
         """
@@ -175,7 +175,7 @@ class AzureSQL(BaseConnection):
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason=f"Query execution failed: {str(e)}",
-                suggestions=self._get_error_suggestions(str(e))
+                suggestions=self._get_error_suggestions(str(e)),
             )
 
     def read_table(self, table_name: str, schema: Optional[str] = "dbo") -> pd.DataFrame:
@@ -218,7 +218,7 @@ class AzureSQL(BaseConnection):
 
         Returns:
             Number of rows written
-            
+
         Raises:
             ConnectionError: If write fails
         """
@@ -242,7 +242,7 @@ class AzureSQL(BaseConnection):
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason=f"Write operation failed: {str(e)}",
-                suggestions=self._get_error_suggestions(str(e))
+                suggestions=self._get_error_suggestions(str(e)),
             )
 
     def execute(self, sql: str, params: Optional[Dict[str, Any]] = None) -> Any:
@@ -255,7 +255,7 @@ class AzureSQL(BaseConnection):
 
         Returns:
             Result from execution
-            
+
         Raises:
             ConnectionError: If execution fails
         """
@@ -273,7 +273,7 @@ class AzureSQL(BaseConnection):
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason=f"Statement execution failed: {str(e)}",
-                suggestions=self._get_error_suggestions(str(e))
+                suggestions=self._get_error_suggestions(str(e)),
             )
 
     def close(self):
@@ -292,14 +292,13 @@ class AzureSQL(BaseConnection):
             suggestions.append(f"Verify auth_mode is correct (current: {self.auth_mode})")
             if "identity" in error_lower:
                 suggestions.append("Ensure Managed Identity has access to the database")
-        
+
         if "firewall" in error_lower or "tcp provider" in error_lower:
             suggestions.append("Check Azure SQL Server firewall rules")
             suggestions.append("Ensure client IP is allowed")
-            
+
         if "driver" in error_lower:
             suggestions.append(f"Verify ODBC driver '{self.driver}' is installed")
             suggestions.append("On Linux: sudo apt-get install msodbcsql18")
-            
-        return suggestions
 
+        return suggestions
