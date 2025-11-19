@@ -29,6 +29,7 @@ class NodeExecutionMetadata:
     rows_out: Optional[int] = None
     rows_change: Optional[int] = None
     rows_change_pct: Optional[float] = None
+    sample_data: Optional[List[Dict[str, Any]]] = None
 
     # Schema tracking
     schema_in: Optional[List[str]] = None
@@ -74,6 +75,7 @@ class NodeExecutionMetadata:
             "rows_out": self.rows_out,
             "rows_change": self.rows_change,
             "rows_change_pct": self.rows_change_pct,
+            "sample_data": self.sample_data,
             "schema_in": self.schema_in,
             "schema_out": self.schema_out,
             "columns_added": self.columns_added,

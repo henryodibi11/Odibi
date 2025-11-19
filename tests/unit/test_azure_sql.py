@@ -2,7 +2,7 @@
 
 import pytest
 import pandas as pd
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, MagicMock, patch
 
 from odibi.connections.azure_sql import AzureSQL
 
@@ -103,7 +103,8 @@ class TestAzureSQLOperations:
     @patch("sqlalchemy.create_engine")
     def test_get_engine_creates_engine(self, mock_create_engine):
         """Should create SQLAlchemy engine."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
 
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
@@ -116,7 +117,8 @@ class TestAzureSQLOperations:
     @patch("sqlalchemy.create_engine")
     def test_get_engine_caches_engine(self, mock_create_engine):
         """Should cache engine instance."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
 
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
@@ -131,7 +133,8 @@ class TestAzureSQLOperations:
     @patch("sqlalchemy.create_engine")
     def test_read_sql(self, mock_create_engine, mock_read_sql):
         """Should execute SQL query and return DataFrame."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
 
         mock_df = pd.DataFrame({"id": [1, 2], "name": ["Alice", "Bob"]})
@@ -148,7 +151,8 @@ class TestAzureSQLOperations:
     @patch("sqlalchemy.create_engine")
     def test_read_sql_with_params(self, mock_create_engine, mock_read_sql):
         """Should support parameterized queries."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
         mock_read_sql.return_value = pd.DataFrame()
 
@@ -163,7 +167,8 @@ class TestAzureSQLOperations:
     @patch("sqlalchemy.create_engine")
     def test_read_table(self, mock_create_engine, mock_read_sql):
         """Should read entire table."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
         mock_read_sql.return_value = pd.DataFrame()
 
@@ -178,7 +183,8 @@ class TestAzureSQLOperations:
     @patch("sqlalchemy.create_engine")
     def test_write_table(self, mock_create_engine):
         """Should write DataFrame to table."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
 
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
@@ -198,7 +204,8 @@ class TestAzureSQLOperations:
     @patch("sqlalchemy.create_engine")
     def test_write_table_with_schema(self, mock_create_engine):
         """Should write to specific schema."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
 
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
@@ -214,7 +221,8 @@ class TestAzureSQLOperations:
     @patch("sqlalchemy.create_engine")
     def test_close_disposes_engine(self, mock_create_engine):
         """Should dispose of engine when closing."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
 
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
@@ -235,20 +243,26 @@ class TestAzureSQLErrorHandling:
     def test_get_engine_without_sqlalchemy(self):
         """Should raise error if SQLAlchemy not installed."""
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
+        
+        from odibi.exceptions import ConnectionError
 
         with patch.dict("sys.modules", {"sqlalchemy": None}):
-            with pytest.raises(ImportError, match="SQLAlchemy is required"):
+            with pytest.raises(ConnectionError, match="Required packages"):
                 conn.get_engine()
 
     @patch("pandas.read_sql")
     @patch("sqlalchemy.create_engine")
     def test_read_sql_handles_connection_error(self, mock_create_engine, mock_read_sql):
         """Should propagate connection errors."""
-        mock_engine = Mock()
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = Mock()
         mock_create_engine.return_value = mock_engine
         mock_read_sql.side_effect = Exception("Connection failed")
+        
+        from odibi.exceptions import ConnectionError
 
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
 
-        with pytest.raises(Exception, match="Connection failed"):
+        # Matches our nicely formatted error message
+        with pytest.raises(ConnectionError, match="Connection validation failed"):
             conn.read_sql("SELECT 1")

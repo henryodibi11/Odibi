@@ -224,13 +224,13 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 ### Deliverables
 
 #### CLI Enhancement
-- [ ] `odibi validate <config>` - Validate YAML without execution
-- [ ] `odibi run <config>` - Execute pipeline from CLI
-- [ ] `odibi graph <config>` - Visualize dependency graph (ASCII art or export to DOT)
-- [ ] `odibi config doctor <config>` - Lint YAML, show resolved connections
-- [ ] Rich error messages with suggestions and context
-- [ ] `--log-level` flag (DEBUG, INFO, WARNING, ERROR)
-- [ ] `--dry-run` mode
+- [x] `odibi validate <config>` - Validate YAML without execution
+- [x] `odibi run <config>` - Execute pipeline from CLI
+- [x] `odibi graph <config>` - Visualize dependency graph (ASCII art or export to DOT)
+- [x] `odibi doctor <config>` - Lint YAML, show resolved connections, check env
+- [x] Rich error messages with suggestions and context
+- [x] `--log-level` flag (DEBUG, INFO, WARNING, ERROR)
+- [x] `--dry-run` mode
 
 #### Testing Utilities
 - [ ] `odibi.testing.fixtures` - Temporary directories, sample data generators
@@ -239,18 +239,26 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 - [ ] Example datasets compatible with both Pandas and Spark
 
 #### Story Generator Enhancements
-- [ ] `odibi.story` module enhancement
-- [ ] Capture run metadata: timestamps, node durations, success/failure
-- [ ] Sample data snapshots (first N rows per node)
-- [ ] Schema tracking (detect schema changes between nodes)
-- [ ] Export formats: Markdown, JSON, HTML (basic)
-- [ ] Configurable verbosity levels
+- [x] `odibi.story` module enhancement
+- [x] Capture run metadata: timestamps, node durations, success/failure
+- [x] Sample data snapshots (first N rows per node)
+- [x] Schema tracking (detect schema changes between nodes)
+- [x] Export formats: Markdown, JSON, HTML (basic)
+- [ ] **Verbosity Levels:** Control detail (Summary vs. Audit vs. Debug)
+- [ ] **Contextual Metadata:** Capture Environment, Git Commit, Odibi Version (Reproducibility)
+- [ ] **Config Snapshot:** Embed effective configuration in the story (Traceability)
+- [ ] **Rendered Logic:** Show actual SQL/Params executed (Transparency)
+- [ ] **Data Quality Evidence:** Show *why* data failed (e.g., "Top 5 invalid values") rather than just "Failed"
+- [ ] **I/O Manifest:** Log exact file paths, ETags, and modification times for provenance
+- [ ] **Visual Lineage:** Embed pipeline graph (Mermaid/ASCII) directly in the story
+- [ ] **Resource Telemetry:** Track peak memory usage and CPU time (Efficiency Truth)
+- [ ] **Reproduction Token:** Exact CLI command to reproduce this specific run
 
 #### Azure Connector Completion
-- [ ] `connections/azure_sql.py` - Implement read/write via SQLAlchemy + ODBC
-- [ ] Azure-specific error handling improvements
+- [x] `connections/azure_sql.py` - Implement read/write via SQLAlchemy + ODBC
+- [x] Azure-specific error handling improvements
 - [ ] Azure connection examples and best practices
-- [ ] Connection factory: YAML `type` field → class instantiation
+- [x] Connection factory: YAML `type` field → class instantiation
 
 #### Cloud Connectors (Deferred to Phase 5)
 - [ ] `connections/s3.py` - AWS S3 (deferred - no production use case)
@@ -376,8 +384,8 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 | v1.1.0-alpha.1 | 🚧 In Progress | Phase 1 scaffolding (Spark/Azure stubs) | 2025-Q4 |
 | v1.1.0 | ⏳ Planned | Phase 1 stable + Phase 2 CLI tools | 2026-Q1 |
 | v1.2.0 | ⏳ Planned | Phase 2 stable | 2026-Q1 |
-| v1.3.0 | ⏳ Planned | Phase 3 - Stories + Connectors | 2026-Q2 |
-| v1.4.0 | ⏳ Planned | Phase 4 - Performance + Production | 2026-Q3 |
+| v1.3.0 | ✅ Completed | Phase 3 - Stories + Connectors | 2025-11-10 |
+| v1.4.0 | 🚧 In Progress | Phase 4 - Performance + Production | 2026-Q3 |
 | v2.0.0 | ⏳ Planned | Phase 5 - Community + Ecosystem | 2026 |
 
 ---
@@ -390,8 +398,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Testing requirements for new features
 - Documentation standards
 
-**Current Focus:** Phase 1 scaffolding  
-**Next Up:** CLI tools and testing utilities
+**Current Focus:** Phase 4 - Performance + Production Hardening
+**Next Up:** Engine benchmarks and reliability features
 
 ---
 

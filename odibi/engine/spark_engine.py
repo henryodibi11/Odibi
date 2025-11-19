@@ -206,18 +206,91 @@ class SparkEngine(Engine):
         )
 
     def count_nulls(self, df, columns: List[str]) -> Dict[str, int]:
-        """Count nulls in specified columns (Phase 1 stub)."""
-        raise NotImplementedError(
-            "SparkEngine.count_nulls() will be implemented in Phase 3. "
-            "See PHASES.md for implementation plan."
-        )
+        """Count nulls in specified columns.
+
+        Args:
+            df: Spark DataFrame
+            columns: Columns to check
+
+        Returns:
+            Dictionary of column -> null count
+        """
+        from pyspark.sql.functions import col, count, when
+
+        # Validate columns exist
+        missing = set(columns) - set(df.columns)
+        if missing:
+            raise ValueError(
+                f"Columns not found in DataFrame: {', '.join(missing)}"
+            )
+
+        # Build aggregation expression
+        aggs = [count(when(col(c).isNull(), c)).alias(c) for c in columns]
+
+        # Execute single pass
+        result = df.select(*aggs).collect()[0].asDict()
+
+        return result
 
     def validate_schema(self, df, schema_rules: Dict[str, Any]) -> List[str]:
-        """Validate DataFrame schema (Phase 1 stub)."""
-        raise NotImplementedError(
-            "SparkEngine.validate_schema() will be implemented in Phase 3. "
-            "See PHASES.md for implementation plan."
-        )
+        """Validate DataFrame schema.
+
+        Args:
+            df: Spark DataFrame
+            schema_rules: Validation rules
+
+        Returns:
+            List of validation failures
+        """
+        failures = []
+
+        # Check required columns
+        if "required_columns" in schema_rules:
+            required = schema_rules["required_columns"]
+            missing = set(required) - set(df.columns)
+            if missing:
+                failures.append(f"Missing required columns: {', '.join(missing)}")
+
+        # Check column types
+        if "types" in schema_rules:
+            # Map common types to Spark type strings
+            # Note: Spark types are like 'integer', 'string', 'double', 'boolean'
+            type_map = {
+                "int": ["integer", "long", "short", "byte"],
+                "float": ["double", "float"],
+                "str": ["string"],
+                "bool": ["boolean"],
+            }
+
+            for col_name, expected_type in schema_rules["types"].items():
+                if col_name not in df.columns:
+                    failures.append(f"Column '{col_name}' not found for type validation")
+                    continue
+
+                # Get actual type (simple string representation)
+                # e.g. 'integer', 'string', 'array<string>'
+                actual_type = dict(df.dtypes)[col_name]
+                expected_dtypes = type_map.get(expected_type, [expected_type])
+
+                if actual_type not in expected_dtypes:
+                    failures.append(
+                        f"Column '{col_name}' has type '{actual_type}', "
+                        f"expected '{expected_type}'"
+                    )
+
+        return failures
+
+    def get_sample(self, df, n: int = 10) -> List[Dict[str, Any]]:
+        """Get sample rows as list of dictionaries.
+
+        Args:
+            df: Spark DataFrame
+            n: Number of rows to return
+
+        Returns:
+            List of row dictionaries
+        """
+        return [row.asDict() for row in df.limit(n).collect()]
 
     def vacuum_delta(
         self,
@@ -236,7 +309,8 @@ class SparkEngine(Engine):
             from delta.tables import DeltaTable
         except ImportError:
             raise ImportError(
-                "Delta Lake support requires 'pip install odibi[spark]' with delta-spark. "
+                "Delta Lake support requires 'pip install odibi[spark]' "
+                "with delta-spark. "
                 "See README.md for installation instructions."
             )
 
@@ -261,13 +335,16 @@ class SparkEngine(Engine):
             from delta.tables import DeltaTable
         except ImportError:
             raise ImportError(
-                "Delta Lake support requires 'pip install odibi[spark]' with delta-spark. "
+                "Delta Lake support requires 'pip install odibi[spark]' "
+                "with delta-spark. "
                 "See README.md for installation instructions."
             )
 
         full_path = connection.get_path(path)
         delta_table = DeltaTable.forPath(self.spark, full_path)
-        history_df = delta_table.history(limit) if limit else delta_table.history()
+        history_df = (
+            delta_table.history(limit) if limit else delta_table.history()
+        )
 
         # Convert to list of dictionaries
         return [row.asDict() for row in history_df.collect()]
@@ -284,7 +361,8 @@ class SparkEngine(Engine):
             from delta.tables import DeltaTable
         except ImportError:
             raise ImportError(
-                "Delta Lake support requires 'pip install odibi[spark]' with delta-spark. "
+                "Delta Lake support requires 'pip install odibi[spark]' "
+                "with delta-spark. "
                 "See README.md for installation instructions."
             )
 

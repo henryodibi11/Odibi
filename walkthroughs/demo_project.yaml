@@ -1,0 +1,41 @@
+connections:
+  local_data:
+    base_path: ./data
+    type: local
+engine: pandas
+pipelines:
+- description: Demonstrates schema changes between nodes
+  nodes:
+  - description: Generates initial sales data
+    name: create_source
+    transform:
+      steps:
+      - sql: "\n                                SELECT \n                        \
+          \            'A' as product, \n                                    'North'\
+          \ as region, \n                                    100 as sales\n      \
+          \                          UNION ALL\n                                SELECT\
+          \ 'B', 'North', 150\n                                UNION ALL\n       \
+          \                         SELECT 'A', 'South', 200\n                   \
+          \             "
+  - depends_on:
+    - create_source
+    description: Adds a new column 'tax'
+    name: enrich_data
+    transform:
+      steps:
+      - sql: SELECT *, sales * 0.1 as tax FROM create_source
+  - depends_on:
+    - enrich_data
+    description: Removes the region column
+    name: cleanup_data
+    transform:
+      steps:
+      - sql: SELECT product, sales, tax FROM enrich_data
+  pipeline: schema_evolution_demo
+project: Schema Tracking Demo
+story:
+  auto_generate: true
+  connection: local_data
+  max_sample_rows: 5
+  path: stories
+version: 1.0.0

@@ -5,9 +5,10 @@ Azure SQL Database Connection
 Provides connectivity to Azure SQL databases with authentication support.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import pandas as pd
-from .base import BaseConnection
+from odibi.connections.base import BaseConnection
+from odibi.exceptions import ConnectionError
 
 
 class AzureSQL(BaseConnection):
@@ -106,7 +107,7 @@ class AzureSQL(BaseConnection):
             SQLAlchemy engine instance
 
         Raises:
-            ImportError: If required packages not installed
+            ConnectionError: If connection fails or drivers missing
         """
         if self._engine is not None:
             return self._engine
@@ -115,24 +116,41 @@ class AzureSQL(BaseConnection):
             from sqlalchemy import create_engine
             from urllib.parse import quote_plus
         except ImportError:
-            raise ImportError(
-                "SQLAlchemy is required for Azure SQL operations. "
-                "Install with: pip install sqlalchemy pyodbc"
+            raise ConnectionError(
+                connection_name=f"AzureSQL({self.server})",
+                reason="Required packages 'sqlalchemy' or 'pyodbc' not found.",
+                suggestions=[
+                    "Install required packages: pip install sqlalchemy pyodbc",
+                    "Or install odibi with azure extras: pip install 'odibi[azure]'"
+                ]
             )
 
-        # Build connection string
-        conn_str = self.odbc_dsn()
-        connection_url = f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}"
+        try:
+            # Build connection string
+            conn_str = self.odbc_dsn()
+            connection_url = f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}"
 
-        # Create engine with connection pooling
-        self._engine = create_engine(
-            connection_url,
-            pool_pre_ping=True,  # Verify connections before use
-            pool_recycle=3600,  # Recycle connections after 1 hour
-            echo=False,
-        )
+            # Create engine with connection pooling
+            self._engine = create_engine(
+                connection_url,
+                pool_pre_ping=True,  # Verify connections before use
+                pool_recycle=3600,  # Recycle connections after 1 hour
+                echo=False,
+            )
+            
+            # Test connection
+            with self._engine.connect() as conn:
+                pass
+                
+            return self._engine
 
-        return self._engine
+        except Exception as e:
+            suggestions = self._get_error_suggestions(str(e))
+            raise ConnectionError(
+                connection_name=f"AzureSQL({self.server})",
+                reason=f"Failed to create engine: {str(e)}",
+                suggestions=suggestions
+            )
 
     def read_sql(self, query: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
         """
@@ -144,13 +162,21 @@ class AzureSQL(BaseConnection):
 
         Returns:
             Query results as pandas DataFrame
-
-        Example:
-            >>> conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
-            >>> df = conn.read_sql("SELECT * FROM users WHERE age > :min_age", {"min_age": 18})
+            
+        Raises:
+            ConnectionError: If execution fails
         """
-        engine = self.get_engine()
-        return pd.read_sql(query, engine, params=params)
+        try:
+            engine = self.get_engine()
+            return pd.read_sql(query, engine, params=params)
+        except Exception as e:
+            if isinstance(e, ConnectionError):
+                raise
+            raise ConnectionError(
+                connection_name=f"AzureSQL({self.server})",
+                reason=f"Query execution failed: {str(e)}",
+                suggestions=self._get_error_suggestions(str(e))
+            )
 
     def read_table(self, table_name: str, schema: Optional[str] = "dbo") -> pd.DataFrame:
         """
@@ -192,24 +218,32 @@ class AzureSQL(BaseConnection):
 
         Returns:
             Number of rows written
-
-        Example:
-            >>> conn = AzureSQL(server="myserver.database.windows.net", database="mydb")
-            >>> conn.write_table(df, "users", if_exists="append")
+            
+        Raises:
+            ConnectionError: If write fails
         """
-        engine = self.get_engine()
+        try:
+            engine = self.get_engine()
 
-        rows_written = df.to_sql(
-            name=table_name,
-            con=engine,
-            schema=schema,
-            if_exists=if_exists,
-            index=index,
-            chunksize=chunksize,
-            method="multi",  # Use multi-row INSERT for better performance
-        )
+            rows_written = df.to_sql(
+                name=table_name,
+                con=engine,
+                schema=schema,
+                if_exists=if_exists,
+                index=index,
+                chunksize=chunksize,
+                method="multi",  # Use multi-row INSERT for better performance
+            )
 
-        return rows_written if rows_written is not None else len(df)
+            return rows_written if rows_written is not None else len(df)
+        except Exception as e:
+            if isinstance(e, ConnectionError):
+                raise
+            raise ConnectionError(
+                connection_name=f"AzureSQL({self.server})",
+                reason=f"Write operation failed: {str(e)}",
+                suggestions=self._get_error_suggestions(str(e))
+            )
 
     def execute(self, sql: str, params: Optional[Dict[str, Any]] = None) -> Any:
         """
@@ -221,16 +255,51 @@ class AzureSQL(BaseConnection):
 
         Returns:
             Result from execution
+            
+        Raises:
+            ConnectionError: If execution fails
         """
-        engine = self.get_engine()
+        try:
+            engine = self.get_engine()
+            from sqlalchemy import text
 
-        with engine.connect() as conn:
-            result = conn.execute(sql, params or {})
-            conn.commit()
-            return result
+            with engine.connect() as conn:
+                result = conn.execute(text(sql), params or {})
+                conn.commit()
+                return result
+        except Exception as e:
+            if isinstance(e, ConnectionError):
+                raise
+            raise ConnectionError(
+                connection_name=f"AzureSQL({self.server})",
+                reason=f"Statement execution failed: {str(e)}",
+                suggestions=self._get_error_suggestions(str(e))
+            )
 
     def close(self):
         """Close database connection and dispose of engine."""
         if self._engine:
             self._engine.dispose()
             self._engine = None
+
+    def _get_error_suggestions(self, error_msg: str) -> List[str]:
+        """Generate suggestions based on error message."""
+        suggestions = []
+        error_lower = error_msg.lower()
+
+        if "login failed" in error_lower:
+            suggestions.append("Check username and password")
+            suggestions.append(f"Verify auth_mode is correct (current: {self.auth_mode})")
+            if "identity" in error_lower:
+                suggestions.append("Ensure Managed Identity has access to the database")
+        
+        if "firewall" in error_lower or "tcp provider" in error_lower:
+            suggestions.append("Check Azure SQL Server firewall rules")
+            suggestions.append("Ensure client IP is allowed")
+            
+        if "driver" in error_lower:
+            suggestions.append(f"Verify ODBC driver '{self.driver}' is installed")
+            suggestions.append("On Linux: sudo apt-get install msodbcsql18")
+            
+        return suggestions
+

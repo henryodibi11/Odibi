@@ -1,6 +1,6 @@
 """Story generator for pipeline execution documentation."""
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
@@ -141,6 +141,23 @@ class StoryGenerator:
                 lines.append(f"- {step}")
 
         # Schema info
+        if result.metadata and "schema_in" in result.metadata:
+            schema_in = result.metadata["schema_in"]
+            lines.append("")
+            lines.append("**Input schema:**")
+            lines.append(
+                f"- Columns ({len(schema_in)}): {', '.join(schema_in)}"
+            )
+
+            # Add input sample
+            if "sample_data_in" in result.metadata:
+                sample_in = result.metadata["sample_data_in"]
+                if sample_in:
+                    lines.append("")
+                    lines.append(f"**Sample input** (first {len(sample_in)} rows):")
+                    lines.append("")
+                    lines.append(self._sample_to_markdown(sample_in, schema_in))
+
         if result.result_schema:
             lines.append("")
             lines.append("**Output schema:**")
@@ -148,20 +165,30 @@ class StoryGenerator:
                 f"- Columns ({len(result.result_schema)}): {', '.join(result.result_schema)}"
             )
 
+            # Schema changes
+            if result.metadata:
+                added = result.metadata.get("columns_added")
+                removed = result.metadata.get("columns_removed")
+
+                if added or removed:
+                    lines.append("")
+                    lines.append("**Schema Changes:**")
+                    if added:
+                        lines.append(f"- 🟢 **Added:** {', '.join(added)}")
+                    if removed:
+                        lines.append(f"- 🔴 **Removed:** {', '.join(removed)}")
+
         if result.rows_processed is not None:
             lines.append(f"- Rows: {result.rows_processed:,}")
 
         # Sample data
-        if context and context.has(node_name) and result.success:
-            try:
-                df = context.get(node_name)
+        if result.metadata and "sample_data" in result.metadata:
+            sample_data = result.metadata["sample_data"]
+            if sample_data:
                 lines.append("")
-                lines.append(f"**Sample output** (first {self.max_sample_rows} rows):")
+                lines.append(f"**Sample output** (first {len(sample_data)} rows):")
                 lines.append("")
-                lines.append(self._dataframe_to_markdown(df, self.max_sample_rows))
-            except Exception:
-                # If we can't get the data, skip sample
-                pass
+                lines.append(self._sample_to_markdown(sample_data, result.result_schema))
 
         # Error details
         if result.error:
@@ -176,6 +203,44 @@ class StoryGenerator:
         lines.append("")
 
         return lines
+
+    def _sample_to_markdown(self, sample: List[Dict[str, Any]], schema: Optional[List[str]]) -> str:
+        """Convert sample data to markdown table.
+
+        Args:
+            sample: List of row dictionaries
+            schema: Optional list of column names (for ordering)
+
+        Returns:
+            Markdown table string
+        """
+        if not sample:
+            return "*No data*"
+
+        # Determine columns
+        if schema:
+            columns = schema
+        else:
+            columns = list(sample[0].keys())
+
+        # Build markdown table
+        lines = []
+
+        # Header
+        header = "| " + " | ".join(str(col) for col in columns) + " |"
+        lines.append(header)
+
+        # Separator
+        separator = "| " + " | ".join("---" for _ in columns) + " |"
+        lines.append(separator)
+
+        # Rows
+        for row in sample:
+            values = [str(row.get(col, "")) for col in columns]
+            row_str = "| " + " | ".join(values) + " |"
+            lines.append(row_str)
+
+        return "\n".join(lines)
 
     def _dataframe_to_markdown(self, df: pd.DataFrame, max_rows: int) -> str:
         """Convert DataFrame to markdown table.

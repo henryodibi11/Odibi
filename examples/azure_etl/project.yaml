@@ -1,0 +1,64 @@
+project: Azure ETL Example
+engine: pandas  # Can also be 'spark'
+description: "Read from ADLS, transform, write to Azure SQL"
+
+connections:
+  # Source: Azure Data Lake Storage
+  adls_source:
+    type: azure_adls
+    account: mydatalake
+    container: raw-data
+    auth_mode: key_vault
+    auth:
+      key_vault_name: my-key-vault
+      secret_name: adls-key
+
+  # Destination: Azure SQL Database
+  sql_dest:
+    type: azure_sql
+    server: myserver.database.windows.net
+    database: analytics_db
+    auth_mode: aad_msi  # Managed Identity
+    
+  # Stories storage
+  story_storage:
+    type: local
+    base_path: ./stories
+
+story:
+  connection: story_storage
+  path: ./
+  auto_generate: true
+
+pipelines:
+  - pipeline: adls_to_sql
+    description: "Ingest parquet from ADLS to Azure SQL"
+    nodes:
+      - name: read_telemetry
+        read:
+          connection: adls_source
+          path: telemetry/2025/11/
+          format: parquet
+      
+      - name: aggregate_metrics
+        depends_on: [read_telemetry]
+        transform:
+          steps:
+            - |
+              SELECT 
+                device_id,
+                date_trunc('hour', timestamp) as hour_bucket,
+                avg(temperature) as avg_temp,
+                max(cpu_usage) as max_cpu
+              FROM read_telemetry
+              GROUP BY 1, 2
+      
+      - name: write_to_sql
+        depends_on: [aggregate_metrics]
+        write:
+          connection: sql_dest
+          table: device_metrics_hourly
+          format: sql  # Not strictly needed for SQL connection but good for clarity
+          mode: append
+          options:
+            chunksize: 1000

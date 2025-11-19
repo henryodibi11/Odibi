@@ -82,6 +82,8 @@ class DocStoryGenerator:
             return self._render_html(doc_data, output_path, theme)
         elif format.lower() in ["markdown", "md"]:
             return self._render_markdown(doc_data, output_path)
+        elif format.lower() == "json":
+            return self._render_json(doc_data, output_path)
         else:
             raise ValueError(f"Unsupported format: {format}")
 
@@ -513,5 +515,26 @@ class DocStoryGenerator:
 
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(markdown)
+
+        return str(output_file)
+
+    def _render_json(self, doc_data: Dict[str, Any], output_path: str) -> str:
+        """
+        Render documentation as JSON.
+
+        Args:
+            doc_data: Documentation data
+            output_path: Output file path
+
+        Returns:
+            Path to generated file
+        """
+        import json
+
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(doc_data, f, indent=2)
 
         return str(output_file)

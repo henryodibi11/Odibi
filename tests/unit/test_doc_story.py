@@ -223,6 +223,24 @@ class TestDocStoryGenerator:
         content = Path(result_path).read_text(encoding="utf-8")
         assert "Pipeline Flow" not in content
 
+    def test_generate_json(self, sample_pipeline_config, tmp_path):
+        """Should generate JSON documentation."""
+        import json
+
+        generator = DocStoryGenerator(sample_pipeline_config)
+        output_path = tmp_path / "doc.json"
+
+        result_path = generator.generate(str(output_path), format="json", validate=False)
+
+        assert Path(result_path).exists()
+        with open(result_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert data["title"]
+        assert data["overview"]["pipeline_name"] == "test_pipeline"
+        assert len(data["operations"]) == 2
+        assert "load_data" in [op["node_name"] for op in data["operations"]]
+
     def test_generate_invalid_format(self, sample_pipeline_config, tmp_path):
         """Should raise error for invalid format."""
         generator = DocStoryGenerator(sample_pipeline_config)

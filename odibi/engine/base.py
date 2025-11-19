@@ -144,3 +144,16 @@ class Engine(ABC):
             List of validation failures (empty if valid)
         """
         pass
+
+    @abstractmethod
+    def get_sample(self, df: Any, n: int = 10) -> List[Dict[str, Any]]:
+        """Get sample rows as list of dictionaries.
+
+        Args:
+            df: DataFrame
+            n: Number of rows to return
+
+        Returns:
+            List of row dictionaries
+        """
+        pass

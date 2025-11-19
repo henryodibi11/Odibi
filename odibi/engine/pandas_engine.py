@@ -467,6 +467,18 @@ class PandasEngine(Engine):
 
         return {"type": "record", "name": "DataFrame", "fields": fields}
 
+    def get_sample(self, df: pd.DataFrame, n: int = 10) -> List[Dict[str, Any]]:
+        """Get sample rows as list of dictionaries.
+
+        Args:
+            df: DataFrame
+            n: Number of rows to return
+
+        Returns:
+            List of row dictionaries
+        """
+        return df.head(n).to_dict("records")
+
     def vacuum_delta(
         self,
         connection: Any,

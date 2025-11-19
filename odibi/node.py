@@ -37,6 +37,8 @@ class Node:
         engine: Any,
         connections: Dict[str, Any],
         config_file: Optional[str] = None,
+        max_sample_rows: int = 10,
+        dry_run: bool = False,
     ):
         """Initialize node.
 
@@ -46,12 +48,16 @@ class Node:
             engine: Execution engine (Spark or Pandas)
             connections: Available connections
             config_file: Path to config file (for error reporting)
+            max_sample_rows: Maximum rows to capture for story snapshot
+            dry_run: Whether to simulate execution
         """
         self.config = config
         self.context = context
         self.engine = engine
         self.connections = connections
         self.config_file = config_file
+        self.max_sample_rows = max_sample_rows
+        self.dry_run = dry_run
 
         self._cached_result: Optional[Any] = None
         self._execution_steps: List[str] = []
@@ -63,6 +69,35 @@ class Node:
             NodeResult with execution details
         """
         start_time = time.time()
+        
+        if self.dry_run:
+            # Dry run execution
+            self._execution_steps.append("Dry run: Skipping actual execution")
+            
+            # Simulate steps
+            if self.config.read:
+                self._execution_steps.append(f"Dry run: Would read from {self.config.read.connection}")
+            
+            if self.config.transform:
+                self._execution_steps.append(f"Dry run: Would apply {len(self.config.transform.steps)} transform steps")
+                
+            if self.config.write:
+                self._execution_steps.append(f"Dry run: Would write to {self.config.write.connection}")
+                
+            return NodeResult(
+                node_name=self.config.name,
+                success=True,
+                duration=0.0,
+                rows_processed=0,
+                metadata={
+                    "dry_run": True,
+                    "steps": self._execution_steps
+                }
+            )
+
+        input_df = None
+        input_schema = None
+        input_sample = None
 
         try:
             result_df = None
@@ -70,14 +105,30 @@ class Node:
             # Read phase
             if self.config.read:
                 result_df = self._execute_read()
+                input_df = result_df
                 self._execution_steps.append(f"Read from {self.config.read.connection}")
+            elif self.config.depends_on:
+                # If this is a transform/write node, get data from dependency
+                # We use the first dependency as the "primary" input for schema comparison
+                input_df = self.context.get(self.config.depends_on[0])
+
+            # Capture input schema before transformation
+            if input_df is not None:
+                input_schema = self._get_schema(input_df)
+                
+                if self.max_sample_rows > 0:
+                    try:
+                        input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
+                    except Exception:
+                        # Don't fail execution if sampling fails
+                        pass
 
             # Transform phase
             if self.config.transform:
-                if result_df is None and not self._execution_steps:
-                    # Transform-only node needs data from context
-                    # We'll handle this in _execute_transform
-                    pass
+                if result_df is None and input_df is not None:
+                    # Use input_df if available (from dependency)
+                    result_df = input_df
+                
                 result_df = self._execute_transform(result_df)
                 self._execution_steps.append(
                     f"Applied {len(self.config.transform.steps)} transform steps"
@@ -110,6 +161,28 @@ class Node:
             # Collect metadata
             duration = time.time() - start_time
             metadata = self._collect_metadata(result_df)
+            
+            # Calculate schema changes if we have both input and output schemas
+            if input_schema and metadata.get("schema"):
+                output_schema = metadata["schema"]
+                set_in = set(input_schema)
+                set_out = set(output_schema)
+                
+                metadata["schema_in"] = input_schema
+                metadata["columns_added"] = list(set_out - set_in)
+                metadata["columns_removed"] = list(set_in - set_out)
+                
+                if input_sample:
+                    metadata["sample_data_in"] = input_sample
+
+            # Add sample data to metadata if requested
+            if result_df is not None and self.max_sample_rows > 0:
+                try:
+                    sample = self.engine.get_sample(result_df, n=self.max_sample_rows)
+                    metadata["sample_data"] = sample
+                except Exception:
+                    # Don't fail execution if sampling fails (e.g. serialization issues)
+                    metadata["sample_data"] = []
 
             return NodeResult(
                 node_name=self.config.name,

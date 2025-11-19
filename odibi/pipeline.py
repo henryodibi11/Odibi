@@ -131,11 +131,12 @@ class Pipeline:
         # Delegate to PipelineManager
         return PipelineManager.from_yaml(yaml_path)
 
-    def run(self, parallel: bool = False) -> PipelineResults:
+    def run(self, parallel: bool = False, dry_run: bool = False) -> PipelineResults:
         """Execute the pipeline.
 
         Args:
             parallel: Whether to use parallel execution (not implemented yet)
+            dry_run: Whether to simulate execution without running operations
 
         Returns:
             PipelineResults with execution details
@@ -165,6 +166,7 @@ class Pipeline:
                 engine=self.engine,
                 connections=self.connections,
                 config_file=None,  # TODO: track config file
+                dry_run=dry_run,
             )
 
             node_result = node.execute()
@@ -428,23 +430,51 @@ class PipelineManager:
                     client_secret=client_secret,
                     validate=conn_config.get("validate", True),
                 )
+            elif conn_type == "azure_sql" or conn_type == "sql_server":
+                # Import AzureSQL
+                try:
+                    from odibi.connections.azure_sql import AzureSQL
+                except ImportError:
+                    raise ImportError(
+                        "Azure SQL support requires 'pip install odibi[azure]'. "
+                        "See README.md for installation instructions."
+                    )
+
+                # Extract config
+                auth_config = conn_config.get("auth", {})
+                username = auth_config.get("username") or conn_config.get("username")
+                password = auth_config.get("password") or conn_config.get("password")
+                
+                connections[conn_name] = AzureSQL(
+                    server=conn_config["server"],
+                    database=conn_config["database"],
+                    driver=conn_config.get("driver", "ODBC Driver 18 for SQL Server"),
+                    username=username,
+                    password=password,
+                    auth_mode=conn_config.get("auth_mode", "aad_msi"),
+                    port=conn_config.get("port", 1433),
+                    timeout=conn_config.get("timeout", 30),
+                )
             else:
                 raise ValueError(
                     f"Unsupported connection type: {conn_type}. "
-                    f"Supported types: local, azure_adls. "
+                    f"Supported types: local, azure_adls, azure_sql. "
                     f"See docs for connection setup."
                 )
 
         return connections
 
     def run(
-        self, pipelines: Optional[Union[str, List[str]]] = None
+        self, 
+        pipelines: Optional[Union[str, List[str]]] = None,
+        dry_run: bool = False
     ) -> Union[PipelineResults, Dict[str, PipelineResults]]:
         """Run one, multiple, or all pipelines.
 
         Args:
             pipelines: Pipeline name(s) to run. If None, runs all pipelines.
                       Can be a string (single pipeline) or list of strings.
+            dry_run: Whether to simulate execution.
 
         Returns:
             If single pipeline: PipelineResults
@@ -478,9 +508,11 @@ class PipelineManager:
         for name in pipeline_names:
             print(f"\n{'='*60}")
             print(f"Running pipeline: {name}")
+            if dry_run:
+                print("Mode: DRY RUN (Simulation)")
             print(f"{'='*60}\n")
 
-            results[name] = self._pipelines[name].run()
+            results[name] = self._pipelines[name].run(dry_run=dry_run)
 
             # Print summary
             result = results[name]
