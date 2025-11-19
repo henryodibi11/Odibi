@@ -343,9 +343,11 @@ class TestAzureADLSSparkIntegration:
         # Check calls
         prefix = "fs.azure.account.auth.type.myaccount.dfs.core.windows.net"
         mock_spark.conf.set.assert_any_call(prefix, "OAuth")
-        
+
         prefix = "fs.azure.account.oauth.provider.type.myaccount.dfs.core.windows.net"
-        mock_spark.conf.set.assert_any_call(prefix, "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
+        mock_spark.conf.set.assert_any_call(
+            prefix, "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider"
+        )
 
     def test_configure_spark_managed_identity(self):
         """Test configure_spark sets OAuth config for managed_identity."""
@@ -361,9 +363,11 @@ class TestAzureADLSSparkIntegration:
         # Check calls
         prefix = "fs.azure.account.auth.type.myaccount.dfs.core.windows.net"
         mock_spark.conf.set.assert_any_call(prefix, "OAuth")
-        
+
         prefix = "fs.azure.account.oauth.provider.type.myaccount.dfs.core.windows.net"
-        mock_spark.conf.set.assert_any_call(prefix, "org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider")
+        mock_spark.conf.set.assert_any_call(
+            prefix, "org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider"
+        )
 
     @patch("azure.keyvault.secrets.SecretClient")
     @patch("azure.identity.DefaultAzureCredential")

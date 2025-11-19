@@ -401,15 +401,17 @@ class PipelineManager:
 
                 # 2. Auth dictionary (preferred) vs flat structure (legacy)
                 auth_config = conn_config.get("auth", {})
-                
+
                 # Extract auth details from auth dict OR top-level
-                key_vault_name = auth_config.get("key_vault_name") or conn_config.get("key_vault_name")
+                key_vault_name = auth_config.get("key_vault_name") or conn_config.get(
+                    "key_vault_name"
+                )
                 secret_name = auth_config.get("secret_name") or conn_config.get("secret_name")
                 account_key = auth_config.get("account_key") or conn_config.get("account_key")
                 tenant_id = auth_config.get("tenant_id") or conn_config.get("tenant_id")
                 client_id = auth_config.get("client_id") or conn_config.get("client_id")
                 client_secret = auth_config.get("client_secret") or conn_config.get("client_secret")
-                
+
                 # Default auth mode if not specified
                 auth_mode = conn_config.get("auth_mode", "key_vault")
 

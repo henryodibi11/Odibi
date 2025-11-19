@@ -54,7 +54,7 @@ class AzureADLS(BaseConnection):
         self.tenant_id = tenant_id
         self.client_id = client_id
         self.client_secret = client_secret
-        
+
         self._cached_key: Optional[str] = None
 
         if validate:
@@ -102,7 +102,7 @@ class AzureADLS(BaseConnection):
             pass
         else:
             raise ValueError(
-                f"Unsupported auth_mode: '{self.auth_mode}'. " 
+                f"Unsupported auth_mode: '{self.auth_mode}'. "
                 f"Use 'key_vault', 'direct_key', 'service_principal', or 'managed_identity'."
             )
 
@@ -110,7 +110,7 @@ class AzureADLS(BaseConnection):
         """Get storage account key (cached).
 
         Only relevant for 'key_vault' and 'direct_key' modes.
-        
+
         Args:
             timeout: Timeout for Key Vault operations in seconds (default: 30.0)
 
@@ -160,7 +160,7 @@ class AzureADLS(BaseConnection):
 
         elif self.auth_mode == "direct_key":
             return self.account_key
-            
+
         # For other modes (SP, MI), we don't use an account key
         return None
 
@@ -171,23 +171,23 @@ class AzureADLS(BaseConnection):
             Dictionary with appropriate authentication parameters for fsspec
         """
         base_options = {"account_name": self.account}
-        
+
         if self.auth_mode in ["key_vault", "direct_key"]:
             return {**base_options, "account_key": self.get_storage_key()}
-            
+
         elif self.auth_mode == "service_principal":
             return {
                 **base_options,
                 "tenant_id": self.tenant_id,
                 "client_id": self.client_id,
-                "client_secret": self.client_secret
+                "client_secret": self.client_secret,
             }
-            
+
         elif self.auth_mode == "managed_identity":
-             # adlfs supports using DefaultAzureCredential implicitly if anon=False 
-             # and no other creds provided, assuming azure.identity is installed
+            # adlfs supports using DefaultAzureCredential implicitly if anon=False
+            # and no other creds provided, assuming azure.identity is installed
             return {**base_options, "anon": False}
-            
+
         return base_options
 
     def configure_spark(self, spark) -> None:
@@ -199,22 +199,22 @@ class AzureADLS(BaseConnection):
         if self.auth_mode in ["key_vault", "direct_key"]:
             config_key = f"fs.azure.account.key.{self.account}.dfs.core.windows.net"
             spark.conf.set(config_key, self.get_storage_key())
-            
+
         elif self.auth_mode == "service_principal":
             # Configure OAuth for ADLS Gen2
             # Ref: https://hadoop.apache.org/docs/stable/hadoop-azure/abfs.html
             prefix = f"fs.azure.account.auth.type.{self.account}.dfs.core.windows.net"
             spark.conf.set(prefix, "OAuth")
-            
+
             prefix = f"fs.azure.account.oauth.provider.type.{self.account}.dfs.core.windows.net"
             spark.conf.set(prefix, "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
-            
+
             prefix = f"fs.azure.account.oauth2.client.id.{self.account}.dfs.core.windows.net"
             spark.conf.set(prefix, self.client_id)
-            
+
             prefix = f"fs.azure.account.oauth2.client.secret.{self.account}.dfs.core.windows.net"
             spark.conf.set(prefix, self.client_secret)
-            
+
             prefix = f"fs.azure.account.oauth2.client.endpoint.{self.account}.dfs.core.windows.net"
             endpoint = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/token"
             spark.conf.set(prefix, endpoint)
@@ -222,7 +222,7 @@ class AzureADLS(BaseConnection):
         elif self.auth_mode == "managed_identity":
             prefix = f"fs.azure.account.auth.type.{self.account}.dfs.core.windows.net"
             spark.conf.set(prefix, "OAuth")
-            
+
             prefix = f"fs.azure.account.oauth.provider.type.{self.account}.dfs.core.windows.net"
             spark.conf.set(prefix, "org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider")
 

@@ -6,6 +6,7 @@ from pathlib import Path
 # Import PipelineManager - this is safe as it doesn't import AzureADLS at module level
 from odibi.pipeline import PipelineManager
 
+
 class TestPipelineManagerConnections:
     """Test connection building logic in PipelineManager."""
 
@@ -16,10 +17,12 @@ class TestPipelineManagerConnections:
         self.mock_adls_module = MagicMock()
         # Assign the mock class to the module
         self.mock_adls_module.AzureADLS = self.mock_adls_class
-        
-        # Patch the module in sys.modules so that 'from odibi.connections.azure_adls import AzureADLS' 
+
+        # Patch the module in sys.modules so that 'from odibi.connections.azure_adls import AzureADLS'
         # inside the method returns our mock
-        self.patcher = patch.dict(sys.modules, {'odibi.connections.azure_adls': self.mock_adls_module})
+        self.patcher = patch.dict(
+            sys.modules, {"odibi.connections.azure_adls": self.mock_adls_module}
+        )
         self.patcher.start()
 
     def teardown_method(self):
@@ -27,17 +30,12 @@ class TestPipelineManagerConnections:
 
     def test_build_local_connection(self):
         """Test building a local connection."""
-        conn_configs = {
-            "my_local": {
-                "type": "local",
-                "base_path": "/tmp/data"
-            }
-        }
-        
+        conn_configs = {"my_local": {"type": "local", "base_path": "/tmp/data"}}
+
         # We assume LocalConnection is available and works (it's a simple class)
         # If we wanted to be strict we could mock it too, but testing real one is fine for integration
         connections = PipelineManager._build_connections(conn_configs)
-        
+
         assert "my_local" in connections
         conn = connections["my_local"]
         # Check attribute if possible, or just existence
@@ -51,27 +49,27 @@ class TestPipelineManagerConnections:
                 "account_name": "myaccount",  # legacy name
                 "container": "mycontainer",
                 "key_vault_name": "kv-test",
-                "secret_name": "secret-test"
+                "secret_name": "secret-test",
             }
         }
 
         connections = PipelineManager._build_connections(conn_configs)
 
         assert "my_adls" in connections
-        
+
         # Verify AzureADLS was initialized with correct params
         self.mock_adls_class.assert_called_with(
             account="myaccount",
             container="mycontainer",
             path_prefix="",
-            auth_mode="key_vault", # default
+            auth_mode="key_vault",  # default
             key_vault_name="kv-test",
             secret_name="secret-test",
             account_key=None,
             tenant_id=None,
             client_id=None,
             client_secret=None,
-            validate=True
+            validate=True,
         )
 
     def test_build_azure_adls_auth_dict(self):
@@ -79,17 +77,14 @@ class TestPipelineManagerConnections:
         conn_configs = {
             "my_adls": {
                 "type": "azure_adls",
-                "account": "newaccount", # new alias
+                "account": "newaccount",  # new alias
                 "container": "newcontainer",
-                "auth": {
-                    "key_vault_name": "kv-new",
-                    "secret_name": "secret-new"
-                }
+                "auth": {"key_vault_name": "kv-new", "secret_name": "secret-new"},
             }
         }
 
         connections = PipelineManager._build_connections(conn_configs)
-        
+
         self.mock_adls_class.assert_called_with(
             account="newaccount",
             container="newcontainer",
@@ -101,7 +96,7 @@ class TestPipelineManagerConnections:
             tenant_id=None,
             client_id=None,
             client_secret=None,
-            validate=True
+            validate=True,
         )
 
     def test_build_azure_adls_direct_key(self):
@@ -112,14 +107,12 @@ class TestPipelineManagerConnections:
                 "account": "directaccount",
                 "container": "data",
                 "auth_mode": "direct_key",
-                "auth": {
-                    "account_key": "fake-key-123"
-                }
+                "auth": {"account_key": "fake-key-123"},
             }
         }
 
         connections = PipelineManager._build_connections(conn_configs)
-        
+
         self.mock_adls_class.assert_called_with(
             account="directaccount",
             container="data",
@@ -131,7 +124,7 @@ class TestPipelineManagerConnections:
             tenant_id=None,
             client_id=None,
             client_secret=None,
-            validate=True
+            validate=True,
         )
 
     def test_build_azure_adls_path_prefix(self):
@@ -142,14 +135,14 @@ class TestPipelineManagerConnections:
                 "account": "acc",
                 "container": "cont",
                 "path_prefix": "/mnt/data",
-                "account_name": "acc", # Should be ignored if account is present or just serve as backup
+                "account_name": "acc",  # Should be ignored if account is present or just serve as backup
                 "key_vault_name": "kv",
-                "secret_name": "sec"
+                "secret_name": "sec",
             }
         }
 
         PipelineManager._build_connections(conn_configs)
-        
+
         self.mock_adls_class.assert_called_with(
             account="acc",
             container="cont",
@@ -161,9 +154,9 @@ class TestPipelineManagerConnections:
             tenant_id=None,
             client_id=None,
             client_secret=None,
-            validate=True
+            validate=True,
         )
-        
+
     def test_build_azure_adls_service_principal(self):
         """Test Azure ADLS with service principal auth."""
         conn_configs = {
@@ -172,16 +165,12 @@ class TestPipelineManagerConnections:
                 "account": "spaccount",
                 "container": "spdata",
                 "auth_mode": "service_principal",
-                "auth": {
-                    "tenant_id": "tid",
-                    "client_id": "cid",
-                    "client_secret": "csecret"
-                }
+                "auth": {"tenant_id": "tid", "client_id": "cid", "client_secret": "csecret"},
             }
         }
 
         PipelineManager._build_connections(conn_configs)
-        
+
         self.mock_adls_class.assert_called_with(
             account="spaccount",
             container="spdata",
@@ -193,7 +182,7 @@ class TestPipelineManagerConnections:
             tenant_id="tid",
             client_id="cid",
             client_secret="csecret",
-            validate=True
+            validate=True,
         )
 
     def test_missing_account_name_raises_error(self):
@@ -201,7 +190,7 @@ class TestPipelineManagerConnections:
         conn_configs = {
             "bad_adls": {
                 "type": "azure_adls",
-                "container": "data"
+                "container": "data",
                 # Missing account
             }
         }
@@ -211,12 +200,7 @@ class TestPipelineManagerConnections:
 
     def test_unsupported_connection_type(self):
         """Test validation of unsupported connection types."""
-        conn_configs = {
-            "bad_conn": {
-                "type": "ftp_server",
-                "host": "localhost"
-            }
-        }
-        
+        conn_configs = {"bad_conn": {"type": "ftp_server", "host": "localhost"}}
+
         with pytest.raises(ValueError, match="Unsupported connection type"):
-             PipelineManager._build_connections(conn_configs)
+            PipelineManager._build_connections(conn_configs)
