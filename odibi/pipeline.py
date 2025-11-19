@@ -383,7 +383,7 @@ class PipelineManager:
                 connections[conn_name] = LocalConnection(
                     base_path=conn_config.get("base_path", "./data")
                 )
-            elif conn_type == "azure_adls":
+            elif conn_type == "azure_adls" or conn_type == "azure_blob":
                 # Import here to avoid dependency issues
                 try:
                     from odibi.connections.azure_adls import AzureADLS
@@ -393,14 +393,37 @@ class PipelineManager:
                         "See README.md for installation instructions."
                     )
 
+                # Handle config discrepancies (config.py vs flat structure)
+                # 1. Account name
+                account = conn_config.get("account_name") or conn_config.get("account")
+                if not account:
+                    raise ValueError(f"Connection '{conn_name}' missing 'account_name'")
+
+                # 2. Auth dictionary (preferred) vs flat structure (legacy)
+                auth_config = conn_config.get("auth", {})
+                
+                # Extract auth details from auth dict OR top-level
+                key_vault_name = auth_config.get("key_vault_name") or conn_config.get("key_vault_name")
+                secret_name = auth_config.get("secret_name") or conn_config.get("secret_name")
+                account_key = auth_config.get("account_key") or conn_config.get("account_key")
+                tenant_id = auth_config.get("tenant_id") or conn_config.get("tenant_id")
+                client_id = auth_config.get("client_id") or conn_config.get("client_id")
+                client_secret = auth_config.get("client_secret") or conn_config.get("client_secret")
+                
+                # Default auth mode if not specified
+                auth_mode = conn_config.get("auth_mode", "key_vault")
+
                 connections[conn_name] = AzureADLS(
-                    account=conn_config["account"],
+                    account=account,
                     container=conn_config["container"],
                     path_prefix=conn_config.get("path_prefix", ""),
-                    auth_mode=conn_config.get("auth_mode", "key_vault"),
-                    key_vault_name=conn_config.get("key_vault_name"),
-                    secret_name=conn_config.get("secret_name"),
-                    account_key=conn_config.get("account_key"),
+                    auth_mode=auth_mode,
+                    key_vault_name=key_vault_name,
+                    secret_name=secret_name,
+                    account_key=account_key,
+                    tenant_id=tenant_id,
+                    client_id=client_id,
+                    client_secret=client_secret,
                     validate=conn_config.get("validate", True),
                 )
             else:

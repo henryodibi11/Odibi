@@ -287,6 +287,29 @@ Engine Layer (Spark/Pandas adapters)
 Connection Layer (Azure/Local/Delta/SQL)
 ```
 
+## 🔍 Analysis: Configuration Architecture
+
+### Hierarchy Overview
+
+```
+ProjectConfig (top-level)
+├── project: str
+├── engine: EngineType
+├── connections: Dict[str, ConnectionConfig]
+├── pipelines: List[PipelineConfig]
+│   └── PipelineConfig
+│       ├── pipeline: str
+│       └── nodes: List[NodeConfig]
+│           └── NodeConfig
+│               ├── name: str
+│               ├── read: Optional[ReadConfig]
+│               ├── transform: Optional[TransformConfig]
+│               └── write: Optional[WriteConfig]
+├── story: StoryConfig
+├── retry: RetryConfig
+└── logging: LoggingConfig
+```
+
 ## Documentation
 
 **🚀 Getting Started:**

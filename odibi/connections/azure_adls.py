@@ -1,17 +1,17 @@
-"""Azure Data Lake Storage Gen2 connection (Phase 2A: Key Vault authentication)."""
+"""Azure Data Lake Storage Gen2 connection (Phase 2A: Multi-mode authentication)."""
 
 import os
 import posixpath
 import warnings
-from typing import Optional
+from typing import Optional, Dict, Any
 from .base import BaseConnection
 
 
 class AzureADLS(BaseConnection):
     """Azure Data Lake Storage Gen2 connection.
 
-    Phase 2A: Key Vault authentication + multi-account support
-    Supports both key_vault (recommended) and direct_key auth modes.
+    Phase 2A: Multi-mode authentication + multi-account support
+    Supports key_vault (recommended), direct_key, service_principal, and managed_identity.
     """
 
     def __init__(
@@ -23,6 +23,9 @@ class AzureADLS(BaseConnection):
         key_vault_name: Optional[str] = None,
         secret_name: Optional[str] = None,
         account_key: Optional[str] = None,
+        tenant_id: Optional[str] = None,
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
         validate: bool = True,
         **kwargs,
     ):
@@ -32,10 +35,13 @@ class AzureADLS(BaseConnection):
             account: Storage account name (e.g., 'mystorageaccount')
             container: Container/filesystem name
             path_prefix: Optional prefix for all paths
-            auth_mode: Authentication mode ('key_vault' or 'direct_key')
+            auth_mode: Authentication mode ('key_vault', 'direct_key', 'service_principal', 'managed_identity')
             key_vault_name: Azure Key Vault name (required for key_vault mode)
             secret_name: Secret name in Key Vault (required for key_vault mode)
             account_key: Storage account key (required for direct_key mode)
+            tenant_id: Azure Tenant ID (required for service_principal)
+            client_id: Service Principal Client ID (required for service_principal)
+            client_secret: Service Principal Client Secret (required for service_principal)
             validate: Validate configuration on init
         """
         self.account = account
@@ -45,6 +51,10 @@ class AzureADLS(BaseConnection):
         self.key_vault_name = key_vault_name
         self.secret_name = secret_name
         self.account_key = account_key
+        self.tenant_id = tenant_id
+        self.client_id = client_id
+        self.client_secret = client_secret
+        
         self._cached_key: Optional[str] = None
 
         if validate:
@@ -81,19 +91,31 @@ class AzureADLS(BaseConnection):
                     f"Use auth_mode: key_vault. Connection: {self.account}/{self.container}",
                     UserWarning,
                 )
+        elif self.auth_mode == "service_principal":
+            if not self.tenant_id or not self.client_id or not self.client_secret:
+                raise ValueError(
+                    f"service_principal mode requires 'tenant_id', 'client_id', and 'client_secret' "
+                    f"for connection to {self.account}/{self.container}"
+                )
+        elif self.auth_mode == "managed_identity":
+            # No specific config required, but we might check if environment supports it
+            pass
         else:
             raise ValueError(
-                f"Unsupported auth_mode: '{self.auth_mode}'. " f"Use 'key_vault' or 'direct_key'."
+                f"Unsupported auth_mode: '{self.auth_mode}'. " 
+                f"Use 'key_vault', 'direct_key', 'service_principal', or 'managed_identity'."
             )
 
-    def get_storage_key(self, timeout: float = 30.0) -> str:
+    def get_storage_key(self, timeout: float = 30.0) -> Optional[str]:
         """Get storage account key (cached).
 
+        Only relevant for 'key_vault' and 'direct_key' modes.
+        
         Args:
             timeout: Timeout for Key Vault operations in seconds (default: 30.0)
 
         Returns:
-            Storage account key
+            Storage account key or None if not applicable for auth_mode
 
         Raises:
             ImportError: If azure libraries not installed (key_vault mode)
@@ -138,25 +160,71 @@ class AzureADLS(BaseConnection):
 
         elif self.auth_mode == "direct_key":
             return self.account_key
+            
+        # For other modes (SP, MI), we don't use an account key
+        return None
 
-        raise ValueError(f"Invalid auth_mode: {self.auth_mode}")
-
-    def pandas_storage_options(self) -> dict:
+    def pandas_storage_options(self) -> Dict[str, Any]:
         """Get storage options for pandas/fsspec.
 
         Returns:
-            Dictionary with account_name and account_key for fsspec
+            Dictionary with appropriate authentication parameters for fsspec
         """
-        return {"account_name": self.account, "account_key": self.get_storage_key()}
+        base_options = {"account_name": self.account}
+        
+        if self.auth_mode in ["key_vault", "direct_key"]:
+            return {**base_options, "account_key": self.get_storage_key()}
+            
+        elif self.auth_mode == "service_principal":
+            return {
+                **base_options,
+                "tenant_id": self.tenant_id,
+                "client_id": self.client_id,
+                "client_secret": self.client_secret
+            }
+            
+        elif self.auth_mode == "managed_identity":
+             # adlfs supports using DefaultAzureCredential implicitly if anon=False 
+             # and no other creds provided, assuming azure.identity is installed
+            return {**base_options, "anon": False}
+            
+        return base_options
 
     def configure_spark(self, spark) -> None:
-        """Configure Spark session with storage account key.
+        """Configure Spark session with storage credentials.
 
         Args:
             spark: SparkSession instance
         """
-        config_key = f"fs.azure.account.key.{self.account}.dfs.core.windows.net"
-        spark.conf.set(config_key, self.get_storage_key())
+        if self.auth_mode in ["key_vault", "direct_key"]:
+            config_key = f"fs.azure.account.key.{self.account}.dfs.core.windows.net"
+            spark.conf.set(config_key, self.get_storage_key())
+            
+        elif self.auth_mode == "service_principal":
+            # Configure OAuth for ADLS Gen2
+            # Ref: https://hadoop.apache.org/docs/stable/hadoop-azure/abfs.html
+            prefix = f"fs.azure.account.auth.type.{self.account}.dfs.core.windows.net"
+            spark.conf.set(prefix, "OAuth")
+            
+            prefix = f"fs.azure.account.oauth.provider.type.{self.account}.dfs.core.windows.net"
+            spark.conf.set(prefix, "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
+            
+            prefix = f"fs.azure.account.oauth2.client.id.{self.account}.dfs.core.windows.net"
+            spark.conf.set(prefix, self.client_id)
+            
+            prefix = f"fs.azure.account.oauth2.client.secret.{self.account}.dfs.core.windows.net"
+            spark.conf.set(prefix, self.client_secret)
+            
+            prefix = f"fs.azure.account.oauth2.client.endpoint.{self.account}.dfs.core.windows.net"
+            endpoint = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/token"
+            spark.conf.set(prefix, endpoint)
+
+        elif self.auth_mode == "managed_identity":
+            prefix = f"fs.azure.account.auth.type.{self.account}.dfs.core.windows.net"
+            spark.conf.set(prefix, "OAuth")
+            
+            prefix = f"fs.azure.account.oauth.provider.type.{self.account}.dfs.core.windows.net"
+            spark.conf.set(prefix, "org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider")
 
     def uri(self, path: str) -> str:
         """Build abfss:// URI for given path.

@@ -15,8 +15,9 @@ connections:
     container: bronze
     path_prefix: raw  # Optional: all paths will be prefixed with "raw/"
     auth_mode: key_vault  # Recommended for production
-    key_vault_name: company-keyvault
-    secret_name: bronze-storage-key
+    auth:
+      key_vault_name: company-keyvault
+      secret_name: bronze-storage-key
 
   # Silver layer - cleaned data
   silver:
@@ -25,8 +26,9 @@ connections:
     container: silver
     path_prefix: cleaned
     auth_mode: key_vault
-    key_vault_name: company-keyvault
-    secret_name: silver-storage-key
+    auth:
+      key_vault_name: company-keyvault
+      secret_name: silver-storage-key
 
   # Local development (alternative - direct_key mode)
   # Uncomment for local testing
@@ -35,7 +37,8 @@ connections:
   #   account: mystorageaccount1
   #   container: bronze
   #   auth_mode: direct_key
-  #   account_key: "${BRONZE_STORAGE_KEY}"  # From environment variable
+  #   auth:
+  #     account_key: "${BRONZE_STORAGE_KEY}"  # From environment variable
 
 # Story configuration (where execution reports are saved)
 story:
@@ -127,8 +130,9 @@ pipelines:
 #
 # 1. key_vault (Recommended for production):
 #    auth_mode: key_vault
-#    key_vault_name: my-keyvault
-#    secret_name: storage-key
+#    auth:
+#      key_vault_name: my-keyvault
+#      secret_name: storage-key
 #
 # 2. managed_identity (For Databricks/Azure VMs):
 #    auth_mode: managed_identity
@@ -136,13 +140,15 @@ pipelines:
 #
 # 3. service_principal (For service accounts):
 #    auth_mode: service_principal
-#    tenant_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-#    client_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-#    client_secret: ${SERVICE_PRINCIPAL_SECRET}
+#    auth:
+#      tenant_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+#      client_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+#      client_secret: ${SERVICE_PRINCIPAL_SECRET}
 #
 # 4. direct_key (For local development only):
 #    auth_mode: direct_key
-#    account_key: ${STORAGE_ACCOUNT_KEY}
+#    auth:
+#      account_key: ${STORAGE_ACCOUNT_KEY}
 
 # ============================================
 # SUPPORTED FORMATS WITH ADLS

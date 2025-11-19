@@ -42,6 +42,40 @@ class TestAzureADLSValidation:
                 # missing account_key
             )
 
+    def test_validation_service_principal_missing_fields(self):
+        """Test validation fails when service principal fields are missing."""
+        with pytest.raises(ValueError, match="service_principal mode requires"):
+            AzureADLS(
+                account="myaccount",
+                container="mycontainer",
+                auth_mode="service_principal",
+                tenant_id="tid",
+                client_id="cid",
+                # missing client_secret
+            )
+
+    def test_validation_success_service_principal(self):
+        """Test validation succeeds with valid service principal config."""
+        conn = AzureADLS(
+            account="myaccount",
+            container="mycontainer",
+            auth_mode="service_principal",
+            tenant_id="tid",
+            client_id="cid",
+            client_secret="csecret",
+        )
+        assert conn.auth_mode == "service_principal"
+        assert conn.tenant_id == "tid"
+
+    def test_validation_success_managed_identity(self):
+        """Test validation succeeds for managed identity."""
+        conn = AzureADLS(
+            account="myaccount",
+            container="mycontainer",
+            auth_mode="managed_identity",
+        )
+        assert conn.auth_mode == "managed_identity"
+
     def test_validation_unsupported_auth_mode(self):
         """Test validation fails with unsupported auth mode."""
         with pytest.raises(ValueError, match="Unsupported auth_mode"):
@@ -217,6 +251,36 @@ class TestAzureADLSPandasIntegration:
 
         assert opts == {"account_name": "myaccount", "account_key": "test-key-123"}
 
+    def test_pandas_storage_options_service_principal(self):
+        """Test pandas_storage_options returns correct dict for service_principal."""
+        conn = AzureADLS(
+            account="myaccount",
+            container="mycontainer",
+            auth_mode="service_principal",
+            tenant_id="tid",
+            client_id="cid",
+            client_secret="csecret",
+        )
+
+        opts = conn.pandas_storage_options()
+        assert opts == {
+            "account_name": "myaccount",
+            "tenant_id": "tid",
+            "client_id": "cid",
+            "client_secret": "csecret",
+        }
+
+    def test_pandas_storage_options_managed_identity(self):
+        """Test pandas_storage_options returns correct dict for managed_identity."""
+        conn = AzureADLS(
+            account="myaccount",
+            container="mycontainer",
+            auth_mode="managed_identity",
+        )
+
+        opts = conn.pandas_storage_options()
+        assert opts == {"account_name": "myaccount", "anon": False}
+
     @patch("azure.keyvault.secrets.SecretClient")
     @patch("azure.identity.DefaultAzureCredential")
     def test_pandas_storage_options_key_vault(self, mock_cred, mock_client):
@@ -261,6 +325,45 @@ class TestAzureADLSSparkIntegration:
         # Verify Spark config was set
         expected_key = "fs.azure.account.key.myaccount.dfs.core.windows.net"
         mock_spark.conf.set.assert_called_once_with(expected_key, "test-key-123")
+
+    def test_configure_spark_service_principal(self):
+        """Test configure_spark sets OAuth config for service_principal."""
+        conn = AzureADLS(
+            account="myaccount",
+            container="mycontainer",
+            auth_mode="service_principal",
+            tenant_id="tid",
+            client_id="cid",
+            client_secret="csecret",
+        )
+
+        mock_spark = MagicMock()
+        conn.configure_spark(mock_spark)
+
+        # Check calls
+        prefix = "fs.azure.account.auth.type.myaccount.dfs.core.windows.net"
+        mock_spark.conf.set.assert_any_call(prefix, "OAuth")
+        
+        prefix = "fs.azure.account.oauth.provider.type.myaccount.dfs.core.windows.net"
+        mock_spark.conf.set.assert_any_call(prefix, "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
+
+    def test_configure_spark_managed_identity(self):
+        """Test configure_spark sets OAuth config for managed_identity."""
+        conn = AzureADLS(
+            account="myaccount",
+            container="mycontainer",
+            auth_mode="managed_identity",
+        )
+
+        mock_spark = MagicMock()
+        conn.configure_spark(mock_spark)
+
+        # Check calls
+        prefix = "fs.azure.account.auth.type.myaccount.dfs.core.windows.net"
+        mock_spark.conf.set.assert_any_call(prefix, "OAuth")
+        
+        prefix = "fs.azure.account.oauth.provider.type.myaccount.dfs.core.windows.net"
+        mock_spark.conf.set.assert_any_call(prefix, "org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider")
 
     @patch("azure.keyvault.secrets.SecretClient")
     @patch("azure.identity.DefaultAzureCredential")

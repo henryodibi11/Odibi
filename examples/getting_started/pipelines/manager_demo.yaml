@@ -1,0 +1,33 @@
+project: Getting Started Project
+engine: pandas
+
+connections:
+  local_data:
+    type: local
+    base_path: ./data
+  local_output:
+    type: local
+    base_path: ./output
+
+story:
+  connection: local_output
+  path: stories/
+  max_sample_rows: 5
+
+pipelines:
+  - pipeline: simple_etl_managed
+    description: "Load CSV and save as Parquet (via Manager)"
+    nodes:
+      - name: load_sales
+        read:
+          connection: local_data
+          format: csv
+          path: sales.csv
+      
+      - name: save_parquet_managed
+        depends_on: [load_sales]
+        write:
+          connection: local_output
+          format: parquet
+          path: sales_managed.parquet
+          mode: overwrite

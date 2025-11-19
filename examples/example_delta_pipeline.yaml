@@ -15,8 +15,9 @@ connections:
     container: bronze
     path_prefix: raw
     auth_mode: key_vault
-    key_vault_name: YOUR_KEY_VAULT
-    secret_name: bronze-storage-key
+    auth:
+      key_vault_name: YOUR_KEY_VAULT
+      secret_name: bronze-storage-key
 
   silver:
     type: azure_adls
@@ -24,8 +25,9 @@ connections:
     container: silver
     path_prefix: clean
     auth_mode: key_vault
-    key_vault_name: YOUR_KEY_VAULT
-    secret_name: silver-storage-key
+    auth:
+      key_vault_name: YOUR_KEY_VAULT
+      secret_name: silver-storage-key
 
 story:
   connection: local

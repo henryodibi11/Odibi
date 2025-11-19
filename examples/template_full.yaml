@@ -41,11 +41,26 @@ connections:
     account: mystorageaccount
     container: data
     path_prefix: /project1
-    auth_mode: key_vault  # Recommended: 'key_vault', or 'managed_identity', 'service_principal'
-    key_vault_name: company-keyvault  # Required for key_vault mode
-    secret_name: storage-account-key  # Required for key_vault mode
-    # For managed_identity: no additional fields needed (uses cluster identity)
-    # For service_principal: add tenant_id, client_id, client_secret
+    auth_mode: key_vault  # Options: 'key_vault' (recommended), 'direct_key', 'managed_identity', 'service_principal'
+    
+    # Auth Configuration (Preferred: use 'auth' dictionary)
+    auth:
+      # For 'key_vault' mode:
+      key_vault_name: company-keyvault
+      secret_name: storage-account-key
+      
+      # For 'direct_key' mode (Development/Testing):
+      # account_key: "your-storage-account-key"
+      
+      # For 'service_principal' mode:
+      # tenant_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      # client_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      # client_secret: ${SERVICE_PRINCIPAL_SECRET}
+      
+    # For 'managed_identity' mode: no 'auth' section needed (uses cluster identity)
+    
+    # Advanced Settings
+    # validate: true  # Check connection on startup (default: true)
   
   # Example: Azure SQL Database (Phase 2A ✅)
   azure_db:
@@ -54,8 +69,9 @@ connections:
     database: analytics
     port: 1433  # default
     auth_mode: key_vault  # or 'managed_identity', 'service_principal'
-    key_vault_name: company-keyvault  # For key_vault mode
-    secret_name: sql-connection-string  # For key_vault mode
+    auth:
+      key_vault_name: company-keyvault  # For key_vault mode
+      secret_name: sql-connection-string  # For key_vault mode
 
 # ============================================
 # STORY GENERATION (Required)
