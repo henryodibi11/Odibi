@@ -5,8 +5,6 @@ Graph CLI Command
 Visualizes the pipeline dependency graph.
 """
 
-import sys
-import argparse
 from odibi.pipeline import PipelineManager
 from odibi.graph import DependencyGraph
 

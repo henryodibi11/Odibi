@@ -38,7 +38,7 @@ def doctor_command(args):
         try:
             import pyspark
 
-            print("✅ pyspark installed")
+            print(f"✅ pyspark installed ({pyspark.__version__})")
         except ImportError:
             print("❌ pyspark not installed. Run: pip install odibi[spark]")
             issues_found += 1

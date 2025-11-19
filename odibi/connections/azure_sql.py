@@ -139,7 +139,7 @@ class AzureSQL(BaseConnection):
             )
 
             # Test connection
-            with self._engine.connect() as conn:
+            with self._engine.connect():
                 pass
 
             return self._engine
