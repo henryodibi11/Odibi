@@ -83,7 +83,7 @@ class TestPipelineManagerConnections:
             }
         }
 
-        connections = PipelineManager._build_connections(conn_configs)
+        PipelineManager._build_connections(conn_configs)
 
         self.mock_adls_class.assert_called_with(
             account="newaccount",
@@ -111,7 +111,7 @@ class TestPipelineManagerConnections:
             }
         }
 
-        connections = PipelineManager._build_connections(conn_configs)
+        PipelineManager._build_connections(conn_configs)
 
         self.mock_adls_class.assert_called_with(
             account="directaccount",
