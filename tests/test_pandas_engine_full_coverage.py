@@ -350,7 +350,10 @@ class TestPandasEngineWrite:
                 )
             )
 
-        fake_mod = types.SimpleNamespace(write_deltalake=write_deltalake)
+        fake_mod = types.SimpleNamespace(
+            write_deltalake=write_deltalake,
+            DeltaTable=types.SimpleNamespace(isDeltaTable=lambda *a: False),
+        )
         monkeypatch.setitem(sys.modules, "deltalake", fake_mod)
 
         df = pd.DataFrame({"x": [1]})
