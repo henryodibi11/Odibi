@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import time
 from pathlib import Path
-import yaml
 
 from odibi.config import PipelineConfig, ProjectConfig
 from odibi.context import create_context
@@ -15,6 +14,7 @@ from odibi.engine import PandasEngine
 from odibi.exceptions import DependencyError
 from odibi.story import StoryGenerator
 from odibi.connections import LocalConnection
+from odibi.utils import load_yaml_with_env
 
 
 @dataclass
@@ -345,13 +345,17 @@ class PipelineManager:
             >>> manager = PipelineManager.from_yaml("config.yaml")
             >>> results = manager.run()  # Run all pipelines
         """
-        # Load YAML
+        # Load YAML with environment variable substitution
         yaml_path_obj = Path(yaml_path)
-        if not yaml_path_obj.exists():
-            raise FileNotFoundError(f"YAML file not found: {yaml_path}")
+        # Path check is now handled inside load_yaml_with_env but we can keep/remove it.
+        # load_yaml_with_env takes a str, so passing str(yaml_path_obj) is safer.
 
-        with open(yaml_path_obj, "r") as f:
-            config = yaml.safe_load(f)
+        try:
+            config = load_yaml_with_env(str(yaml_path_obj))
+        except FileNotFoundError:
+            # Re-raise to maintain backward compatibility with existing error handling if needed
+            # or just let it bubble up. The original raised FileNotFoundError manually.
+            raise FileNotFoundError(f"YAML file not found: {yaml_path}")
 
         # Parse and validate entire YAML as ProjectConfig (single source of truth)
         project_config = ProjectConfig(**config)
