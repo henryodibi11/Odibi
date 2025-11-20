@@ -45,6 +45,9 @@ Examples:
     run_parser.add_argument(
         "--dry-run", action="store_true", help="Simulate execution without running operations"
     )
+    run_parser.add_argument(
+        "--resume", action="store_true", help="Resume from last failure (skip successful nodes)"
+    )
 
     # odibi validate
     validate_parser = subparsers.add_parser("validate", help="Validate config")

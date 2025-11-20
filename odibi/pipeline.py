@@ -6,7 +6,7 @@ from datetime import datetime
 import time
 from pathlib import Path
 
-from odibi.config import PipelineConfig, ProjectConfig
+from odibi.config import PipelineConfig, ProjectConfig, RetryConfig
 from odibi.context import create_context
 from odibi.graph import DependencyGraph
 from odibi.node import Node, NodeResult
@@ -15,6 +15,8 @@ from odibi.exceptions import DependencyError
 from odibi.story import StoryGenerator
 from odibi.connections import LocalConnection
 from odibi.utils import load_yaml_with_env
+from odibi.utils.logging import logger, configure_logging
+from odibi.state import StateManager
 
 
 @dataclass
@@ -70,6 +72,7 @@ class Pipeline:
         connections: Optional[Dict[str, Any]] = None,
         generate_story: bool = True,
         story_config: Optional[Dict[str, Any]] = None,
+        retry_config: Optional[RetryConfig] = None,
     ):
         """Initialize pipeline.
 
@@ -79,11 +82,13 @@ class Pipeline:
             connections: Available connections
             generate_story: Whether to generate execution stories
             story_config: Story generator configuration
+            retry_config: Retry configuration
         """
         self.config = pipeline_config
         self.engine_type = engine
         self.connections = connections or {}
         self.generate_story = generate_story
+        self.retry_config = retry_config
 
         # Initialize story generator
         story_config = story_config or {}
@@ -131,12 +136,15 @@ class Pipeline:
         # Delegate to PipelineManager
         return PipelineManager.from_yaml(yaml_path)
 
-    def run(self, parallel: bool = False, dry_run: bool = False) -> PipelineResults:
+    def run(
+        self, parallel: bool = False, dry_run: bool = False, resume_from_failure: bool = False
+    ) -> PipelineResults:
         """Execute the pipeline.
 
         Args:
             parallel: Whether to use parallel execution (not implemented yet)
             dry_run: Whether to simulate execution without running operations
+            resume_from_failure: Whether to skip successfully completed nodes from last run
 
         Returns:
             PipelineResults with execution details
@@ -145,6 +153,7 @@ class Pipeline:
         start_timestamp = datetime.now().isoformat()
 
         results = PipelineResults(pipeline_name=self.config.pipeline, start_time=start_timestamp)
+        state_manager = StateManager() if resume_from_failure else None
 
         # Get execution order
         execution_order = self.graph.topological_sort()
@@ -159,6 +168,54 @@ class Pipeline:
                 results.skipped.append(node_name)
                 continue
 
+            # Check for resume capability
+            should_skip = False
+            if resume_from_failure and state_manager:
+                last_status = state_manager.get_last_run_status(self.config.pipeline, node_name)
+                if last_status is True:
+                    # Node succeeded last time. Can we restore state?
+                    # We can only skip if we can restore the output context (if it was written)
+                    # or if it produced no output context (e.g. pure side effect, though rare in ETL)
+
+                    # If node has write, we can try to read it back to restore context
+                    if node_config.write:
+                        try:
+                            # Create a temporary node instance to perform restore
+                            temp_node = Node(
+                                config=node_config,
+                                context=self.context,
+                                engine=self.engine,
+                                connections=self.connections,
+                            )
+                            if temp_node.restore():
+                                should_skip = True
+                                logger.info(
+                                    f"Resuming: Skipped successful node '{node_name}' (restored from storage)"
+                                )
+                        except Exception as e:
+                            logger.warning(
+                                f"Resuming: Could not restore node '{node_name}', re-running. Error: {e}"
+                            )
+                    else:
+                        # Pure transform without write.
+                        # We cannot skip this unless we know for sure no downstream node needs it.
+                        # For safety in this phase, we re-run it.
+                        # Future improvement: Check if any pending node depends on this.
+                        logger.info(
+                            f"Resuming: Re-running node '{node_name}' (in-memory transform cannot be restored)"
+                        )
+
+            if should_skip:
+                results.completed.append(node_name)
+                # Add a dummy result for the skipped node
+                results.node_results[node_name] = NodeResult(
+                    node_name=node_name,
+                    success=True,
+                    duration=0.0,
+                    metadata={"skipped": True, "reason": "resume_from_failure"},
+                )
+                continue
+
             # Execute node
             node = Node(
                 config=node_config,
@@ -167,6 +224,7 @@ class Pipeline:
                 connections=self.connections,
                 config_file=None,  # TODO: track config file
                 dry_run=dry_run,
+                retry_config=self.retry_config,
             )
 
             node_result = node.execute()
@@ -180,6 +238,10 @@ class Pipeline:
         # Calculate duration
         results.duration = time.time() - start_time
         results.end_time = datetime.now().isoformat()
+
+        # Save state if running normally (not dry run)
+        if not dry_run:
+            StateManager().save_pipeline_run(self.config.pipeline, results)
 
         # Generate story
         if self.generate_story:
@@ -297,6 +359,11 @@ class PipelineManager:
         self.connections = connections
         self._pipelines: Dict[str, Pipeline] = {}
 
+        # Configure logging
+        configure_logging(
+            structured=project_config.logging.structured, level=project_config.logging.level.value
+        )
+
         # Get story configuration
         story_config = self._get_story_config()
 
@@ -309,6 +376,7 @@ class PipelineManager:
                 engine=project_config.engine,
                 connections=connections,
                 story_config=story_config,
+                retry_config=project_config.retry,
             )
 
     def _get_story_config(self) -> Dict[str, Any]:
@@ -469,24 +537,20 @@ class PipelineManager:
         return connections
 
     def run(
-        self, pipelines: Optional[Union[str, List[str]]] = None, dry_run: bool = False
+        self,
+        pipelines: Optional[Union[str, List[str]]] = None,
+        dry_run: bool = False,
+        resume_from_failure: bool = False,
     ) -> Union[PipelineResults, Dict[str, PipelineResults]]:
         """Run one, multiple, or all pipelines.
 
         Args:
-            pipelines: Pipeline name(s) to run. If None, runs all pipelines.
-                      Can be a string (single pipeline) or list of strings.
+            pipelines: Pipeline name(s) to run.
             dry_run: Whether to simulate execution.
+            resume_from_failure: Whether to skip successfully completed nodes from last run.
 
         Returns:
-            If single pipeline: PipelineResults
-            If multiple pipelines: Dict[pipeline_name -> PipelineResults]
-
-        Examples:
-            >>> manager = PipelineManager.from_yaml("config.yaml")
-            >>> results = manager.run()  # Run all
-            >>> results = manager.run('bronze_to_silver')  # Run one
-            >>> results = manager.run(['bronze_to_silver', 'silver_to_gold'])  # Run multiple
+            PipelineResults or Dict of results
         """
         # Determine which pipelines to run
         if pipelines is None:
@@ -508,23 +572,30 @@ class PipelineManager:
         # Run pipelines
         results = {}
         for name in pipeline_names:
-            print(f"\n{'='*60}")
-            print(f"Running pipeline: {name}")
+            logger.info(f"Running pipeline: {name}")
             if dry_run:
-                print("Mode: DRY RUN (Simulation)")
-            print(f"{'='*60}\n")
+                logger.info("Mode: DRY RUN (Simulation)")
+            if resume_from_failure:
+                logger.info("Mode: RESUME FROM FAILURE")
 
-            results[name] = self._pipelines[name].run(dry_run=dry_run)
+            results[name] = self._pipelines[name].run(
+                dry_run=dry_run, resume_from_failure=resume_from_failure
+            )
 
             # Print summary
             result = results[name]
-            status = "✅ SUCCESS" if not result.failed else "❌ FAILED"
-            print(f"\n{status} - {name}")
-            print(f"  Completed: {len(result.completed)} nodes")
-            print(f"  Failed: {len(result.failed)} nodes")
-            print(f"  Duration: {result.duration:.2f}s")
+            status = "SUCCESS" if not result.failed else "FAILED"
+            if result.failed:
+                logger.error(f"{status} - {name}", duration=f"{result.duration:.2f}s")
+            else:
+                logger.info(f"{status} - {name}", duration=f"{result.duration:.2f}s")
+
+            logger.info(f"Completed: {len(result.completed)} nodes")
+            if result.failed:
+                logger.info(f"Failed: {len(result.failed)} nodes")
+
             if result.story_path:
-                print(f"  Story: {result.story_path}")
+                logger.info(f"Story: {result.story_path}")
 
         # Return single result if only one pipeline, otherwise dict
         if len(pipeline_names) == 1:

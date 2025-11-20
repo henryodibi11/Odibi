@@ -1,13 +1,14 @@
 """Run command implementation."""
 
 from odibi.pipeline import PipelineManager
+from odibi.utils.logging import logger
 
 
 def run_command(args):
     """Execute pipeline from config file."""
     try:
         manager = PipelineManager.from_yaml(args.config)
-        results = manager.run(dry_run=args.dry_run)
+        results = manager.run(dry_run=args.dry_run, resume_from_failure=args.resume)
 
         # Check results for failures
         failed = False
@@ -23,12 +24,12 @@ def run_command(args):
                 failed = True
 
         if failed:
-            print("\n❌ Pipeline execution failed")
+            logger.error("Pipeline execution failed")
             return 1
         else:
-            print("\n✅ Pipeline completed successfully")
+            logger.info("Pipeline completed successfully")
             return 0
 
     except Exception as e:
-        print(f"Pipeline failed: {e}")
+        logger.error(f"Pipeline failed: {e}")
         return 1

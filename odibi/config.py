@@ -184,6 +184,9 @@ class NodeConfig(BaseModel):
     # Optional features
     cache: bool = Field(default=False, description="Cache result for reuse")
     validation: Optional[ValidationConfig] = None
+    sensitive: Union[bool, List[str]] = Field(
+        default=False, description="If true or list of columns, masks sample data in stories"
+    )
 
     @model_validator(mode="after")
     def check_at_least_one_operation(self):

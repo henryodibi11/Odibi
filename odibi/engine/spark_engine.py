@@ -5,6 +5,7 @@ Status: Phase 2B implemented - Delta Lake read/write, VACUUM, history, restore
 
 from typing import Any, Dict, List, Tuple, Optional
 from .base import Engine
+from odibi.exceptions import TransformError
 
 
 class SparkEngine(Engine):
@@ -162,6 +163,37 @@ class SparkEngine(Engine):
                 UserWarning,
             )
 
+        # Handle Upsert/Append-Once for Delta Lake
+        if format == "delta" and mode in ["upsert", "append_once"]:
+            try:
+                from delta.tables import DeltaTable
+            except ImportError:
+                raise ImportError("Delta Lake support requires 'delta-spark'")
+
+            if "keys" not in options:
+                raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
+
+            # Check if table exists
+            if DeltaTable.isDeltaTable(self.spark, full_path):
+                delta_table = DeltaTable.forPath(self.spark, full_path)
+                keys = options["keys"]
+                if isinstance(keys, str):
+                    keys = [keys]
+
+                condition = " AND ".join([f"target.{k} = source.{k}" for k in keys])
+
+                merger = delta_table.alias("target").merge(df.alias("source"), condition)
+
+                if mode == "upsert":
+                    merger.whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+                else:  # append_once
+                    merger.whenNotMatchedInsertAll().execute()
+                return
+            else:
+                # Table does not exist, fall back to standard write (create)
+                # Usually initial write is overwrite/create
+                mode = "overwrite"
+
         # Write based on format
         writer = df.write.format(format).mode(mode)
 
@@ -186,12 +218,23 @@ class SparkEngine(Engine):
 
         Returns:
             Result DataFrame
+
+        Raises:
+            TransformError: If SQL execution fails
         """
         # Register all DataFrames as temporary views
         for table_name, df in context.items():
             df.createOrReplaceTempView(table_name)
 
-        return self.spark.sql(sql)
+        try:
+            return self.spark.sql(sql)
+        except Exception as e:
+            # Try to identify AnalysisException by name to avoid hard dependency on pyspark import
+            if "AnalysisException" in type(e).__name__:
+                raise TransformError(f"Spark SQL Analysis Error: {e}") from e
+            if "ParseException" in type(e).__name__:
+                raise TransformError(f"Spark SQL Parse Error: {e}") from e
+            raise e
 
     def execute_transform(self, *args, **kwargs):
         raise NotImplementedError(

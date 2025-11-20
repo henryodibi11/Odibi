@@ -1,7 +1,8 @@
 """Unified context for data passing between nodes."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 import pandas as pd
 
 
@@ -14,7 +15,7 @@ class Context(ABC):
 
         Args:
             name: Identifier for the DataFrame
-            df: DataFrame (Spark or Pandas)
+            df: DataFrame (Spark or Pandas) or Iterator (Pandas chunked)
         """
         pass
 
@@ -65,27 +66,29 @@ class PandasContext(Context):
 
     def __init__(self) -> None:
         """Initialize Pandas context."""
-        self._data: Dict[str, pd.DataFrame] = {}
+        self._data: Dict[str, Union[pd.DataFrame, Iterator[pd.DataFrame]]] = {}
 
-    def register(self, name: str, df: pd.DataFrame) -> None:
-        """Register a Pandas DataFrame.
+    def register(self, name: str, df: Union[pd.DataFrame, Iterator[pd.DataFrame]]) -> None:
+        """Register a Pandas DataFrame or Iterator.
 
         Args:
             name: Identifier for the DataFrame
-            df: Pandas DataFrame
+            df: Pandas DataFrame or Iterator of DataFrames
         """
-        if not isinstance(df, pd.DataFrame):
-            raise TypeError(f"Expected pandas.DataFrame, got {type(df)}")
+        from collections.abc import Iterator
+
+        if not isinstance(df, pd.DataFrame) and not isinstance(df, Iterator):
+            raise TypeError(f"Expected pandas.DataFrame or Iterator, got {type(df)}")
         self._data[name] = df
 
-    def get(self, name: str) -> pd.DataFrame:
-        """Retrieve a registered Pandas DataFrame.
+    def get(self, name: str) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
+        """Retrieve a registered Pandas DataFrame or Iterator.
 
         Args:
             name: Identifier of the DataFrame
 
         Returns:
-            The registered Pandas DataFrame
+            The registered Pandas DataFrame or Iterator
 
         Raises:
             KeyError: If name not found in context

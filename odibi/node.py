@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 from pydantic import BaseModel, Field
 
-from odibi.config import NodeConfig
+from odibi.config import NodeConfig, RetryConfig
 from odibi.context import Context
 from odibi.registry import FunctionRegistry
 from odibi.exceptions import NodeExecutionError, TransformError, ValidationError, ExecutionContext
@@ -39,6 +39,7 @@ class Node:
         config_file: Optional[str] = None,
         max_sample_rows: int = 10,
         dry_run: bool = False,
+        retry_config: Optional[RetryConfig] = None,
     ):
         """Initialize node.
 
@@ -50,6 +51,7 @@ class Node:
             config_file: Path to config file (for error reporting)
             max_sample_rows: Maximum rows to capture for story snapshot
             dry_run: Whether to simulate execution
+            retry_config: Retry configuration
         """
         self.config = config
         self.context = context
@@ -58,15 +60,130 @@ class Node:
         self.config_file = config_file
         self.max_sample_rows = max_sample_rows
         self.dry_run = dry_run
+        self.retry_config = retry_config or RetryConfig(enabled=False)
 
         self._cached_result: Optional[Any] = None
         self._execution_steps: List[str] = []
 
+    def restore(self) -> bool:
+        """Restore node state from previous execution (if persisted).
+
+        Returns:
+            True if restored successfully, False otherwise
+        """
+        # Can only restore if we wrote something to a location we can read back
+        if not self.config.write:
+            return False
+
+        write_config = self.config.write
+        connection = self.connections.get(write_config.connection)
+
+        if connection is None:
+            return False
+
+        try:
+            # Attempt to read back the output
+            # We map write_config fields to read arguments
+            # format, table, path are same for read/write usually
+
+            df = self.engine.read(
+                connection=connection,
+                format=write_config.format,
+                table=write_config.table,
+                path=write_config.path,
+                options={},  # We don't know read options, assuming default is fine for restore
+            )
+
+            if df is not None:
+                self.context.register(self.config.name, df)
+                # Cache if requested
+                if self.config.cache:
+                    self._cached_result = df
+                return True
+
+        except Exception:
+            # If read fails (file deleted?), we can't restore
+            return False
+
+        return False
+
     def execute(self) -> NodeResult:
-        """Execute the node.
+        """Execute the node with retry logic.
 
         Returns:
             NodeResult with execution details
+        """
+        start_time = time.time()
+        attempts = 0
+        max_attempts = self.retry_config.max_attempts if self.retry_config.enabled else 1
+        last_error = None
+
+        while attempts < max_attempts:
+            attempts += 1
+            try:
+                # Reset execution steps for each attempt (keep dry run logic separate if needed)
+                if not self.dry_run:
+                    self._execution_steps = []
+
+                result = self._execute_attempt()
+
+                # If successful, add attempt count metadata and return
+                if result.success:
+                    result.metadata["attempts"] = attempts
+                    # Update duration to include all attempts
+                    result.duration = time.time() - start_time
+                    return result
+
+                # Should not happen if _execute_attempt raises exception on failure,
+                # but if it returns failed result:
+                last_error = result.error
+
+            except Exception as e:
+                last_error = e
+                # Log or handle error between retries if needed
+                if attempts < max_attempts:
+                    # Backoff strategy
+                    sleep_time = 1
+                    if self.retry_config.backoff == "exponential":
+                        sleep_time = 2 ** (attempts - 1)
+                    elif self.retry_config.backoff == "linear":
+                        sleep_time = attempts
+
+                    # In tests, we might want to skip sleep, but for now simple time.sleep
+                    time.sleep(sleep_time)
+
+        # All attempts failed
+        duration = time.time() - start_time
+
+        # Wrap error if needed
+        if not isinstance(last_error, NodeExecutionError) and last_error:
+            exec_context = ExecutionContext(
+                node_name=self.config.name,
+                config_file=self.config_file,
+                previous_steps=self._execution_steps,
+            )
+            error = NodeExecutionError(
+                message=str(last_error),
+                context=exec_context,
+                original_error=last_error,
+                suggestions=self._generate_suggestions(last_error),
+            )
+        else:
+            error = last_error
+
+        return NodeResult(
+            node_name=self.config.name,
+            success=False,
+            duration=duration,
+            error=error,
+            metadata={"attempts": attempts},
+        )
+
+    def _execute_attempt(self) -> NodeResult:
+        """Single execution attempt.
+
+        Returns:
+             NodeResult (success=True) or raises Exception
         """
         start_time = time.time()
 
@@ -102,84 +219,100 @@ class Node:
         input_schema = None
         input_sample = None
 
-        try:
-            result_df = None
+        # try-except removed here, letting exceptions bubble up to execute() loop
+        result_df = None
 
-            # Read phase
-            if self.config.read:
-                result_df = self._execute_read()
-                input_df = result_df
-                self._execution_steps.append(f"Read from {self.config.read.connection}")
-            elif self.config.depends_on:
-                # If this is a transform/write node, get data from dependency
-                # We use the first dependency as the "primary" input for schema comparison
-                input_df = self.context.get(self.config.depends_on[0])
+        # Read phase
+        if self.config.read:
+            result_df = self._execute_read()
+            input_df = result_df
+            self._execution_steps.append(f"Read from {self.config.read.connection}")
+        elif self.config.depends_on:
+            # If this is a transform/write node, get data from dependency
+            # We use the first dependency as the "primary" input for schema comparison
+            input_df = self.context.get(self.config.depends_on[0])
 
-            # Capture input schema before transformation
-            if input_df is not None:
-                input_schema = self._get_schema(input_df)
+        # Capture input schema before transformation
+        if input_df is not None:
+            input_schema = self._get_schema(input_df)
 
-                if self.max_sample_rows > 0:
-                    try:
-                        input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
-                    except Exception:
-                        # Don't fail execution if sampling fails
-                        pass
+            if self.max_sample_rows > 0:
+                try:
+                    input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
+                except Exception:
+                    # Don't fail execution if sampling fails
+                    pass
 
-            # Transform phase
-            if self.config.transform:
-                if result_df is None and input_df is not None:
-                    # Use input_df if available (from dependency)
-                    result_df = input_df
+        # Transform phase
+        if self.config.transform:
+            if result_df is None and input_df is not None:
+                # Use input_df if available (from dependency)
+                result_df = input_df
 
-                result_df = self._execute_transform(result_df)
-                self._execution_steps.append(
-                    f"Applied {len(self.config.transform.steps)} transform steps"
-                )
+            result_df = self._execute_transform(result_df)
+            self._execution_steps.append(
+                f"Applied {len(self.config.transform.steps)} transform steps"
+            )
 
-            # Validation phase
-            if self.config.validation and result_df is not None:
-                self._execute_validation(result_df)
-                self._execution_steps.append("Validation passed")
+        # Validation phase
+        if self.config.validation and result_df is not None:
+            self._execute_validation(result_df)
+            self._execution_steps.append("Validation passed")
 
-            # Write phase
-            if self.config.write:
-                # If write-only node, get data from context based on dependencies
-                if result_df is None and self.config.depends_on:
-                    # Use data from first dependency
-                    result_df = self.context.get(self.config.depends_on[0])
+        # Write phase
+        if self.config.write:
+            # If write-only node, get data from context based on dependencies
+            if result_df is None and self.config.depends_on:
+                # Use data from first dependency
+                result_df = self.context.get(self.config.depends_on[0])
 
-                if result_df is not None:
-                    self._execute_write(result_df)
-                    self._execution_steps.append(f"Written to {self.config.write.connection}")
-
-            # Register in context for downstream nodes
             if result_df is not None:
-                self.context.register(self.config.name, result_df)
+                self._execute_write(result_df)
+                self._execution_steps.append(f"Written to {self.config.write.connection}")
 
-                # Cache if requested
-                if self.config.cache:
-                    self._cached_result = result_df
+        # Register in context for downstream nodes
+        if result_df is not None:
+            self.context.register(self.config.name, result_df)
 
-            # Collect metadata
-            duration = time.time() - start_time
-            metadata = self._collect_metadata(result_df)
+            # Cache if requested
+            if self.config.cache:
+                self._cached_result = result_df
 
-            # Calculate schema changes if we have both input and output schemas
-            if input_schema and metadata.get("schema"):
-                output_schema = metadata["schema"]
-                set_in = set(input_schema)
-                set_out = set(output_schema)
+        # Collect metadata
+        duration = time.time() - start_time
+        metadata = self._collect_metadata(result_df)
 
-                metadata["schema_in"] = input_schema
-                metadata["columns_added"] = list(set_out - set_in)
-                metadata["columns_removed"] = list(set_in - set_out)
+        # Calculate schema changes if we have both input and output schemas
+        if input_schema and metadata.get("schema"):
+            output_schema = metadata["schema"]
+            set_in = set(input_schema)
+            set_out = set(output_schema)
 
-                if input_sample:
-                    metadata["sample_data_in"] = input_sample
+            metadata["schema_in"] = input_schema
+            metadata["columns_added"] = list(set_out - set_in)
+            metadata["columns_removed"] = list(set_in - set_out)
 
-            # Add sample data to metadata if requested
-            if result_df is not None and self.max_sample_rows > 0:
+            if input_sample:
+                metadata["sample_data_in"] = input_sample
+
+        # Add sample data to metadata if requested
+        if result_df is not None and self.max_sample_rows > 0:
+            if isinstance(self.config.sensitive, list):
+                # Redact specific columns
+                try:
+                    sample = self.engine.get_sample(result_df, n=self.max_sample_rows)
+                    for row in sample:
+                        for col in self.config.sensitive:
+                            if col in row:
+                                row[col] = "[REDACTED]"
+                    metadata["sample_data"] = sample
+                except Exception:
+                    metadata["sample_data"] = []
+            elif self.config.sensitive:
+                # Redact all data
+                metadata["sample_data"] = [{"message": "[REDACTED: Sensitive Data]"}]
+            else:
+                # No redaction
                 try:
                     sample = self.engine.get_sample(result_df, n=self.max_sample_rows)
                     metadata["sample_data"] = sample
@@ -187,41 +320,24 @@ class Node:
                     # Don't fail execution if sampling fails (e.g. serialization issues)
                     metadata["sample_data"] = []
 
-            return NodeResult(
-                node_name=self.config.name,
-                success=True,
-                duration=duration,
-                rows_processed=metadata.get("rows"),
-                schema=metadata.get("schema"),
-                metadata=metadata,
-            )
+        # Redact input sample if sensitive
+        if "sample_data_in" in metadata:
+            if isinstance(self.config.sensitive, list):
+                for row in metadata["sample_data_in"]:
+                    for col in self.config.sensitive:
+                        if col in row:
+                            row[col] = "[REDACTED]"
+            elif self.config.sensitive:
+                metadata["sample_data_in"] = [{"message": "[REDACTED: Sensitive Data]"}]
 
-        except Exception as e:
-            duration = time.time() - start_time
-
-            # Wrap in NodeExecutionError with context
-            if not isinstance(e, NodeExecutionError):
-                exec_context = ExecutionContext(
-                    node_name=self.config.name,
-                    config_file=self.config_file,
-                    previous_steps=self._execution_steps,
-                )
-
-                error = NodeExecutionError(
-                    message=str(e),
-                    context=exec_context,
-                    original_error=e,
-                    suggestions=self._generate_suggestions(e),
-                )
-            else:
-                error = e
-
-            return NodeResult(
-                node_name=self.config.name,
-                success=False,
-                duration=duration,
-                error=error,
-            )
+        return NodeResult(
+            node_name=self.config.name,
+            success=True,
+            duration=duration,
+            rows_processed=metadata.get("rows"),
+            schema=metadata.get("schema"),
+            metadata=metadata,
+        )
 
     def _execute_read(self) -> Any:
         """Execute read operation.

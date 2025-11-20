@@ -202,26 +202,128 @@ class PandasEngine(Engine):
         # Merge storage options for cloud connections
         merged_options = self._merge_storage_options(connection, options)
 
+        # Clean up custom options that are not supported by pandas writers
+        # 'keys' is used for upsert/append_once logic but not by to_csv/to_parquet
+        writer_options = merged_options.copy()
+        writer_options.pop("keys", None)
+
         # Only create local directories (skip for remote URIs like abfss://, s3://)
         parsed = urlparse(full_path)
         if not parsed.scheme or parsed.scheme == "file":
             Path(full_path).parent.mkdir(parents=True, exist_ok=True)
 
+        # --- Generic Upsert/Append-Once Logic for File Formats (CSV, Parquet, JSON) ---
+        # Delta Lake has its own native implementation below.
+        if mode in ["upsert", "append_once"] and format != "delta":
+            if "keys" not in options:
+                raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
+
+            keys = options["keys"]
+            if isinstance(keys, str):
+                keys = [keys]
+
+            # Try to read existing file
+            # Note: This approach rewrites the entire file and is not suitable for massive datasets.
+            # For massive datasets, use Delta Lake.
+            existing_df = None
+            try:
+                # Use cleaned writer_options for reading to avoid passing 'keys' to readers
+                if format == "csv":
+                    existing_df = pd.read_csv(full_path, **writer_options)
+                elif format == "parquet":
+                    existing_df = pd.read_parquet(full_path, **writer_options)
+                elif format == "json":
+                    existing_df = pd.read_json(full_path, **writer_options)
+                elif format == "excel":
+                    existing_df = pd.read_excel(full_path, **writer_options)
+            except (FileNotFoundError, Exception):
+                # File likely doesn't exist (or other read error), treat as new write
+                pass
+
+            if existing_df is not None:
+                # Handle Iterator input for merge (must materialize)
+                if isinstance(df, Iterator):
+                    df = pd.concat(df, ignore_index=True)
+
+                if mode == "append_once":
+                    # Filter out rows from 'df' that are already in 'existing_df'
+                    # Left anti join logic
+
+                    # Check if keys exist
+                    missing_keys = set(keys) - set(df.columns)
+                    if missing_keys:
+                        raise KeyError(f"Keys {missing_keys} not found in input data")
+
+                    missing_existing = set(keys) - set(existing_df.columns)
+                    if missing_existing:
+                        # Existing file schema mismatch - append anyway or fail?
+                        # Safest is to fail or assume distinct. Let's append to avoid data loss,
+                        # but append_once implies we want to avoid dups.
+                        # If keys missing in existing, we can't check.
+                        pass
+                    else:
+                        # Identify new rows
+                        # Use merge with indicator
+                        # Only check on keys
+                        merged = df.merge(existing_df[keys], on=keys, how="left", indicator=True)
+                        new_rows = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
+
+                        # Update df to only be the new rows
+                        # For CSV/JSON which support append, we can just append the new rows.
+                        # For Parquet/Excel, we must rewrite the whole file with (Existing + New).
+                        if format in ["csv", "json"]:
+                            df = new_rows
+                            mode = "append"
+                        else:
+                            # Parquet/Excel - rewrite everything
+                            df = pd.concat([existing_df, new_rows], ignore_index=True)
+                            mode = "overwrite"
+
+                elif mode == "upsert":
+                    # Update existing rows, insert new rows
+                    # Strategy:
+                    # 1. Set index to keys
+                    # 2. Combine/Update
+                    # 3. Reset index
+
+                    # Check if keys exist
+                    missing_keys = set(keys) - set(df.columns)
+                    if missing_keys:
+                        raise KeyError(f"Keys {missing_keys} not found in input data")
+
+                    # Update existing with new values
+                    # combine_first: updates nulls. We want overwrite.
+                    # We can concat and drop duplicates keeping last, BUT that assumes full row match?
+                    # No, we update based on key.
+
+                    # 1. Remove rows from existing that are in input (based on keys)
+                    # indicator merge to find rows to keep
+                    merged_indicator = existing_df.merge(
+                        df[keys], on=keys, how="left", indicator=True
+                    )
+                    rows_to_keep = existing_df[merged_indicator["_merge"] == "left_only"]
+
+                    # 2. Concat rows_to_keep + input df
+                    df = pd.concat([rows_to_keep, df], ignore_index=True)
+
+                    # 3. Write mode becomes overwrite (replacing file with merged result)
+                    mode = "overwrite"
+
         # Write based on format
         if format == "csv":
             mode_param = "w" if mode == "overwrite" else "a"
-            df.to_csv(full_path, mode=mode_param, index=False, **merged_options)
+            df.to_csv(full_path, mode=mode_param, index=False, **writer_options)
         elif format == "parquet":
             # Parquet doesn't support append easily
-            df.to_parquet(full_path, index=False, **merged_options)
+            df.to_parquet(full_path, index=False, **writer_options)
         elif format == "json":
             mode_param = "w" if mode == "overwrite" else "a"
-            df.to_json(full_path, orient="records", mode=mode_param, **merged_options)
+            df.to_json(full_path, orient="records", mode=mode_param, **writer_options)
         elif format == "excel":
-            df.to_excel(full_path, index=False, **merged_options)
+            df.to_excel(full_path, index=False, **writer_options)
         elif format == "delta":
             try:
-                from deltalake import write_deltalake
+                from deltalake import write_deltalake, DeltaTable
             except ImportError:
                 raise ImportError(
                     "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
@@ -246,16 +348,59 @@ class PandasEngine(Engine):
                 )
 
             # Convert mode to Delta mode
-            delta_mode = "overwrite" if mode == "overwrite" else "append"
+            if mode == "upsert" or mode == "append_once":
+                # Use merge for upsert/append_once
+                if "keys" not in options:
+                    raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
 
-            # Write Delta table
-            write_deltalake(
-                full_path,
-                df,
-                mode=delta_mode,
-                partition_by=partition_by,
-                storage_options=storage_opts,
-            )
+                # Load existing table to check if it exists
+                try:
+                    dt = DeltaTable(full_path, storage_options=storage_opts)
+                except Exception:
+                    # If table doesn't exist, 'upsert' and 'append_once' act like 'write' (create new)
+                    # We fall back to standard write_deltalake with mode='overwrite' (or 'error'?)
+                    # Standard behavior is usually to create if not exists.
+                    # Let's use write_deltalake directly for creation.
+                    # print(f"DEBUG: DeltaTable init failed: {e}")
+                    write_deltalake(
+                        full_path,
+                        df,
+                        mode="overwrite",  # Initial write is always overwrite/create
+                        partition_by=partition_by,
+                        storage_options=storage_opts,
+                    )
+                    return
+
+                # Construct merge predicate
+                keys = options["keys"]
+                if isinstance(keys, str):
+                    keys = [keys]
+
+                predicate = " AND ".join([f"target.{k} = source.{k}" for k in keys])
+
+                merger = dt.merge(
+                    source=df, predicate=predicate, source_alias="source", target_alias="target"
+                )
+
+                if mode == "upsert":
+                    # Update existing, Insert new
+                    merger.when_matched_update_all().when_not_matched_insert_all().execute()
+                else:  # append_once
+                    # Only Insert new (deduplicate)
+                    merger.when_not_matched_insert_all().execute()
+
+            else:
+                # Standard write modes (overwrite/append)
+                delta_mode = "overwrite" if mode == "overwrite" else "append"
+
+                # Write Delta table
+                write_deltalake(
+                    full_path,
+                    df,
+                    mode=delta_mode,
+                    partition_by=partition_by,
+                    storage_options=storage_opts,
+                )
         elif format == "avro":
             try:
                 import fastavro
@@ -309,6 +454,15 @@ class PandasEngine(Engine):
             # Register all DataFrames from context
             for name in context.list_names():
                 df = context.get(name)
+
+                # Handle chunked data (Iterator)
+                from collections.abc import Iterator
+
+                if isinstance(df, Iterator):
+                    # Warning: Materializing iterator for SQL execution
+                    # TODO: Investigate DuckDB streaming support for iterators
+                    df = pd.concat(df, ignore_index=True)
+
                 conn.register(name, df)
 
             # Execute query
@@ -323,7 +477,17 @@ class PandasEngine(Engine):
                 from pandasql import sqldf
 
                 # Build local namespace with DataFrames
-                locals_dict = {name: context.get(name) for name in context.list_names()}
+                locals_dict = {}
+                for name in context.list_names():
+                    df = context.get(name)
+
+                    # Handle chunked data (Iterator)
+                    from collections.abc import Iterator
+
+                    if isinstance(df, Iterator):
+                        df = pd.concat(df, ignore_index=True)
+
+                    locals_dict[name] = df
 
                 return sqldf(sql, locals_dict)
 
@@ -334,18 +498,28 @@ class PandasEngine(Engine):
                 )
 
     def execute_operation(
-        self, operation: str, params: Dict[str, Any], df: pd.DataFrame
+        self,
+        operation: str,
+        params: Dict[str, Any],
+        df: Union[pd.DataFrame, Iterator[pd.DataFrame]],
     ) -> pd.DataFrame:
         """Execute built-in operation.
 
         Args:
             operation: Operation name
             params: Operation parameters
-            df: Input DataFrame
+            df: Input DataFrame or Iterator
 
         Returns:
             Result DataFrame
         """
+        # Handle chunked data (Iterator)
+        from collections.abc import Iterator
+
+        if isinstance(df, Iterator):
+            # Warning: Materializing iterator for operation execution
+            df = pd.concat(df, ignore_index=True)
+
         if operation == "pivot":
             return self._pivot(df, params)
         else:
@@ -365,6 +539,24 @@ class PandasEngine(Engine):
         pivot_column = params["pivot_column"]
         value_column = params["value_column"]
         agg_func = params.get("agg_func", "first")
+
+        # Validate columns exist
+        required_columns = set()
+        if isinstance(group_by, list):
+            required_columns.update(group_by)
+        elif isinstance(group_by, str):
+            required_columns.add(group_by)
+            group_by = [group_by]
+
+        required_columns.add(pivot_column)
+        required_columns.add(value_column)
+
+        missing = required_columns - set(df.columns)
+        if missing:
+            raise KeyError(
+                f"Columns not found in DataFrame for pivot operation: {missing}. "
+                f"Available: {list(df.columns)}"
+            )
 
         result = df.pivot_table(
             index=group_by, columns=pivot_column, values=value_column, aggfunc=agg_func

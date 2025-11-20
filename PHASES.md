@@ -11,8 +11,8 @@
 
 ### Phase 4: Production
 - **Status:** 🚧 In Progress
-- **Current Version:** v1.4.0-alpha.1
-- **Focus:** Config Templating, Memory Safety, Benchmarks
+- **Current Version:** v1.4.0-alpha.3
+- **Focus:** Checkpointing, Logging, Memory Safety
 
 | Phase | Status | Version | Completion |
 |-------|--------|---------|------------|
@@ -23,7 +23,7 @@
 | **Phase 2C: Performance** | ✅ Complete | v1.2.0-alpha.3 | Nov 2025 |
 | **Phase 2.5: Reorganization** | ✅ Complete | v1.2.0-alpha.4 | Nov 2025 |
 | **Phase 3: Transparency** | ✅ Complete | v1.3.0-alpha.5 | Nov 10, 2025 |
-| **Phase 4: Production** | 🚧 In Progress | v1.4.0-alpha.1 | Q1-Q2 2026 |
+| **Phase 4: Production** | 🚧 In Progress | v1.4.0-alpha.2 | Q1-Q2 2026 |
 
 ### Quick Links
 - **CI Status:** [![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
@@ -299,33 +299,33 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 ### Deliverables
 
 #### Infrastructure (Pre-requisite)
-- [ ] **Spark CI Hardening:** Ensure GitHub Actions runs Spark tests (install Java/Hadoop)
+- [x] **Spark CI Hardening:** Ensure GitHub Actions runs Spark tests (install Java/Hadoop)
 - [x] **Local Spark Setup:** Scripts/Docs for local Spark testing
   - Windows (Interactive): `examples/run_local_spark.bat`
   - WSL (Recommended): `docs/WSL_GUIDE.md`
 
 #### Performance
-- [ ] Engine benchmarks (Pandas vs Spark for common operations)
+- [x] Engine benchmarks (Pandas vs Spark for common operations)
 - [ ] Lazy evaluation strategies where applicable
 - [ ] Parallel node execution (use layers from graph analysis)
-- [ ] **Memory Safety:** Automatic chunking for Pandas engine
-- [ ] Benchmark suite in `tests/benchmarks/`
-- [ ] Performance guide (`docs/performance.md`)
+- [x] **Memory Safety:** Automatic chunking for Pandas engine
+- [x] Benchmark suite in `tests/benchmarks/`
+- [x] Performance guide (`docs/performance.md`)
 
 #### Reliability
-- [ ] Retry/backoff for connection failures (configurable)
-- [ ] Idempotent write modes (append-once, upsert patterns)
-- [ ] **Checkpointing:** `--resume-from-failure` support
+- [x] Retry/backoff for connection failures (configurable)
+- [x] Idempotent write modes (append-once, upsert patterns)
+- [x] **Checkpointing:** `--resume-from-failure` support
 - [ ] Schema validation improvements (consistent across engines)
-- [ ] Structured logging (JSON output option)
+- [x] Structured logging (JSON output option)
 - [ ] Log level controls per node
 
 #### Security & Operations
-- [ ] **PII Redaction:** `sensitive: true` masking in stories/logs
+- [x] **PII Redaction:** `sensitive: true` masking in stories/logs
 - [ ] **Alerting Hooks:** `on_failure` webhooks (Slack/Teams)
-- [ ] **Config Templating:** Environment variable substitution (`${VAR}`)
+- [ ] **Config Templating:** Environment variable substitution (`${VAR}`) (Already supported)
 - [ ] **Artifact Retention:** Auto-cleanup of old stories
-- [ ] Standardized error types across engines
+- [x] Standardized error types across engines
 - [ ] Error context preservation through stack
 - [ ] Detailed error messages with actionable suggestions
 - [ ] Error recovery strategies (skip, retry, fail-fast)
@@ -415,7 +415,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Documentation standards
 
 **Current Focus:** Phase 4 - Performance + Production Hardening
-**Next Up:** Engine benchmarks and reliability features
+**Next Up:** Idempotent write modes and reliability features
 
 ---
 
