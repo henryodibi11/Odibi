@@ -289,8 +289,9 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 
 ### Goals
 - Stabilize API contracts and error semantics
-- Optimize performance for production workloads
-- Add retry logic and idempotency
+- Optimize performance for production workloads (Chunking, Parallelism)
+- Add retry logic, idempotency, and checkpointing
+- Enable enterprise features (PII redaction, Alerting, Env vars)
 
 ### Deliverables
 
@@ -298,17 +299,23 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 - [ ] Engine benchmarks (Pandas vs Spark for common operations)
 - [ ] Lazy evaluation strategies where applicable
 - [ ] Parallel node execution (use layers from graph analysis)
+- [ ] **Memory Safety:** Automatic chunking for Pandas engine
 - [ ] Benchmark suite in `tests/benchmarks/`
 - [ ] Performance guide (`docs/performance.md`)
 
 #### Reliability
 - [ ] Retry/backoff for connection failures (configurable)
 - [ ] Idempotent write modes (append-once, upsert patterns)
+- [ ] **Checkpointing:** `--resume-from-failure` support
 - [ ] Schema validation improvements (consistent across engines)
 - [ ] Structured logging (JSON output option)
 - [ ] Log level controls per node
 
-#### Error Handling
+#### Security & Operations
+- [ ] **PII Redaction:** `sensitive: true` masking in stories/logs
+- [ ] **Alerting Hooks:** `on_failure` webhooks (Slack/Teams)
+- [ ] **Config Templating:** Environment variable substitution (`${VAR}`)
+- [ ] **Artifact Retention:** Auto-cleanup of old stories
 - [ ] Standardized error types across engines
 - [ ] Error context preservation through stack
 - [ ] Detailed error messages with actionable suggestions
