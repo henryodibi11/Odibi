@@ -116,6 +116,7 @@ class TestEngineBenchmarks:
             fake_connection,
             "csv",
             path=benchmark_data["csv"],
+            options={"header": "true", "inferSchema": "true"},
         )
         # Spark read is lazy, so count() to trigger execution
         self._run_benchmark("SparkEngine", "Count (trigger read)", df.count)
