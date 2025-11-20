@@ -78,9 +78,13 @@ class TestRunCommand:
         """Run command should work with valid config."""
         args = Mock()
         args.config = "test.yaml"
+        args.dry_run = False
+
+        mock_result = Mock()
+        mock_result.failed = []
 
         mock_manager = Mock()
-        mock_manager.run.return_value = []
+        mock_manager.run.return_value = mock_result
 
         with patch("odibi.cli.run.PipelineManager") as MockManager:
             MockManager.from_yaml.return_value = mock_manager
