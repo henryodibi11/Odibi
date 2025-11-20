@@ -1,6 +1,6 @@
 """Pandas engine implementation."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, Iterator
 import pandas as pd
 from pathlib import Path
 from urllib.parse import urlparse
@@ -51,7 +51,7 @@ class PandasEngine(Engine):
         table: Optional[str] = None,
         path: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
-    ) -> pd.DataFrame:
+    ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
         """Read data using Pandas.
 
         Args:
@@ -59,10 +59,10 @@ class PandasEngine(Engine):
             format: Data format
             table: Table name
             path: File path
-            options: Format-specific options
+            options: Format-specific options (including chunksize)
 
         Returns:
-            Pandas DataFrame
+            Pandas DataFrame or Iterator[pd.DataFrame]
         """
         options = options or {}
 
@@ -135,7 +135,7 @@ class PandasEngine(Engine):
 
     def write(
         self,
-        df: pd.DataFrame,
+        df: Union[pd.DataFrame, Iterator[pd.DataFrame]],
         connection: Any,
         format: str,
         table: Optional[str] = None,
@@ -146,7 +146,7 @@ class PandasEngine(Engine):
         """Write data using Pandas.
 
         Args:
-            df: DataFrame to write
+            df: DataFrame or Iterator of DataFrames to write
             connection: Connection object
             format: Output format
             table: Table name
@@ -155,6 +155,39 @@ class PandasEngine(Engine):
             options: Format-specific options
         """
         options = options or {}
+
+        # Handle iterator/generator input
+        if isinstance(df, Iterator):
+            first_chunk = True
+            for chunk in df:
+                # Determine mode for this chunk
+                # First chunk uses user-provided mode, subsequent chunks append
+                current_mode = mode if first_chunk else "append"
+
+                # Determine options for this chunk
+                current_options = options.copy()
+
+                # For CSV, if appending (subsequent chunks), we generally don't want to repeat header
+                # unless user explicitly handled it.
+                # If user passed header=False globally, we respect it.
+                # If user passed header=True (default), we only want it for first chunk.
+                if not first_chunk and format == "csv":
+                    # Only override if not explicitly set to False (though usually it defaults to True)
+                    if current_options.get("header") is not False:
+                        current_options["header"] = False
+
+                # Write the chunk
+                self.write(
+                    chunk,
+                    connection,
+                    format,
+                    table,
+                    path,
+                    mode=current_mode,
+                    options=current_options,
+                )
+                first_chunk = False
+            return
 
         # Get full path from connection
         if path:
@@ -181,7 +214,7 @@ class PandasEngine(Engine):
             df.to_parquet(full_path, index=False, **merged_options)
         elif format == "json":
             mode_param = "w" if mode == "overwrite" else "a"
-            df.to_json(full_path, orient="records", **merged_options)
+            df.to_json(full_path, orient="records", mode=mode_param, **merged_options)
         elif format == "excel":
             df.to_excel(full_path, index=False, **merged_options)
         elif format == "delta":
