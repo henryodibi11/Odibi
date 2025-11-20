@@ -157,6 +157,8 @@ class PandasEngine(Engine):
         options = options or {}
 
         # Handle iterator/generator input
+        from collections.abc import Iterator
+
         if isinstance(df, Iterator):
             first_chunk = True
             for chunk in df:

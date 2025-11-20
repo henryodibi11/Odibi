@@ -300,7 +300,9 @@ ODIBI will evolve through 5 distinct phases, each building on the previous found
 
 #### Infrastructure (Pre-requisite)
 - [ ] **Spark CI Hardening:** Ensure GitHub Actions runs Spark tests (install Java/Hadoop)
-- [ ] **Local Spark Setup:** Scripts/Docs for local Spark testing
+- [x] **Local Spark Setup:** Scripts/Docs for local Spark testing
+  - Windows (Interactive): `examples/run_local_spark.bat`
+  - WSL (Recommended): `docs/WSL_GUIDE.md`
 
 #### Performance
 - [ ] Engine benchmarks (Pandas vs Spark for common operations)
