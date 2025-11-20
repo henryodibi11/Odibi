@@ -18,7 +18,10 @@ def benchmark_data(tmp_path_factory):
         "category": np.random.choice(["A", "B", "C", "D"], size=num_rows),
         "value1": np.random.rand(num_rows) * 100,
         "value2": np.random.randint(0, 1000, size=num_rows),
-        "date": pd.date_range(start="2023-01-01", periods=num_rows, freq="min"),
+        # Force microsecond precision for Spark compatibility (Spark doesn't support nanoseconds in Parquet)
+        "date": pd.date_range(start="2023-01-01", periods=num_rows, freq="min").astype(
+            "datetime64[us]"
+        ),
     }
 
     df = pd.DataFrame(data)
