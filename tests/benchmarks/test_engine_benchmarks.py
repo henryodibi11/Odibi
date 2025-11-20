@@ -132,7 +132,8 @@ class TestEngineBenchmarks:
 
         # Filter
         # Spark filter is lazy
-        filtered = df.filter(df.category == "A")
+        # Use bracket notation or col() to avoid ATTRIBUTE_NOT_SUPPORTED errors
+        filtered = df.filter(df["category"] == "A")
         self._run_benchmark("SparkEngine", "Filter+Count", filtered.count)
 
         # GroupBy + Aggregate
