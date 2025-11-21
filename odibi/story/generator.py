@@ -165,7 +165,8 @@ class StoryGenerator:
         try:
             import fsspec
 
-            with fsspec.open(path, "w", encoding="utf-8") as f:
+            # Use provided storage options (credentials)
+            with fsspec.open(path, "w", encoding="utf-8", **self.storage_options) as f:
                 f.write(content)
         except ImportError:
             # Fallback for environments without fsspec (e.g., minimal Spark)
