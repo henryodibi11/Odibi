@@ -126,7 +126,8 @@ class Pipeline:
             raise ValueError(f"Unsupported engine: {engine}")
 
         # Initialize context
-        self.context = create_context(engine)
+        spark_session = getattr(self.engine, "spark", None)
+        self.context = create_context(engine, spark_session=spark_session)
 
         # Build dependency graph
         self.graph = DependencyGraph(pipeline_config.nodes)
