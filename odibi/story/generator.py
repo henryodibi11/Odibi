@@ -48,8 +48,15 @@ class StoryGenerator:
         """
         self.pipeline_name = pipeline_name
         self.max_sample_rows = max_sample_rows
-        self.output_path = Path(output_path)
-        self.output_path.mkdir(parents=True, exist_ok=True)
+        self.output_path_str = output_path  # Store original string
+        self.is_remote = "://" in output_path
+
+        if not self.is_remote:
+            self.output_path = Path(output_path)
+            self.output_path.mkdir(parents=True, exist_ok=True)
+        else:
+            self.output_path = None  # Handle remote paths differently
+
         self.retention_days = retention_days
         self.retention_count = retention_count
 
@@ -136,27 +143,41 @@ class StoryGenerator:
         # Write to file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{self.pipeline_name}_{timestamp}.md"
-        story_path = self.output_path / filename
 
-        # Append Config Snapshot at the end
-        if config:
-            # Clean config for YAML dump (handle multiline strings)
-            config = self._clean_config_for_dump(config)
-
-            lines.append("")
-            lines.append("## Configuration Snapshot")
-            lines.append("")
-            lines.append("```yaml")
-            lines.append(yaml.dump(config, default_flow_style=False))
-            lines.append("```")
-
-        with open(story_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines))
+        if self.is_remote:
+            # Remote path handling
+            full_path = f"{self.output_path_str.rstrip('/')}/{filename}"
+            self._write_remote(full_path, "\n".join(lines))
+            story_path = full_path
+        else:
+            # Local path handling
+            story_path = self.output_path / filename
+            with open(story_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
 
         # Auto-cleanup old stories
         self.cleanup()
 
         return str(story_path)
+
+    def _write_remote(self, path: str, content: str) -> None:
+        """Write content to remote path using fsspec."""
+        try:
+            import fsspec
+            with fsspec.open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+        except ImportError:
+            # Fallback for environments without fsspec (e.g., minimal Spark)
+            # Try dbutils if on Databricks
+            try:
+                from pyspark.dbutils import DBUtils
+                from pyspark.sql import SparkSession
+                spark = SparkSession.builder.getOrCreate()
+                dbutils = DBUtils(spark)
+                # dbutils.fs.put expects string
+                dbutils.fs.put(path, content, True)
+            except Exception:
+                print(f"Warning: Could not write story to {path}. Install 'fsspec' or 'adlfs'.")
 
     def _clean_config_for_dump(self, config: Any) -> Any:
         """Clean configuration for YAML dumping.
