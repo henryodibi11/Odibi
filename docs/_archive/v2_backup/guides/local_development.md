@@ -222,7 +222,7 @@ pipelines:
           connection: bronze
           path: data/sales.csv
           format: csv
-      
+
       # Write as Parquet
       - name: save_parquet
         depends_on: [load_csv]
@@ -230,7 +230,7 @@ pipelines:
           connection: bronze
           path: data/sales.parquet
           format: parquet
-          
+
       # Write as Avro
       - name: save_avro
         depends_on: [load_csv]

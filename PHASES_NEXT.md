@@ -42,6 +42,36 @@ This document outlines the next evolution of the Odibi framework, focusing on la
 
 ---
 
+## Phase 10: Documentation & Education (Prioritized)
+
+**Goal:** Transform Odibi from a "tool with a README" to a "Framework with a Learning Platform". Consolidate loose docs, adopt Diátaxis structure, and ensure every feature is teachable.
+
+### 10.1. Documentation Restructuring (The "Diátaxis" Refactor)
+- **Audit:** Remove duplicate/conflicting guides (e.g., consolidate 3x WSL guides into one authoritative source).
+- **Structure:** Reorganize `docs/` into standard buckets:
+  - `tutorials/` (Learning-oriented: "Zero to Hero")
+  - `guides/` (Task-oriented: "How to X")
+  - `reference/` (Information-oriented: API, Config Spec)
+  - `explanation/` (Understanding-oriented: "Why Odibi?", Architecture)
+
+### 10.2. The "Master CLI Guide" (Task-Based)
+- Move beyond `odibi --help`. Write task-based guides for every command:
+  - "How to debug pipelines with `odibi doctor`"
+  - "How to stress-test data with `odibi stress`"
+  - "How to generate projects with `odibi generate-project`"
+
+### 10.3. The "Odibi Cheatsheet"
+- A high-density PDF/Markdown reference for daily use.
+  - `odibi.yaml` syntax map.
+  - Top 10 CLI command patterns.
+  - Standard project directory structure.
+
+### 10.4. "The Gauntlet" Documentation
+- We built 10 reference projects (OdibiFlix, OdibiEats, etc.). Now we must document them.
+- Create a "Case Studies" section explaining *why* each example was built and what pattern it demonstrates (e.g., "OdibiFlix: Handling high-volume clickstream data").
+
+---
+
 ## Phase 7: Ecosystem & Platform
 
 **Goal:** Move from a "Library" to a "Platform" by integrating with the wider data engineering ecosystem.
@@ -110,28 +140,12 @@ A standalone web interface for observability.
 
 ---
 
-## Phase 10: Documentation & Education
-
-**Goal:** Lower the barrier to entry with world-class documentation and guides.
-
-### 10.1. The "Master CLI Guide"
-- A comprehensive guide covering all CLI commands:
-  - `odibi run`: Executing pipelines.
-  - `odibi generate`: exporting to Airflow/Dagster.
-  - `odibi generate-project`: Quickstarting from data.
-  - `odibi stress`: Stress testing datasets.
-  - `odibi doctor`: Debugging configuration.
-  - `odibi story`: Managing reports.
-- **Format:** Interactive web docs (MkDocs) + Cheatsheet PDF.
-
----
-
 ## Summary of Priorities
 
 | Phase | Feature | Value Prop |
 |-------|---------|------------|
+| **10** | **Docs Overhaul** | **PRIORITY:** Ensure users can actually use v2.0 features. |
 | **6** | **Reference Project** | Proof of capability, stress testing, marketing asset. |
 | **7** | **Airflow/Dagster Gen** | Enterprise adoption blocker removal. |
 | **7** | **Control Plane UI** | Operational visibility for non-engineers. |
 | **7** | **VS Code Ext** | Developer stickiness and ease of use. |
-| **10** | **CLI Master Guide** | Ensure users know how to use the powerful tools we've built. |

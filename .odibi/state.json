@@ -404,6 +404,96 @@
           "timestamp": null
         }
       }
+    },
+    "alert_test": {
+      "last_run": "2025-11-21T04:55:21.519474",
+      "nodes": {}
+    },
+    "parallel_test": {
+      "last_run": "2025-11-21T04:55:22.153453",
+      "nodes": {
+        "node_a": {
+          "success": false,
+          "timestamp": null
+        },
+        "node_b": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.153453"
+        },
+        "node_c": {
+          "success": false,
+          "timestamp": null
+        }
+      }
+    },
+    "test_read": {
+      "last_run": "2025-11-21T04:55:22.166962",
+      "nodes": {
+        "load_data": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.166962"
+        }
+      }
+    },
+    "test_deps": {
+      "last_run": "2025-11-21T04:55:22.232961",
+      "nodes": {
+        "load": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.231961"
+        },
+        "transform": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.232961"
+        }
+      }
+    },
+    "test_write": {
+      "last_run": "2025-11-21T04:55:22.292470",
+      "nodes": {
+        "load": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.292470"
+        },
+        "save": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.292470"
+        }
+      }
+    },
+    "test_failure": {
+      "last_run": "2025-11-21T04:55:22.342418",
+      "nodes": {
+        "load": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.341418"
+        },
+        "fail": {
+          "success": false,
+          "timestamp": null
+        },
+        "dependent": {
+          "success": false,
+          "timestamp": null
+        }
+      }
+    },
+    "test_independent": {
+      "last_run": "2025-11-21T04:55:22.393925",
+      "nodes": {
+        "success1": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.391925"
+        },
+        "fail": {
+          "success": false,
+          "timestamp": null
+        },
+        "success2": {
+          "success": true,
+          "timestamp": "2025-11-21T04:55:22.392925"
+        }
+      }
     }
   }
 }

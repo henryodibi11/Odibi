@@ -1,436 +1,103 @@
 # ODIBI Framework
+**Explicit over implicit. Stories over magic. Simple over clever.**
 
 [![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**Explicit over implicit. Stories over magic. Simple over clever.**
+ODIBI is a declarative data engineering framework that makes pipelines **transparent**, **traceable**, and **teachable**.
 
-ODIBI is a declarative data engineering framework that makes data pipelines transparent, traceable, and teachable. Whether you're learning data engineering or building production systems, ODIBI helps you write pipelines that are easy to understand, debug, and evolve.
+Whether you are processing 10MB on your laptop or 10TB on Databricks, Odibi provides a unified "control plane" for your data.
 
-## Core Philosophy
+---
 
-- **Everything is a Node**: Every operation follows `read → transform → write`
-- **Everything Explicit**: If it appears in the story, it must be in the config
-- **Connections Centralized**: Define once, reference everywhere
-- **Dependencies Clear**: No magic, no hidden flow
-- **Stories Automatic**: Every run is documented
-- **Engine Agnostic**: Same config works on Spark or Pandas
-- **Production Ready**: Secrets management, observability, and plugins built-in
+## ⚡ The 30-Second Demo
 
-## Installation
+Don't write boilerplate. Generate it.
 
 ```bash
-# Basic installation (Pandas engine only)
+# 1. Point Odibi at your messy data
+odibi generate-project --input ./raw_csvs --output ./my_project
+
+# 2. Run the generated pipeline
+cd my_project
+odibi run odibi.yaml
+
+# 3. View the "Data Story" (Audit Report)
+odibi story view --latest
+```
+
+**What just happened?**
+*   Odibi analyzed your CSVs and inferred the schema.
+*   It built a **Bronze/Silver** architecture automatically.
+*   It ran the pipeline using the **Pandas** engine (or Spark, if configured).
+*   It generated an **interactive HTML report** showing exactly what happened to every row.
+
+---
+
+## 📚 Documentation
+
+We have rebuilt our documentation to help you learn fast.
+
+### 🏁 Start Here
+*   **[Getting Started Tutorial](docs/tutorials/getting_started.md):** Go from zero to production in 10 minutes.
+*   **[Master CLI Guide](docs/guides/cli_master_guide.md):** Learn `run`, `stress`, `doctor`, and more.
+
+### 📘 Guides & How-To
+*   **[WSL Setup Guide](docs/guides/wsl_setup.md):** The definitive guide to Windows development.
+*   **[Production Deployment](docs/guides/production_deployment.md):** Moving from local to Azure/Databricks.
+*   **[Custom Transformations](docs/guides/custom_transformations.md):** Write your own Python logic.
+
+### ⚙️ Reference
+*   **[Cheatsheet](docs/reference/cheatsheet.md):** Syntax and commands on one page.
+*   **[Configuration](docs/reference/configuration.md):** Every YAML option explained.
+*   **[Supported Formats](docs/reference/supported_formats.md):** CSV, Parquet, Delta, JSON, Avro.
+
+### 🧠 Concepts
+*   **[Architecture](docs/explanation/architecture.md):** How Odibi works under the hood.
+*   **[Case Studies](docs/explanation/case_studies.md):** Learn from reference projects (OdibiFlix, OdibiEats).
+
+---
+
+## 🚀 Key Features
+
+### 1. "Data Stories" (Auto-Documentation)
+Every time a pipeline runs, Odibi generates a "Story"—a JSON/HTML artifact capturing:
+*   **Row Counts:** "Dropped 50 rows (-5%) in filtering step."
+*   **Schema Changes:** "Column `user_id` cast from String to Int64."
+*   **Performance:** "Node `clean_data` took 12.4s."
+
+### 2. Stress Testing ("Chaos Monkey")
+Proactively find bugs before production.
+```bash
+# Fuzz test your pipeline with random data
+odibi stress odibi.yaml --runs 10
+```
+
+### 3. Production-Ready
+*   **Secrets:** Built-in redaction for logs and artifacts.
+*   **Delta Lake:** Full ACID transaction support (Time Travel, VACUUM).
+*   **Azure Native:** Seamless integration with ADLS Gen2 and Key Vault.
+
+---
+
+## 📦 Installation
+
+```bash
+# Standard (Pandas Engine)
 pip install odibi
 
-# With Spark support (for Databricks and large-scale processing)
-pip install "odibi[spark]"
-
-# With Azure connectors (ADLS Gen2, Azure SQL)
-pip install "odibi[azure]"
-
-# With Telemetry and Observability
-pip install "odibi[telemetry]"
-
-# All extras (Spark + Azure + Telemetry + Advanced)
-pip install "odibi[all]"
+# Enterprise (Spark + Azure + Delta)
+pip install "odibi[spark,azure]"
 ```
 
 ---
 
-## Quick Start
+## 🤝 Contributing
 
-### Command-Line Interface (Recommended)
-
-```bash
-# Initialize secrets template
-odibi secrets init pipeline.yaml
-
-# Validate your configuration
-odibi validate pipeline.yaml
-
-# Run your pipeline
-odibi run pipeline.yaml
-
-# Get help
-odibi --help
-```
-
-### Python API
-
-```python
-from odibi.pipeline import PipelineManager
-
-# Load and run all pipelines from YAML
-manager = PipelineManager.from_yaml("examples/templates/example_local.yaml")
-results = manager.run()  # Runs all defined pipelines
-
-# Or run specific pipeline
-result = manager.run_pipeline('bronze_to_silver')
-print(f"✅ {len(result.completed)} nodes completed")
-```
-
-**What it does:**
-- Loads CSV/Parquet/Avro/Delta from configured locations
-- Cleans and validates data (SQL transforms)
-- Saves output in Delta Lake format (ACID transactions)
-- Generates execution story automatically
-
-See [examples/templates/template_full.yaml](examples/templates/template_full.yaml) for all configuration options.
-
-### Option 2: Spark + Azure Pipeline (Production)
-
-For large-scale data processing on Databricks.
-
-1. **Install with extras:**
-   ```bash
-   pip install "odibi[spark,azure]"
-   ```
-
-2. **Configure Azure connections:**
-   - See [docs/setup_azure.md](docs/setup_azure.md) for authentication setup
-   - See [docs/tutorials/databricks_setup.ipynb](docs/tutorials/databricks_setup.ipynb) for cluster configuration
-
-3. **Run Spark pipeline:**
-   ```bash
-   odibi run examples/templates/example_spark.yaml
-   ```
-
-See [examples/templates/example_spark.yaml](examples/templates/example_spark.yaml) for the full configuration.
+We welcome contributions! Please see our [Contributing Guide](docs/guides/contributing.md).
 
 ---
 
-### 🎓 Interactive Tutorial
-
-**Complete walkthrough:** `docs/tutorials/walkthroughs/01_local_pipeline_pandas.ipynb`
-
-```bash
-# Install Jupyter if needed
-pip install jupyter
-
-# Launch tutorial
-jupyter notebook docs/tutorials/walkthroughs/01_local_pipeline_pandas.ipynb
-```
-
-**Learn in 30 minutes:**
-- ✅ Basic pipelines
-- ✅ Transform functions
-- ✅ SQL transforms  
-- ✅ Multi-source joins
-- ✅ Debugging techniques
-
----
-
-### Your First Pipeline (From Scratch)
-
-**1. Create project.yaml**
-
-```yaml
-project: My First Pipeline
-engine: pandas
-
-connections:
-  local:
-    type: local
-    base_path: ./data
-```
-
-**2. Create pipelines/simple.yaml**
-
-```yaml
-pipeline: simple_etl
-
-nodes:
-  - name: load_data
-    read:
-      connection: local
-      path: input.csv
-      format: csv
-    cache: true
-
-  - name: clean_data
-    depends_on: [load_data]
-    transform:
-      steps:
-        - "SELECT * FROM load_data WHERE amount > 0"
-
-  - name: save_result
-    depends_on: [clean_data]
-    write:
-      connection: local
-      path: output.parquet
-      format: parquet
-      mode: overwrite
-```
-
-**3. Run it**
-
-```bash
-odibi run project.yaml
-```
-
-That's it! ODIBI will:
-- Load your CSV
-- Apply transformations
-- Save to Parquet
-- Generate a complete story of what happened
-
-## Features
-
-### Extensibility & Custom Logic (Phase 5 & 6) ✨ NEW
-ODIBI is now fully extensible and battle-tested:
-- **Custom Python Transforms:** Place `transforms.py` in your project folder, and `@transform` functions are automatically discovered.
-- **HTTP Connector:** Fetch data directly from APIs with `type: http`.
-- **Custom Readers:** Add support for any file format (NetCDF, XML, etc.) via plugins.
-- **Glob Patterns:** Read multiple files (`data/*.csv`) effortlessly.
-- **Real-World Validation:** Verified against 10 complex scenarios ("The Gauntlet") covering Retail, IoT, Finance, and more.
-
-## Reference Hardware
-
-Odibi is developed and stress-tested on the **COMMANDCENTER** reference architecture to ensure high-performance capabilities:
-
-- **CPU:** Intel Core i9-13900F/14900F (Family 6 Model 183) - 24+ Cores
-- **RAM:** 32GB DDR5 (High-Bandwidth)
-- **Storage:** >9TB NVMe/HDD Mix (Massive Dataset Support)
-- **Role:** "The Gauntlet" Proving Ground for 100GB+ stress tests.
-
-We design Odibi to scale from laptops to this reference specification and beyond (Spark clusters).
-
-### Delta Lake Support (Phase 2B)
-Production-ready Delta Lake integration with ACID transactions and time travel:
-
-```python
-# Write Delta table
-engine.write(df, connection=conn, format="delta", path="sales.delta", mode="append")
-
-# Read with time travel
-df_v5 = engine.read(conn, format="delta", path="sales.delta", options={"versionAsOf": 5})
-
-# VACUUM old files
-result = engine.vacuum_delta(conn, "sales.delta", retention_hours=168)
-
-# Restore to previous version
-engine.restore_delta(conn, "sales.delta", version=5)
-```
-
-**Features:**
-- ✅ ACID transactions (no partial writes)
-- ✅ Time travel (audit trail, debugging)
-- ✅ Schema evolution (add columns safely)
-- ✅ VACUUM operations (optimize storage)
-- ✅ Works with Pandas and Spark engines
-- ✅ Full Azure ADLS integration
-
-See [docs/DELTA_LAKE_GUIDE.md](docs/DELTA_LAKE_GUIDE.md) for complete guide.
-
-### Plugins & Extensibility
-Add custom connectors without forking the codebase:
-
-```bash
-pip install odibi-connector-postgres
-```
-
-```yaml
-connections:
-  my_db:
-    type: postgres
-    host: localhost
-```
-
-### Unified Context API
-Transform functions work on both Spark and Pandas without changes:
-
-```python
-from odibi import transform
-
-@transform
-def enrich_data(context, reference_table: str, threshold: float = 0.5):
-    """Enrich data with reference information."""
-    ref_data = context.get(reference_table)
-    # Your logic here - works on both engines!
-    return enriched_df
-```
-
-### Smart Dependency Management
-Nodes execute in the right order, with automatic parallelization:
-
-```yaml
-nodes:
-  - name: ref_1
-    read: {...}
-
-  - name: ref_2
-    read: {...}
-
-  - name: combine
-    depends_on: [ref_1, ref_2]  # Waits for both
-    transform: {...}
-```
-
-### Rich Error Messages
-When things fail, you know exactly where and why:
-
-```
-✗ Node execution failed: clean_data
-  Location: pipelines/simple.yaml:15
-  Step: 1 of 1
-
-  Error: Column 'amount' not found
-  Available columns: ['timestamp', 'value', 'status']
-
-  Suggestions:
-    1. Check input data schema: odibi run-node load_data --show-output
-    2. Verify column name in SQL query
-```
-
-### Automatic Documentation
-Every run generates a story showing:
-- What was executed and when
-- Input/output samples
-- Schema changes
-- Row counts
-- Duration
-- Success/failures
-
-## Development Workflow
-
-```bash
-# Validate config without running
-odibi validate project.yaml
-
-# Run pipeline
-odibi run project.yaml
-
-# Use Python module syntax
-python -m odibi run project.yaml
-python -m odibi validate project.yaml
-```
-
-**Note:** Advanced CLI commands (run-node, graph, etc.) coming in Phase 3.
-
-## Architecture
-
-```
-User Layer (YAML configs + Python transforms)
-            ↓
-Orchestration Layer (dependency graph, executor)
-            ↓
-Node Layer (unified read/transform/write)
-            ↓
-Engine Layer (Spark/Pandas adapters)
-            ↓
-Connection Layer (Azure/Local/Delta/SQL)
-```
-
-## 🔍 Analysis: Configuration Architecture
-
-### Hierarchy Overview
-
-```
-ProjectConfig (top-level)
-├── project: str
-├── engine: EngineType
-├── connections: Dict[str, ConnectionConfig]
-├── pipelines: List[PipelineConfig]
-│   └── PipelineConfig
-│       ├── pipeline: str
-│       └── nodes: List[NodeConfig]
-│           └── NodeConfig
-│               ├── name: str
-│               ├── read: Optional[ReadConfig]
-│               ├── transform: Optional[TransformConfig]
-│               └── write: Optional[WriteConfig]
-├── story: StoryConfig
-├── retry: RetryConfig
-└── logging: LoggingConfig
-```
-
-## Documentation
-
-**🚀 Getting Started:**
-- [Quick Start Guide](docs/guides/01_QUICK_START.md) - Get up and running in 5 minutes
-- [Getting Started Tutorial](examples/getting_started/) - Complete interactive walkthrough
-- [Local Pandas Example](examples/example_local.yaml) - Simple Bronze→Silver→Gold pipeline
-
-**📚 Core Guides:**
-- [Configuration Guide](docs/CONFIGURATION_EXPLAINED.md) - Complete config reference
-- [Delta Lake Guide](docs/DELTA_LAKE_GUIDE.md) - ACID transactions & time travel
-- [User Guide](docs/guides/02_USER_GUIDE.md) - Building pipelines
-- [Transformation Guide](docs/guides/05_TRANSFORMATION_GUIDE.md) - Custom transforms
-- [Troubleshooting](docs/guides/06_TROUBLESHOOTING.md) - Common issues
-
-**📖 Setup & Deployment:**
-- [Databricks Setup](docs/setup_databricks.md) - Community + Azure Databricks
-- [Azure Integration](docs/setup_azure.md) - ADLS Gen2 + Azure SQL
-- [Local Development](docs/LOCAL_DEVELOPMENT.md) - Local testing
-- [Supported Formats](docs/SUPPORTED_FORMATS.md) - File format guide
-
-**💡 Templates & Examples:**
-- [template_full.yaml](examples/templates/template_full.yaml) - Complete feature reference
-- [template_full_adls.yaml](examples/templates/template_full_adls.yaml) - Azure multi-account
-- [example_delta_pipeline.yaml](examples/templates/example_delta_pipeline.yaml) - Delta Lake patterns
-- [example_spark.yaml](examples/templates/example_spark.yaml) - Spark on Databricks
-
-**🎓 Advanced Walkthroughs:**
-- [Delta Lake Deep Dive](docs/tutorials/walkthroughs/phase2b_delta_lake.ipynb) - All Delta features
-- [Production Pipelines](docs/tutorials/walkthroughs/phase2b_production_pipeline.ipynb) - YAML + Key Vault
-- [ADLS Integration](docs/tutorials/walkthroughs/phase2a_adls_test.ipynb) - Azure storage
-
-**🔧 Project Info:**
-- [PHASES.md](PHASES.md) - Roadmap & current status
-- [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
-- [CHANGELOG.md](CHANGELOG.md) - Version history
-- [Documentation Index](docs/README.md) - All docs organized
-
----
-
-## Roadmap
-
- ODIBI is being developed in deliberate phases:
-
- - ✅ **Phase 1:** Pandas MVP, Spark scaffolding, Azure connections, CI/CD
- - ✅ **Phase 2A:** Azure ADLS + Key Vault authentication
- - ✅ **Phase 2B:** Delta Lake support (read/write, VACUUM, time travel)
- - ✅ **Phase 2C:** Performance optimization, parallel Key Vault fetching
- - ✅ **Phase 3:** CLI tools, testing utilities, advanced features
- - ✅ **Phase 4:** Production hardening, performance tuning
- - ✅ **Phase 5:** Community ecosystem, plugin system (Complete Nov 2025)
- - ✅ **Phase 6:** Real-World Validation "The Gauntlet" (Complete Nov 2025)
-
- See [PHASES.md](PHASES.md) for detailed roadmap.
-
----
-
-## Contributing
-
-We welcome contributions! ODIBI is designed to be community-driven from the start.
-
-**Before contributing:**
-1. Read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
-2. Check [PHASES.md](PHASES.md) for available work
-3. Review [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-
-**Quick start for contributors:**
-```bash
-git clone https://github.com/henryodibi11/Odibi.git
-cd Odibi
-pip install -e .[dev]
-pre-commit install
-pytest -v  # All 89 tests should pass
-```
-
----
-
-## Contact & Support
-
-- **GitHub Issues:** https://github.com/henryodibi11/Odibi/issues
-- **Email:** henryodibi@outlook.com
-- **LinkedIn:** [Henry Odibi](https://www.linkedin.com/in/henry-odibi)
-
----
-
-## License
-
-MIT
+**Maintainer:** Henry Odibi (@henryodibi11)
+**License:** MIT

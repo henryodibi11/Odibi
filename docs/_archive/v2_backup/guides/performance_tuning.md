@@ -83,7 +83,7 @@ nodes:
    ```python
    # CLI
    odibi run --parallel --max-workers 4
-   
+
    # Python
    pipeline.run(parallel=True, max_workers=8)
    ```

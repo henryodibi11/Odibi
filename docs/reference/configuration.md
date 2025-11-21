@@ -1,6 +1,6 @@
 # ODIBI Configuration System Explained
 
-**Last Updated:** 2025-11-20
+**Last Updated:** 2025-11-21
 **Author:** Henry Odibi
 **Purpose:** Demystify how YAML configs, Python classes, and execution flow together
 
@@ -232,6 +232,11 @@ connections:
   outputs:                # → connections["outputs"]
     type: local
     base_path: ./outputs
+  api_source:             # → connections["api_source"]
+    type: http
+    base_url: "https://api.example.com/v1"
+    headers:
+      Authorization: "Bearer ${API_TOKEN}"
 story:
   connection: outputs     # → story.connection (required)
   path: stories/          # → story.path
@@ -273,6 +278,7 @@ class NodeConfig(BaseModel):
     transform: Optional[TransformConfig] = None
     write: Optional[WriteConfig] = None
     cache: bool = False
+    sensitive: Union[bool, List[str]] = False  # PII Masking
 ```
 
 **Maps to YAML:**
@@ -280,6 +286,7 @@ class NodeConfig(BaseModel):
 nodes:
   - name: load_raw_sales         # → name
     depends_on: [prev_node]      # → depends_on
+    sensitive: ["email"]         # → sensitive (Redact email in reports)
     read:                        # → read (ReadConfig)
       connection: local
       path: bronze/sales.csv
@@ -314,7 +321,7 @@ class PipelineManager:
         for pipeline_config_dict in yaml_config["pipelines"]:
             pipeline_config = PipelineConfig(**pipeline_config_dict)
             self._pipelines[pipeline_config.pipeline] = Pipeline(...)
-    
+
     def run(self, pipelines=None):
         # Run all or specific pipelines
 ```
@@ -334,7 +341,7 @@ class Pipeline:
         self.engine = PandasEngine()   # Or SparkEngine
         self.context = create_context(engine)
         self.graph = DependencyGraph(pipeline_config.nodes)
-    
+
     def run(self):
         execution_order = self.graph.topological_sort()
         for node_name in execution_order:
@@ -357,12 +364,12 @@ class Node:
         if self.config.read:
             data = self.engine.read(...)
             self.context.register(self.config.name, data)
-        
+
         # 2. Transform data (if transform config exists)
         if self.config.transform:
             data = self.engine.execute_transform(...)
             self.context.register(self.config.name, data)
-        
+
         # 3. Write data (if write config exists)
         if self.config.write:
             self.engine.write(...)
@@ -403,13 +410,13 @@ pipelines:
           path: input.csv
           format: csv
         cache: true
-      
+
       - name: clean_data
         depends_on: [load_data]
         transform:
           steps:
             - "SELECT * FROM load_data WHERE amount > 0"
-      
+
       - name: save_data
         depends_on: [clean_data]
         write:
@@ -475,7 +482,7 @@ for pipeline_config_dict in config["pipelines"]:
         ]
     )
     # ✅ Validation passed (all nodes have unique names, at least one operation each)
-    
+
     # Create Pipeline instance
     self._pipelines["example"] = Pipeline(
         pipeline_config=pipeline_config,
@@ -525,7 +532,7 @@ if self.config.read:
     # Get connection
     conn = self.connections["local"]  # LocalConnection(base_path="./data")
     full_path = conn.get_path("input.csv")  # "./data/input.csv"
-    
+
     # Read using engine
     data = self.engine.read(
         path=full_path,
@@ -533,7 +540,7 @@ if self.config.read:
         options={}
     )
     # data = pandas.DataFrame(...)
-    
+
     # Register in context
     self.context.register("load_data", data)
 ```
@@ -547,7 +554,7 @@ if self.config.transform:
     # Engine gets "load_data" DataFrame from context
     # Executes SQL using pandasql or duckdb
     # Returns filtered DataFrame
-    
+
     self.context.register("clean_data", data)
 ```
 
@@ -558,7 +565,7 @@ if self.config.write:
     data = self.context.get("clean_data")  # Get from previous node
     conn = self.connections["local"]
     full_path = conn.get_path("output.parquet")  # "./data/output.parquet"
-    
+
     self.engine.write(
         data=data,
         path=full_path,
@@ -892,13 +899,13 @@ SELECT * FROM load_data WHERE amount > 0
 def execute_sql(self, sql: str, context: Context):
     # 1. Find all table references in SQL
     tables = extract_table_names(sql)  # ["load_data"]
-    
+
     # 2. Get DataFrames from context
     load_data = context.get("load_data")  # The DataFrame from earlier node
-    
+
     # 3. Execute SQL using pandasql or duckdb
     result = duckdb.query(sql).to_df()
-    
+
     return result
 ```
 
@@ -982,20 +989,20 @@ pipelines:
       - name: string          # Unique node name
         depends_on: [string]  # List of node names (optional)
         cache: bool (optional)
-        
+
         # At least ONE of these:
         read:
           connection: string  # Connection name
           path: string        # Relative to connection base_path
           format: csv|parquet|json|excel|avro
           options: dict       # Format-specific (optional)
-        
+
         transform:
           steps:              # List of SQL strings or function calls
             - string (SQL)
             - function: string
               params: dict
-        
+
         write:
           connection: string
           path: string

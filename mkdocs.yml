@@ -36,29 +36,24 @@ plugins:
 
 nav:
   - Home: README.md
-  - Guides:
-    - Tutorials:
+  - Tutorials:
+      - Getting Started: docs/tutorials/getting_started.md
       - Databricks Setup: docs/tutorials/databricks_setup.ipynb
-      - Walkthroughs: docs/tutorials/walkthroughs/README.md
-    - Setup:
-      - Local Development: docs/LOCAL_DEVELOPMENT.md
-      - Azure Setup: docs/setup_azure.md
-      - Databricks Setup: docs/setup_databricks.md
-      - WSL Guide: docs/WSL_GUIDE.md
-    - Usage:
-      - Configuration: docs/CONFIGURATION_EXPLAINED.md
-      - Delta Lake: docs/DELTA_LAKE_GUIDE.md
-      - Supported Formats: docs/SUPPORTED_FORMATS.md
-  - Production:
-    - Deployment: docs/production.md
-    - Monitoring: docs/monitoring.md
-    - Performance: docs/performance.md
-  - API Reference:
-    - Pipeline: docs/api/pipeline.md
-    - Engine: docs/api/engine.md
-    - Connections: docs/api/connections.md
-    - CLI: docs/api/cli.md
-  - Phases:
-    - Roadmap: PHASES.md
-    - Phase 5 (Completed): docs/_archive/PHASE5_ROADMAP_COMPLETED.md
-    - Contributing: CONTRIBUTING.md
+  - Guides:
+      - Writing Transformations: docs/guides/writing_transformations.md
+      - Master CLI: docs/guides/cli_master_guide.md
+      - Production Deployment: docs/guides/production_deployment.md
+      - WSL Setup: docs/guides/wsl_setup.md
+  - Reference:
+      - Cheatsheet: docs/reference/cheatsheet.md
+      - Configuration: docs/reference/configuration.md
+      - Supported Formats: docs/reference/supported_formats.md
+      - API:
+        - Pipeline: docs/reference/api/pipeline.md
+        - Engine: docs/reference/api/engine.md
+        - Connections: docs/reference/api/connections.md
+        - CLI: docs/reference/api/cli.md
+  - Explanation:
+      - Architecture: docs/explanation/architecture.md
+      - Case Studies: docs/explanation/case_studies.md
+  - Contributing: docs/guides/contributing.md

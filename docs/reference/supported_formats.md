@@ -195,7 +195,7 @@ pipelines:
           connection: bronze
           path: data/sales.csv
           format: csv
-      
+
       - name: write_avro_to_adls
         depends_on: [read_csv_from_adls]
         write:
@@ -247,12 +247,37 @@ All formats support:
 
 ---
 
-## Coming Soon (Phase 2B)
+### Delta Lake (Databricks / Open Source)
 
-**Delta Lake Format:**
-- ACID transactions
-- Time travel
-- Schema evolution
-- Optimized for data lakes
+**Use Case:** ACID transactions, time travel, data lakehouse
 
-See [PHASE2_DESIGN_DECISIONS.md](PHASE2_DESIGN_DECISIONS.md) for Delta Lake roadmap.
+**Benefits:**
+- **ACID Transactions:** No partial writes or corruption
+- **Time Travel:** Query previous versions of data
+- **Schema Evolution:** Safely evolve schema over time
+- **Audit History:** Track all changes to the table
+
+**Dependencies:** Requires `delta-spark` (for Spark engine) or `deltalake` (for Pandas engine).
+
+**Read Example:**
+```yaml
+- name: load_delta
+  read:
+    connection: bronze
+    path: data/sales.delta
+    format: delta
+    options:
+      version_as_of: 5  # Time travel!
+```
+
+**Write Example:**
+```yaml
+- name: save_delta
+  write:
+    connection: silver
+    path: output/sales.delta
+    format: delta
+    mode: append  # or overwrite
+```
+
+See the **[Delta Lake Guide](../guides/delta_lake.md)** for advanced features like VACUUM and Restore.

@@ -81,7 +81,10 @@ odibi/
 │   ├── main.py
 │   ├── run.py
 │   ├── validate.py
-│   └── story.py
+│   ├── story.py
+│   ├── stress.py         # Fuzz testing
+│   ├── doctor.py         # Environment debugging
+│   └── generate.py       # Scaffolding
 └── utils/                 # Utilities
     └── setup_helpers.py
 ```
@@ -994,9 +997,9 @@ def my_operation(df, threshold):
 You now understand how Odibi works internally!
 
 **Continue learning:**
-- **[Architecture Guide](04_ARCHITECTURE_GUIDE.md)** - Visual diagrams of the system
-- **[Transformation Guide](05_TRANSFORMATION_GUIDE.md)** - Write your own operations
-- **[Troubleshooting](06_TROUBLESHOOTING.md)** - Debug common issues
+- **[Architecture Guide](../explanation/architecture.md)** - Visual diagrams of the system
+- **[Transformation Guide](custom_transformations.md)** - Write your own operations
+- **[Troubleshooting](troubleshooting.md)** - Debug common issues
 
 **Want to contribute?**
 - Read `CONTRIBUTING.md`
