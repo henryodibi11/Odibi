@@ -67,9 +67,16 @@ class SparkEngine(Engine):
             if hasattr(connection, "configure_spark"):
                 connection.configure_spark(self.spark)
 
-    def get_schema(self, df) -> List[Tuple[str, str]]:
-        """Get DataFrame schema as list of (name, type) tuples."""
-        return [(f.name, f.dataType.simpleString()) for f in df.schema]
+    def get_schema(self, df) -> List[str]:
+        """Get DataFrame schema as list of column names.
+
+        Args:
+            df: Spark DataFrame
+
+        Returns:
+            List of column names
+        """
+        return df.columns
 
     def get_shape(self, df) -> Tuple[int, int]:
         """Get DataFrame shape as (rows, columns)."""

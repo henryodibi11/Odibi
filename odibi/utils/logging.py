@@ -16,6 +16,9 @@ class StructuredLogger:
         logging.basicConfig(level=self.level, format="%(message)s", stream=sys.stdout)
         self.logger = logging.getLogger("odibi")
 
+        # Suppress noisy Py4J logging
+        logging.getLogger("py4j").setLevel(logging.WARNING)
+
     def register_secret(self, secret: str):
         """Register a secret string to be redacted from logs."""
         if secret and isinstance(secret, str) and len(secret.strip()) > 0:
