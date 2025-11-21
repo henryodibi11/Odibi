@@ -37,6 +37,34 @@ class LogLevel(str, Enum):
     ERROR = "ERROR"
 
 
+class AlertType(str, Enum):
+    """Types of alerting channels."""
+
+    WEBHOOK = "webhook"
+    SLACK = "slack"
+    TEAMS = "teams"
+
+
+class AlertConfig(BaseModel):
+    """Configuration for alerts."""
+
+    type: AlertType
+    url: str = Field(description="Webhook URL")
+    on_events: List[str] = Field(
+        default=["on_failure"],
+        description="Events to trigger alert: on_start, on_success, on_failure",
+    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Extra metadata for alert")
+
+
+class ErrorStrategy(str, Enum):
+    """Strategy for handling node failures."""
+
+    FAIL_FAST = "fail_fast"  # Stop pipeline immediately
+    FAIL_LATER = "fail_later"  # Continue pipeline (dependents skipped) - DEFAULT
+    IGNORE = "ignore"  # Treat as success (warning) - Dependents run
+
+
 # ============================================
 # Connection Configurations
 # ============================================
@@ -149,6 +177,12 @@ class ValidationConfig(BaseModel):
     no_nulls: List[str] = Field(
         default_factory=list, description="Columns that must not have nulls"
     )
+    ranges: Dict[str, Dict[str, float]] = Field(
+        default_factory=dict, description="Value ranges {col: {min: 0, max: 100}}"
+    )
+    allowed_values: Dict[str, List[Any]] = Field(
+        default_factory=dict, description="Allowed values {col: [val1, val2]}"
+    )
 
 
 class WriteConfig(BaseModel):
@@ -183,6 +217,10 @@ class NodeConfig(BaseModel):
 
     # Optional features
     cache: bool = Field(default=False, description="Cache result for reuse")
+    log_level: Optional[LogLevel] = Field(default=None, description="Override log level for this node")
+    on_error: ErrorStrategy = Field(
+        default=ErrorStrategy.FAIL_LATER, description="Failure handling strategy"
+    )
     validation: Optional[ValidationConfig] = None
     sensitive: Union[bool, List[str]] = Field(
         default=False, description="If true or list of columns, masks sample data in stories"
@@ -256,6 +294,8 @@ class StoryConfig(BaseModel):
     path: str = Field(description="Path for stories (relative to connection base_path)")
     max_sample_rows: int = Field(default=10, ge=0, le=100)
     auto_generate: bool = True
+    retention_days: Optional[int] = Field(default=30, ge=1, description="Days to keep stories")
+    retention_count: Optional[int] = Field(default=100, ge=1, description="Max number of stories to keep")
 
 
 # DefaultsConfig deleted - settings moved to top-level ProjectConfig
@@ -288,6 +328,7 @@ class ProjectConfig(BaseModel):
     # Global settings (optional with defaults in Pydantic)
     retry: RetryConfig = Field(default_factory=RetryConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    alerts: List[AlertConfig] = Field(default_factory=list, description="Alert configurations")
 
     # === PHASE 3 ===
     environments: Optional[Dict[str, Dict[str, Any]]] = Field(

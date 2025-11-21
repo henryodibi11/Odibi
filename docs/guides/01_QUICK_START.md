@@ -86,9 +86,9 @@ ls stories/runs/  # Auto-generated story!
 1. **Odibi loaded** your config
 2. **Read** `input.csv`
 3. **Wrote** `output.parquet`
-4. **Generated** a beautiful HTML story in `stories/runs/`
+4. **Generated** a markdown story in `stories/` (see `path` in config)
 
-Open the HTML story in your browser to see:
+Check the story to see:
 - Execution timeline
 - Row counts
 - Schema changes
@@ -114,8 +114,8 @@ pipelines:
         description: Keep only high-value records
         depends_on: [load_data]
         transform:
-          operation: sql
-          query: "SELECT * FROM df WHERE Value > 150"
+          steps:
+            - "SELECT * FROM load_data WHERE Value > 150"
 
       - name: save_data
         depends_on: [filter_high_values]  # Changed dependency

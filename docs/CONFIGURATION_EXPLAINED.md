@@ -1,7 +1,7 @@
 # ODIBI Configuration System Explained
 
-**Last Updated:** 2025-11-07  
-**Author:** Henry Odibi  
+**Last Updated:** 2025-11-20
+**Author:** Henry Odibi
 **Purpose:** Demystify how YAML configs, Python classes, and execution flow together
 
 ---
@@ -62,7 +62,7 @@ Let's trace a real pipeline from file to execution:
 ### Step 1: You Write YAML (User)
 
 ```yaml
-# example_local.yaml
+# examples/templates/example_local.yaml
 project: My Pipeline
 engine: pandas
 connections:
@@ -81,7 +81,7 @@ pipelines:
 
 ### Step 2: YAML → Pydantic Models (Automatic)
 
-When you call `Pipeline.from_yaml("example_local.yaml")`:
+When you call `Pipeline.from_yaml("examples/templates/example_local.yaml")`:
 
 ```python
 # pipeline.py (line 317)
@@ -1011,7 +1011,7 @@ pipelines:
 from odibi.pipeline import Pipeline
 
 # Load and run all pipelines
-manager = Pipeline.from_yaml("config.yaml")
+manager = Pipeline.from_yaml("examples/templates/template_full.yaml")
 results = manager.run()  # Dict[name -> PipelineResults] or single PipelineResults
 
 # Run specific pipeline
@@ -1105,9 +1105,9 @@ YAML file
 
 **Questions? Confusion?**  
 Open an issue on GitHub or check:
-- [examples/template_full.yaml](../examples/template_full.yaml) - Complete YAML reference
-- [walkthroughs/01_local_pipeline_pandas.ipynb](../walkthroughs/01_local_pipeline_pandas.ipynb) - Interactive tutorial
+- [examples/templates/template_full.yaml](../examples/templates/template_full.yaml) - Complete YAML reference
+- [docs/tutorials/walkthroughs/01_local_pipeline_pandas.ipynb](docs/tutorials/walkthroughs/01_local_pipeline_pandas.ipynb) - Interactive tutorial
 
 ---
 
-*This document evolves with the framework. Last updated: 2025-11-07*
+*This document evolves with the framework. Last updated: 2025-11-20*

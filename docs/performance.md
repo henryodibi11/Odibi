@@ -77,5 +77,14 @@ nodes:
 ### Optimization Tips
 1. **Use Parquet:** Always prefer Parquet over CSV for internal data movement. It preserves schema and is compressed.
 2. **Filter Early:** Apply filters as early as possible in the pipeline to reduce data volume.
-3. **Chunking:** Use `chunksize` for large CSV/JSON imports in Pandas.
+3. **Chunking:** Use `chunksize` for large CSV/JSON imports in Pandas to avoid OOM.
 4. **Lazy Evaluation:** Spark is lazy; chain operations together rather than materializing intermediate results.
+5. **Parallel Execution:** Enable parallel execution for independent nodes.
+   ```python
+   # CLI
+   odibi run --parallel --max-workers 4
+   
+   # Python
+   pipeline.run(parallel=True, max_workers=8)
+   ```
+6. **Thread Tuning:** Adjust `max_workers` based on CPU cores and I/O wait times. For I/O bound tasks (many reads/writes), higher worker count is beneficial.

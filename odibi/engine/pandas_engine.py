@@ -209,7 +209,10 @@ class PandasEngine(Engine):
 
         # Only create local directories (skip for remote URIs like abfss://, s3://)
         parsed = urlparse(full_path)
-        if not parsed.scheme or parsed.scheme == "file":
+        # On Windows, drive letters can be parsed as schemes (e.g. "c")
+        is_windows_drive = len(parsed.scheme) == 1 and parsed.scheme.isalpha() if parsed.scheme else False
+
+        if not parsed.scheme or parsed.scheme == "file" or is_windows_drive:
             Path(full_path).parent.mkdir(parents=True, exist_ok=True)
 
         # --- Generic Upsert/Append-Once Logic for File Formats (CSV, Parquet, JSON) ---

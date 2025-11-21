@@ -455,26 +455,23 @@ az role assignment create \
 
 ---
 
-## Phase 1 Status
+## Feature Status
 
-**Currently Available (Phase 1):**
+**Available:**
 - ✅ ADLS path/URI resolution
 - ✅ Azure SQL DSN string generation
 - ✅ Connection validation and configuration
-- ✅ Key Vault integration pattern documented
-
-**Coming in Phase 3:**
-- ⏳ Actual read/write operations via `SparkEngine`
-- ⏳ Integration with Pandas engine for Azure SQL
-- ⏳ Support for Azure Blob Storage (non-ADLS)
+- ✅ Key Vault integration
+- ✅ Actual read/write operations via `SparkEngine`
+- ✅ Integration with Pandas engine for Azure SQL
 
 ---
 
 ## Next Steps
 
 - See [setup_databricks.md](setup_databricks.md) for Databricks cluster setup
-- Check [examples/example_spark.yaml](../examples/example_spark.yaml) for Azure pipeline examples
-- Review [PHASES.md](../PHASES.md) for Azure feature roadmap
+- Check [examples/templates/azure_spark.yaml](../examples/templates/azure_spark.yaml) for Azure pipeline examples
+- Review [PHASES.md](../PHASES.md) for roadmap
 
 ---
 

@@ -6,7 +6,7 @@ from datetime import datetime
 import time
 from pathlib import Path
 
-from odibi.config import PipelineConfig, ProjectConfig, RetryConfig
+from odibi.config import PipelineConfig, ProjectConfig, RetryConfig, AlertConfig, ErrorStrategy
 from odibi.context import create_context
 from odibi.graph import DependencyGraph
 from odibi.node import Node, NodeResult
@@ -17,6 +17,8 @@ from odibi.connections import LocalConnection
 from odibi.utils import load_yaml_with_env
 from odibi.utils.logging import logger, configure_logging
 from odibi.state import StateManager
+from odibi.utils.alerting import send_alert
+from odibi.plugins import load_plugins, get_connection_factory
 
 
 @dataclass
@@ -73,6 +75,7 @@ class Pipeline:
         generate_story: bool = True,
         story_config: Optional[Dict[str, Any]] = None,
         retry_config: Optional[RetryConfig] = None,
+        alerts: Optional[List[AlertConfig]] = None,
     ):
         """Initialize pipeline.
 
@@ -83,12 +86,14 @@ class Pipeline:
             generate_story: Whether to generate execution stories
             story_config: Story generator configuration
             retry_config: Retry configuration
+            alerts: Alert configurations
         """
         self.config = pipeline_config
         self.engine_type = engine
         self.connections = connections or {}
         self.generate_story = generate_story
         self.retry_config = retry_config
+        self.alerts = alerts or []
 
         # Initialize story generator
         story_config = story_config or {}
@@ -137,14 +142,19 @@ class Pipeline:
         return PipelineManager.from_yaml(yaml_path)
 
     def run(
-        self, parallel: bool = False, dry_run: bool = False, resume_from_failure: bool = False
+        self,
+        parallel: bool = False,
+        dry_run: bool = False,
+        resume_from_failure: bool = False,
+        max_workers: int = 4,
     ) -> PipelineResults:
         """Execute the pipeline.
 
         Args:
-            parallel: Whether to use parallel execution (not implemented yet)
+            parallel: Whether to use parallel execution
             dry_run: Whether to simulate execution without running operations
             resume_from_failure: Whether to skip successfully completed nodes from last run
+            max_workers: Maximum number of parallel threads (default: 4)
 
         Returns:
             PipelineResults with execution details
@@ -153,34 +163,36 @@ class Pipeline:
         start_timestamp = datetime.now().isoformat()
 
         results = PipelineResults(pipeline_name=self.config.pipeline, start_time=start_timestamp)
+        
+        # Alert: on_start
+        self._send_alerts("on_start", results)
+        
         state_manager = StateManager() if resume_from_failure else None
 
-        # Get execution order
-        execution_order = self.graph.topological_sort()
-
-        # Execute nodes in order
-        for node_name in execution_order:
-            # Skip if dependencies failed
+        # Define node processing function (inner function to capture self/context)
+        def process_node(node_name: str) -> NodeResult:
+            # Check dependencies (thread-safe check on results object? No, need synchronization if strictly parallel)
+            # But since we execute by layers, dependencies (previous layers) are guaranteed to be done.
+            # So we only need to check if any dependency FAILED.
+            
             node_config = self.graph.nodes[node_name]
             deps_failed = any(dep in results.failed for dep in node_config.depends_on)
 
             if deps_failed:
-                results.skipped.append(node_name)
-                continue
+                return NodeResult(
+                    node_name=node_name,
+                    success=False,
+                    duration=0.0,
+                    metadata={"skipped": True, "reason": "dependency_failed"},
+                )
 
             # Check for resume capability
-            should_skip = False
             if resume_from_failure and state_manager:
                 last_status = state_manager.get_last_run_status(self.config.pipeline, node_name)
                 if last_status is True:
-                    # Node succeeded last time. Can we restore state?
-                    # We can only skip if we can restore the output context (if it was written)
-                    # or if it produced no output context (e.g. pure side effect, though rare in ETL)
-
-                    # If node has write, we can try to read it back to restore context
+                    # Try to restore
                     if node_config.write:
                         try:
-                            # Create a temporary node instance to perform restore
                             temp_node = Node(
                                 config=node_config,
                                 context=self.context,
@@ -188,52 +200,144 @@ class Pipeline:
                                 connections=self.connections,
                             )
                             if temp_node.restore():
-                                should_skip = True
-                                logger.info(
-                                    f"Resuming: Skipped successful node '{node_name}' (restored from storage)"
+                                logger.info(f"Resuming: Skipped node '{node_name}' (restored)")
+                                return NodeResult(
+                                    node_name=node_name,
+                                    success=True,
+                                    duration=0.0,
+                                    metadata={"skipped": True, "reason": "resume_from_failure"},
                                 )
                         except Exception as e:
-                            logger.warning(
-                                f"Resuming: Could not restore node '{node_name}', re-running. Error: {e}"
-                            )
+                            logger.warning(f"Resuming: Could not restore '{node_name}': {e}")
                     else:
-                        # Pure transform without write.
-                        # We cannot skip this unless we know for sure no downstream node needs it.
-                        # For safety in this phase, we re-run it.
-                        # Future improvement: Check if any pending node depends on this.
-                        logger.info(
-                            f"Resuming: Re-running node '{node_name}' (in-memory transform cannot be restored)"
-                        )
-
-            if should_skip:
-                results.completed.append(node_name)
-                # Add a dummy result for the skipped node
-                results.node_results[node_name] = NodeResult(
-                    node_name=node_name,
-                    success=True,
-                    duration=0.0,
-                    metadata={"skipped": True, "reason": "resume_from_failure"},
-                )
-                continue
+                        # Cannot restore pure transform safely without more logic
+                        logger.info(f"Resuming: Re-running '{node_name}' (in-memory)")
 
             # Execute node
-            node = Node(
-                config=node_config,
-                context=self.context,
-                engine=self.engine,
-                connections=self.connections,
-                config_file=None,  # TODO: track config file
-                dry_run=dry_run,
-                retry_config=self.retry_config,
-            )
+            try:
+                node = Node(
+                    config=node_config,
+                    context=self.context,
+                    engine=self.engine,
+                    connections=self.connections,
+                    dry_run=dry_run,
+                    retry_config=self.retry_config,
+                )
+                return node.execute()
+            except Exception as e:
+                logger.error(f"Node '{node_name}' failed: {e}")
+                return NodeResult(
+                    node_name=node_name,
+                    success=False,
+                    duration=0.0,
+                    error=str(e)
+                )
 
-            node_result = node.execute()
-            results.node_results[node_name] = node_result
-
-            if node_result.success:
-                results.completed.append(node_name)
-            else:
-                results.failed.append(node_name)
+        if parallel:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            # Get execution layers (nodes in a layer are independent)
+            layers = self.graph.get_execution_layers()
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for layer in layers:
+                    # Submit all nodes in layer
+                    future_to_node = {
+                        executor.submit(process_node, node_name): node_name 
+                        for node_name in layer
+                    }
+                    
+                    # Wait for layer to complete
+                    layer_failed = False
+                    for future in as_completed(future_to_node):
+                        node_name = future_to_node[future]
+                        try:
+                            result = future.result()
+                            results.node_results[node_name] = result
+                            
+                            if result.success:
+                                # specific check for skipped result
+                                if result.metadata.get("skipped"):
+                                    if result.metadata.get("reason") == "dependency_failed":
+                                        results.skipped.append(node_name)
+                                        # Treat dependency failure as failure for downstream? 
+                                        # Logic says if node skipped due to deps, it didn't "fail" execution, 
+                                        # but downstream will also skip.
+                                        # Wait, process_node logic returns success=False for dep failure above?
+                                        # Let's fix process_node return values.
+                                    else:
+                                        results.completed.append(node_name)
+                                else:
+                                    results.completed.append(node_name)
+                            else:
+                                if result.metadata.get("skipped"):
+                                    results.skipped.append(node_name)
+                                    # Add to failed so downstream skips?
+                                    results.failed.append(node_name)
+                                else:
+                                    results.failed.append(node_name)
+                                    layer_failed = True
+                                    
+                                    # Check Fail Fast
+                                    node_config = self.graph.nodes[node_name]
+                                    if node_config.on_error == ErrorStrategy.FAIL_FAST:
+                                        logger.error(f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline.")
+                                        executor.shutdown(cancel_futures=True, wait=False)
+                                        break
+                                    
+                        except Exception as exc:
+                            logger.error(f"Node '{node_name}' generated exception: {exc}")
+                            results.failed.append(node_name)
+                            layer_failed = True
+                            
+                            # Check Fail Fast
+                            node_config = self.graph.nodes[node_name]
+                            if node_config.on_error == ErrorStrategy.FAIL_FAST:
+                                logger.error(f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline.")
+                                executor.shutdown(cancel_futures=True, wait=False)
+                                break
+                    
+                    # If any node in layer failed, we continue to next layer (unless fail_fast triggered break)
+                    if layer_failed:
+                        # Check if any failure was fail_fast (if we broke loop above)
+                        # We need to check if we should stop completely
+                        # Actually, if we broke the inner loop, we are here.
+                        # We need to break outer loop too if fail_fast happened.
+                        # Let's check results for fail_fast trigger? 
+                        # Or just check if executor is shutdown? Hard to check.
+                        # Let's check the failed nodes' config.
+                        for failed_node in results.failed:
+                             if self.graph.nodes[failed_node].on_error == ErrorStrategy.FAIL_FAST:
+                                 return results
+        
+        else:
+            # Serial execution (existing logic refactored to use process_node for consistency?)
+            # Or keep original robust logic? 
+            # Let's keep original linear execution but use layers to be consistent, 
+            # or use topological sort which is safer for serial.
+            execution_order = self.graph.topological_sort()
+            for node_name in execution_order:
+                result = process_node(node_name)
+                results.node_results[node_name] = result
+                
+                if result.success:
+                    if result.metadata.get("skipped") and result.metadata.get("reason") == "dependency_failed":
+                         results.skipped.append(node_name)
+                         results.failed.append(node_name) # Mark as failed so downstream skips
+                    else:
+                         results.completed.append(node_name)
+                else:
+                    if result.metadata.get("skipped"):
+                        results.skipped.append(node_name)
+                        results.failed.append(node_name)
+                    else:
+                        results.failed.append(node_name)
+                        
+                        # Check Fail Fast
+                        node_config = self.graph.nodes[node_name]
+                        if node_config.on_error == ErrorStrategy.FAIL_FAST:
+                            logger.error(f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline.")
+                            break
 
         # Calculate duration
         results.duration = time.time() - start_time
@@ -245,6 +349,12 @@ class Pipeline:
 
         # Generate story
         if self.generate_story:
+            # Convert config to JSON-compatible dict (resolves Enums to strings)
+            if hasattr(self.config, "model_dump"):
+                config_dump = self.config.model_dump(mode="json")
+            else:
+                config_dump = self.config.dict()
+
             story_path = self.story_generator.generate(
                 node_results=results.node_results,
                 completed=results.completed,
@@ -254,10 +364,44 @@ class Pipeline:
                 start_time=results.start_time,
                 end_time=results.end_time,
                 context=self.context,
+                config=config_dump,
             )
             results.story_path = story_path
 
+        # Alert: on_success / on_failure
+        if results.failed:
+            self._send_alerts("on_failure", results)
+        else:
+            self._send_alerts("on_success", results)
+
         return results
+
+    def _send_alerts(self, event: str, results: PipelineResults) -> None:
+        """Send alerts for a specific event.
+
+        Args:
+            event: Event name (on_start, on_success, on_failure)
+            results: Pipeline results
+        """
+        for alert_config in self.alerts:
+            if event in alert_config.on_events:
+                status = "FAILED" if results.failed else "SUCCESS"
+                if event == "on_start":
+                    status = "STARTED"
+
+                context = {
+                    "pipeline": self.config.pipeline,
+                    "status": status,
+                    "duration": results.duration,
+                    "timestamp": datetime.now().isoformat(),
+                }
+                
+                msg = f"Pipeline '{self.config.pipeline}' {status}"
+                if results.failed:
+                    msg += f". Failed nodes: {', '.join(results.failed)}"
+                
+                send_alert(alert_config, msg, context)
+
 
     def run_node(self, node_name: str, mock_data: Optional[Dict[str, Any]] = None) -> NodeResult:
         """Execute a single node (for testing/debugging).
@@ -377,6 +521,7 @@ class PipelineManager:
                 connections=connections,
                 story_config=story_config,
                 retry_config=project_config.retry,
+                alerts=project_config.alerts,
             )
 
     def _get_story_config(self) -> Dict[str, Any]:
@@ -450,8 +595,18 @@ class PipelineManager:
             ValueError: If connection type is not supported
         """
         connections = {}
+        
+        # Load plugins
+        load_plugins()
+        
         for conn_name, conn_config in conn_configs.items():
             conn_type = conn_config.get("type", "local")
+            
+            # Check plugins
+            factory = get_connection_factory(conn_type)
+            if factory:
+                connections[conn_name] = factory(conn_name, conn_config)
+                continue
 
             if conn_type == "local":
                 connections[conn_name] = LocalConnection(
@@ -489,6 +644,12 @@ class PipelineManager:
                 # Default auth mode if not specified
                 auth_mode = conn_config.get("auth_mode", "key_vault")
 
+                # Register secrets for redaction
+                if account_key:
+                    logger.register_secret(account_key)
+                if client_secret:
+                    logger.register_secret(client_secret)
+
                 connections[conn_name] = AzureADLS(
                     account=account,
                     container=conn_config["container"],
@@ -516,6 +677,10 @@ class PipelineManager:
                 auth_config = conn_config.get("auth", {})
                 username = auth_config.get("username") or conn_config.get("username")
                 password = auth_config.get("password") or conn_config.get("password")
+
+                # Register secret
+                if password:
+                    logger.register_secret(password)
 
                 connections[conn_name] = AzureSQL(
                     server=conn_config["server"],

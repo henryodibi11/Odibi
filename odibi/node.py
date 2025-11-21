@@ -108,11 +108,44 @@ class Node:
         return False
 
     def execute(self) -> NodeResult:
-        """Execute the node with retry logic.
+        """Execute the node with telemetry and retry logic.
 
         Returns:
             NodeResult with execution details
         """
+        from odibi.utils.telemetry import tracer, nodes_executed, rows_processed, node_duration, Status, StatusCode
+
+        with tracer.start_as_current_span("node_execution") as span:
+            span.set_attribute("node.name", self.config.name)
+            span.set_attribute("node.engine", self.engine.__class__.__name__)
+
+            try:
+                result = self._execute_with_retries()
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR))
+                nodes_executed.add(1, {"status": "failure", "node": self.config.name})
+                raise e
+
+            # Record telemetry
+            if result.success:
+                span.set_status(Status(StatusCode.OK))
+                nodes_executed.add(1, {"status": "success", "node": self.config.name})
+            else:
+                span.set_status(Status(StatusCode.ERROR))
+                if result.error:
+                    span.record_exception(result.error)
+                nodes_executed.add(1, {"status": "failure", "node": self.config.name})
+
+            if result.rows_processed is not None:
+                rows_processed.add(result.rows_processed, {"node": self.config.name})
+
+            node_duration.record(result.duration, {"node": self.config.name})
+
+            return result
+
+    def _execute_with_retries(self) -> NodeResult:
+        """Execute with internal retry logic."""
         start_time = time.time()
         attempts = 0
         max_attempts = self.retry_config.max_attempts if self.retry_config.enabled else 1
@@ -511,6 +544,36 @@ class Node:
             schema_failures = self._validate_schema(df, validation_config.schema_validation)
             failures.extend(schema_failures)
 
+        # Range validation
+        if validation_config.ranges:
+            for col, bounds in validation_config.ranges.items():
+                if col in df.columns:
+                    min_val = bounds.get("min")
+                    max_val = bounds.get("max")
+                    
+                    if min_val is not None:
+                        min_violations = df[df[col] < min_val]
+                        if len(min_violations) > 0:
+                            failures.append(f"Column '{col}' has values < {min_val}")
+                            
+                    if max_val is not None:
+                        max_violations = df[df[col] > max_val]
+                        if len(max_violations) > 0:
+                            failures.append(f"Column '{col}' has values > {max_val}")
+                else:
+                    failures.append(f"Column '{col}' not found for range validation")
+
+        # Allowed values validation
+        if validation_config.allowed_values:
+            for col, allowed in validation_config.allowed_values.items():
+                if col in df.columns:
+                    # Check for values not in allowed list
+                    invalid = df[~df[col].isin(allowed)]
+                    if len(invalid) > 0:
+                        failures.append(f"Column '{col}' has invalid values")
+                else:
+                    failures.append(f"Column '{col}' not found for allowed values validation")
+
         if failures:
             raise ValidationError(self.config.name, failures)
 
@@ -643,6 +706,10 @@ class Node:
         if "column" in error_str and "not found" in error_str:
             suggestions.append("Check that previous nodes output the expected columns")
             suggestions.append(f"Use 'odibi run-node {self.config.name} --show-schema' to debug")
+            
+        if "validation failed" in error_str:
+            suggestions.append("Check your validation rules against the input data")
+            suggestions.append("Inspect the sample data in the generated story")
 
         if "keyerror" in error.__class__.__name__.lower():
             suggestions.append("Verify that all referenced DataFrames are registered in context")
@@ -651,5 +718,9 @@ class Node:
         if "function" in error_str and "not" in error_str:
             suggestions.append("Ensure the transform function is decorated with @transform")
             suggestions.append("Import the module containing the transform function")
+            
+        if "connection" in error_str:
+            suggestions.append("Verify connection configuration in project.yaml")
+            suggestions.append("Check network connectivity and credentials")
 
         return suggestions

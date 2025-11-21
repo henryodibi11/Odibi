@@ -244,5 +244,5 @@ pipelines:
 
 ## Next Steps
 
-- See [examples/template_full_adls.yaml](../examples/template_full_adls.yaml) for full ADLS pipeline example
+- See [examples/templates/template_full_adls.yaml](../examples/templates/template_full_adls.yaml) for full ADLS pipeline example
 - For Databricks setup, see [docs/databricks_setup.md](databricks_setup.md) (coming in Phase 2C)

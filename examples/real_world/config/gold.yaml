@@ -1,0 +1,122 @@
+project: odibi_store_gold
+description: "Gold Layer Analytics"
+engine: pandas
+
+connections:
+  silver_layer:
+    type: local
+    base_path: ./examples/real_world/data/silver
+  
+  gold_layer:
+    type: local
+    base_path: ./examples/real_world/data/gold
+
+story:
+  connection: gold_layer
+  path: ../stories/gold
+  auto_generate: true
+
+pipelines:
+  # --- Pipeline 1: Global Revenue Report ---
+  - pipeline: report_revenue
+    description: "Daily revenue in USD"
+    nodes:
+      - name: items
+        read:
+          connection: silver_layer
+          path: items_enriched
+          format: parquet
+          
+      - name: orders
+        read:
+          connection: silver_layer
+          path: orders_enriched
+          format: parquet
+
+      - name: daily_revenue
+        depends_on: [items, orders]
+        transform:
+          steps:
+            - sql: |
+                SELECT 
+                  o.order_date,
+                  COUNT(DISTINCT o.order_id) as total_orders,
+                  SUM(i.price_usd) as revenue_usd,
+                  SUM(i.freight_usd) as freight_usd
+                FROM items i
+                JOIN orders o ON i.order_id = o.order_id
+                GROUP BY 1
+                ORDER BY 1
+
+      - name: save_revenue_report
+        depends_on: [daily_revenue]
+        write:
+          connection: gold_layer
+          path: global_revenue
+          format: parquet
+          mode: overwrite
+
+  # --- Pipeline 2: Logistics Performance ---
+  - pipeline: report_logistics
+    description: "Delivery delays by customer state"
+    nodes:
+      - name: orders
+        read:
+          connection: silver_layer
+          path: orders_enriched
+          format: parquet
+      
+      # We need customers to get state
+      # But customers are in Bronze. Silver usually joins this.
+      # Let's read customers from Bronze directly (lookup pattern)
+      # Or better: assume we made silver_customers. 
+      # I didn't make silver_customers. I'll read bronze_customers but I need to define connection.
+      # Actually, I can define multiple connections here.
+      
+      # Workaround: Add bronze_layer connection to this config
+      
+      - name: customers
+        read:
+          connection: bronze_layer
+          path: customers
+          format: parquet
+
+      - name: state_performance
+        depends_on: [orders, customers]
+        transform:
+          steps:
+            - sql: |
+                SELECT 
+                  c.customer_state,
+                  COUNT(o.order_id) as delivered_orders,
+                  AVG(o.delay_days) as avg_delay_days,
+                  -- How many late? (delay > 0 means delivered AFTER estimated)
+                  SUM(CASE WHEN o.delay_days > 0 THEN 1 ELSE 0 END) as late_orders,
+                  ROUND(SUM(CASE WHEN o.delay_days > 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(o.order_id), 2) as late_pct
+                FROM orders o
+                JOIN customers c ON o.customer_id = c.customer_id
+                WHERE o.order_status = 'delivered'
+                GROUP BY 1
+                ORDER BY avg_delay_days DESC
+
+      - name: save_logistics_report
+        depends_on: [state_performance]
+        write:
+          connection: gold_layer
+          path: logistics_performance
+          format: parquet
+          mode: overwrite
+
+# Add missing connection for customers
+connections:
+  silver_layer:
+    type: local
+    base_path: ./examples/real_world/data/silver
+  
+  gold_layer:
+    type: local
+    base_path: ./examples/real_world/data/gold
+
+  bronze_layer:
+    type: local
+    base_path: ./examples/real_world/data/bronze

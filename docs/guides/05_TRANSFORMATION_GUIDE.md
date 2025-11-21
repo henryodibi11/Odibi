@@ -67,9 +67,11 @@ def explain(column, threshold=3, **context):
 ```yaml
 - name: clean_temperature_data
   transform:
-    operation: remove_outliers
-    column: temperature
-    threshold: 3
+    steps:
+      - operation: remove_outliers
+        params:
+          column: temperature
+          threshold: 3
 ```
 
 ---
@@ -431,8 +433,9 @@ def my_op(df, columns):
 
 **Why?** YAML users might write:
 ```yaml
-columns: ID            # String
-columns: [ID, Name]    # List
+params:
+  columns: ID            # String
+  columns: [ID, Name]    # List
 ```
 
 ### 3. Validate Inputs
@@ -713,12 +716,14 @@ def explain(
 - name: calculate_boiler_efficiency
   depends_on: [load_sensor_data]
   transform:
-    operation: calculate_thermal_efficiency
-    fuel_column: fuel_consumption_kwh
-    output_column: heat_output_kwh
-    target_column: efficiency_target
-    flag_low_performance: true
-    low_threshold: 0.65
+    steps:
+      - operation: calculate_thermal_efficiency
+        params:
+          fuel_column: fuel_consumption_kwh
+          output_column: heat_output_kwh
+          target_column: efficiency_target
+          flag_low_performance: true
+          low_threshold: 0.65
 ```
 
 ---

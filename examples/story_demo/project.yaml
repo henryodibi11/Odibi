@@ -1,0 +1,63 @@
+project: Story Demo Pipeline
+engine: pandas
+
+connections:
+  data:
+    type: local
+    base_path: examples/story_demo/data
+  artifacts:
+    type: local
+    base_path: examples/story_demo/outputs
+
+story:
+  connection: artifacts
+  path: stories/
+  max_sample_rows: 5
+
+pipelines:
+  - pipeline: sales_analytics
+    layer: transformation
+    nodes:
+      - name: load_transactions
+        read:
+          connection: data
+          path: transactions.csv
+          format: csv
+        cache: true
+
+      - name: enrich_transactions
+        depends_on: [load_transactions]
+        transform:
+          steps:
+            # Add tax column and filter high value
+            - |
+              WITH computed AS (
+                SELECT 
+                  *,
+                  amount * 0.1 as tax_amount,
+                  amount * 1.1 as total_amount
+                FROM load_transactions
+              )
+              SELECT * FROM computed WHERE total_amount > 50
+
+      - name: daily_summary
+        depends_on: [enrich_transactions]
+        transform:
+          steps:
+            # Aggregation (Schema change: extensive)
+            - |
+              SELECT 
+                transaction_date,
+                COUNT(*) as tx_count,
+                SUM(total_amount) as daily_revenue
+              FROM enrich_transactions
+              GROUP BY transaction_date
+              ORDER BY transaction_date
+
+      - name: save_report
+        depends_on: [daily_summary]
+        write:
+          connection: artifacts
+          path: reports/daily_summary.csv
+          format: csv
+          mode: overwrite

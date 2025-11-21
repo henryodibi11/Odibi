@@ -1,0 +1,167 @@
+{
+  "pipelines": {
+    "ingest_olist": {
+      "last_run": "2025-11-20T17:59:59.003179",
+      "nodes": {
+        "read_orders": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:58.362354"
+        },
+        "read_items": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:58.486454"
+        },
+        "read_products": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:58.519774"
+        },
+        "read_customers": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:58.603436"
+        },
+        "read_translation": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:58.603436"
+        },
+        "save_orders": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:58.802784"
+        },
+        "save_items": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:58.886542"
+        },
+        "save_products": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:58.920226"
+        },
+        "save_customers": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:59.003179"
+        },
+        "save_translation": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:59.003179"
+        }
+      }
+    },
+    "ingest_rates": {
+      "last_run": "2025-11-20T17:59:59.253444",
+      "nodes": {
+        "read_rates": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:59.253444"
+        },
+        "save_rates": {
+          "success": true,
+          "timestamp": "2025-11-20T17:59:59.253444"
+        }
+      }
+    },
+    "enrich_orders": {
+      "last_run": "2025-11-20T18:00:31.292732",
+      "nodes": {
+        "orders": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:30.973090"
+        },
+        "rates": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:30.973090"
+        },
+        "orders_enriched": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:31.192582"
+        },
+        "save_silver_orders": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:31.277022"
+        }
+      }
+    },
+    "enrich_products": {
+      "last_run": "2025-11-20T18:00:31.622945",
+      "nodes": {
+        "products": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:31.554444"
+        },
+        "translations": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:31.554444"
+        },
+        "products_translated": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:31.601315"
+        },
+        "save_silver_products": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:31.622945"
+        }
+      }
+    },
+    "enrich_items": {
+      "last_run": "2025-11-20T18:00:32.326711",
+      "nodes": {
+        "items": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:31.943707"
+        },
+        "silver_orders": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:32.143248"
+        },
+        "items_with_currency": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:32.242980"
+        },
+        "save_silver_items": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:32.326711"
+        }
+      }
+    },
+    "report_revenue": {
+      "last_run": "2025-11-20T18:00:56.237379",
+      "nodes": {
+        "items": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:56.000835"
+        },
+        "orders": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:56.079479"
+        },
+        "daily_revenue": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:56.226373"
+        },
+        "save_revenue_report": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:56.237379"
+        }
+      }
+    },
+    "report_logistics": {
+      "last_run": "2025-11-20T18:00:56.665871",
+      "nodes": {
+        "orders": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:56.526686"
+        },
+        "customers": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:56.593359"
+        },
+        "state_performance": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:56.658561"
+        },
+        "save_logistics_report": {
+          "success": true,
+          "timestamp": "2025-11-20T18:00:56.664871"
+        }
+      }
+    }
+  }
+}

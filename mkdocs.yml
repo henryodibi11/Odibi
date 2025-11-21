@@ -1,0 +1,64 @@
+site_name: Odibi Framework
+site_description: A declarative data engineering framework - Explicit over implicit, Stories over magic.
+site_url: https://henryodibi11.github.io/Odibi/
+repo_url: https://github.com/henryodibi11/Odibi
+repo_name: henryodibi11/Odibi
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - toc.integrate
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_root_heading: true
+            show_source: true
+
+nav:
+  - Home: README.md
+  - Guides:
+    - Tutorials:
+      - Databricks Setup: docs/tutorials/databricks_setup.ipynb
+      - Walkthroughs: docs/tutorials/walkthroughs/README.md
+    - Setup:
+      - Local Development: docs/LOCAL_DEVELOPMENT.md
+      - Azure Setup: docs/setup_azure.md
+      - Databricks Setup: docs/setup_databricks.md
+      - WSL Guide: docs/WSL_GUIDE.md
+    - Usage:
+      - Configuration: docs/CONFIGURATION_EXPLAINED.md
+      - Delta Lake: docs/DELTA_LAKE_GUIDE.md
+      - Supported Formats: docs/SUPPORTED_FORMATS.md
+  - Production:
+    - Deployment: docs/production.md
+    - Monitoring: docs/monitoring.md
+    - Performance: docs/performance.md
+  - API Reference:
+    - Pipeline: docs/api/pipeline.md
+    - Engine: docs/api/engine.md
+    - Connections: docs/api/connections.md
+    - CLI: docs/api/cli.md
+  - Phases:
+    - Roadmap: PHASES.md
+    - Phase 5 (Completed): docs/_archive/PHASE5_ROADMAP_COMPLETED.md
+    - Contributing: CONTRIBUTING.md

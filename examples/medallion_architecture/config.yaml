@@ -1,0 +1,120 @@
+# ============================================
+# Example: Medallion Architecture (Bronze/Silver/Gold)
+# ============================================
+# Demonstrates:
+# 1. Multi-layer pipeline organization
+# 2. Bronze: Raw ingestion
+# 3. Silver: Cleansing & Enrichment
+# 4. Gold: Aggregation for Reporting
+#
+# Run with: odibi run examples/medallion_architecture/config.yaml
+# ============================================
+
+project: enterprise_warehouse
+engine: spark
+description: "Standard Lakehouse architecture implementation"
+
+# 1. Define Connections
+connections:
+  # Separation of concerns via folders (or separate containers/accounts in real life)
+  bronze_layer:
+    type: local
+    base_path: ./data/lakehouse/bronze
+  
+  silver_layer:
+    type: local
+    base_path: ./data/lakehouse/silver
+    
+  gold_layer:
+    type: local
+    base_path: ./data/lakehouse/gold
+
+# 2. Story
+story:
+  connection: gold_layer
+  path: ../stories
+  auto_generate: true
+
+# 3. Define Pipelines (One per layer usually, or chained)
+pipelines:
+  # === BRONZE LAYER (Ingestion) ===
+  - pipeline: ingest_iot_data
+    layer: bronze
+    description: "Ingest raw JSON logs"
+    nodes:
+      - name: read_raw_json
+        read:
+          connection: bronze_layer
+          path: landing/iot_logs.json
+          format: json
+          
+      - name: save_bronze_delta
+        depends_on: [read_raw_json]
+        write:
+          connection: bronze_layer
+          path: iot_history_delta
+          format: delta
+          mode: append
+          options:
+            mergeSchema: true  # Allow schema evolution
+
+  # === SILVER LAYER (Cleansing) ===
+  - pipeline: clean_iot_data
+    layer: silver
+    description: "Filter valid signals and dedup"
+    nodes:
+      - name: read_bronze
+        read:
+          connection: bronze_layer
+          path: iot_history_delta
+          format: delta
+
+      - name: filter_outliers
+        depends_on: [read_bronze]
+        transform:
+          steps:
+            - sql: |
+                SELECT * 
+                FROM read_bronze
+                WHERE temperature BETWEEN -50 AND 150
+                  AND signal_quality > 0.8
+
+      - name: save_silver_delta
+        depends_on: [filter_outliers]
+        write:
+          connection: silver_layer
+          path: iot_cleaned_delta
+          format: delta
+          mode: overwrite
+
+  # === GOLD LAYER (Aggregation) ===
+  - pipeline: daily_aggregates
+    layer: gold
+    description: "Daily averages per device"
+    nodes:
+      - name: read_silver
+        read:
+          connection: silver_layer
+          path: iot_cleaned_delta
+          format: delta
+
+      - name: calc_daily_stats
+        depends_on: [read_silver]
+        transform:
+          steps:
+            - sql: |
+                SELECT 
+                  device_id,
+                  date_trunc('day', timestamp) as log_date,
+                  avg(temperature) as avg_temp,
+                  max(temperature) as max_temp
+                FROM read_silver
+                GROUP BY 1, 2
+
+      - name: save_gold_report
+        depends_on: [calc_daily_stats]
+        write:
+          connection: gold_layer
+          path: device_daily_stats
+          format: delta
+          mode: overwrite

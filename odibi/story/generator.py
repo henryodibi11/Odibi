@@ -4,15 +4,37 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
+import yaml
+import subprocess
+from odibi import __version__
 
 from odibi.node import NodeResult
+
+
+# Custom class to force block style for multiline strings
+class MultilineString(str):
+    """String subclass to force YAML block scalar style."""
+    pass
+
+
+def multiline_presenter(dumper, data):
+    """YAML representer for MultilineString."""
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+
+
+yaml.add_representer(MultilineString, multiline_presenter)
 
 
 class StoryGenerator:
     """Generates markdown documentation of pipeline execution."""
 
     def __init__(
-        self, pipeline_name: str, max_sample_rows: int = 10, output_path: str = "stories/"
+        self,
+        pipeline_name: str,
+        max_sample_rows: int = 10,
+        output_path: str = "stories/",
+        retention_days: int = 30,
+        retention_count: int = 100,
     ):
         """Initialize story generator.
 
@@ -20,11 +42,15 @@ class StoryGenerator:
             pipeline_name: Name of the pipeline
             max_sample_rows: Maximum rows to show in samples
             output_path: Directory for story output
+            retention_days: Days to keep stories
+            retention_count: Max number of stories to keep
         """
         self.pipeline_name = pipeline_name
         self.max_sample_rows = max_sample_rows
         self.output_path = Path(output_path)
         self.output_path.mkdir(parents=True, exist_ok=True)
+        self.retention_days = retention_days
+        self.retention_count = retention_count
 
     def generate(
         self,
@@ -36,6 +62,7 @@ class StoryGenerator:
         start_time: str,
         end_time: str,
         context: Any = None,
+        config: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Generate story markdown.
 
@@ -48,18 +75,24 @@ class StoryGenerator:
             start_time: ISO timestamp of start
             end_time: ISO timestamp of end
             context: Optional context to access intermediate DataFrames
+            config: Optional pipeline configuration snapshot
 
         Returns:
             Path to generated story file
         """
         lines = []
+        git_info = self._get_git_info()
 
         # Header
         lines.append(f"# Pipeline Run Story: {self.pipeline_name}")
         lines.append("")
-        lines.append(f"**Executed:** {start_time}")
-        lines.append(f"**Completed:** {end_time}")
-        lines.append(f"**Duration:** {duration:.2f}s")
+        lines.append("### Execution Metadata")
+        lines.append(f"- **Started:** {start_time}")
+        lines.append(f"- **Completed:** {end_time}")
+        lines.append(f"- **Duration:** {duration:.2f}s")
+        lines.append(f"- **Odibi Version:** v{__version__}")
+        lines.append(f"- **Git Commit:** `{git_info['commit']}` (Branch: `{git_info['branch']}`)")
+
 
         # Status
         if failed:
@@ -105,10 +138,93 @@ class StoryGenerator:
         filename = f"{self.pipeline_name}_{timestamp}.md"
         story_path = self.output_path / filename
 
+        # Append Config Snapshot at the end
+        if config:
+            # Clean config for YAML dump (handle multiline strings)
+            config = self._clean_config_for_dump(config)
+
+            lines.append("")
+            lines.append("## Configuration Snapshot")
+            lines.append("")
+            lines.append("```yaml")
+            lines.append(yaml.dump(config, default_flow_style=False))
+            lines.append("```")
+
         with open(story_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
 
+        # Auto-cleanup old stories
+        self.cleanup()
+
         return str(story_path)
+
+    def _clean_config_for_dump(self, config: Any) -> Any:
+        """Clean configuration for YAML dumping.
+
+        Handles multiline strings to force block style.
+        """
+        if isinstance(config, dict):
+            return {k: self._clean_config_for_dump(v) for k, v in config.items()}
+        elif isinstance(config, list):
+            return [self._clean_config_for_dump(v) for v in config]
+        elif isinstance(config, str) and "\n" in config:
+            # Use custom class to force block style
+            # Strip trailing spaces from lines to allow block style
+            cleaned = config.replace(" \n", "\n").strip()
+            return MultilineString(cleaned)
+        return config
+
+    def _get_git_info(self) -> Dict[str, str]:
+        """Get current git commit and branch."""
+        try:
+            # Run git commands silently
+            commit = subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"], 
+                stderr=subprocess.DEVNULL
+            ).decode("utf-8").strip()
+            
+            branch = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], 
+                stderr=subprocess.DEVNULL
+            ).decode("utf-8").strip()
+            
+            return {"commit": commit, "branch": branch}
+        except Exception:
+            return {"commit": "unknown", "branch": "unknown"}
+
+    def cleanup(self) -> None:
+        """Remove old stories based on retention policy."""
+        try:
+            from datetime import timedelta
+
+            # Find all stories for this pipeline
+            stories = sorted(
+                self.output_path.glob(f"{self.pipeline_name}_*.md"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True
+            )
+
+            # 1. Count retention
+            if len(stories) > self.retention_count:
+                to_delete = stories[self.retention_count:]
+                for path in to_delete:
+                    path.unlink(missing_ok=True)
+                
+                # Update list for next check
+                stories = stories[:self.retention_count]
+
+            # 2. Time retention
+            now = datetime.now()
+            cutoff = now - timedelta(days=self.retention_days)
+            
+            for path in stories:
+                mtime = datetime.fromtimestamp(path.stat().st_mtime)
+                if mtime < cutoff:
+                    path.unlink(missing_ok=True)
+
+        except Exception as e:
+            # Don't fail generation if cleanup fails
+            print(f"Warning: Story cleanup failed: {e}")
 
     def _generate_node_section(self, node_name: str, result: NodeResult, context: Any) -> List[str]:
         """Generate markdown section for a single node.

@@ -91,13 +91,13 @@ stories/
 *.md.bak
 
 # Example output
-examples/getting_started/output/
-examples/getting_started/stories/
+# examples/getting_started/output/
+# examples/getting_started/stories/
 
 # Walkthrough generated data (from notebook execution)
 data/
 !examples/**/data/
-walkthroughs/data/
+docs/tutorials/walkthroughs/data/
 
 # Exploration notebooks (temporary)
 test_exploration*.ipynb

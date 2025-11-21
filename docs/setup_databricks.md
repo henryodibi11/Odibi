@@ -245,8 +245,8 @@ dbutils.library.restartPython()
 ## Next Steps
 
 - See [setup_azure.md](setup_azure.md) for Azure ADLS authentication details
-- Check [examples/example_spark.yaml](../examples/example_spark.yaml) for complete pipeline examples
-- Review [PHASES.md](../PHASES.md) to see Spark feature roadmap (Phase 3)
+- Check [examples/templates/example_spark.yaml](../examples/templates/example_spark.yaml) for complete pipeline examples
+- Review [PHASES.md](../PHASES.md) for roadmap
 
 ---
 

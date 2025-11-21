@@ -7,10 +7,15 @@ from odibi.cli.validate import validate_command
 from odibi.cli.doctor import doctor_command
 from odibi.cli.story import add_story_parser, story_command
 from odibi.cli.graph import graph_command
+from odibi.cli.secrets import add_secrets_parser, secrets_command
+from odibi.utils.telemetry import setup_telemetry
 
 
 def main():
     """Main CLI entry point."""
+    # Configure telemetry early
+    setup_telemetry()
+
     parser = argparse.ArgumentParser(
         description="Odibi Data Pipeline Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -72,6 +77,9 @@ Examples:
     # odibi story
     add_story_parser(subparsers)
 
+    # odibi secrets
+    add_secrets_parser(subparsers)
+
     args = parser.parse_args()
 
     # Configure logging
@@ -93,6 +101,8 @@ Examples:
         return graph_command(args)
     elif args.command == "story":
         return story_command(args)
+    elif args.command == "secrets":
+        return secrets_command(args)
     else:
         parser.print_help()
         return 1

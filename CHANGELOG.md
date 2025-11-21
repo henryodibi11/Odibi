@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-11-20
+
+### Added - Production Hardening (Phase 4)
+- **Retry Logic**: Configurable exponential backoff for node failures (`retry` config section).
+- **Checkpointing**: Resume failed pipelines from last successful node with `--resume-from-failure`.
+- **Parallel Execution**: Execute independent nodes concurrently using execution layers.
+- **Alerting System**: Webhook integration for Slack/Teams notifications on start/success/failure.
+- **PII Redaction**: `sensitive: true` flag on nodes to mask data in generated stories.
+- **Structured Logging**: JSON logging support for integration with log aggregators (Splunk, Datadog).
+- **Error Strategies**: Configurable failure handling (`fail_fast`, `fail_later`, `ignore`).
+- **State Management**: `StateManager` to track execution status for checkpointing.
+
+### Changed
+- **Performance**: optimized execution graph resolution.
+- **Doctor**: Enhanced system diagnostics to check for new production features.
+
+## [1.3.0] - 2025-11-15
+
+### Added - CLI & Connectivity (Phase 3)
+- **Full CLI Suite**:
+  - `odibi doctor`: System diagnostics.
+  - `odibi graph`: Visualization of pipeline dependencies.
+  - `odibi validate`: Schema and logic validation.
+- **Azure SQL Connector**: Production-ready SQLAlchemy/ODBC connection with Managed Identity support.
+- **Story Themes**: Custom styling for HTML reports (Corporate, Dark, Minimal).
+- **Story Renderers**: Pluggable renderers for HTML, Markdown, and JSON outputs.
+- **Documentation**: Comprehensive CLI reference.
+
 ## [1.2.0-alpha.4-phase2.5] - 2025-11-10
 
 ### Added

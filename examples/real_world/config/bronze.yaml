@@ -1,0 +1,120 @@
+project: odibi_store
+description: "Bronze Layer Ingestion for OdibiStore"
+engine: pandas
+
+# 1. Connections
+connections:
+  raw_data:
+    type: local
+    base_path: ./examples/real_world/data/raw
+  
+  bronze_layer:
+    type: local
+    base_path: ./examples/real_world/data/bronze
+
+# 2. Story Settings
+story:
+  connection: bronze_layer
+  path: ../stories/bronze
+  auto_generate: true
+
+# 3. Pipelines
+pipelines:
+  # --- Pipeline 1: Ingest Olist CSVs ---
+  - pipeline: ingest_olist
+    description: "Ingest raw CSVs to Parquet with schema enforcement"
+    nodes:
+      # Orders
+      - name: read_orders
+        read:
+          connection: raw_data
+          path: olist_orders_dataset.csv
+          format: csv
+          # options: {header: true}  <-- Removed (default is header=0)
+      
+      - name: save_orders
+        depends_on: [read_orders]
+        write:
+          connection: bronze_layer
+          path: orders
+          format: parquet
+          mode: overwrite
+
+      # Order Items
+      - name: read_items
+        read:
+          connection: raw_data
+          path: olist_order_items_dataset.csv
+          format: csv
+      
+      - name: save_items
+        depends_on: [read_items]
+        write:
+          connection: bronze_layer
+          path: order_items
+          format: parquet
+          mode: overwrite
+
+      # Products
+      - name: read_products
+        read:
+          connection: raw_data
+          path: olist_products_dataset.csv
+          format: csv
+      
+      - name: save_products
+        depends_on: [read_products]
+        write:
+          connection: bronze_layer
+          path: products
+          format: parquet
+          mode: overwrite
+
+      # Customers
+      - name: read_customers
+        read:
+          connection: raw_data
+          path: olist_customers_dataset.csv
+          format: csv
+      
+      - name: save_customers
+        depends_on: [read_customers]
+        write:
+          connection: bronze_layer
+          path: customers
+          format: parquet
+          mode: overwrite
+          
+      # Translations (Category Name EN)
+      - name: read_translation
+        read:
+          connection: raw_data
+          path: product_category_name_translation.csv
+          format: csv
+          
+      - name: save_translation
+        depends_on: [read_translation]
+        write:
+          connection: bronze_layer
+          path: category_translation
+          format: parquet
+          mode: overwrite
+
+  # --- Pipeline 2: Ingest Exchange Rates ---
+  - pipeline: ingest_rates
+    description: "Ingest flattened exchange rates"
+    nodes:
+      - name: read_rates
+        read:
+          connection: raw_data
+          path: exchange_rates_flat.csv
+          format: csv
+          # options: {header: true} <-- Removed
+          
+      - name: save_rates
+        depends_on: [read_rates]
+        write:
+          connection: bronze_layer
+          path: exchange_rates
+          format: parquet
+          mode: overwrite

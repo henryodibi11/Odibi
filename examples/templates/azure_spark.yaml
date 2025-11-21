@@ -1,0 +1,42 @@
+# ============================================
+# Azure ADLS + Spark Template
+# ============================================
+# Best for: Cloud production pipelines
+# --------------------------------------------
+project: Azure Spark ETL
+engine: spark
+
+connections:
+  adls_gen2:
+    type: azure_adls
+    account_name: "${ADLS_ACCOUNT}"
+    container: "${ADLS_CONTAINER}"
+    auth_mode: key_vault
+    key_vault_name: "${KV_NAME}"
+    secret_name: "${KV_SECRET}"
+
+pipelines:
+  - pipeline: cloud_migration
+    nodes:
+      - name: read_delta
+        read:
+          connection: adls_gen2
+          path: raw/events
+          format: delta
+          
+      - name: agg_daily
+        depends_on: [read_delta]
+        transform:
+          steps:
+            - sql: |
+                SELECT date, count(*) as events 
+                FROM read_delta 
+                GROUP BY date
+                
+      - name: write_summary
+        depends_on: [agg_daily]
+        write:
+          connection: adls_gen2
+          path: processed/daily_summary
+          format: delta
+          mode: overwrite

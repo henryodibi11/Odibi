@@ -1,6 +1,6 @@
 """ODIBI - Explicit, Traceable, Simple Data Engineering Framework."""
 
-__version__ = "1.0.0"
+__version__ = "1.4.0"
 
 # Core components (available now)
 from odibi.registry import transform

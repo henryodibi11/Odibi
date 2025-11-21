@@ -17,6 +17,7 @@ ODIBI is a declarative data engineering framework that makes data pipelines tran
 - **Dependencies Clear**: No magic, no hidden flow
 - **Stories Automatic**: Every run is documented
 - **Engine Agnostic**: Same config works on Spark or Pandas
+- **Production Ready**: Secrets management, observability, and plugins built-in
 
 ## Installation
 
@@ -30,14 +31,11 @@ pip install "odibi[spark]"
 # With Azure connectors (ADLS Gen2, Azure SQL)
 pip install "odibi[azure]"
 
-# All extras (Spark + Azure + advanced features)
-pip install "odibi[all]"
+# With Telemetry and Observability
+pip install "odibi[telemetry]"
 
-# Development installation (includes testing and linting tools)
-git clone https://github.com/henryodibi11/Odibi.git
-cd Odibi
-pip install -e .[dev]
-pre-commit install
+# All extras (Spark + Azure + Telemetry + Advanced)
+pip install "odibi[all]"
 ```
 
 ---
@@ -47,6 +45,9 @@ pre-commit install
 ### Command-Line Interface (Recommended)
 
 ```bash
+# Initialize secrets template
+odibi secrets init pipeline.yaml
+
 # Validate your configuration
 odibi validate pipeline.yaml
 
@@ -63,7 +64,7 @@ odibi --help
 from odibi.pipeline import PipelineManager
 
 # Load and run all pipelines from YAML
-manager = PipelineManager.from_yaml("examples/example_local.yaml")
+manager = PipelineManager.from_yaml("examples/templates/example_local.yaml")
 results = manager.run()  # Runs all defined pipelines
 
 # Or run specific pipeline
@@ -77,7 +78,7 @@ print(f"✅ {len(result.completed)} nodes completed")
 - Saves output in Delta Lake format (ACID transactions)
 - Generates execution story automatically
 
-See [examples/template_full.yaml](examples/template_full.yaml) for all configuration options.
+See [examples/templates/template_full.yaml](examples/templates/template_full.yaml) for all configuration options.
 
 ### Option 2: Spark + Azure Pipeline (Production)
 
@@ -90,24 +91,27 @@ For large-scale data processing on Databricks.
 
 2. **Configure Azure connections:**
    - See [docs/setup_azure.md](docs/setup_azure.md) for authentication setup
-   - See [docs/setup_databricks.md](docs/setup_databricks.md) for cluster configuration
+   - See [docs/tutorials/databricks_setup.ipynb](docs/tutorials/databricks_setup.ipynb) for cluster configuration
 
 3. **Run Spark pipeline:**
    ```bash
-   odibi run examples/example_spark.yaml
+   odibi run examples/templates/example_spark.yaml
    ```
 
-See [examples/example_spark.yaml](examples/example_spark.yaml) for the full configuration.
+See [examples/templates/example_spark.yaml](examples/templates/example_spark.yaml) for the full configuration.
 
 ---
 
 ### 🎓 Interactive Tutorial
 
-**Complete walkthrough:** `examples/getting_started/walkthrough.ipynb`
+**Complete walkthrough:** `docs/tutorials/walkthroughs/01_local_pipeline_pandas.ipynb`
 
 ```bash
-cd examples/getting_started
-jupyter notebook walkthrough.ipynb
+# Install Jupyter if needed
+pip install jupyter
+
+# Launch tutorial
+jupyter notebook docs/tutorials/walkthroughs/01_local_pipeline_pandas.ipynb
 ```
 
 **Learn in 30 minutes:**
@@ -201,6 +205,20 @@ engine.restore_delta(conn, "sales.delta", version=5)
 - ✅ Full Azure ADLS integration
 
 See [docs/DELTA_LAKE_GUIDE.md](docs/DELTA_LAKE_GUIDE.md) for complete guide.
+
+### Plugins & Extensibility
+Add custom connectors without forking the codebase:
+
+```bash
+pip install odibi-connector-postgres
+```
+
+```yaml
+connections:
+  my_db:
+    type: postgres
+    host: localhost
+```
 
 ### Unified Context API
 Transform functions work on both Spark and Pandas without changes:
@@ -331,15 +349,15 @@ ProjectConfig (top-level)
 - [Supported Formats](docs/SUPPORTED_FORMATS.md) - File format guide
 
 **💡 Templates & Examples:**
-- [template_full.yaml](examples/template_full.yaml) - Complete feature reference
-- [template_full_adls.yaml](examples/template_full_adls.yaml) - Azure multi-account
-- [example_delta_pipeline.yaml](examples/example_delta_pipeline.yaml) - Delta Lake patterns
-- [example_spark.yaml](examples/example_spark.yaml) - Spark on Databricks
+- [template_full.yaml](examples/templates/template_full.yaml) - Complete feature reference
+- [template_full_adls.yaml](examples/templates/template_full_adls.yaml) - Azure multi-account
+- [example_delta_pipeline.yaml](examples/templates/example_delta_pipeline.yaml) - Delta Lake patterns
+- [example_spark.yaml](examples/templates/example_spark.yaml) - Spark on Databricks
 
 **🎓 Advanced Walkthroughs:**
-- [Delta Lake Deep Dive](walkthroughs/phase2b_delta_lake.ipynb) - All Delta features
-- [Production Pipelines](walkthroughs/phase2b_production_pipeline.ipynb) - YAML + Key Vault
-- [ADLS Integration](walkthroughs/phase2a_adls_test.ipynb) - Azure storage
+- [Delta Lake Deep Dive](docs/tutorials/walkthroughs/phase2b_delta_lake.ipynb) - All Delta features
+- [Production Pipelines](docs/tutorials/walkthroughs/phase2b_production_pipeline.ipynb) - YAML + Key Vault
+- [ADLS Integration](docs/tutorials/walkthroughs/phase2a_adls_test.ipynb) - Azure storage
 
 **🔧 Project Info:**
 - [PHASES.md](PHASES.md) - Roadmap & current status
@@ -350,18 +368,18 @@ ProjectConfig (top-level)
 ---
 
 ## Roadmap
-
-ODIBI is being developed in deliberate phases:
-
-- ✅ **Phase 1:** Pandas MVP, Spark scaffolding, Azure connections, CI/CD
-- ✅ **Phase 2A:** Azure ADLS + Key Vault authentication
-- ✅ **Phase 2B (Current):** Delta Lake support (read/write, VACUUM, time travel)
-- 🔜 **Phase 2C (Next):** Performance optimization, parallel Key Vault fetching
-- ⏳ **Phase 3 (Q1 2026):** CLI tools, testing utilities, advanced features
-- ⏳ **Phase 4 (Q2 2026):** Production hardening, performance tuning
-- ⏳ **Phase 5 (2026+):** Community ecosystem, plugin system
-
-See [PHASES.md](PHASES.md) for detailed roadmap.
+ 
+ ODIBI is being developed in deliberate phases:
+ 
+ - ✅ **Phase 1:** Pandas MVP, Spark scaffolding, Azure connections, CI/CD
+ - ✅ **Phase 2A:** Azure ADLS + Key Vault authentication
+ - ✅ **Phase 2B:** Delta Lake support (read/write, VACUUM, time travel)
+ - ✅ **Phase 2C:** Performance optimization, parallel Key Vault fetching
+ - ✅ **Phase 3:** CLI tools, testing utilities, advanced features
+ - ✅ **Phase 4:** Production hardening, performance tuning
+ - ✅ **Phase 5:** Community ecosystem, plugin system (Complete Nov 2025)
+ 
+ See [PHASES.md](PHASES.md) for detailed roadmap.
 
 ---
 

@@ -1,0 +1,90 @@
+# ============================================
+# Example: Azure ETL Pipeline (ADLS -> SQL)
+# ============================================
+# Demonstrates:
+# 1. Secure connection to Azure Data Lake (ADLS Gen2)
+# 2. Secure connection to Azure SQL Database
+# 3. Reading Parquet from Data Lake
+# 4. Writing results to SQL Table
+#
+# Prereq: Set env vars for secrets (see README)
+# Run with: odibi run examples/azure_etl/config.yaml
+# ============================================
+
+project: azure_migration
+engine: pandas  # Or 'spark' for big data
+description: "Moves data from Data Lake to SQL Database"
+
+# 1. Define Connections
+connections:
+  # Source: Azure Data Lake
+  # Uses Key Vault or Environment Variables for auth
+  data_lake:
+    type: azure_adls
+    account_name: "${ADLS_ACCOUNT_NAME}"
+    container: "raw-data"
+    auth:
+      client_id: "${AZURE_CLIENT_ID}"
+      client_secret: "${AZURE_CLIENT_SECRET}"
+      tenant_id: "${AZURE_TENANT_ID}"
+
+  # Target: Azure SQL Database
+  sql_dw:
+    type: azure_sql
+    server: "${SQL_SERVER_NAME}.database.windows.net"
+    database: "AnalyticsDB"
+    auth:
+      username: "${SQL_USER}"
+      password: "${SQL_PASSWORD}"
+    driver: "ODBC Driver 18 for SQL Server"
+
+  # Local storage for stories/logs
+  local_logs:
+    type: local
+    base_path: ./logs
+
+# 2. Define Story
+story:
+  connection: local_logs
+  path: ./stories
+  auto_generate: true
+
+# 3. Define Pipelines
+pipelines:
+  - pipeline: customer_migration
+    description: "Migrate customer data from Parquet to SQL"
+    nodes:
+      # Step A: Read from ADLS
+      - name: read_customers_parquet
+        description: "Read customer master data"
+        read:
+          connection: data_lake
+          path: master/customers/v1/
+          format: parquet
+
+      # Step B: Standardize Columns (Pandas/SQL)
+      - name: standardize_names
+        description: "Ensure upper case names"
+        depends_on: [read_customers_parquet]
+        transform:
+          steps:
+            - sql: |
+                SELECT 
+                  customer_id,
+                  upper(first_name) as first_name,
+                  upper(last_name) as last_name,
+                  email,
+                  created_at
+                FROM read_customers_parquet
+
+      # Step C: Write to Azure SQL
+      - name: write_to_sql
+        description: "Load into dim_customers table"
+        depends_on: [standardize_names]
+        write:
+          connection: sql_dw
+          table: dbo.dim_customers
+          format: sql  # Implicit format for SQL connection
+          mode: append
+          options:
+            chunksize: 1000  # Write in batches

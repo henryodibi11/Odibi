@@ -1,0 +1,35 @@
+# ============================================
+# Local Pandas Pipeline Template
+# ============================================
+# Best for: Learning and simple ETL
+# --------------------------------------------
+project: Local Example
+engine: pandas
+
+connections:
+  local:
+    type: local
+    base_path: ./data
+
+pipelines:
+  - pipeline: basic_etl
+    nodes:
+      - name: load_csv
+        read:
+          connection: local
+          path: input/data.csv
+          format: csv
+      
+      - name: clean
+        depends_on: [load_csv]
+        transform:
+          steps:
+            - "SELECT * FROM load_csv WHERE id IS NOT NULL"
+            
+      - name: save
+        depends_on: [clean]
+        write:
+          connection: local
+          path: output/cleaned.parquet
+          format: parquet
+          mode: overwrite
