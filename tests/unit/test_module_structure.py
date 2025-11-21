@@ -110,25 +110,27 @@ class TestTestingModule:
         assert odibi.testing is not None
 
     def test_testing_version(self):
-        """Testing module should have version 0.0.0 (scaffolding)."""
+        """Testing module should have version 1.3.0-alpha.1 (Phase 3A)."""
         import odibi.testing
 
         assert hasattr(odibi.testing, "__version__")
-        assert odibi.testing.__version__ == "0.0.0"
+        assert odibi.testing.__version__ == "1.3.0-alpha.1"
 
-    def test_testing_all_empty(self):
-        """Testing module should export nothing yet."""
+    def test_testing_exports(self):
+        """Testing module should export fixtures and assertions."""
         import odibi.testing
 
-        assert odibi.testing.__all__ == []
+        assert "temp_directory" in odibi.testing.__all__
+        assert "generate_sample_data" in odibi.testing.__all__
+        assert "assert_frame_equal" in odibi.testing.__all__
+        assert "assert_schema_equal" in odibi.testing.__all__
 
     def test_testing_docstring(self):
         """Testing module should have comprehensive documentation."""
         import odibi.testing
 
         assert odibi.testing.__doc__ is not None
-        assert "Testing Utilities" in odibi.testing.__doc__
-        assert "fixtures" in odibi.testing.__doc__.lower()
+        assert "Testing utilities" in odibi.testing.__doc__
 
 
 class TestCLIModule:
