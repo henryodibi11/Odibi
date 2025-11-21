@@ -5,6 +5,10 @@
 # --------------------------------------------
 project: Local Example
 engine: pandas
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff: exponential
 
 connections:
   local:

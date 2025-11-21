@@ -24,28 +24,37 @@ This document outlines the next evolution of the Odibi framework, focusing on la
 
 **Goal:** Move from a "Library" to a "Platform" by integrating with the wider data engineering ecosystem.
 
-### 7.1. Orchestration Generators (`odibi generate`)
-Instead of building our own scheduler, generate code for industry standards.
-- **Airflow:** Generate a DAG file where each Odibi Node is a `BashOperator` or `PythonOperator`.
-- **Dagster:** Generate a Graph where each Node is a Software-Defined Asset.
-- **GitHub Actions:** Generate a workflow for CI/CD deployment of pipelines.
+### 7.1. Developer Experience (DX) - ✅ COMPLETED
+**Status:** ✅ Completed (Nov 2025) - v2.1.0
+**Outcome:**
+- **VS Code Support:** Implemented `odibi init-vscode` (JSON Schema for IntelliSense).
+- **Project Templates:** Implemented `odibi create` with "Template-Driven Development".
+- **Modular Configs:** Implemented `imports: [...]` to split large YAML files.
+- **Engine Hardening:** Fixed 4 major functional gaps.
+- **Unified Key Vault:** Decoupled secrets from auth modes.
 
-### 7.2. The "Control Plane" UI
-A standalone web interface for observability.
-- **Tech:** FastAPI + React (or Streamlit/NiceGUI for simplicity).
-- **Features:**
-  - **Pipeline Gallery:** Visual graph of all pipelines in the project.
-  - **Run History:** Timeline of past runs (green/red bars).
-  - **Story Viewer:** Render the JSON stories as interactive HTML reports.
-  - **Drift Detection:** Visual warning if schema or row counts deviate significantly.
+### 7.2. Orchestration Generators (DEFERRED)
+**Status:** ⏸️ On Hold
+**Reason:** Orchestration is not currently a bottleneck. We will let actual usage patterns drive the requirements for this feature later.
+**Planned Features:**
+- Generators for Databricks Jobs, ADF Pipelines, and GitHub Actions.
 
-### 7.3. Developer Experience (DX)
-- **VS Code Extension:**
-  - Syntax highlighting for `odibi.yaml`.
-  - "Run This Node" code lens button in YAML files.
-  - Auto-completion for connection names and table paths.
-- **Interactive TUI (Text User Interface):**
-  - A `top`-like interface for watching pipeline progress in the terminal.
+### 7.3. The "Control Plane" UI (DEFERRED)
+**Status:** ⏸️ On Hold
+**Planned Features:** Standalone web interface for observability.
+
+---
+
+## Phase 8: Usage & "The Big Picture" (CURRENT)
+
+**Goal:** Stop building features and start **using** Odibi to reclaim time and freedom. Let real-world pains drive future development.
+
+**Focus Areas:**
+1.  **Real-world Implementation:** Deploying Odibi v2.1.0 to actual projects.
+2.  **Stability:** Fixing bugs that arise during daily usage.
+3.  **Strategic Data Engineering:** Using the time saved to focus on architecture and value.
+
+---
 
 ---
 

@@ -120,7 +120,15 @@ def fetch_keyvault_secrets_parallel(
     results = {}
 
     for name, conn in connections.items():
-        if hasattr(conn, "auth_mode") and conn.auth_mode == "key_vault":
+        # Check if connection is configured to use Key Vault (has vault name and secret name)
+        # This supports ANY auth mode (key_vault, sas_token, service_principal, sql, etc.)
+        # as long as they want to fetch a credential from KV.
+        if (
+            hasattr(conn, "key_vault_name")
+            and conn.key_vault_name
+            and hasattr(conn, "secret_name")
+            and conn.secret_name
+        ):
             kv_connections.append((name, conn))
         else:
             results[name] = KeyVaultFetchResult(

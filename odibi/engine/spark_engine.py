@@ -91,7 +91,7 @@ class SparkEngine(Engine):
 
         Args:
             connection: Connection object (with get_path method)
-            format: Data format (csv, parquet, json, delta)
+            format: Data format (csv, parquet, json, delta, sql_server)
             table: Table name
             path: File path
             options: Format-specific options (including versionAsOf for Delta time travel)
@@ -101,22 +101,50 @@ class SparkEngine(Engine):
         """
         options = options or {}
 
-        # Get full path from connection
-        if path:
-            full_path = connection.get_path(path)
-        elif table:
-            full_path = connection.get_path(table)
-        else:
-            raise ValueError("Either path or table must be provided")
+        # SQL Server / Azure SQL Support
+        if format in ["sql_server", "azure_sql"]:
+            if not hasattr(connection, "get_spark_options"):
+                raise ValueError(
+                    f"Connection type '{type(connection).__name__}' does not support Spark SQL read"
+                )
+
+            jdbc_options = connection.get_spark_options()
+
+            # Merge with user options (user options take precedence)
+            merged_options = {**jdbc_options, **options}
+
+            if table:
+                merged_options["dbtable"] = table
+            elif "query" in options:
+                merged_options["query"] = options["query"]
+            elif "dbtable" not in merged_options:
+                raise ValueError("SQL format requires 'table' config or 'query' option")
+
+            return self.spark.read.format("jdbc").options(**merged_options).load()
 
         # Read based on format
-        reader = self.spark.read.format(format)
+        if table:
+            # Managed/External Table (Catalog)
+            reader = self.spark.read.format(format)
 
-        # Apply options
-        for key, value in options.items():
-            reader = reader.option(key, value)
+            # Apply options
+            for key, value in options.items():
+                reader = reader.option(key, value)
 
-        return reader.load(full_path)
+            return reader.table(table)
+
+        elif path:
+            # File Path
+            full_path = connection.get_path(path)
+            reader = self.spark.read.format(format)
+
+            # Apply options
+            for key, value in options.items():
+                reader = reader.option(key, value)
+
+            return reader.load(full_path)
+        else:
+            raise ValueError("Either path or table must be provided")
 
     def write(
         self,
@@ -141,16 +169,62 @@ class SparkEngine(Engine):
         """
         options = options or {}
 
-        # Get full path from connection
-        if path:
+        # SQL Server / Azure SQL Support
+        if format in ["sql_server", "azure_sql"]:
+            if not hasattr(connection, "get_spark_options"):
+                raise ValueError(
+                    f"Connection type '{type(connection).__name__}' does not support Spark SQL write"
+                )
+
+            jdbc_options = connection.get_spark_options()
+            merged_options = {**jdbc_options, **options}
+
+            if table:
+                merged_options["dbtable"] = table
+            elif "dbtable" not in merged_options:
+                raise ValueError("SQL format requires 'table' config or 'dbtable' option")
+
+            # Map mode
+            # Spark JDBC supports overwrite, append, ignore, error
+            # If mode is 'upsert', we can't do it natively easily without custom SQL.
+            if mode not in ["overwrite", "append", "ignore", "error"]:
+                # Fallback or error?
+                # For now, map 'fail' to 'error'
+                if mode == "fail":
+                    mode = "error"
+                else:
+                    # upsert not supported in JDBC write generically
+                    raise ValueError(f"Write mode '{mode}' not supported for Spark SQL write")
+
+            df.write.format("jdbc").options(**merged_options).mode(mode).save()
+            return
+
+        # Get output location
+        if table:
+            # Managed/External Table (Catalog)
+            writer = df.write.format(format).mode(mode)
+
+            partition_by = options.get("partition_by")
+            # Apply partitioning if specified
+            if partition_by:
+                if isinstance(partition_by, str):
+                    partition_by = [partition_by]
+                writer = writer.partitionBy(*partition_by)
+
+            # Apply other options
+            for key, value in options.items():
+                writer = writer.option(key, value)
+
+            writer.saveAsTable(table)
+            return
+
+        elif path:
             full_path = connection.get_path(path)
-        elif table:
-            full_path = connection.get_path(table)
         else:
             raise ValueError("Either path or table must be provided")
 
         # Extract partition_by option
-        partition_by = options.pop("partition_by", None)
+        partition_by = options.pop("partition_by", None) or options.pop("partitionBy", None)
 
         # Warn about partitioning anti-patterns
         if partition_by:
@@ -163,7 +237,7 @@ class SparkEngine(Engine):
                 UserWarning,
             )
 
-        # Handle Upsert/Append-Once for Delta Lake
+        # Handle Upsert/Append-Once for Delta Lake (Path-based only for now)
         if format == "delta" and mode in ["upsert", "append_once"]:
             try:
                 from delta.tables import DeltaTable
@@ -194,7 +268,7 @@ class SparkEngine(Engine):
                 # Usually initial write is overwrite/create
                 mode = "overwrite"
 
-        # Write based on format
+        # Write based on format (Path-based)
         writer = df.write.format(format).mode(mode)
 
         # Apply partitioning if specified
@@ -214,7 +288,7 @@ class SparkEngine(Engine):
 
         Args:
             sql: SQL query string
-            context: Dict of table_name -> DataFrame
+            context: Context object (SparkContext)
 
         Returns:
             Result DataFrame
@@ -223,8 +297,10 @@ class SparkEngine(Engine):
             TransformError: If SQL execution fails
         """
         # Register all DataFrames as temporary views
-        for table_name, df in context.items():
-            df.createOrReplaceTempView(table_name)
+        # Context doesn't have .items(), use list_names() and get()
+        for name in context.list_names():
+            df = context.get(name)
+            df.createOrReplaceTempView(name)
 
         try:
             return self.spark.sql(sql)
@@ -242,11 +318,87 @@ class SparkEngine(Engine):
             "See PHASES.md for implementation plan."
         )
 
-    def execute_operation(self, *args, **kwargs):
-        raise NotImplementedError(
-            "SparkEngine.execute_operation() will be implemented in Phase 2B. "
-            "See PHASES.md for implementation plan."
-        )
+    def execute_operation(self, operation: str, params: Dict[str, Any], df) -> Any:
+        """Execute built-in operation on Spark DataFrame.
+
+        Args:
+            operation: Operation name
+            params: Operation parameters
+            df: Spark DataFrame
+
+        Returns:
+            Transformed Spark DataFrame
+        """
+        params = params or {}
+
+        if operation == "drop_duplicates":
+            # Spark uses dropDuplicates(subset=...)
+            subset = params.get("subset")
+            if subset:
+                if isinstance(subset, str):
+                    subset = [subset]
+                return df.dropDuplicates(subset=subset)
+            return df.dropDuplicates()
+
+        elif operation == "fillna":
+            # Spark uses fillna(value, subset=...)
+            # Pandas uses fillna(value=..., subset=...) or dict
+            value = params.get("value")
+            subset = params.get("subset")
+            return df.fillna(value, subset=subset)
+
+        elif operation == "drop":
+            # Spark uses drop(*cols)
+            columns = params.get("columns")
+            if not columns:
+                return df
+            if isinstance(columns, str):
+                columns = [columns]
+            return df.drop(*columns)
+
+        elif operation == "rename":
+            # Spark uses withColumnRenamed(existing, new) per column
+            # Params: columns={"old": "new"}
+            columns = params.get("columns")
+            if not columns:
+                return df
+
+            res = df
+            for old_name, new_name in columns.items():
+                res = res.withColumnRenamed(old_name, new_name)
+            return res
+
+        elif operation == "sort":
+            # Spark uses orderBy/sort
+            by = params.get("by")
+            ascending = params.get("ascending", True)
+
+            if not by:
+                return df
+
+            if isinstance(by, str):
+                by = [by]
+
+            if not ascending:
+                from pyspark.sql.functions import desc
+
+                # If multiple cols, desc applies to all? Spark API is complex here.
+                # Simplification: Sort all descending if ascending=False
+                sort_cols = [desc(c) for c in by]
+                return df.orderBy(*sort_cols)
+
+            return df.orderBy(*by)
+
+        elif operation == "sample":
+            # Spark uses sample(withReplacement, fraction, seed)
+            # Pandas uses n=... or frac=...
+            fraction = params.get("frac", 0.1)
+            seed = params.get("random_state")
+            with_replacement = params.get("replace", False)
+            return df.sample(withReplacement=with_replacement, fraction=fraction, seed=seed)
+
+        else:
+            raise ValueError(f"Unsupported operation for Spark engine: {operation}")
 
     def count_nulls(self, df, columns: List[str]) -> Dict[str, int]:
         """Count nulls in specified columns.
@@ -318,6 +470,69 @@ class SparkEngine(Engine):
                         f"Column '{col_name}' has type '{actual_type}', "
                         f"expected '{expected_type}'"
                     )
+
+        return failures
+
+    def validate_data(self, df, validation_config: Any) -> List[str]:
+        """Validate DataFrame against rules.
+
+        Args:
+            df: Spark DataFrame
+            validation_config: ValidationConfig object
+
+        Returns:
+            List of validation failure messages
+        """
+        from pyspark.sql.functions import col
+
+        failures = []
+
+        # Check not empty
+        if validation_config.not_empty:
+            if df.isEmpty():
+                failures.append("DataFrame is empty")
+
+        # Check for nulls in specified columns
+        if validation_config.no_nulls:
+            null_counts = self.count_nulls(df, validation_config.no_nulls)
+            for col_name, count in null_counts.items():
+                if count > 0:
+                    failures.append(f"Column '{col_name}' has {count} null values")
+
+        # Schema validation
+        if validation_config.schema_validation:
+            schema_failures = self.validate_schema(df, validation_config.schema_validation)
+            failures.extend(schema_failures)
+
+        # Range validation
+        if validation_config.ranges:
+            for col_name, bounds in validation_config.ranges.items():
+                if col_name in df.columns:
+                    min_val = bounds.get("min")
+                    max_val = bounds.get("max")
+
+                    if min_val is not None:
+                        count = df.filter(col(col_name) < min_val).count()
+                        if count > 0:
+                            failures.append(f"Column '{col_name}' has values < {min_val}")
+
+                    if max_val is not None:
+                        count = df.filter(col(col_name) > max_val).count()
+                        if count > 0:
+                            failures.append(f"Column '{col_name}' has values > {max_val}")
+                else:
+                    failures.append(f"Column '{col_name}' not found for range validation")
+
+        # Allowed values validation
+        if validation_config.allowed_values:
+            for col_name, allowed in validation_config.allowed_values.items():
+                if col_name in df.columns:
+                    # Check for values not in allowed list
+                    count = df.filter(~col(col_name).isin(allowed)).count()
+                    if count > 0:
+                        failures.append(f"Column '{col_name}' has invalid values")
+                else:
+                    failures.append(f"Column '{col_name}' not found for allowed values validation")
 
         return failures
 

@@ -45,9 +45,10 @@ def test_spark_engine_methods_not_implemented():
     engine = SparkEngine(spark_session=mock_spark)
 
     # Phase 2A: read/write/execute_sql are implemented
-    # Only execute_transform and execute_operation should raise NotImplementedError
+    # execute_transform should raise NotImplementedError
     with pytest.raises(NotImplementedError, match="Phase 2B"):
         engine.execute_transform()
 
-    with pytest.raises(NotImplementedError, match="Phase 2B"):
-        engine.execute_operation()
+    # execute_operation raises ValueError for unsupported operations
+    with pytest.raises(ValueError, match="Unsupported operation"):
+        engine.execute_operation("op", {}, None)

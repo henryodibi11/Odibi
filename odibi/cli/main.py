@@ -10,6 +10,9 @@ from odibi.cli.graph import graph_command
 from odibi.cli.secrets import add_secrets_parser, secrets_command
 from odibi.cli.generate_project import add_generate_project_parser, generate_project_command
 from odibi.cli.stress import add_stress_parser, run_stress_test
+from odibi.cli.schema import schema_command
+from odibi.cli.ide import add_ide_parser, init_vscode_command
+from odibi.cli.create import add_create_parser, create_command
 from odibi.utils.telemetry import setup_telemetry
 
 
@@ -88,6 +91,15 @@ Examples:
     # odibi stress
     add_stress_parser(subparsers)
 
+    # odibi schema
+    subparsers.add_parser("schema", help="Generate JSON schema for VS Code")
+
+    # odibi init-vscode
+    add_ide_parser(subparsers)
+
+    # odibi create
+    add_create_parser(subparsers)
+
     args = parser.parse_args()
 
     # Configure logging
@@ -115,6 +127,12 @@ Examples:
         return generate_project_command(args)
     elif args.command == "stress":
         return run_stress_test(args)
+    elif args.command == "schema":
+        return schema_command(args)
+    elif args.command == "init-vscode":
+        return init_vscode_command(args)
+    elif args.command == "create":
+        return create_command(args)
     else:
         parser.print_help()
         return 1

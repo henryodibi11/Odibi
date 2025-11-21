@@ -66,10 +66,11 @@ class TestPipelineManagerConnections:
             key_vault_name="kv-test",
             secret_name="secret-test",
             account_key=None,
+            sas_token=None,
             tenant_id=None,
             client_id=None,
             client_secret=None,
-            validate=True,
+            validate=False,
         )
 
     def test_build_azure_adls_auth_dict(self):
@@ -93,10 +94,11 @@ class TestPipelineManagerConnections:
             key_vault_name="kv-new",
             secret_name="secret-new",
             account_key=None,
+            sas_token=None,
             tenant_id=None,
             client_id=None,
             client_secret=None,
-            validate=True,
+            validate=False,
         )
 
     def test_build_azure_adls_direct_key(self):
@@ -121,10 +123,11 @@ class TestPipelineManagerConnections:
             key_vault_name=None,
             secret_name=None,
             account_key="fake-key-123",
+            sas_token=None,
             tenant_id=None,
             client_id=None,
             client_secret=None,
-            validate=True,
+            validate=False,
         )
 
     def test_build_azure_adls_path_prefix(self):
@@ -151,10 +154,11 @@ class TestPipelineManagerConnections:
             key_vault_name="kv",
             secret_name="sec",
             account_key=None,
+            sas_token=None,
             tenant_id=None,
             client_id=None,
             client_secret=None,
-            validate=True,
+            validate=False,
         )
 
     def test_build_azure_adls_service_principal(self):
@@ -179,10 +183,11 @@ class TestPipelineManagerConnections:
             key_vault_name=None,
             secret_name=None,
             account_key=None,
+            sas_token=None,
             tenant_id="tid",
             client_id="cid",
             client_secret="csecret",
-            validate=True,
+            validate=False,
         )
 
     def test_missing_account_name_raises_error(self):

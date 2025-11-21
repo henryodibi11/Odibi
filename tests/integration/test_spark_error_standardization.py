@@ -32,9 +32,13 @@ class TestSparkErrorStandardization:
 
         mock_spark_session.sql.side_effect = AnalysisException("Table not found")
 
+        # Context needs to support list_names()
+        mock_context = MagicMock()
+        mock_context.list_names.return_value = []
+
         # Now expecting TransformError
         with pytest.raises(TransformError, match="Spark SQL Analysis Error"):
-            spark_engine.execute_sql("SELECT * FROM bad_table", {})
+            spark_engine.execute_sql("SELECT * FROM bad_table", mock_context)
 
     def test_read_missing_path_error(self, spark_engine):
         """Test error when path is missing."""

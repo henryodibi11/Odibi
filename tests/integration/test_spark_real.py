@@ -26,5 +26,10 @@ def test_spark_real_session():
         assert rows[0]["name"] == "Alice"
 
         spark.stop()
+    except RuntimeError as e:
+        if "Only remote Spark sessions using Databricks Connect are supported" in str(e):
+            pytest.skip("Databricks Connect installed but not configured")
+        else:
+            pytest.fail(f"Failed to start or use real Spark session: {e}")
     except Exception as e:
         pytest.fail(f"Failed to start or use real Spark session: {e}")

@@ -23,6 +23,7 @@ class AzureADLS(BaseConnection):
         key_vault_name: Optional[str] = None,
         secret_name: Optional[str] = None,
         account_key: Optional[str] = None,
+        sas_token: Optional[str] = None,
         tenant_id: Optional[str] = None,
         client_id: Optional[str] = None,
         client_secret: Optional[str] = None,
@@ -35,10 +36,11 @@ class AzureADLS(BaseConnection):
             account: Storage account name (e.g., 'mystorageaccount')
             container: Container/filesystem name
             path_prefix: Optional prefix for all paths
-            auth_mode: Authentication mode ('key_vault', 'direct_key', 'service_principal', 'managed_identity')
+            auth_mode: Authentication mode ('key_vault', 'direct_key', 'sas_token', 'service_principal', 'managed_identity')
             key_vault_name: Azure Key Vault name (required for key_vault mode)
             secret_name: Secret name in Key Vault (required for key_vault mode)
             account_key: Storage account key (required for direct_key mode)
+            sas_token: Shared Access Signature token (required for sas_token mode)
             tenant_id: Azure Tenant ID (required for service_principal)
             client_id: Service Principal Client ID (required for service_principal)
             client_secret: Service Principal Client Secret (required for service_principal)
@@ -51,6 +53,7 @@ class AzureADLS(BaseConnection):
         self.key_vault_name = key_vault_name
         self.secret_name = secret_name
         self.account_key = account_key
+        self.sas_token = sas_token
         self.tenant_id = tenant_id
         self.client_id = client_id
         self.client_secret = client_secret
@@ -91,10 +94,19 @@ class AzureADLS(BaseConnection):
                     f"Use auth_mode: key_vault. Connection: {self.account}/{self.container}",
                     UserWarning,
                 )
-        elif self.auth_mode == "service_principal":
-            if not self.tenant_id or not self.client_id or not self.client_secret:
+        elif self.auth_mode == "sas_token":
+            if not self.sas_token and not (self.key_vault_name and self.secret_name):
                 raise ValueError(
-                    f"service_principal mode requires 'tenant_id', 'client_id', and 'client_secret' "
+                    f"sas_token mode requires 'sas_token' (or key_vault_name/secret_name) "
+                    f"for connection to {self.account}/{self.container}"
+                )
+        elif self.auth_mode == "service_principal":
+            if not self.tenant_id or not self.client_id:
+                raise ValueError("service_principal mode requires 'tenant_id' and 'client_id'")
+
+            if not self.client_secret and not (self.key_vault_name and self.secret_name):
+                raise ValueError(
+                    f"service_principal mode requires 'client_secret' (or key_vault_name/secret_name) "
                     f"for connection to {self.account}/{self.container}"
                 )
         elif self.auth_mode == "managed_identity":
@@ -161,8 +173,16 @@ class AzureADLS(BaseConnection):
         elif self.auth_mode == "direct_key":
             return self.account_key
 
+        elif self.auth_mode == "sas_token":
+            # Return cached key (fetched from KV) if available, else sas_token arg
+            return self._cached_key or self.sas_token
+
         # For other modes (SP, MI), we don't use an account key
         return None
+
+    def get_client_secret(self) -> Optional[str]:
+        """Get Service Principal client secret (cached or literal)."""
+        return self._cached_key or self.client_secret
 
     def pandas_storage_options(self) -> Dict[str, Any]:
         """Get storage options for pandas/fsspec.
@@ -175,12 +195,16 @@ class AzureADLS(BaseConnection):
         if self.auth_mode in ["key_vault", "direct_key"]:
             return {**base_options, "account_key": self.get_storage_key()}
 
+        elif self.auth_mode == "sas_token":
+            # Use get_storage_key() which handles KV fallback for SAS
+            return {**base_options, "sas_token": self.get_storage_key()}
+
         elif self.auth_mode == "service_principal":
             return {
                 **base_options,
                 "tenant_id": self.tenant_id,
                 "client_id": self.client_id,
-                "client_secret": self.client_secret,
+                "client_secret": self.get_client_secret(),
             }
 
         elif self.auth_mode == "managed_identity":
@@ -200,6 +224,25 @@ class AzureADLS(BaseConnection):
             config_key = f"fs.azure.account.key.{self.account}.dfs.core.windows.net"
             spark.conf.set(config_key, self.get_storage_key())
 
+        elif self.auth_mode == "sas_token":
+            # SAS Token Configuration
+            # fs.azure.sas.token.provider.type -> org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider
+            # fs.azure.sas.fixed.token -> <token>
+            provider_key = f"fs.azure.account.auth.type.{self.account}.dfs.core.windows.net"
+            spark.conf.set(provider_key, "SAS")
+
+            sas_provider_key = (
+                f"fs.azure.sas.token.provider.type.{self.account}.dfs.core.windows.net"
+            )
+            spark.conf.set(
+                sas_provider_key, "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider"
+            )
+
+            sas_token = self.get_storage_key()
+
+            sas_token_key = f"fs.azure.sas.fixed.token.{self.account}.dfs.core.windows.net"
+            spark.conf.set(sas_token_key, sas_token)
+
         elif self.auth_mode == "service_principal":
             # Configure OAuth for ADLS Gen2
             # Ref: https://hadoop.apache.org/docs/stable/hadoop-azure/abfs.html
@@ -213,7 +256,7 @@ class AzureADLS(BaseConnection):
             spark.conf.set(prefix, self.client_id)
 
             prefix = f"fs.azure.account.oauth2.client.secret.{self.account}.dfs.core.windows.net"
-            spark.conf.set(prefix, self.client_secret)
+            spark.conf.set(prefix, self.get_client_secret())
 
             prefix = f"fs.azure.account.oauth2.client.endpoint.{self.account}.dfs.core.windows.net"
             endpoint = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/token"

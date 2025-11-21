@@ -192,6 +192,26 @@ class PandasEngine(Engine):
                     reader = fastavro.reader(f)
                     records = [record for record in reader]
                 return pd.DataFrame(records)
+        elif format in ["sql_server", "azure_sql"]:
+            if not hasattr(connection, "read_table"):
+                raise ValueError(
+                    f"Connection type '{type(connection).__name__}' does not support SQL operations"
+                )
+
+            if table:
+                # Extract schema from table name if present
+                if "." in table:
+                    schema, table_name = table.split(".", 1)
+                else:
+                    schema, table_name = "dbo", table
+
+                return connection.read_table(table_name=table_name, schema=schema)
+            else:
+                # Check for query in options
+                query = options.get("query")
+                if query:
+                    return connection.read_sql(query)
+                raise ValueError("SQL format requires 'table' config or 'query' in options")
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
@@ -251,6 +271,40 @@ class PandasEngine(Engine):
                     options=current_options,
                 )
                 first_chunk = False
+            return
+
+        # SQL Server / Azure SQL Support
+        if format in ["sql_server", "azure_sql"]:
+            if not hasattr(connection, "write_table"):
+                raise ValueError(
+                    f"Connection type '{type(connection).__name__}' does not support SQL operations"
+                )
+
+            if not table:
+                raise ValueError("SQL format requires 'table' config")
+
+            # Extract schema from table name if present
+            if "." in table:
+                schema, table_name = table.split(".", 1)
+            else:
+                schema, table_name = "dbo", table
+
+            # Map mode to if_exists
+            if_exists = "replace"  # overwrite
+            if mode == "append":
+                if_exists = "append"
+            elif mode == "fail":
+                if_exists = "fail"
+
+            chunksize = options.get("chunksize", 1000)
+
+            connection.write_table(
+                df=df,
+                table_name=table_name,
+                schema=schema,
+                if_exists=if_exists,
+                chunksize=chunksize,
+            )
             return
 
         # Get full path from connection
@@ -500,6 +554,37 @@ class PandasEngine(Engine):
                 write_mode = "wb" if mode == "overwrite" else "ab"
                 with open(full_path, write_mode) as f:
                     fastavro.writer(f, schema, records)
+        elif format in ["sql_server", "azure_sql"]:
+            if not hasattr(connection, "write_table"):
+                raise ValueError(
+                    f"Connection type '{type(connection).__name__}' does not support SQL operations"
+                )
+
+            if not table:
+                raise ValueError("SQL format requires 'table' config")
+
+            # Extract schema from table name if present
+            if "." in table:
+                schema, table_name = table.split(".", 1)
+            else:
+                schema, table_name = "dbo", table
+
+            # Map mode to if_exists
+            if_exists = "replace"  # overwrite
+            if mode == "append":
+                if_exists = "append"
+            elif mode == "fail":
+                if_exists = "fail"
+
+            chunksize = options.get("chunksize", 1000)
+
+            connection.write_table(
+                df=df,
+                table_name=table_name,
+                schema=schema,
+                if_exists=if_exists,
+                chunksize=chunksize,
+            )
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
@@ -594,6 +679,18 @@ class PandasEngine(Engine):
 
         if operation == "pivot":
             return self._pivot(df, params)
+        elif operation == "drop_duplicates":
+            return df.drop_duplicates(**params)
+        elif operation == "fillna":
+            return df.fillna(**params)
+        elif operation == "drop":
+            return df.drop(**params)
+        elif operation == "rename":
+            return df.rename(**params)
+        elif operation == "sort":
+            return df.sort_values(**params)
+        elif operation == "sample":
+            return df.sample(**params)
         else:
             raise ValueError(f"Unsupported operation: {operation}")
 
@@ -765,6 +862,67 @@ class PandasEngine(Engine):
             fields.append({"name": col, "type": avro_type})
 
         return {"type": "record", "name": "DataFrame", "fields": fields}
+
+    def validate_data(self, df: pd.DataFrame, validation_config: Any) -> List[str]:
+        """Validate DataFrame against rules.
+
+        Args:
+            df: DataFrame
+            validation_config: ValidationConfig object
+
+        Returns:
+            List of validation failure messages
+        """
+        failures = []
+
+        # Check not empty
+        if validation_config.not_empty:
+            if len(df) == 0:
+                failures.append("DataFrame is empty")
+
+        # Check for nulls in specified columns
+        if validation_config.no_nulls:
+            null_counts = self.count_nulls(df, validation_config.no_nulls)
+            for col, count in null_counts.items():
+                if count > 0:
+                    failures.append(f"Column '{col}' has {count} null values")
+
+        # Schema validation
+        if validation_config.schema_validation:
+            schema_failures = self.validate_schema(df, validation_config.schema_validation)
+            failures.extend(schema_failures)
+
+        # Range validation
+        if validation_config.ranges:
+            for col, bounds in validation_config.ranges.items():
+                if col in df.columns:
+                    min_val = bounds.get("min")
+                    max_val = bounds.get("max")
+
+                    if min_val is not None:
+                        min_violations = df[df[col] < min_val]
+                        if len(min_violations) > 0:
+                            failures.append(f"Column '{col}' has values < {min_val}")
+
+                    if max_val is not None:
+                        max_violations = df[df[col] > max_val]
+                        if len(max_violations) > 0:
+                            failures.append(f"Column '{col}' has values > {max_val}")
+                else:
+                    failures.append(f"Column '{col}' not found for range validation")
+
+        # Allowed values validation
+        if validation_config.allowed_values:
+            for col, allowed in validation_config.allowed_values.items():
+                if col in df.columns:
+                    # Check for values not in allowed list
+                    invalid = df[~df[col].isin(allowed)]
+                    if len(invalid) > 0:
+                        failures.append(f"Column '{col}' has invalid values")
+                else:
+                    failures.append(f"Column '{col}' not found for allowed values validation")
+
+        return failures
 
     def get_sample(self, df: pd.DataFrame, n: int = 10) -> List[Dict[str, Any]]:
         """Get sample rows as list of dictionaries.

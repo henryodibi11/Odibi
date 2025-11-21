@@ -1,24 +1,30 @@
 project: Azure ETL Example
 engine: pandas  # Can also be 'spark'
 description: "Read from ADLS, transform, write to Azure SQL"
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff: exponential
 
 connections:
   # Source: Azure Data Lake Storage
   adls_source:
-    type: azure_adls
-    account: mydatalake
+    type: azure_blob
+    account_name: mydatalake
     container: raw-data
-    auth_mode: key_vault
+    validation_mode: lazy
     auth:
       key_vault_name: my-key-vault
       secret_name: adls-key
 
   # Destination: Azure SQL Database
   sql_dest:
-    type: azure_sql
-    server: myserver.database.windows.net
+    type: sql_server
+    host: myserver.database.windows.net
     database: analytics_db
-    auth_mode: aad_msi  # Managed Identity
+    port: 1433
+    # Using Managed Identity / default driver auth (no secrets in config)
+    auth: {}
     
   # Stories storage
   story_storage:

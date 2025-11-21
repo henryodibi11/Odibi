@@ -29,7 +29,9 @@ class AzureSQL(BaseConnection):
         driver: str = "ODBC Driver 18 for SQL Server",
         username: Optional[str] = None,
         password: Optional[str] = None,
-        auth_mode: str = "aad_msi",  # "aad_msi" or "sql"
+        auth_mode: str = "aad_msi",  # "aad_msi", "sql", "key_vault"
+        key_vault_name: Optional[str] = None,
+        secret_name: Optional[str] = None,
         port: int = 1433,
         timeout: int = 30,
         **kwargs,
@@ -43,7 +45,9 @@ class AzureSQL(BaseConnection):
             driver: ODBC driver name (default: ODBC Driver 18 for SQL Server)
             username: SQL auth username (required if auth_mode='sql')
             password: SQL auth password (required if auth_mode='sql')
-            auth_mode: Authentication mode ('aad_msi' or 'sql')
+            auth_mode: Authentication mode ('aad_msi', 'sql', 'key_vault')
+            key_vault_name: Key Vault name (required if auth_mode='key_vault')
+            secret_name: Secret name containing password (required if auth_mode='key_vault')
             port: SQL Server port (default: 1433)
             timeout: Connection timeout in seconds (default: 30)
         """
@@ -53,9 +57,41 @@ class AzureSQL(BaseConnection):
         self.username = username
         self.password = password
         self.auth_mode = auth_mode
+        self.key_vault_name = key_vault_name
+        self.secret_name = secret_name
         self.port = port
         self.timeout = timeout
         self._engine = None
+        self._cached_key = None  # For consistency with ADLS / parallel fetch
+
+    def get_password(self) -> Optional[str]:
+        """Get password (cached)."""
+        if self.password:
+            return self.password
+
+        if self._cached_key:
+            return self._cached_key
+
+        if self.auth_mode == "key_vault":
+            if not self.key_vault_name or not self.secret_name:
+                raise ValueError("key_vault mode requires key_vault_name and secret_name")
+
+            try:
+                from azure.identity import DefaultAzureCredential
+                from azure.keyvault.secrets import SecretClient
+
+                credential = DefaultAzureCredential()
+                kv_uri = f"https://{self.key_vault_name}.vault.azure.net"
+                client = SecretClient(vault_url=kv_uri, credential=credential)
+                secret = client.get_secret(self.secret_name)
+                self._cached_key = secret.value
+                return self._cached_key
+            except ImportError:
+                raise ImportError(
+                    "Key Vault support requires 'azure-identity' and 'azure-keyvault-secrets'"
+                )
+
+        return None
 
     def odbc_dsn(self) -> str:
         """Build ODBC connection string.
@@ -77,10 +113,14 @@ class AzureSQL(BaseConnection):
             f"Connection Timeout=30;"
         )
 
-        if self.username and self.password:
-            dsn += f"UID={self.username};PWD={self.password};"
-        else:
+        pwd = self.get_password()
+        if self.username and pwd:
+            dsn += f"UID={self.username};PWD={pwd};"
+        elif self.auth_mode == "aad_msi":
             dsn += "Authentication=ActiveDirectoryMsi;"
+        elif self.auth_mode == "aad_service_principal":
+            # Not fully supported via ODBC string simply without token usually
+            pass
 
         return dsn
 
@@ -96,8 +136,20 @@ class AzureSQL(BaseConnection):
             raise ValueError("Azure SQL connection requires 'database'")
 
         if self.auth_mode == "sql":
-            if not self.username or not self.password:
-                raise ValueError("Azure SQL with auth_mode='sql' requires username and password")
+            if not self.username:
+                raise ValueError("Azure SQL with auth_mode='sql' requires username")
+            if not self.password and not (self.key_vault_name and self.secret_name):
+                raise ValueError(
+                    "Azure SQL with auth_mode='sql' requires password (or key_vault_name/secret_name)"
+                )
+
+        if self.auth_mode == "key_vault":
+            if not self.key_vault_name or not self.secret_name:
+                raise ValueError(
+                    "Azure SQL with auth_mode='key_vault' requires key_vault_name and secret_name"
+                )
+            if not self.username:
+                raise ValueError("Azure SQL with auth_mode='key_vault' requires username")
 
     def get_engine(self):
         """
@@ -302,3 +354,37 @@ class AzureSQL(BaseConnection):
             suggestions.append("On Linux: sudo apt-get install msodbcsql18")
 
         return suggestions
+
+    def get_spark_options(self) -> Dict[str, str]:
+        """Get Spark JDBC options.
+
+        Returns:
+            Dictionary of Spark JDBC options (url, user, password, etc.)
+        """
+        # Build JDBC URL
+        # Note: Spark uses its own JDBC driver (usually com.microsoft.sqlserver.jdbc.SQLServerDriver)
+        # We rely on the driver being present in the Spark environment.
+
+        jdbc_url = f"jdbc:sqlserver://{self.server}:{self.port};databaseName={self.database};"
+
+        if self.auth_mode == "aad_msi":
+            # For MSI, append authentication property to URL
+            jdbc_url += "encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;authentication=ActiveDirectoryMsi;"
+        elif self.auth_mode == "aad_service_principal":
+            # Not fully implemented in init yet, but placeholder
+            pass
+
+        options = {
+            "url": jdbc_url,
+            # "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver", # Usually auto-detected or configured in Spark
+        }
+
+        if self.auth_mode == "sql" or self.auth_mode == "key_vault":
+            if self.username:
+                options["user"] = self.username
+
+            pwd = self.get_password()
+            if pwd:
+                options["password"] = pwd
+
+        return options

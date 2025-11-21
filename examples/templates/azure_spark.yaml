@@ -5,15 +5,25 @@
 # --------------------------------------------
 project: Azure Spark ETL
 engine: spark
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff: exponential
 
 connections:
   adls_gen2:
-    type: azure_adls
+    type: azure_blob
     account_name: "${ADLS_ACCOUNT}"
     container: "${ADLS_CONTAINER}"
-    auth_mode: key_vault
-    key_vault_name: "${KV_NAME}"
-    secret_name: "${KV_SECRET}"
+    validation_mode: lazy
+    auth:
+      key_vault_name: "${KV_NAME}"
+      secret_name: "${KV_SECRET}"
+
+  spark_catalog:
+    type: delta
+    catalog: hive_metastore
+    schema: default
 
 pipelines:
   - pipeline: cloud_migration

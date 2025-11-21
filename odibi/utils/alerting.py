@@ -34,13 +34,24 @@ def _build_payload(config: AlertConfig, message: str, context: Dict[str, Any]) -
     pipeline = context.get("pipeline", "Unknown Pipeline")
     status = context.get("status", "UNKNOWN")
     duration = context.get("duration", 0.0)
+    project_config = context.get("project_config")
+
+    # Extract rich metadata if available
+    project_name = "Odibi Project"
+    owner = None
+    # environment = "Production"  # Default, or from env var/config if available in future
+
+    if project_config:
+        project_name = getattr(project_config, "project", project_name)
+        owner = getattr(project_config, "owner", None)
+        # environment = getattr(project_config, "environment", environment) # Phase 3
 
     if config.type == AlertType.SLACK:
         # Slack Block Kit
         # color = "#36a64f" if status == "SUCCESS" else "#ff0000"
         icon = "✅" if status == "SUCCESS" else "❌"
 
-        return {
+        payload = {
             "blocks": [
                 {
                     "type": "header",
@@ -49,6 +60,7 @@ def _build_payload(config: AlertConfig, message: str, context: Dict[str, Any]) -
                 {
                     "type": "section",
                     "fields": [
+                        {"type": "mrkdwn", "text": f"*Project:*\n{project_name}"},
                         {"type": "mrkdwn", "text": f"*Status:*\n{status}"},
                         {"type": "mrkdwn", "text": f"*Duration:*\n{duration:.2f}s"},
                         {"type": "mrkdwn", "text": f"*Message:*\n{message}"},
@@ -57,27 +69,81 @@ def _build_payload(config: AlertConfig, message: str, context: Dict[str, Any]) -
             ]
         }
 
-    elif config.type == AlertType.TEAMS:
-        # Microsoft Teams Card
-        theme_color = "00FF00" if status == "SUCCESS" else "FF0000"
+        if owner:
+            payload["blocks"][1]["fields"].append({"type": "mrkdwn", "text": f"*Owner:*\n{owner}"})
 
-        return {
-            "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
-            "themeColor": theme_color,
-            "summary": f"Pipeline {pipeline} {status}",
-            "sections": [
+        # Merge user metadata (e.g., channel override)
+        payload.update(config.metadata)
+        return payload
+
+    elif config.type == AlertType.TEAMS:
+        # Modern Adaptive Card (v1.4)
+
+        # Determine style and icon based on status
+        if status == "SUCCESS":
+            style = "Good"  # Green
+            status_icon = "✅"
+        elif status == "STARTED":
+            style = "Accent"  # Blue
+            status_icon = "🚀"
+        else:
+            style = "Attention"  # Red
+            status_icon = "❌"
+
+        # Build Fact Set
+        facts = [
+            {"title": "⏱ Duration", "value": f"{duration:.2f}s"},
+            {"title": "📅 Time", "value": context.get("timestamp", "")},
+            {"title": "📝 Message", "value": message},
+        ]
+
+        if owner:
+            facts.insert(0, {"title": "👤 Owner", "value": owner})
+
+        # Add manual metadata to facts if present
+        if config.metadata:
+            for k, v in config.metadata.items():
+                facts.append({"title": f"📎 {k}", "value": str(v)})
+
+        adaptive_card = {
+            "type": "AdaptiveCard",
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "version": "1.4",
+            "body": [
                 {
-                    "activityTitle": f"ODIBI Pipeline: {pipeline}",
-                    "activitySubtitle": f"Status: {status}",
-                    "facts": [
-                        {"name": "Duration", "value": f"{duration:.2f}s"},
-                        {"name": "Message", "value": message},
+                    "type": "Container",
+                    "style": style,
+                    "items": [
+                        {
+                            "type": "TextBlock",
+                            "text": f"{status_icon} Pipeline: {pipeline}",
+                            "weight": "Bolder",
+                            "size": "Medium",
+                            "color": "Light",
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": f"Project: {project_name} | Status: {status}",
+                            "isSubtle": True,
+                            "spacing": "None",
+                            "color": "Light",
+                            "size": "Small",
+                        },
                     ],
-                    "markdown": True,
-                }
+                },
+                {"type": "Container", "items": [{"type": "FactSet", "facts": facts}]},
             ],
         }
+
+        # Wrapper required for Incoming Webhooks / Workflows
+        payload = {
+            "type": "message",
+            "attachments": [
+                {"contentType": "application/vnd.microsoft.card.adaptive", "content": adaptive_card}
+            ],
+        }
+
+        return payload
 
     else:
         # Generic Webhook

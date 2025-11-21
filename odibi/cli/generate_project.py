@@ -235,8 +235,18 @@ def generate_project_structure(input_dir: Path, output_dir: Path, project_name: 
     pipeline_config = {
         "project": project_name,
         "engine": "pandas",
-        "story": {"connection": "local", "path": ".odibi/stories", "auto_generate": True},
-        "connections": {"local": {"type": "local", "base_path": "./data"}},
+        "retry": {"enabled": True, "max_attempts": 3, "backoff": "exponential"},
+        "story": {
+            "connection": "local",
+            "path": ".odibi/stories",
+            "auto_generate": True,
+            "max_sample_rows": 10,
+            "retention_days": 30,
+            "retention_count": 100,
+        },
+        "connections": {
+            "local": {"type": "local", "base_path": "./data", "validation_mode": "lazy"}
+        },
         "pipelines": [{"pipeline": "main", "nodes": []}],
     }
 

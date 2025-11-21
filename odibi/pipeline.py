@@ -11,6 +11,11 @@ from odibi.context import create_context
 from odibi.graph import DependencyGraph
 from odibi.node import Node, NodeResult
 from odibi.engine import PandasEngine
+
+try:
+    from odibi.engine.spark_engine import SparkEngine
+except ImportError:
+    SparkEngine = None  # Handle optional dependency
 from odibi.exceptions import DependencyError
 from odibi.story import StoryGenerator
 from odibi.connections import LocalConnection
@@ -89,6 +94,7 @@ class Pipeline:
             alerts: Alert configurations
         """
         self.config = pipeline_config
+        self.project_config = None  # Set by PipelineManager if available
         self.engine_type = engine
         self.connections = connections or {}
         self.generate_story = generate_story
@@ -106,6 +112,16 @@ class Pipeline:
         # Initialize engine
         if engine == "pandas":
             self.engine = PandasEngine()
+        elif engine == "spark":
+            if SparkEngine is None:
+                raise ImportError(
+                    "Spark engine not available. "
+                    "Install with 'pip install odibi[spark]' or ensure pyspark is installed."
+                )
+
+            # SparkEngine can take existing session if needed, but here we let it create/get one
+            # We might need to pass connections to it for ADLS auth config
+            self.engine = SparkEngine(connections=connections)
         else:
             raise ValueError(f"Unsupported engine: {engine}")
 
@@ -397,6 +413,7 @@ class Pipeline:
                     "status": status,
                     "duration": results.duration,
                     "timestamp": datetime.now().isoformat(),
+                    "project_config": self.project_config,
                 }
 
                 msg = f"Pipeline '{self.config.pipeline}' {status}"
@@ -525,6 +542,8 @@ class PipelineManager:
                 retry_config=project_config.retry,
                 alerts=project_config.alerts,
             )
+            # Inject project config into pipeline for richer context
+            self._pipelines[pipeline_name].project_config = project_config
 
     def _get_story_config(self) -> Dict[str, Any]:
         """Build story config from project_config.story.
@@ -601,6 +620,7 @@ class PipelineManager:
         # Load plugins
         load_plugins()
 
+        # Build initial connection objects (without prefetching secrets)
         for conn_name, conn_config in conn_configs.items():
             conn_type = conn_config.get("type", "local")
 
@@ -647,6 +667,7 @@ class PipelineManager:
                 )
                 secret_name = auth_config.get("secret_name") or conn_config.get("secret_name")
                 account_key = auth_config.get("account_key") or conn_config.get("account_key")
+                sas_token = auth_config.get("sas_token") or conn_config.get("sas_token")
                 tenant_id = auth_config.get("tenant_id") or conn_config.get("tenant_id")
                 client_id = auth_config.get("client_id") or conn_config.get("client_id")
                 client_secret = auth_config.get("client_secret") or conn_config.get("client_secret")
@@ -654,9 +675,34 @@ class PipelineManager:
                 # Default auth mode if not specified
                 auth_mode = conn_config.get("auth_mode", "key_vault")
 
+                # Auto-detect auth_mode if not specified but sas_token is present
+                if "auth_mode" not in conn_config:
+                    if sas_token:
+                        auth_mode = "sas_token"
+                    elif key_vault_name and secret_name:
+                        auth_mode = "key_vault"
+                    elif account_key:
+                        auth_mode = "direct_key"
+                    elif tenant_id and client_id and client_secret:
+                        auth_mode = "service_principal"
+                    else:
+                        # Default to managed_identity if no specific credentials provided
+                        # This supports the "Default (Recommended)" option in the template
+                        auth_mode = "managed_identity"
+
+                # Check validation_mode (eager vs lazy default)
+                validation_mode = conn_config.get("validation_mode", "lazy")
+                validate = conn_config.get("validate")
+
+                if validate is None:
+                    # If not explicitly set, derive from validation_mode
+                    validate = True if validation_mode == "eager" else False
+
                 # Register secrets for redaction
                 if account_key:
                     logger.register_secret(account_key)
+                if sas_token:
+                    logger.register_secret(sas_token)
                 if client_secret:
                     logger.register_secret(client_secret)
 
@@ -668,11 +714,55 @@ class PipelineManager:
                     key_vault_name=key_vault_name,
                     secret_name=secret_name,
                     account_key=account_key,
+                    sas_token=sas_token,
                     tenant_id=tenant_id,
                     client_id=client_id,
                     client_secret=client_secret,
-                    validate=conn_config.get("validate", True),
+                    validate=validate,
                 )
+            elif conn_type == "delta":
+                # Check if we have support
+                try:
+                    # For local delta, we need 'deltalake' (pandas) or 'delta-spark' (spark)
+                    # But connection object itself might just be a holder for path/catalog config
+                    # Since we don't have a dedicated DeltaConnection class yet in the core,
+                    # we can use a generic config holder or simple dict if the engine handles it.
+                    # However, to be clean, let's assume we treat it as "local" with special validation
+                    # if it's path-based, or just pass through if catalog-based.
+
+                    # Actually, better to use LocalConnection for path-based delta if no specific class
+                    if "path" in conn_config:
+                        connections[conn_name] = LocalConnection(
+                            base_path=conn_config.get("path") or conn_config.get("base_path")
+                        )
+                    else:
+                        # Catalog based (Spark only)
+                        # We can create a dummy connection object that just holds the catalog/schema info
+                        # so the Engine can read it.
+                        from odibi.connections.base import BaseConnection
+
+                        class DeltaCatalogConnection(BaseConnection):
+                            def __init__(self, catalog, schema):
+                                self.catalog = catalog
+                                self.schema = schema
+
+                            def get_path(self, table):
+                                return f"{self.catalog}.{self.schema}.{table}"
+
+                            def validate(self):
+                                pass
+
+                            def pandas_storage_options(self):
+                                return {}
+
+                        connections[conn_name] = DeltaCatalogConnection(
+                            catalog=conn_config.get("catalog"),
+                            schema=conn_config.get("schema") or "default",
+                        )
+
+                except Exception as e:
+                    raise ValueError(f"Failed to initialize Delta connection '{conn_name}': {e}")
+
             elif conn_type == "azure_sql" or conn_type == "sql_server":
                 # Import AzureSQL
                 try:
@@ -684,21 +774,42 @@ class PipelineManager:
                     )
 
                 # Extract config
+                # Support 'host' (new standard) or 'server' (legacy)
+                server = conn_config.get("host") or conn_config.get("server")
+                if not server:
+                    raise ValueError(f"Connection '{conn_name}' missing 'host' or 'server'")
+
                 auth_config = conn_config.get("auth", {})
                 username = auth_config.get("username") or conn_config.get("username")
                 password = auth_config.get("password") or conn_config.get("password")
+                key_vault_name = auth_config.get("key_vault_name") or conn_config.get(
+                    "key_vault_name"
+                )
+                secret_name = auth_config.get("secret_name") or conn_config.get("secret_name")
+
+                # Auto-detect auth_mode for SQL if not specified
+                auth_mode = conn_config.get("auth_mode")
+                if not auth_mode:
+                    if username and password:
+                        auth_mode = "sql"
+                    elif key_vault_name and secret_name and username:
+                        auth_mode = "key_vault"
+                    else:
+                        auth_mode = "aad_msi"
 
                 # Register secret
                 if password:
                     logger.register_secret(password)
 
                 connections[conn_name] = AzureSQL(
-                    server=conn_config["server"],
+                    server=server,
                     database=conn_config["database"],
                     driver=conn_config.get("driver", "ODBC Driver 18 for SQL Server"),
                     username=username,
                     password=password,
-                    auth_mode=conn_config.get("auth_mode", "aad_msi"),
+                    auth_mode=auth_mode,
+                    key_vault_name=key_vault_name,
+                    secret_name=secret_name,
                     port=conn_config.get("port", 1433),
                     timeout=conn_config.get("timeout", 30),
                 )
@@ -708,6 +819,19 @@ class PipelineManager:
                     f"Supported types: local, azure_adls, azure_sql. "
                     f"See docs for connection setup."
                 )
+
+        # Parallel Key Vault fetch (Optimization)
+        # We run this after all connections are instantiated to batch the requests
+        try:
+            from odibi.utils import configure_connections_parallel
+
+            connections, errors = configure_connections_parallel(connections, verbose=False)
+            if errors:
+                for error in errors:
+                    logger.warning(error)
+        except ImportError:
+            # Optional utility, skip if not available or fails
+            pass
 
         return connections
 

@@ -111,12 +111,22 @@ class SQLServerConnectionConfig(BaseConnectionConfig):
     auth: Dict[str, str] = Field(default_factory=dict)
 
 
+class HttpConnectionConfig(BaseConnectionConfig):
+    """HTTP connection."""
+
+    type: str = "http"
+    base_url: str
+    headers: Dict[str, str] = Field(default_factory=dict)
+    auth: Dict[str, str] = Field(default_factory=dict)
+
+
 # Connection config discriminated union
 ConnectionConfig = Union[
     LocalConnectionConfig,
     AzureBlobConnectionConfig,
     DeltaConnectionConfig,
     SQLServerConnectionConfig,
+    HttpConnectionConfig,
 ]
 
 

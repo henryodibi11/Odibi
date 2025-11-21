@@ -188,6 +188,8 @@ class Node:
                         sleep_time = 2 ** (attempts - 1)
                     elif self.retry_config.backoff == "linear":
                         sleep_time = attempts
+                    elif self.retry_config.backoff == "constant":
+                        sleep_time = 1
 
                     # In tests, we might want to skip sleep, but for now simple time.sleep
                     time.sleep(sleep_time)
@@ -532,54 +534,9 @@ class Node:
             ValidationError: If validation fails
         """
         validation_config = self.config.validation
-        failures = []
 
-        # Check not empty
-        if validation_config.not_empty:
-            if self._is_empty(df):
-                failures.append("DataFrame is empty")
-
-        # Check for nulls in specified columns
-        if validation_config.no_nulls:
-            null_counts = self._count_nulls(df, validation_config.no_nulls)
-            for col, count in null_counts.items():
-                if count > 0:
-                    failures.append(f"Column '{col}' has {count} null values")
-
-        # Schema validation
-        if validation_config.schema_validation:
-            schema_failures = self._validate_schema(df, validation_config.schema_validation)
-            failures.extend(schema_failures)
-
-        # Range validation
-        if validation_config.ranges:
-            for col, bounds in validation_config.ranges.items():
-                if col in df.columns:
-                    min_val = bounds.get("min")
-                    max_val = bounds.get("max")
-
-                    if min_val is not None:
-                        min_violations = df[df[col] < min_val]
-                        if len(min_violations) > 0:
-                            failures.append(f"Column '{col}' has values < {min_val}")
-
-                    if max_val is not None:
-                        max_violations = df[df[col] > max_val]
-                        if len(max_violations) > 0:
-                            failures.append(f"Column '{col}' has values > {max_val}")
-                else:
-                    failures.append(f"Column '{col}' not found for range validation")
-
-        # Allowed values validation
-        if validation_config.allowed_values:
-            for col, allowed in validation_config.allowed_values.items():
-                if col in df.columns:
-                    # Check for values not in allowed list
-                    invalid = df[~df[col].isin(allowed)]
-                    if len(invalid) > 0:
-                        failures.append(f"Column '{col}' has invalid values")
-                else:
-                    failures.append(f"Column '{col}' not found for allowed values validation")
+        # Delegate to engine
+        failures = self.engine.validate_data(df, validation_config)
 
         if failures:
             raise ValidationError(self.config.name, failures)

@@ -1,0 +1,41 @@
+# =============================================================================
+# SHARED CONNECTIONS
+# =============================================================================
+# This file defines the infrastructure connections.
+# It can be imported by multiple project master files.
+# =============================================================================
+
+connections:
+  # --- Source: Raw Data Landing Zone ---
+  raw_data:
+    type: local
+    base_path: ./data/raw
+    # For cloud:
+    # type: azure_blob
+    # container: landing-zone
+
+  # --- Destination: Processed Data & Stories ---
+  processed_data:
+    type: local
+    base_path: ./data/processed
+    # For cloud:
+    # type: azure_blob
+    # container: analytics-ready
+
+  # --- Reference Data (Optional) ---
+  # ref_db:
+  #   type: sql_server
+  #   host: my-db.database.windows.net
+  #   database: ref_master
+  #   auth: {}
+
+# =============================================================================
+# STORY CONFIGURATION
+# =============================================================================
+# Defines where execution reports are saved.
+story:
+  connection: processed_data
+  path: stories/
+  auto_generate: true
+  max_sample_rows: 20
+

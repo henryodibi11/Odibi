@@ -164,6 +164,19 @@ class Engine(ABC):
         pass
 
     @abstractmethod
+    def validate_data(self, df: Any, validation_config: Any) -> List[str]:
+        """Validate data against rules.
+
+        Args:
+            df: DataFrame to validate
+            validation_config: ValidationConfig object
+
+        Returns:
+            List of validation failure messages (empty if valid)
+        """
+        pass
+
+    @abstractmethod
     def get_sample(self, df: Any, n: int = 10) -> List[Dict[str, Any]]:
         """Get sample rows as list of dictionaries.
 

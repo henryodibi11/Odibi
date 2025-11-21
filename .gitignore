@@ -111,3 +111,5 @@ test_exploration*.ipynb
 
 # Stress Testing
 # stress_test_runs*/
+
+.databricks

@@ -5,9 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2025-11-21
 
-## [1.4.0] - 2025-11-20
+### Added - Developer Experience (DX)
+- **Unified Key Vault Support**: Fetch credentials for ANY connection (ADLS, Azure SQL) from Key Vault using `key_vault_name` and `secret_name`, regardless of authentication mode (SAS, Account Key, SQL Auth).
+- **Master Template (`odibi create`)**: Comprehensive, verifiable "Kitchen Sink" template documenting every feature with inline comments.
+- **Auto-Detect Auth**: Azure ADLS connections now auto-detect auth mode (`sas_token`, `key_vault`, `service_principal`, or `managed_identity`) based on provided config.
+- **Spark Engine Hardening**:
+  - Fixed SQL transformation support (`execute_sql`) on Spark context.
+  - Added native PySpark implementations for data validation (`ranges`, `allowed_values`).
+  - Enabled proper JDBC connection string generation for Azure SQL on Spark.
+- **Delta Connection Support**: Native support for `type: delta` in configuration, creating `LocalConnection` (path-based) or `DeltaCatalogConnection` (catalog-based) automatically.
+- **Documentation**: Explanatory comments in templates for Retry Strategies, Validation Modes, and Security best practices.
+
+### Fixed
+- **Spark SQL Crash**: Fixed `SparkEngine.execute_sql` trying to call `.items()` on SparkContext.
+- **Validation Logic**: Decoupled validation logic from Node execution, allowing engine-specific implementations (preventing Pandas logic from running on Spark DataFrames).
+- **Configuration Gaps**: Resolved discrepancies between `odibi create` template and actual codebase capabilities.
+
+## [2.0.0] - 2025-11-20
 
 ### Added - Production Hardening (Phase 4)
 - **Retry Logic**: Configurable exponential backoff for node failures (`retry` config section).

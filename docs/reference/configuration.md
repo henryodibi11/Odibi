@@ -182,7 +182,7 @@ result = manager.run('bronze_to_silver')  # Runs specific pipeline
 | `engine` | Execution engine (pandas/spark) | ✅ Yes |
 | `connections` | Where data lives | ✅ Yes |
 | `pipelines` | List of pipelines | ✅ Yes |
-| `story` | Story generation config | ❌ Optional |
+| `story` | Story generation config | ✅ Yes |
 
 **Example:**
 ```yaml
@@ -215,7 +215,7 @@ class ProjectConfig(BaseModel):
     engine: EngineType = EngineType.PANDAS  # Default
     connections: Dict[str, Dict[str, Any]]  # Required
     story: StoryConfig  # Required
-    pipelines: List[Dict[str, Any]]  # Required
+    pipelines: List[PipelineConfig]  # Required
     retry: RetryConfig = RetryConfig()  # Default
     logging: LoggingConfig = LoggingConfig()  # Default
 ```
@@ -240,10 +240,14 @@ connections:
 story:
   connection: outputs     # → story.connection (required)
   path: stories/          # → story.path
-  enabled: true           # → story.enabled
+  auto_generate: true     # → story.auto_generate
+  max_sample_rows: 10     # → story.max_sample_rows
+  retention_days: 30      # → story.retention_days
+  retention_count: 100    # → story.retention_count
 retry:
+  enabled: true           # → retry.enabled
   max_attempts: 3         # → retry.max_attempts
-  backoff_seconds: 2.0    # → retry.backoff_seconds
+  backoff: exponential    # → retry.backoff
 logging:
   level: INFO             # → logging.level
 pipelines:                # → pipelines (list of pipeline configs)
@@ -968,17 +972,31 @@ def execute_sql(self, sql: str, context: Context):
 project: string               # Project name
 engine: pandas|spark          # Execution engine
 
+# GLOBAL SETTINGS (optional)
+retry:
+  enabled: bool
+  max_attempts: int
+  backoff: exponential|linear|constant
+logging:
+  level: DEBUG|INFO|WARNING|ERROR
+  structured: bool
+  metadata: dict
+
 # CONNECTIONS (required, at least one)
 connections:
   <connection_name>:          # Your choice of name
-    type: local|azure_adls|...
+    type: local|azure_blob|delta|sql_server|http
+    validation_mode: lazy|eager   # optional, defaults to 'lazy'
     <type-specific-config>
 
-# STORY (optional)
+# STORY (required)
 story:
+  connection: string        # Name of connection to write stories
+  path: string              # Relative path under that connection
   auto_generate: bool
   max_sample_rows: int
-  output_path: string
+  retention_days: int (optional)
+  retention_count: int (optional)
 
 # PIPELINES (required, at least one)
 pipelines:

@@ -1,0 +1,44 @@
+# =============================================================================
+# ODIBI MODULAR PROJECT MASTER
+# =============================================================================
+# This is the "Root" configuration file. It orchestrates the project by
+# importing other specialized YAML files.
+#
+# Advantages of Modular Configs:
+# 1. Separation of Concerns: Keep connections separate from logic.
+# 2. Reusability: Reuse the same connections.yaml across multiple projects.
+# 3. Readability: Avoid giant 1000-line YAML files.
+# =============================================================================
+
+project: My Modular Project
+version: "1.0.0"
+description: "An example of a split-configuration project"
+owner: "Data Team"
+
+# -----------------------------------------------------------------------------
+# Execution Engine
+# -----------------------------------------------------------------------------
+engine: pandas  # or 'spark'
+
+# -----------------------------------------------------------------------------
+# Imports
+# -----------------------------------------------------------------------------
+# List relative paths to other YAML files to include.
+# Odibi merges them in order (later imports override earlier ones, lists append).
+imports:
+  - connections.yaml            # Defines 'connections' and 'story'
+  - pipelines/ingest.yaml       # Defines Bronze layer pipelines
+  - pipelines/transform.yaml    # Defines Silver/Gold layer pipelines
+
+# -----------------------------------------------------------------------------
+# Global Settings
+# -----------------------------------------------------------------------------
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff: exponential
+
+logging:
+  level: INFO
+  structured: false
+

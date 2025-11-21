@@ -8,18 +8,38 @@ from typing import Dict, Any
 ENV_PATTERN = re.compile(r"\$\{(?:env:)?([A-Za-z0-9_]+)\}")
 
 
-def load_yaml_with_env(path: str) -> Dict[str, Any]:
-    """Load YAML file with environment variable substitution.
+def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge override dictionary into base dictionary.
 
-    Supports patterns:
-    - ${VAR_NAME}
-    - ${env:VAR_NAME}
+    Rules:
+    1. Dicts are merged recursively.
+    2. List 'pipelines' are appended.
+    3. Other types (and other lists) are overwritten by the override.
+    """
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        elif key == "pipelines" and isinstance(value, list) and isinstance(result.get(key), list):
+            # Special case: Append pipelines instead of overwriting
+            result[key] = result[key] + value
+        else:
+            result[key] = value
+    return result
+
+
+def load_yaml_with_env(path: str) -> Dict[str, Any]:
+    """Load YAML file with environment variable substitution and imports.
+
+    Supports:
+    - ${VAR_NAME} substitution
+    - 'imports' list of relative paths
 
     Args:
         path: Path to YAML file
 
     Returns:
-        Parsed dictionary
+        Parsed dictionary (merged with imports)
 
     Raises:
         FileNotFoundError: If file does not exist
@@ -29,7 +49,11 @@ def load_yaml_with_env(path: str) -> Dict[str, Any]:
     if not os.path.exists(path):
         raise FileNotFoundError(f"YAML file not found: {path}")
 
-    with open(path, "r") as f:
+    # Get absolute path for relative import resolution
+    abs_path = os.path.abspath(path)
+    base_dir = os.path.dirname(abs_path)
+
+    with open(abs_path, "r") as f:
         content = f.read()
 
     def replace_env(match):
@@ -43,4 +67,27 @@ def load_yaml_with_env(path: str) -> Dict[str, Any]:
     substituted_content = ENV_PATTERN.sub(replace_env, content)
 
     # Parse YAML
-    return yaml.safe_load(substituted_content)
+    data = yaml.safe_load(substituted_content) or {}
+
+    # Handle imports
+    imports = data.pop("imports", [])
+    if imports:
+        if isinstance(imports, str):
+            imports = [imports]
+
+        merged_data = {}
+        for import_path in imports:
+            # Resolve relative to current file
+            if not os.path.isabs(import_path):
+                full_import_path = os.path.join(base_dir, import_path)
+            else:
+                full_import_path = import_path
+
+            # Recursive load
+            imported_data = load_yaml_with_env(full_import_path)
+            merged_data = _deep_merge(merged_data, imported_data)
+
+        # Merge current data on top of imported data
+        data = _deep_merge(merged_data, data)
+
+    return data

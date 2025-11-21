@@ -103,11 +103,26 @@ Odibi will:
 
 Data engineering is often invisible. Odibi makes it visible. Every run generates a report.
 
-Run this command to open the latest report in your browser:
+List the generated stories:
 
 ```bash
-odibi story view --latest
+odibi story list
 ```
+
+You will see output like:
+```text
+📚 Stories in .odibi/stories:
+================================================================================
+  📄 main_documentation.html
+     Modified: 2025-11-21 14:30:00
+     Size: 15.2KB
+     Path: .odibi/stories/main_documentation.html
+```
+
+Open the HTML file in your browser to view the report:
+- **Windows:** `start .odibi/stories/main_documentation.html`
+- **Mac:** `open .odibi/stories/main_documentation.html`
+- **Linux:** `xdg-open .odibi/stories/main_documentation.html`
 
 **What to look for in the report:**
 *   **Row Counts:** Did we lose any rows?
