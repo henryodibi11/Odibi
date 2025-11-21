@@ -104,20 +104,6 @@ class Pipeline:
         # Initialize story generator
         story_config = story_config or {}
 
-        # Extract storage options if available (for remote writing)
-        storage_options = {}
-        story_conn_name = (
-            pipeline_config.story_connection or "local"
-        )  # Fallback logic might be needed or it is handled in PipelineManager
-
-        # Note: PipelineManager passes fully resolved paths in story_config['output_path']
-        # but we might need the connection object to get credentials.
-        # Pipeline receives connections dict.
-
-        # If story_config comes from PipelineManager, it has 'output_path' but not the connection object itself.
-        # We need to find which connection corresponds to the story path if possible,
-        # OR PipelineManager should pass storage_options in story_config.
-
         self.story_generator = StoryGenerator(
             pipeline_name=pipeline_config.pipeline,
             max_sample_rows=story_config.get("max_sample_rows", 10),
