@@ -164,6 +164,7 @@ class StoryGenerator:
         """Write content to remote path using fsspec."""
         try:
             import fsspec
+
             with fsspec.open(path, "w", encoding="utf-8") as f:
                 f.write(content)
         except ImportError:
@@ -172,6 +173,7 @@ class StoryGenerator:
             try:
                 from pyspark.dbutils import DBUtils
                 from pyspark.sql import SparkSession
+
                 spark = SparkSession.builder.getOrCreate()
                 dbutils = DBUtils(spark)
                 # dbutils.fs.put expects string
