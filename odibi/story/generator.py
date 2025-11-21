@@ -36,6 +36,7 @@ class StoryGenerator:
         output_path: str = "stories/",
         retention_days: int = 30,
         retention_count: int = 100,
+        storage_options: Optional[Dict[str, Any]] = None,
     ):
         """Initialize story generator.
 
@@ -45,11 +46,13 @@ class StoryGenerator:
             output_path: Directory for story output
             retention_days: Days to keep stories
             retention_count: Max number of stories to keep
+            storage_options: Credentials for remote storage (e.g. ADLS)
         """
         self.pipeline_name = pipeline_name
         self.max_sample_rows = max_sample_rows
         self.output_path_str = output_path  # Store original string
         self.is_remote = "://" in output_path
+        self.storage_options = storage_options or {}
 
         if not self.is_remote:
             self.output_path = Path(output_path)
