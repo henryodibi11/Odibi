@@ -4,71 +4,19 @@ This document outlines the next evolution of the Odibi framework, focusing on la
 
 ---
 
-## Phase 6: The "Flagship" Reference Project (COMPLETED)
+## Phase 6: The "Flagship" Reference Project (Automated via Phase 9)
 
-**Status:** ✅ Completed (Nov 2025)
-**Outcome:** Delivered 10 reference projects ("The Gauntlet") covering Retail, IoT, Finance, Healthcare, and more. See `examples/` for implementations.
+**Status:** ✅ Completed (Nov 2025) - Merged into Phase 9 ("The Infinite Gauntlet")
+**Outcome:** We pivoted from manually building 10 reference projects to building a **generator** (`odibi generate-project`) and **stress tester** (`odibi stress`) that can generate infinite reference projects. We verified against 50+ datasets (including "OdibiEats" style data).
 
-**Goal:** Prove Odibi's capability to handle messy, high-volume, complex real-world scenarios beyond simple tutorials.
-
-**Project Codename:** `OdibiEats` (Simulated Food Delivery Analytics)
-
-### 6.1. Complexity Requirements
-- **Volume:** 1GB - 10GB simulated dataset (not "Big Data" but enough to break inefficient Pandas code).
-- **Sources:**
-  - **API:** Simulated stream of JSON events (User Clicks, Driver Locations).
-  - **SQL:** Transactional database dump (Orders, Payments).
-  - **CSV:** Third-party lookups (Geo-fencing zones, Restaurant metadata).
-- **Architecture:** Medallion (Bronze -> Silver -> Gold).
-
-### 6.2. Key Use Cases to Implement
-1.  **Identity Resolution (Graph Logic):**
-    - Stitching anonymous `session_id` (browsing) to `user_id` (after login/signup).
-    - Requires complex joins and window functions.
-2.  **Slowly Changing Dimensions (SCD Type 2):**
-    - Tracking restaurant menu price changes over time.
-    - "What was the price of a Burger on Nov 1st?" vs "Current Price".
-3.  **Sessionization:**
-    - Grouping clickstream events into 30-minute sessions.
-    - Calculating "Time on Site" and "Conversion Rate per Session".
-4.  **Geospatial Analytics:**
-    - Mapping driver pings to delivery zones.
-    - "Average delivery time per neighborhood".
-
-### 6.3. Deliverables
-- `examples/reference_project/`: A self-contained folder.
-- `datagen/`: Scripts to generate the synthetic data at scale.
-- **Performance Report:** Compare Pandas vs Spark execution times on this dataset.
+**Goal:** Prove Odibi's capability to handle messy, high-volume, complex real-world scenarios.
 
 ---
 
-## Phase 10: Documentation & Education (Prioritized)
+## Phase 10: Documentation & Education (COMPLETED)
 
-**Goal:** Transform Odibi from a "tool with a README" to a "Framework with a Learning Platform". Consolidate loose docs, adopt Diátaxis structure, and ensure every feature is teachable.
-
-### 10.1. Documentation Restructuring (The "Diátaxis" Refactor)
-- **Audit:** Remove duplicate/conflicting guides (e.g., consolidate 3x WSL guides into one authoritative source).
-- **Structure:** Reorganize `docs/` into standard buckets:
-  - `tutorials/` (Learning-oriented: "Zero to Hero")
-  - `guides/` (Task-oriented: "How to X")
-  - `reference/` (Information-oriented: API, Config Spec)
-  - `explanation/` (Understanding-oriented: "Why Odibi?", Architecture)
-
-### 10.2. The "Master CLI Guide" (Task-Based)
-- Move beyond `odibi --help`. Write task-based guides for every command:
-  - "How to debug pipelines with `odibi doctor`"
-  - "How to stress-test data with `odibi stress`"
-  - "How to generate projects with `odibi generate-project`"
-
-### 10.3. The "Odibi Cheatsheet"
-- A high-density PDF/Markdown reference for daily use.
-  - `odibi.yaml` syntax map.
-  - Top 10 CLI command patterns.
-  - Standard project directory structure.
-
-### 10.4. "The Gauntlet" Documentation
-- We built 10 reference projects (OdibiFlix, OdibiEats, etc.). Now we must document them.
-- Create a "Case Studies" section explaining *why* each example was built and what pattern it demonstrates (e.g., "OdibiFlix: Handling high-volume clickstream data").
+**Status:** ✅ Completed (Nov 2025)
+**Outcome:** Rebuilt documentation suite using Diátaxis framework. Delivered "Getting Started" tutorial, "Master CLI Guide", and "Cheatsheet". Verified against v2.0 features.
 
 ---
 
@@ -144,7 +92,7 @@ A standalone web interface for observability.
 
 | Phase | Feature | Value Prop |
 |-------|---------|------------|
-| **10** | **Docs Overhaul** | **PRIORITY:** Ensure users can actually use v2.0 features. |
+| **10** | **Docs Overhaul** | **COMPLETED:** Diátaxis restructure, Master CLI Guide, Tutorials. |
 | **6** | **Reference Project** | Proof of capability, stress testing, marketing asset. |
 | **7** | **Airflow/Dagster Gen** | Enterprise adoption blocker removal. |
 | **7** | **Control Plane UI** | Operational visibility for non-engineers. |
