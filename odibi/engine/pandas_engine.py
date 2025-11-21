@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union, Iterator
 import pandas as pd
 from pathlib import Path
 from urllib.parse import urlparse
+import glob
 
 from odibi.engine.base import Engine
 from odibi.context import Context, PandasContext
@@ -77,12 +78,73 @@ class PandasEngine(Engine):
         # Merge storage options for cloud connections
         merged_options = self._merge_storage_options(connection, options)
 
+        # Sanitize options for pandas compatibility
+        if "header" in merged_options:
+            # YAML 'header: true' -> Python True, but read_csv expects 0 (int) or None
+            if merged_options["header"] is True:
+                merged_options["header"] = 0
+            # YAML 'header: false' -> Python False, but read_csv expects None
+            elif merged_options["header"] is False:
+                merged_options["header"] = None
+
+        # Custom Readers
+        if format in self._custom_readers:
+            return self._custom_readers[format](full_path, **merged_options)
+
+        # Handle glob patterns for local files
+        is_glob = False
+        if path and ("*" in path or "?" in path or "[" in path):
+            parsed = urlparse(str(full_path))
+            # Only expand for local files (no scheme, file://, or drive letter)
+            is_local = (
+                not parsed.scheme
+                or parsed.scheme == "file"
+                or (len(parsed.scheme) == 1 and parsed.scheme.isalpha())
+            )
+
+            if is_local:
+                glob_path = str(full_path)
+                if glob_path.startswith("file:///"):
+                    glob_path = glob_path[8:]
+                elif glob_path.startswith("file://"):
+                    glob_path = glob_path[7:]
+
+                matched_files = glob.glob(glob_path)
+                if not matched_files:
+                    raise FileNotFoundError(f"No files matched pattern: {glob_path}")
+
+                full_path = matched_files
+                is_glob = True
+
         # Read based on format
         if format == "csv":
-            return pd.read_csv(full_path, **merged_options)
+            try:
+                if is_glob and isinstance(full_path, list):
+                    dfs = [pd.read_csv(f, **merged_options) for f in full_path]
+                    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                return pd.read_csv(full_path, **merged_options)
+            except UnicodeDecodeError:
+                # Retry with common fallbacks
+                merged_options["encoding"] = "latin1"
+                if is_glob and isinstance(full_path, list):
+                    dfs = [pd.read_csv(f, **merged_options) for f in full_path]
+                    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                return pd.read_csv(full_path, **merged_options)
+            except pd.errors.ParserError:
+                # Retry with bad lines skipped
+                merged_options["on_bad_lines"] = "skip"
+                if is_glob and isinstance(full_path, list):
+                    dfs = [pd.read_csv(f, **merged_options) for f in full_path]
+                    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                return pd.read_csv(full_path, **merged_options)
         elif format == "parquet":
+            # read_parquet handles list of files
             return pd.read_parquet(full_path, **merged_options)
         elif format == "json":
+            if is_glob and isinstance(full_path, list):
+                dfs = [pd.read_json(f, **merged_options) for f in full_path]
+                return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
             return pd.read_json(full_path, **merged_options)
         elif format == "excel":
             return pd.read_excel(full_path, **merged_options)
@@ -207,10 +269,17 @@ class PandasEngine(Engine):
         writer_options = merged_options.copy()
         writer_options.pop("keys", None)
 
+        # Custom Writers
+        if format in self._custom_writers:
+            self._custom_writers[format](df, full_path, mode=mode, **writer_options)
+            return
+
         # Only create local directories (skip for remote URIs like abfss://, s3://)
         parsed = urlparse(full_path)
         # On Windows, drive letters can be parsed as schemes (e.g. "c")
-        is_windows_drive = len(parsed.scheme) == 1 and parsed.scheme.isalpha() if parsed.scheme else False
+        is_windows_drive = (
+            len(parsed.scheme) == 1 and parsed.scheme.isalpha() if parsed.scheme else False
+        )
 
         if not parsed.scheme or parsed.scheme == "file" or is_windows_drive:
             Path(full_path).parent.mkdir(parents=True, exist_ok=True)

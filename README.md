@@ -179,7 +179,26 @@ That's it! ODIBI will:
 
 ## Features
 
-### Delta Lake Support (Phase 2B) ✨ NEW
+### Extensibility & Custom Logic (Phase 5 & 6) ✨ NEW
+ODIBI is now fully extensible and battle-tested:
+- **Custom Python Transforms:** Place `transforms.py` in your project folder, and `@transform` functions are automatically discovered.
+- **HTTP Connector:** Fetch data directly from APIs with `type: http`.
+- **Custom Readers:** Add support for any file format (NetCDF, XML, etc.) via plugins.
+- **Glob Patterns:** Read multiple files (`data/*.csv`) effortlessly.
+- **Real-World Validation:** Verified against 10 complex scenarios ("The Gauntlet") covering Retail, IoT, Finance, and more.
+
+## Reference Hardware
+
+Odibi is developed and stress-tested on the **COMMANDCENTER** reference architecture to ensure high-performance capabilities:
+
+- **CPU:** Intel Core i9-13900F/14900F (Family 6 Model 183) - 24+ Cores
+- **RAM:** 32GB DDR5 (High-Bandwidth)
+- **Storage:** >9TB NVMe/HDD Mix (Massive Dataset Support)
+- **Role:** "The Gauntlet" Proving Ground for 100GB+ stress tests.
+
+We design Odibi to scale from laptops to this reference specification and beyond (Spark clusters).
+
+### Delta Lake Support (Phase 2B)
 Production-ready Delta Lake integration with ACID transactions and time travel:
 
 ```python
@@ -368,9 +387,9 @@ ProjectConfig (top-level)
 ---
 
 ## Roadmap
- 
+
  ODIBI is being developed in deliberate phases:
- 
+
  - ✅ **Phase 1:** Pandas MVP, Spark scaffolding, Azure connections, CI/CD
  - ✅ **Phase 2A:** Azure ADLS + Key Vault authentication
  - ✅ **Phase 2B:** Delta Lake support (read/write, VACUUM, time travel)
@@ -378,7 +397,8 @@ ProjectConfig (top-level)
  - ✅ **Phase 3:** CLI tools, testing utilities, advanced features
  - ✅ **Phase 4:** Production hardening, performance tuning
  - ✅ **Phase 5:** Community ecosystem, plugin system (Complete Nov 2025)
- 
+ - ✅ **Phase 6:** Real-World Validation "The Gauntlet" (Complete Nov 2025)
+
  See [PHASES.md](PHASES.md) for detailed roadmap.
 
 ---

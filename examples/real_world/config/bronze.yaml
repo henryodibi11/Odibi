@@ -7,10 +7,14 @@ connections:
   raw_data:
     type: local
     base_path: ./examples/real_world/data/raw
-  
+
   bronze_layer:
     type: local
     base_path: ./examples/real_world/data/bronze
+
+  frankfurter_api:
+    type: http
+    base_url: "https://api.frankfurter.app"
 
 # 2. Story Settings
 story:
@@ -30,8 +34,7 @@ pipelines:
           connection: raw_data
           path: olist_orders_dataset.csv
           format: csv
-          # options: {header: true}  <-- Removed (default is header=0)
-      
+
       - name: save_orders
         depends_on: [read_orders]
         write:
@@ -46,7 +49,7 @@ pipelines:
           connection: raw_data
           path: olist_order_items_dataset.csv
           format: csv
-      
+
       - name: save_items
         depends_on: [read_items]
         write:
@@ -61,7 +64,7 @@ pipelines:
           connection: raw_data
           path: olist_products_dataset.csv
           format: csv
-      
+
       - name: save_products
         depends_on: [read_products]
         write:
@@ -76,7 +79,7 @@ pipelines:
           connection: raw_data
           path: olist_customers_dataset.csv
           format: csv
-      
+
       - name: save_customers
         depends_on: [read_customers]
         write:
@@ -84,14 +87,14 @@ pipelines:
           path: customers
           format: parquet
           mode: overwrite
-          
+
       # Translations (Category Name EN)
       - name: read_translation
         read:
           connection: raw_data
           path: product_category_name_translation.csv
           format: csv
-          
+
       - name: save_translation
         depends_on: [read_translation]
         write:
@@ -100,19 +103,25 @@ pipelines:
           format: parquet
           mode: overwrite
 
-  # --- Pipeline 2: Ingest Exchange Rates ---
+  # --- Pipeline 2: Ingest Exchange Rates (via API) ---
   - pipeline: ingest_rates
-    description: "Ingest flattened exchange rates"
+    description: "Ingest flattened exchange rates from API"
     nodes:
-      - name: read_rates
+      - name: fetch_rates
         read:
-          connection: raw_data
-          path: exchange_rates_flat.csv
-          format: csv
-          # options: {header: true} <-- Removed
-          
+          connection: frankfurter_api
+          path: "2016-09-01..2018-10-31?from=BRL&to=USD,EUR"
+          format: json
+
+      - name: flatten_rates
+        depends_on: [fetch_rates]
+        transform:
+          steps:
+            - function: flatten_exchange_rates
+              params: {}
+
       - name: save_rates
-        depends_on: [read_rates]
+        depends_on: [flatten_rates]
         write:
           connection: bronze_layer
           path: exchange_rates

@@ -36,9 +36,21 @@ This project demonstrates Odibi's capabilities using a real-world, relational e-
     ```bash
     python examples/real_world/scripts/setup_data.py
     ```
-    *Note: You will need to download the Olist dataset from Kaggle manually if not present.*
 
-2.  **Run Pipeline:**
+2.  **Run Pipelines (Sequential):**
+    The project is split into three layers for modularity.
+
+    **Bronze (Ingestion):**
     ```bash
-    odibi run examples/real_world/config/odibi_store.yaml
+    python -m odibi.cli.main run examples/real_world/config/bronze.yaml
+    ```
+
+    **Silver (Enrichment):**
+    ```bash
+    python -m odibi.cli.main run examples/real_world/config/silver.yaml
+    ```
+
+    **Gold (Analytics):**
+    ```bash
+    python -m odibi.cli.main run examples/real_world/config/gold.yaml
     ```

@@ -1,0 +1,40 @@
+project: odibi_law
+description: "Legal Text Analysis"
+engine: pandas
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./examples/odibi_law/data/raw
+  lake:
+    type: local
+    base_path: ./examples/odibi_law/data/lake
+
+story:
+  connection: lake
+  path: ../stories
+  auto_generate: true
+
+pipelines:
+  - pipeline: process_bills
+    nodes:
+      - name: read_bills
+        read:
+          connection: raw_data
+          path: bills.csv
+          format: csv
+
+      - name: summarize
+        depends_on: [read_bills]
+        transform:
+          steps:
+            - function: summarize_bill
+              params: {}
+
+      - name: save_summaries
+        depends_on: [summarize]
+        write:
+          connection: lake
+          path: gold/summaries
+          format: parquet
+          mode: overwrite

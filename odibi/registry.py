@@ -63,8 +63,8 @@ class FunctionRegistry:
 
         sig = cls._signatures[name]
 
-        # Get function parameters (excluding 'context' which is injected)
-        func_params = {k: v for k, v in sig.parameters.items() if k != "context"}
+        # Get function parameters (excluding 'context' and 'current' which are injected)
+        func_params = {k: v for k, v in sig.parameters.items() if k not in ["context", "current"]}
 
         # Check for missing required parameters
         missing = []

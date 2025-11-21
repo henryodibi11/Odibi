@@ -25,7 +25,7 @@ class StructuredLogger:
         """Redact registered secrets from text."""
         if not text or not self._secrets:
             return text
-        
+
         for secret in self._secrets:
             if secret in text:
                 text = text.replace(secret, "[REDACTED]")
@@ -82,11 +82,11 @@ class StructuredLogger:
             if level == "INFO":
                 self.logger.info(formatted_msg)
             elif level == "WARNING":
-                self.logger.warning(f"⚠️ {formatted_msg}")
+                self.logger.warning(f"[WARN] {formatted_msg}")
             elif level == "ERROR":
-                self.logger.error(f"❌ {formatted_msg}")
+                self.logger.error(f"[ERROR] {formatted_msg}")
             elif level == "DEBUG":
-                self.logger.debug(f"🐛 {formatted_msg}")
+                self.logger.debug(f"[DEBUG] {formatted_msg}")
 
 
 # Global instance to be initialized

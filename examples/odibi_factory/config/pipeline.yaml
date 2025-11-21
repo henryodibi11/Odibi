@@ -1,0 +1,62 @@
+project: odibi_factory
+description: "IoT Anomaly Detection (Real Data)"
+engine: pandas
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./examples/odibi_factory/data/raw
+  lake:
+    type: local
+    base_path: ./examples/odibi_factory/data/lake
+
+story:
+  connection: lake
+  path: ../stories
+  auto_generate: true
+
+pipelines:
+  - pipeline: ingest_iot
+    nodes:
+      - name: read_temp
+        read:
+          connection: raw_data
+          path: machine_temp.csv
+          format: csv
+
+      - name: resample_hourly
+        depends_on: [read_temp]
+        transform:
+          steps:
+            - function: resample_timeseries
+              params:
+                time_col: timestamp
+                rule: "1h"
+                agg: "mean"
+
+      - name: detect_anomalies
+        depends_on: [resample_hourly]
+        transform:
+          steps:
+            - sql: |
+                -- Simple Z-Score on the whole dataset (batch mode)
+                SELECT
+                  timestamp,
+                  value,
+                  (value - AVG(value) OVER ()) / NULLIF(STDDEV(value) OVER (), 0) as z_score
+                FROM resample_hourly
+                -- Filter usually happens in next step, or we just calculate score here
+
+      - name: filter_anomalies
+        depends_on: [detect_anomalies]
+        transform:
+          steps:
+            - sql: "SELECT * FROM detect_anomalies WHERE ABS(z_score) > 3"
+
+      - name: save_anomalies
+        depends_on: [filter_anomalies]
+        write:
+          connection: lake
+          path: gold/anomalies
+          format: parquet
+          mode: overwrite

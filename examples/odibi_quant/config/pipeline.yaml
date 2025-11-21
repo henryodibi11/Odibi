@@ -1,0 +1,51 @@
+project: odibi_quant
+description: "Financial Time Series Analysis"
+engine: pandas
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./examples/odibi_quant/data/raw
+  lake:
+    type: local
+    base_path: ./examples/odibi_quant/data/lake
+
+story:
+  connection: lake
+  path: ../stories
+  auto_generate: true
+
+pipelines:
+  - pipeline: process_stocks
+    nodes:
+      - name: read_aapl
+        read:
+          connection: raw_data
+          path: aapl.us.csv
+          format: csv
+
+      - name: calc_indicators
+        depends_on: [read_aapl]
+        transform:
+          steps:
+            - sql: |
+                SELECT
+                  Date,
+                  Open,
+                  High,
+                  Low,
+                  Close,
+                  Volume,
+                  -- Moving Averages
+                  AVG(Close) OVER (ORDER BY Date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) as sma_50,
+                  AVG(Close) OVER (ORDER BY Date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) as sma_200
+                FROM read_aapl
+                ORDER BY Date ASC
+
+      - name: save_gold
+        depends_on: [calc_indicators]
+        write:
+          connection: lake
+          path: gold/aapl_indicators
+          format: parquet
+          mode: overwrite

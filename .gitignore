@@ -108,3 +108,6 @@ test_exploration*.ipynb
 # Temporary files
 *.tmp
 *.log
+
+# Stress Testing
+# stress_test_runs*/

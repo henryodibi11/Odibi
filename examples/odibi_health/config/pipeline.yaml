@@ -1,0 +1,38 @@
+project: odibi_health
+description: "Healthcare PII Verification"
+engine: pandas
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./examples/odibi_health/data/raw
+
+  secure_zone:
+    type: local
+    base_path: ./examples/odibi_health/data/secure
+
+story:
+  connection: secure_zone
+  path: ../stories
+  auto_generate: true
+
+pipelines:
+  - pipeline: ingest_patients
+    nodes:
+      - name: read_patients
+        read:
+          connection: raw_data
+          path: patients.csv
+          format: csv
+        # Verify column-level redaction
+        sensitive: ["ssn", "phone", "email"]
+
+      - name: save_secure
+        depends_on: [read_patients]
+        write:
+          connection: secure_zone
+          path: patients_masked
+          format: parquet
+          mode: overwrite
+        # Verify full-table redaction
+        sensitive: true

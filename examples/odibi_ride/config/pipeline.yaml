@@ -1,0 +1,116 @@
+project: odibi_ride
+description: "Urban Mobility Analysis (NYC Taxi)"
+engine: pandas
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./examples/odibi_ride/data/raw
+
+  bronze_layer:
+    type: local
+    base_path: ./examples/odibi_ride/data/bronze
+
+  silver_layer:
+    type: local
+    base_path: ./examples/odibi_ride/data/silver
+
+  gold_layer:
+    type: local
+    base_path: ./examples/odibi_ride/data/gold
+
+story:
+  connection: gold_layer
+  path: ../stories
+  auto_generate: true
+
+pipelines:
+  # --- Bronze: Ingestion ---
+  - pipeline: ingest_trips
+    description: "Ingest raw taxi data"
+    nodes:
+      - name: read_raw
+        read:
+          connection: raw_data
+          # Use glob pattern to catch all downloaded months
+          path: "yellow_tripdata_*.parquet"
+          format: parquet
+
+      - name: save_bronze
+        depends_on: [read_raw]
+        write:
+          connection: bronze_layer
+          path: trips
+          format: parquet
+          mode: overwrite
+
+  # --- Silver: Cleaning & Enrichment ---
+  - pipeline: clean_trips
+    description: "Filter invalid trips and calculate duration"
+    nodes:
+      - name: trips
+        read:
+          connection: bronze_layer
+          path: trips
+          format: parquet
+
+      - name: trips_enriched
+        depends_on: [trips]
+        transform:
+          steps:
+            - sql: |
+                SELECT
+                  tpep_pickup_datetime,
+                  tpep_dropoff_datetime,
+                  passenger_count,
+                  trip_distance,
+                  PULocationID,
+                  DOLocationID,
+                  total_amount,
+                  -- Enrichments
+                  date_diff('minute', tpep_pickup_datetime, tpep_dropoff_datetime) as duration_min,
+                  strftime(tpep_pickup_datetime, '%H') as pickup_hour
+                FROM trips
+                WHERE passenger_count > 0
+                  AND trip_distance > 0
+                  AND total_amount > 0
+
+      - name: save_silver
+        depends_on: [trips_enriched]
+        write:
+          connection: silver_layer
+          path: trips_enriched
+          format: parquet
+          mode: overwrite
+
+  # --- Gold: Aggregation ---
+  - pipeline: agg_zone_stats
+    description: "Aggregate stats by Pickup Zone"
+    nodes:
+      - name: clean_trips
+        read:
+          connection: silver_layer
+          path: trips_enriched
+          format: parquet
+
+      - name: zone_stats
+        depends_on: [clean_trips]
+        transform:
+          steps:
+            - sql: |
+                SELECT
+                  PULocationID,
+                  COUNT(*) as trip_count,
+                  AVG(total_amount) as avg_fare,
+                  AVG(duration_min) as avg_duration
+                FROM clean_trips
+                GROUP BY PULocationID
+                ORDER BY trip_count DESC
+
+      - name: save_gold
+        depends_on: [zone_stats]
+        write:
+          connection: gold_layer
+          path: zone_stats
+          format: parquet
+          mode: overwrite

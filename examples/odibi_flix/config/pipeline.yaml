@@ -1,0 +1,92 @@
+project: odibi_flix
+description: "Entertainment Graph Analysis"
+engine: pandas
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./examples/odibi_flix/data/raw
+
+  lake:
+    type: local
+    base_path: ./examples/odibi_flix/data/lake
+
+story:
+  connection: lake
+  path: ../stories
+  auto_generate: true
+
+pipelines:
+  - pipeline: ingest_titles
+    nodes:
+      - name: read_titles
+        read:
+          connection: raw_data
+          path: title.basics.tsv
+          format: csv
+          options:
+            sep: "\t"
+            quoting: 3 # QUOTE_NONE
+
+      - name: save_titles_bronze
+        depends_on: [read_titles]
+        write:
+          connection: lake
+          path: bronze/titles
+          format: parquet
+          mode: overwrite
+
+  - pipeline: process_genres
+    nodes:
+      - name: titles
+        read:
+          connection: lake
+          path: bronze/titles
+          format: parquet
+
+      - name: titles_exploded
+        depends_on: [titles]
+        transform:
+          steps:
+            - function: explode_genres
+              params: {}
+
+      - name: save_titles_silver
+        depends_on: [titles_exploded]
+        write:
+          connection: lake
+          path: silver/titles_exploded
+          format: parquet
+          mode: overwrite
+
+  - pipeline: report_genres
+    nodes:
+      - name: silver_titles
+        read:
+          connection: lake
+          path: silver/titles_exploded
+          format: parquet
+
+      - name: genre_counts
+        depends_on: [silver_titles]
+        transform:
+          steps:
+            - sql: |
+                SELECT
+                  genres,
+                  COUNT(*) as movie_count,
+                  -- runtimeMinutes is text in raw, might need cast
+                  -- DuckDB/PandasSQL might be strict.
+                  -- Let's try simple count first to be safe.
+                  COUNT(*) as count_check
+                FROM silver_titles
+                GROUP BY genres
+                ORDER BY movie_count DESC
+
+      - name: save_report
+        depends_on: [genre_counts]
+        write:
+          connection: lake
+          path: gold/genre_counts
+          format: parquet
+          mode: overwrite

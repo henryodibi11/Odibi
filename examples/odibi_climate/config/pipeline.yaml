@@ -1,0 +1,33 @@
+project: odibi_climate
+description: "Custom Format Plugin Test"
+engine: pandas
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./examples/odibi_climate/data/raw
+  lake:
+    type: local
+    base_path: ./examples/odibi_climate/data/lake
+
+story:
+  connection: lake
+  path: ../stories
+  auto_generate: true
+
+pipelines:
+  - pipeline: ingest_weather
+    nodes:
+      - name: read_custom
+        read:
+          connection: raw_data
+          path: station_1.weather
+          format: weather # Custom format!
+
+      - name: save_standard
+        depends_on: [read_custom]
+        write:
+          connection: lake
+          path: bronze/weather
+          format: parquet
+          mode: overwrite

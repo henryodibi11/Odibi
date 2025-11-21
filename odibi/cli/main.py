@@ -8,6 +8,8 @@ from odibi.cli.doctor import doctor_command
 from odibi.cli.story import add_story_parser, story_command
 from odibi.cli.graph import graph_command
 from odibi.cli.secrets import add_secrets_parser, secrets_command
+from odibi.cli.generate_project import add_generate_project_parser, generate_project_command
+from odibi.cli.stress import add_stress_parser, run_stress_test
 from odibi.utils.telemetry import setup_telemetry
 
 
@@ -80,6 +82,12 @@ Examples:
     # odibi secrets
     add_secrets_parser(subparsers)
 
+    # odibi generate-project
+    add_generate_project_parser(subparsers)
+
+    # odibi stress
+    add_stress_parser(subparsers)
+
     args = parser.parse_args()
 
     # Configure logging
@@ -103,6 +111,10 @@ Examples:
         return story_command(args)
     elif args.command == "secrets":
         return secrets_command(args)
+    elif args.command == "generate-project":
+        return generate_project_command(args)
+    elif args.command == "stress":
+        return run_stress_test(args)
     else:
         parser.print_help()
         return 1

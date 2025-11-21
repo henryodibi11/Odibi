@@ -14,12 +14,13 @@ from odibi.node import NodeResult
 # Custom class to force block style for multiline strings
 class MultilineString(str):
     """String subclass to force YAML block scalar style."""
+
     pass
 
 
 def multiline_presenter(dumper, data):
     """YAML representer for MultilineString."""
-    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
 
 
 yaml.add_representer(MultilineString, multiline_presenter)
@@ -92,7 +93,6 @@ class StoryGenerator:
         lines.append(f"- **Duration:** {duration:.2f}s")
         lines.append(f"- **Odibi Version:** v{__version__}")
         lines.append(f"- **Git Commit:** `{git_info['commit']}` (Branch: `{git_info['branch']}`)")
-
 
         # Status
         if failed:
@@ -178,16 +178,22 @@ class StoryGenerator:
         """Get current git commit and branch."""
         try:
             # Run git commands silently
-            commit = subprocess.check_output(
-                ["git", "rev-parse", "--short", "HEAD"], 
-                stderr=subprocess.DEVNULL
-            ).decode("utf-8").strip()
-            
-            branch = subprocess.check_output(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"], 
-                stderr=subprocess.DEVNULL
-            ).decode("utf-8").strip()
-            
+            commit = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL
+                )
+                .decode("utf-8")
+                .strip()
+            )
+
+            branch = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"], stderr=subprocess.DEVNULL
+                )
+                .decode("utf-8")
+                .strip()
+            )
+
             return {"commit": commit, "branch": branch}
         except Exception:
             return {"commit": "unknown", "branch": "unknown"}
@@ -201,22 +207,22 @@ class StoryGenerator:
             stories = sorted(
                 self.output_path.glob(f"{self.pipeline_name}_*.md"),
                 key=lambda p: p.stat().st_mtime,
-                reverse=True
+                reverse=True,
             )
 
             # 1. Count retention
             if len(stories) > self.retention_count:
-                to_delete = stories[self.retention_count:]
+                to_delete = stories[self.retention_count :]
                 for path in to_delete:
                     path.unlink(missing_ok=True)
-                
+
                 # Update list for next check
-                stories = stories[:self.retention_count]
+                stories = stories[: self.retention_count]
 
             # 2. Time retention
             now = datetime.now()
             cutoff = now - timedelta(days=self.retention_days)
-            
+
             for path in stories:
                 mtime = datetime.fromtimestamp(path.stat().st_mtime)
                 if mtime < cutoff:
@@ -330,6 +336,12 @@ class StoryGenerator:
         """
         if not sample:
             return "*No data*"
+
+        # Check for special redaction message (sensitive: true)
+        if len(sample) == 1 and "message" in sample[0] and len(sample[0]) == 1:
+            msg = sample[0]["message"]
+            if "[REDACTED" in str(msg):
+                return f"**{msg}**"
 
         # Determine columns
         if schema:

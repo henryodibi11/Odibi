@@ -1,165 +1,407 @@
 {
   "pipelines": {
     "ingest_olist": {
-      "last_run": "2025-11-20T17:59:59.003179",
+      "last_run": "2025-11-20T19:09:58.155336",
       "nodes": {
         "read_orders": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:58.362354"
+          "timestamp": "2025-11-20T19:09:56.637216"
         },
         "read_items": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:58.486454"
+          "timestamp": "2025-11-20T19:09:56.761039"
         },
         "read_products": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:58.519774"
+          "timestamp": "2025-11-20T19:09:56.784512"
         },
         "read_customers": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:58.603436"
+          "timestamp": "2025-11-20T19:09:56.852107"
         },
         "read_translation": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:58.603436"
+          "timestamp": "2025-11-20T19:09:56.853108"
         },
         "save_orders": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:58.802784"
+          "timestamp": "2025-11-20T19:09:57.573883"
         },
         "save_items": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:58.886542"
+          "timestamp": "2025-11-20T19:09:57.838258"
         },
         "save_products": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:58.920226"
+          "timestamp": "2025-11-20T19:09:57.894258"
         },
         "save_customers": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:59.003179"
+          "timestamp": "2025-11-20T19:09:58.152337"
         },
         "save_translation": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:59.003179"
+          "timestamp": "2025-11-20T19:09:58.155336"
         }
       }
     },
     "ingest_rates": {
-      "last_run": "2025-11-20T17:59:59.253444",
+      "last_run": "2025-11-20T19:09:58.356350",
       "nodes": {
-        "read_rates": {
+        "fetch_rates": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:59.253444"
+          "timestamp": "2025-11-20T19:09:58.328350"
+        },
+        "flatten_rates": {
+          "success": true,
+          "timestamp": "2025-11-20T19:09:58.351350"
         },
         "save_rates": {
           "success": true,
-          "timestamp": "2025-11-20T17:59:59.253444"
+          "timestamp": "2025-11-20T19:09:58.356350"
         }
       }
     },
     "enrich_orders": {
-      "last_run": "2025-11-20T18:00:31.292732",
+      "last_run": "2025-11-20T19:11:18.528660",
       "nodes": {
         "orders": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:30.973090"
+          "timestamp": "2025-11-20T19:11:17.403684"
         },
         "rates": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:30.973090"
+          "timestamp": "2025-11-20T19:11:17.414684"
         },
         "orders_enriched": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:31.192582"
+          "timestamp": "2025-11-20T19:11:18.225244"
         },
         "save_silver_orders": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:31.277022"
+          "timestamp": "2025-11-20T19:11:18.528660"
         }
       }
     },
     "enrich_products": {
-      "last_run": "2025-11-20T18:00:31.622945",
+      "last_run": "2025-11-20T19:11:18.675407",
       "nodes": {
         "products": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:31.554444"
+          "timestamp": "2025-11-20T19:11:18.592357"
         },
         "translations": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:31.554444"
+          "timestamp": "2025-11-20T19:11:18.599356"
         },
         "products_translated": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:31.601315"
+          "timestamp": "2025-11-20T19:11:18.624327"
         },
         "save_silver_products": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:31.622945"
+          "timestamp": "2025-11-20T19:11:18.675407"
         }
       }
     },
     "enrich_items": {
-      "last_run": "2025-11-20T18:00:32.326711",
+      "last_run": "2025-11-20T19:11:19.074333",
       "nodes": {
         "items": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:31.943707"
+          "timestamp": "2025-11-20T19:11:18.760236"
         },
         "silver_orders": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:32.143248"
+          "timestamp": "2025-11-20T19:11:18.797502"
         },
         "items_with_currency": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:32.242980"
+          "timestamp": "2025-11-20T19:11:18.852913"
         },
         "save_silver_items": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:32.326711"
+          "timestamp": "2025-11-20T19:11:19.073330"
         }
       }
     },
     "report_revenue": {
-      "last_run": "2025-11-20T18:00:56.237379",
+      "last_run": "2025-11-20T19:11:27.897349",
       "nodes": {
         "items": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:56.000835"
+          "timestamp": "2025-11-20T19:11:27.766720"
         },
         "orders": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:56.079479"
+          "timestamp": "2025-11-20T19:11:27.797720"
         },
         "daily_revenue": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:56.226373"
+          "timestamp": "2025-11-20T19:11:27.892074"
         },
         "save_revenue_report": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:56.237379"
+          "timestamp": "2025-11-20T19:11:27.897349"
         }
       }
     },
     "report_logistics": {
-      "last_run": "2025-11-20T18:00:56.665871",
+      "last_run": "2025-11-20T19:11:28.057856",
       "nodes": {
         "orders": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:56.526686"
+          "timestamp": "2025-11-20T19:11:27.970253"
         },
         "customers": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:56.593359"
+          "timestamp": "2025-11-20T19:11:28.005254"
         },
         "state_performance": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:56.658561"
+          "timestamp": "2025-11-20T19:11:28.053856"
         },
         "save_logistics_report": {
           "success": true,
-          "timestamp": "2025-11-20T18:00:56.664871"
+          "timestamp": "2025-11-20T19:11:28.057856"
+        }
+      }
+    },
+    "ingest_trips": {
+      "last_run": "2025-11-20T18:57:55.988996",
+      "nodes": {
+        "read_raw": {
+          "success": true,
+          "timestamp": "2025-11-20T18:57:53.352601"
+        },
+        "save_bronze": {
+          "success": true,
+          "timestamp": "2025-11-20T18:57:55.988996"
+        }
+      }
+    },
+    "clean_trips": {
+      "last_run": "2025-11-20T18:57:58.649443",
+      "nodes": {
+        "trips": {
+          "success": true,
+          "timestamp": "2025-11-20T18:57:56.260533"
+        },
+        "trips_enriched": {
+          "success": true,
+          "timestamp": "2025-11-20T18:57:56.798452"
+        },
+        "save_silver": {
+          "success": true,
+          "timestamp": "2025-11-20T18:57:58.648443"
+        }
+      }
+    },
+    "agg_zone_stats": {
+      "last_run": "2025-11-20T18:57:58.841462",
+      "nodes": {
+        "clean_trips": {
+          "success": true,
+          "timestamp": "2025-11-20T18:57:58.810461"
+        },
+        "zone_stats": {
+          "success": true,
+          "timestamp": "2025-11-20T18:57:58.836462"
+        },
+        "save_gold": {
+          "success": true,
+          "timestamp": "2025-11-20T18:57:58.841462"
+        }
+      }
+    },
+    "ingest_titles": {
+      "last_run": "2025-11-20T19:13:49.448711",
+      "nodes": {
+        "read_titles": {
+          "success": true,
+          "timestamp": "2025-11-20T19:13:49.421441"
+        },
+        "save_titles_bronze": {
+          "success": true,
+          "timestamp": "2025-11-20T19:13:49.447709"
+        }
+      }
+    },
+    "process_genres": {
+      "last_run": "2025-11-20T19:13:49.557221",
+      "nodes": {
+        "titles": {
+          "success": true,
+          "timestamp": "2025-11-20T19:13:49.527713"
+        },
+        "titles_exploded": {
+          "success": true,
+          "timestamp": "2025-11-20T19:13:49.536714"
+        },
+        "save_titles_silver": {
+          "success": true,
+          "timestamp": "2025-11-20T19:13:49.557221"
+        }
+      }
+    },
+    "report_genres": {
+      "last_run": "2025-11-20T19:13:49.671491",
+      "nodes": {
+        "silver_titles": {
+          "success": true,
+          "timestamp": "2025-11-20T19:13:49.631223"
+        },
+        "genre_counts": {
+          "success": true,
+          "timestamp": "2025-11-20T19:13:49.666491"
+        },
+        "save_report": {
+          "success": true,
+          "timestamp": "2025-11-20T19:13:49.671491"
+        }
+      }
+    },
+    "ingest_patients": {
+      "last_run": "2025-11-20T19:15:38.947334",
+      "nodes": {
+        "read_patients": {
+          "success": true,
+          "timestamp": "2025-11-20T19:15:38.932334"
+        },
+        "save_secure": {
+          "success": true,
+          "timestamp": "2025-11-20T19:15:38.947334"
+        }
+      }
+    },
+    "process_stocks": {
+      "last_run": "2025-11-20T19:19:33.448196",
+      "nodes": {
+        "read_aapl": {
+          "success": true,
+          "timestamp": "2025-11-20T19:19:33.352385"
+        },
+        "calc_indicators": {
+          "success": true,
+          "timestamp": "2025-11-20T19:19:33.407385"
+        },
+        "save_gold": {
+          "success": true,
+          "timestamp": "2025-11-20T19:19:33.448196"
+        }
+      }
+    },
+    "ingest_iot": {
+      "last_run": "2025-11-20T19:21:57.759214",
+      "nodes": {
+        "read_temp": {
+          "success": true,
+          "timestamp": "2025-11-20T19:21:57.691094"
+        },
+        "resample_hourly": {
+          "success": true,
+          "timestamp": "2025-11-20T19:21:57.707089"
+        },
+        "detect_anomalies": {
+          "success": true,
+          "timestamp": "2025-11-20T19:21:57.735541"
+        },
+        "filter_anomalies": {
+          "success": true,
+          "timestamp": "2025-11-20T19:21:57.747046"
+        },
+        "save_anomalies": {
+          "success": true,
+          "timestamp": "2025-11-20T19:21:57.758209"
+        }
+      }
+    },
+    "analyze_match": {
+      "last_run": "2025-11-20T19:24:06.478495",
+      "nodes": {
+        "read_events": {
+          "success": true,
+          "timestamp": "2025-11-20T19:24:06.349273"
+        },
+        "flatten": {
+          "success": true,
+          "timestamp": "2025-11-20T19:24:06.353272"
+        },
+        "extract_shots": {
+          "success": true,
+          "timestamp": "2025-11-20T19:24:06.356557"
+        },
+        "player_stats": {
+          "success": true,
+          "timestamp": "2025-11-20T19:24:06.465601"
+        },
+        "save_report": {
+          "success": true,
+          "timestamp": "2025-11-20T19:24:06.477495"
+        }
+      }
+    },
+    "process_bills": {
+      "last_run": "2025-11-20T19:24:48.530925",
+      "nodes": {
+        "read_bills": {
+          "success": true,
+          "timestamp": "2025-11-20T19:24:48.513925"
+        },
+        "summarize": {
+          "success": true,
+          "timestamp": "2025-11-20T19:24:48.514925"
+        },
+        "save_summaries": {
+          "success": true,
+          "timestamp": "2025-11-20T19:24:48.530925"
+        }
+      }
+    },
+    "ingest_logs": {
+      "last_run": "2025-11-20T19:26:59.466311",
+      "nodes": {
+        "read_log": {
+          "success": true,
+          "timestamp": "2025-11-20T19:26:59.372940"
+        },
+        "parse": {
+          "success": true,
+          "timestamp": "2025-11-20T19:26:59.420042"
+        },
+        "detect_attacks": {
+          "success": true,
+          "timestamp": "2025-11-20T19:26:59.452312"
+        },
+        "save_alerts": {
+          "success": true,
+          "timestamp": "2025-11-20T19:26:59.466311"
+        }
+      }
+    },
+    "ingest_weather": {
+      "last_run": "2025-11-20T19:37:10.021610",
+      "nodes": {
+        "read_custom": {
+          "success": true,
+          "timestamp": "2025-11-20T19:37:10.006597"
+        },
+        "save_standard": {
+          "success": true,
+          "timestamp": "2025-11-20T19:37:10.021610"
+        }
+      }
+    },
+    "main": {
+      "last_run": "2025-11-20T20:05:58.954619",
+      "nodes": {
+        "load_users": {
+          "success": false,
+          "timestamp": null
+        },
+        "clean_users": {
+          "success": false,
+          "timestamp": null
         }
       }
     }

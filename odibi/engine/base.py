@@ -9,6 +9,24 @@ from odibi.context import Context
 class Engine(ABC):
     """Abstract base class for execution engines."""
 
+    # Custom format registry
+    _custom_readers: Dict[str, Any] = {}
+    _custom_writers: Dict[str, Any] = {}
+
+    @classmethod
+    def register_format(cls, fmt: str, reader: Optional[Any] = None, writer: Optional[Any] = None):
+        """Register custom format reader/writer.
+
+        Args:
+            fmt: Format name (e.g. 'netcdf')
+            reader: Function(path, **options) -> DataFrame
+            writer: Function(df, path, **options) -> None
+        """
+        if reader:
+            cls._custom_readers[fmt] = reader
+        if writer:
+            cls._custom_writers[fmt] = writer
+
     @abstractmethod
     def read(
         self,

@@ -1,0 +1,6 @@
+id,date,product,category,quantity,price,customer_id,revenue
+1,2024-01-01,Widget A,Electronics,5,29.99,101,149.95
+2,2024-01-01,Widget B,Electronics,3,49.99,102,149.97
+4,2024-01-02,Widget A,Electronics,1,29.99,101,29.99
+7,2024-01-04,Widget B,Electronics,2,49.99,102,99.98
+9,2024-01-05,Widget A,Electronics,3,29.99,107,89.97

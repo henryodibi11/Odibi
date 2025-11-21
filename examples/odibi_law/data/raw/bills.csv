@@ -1,0 +1,3 @@
+bill_id,title,text
+hr-2025-001,Future Data Act,SECTION 1. SHORT TITLE. This Act may be cited as the 'Future Data Act'. SEC. 2. DATA QUALITY. All data pipelines must be tested thoroughly using real-world scenarios. SEC 3. OBSERVABILITY. All pipelines must emit telemetry.
+s-2025-042,AI Transparency Act,SECTION 1. IDENTIFICATION. Artificial Intelligence agents must disclose their nature to human users. SEC 2. LIABILITY. Developers are responsible for agent actions.

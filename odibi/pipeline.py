@@ -163,10 +163,10 @@ class Pipeline:
         start_timestamp = datetime.now().isoformat()
 
         results = PipelineResults(pipeline_name=self.config.pipeline, start_time=start_timestamp)
-        
+
         # Alert: on_start
         self._send_alerts("on_start", results)
-        
+
         state_manager = StateManager() if resume_from_failure else None
 
         # Define node processing function (inner function to capture self/context)
@@ -174,7 +174,7 @@ class Pipeline:
             # Check dependencies (thread-safe check on results object? No, need synchronization if strictly parallel)
             # But since we execute by layers, dependencies (previous layers) are guaranteed to be done.
             # So we only need to check if any dependency FAILED.
-            
+
             node_config = self.graph.nodes[node_name]
             deps_failed = any(dep in results.failed for dep in node_config.depends_on)
 
@@ -226,27 +226,21 @@ class Pipeline:
                 return node.execute()
             except Exception as e:
                 logger.error(f"Node '{node_name}' failed: {e}")
-                return NodeResult(
-                    node_name=node_name,
-                    success=False,
-                    duration=0.0,
-                    error=str(e)
-                )
+                return NodeResult(node_name=node_name, success=False, duration=0.0, error=str(e))
 
         if parallel:
             from concurrent.futures import ThreadPoolExecutor, as_completed
-            
+
             # Get execution layers (nodes in a layer are independent)
             layers = self.graph.get_execution_layers()
-            
+
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 for layer in layers:
                     # Submit all nodes in layer
                     future_to_node = {
-                        executor.submit(process_node, node_name): node_name 
-                        for node_name in layer
+                        executor.submit(process_node, node_name): node_name for node_name in layer
                     }
-                    
+
                     # Wait for layer to complete
                     layer_failed = False
                     for future in as_completed(future_to_node):
@@ -254,14 +248,14 @@ class Pipeline:
                         try:
                             result = future.result()
                             results.node_results[node_name] = result
-                            
+
                             if result.success:
                                 # specific check for skipped result
                                 if result.metadata.get("skipped"):
                                     if result.metadata.get("reason") == "dependency_failed":
                                         results.skipped.append(node_name)
-                                        # Treat dependency failure as failure for downstream? 
-                                        # Logic says if node skipped due to deps, it didn't "fail" execution, 
+                                        # Treat dependency failure as failure for downstream?
+                                        # Logic says if node skipped due to deps, it didn't "fail" execution,
                                         # but downstream will also skip.
                                         # Wait, process_node logic returns success=False for dep failure above?
                                         # Let's fix process_node return values.
@@ -277,66 +271,75 @@ class Pipeline:
                                 else:
                                     results.failed.append(node_name)
                                     layer_failed = True
-                                    
+
                                     # Check Fail Fast
                                     node_config = self.graph.nodes[node_name]
                                     if node_config.on_error == ErrorStrategy.FAIL_FAST:
-                                        logger.error(f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline.")
+                                        logger.error(
+                                            f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline."
+                                        )
                                         executor.shutdown(cancel_futures=True, wait=False)
                                         break
-                                    
+
                         except Exception as exc:
                             logger.error(f"Node '{node_name}' generated exception: {exc}")
                             results.failed.append(node_name)
                             layer_failed = True
-                            
+
                             # Check Fail Fast
                             node_config = self.graph.nodes[node_name]
                             if node_config.on_error == ErrorStrategy.FAIL_FAST:
-                                logger.error(f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline.")
+                                logger.error(
+                                    f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline."
+                                )
                                 executor.shutdown(cancel_futures=True, wait=False)
                                 break
-                    
+
                     # If any node in layer failed, we continue to next layer (unless fail_fast triggered break)
                     if layer_failed:
                         # Check if any failure was fail_fast (if we broke loop above)
                         # We need to check if we should stop completely
                         # Actually, if we broke the inner loop, we are here.
                         # We need to break outer loop too if fail_fast happened.
-                        # Let's check results for fail_fast trigger? 
+                        # Let's check results for fail_fast trigger?
                         # Or just check if executor is shutdown? Hard to check.
                         # Let's check the failed nodes' config.
                         for failed_node in results.failed:
-                             if self.graph.nodes[failed_node].on_error == ErrorStrategy.FAIL_FAST:
-                                 return results
-        
+                            if self.graph.nodes[failed_node].on_error == ErrorStrategy.FAIL_FAST:
+                                return results
+
         else:
             # Serial execution (existing logic refactored to use process_node for consistency?)
-            # Or keep original robust logic? 
-            # Let's keep original linear execution but use layers to be consistent, 
+            # Or keep original robust logic?
+            # Let's keep original linear execution but use layers to be consistent,
             # or use topological sort which is safer for serial.
             execution_order = self.graph.topological_sort()
             for node_name in execution_order:
                 result = process_node(node_name)
                 results.node_results[node_name] = result
-                
+
                 if result.success:
-                    if result.metadata.get("skipped") and result.metadata.get("reason") == "dependency_failed":
-                         results.skipped.append(node_name)
-                         results.failed.append(node_name) # Mark as failed so downstream skips
+                    if (
+                        result.metadata.get("skipped")
+                        and result.metadata.get("reason") == "dependency_failed"
+                    ):
+                        results.skipped.append(node_name)
+                        results.failed.append(node_name)  # Mark as failed so downstream skips
                     else:
-                         results.completed.append(node_name)
+                        results.completed.append(node_name)
                 else:
                     if result.metadata.get("skipped"):
                         results.skipped.append(node_name)
                         results.failed.append(node_name)
                     else:
                         results.failed.append(node_name)
-                        
+
                         # Check Fail Fast
                         node_config = self.graph.nodes[node_name]
                         if node_config.on_error == ErrorStrategy.FAIL_FAST:
-                            logger.error(f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline.")
+                            logger.error(
+                                f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline."
+                            )
                             break
 
         # Calculate duration
@@ -395,13 +398,12 @@ class Pipeline:
                     "duration": results.duration,
                     "timestamp": datetime.now().isoformat(),
                 }
-                
+
                 msg = f"Pipeline '{self.config.pipeline}' {status}"
                 if results.failed:
                     msg += f". Failed nodes: {', '.join(results.failed)}"
-                
-                send_alert(alert_config, msg, context)
 
+                send_alert(alert_config, msg, context)
 
     def run_node(self, node_name: str, mock_data: Optional[Dict[str, Any]] = None) -> NodeResult:
         """Execute a single node (for testing/debugging).
@@ -595,13 +597,13 @@ class PipelineManager:
             ValueError: If connection type is not supported
         """
         connections = {}
-        
+
         # Load plugins
         load_plugins()
-        
+
         for conn_name, conn_config in conn_configs.items():
             conn_type = conn_config.get("type", "local")
-            
+
             # Check plugins
             factory = get_connection_factory(conn_type)
             if factory:
@@ -611,6 +613,14 @@ class PipelineManager:
             if conn_type == "local":
                 connections[conn_name] = LocalConnection(
                     base_path=conn_config.get("base_path", "./data")
+                )
+            elif conn_type == "http":
+                from odibi.connections.http import HttpConnection
+
+                connections[conn_name] = HttpConnection(
+                    base_url=conn_config.get("base_url", ""),
+                    headers=conn_config.get("headers"),
+                    auth=conn_config.get("auth"),
                 )
             elif conn_type == "azure_adls" or conn_type == "azure_blob":
                 # Import here to avoid dependency issues
