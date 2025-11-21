@@ -113,7 +113,14 @@ class Node:
         Returns:
             NodeResult with execution details
         """
-        from odibi.utils.telemetry import tracer, nodes_executed, rows_processed, node_duration, Status, StatusCode
+        from odibi.utils.telemetry import (
+            tracer,
+            nodes_executed,
+            rows_processed,
+            node_duration,
+            Status,
+            StatusCode,
+        )
 
         with tracer.start_as_current_span("node_execution") as span:
             span.set_attribute("node.name", self.config.name)
@@ -550,12 +557,12 @@ class Node:
                 if col in df.columns:
                     min_val = bounds.get("min")
                     max_val = bounds.get("max")
-                    
+
                     if min_val is not None:
                         min_violations = df[df[col] < min_val]
                         if len(min_violations) > 0:
                             failures.append(f"Column '{col}' has values < {min_val}")
-                            
+
                     if max_val is not None:
                         max_violations = df[df[col] > max_val]
                         if len(max_violations) > 0:
@@ -706,7 +713,7 @@ class Node:
         if "column" in error_str and "not found" in error_str:
             suggestions.append("Check that previous nodes output the expected columns")
             suggestions.append(f"Use 'odibi run-node {self.config.name} --show-schema' to debug")
-            
+
         if "validation failed" in error_str:
             suggestions.append("Check your validation rules against the input data")
             suggestions.append("Inspect the sample data in the generated story")
@@ -718,7 +725,7 @@ class Node:
         if "function" in error_str and "not" in error_str:
             suggestions.append("Ensure the transform function is decorated with @transform")
             suggestions.append("Import the module containing the transform function")
-            
+
         if "connection" in error_str:
             suggestions.append("Verify connection configuration in project.yaml")
             suggestions.append("Check network connectivity and credentials")

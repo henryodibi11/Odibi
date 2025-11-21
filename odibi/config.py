@@ -217,7 +217,9 @@ class NodeConfig(BaseModel):
 
     # Optional features
     cache: bool = Field(default=False, description="Cache result for reuse")
-    log_level: Optional[LogLevel] = Field(default=None, description="Override log level for this node")
+    log_level: Optional[LogLevel] = Field(
+        default=None, description="Override log level for this node"
+    )
     on_error: ErrorStrategy = Field(
         default=ErrorStrategy.FAIL_LATER, description="Failure handling strategy"
     )
@@ -295,7 +297,9 @@ class StoryConfig(BaseModel):
     max_sample_rows: int = Field(default=10, ge=0, le=100)
     auto_generate: bool = True
     retention_days: Optional[int] = Field(default=30, ge=1, description="Days to keep stories")
-    retention_count: Optional[int] = Field(default=100, ge=1, description="Max number of stories to keep")
+    retention_count: Optional[int] = Field(
+        default=100, ge=1, description="Max number of stories to keep"
+    )
 
 
 # DefaultsConfig deleted - settings moved to top-level ProjectConfig

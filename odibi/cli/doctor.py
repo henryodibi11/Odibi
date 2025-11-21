@@ -23,7 +23,7 @@ def doctor_command(args):
         except UnicodeEncodeError:
             print(f"[FAIL] Config file not found: {args.config}")
         return 1
-    
+
     try:
         print(f"✅ Config file found: {args.config}")
     except UnicodeEncodeError:
@@ -36,7 +36,7 @@ def doctor_command(args):
 
         # This validates against Pydantic schema
         project_config = ProjectConfig(**config_data)
-        
+
         try:
             print("✅ YAML schema is valid")
         except UnicodeEncodeError:
@@ -54,7 +54,7 @@ def doctor_command(args):
         print(f"ℹ️  Engine: {engine}")
     except UnicodeEncodeError:
         print(f"[INFO] Engine: {engine}")
-    
+
     if engine == "spark":
         try:
             import pyspark

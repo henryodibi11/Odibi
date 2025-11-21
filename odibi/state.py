@@ -58,16 +58,18 @@ class StateManager:
                 with portalocker.Lock(self.lock_path, timeout=60):
                     # Refresh state from disk inside lock to prevent overwrites
                     self.state = self._load_state()
-                    
+
                     self.state["pipelines"][pipeline_name] = pipeline_data
-                    
+
                     with open(self.state_path, "w") as f:
                         json.dump(self.state, f, indent=2)
             except portalocker.exceptions.LockException:
                 # Fallback or raise?
-                # For state file, maybe we shouldn't crash the pipeline if lock fails, 
+                # For state file, maybe we shouldn't crash the pipeline if lock fails,
                 # but it risks corruption. Better to log warning and try to write?
-                print("Warning: Could not acquire lock for state file. State might be inconsistent.")
+                print(
+                    "Warning: Could not acquire lock for state file. State might be inconsistent."
+                )
                 self._unsafe_save(pipeline_name, pipeline_data)
         else:
             self._unsafe_save(pipeline_name, pipeline_data)
@@ -77,7 +79,7 @@ class StateManager:
         # Refresh state to minimize race window
         self.state = self._load_state()
         self.state["pipelines"][pipeline_name] = pipeline_data
-        
+
         with open(self.state_path, "w") as f:
             json.dump(self.state, f, indent=2)
 

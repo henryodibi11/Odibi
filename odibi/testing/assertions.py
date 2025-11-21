@@ -4,8 +4,10 @@ Testing Assertions
 
 Helpers for asserting DataFrame equality and properties.
 """
-from typing import Any, Optional, List
+
+from typing import Any, List
 import pandas as pd
+
 
 def assert_frame_equal(
     left: Any,
@@ -13,7 +15,7 @@ def assert_frame_equal(
     check_dtype: bool = True,
     check_exact: bool = False,
     atol: float = 1e-8,
-    rtol: float = 1e-5
+    rtol: float = 1e-5,
 ) -> None:
     """
     Assert that two DataFrames are equal.
@@ -38,13 +40,9 @@ def assert_frame_equal(
         right_pdf = right_pdf.sort_values(sort_col).reset_index(drop=True)
 
     pd.testing.assert_frame_equal(
-        left_pdf,
-        right_pdf,
-        check_dtype=check_dtype,
-        check_exact=check_exact,
-        atol=atol,
-        rtol=rtol
+        left_pdf, right_pdf, check_dtype=check_dtype, check_exact=check_exact, atol=atol, rtol=rtol
     )
+
 
 def assert_schema_equal(left: Any, right: Any) -> None:
     """
@@ -56,16 +54,18 @@ def assert_schema_equal(left: Any, right: Any) -> None:
 
     assert left_cols == right_cols, f"Schema mismatch: {left_cols} != {right_cols}"
 
+
 def _to_pandas(df: Any) -> pd.DataFrame:
     """Convert to Pandas DataFrame if not already."""
     if isinstance(df, pd.DataFrame):
         return df
-    
+
     # Assume Spark DataFrame
     try:
         return df.toPandas()
     except AttributeError:
         raise TypeError(f"Expected DataFrame, got {type(df)}")
+
 
 def _get_columns(df: Any) -> List[str]:
     """Get column names."""

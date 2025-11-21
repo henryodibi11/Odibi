@@ -2,8 +2,7 @@
 
 import os
 import re
-from typing import Set, List, Optional
-from pathlib import Path
+from typing import Set
 from dotenv import load_dotenv
 
 # Pattern to match ${VAR} or ${env:VAR}
@@ -42,7 +41,7 @@ def init_command(args) -> int:
     try:
         # Extract variables
         vars_found = extract_env_vars(args.config)
-        
+
         if not vars_found:
             print(f"No environment variables found in {args.config}")
             return 0
@@ -53,12 +52,12 @@ def init_command(args) -> int:
             f"# Generated from {args.config}",
             "",
         ]
-        
+
         for var in sorted(vars_found):
             template_lines.append(f"{var}=")
 
         output_path = args.output
-        
+
         # Check if file exists
         if os.path.exists(output_path) and not args.force:
             print(f"Error: {output_path} already exists. Use --force to overwrite.")
@@ -91,7 +90,7 @@ def validate_command(args) -> int:
 
         # Extract variables from config
         vars_required = extract_env_vars(args.config)
-        
+
         if not vars_required:
             print(f"No environment variables found in {args.config}")
             return 0
@@ -108,7 +107,7 @@ def validate_command(args) -> int:
                 print(f"  - {var}")
             print("\nPlease set these variables in your environment or .env file.")
             return 1
-        
+
         print("All required environment variables are set.")
         return 0
 
@@ -123,8 +122,12 @@ def add_secrets_parser(subparsers):
     Args:
         subparsers: Main subparsers object
     """
-    secrets_parser = subparsers.add_parser("secrets", help="Manage secrets and environment variables")
-    secrets_subparsers = secrets_parser.add_subparsers(dest="secrets_command", help="Secrets commands")
+    secrets_parser = subparsers.add_parser(
+        "secrets", help="Manage secrets and environment variables"
+    )
+    secrets_subparsers = secrets_parser.add_subparsers(
+        dest="secrets_command", help="Secrets commands"
+    )
 
     # init command
     init_parser = secrets_subparsers.add_parser("init", help="Create .env.template from config")
@@ -132,9 +135,7 @@ def add_secrets_parser(subparsers):
     init_parser.add_argument(
         "-o", "--output", default=".env.template", help="Output file path (default: .env.template)"
     )
-    init_parser.add_argument(
-        "-f", "--force", action="store_true", help="Overwrite existing file"
-    )
+    init_parser.add_argument("-f", "--force", action="store_true", help="Overwrite existing file")
 
     # validate command
     validate_parser = secrets_subparsers.add_parser("validate", help="Check required variables")

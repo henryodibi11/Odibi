@@ -1,12 +1,11 @@
 """Example Postgres Connection Plugin."""
 
-from typing import Any, List, Optional
-import pandas as pd
 from odibi.connections import BaseConnection
+
 
 class PostgresConnection(BaseConnection):
     """Postgres connection implementation."""
-    
+
     def __init__(self, host: str, database: str, user: str, password: str):
         self.host = host
         self.database = database
@@ -22,11 +21,12 @@ class PostgresConnection(BaseConnection):
         """Validate connection."""
         return True
 
+
 def create_connection(name: str, config: dict) -> PostgresConnection:
     """Factory for Postgres connection."""
     return PostgresConnection(
         host=config["host"],
         database=config["database"],
         user=config["user"],
-        password=config["password"]
+        password=config["password"],
     )

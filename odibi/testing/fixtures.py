@@ -4,13 +4,14 @@ Testing Fixtures
 
 Reusable fixtures for testing pipelines and transformations.
 """
-import os
+
 import shutil
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, Any, Dict, List, Optional
+from typing import Generator, Any, Dict, Optional
 import pandas as pd
 import numpy as np
+
 
 @contextmanager
 def temp_directory() -> Generator[str, None, None]:
@@ -31,10 +32,9 @@ def temp_directory() -> Generator[str, None, None]:
     finally:
         shutil.rmtree(temp_dir)
 
+
 def generate_sample_data(
-    rows: int = 10,
-    engine_type: str = "pandas",
-    schema: Optional[Dict[str, str]] = None
+    rows: int = 10, engine_type: str = "pandas", schema: Optional[Dict[str, str]] = None
 ) -> Any:
     """
     Generate a sample DataFrame (Pandas or Spark).
@@ -52,12 +52,7 @@ def generate_sample_data(
 
     # Default schema if none provided
     if not schema:
-        schema = {
-            "id": "int",
-            "value": "float",
-            "category": "str",
-            "timestamp": "date"
-        }
+        schema = {"id": "int", "value": "float", "category": "str", "timestamp": "date"}
 
     data = {}
     for col, dtype in schema.items():
@@ -79,6 +74,7 @@ def generate_sample_data(
     if engine_type == "spark":
         try:
             from pyspark.sql import SparkSession
+
             # Try to get existing session or create new one
             spark = SparkSession.builder.master("local[*]").appName("odibi-test").getOrCreate()
             return spark.createDataFrame(pdf)
