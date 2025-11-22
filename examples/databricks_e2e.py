@@ -10,21 +10,36 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("OdibiE2E")
 
 # --- Configuration ---
-# Use local temporary directory for reliability (avoiding DBFS mount issues)
-# We will force Spark to use file:// scheme
-BASE_DIR = "/tmp/odibi_e2e"
-CONFIG_PATH = f"{BASE_DIR}/project.yaml"
-DATA_DIR = f"{BASE_DIR}/data"
+# Databricks E2E Setup
+# We need two paths:
+# 1. PYTHON_ROOT: Local path for Python file IO (Data Gen, Stories) -> /dbfs/...
+# 2. SPARK_ROOT: Distributed path for Spark IO -> dbfs:/...
+
+if os.path.exists("/dbfs"):
+    # Databricks environment with DBFS mount
+    PYTHON_ROOT = "/dbfs/tmp/odibi_e2e"
+    SPARK_ROOT = "dbfs:/tmp/odibi_e2e"
+else:
+    # Local fallback (Single Node / Laptop)
+    import tempfile
+
+    PYTHON_ROOT = tempfile.mkdtemp(prefix="odibi_e2e_")
+    SPARK_ROOT = f"file://{PYTHON_ROOT}"
+
+CONFIG_PATH = f"{PYTHON_ROOT}/project.yaml"
+DATA_DIR = f"{PYTHON_ROOT}/data"
 
 # Clean start
 try:
     import shutil
 
-    shutil.rmtree(BASE_DIR, ignore_errors=True)
+    shutil.rmtree(PYTHON_ROOT, ignore_errors=True)
 except Exception:
     pass
 
-print(f"🚀 Running E2E Test in: {BASE_DIR}")
+print(f"🚀 Running E2E Test")
+print(f"📂 Python Path: {PYTHON_ROOT}")
+print(f"⚡ Spark Path:  {SPARK_ROOT}")
 
 
 # --- 1. Data Generation ---
@@ -49,7 +64,7 @@ def generate_data():
     }
     df_sales = pd.DataFrame(sales_data)
     df_sales.to_csv(f"{DATA_DIR}/sales_dirty.csv", index=False, encoding="latin1")
-    print(f"✅ Generated {DATA_DIR}/sales_dirty.csv (Latin1)")
+    print(f"✅ Generated sales_dirty.csv")
 
     # 2. Customers Data (JSON)
     cust_data = {
@@ -59,18 +74,23 @@ def generate_data():
     }
     df_cust = pd.DataFrame(cust_data)
     df_cust.to_json(f"{DATA_DIR}/customers.json", orient="records", lines=True)
-    print(f"✅ Generated {DATA_DIR}/customers.json")
+    print(f"✅ Generated customers.json")
 
 
 # --- 2. Odibi Configuration ---
 def create_config():
-    # IMPORTANT: We use file:// prefix for base_path so Spark knows it's local file system
-    # regardless of where it's running (Driver node).
+    # We define TWO connections:
+    # 1. 'data_lake': Uses SPARK_ROOT (dbfs:/) for Spark operations
+    # 2. 'reporting': Uses PYTHON_ROOT (/dbfs/) for Story generation (Python IO)
+
     config = {
         "project": "Spark E2E Verification",
         "engine": "spark",
-        "connections": {"local_data": {"type": "local", "base_path": f"file://{DATA_DIR}"}},
-        "story": {"connection": "local_data", "path": "stories", "auto_generate": True},
+        "connections": {
+            "data_lake": {"type": "local", "base_path": f"{SPARK_ROOT}/data"},
+            "reporting": {"type": "local", "base_path": f"{PYTHON_ROOT}/data"},
+        },
+        "story": {"connection": "reporting", "path": "stories", "auto_generate": True},
         "pipelines": [
             {
                 "pipeline": "bronze_to_silver",
@@ -79,14 +99,10 @@ def create_config():
                     {
                         "name": "load_sales",
                         "read": {
-                            "connection": "local_data",
+                            "connection": "data_lake",
                             "path": "sales_dirty.csv",
                             "format": "csv",
-                            "options": {
-                                "header": True,
-                                "inferSchema": True,
-                                "auto_encoding": True,  # Feature Test
-                            },
+                            "options": {"header": True, "inferSchema": True, "auto_encoding": True},
                         },
                     },
                     {
@@ -94,7 +110,7 @@ def create_config():
                         "depends_on": ["load_sales"],
                         "transform": {
                             "steps": [
-                                {"operation": "drop_duplicates"},  # Feature Test: Default subset
+                                {"operation": "drop_duplicates"},
                                 {
                                     "operation": "fillna",
                                     "params": {"value": 0.0, "subset": ["amount"]},
@@ -107,7 +123,7 @@ def create_config():
                         },
                         "validation": {"no_nulls": ["id", "amount"]},
                         "write": {
-                            "connection": "local_data",
+                            "connection": "data_lake",
                             "path": "silver_sales",
                             "format": "delta",
                             "mode": "overwrite",
@@ -122,7 +138,7 @@ def create_config():
                     {
                         "name": "read_silver",
                         "read": {
-                            "connection": "local_data",
+                            "connection": "data_lake",
                             "path": "silver_sales",
                             "format": "delta",
                         },
@@ -130,7 +146,7 @@ def create_config():
                     {
                         "name": "read_customers",
                         "read": {
-                            "connection": "local_data",
+                            "connection": "data_lake",
                             "path": "customers.json",
                             "format": "json",
                         },
@@ -140,7 +156,6 @@ def create_config():
                         "depends_on": ["read_silver", "read_customers"],
                         "transform": {
                             "steps": [
-                                # Feature Test: Pivot
                                 {
                                     "operation": "pivot",
                                     "params": {
@@ -150,9 +165,10 @@ def create_config():
                                         "agg_func": "sum",
                                     },
                                 },
-                                # Feature Test: SQL Context (joining with registered customers)
-                                # Note: 'read_customers' registered a view named 'read_customers'
                                 {
+                                    # Note: SparkContext sanitizes names.
+                                    # 'read_customers' -> 'read_customers' (valid)
+                                    # 'current_df' is the pivoted result of 'read_silver'
                                     "sql": """
                                         SELECT 
                                             c.name,
@@ -165,7 +181,7 @@ def create_config():
                             ]
                         },
                         "write": {
-                            "connection": "local_data",
+                            "connection": "data_lake",
                             "path": "gold_report",
                             "format": "delta",
                             "mode": "overwrite",
@@ -185,31 +201,33 @@ def create_config():
 def run_pipeline():
     print("\n🚀 Starting Odibi Pipeline Execution...")
 
-    # Load Project
     manager = PipelineManager.from_yaml(CONFIG_PATH)
 
-    # Run Bronze -> Silver
     print("\n--- Running Bronze to Silver ---")
     res1 = manager.run("bronze_to_silver")
     if res1.failed:
         print(f"❌ Pipeline Failed: {res1.failed}")
+        # Don't exit, try to print story path if available
+        if res1.story_path:
+            print(f"Story: {res1.story_path}")
         exit(1)
 
-    # Run Silver -> Gold
     print("\n--- Running Silver to Gold ---")
     res2 = manager.run("silver_to_gold")
     if res2.failed:
         print(f"❌ Pipeline Failed: {res2.failed}")
+        if res2.story_path:
+            print(f"Story: {res2.story_path}")
         exit(1)
 
     print("\n✅ E2E Verification Successful!")
     print(f"Stories generated at: {DATA_DIR}/stories/")
 
-    # Optional: Peek at result
     try:
         spark = SparkSession.builder.getOrCreate()
         print("\n📊 Gold Report Preview:")
-        df = spark.read.format("delta").load(f"{DATA_DIR}/gold_report")
+        # Read using SPARK_ROOT
+        df = spark.read.format("delta").load(f"{SPARK_ROOT}/data/gold_report")
         df.show()
     except Exception as e:
         print(f"⚠️ Could not preview result: {e}")
