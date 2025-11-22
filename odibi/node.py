@@ -292,9 +292,7 @@ class Node:
                 result_df = input_df
 
             result_df = self._execute_transformer_node(result_df)
-            self._execution_steps.append(
-                f"Applied transformer '{self.config.transformer}'"
-            )
+            self._execution_steps.append(f"Applied transformer '{self.config.transformer}'")
 
         # Transform phase
         if self.config.transform:
@@ -442,8 +440,8 @@ class Node:
         try:
             result = func(self.context, current=input_df, **params)
         except Exception as e:
-             # Wrap error
-             raise TransformError(f"Transformer '{transformer_name}' failed: {e}") from e
+            # Wrap error
+            raise TransformError(f"Transformer '{transformer_name}' failed: {e}") from e
 
         return result
 

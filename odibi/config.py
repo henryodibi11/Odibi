@@ -230,12 +230,8 @@ class NodeConfig(BaseModel):
     read: Optional[ReadConfig] = None
     transform: Optional[TransformConfig] = None
     write: Optional[WriteConfig] = None
-    transformer: Optional[str] = Field(
-        default=None, description="Name of transformer to apply"
-    )
-    params: Dict[str, Any] = Field(
-        default_factory=dict, description="Parameters for transformer"
-    )
+    transformer: Optional[str] = Field(default=None, description="Name of transformer to apply")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Parameters for transformer")
 
     # Optional features
     cache: bool = Field(default=False, description="Cache result for reuse")

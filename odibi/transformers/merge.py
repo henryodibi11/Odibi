@@ -44,24 +44,16 @@ def merge(context, current, **params):
         keys = [keys]
 
     if isinstance(context, SparkContext):
-        return _merge_spark(
-            context, current, target, keys, strategy, audit_cols, params
-        )
+        return _merge_spark(context, current, target, keys, strategy, audit_cols, params)
     elif isinstance(context, PandasContext):
-        return _merge_pandas(
-            context, current, target, keys, strategy, audit_cols, params
-        )
+        return _merge_pandas(context, current, target, keys, strategy, audit_cols, params)
     else:
         raise ValueError(f"Unsupported context type: {type(context)}")
 
 
-def _merge_spark(
-    context, source_df, target, keys, strategy, audit_cols, params
-):
+def _merge_spark(context, source_df, target, keys, strategy, audit_cols, params):
     if DeltaTable is None:
-        raise ImportError(
-            "Spark Merge Transformer requires 'delta-spark' package."
-        )
+        raise ImportError("Spark Merge Transformer requires 'delta-spark' package.")
 
     spark = context.spark
 
@@ -79,12 +71,7 @@ def _merge_spark(
     def get_delta_table():
         # Heuristic: if it looks like a path, use forPath, else forName
         # Path indicators: /, \, :, or starts with .
-        if (
-            "/" in target
-            or "\\" in target
-            or ":" in target
-            or target.startswith(".")
-        ):
+        if "/" in target or "\\" in target or ":" in target or target.startswith("."):
             return DeltaTable.forPath(spark, target)
         return DeltaTable.forName(spark, target)
 
@@ -92,12 +79,7 @@ def _merge_spark(
         # Check if table exists
         is_delta = False
         try:
-            if (
-                "/" in target
-                or "\\" in target
-                or ":" in target
-                or target.startswith(".")
-            ):
+            if "/" in target or "\\" in target or ":" in target or target.startswith("."):
                 is_delta = DeltaTable.isDeltaTable(spark, target)
             else:
                 # For table name, try to access it
@@ -113,19 +95,14 @@ def _merge_spark(
             delta_table = get_delta_table()
 
             condition = " AND ".join([f"target.{k} = source.{k}" for k in keys])
-            merger = delta_table.alias("target").merge(
-                batch_df.alias("source"), condition
-            )
+            merger = delta_table.alias("target").merge(batch_df.alias("source"), condition)
 
             if strategy == "upsert":
                 # Construct update map
                 update_expr = {}
                 for col_name in batch_df.columns:
                     # Skip created_col in update
-                    if (
-                        audit_cols
-                        and audit_cols.get("created_col") == col_name
-                    ):
+                    if audit_cols and audit_cols.get("created_col") == col_name:
                         continue
                     update_expr[col_name] = f"source.{col_name}"
 
@@ -143,20 +120,13 @@ def _merge_spark(
         else:
             # Table does not exist
             if strategy == "delete_match":
-                logger.warning(
-                    f"Target {target} does not exist. Delete match skipped."
-                )
+                logger.warning(f"Target {target} does not exist. Delete match skipped.")
                 return
 
             # Initial write
             writer = batch_df.write.format("delta").mode("overwrite")
 
-            if (
-                "/" in target
-                or "\\" in target
-                or ":" in target
-                or target.startswith(".")
-            ):
+            if "/" in target or "\\" in target or ":" in target or target.startswith("."):
                 writer.save(target)
             else:
                 writer.saveAsTable(target)
@@ -170,16 +140,12 @@ def _merge_spark(
         return source_df
 
 
-def _merge_pandas(
-    context, source_df, target, keys, strategy, audit_cols, params
-):
+def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params):
     import pandas as pd
 
     # Pandas implementation for local dev (Parquet focus)
     path = target
-    if not (
-        "/" in path or "\\" in path or ":" in path or path.startswith(".")
-    ):
+    if not ("/" in path or "\\" in path or ":" in path or path.startswith(".")):
         # If it looks like a table name, try to treat as local path under data/
         # or just warn.
         # For MVP, assuming it's a path or resolved by user.
@@ -231,39 +197,29 @@ def _merge_pandas(
         # Update existing
         # NOTE: We must ensure created_col is NOT updated if it already exists
         if audit_cols and "created_col" in audit_cols:
-             created_col = audit_cols["created_col"]
-             # Remove created_col from source update payload if present
-             # Pandas update() uses all columns in 'other' that match 'self'.
-             # So we need to pass a source_df_indexed WITHOUT created_col
-             cols_to_update = [c for c in source_df_indexed.columns if c != created_col]
-             target_df_indexed.update(source_df_indexed[cols_to_update])
+            created_col = audit_cols["created_col"]
+            # Remove created_col from source update payload if present
+            # Pandas update() uses all columns in 'other' that match 'self'.
+            # So we need to pass a source_df_indexed WITHOUT created_col
+            cols_to_update = [c for c in source_df_indexed.columns if c != created_col]
+            target_df_indexed.update(source_df_indexed[cols_to_update])
         else:
-             target_df_indexed.update(source_df_indexed)
-        
+            target_df_indexed.update(source_df_indexed)
+
         # Append new
-        new_indices = source_df_indexed.index.difference(
-            target_df_indexed.index
-        )
+        new_indices = source_df_indexed.index.difference(target_df_indexed.index)
         if not new_indices.empty:
-            target_df_indexed = pd.concat(
-                [target_df_indexed, source_df_indexed.loc[new_indices]]
-            )
+            target_df_indexed = pd.concat([target_df_indexed, source_df_indexed.loc[new_indices]])
 
     elif strategy == "append_only":
         # Only append new
-        new_indices = source_df_indexed.index.difference(
-            target_df_indexed.index
-        )
+        new_indices = source_df_indexed.index.difference(target_df_indexed.index)
         if not new_indices.empty:
-            target_df_indexed = pd.concat(
-                [target_df_indexed, source_df_indexed.loc[new_indices]]
-            )
+            target_df_indexed = pd.concat([target_df_indexed, source_df_indexed.loc[new_indices]])
 
     elif strategy == "delete_match":
         # Drop indices present in source
-        target_df_indexed = target_df_indexed.drop(
-            source_df_indexed.index, errors="ignore"
-        )
+        target_df_indexed = target_df_indexed.drop(source_df_indexed.index, errors="ignore")
 
     # Reset index
     final_df = target_df_indexed.reset_index()

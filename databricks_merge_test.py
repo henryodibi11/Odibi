@@ -133,7 +133,7 @@ assert row_1.record_updated_at is not None, "Order 1 should have updated_at"
 # Check Order 2 (Untouched)
 row_2 = [r for r in rows if r.order_id == 2][0]
 assert row_2.status == "OPEN", "Order 2 should remain OPEN"
-# Note: record_created_at/updated_at might be null for existing rows if schema evolution didn't backfill, 
+# Note: record_created_at/updated_at might be null for existing rows if schema evolution didn't backfill,
 # or if merge added columns they will be null for non-matched rows.
 # The merge transformer adds audit cols to source. Target schema evolves.
 
