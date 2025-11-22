@@ -575,17 +575,18 @@ class PipelineManager:
         }
 
     @classmethod
-    def from_yaml(cls, yaml_path: str) -> "PipelineManager":
+    def from_yaml(cls, yaml_path: str, env: str = None) -> "PipelineManager":
         """Create PipelineManager from YAML file.
 
         Args:
             yaml_path: Path to YAML configuration file
+            env: Environment name to apply overrides (e.g. 'prod')
 
         Returns:
             PipelineManager instance ready to run pipelines
 
         Example:
-            >>> manager = PipelineManager.from_yaml("config.yaml")
+            >>> manager = PipelineManager.from_yaml("config.yaml", env="prod")
             >>> results = manager.run()  # Run all pipelines
         """
         # Load YAML with environment variable substitution
@@ -594,7 +595,7 @@ class PipelineManager:
         # load_yaml_with_env takes a str, so passing str(yaml_path_obj) is safer.
 
         try:
-            config = load_yaml_with_env(str(yaml_path_obj))
+            config = load_yaml_with_env(str(yaml_path_obj), env=env)
         except FileNotFoundError:
             # Re-raise to maintain backward compatibility with existing error handling if needed
             # or just let it bubble up. The original raised FileNotFoundError manually.

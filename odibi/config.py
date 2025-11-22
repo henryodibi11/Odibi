@@ -349,7 +349,7 @@ class ProjectConfig(BaseModel):
     # === PHASE 3 ===
     environments: Optional[Dict[str, Dict[str, Any]]] = Field(
         default=None,
-        description="Environment-specific overrides (Phase 3 - not implemented)",
+        description="Environment-specific overrides",
     )
 
     @model_validator(mode="after")
@@ -365,9 +365,6 @@ class ProjectConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_environments_not_implemented(self):
-        """Block environments config until Phase 3."""
-        if self.environments:
-            raise NotImplementedError(
-                "Environment overrides are planned for Phase 3. " "See PHASES.md for roadmap."
-            )
+        """Check environments implementation."""
+        # Implemented in Phase 3
         return self

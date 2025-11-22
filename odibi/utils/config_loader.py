@@ -28,18 +28,20 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
     return result
 
 
-def load_yaml_with_env(path: str) -> Dict[str, Any]:
+def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
     """Load YAML file with environment variable substitution and imports.
 
     Supports:
     - ${VAR_NAME} substitution
     - 'imports' list of relative paths
+    - 'environments' overrides based on env param
 
     Args:
         path: Path to YAML file
+        env: Environment name (e.g., 'prod', 'dev') to apply overrides
 
     Returns:
-        Parsed dictionary (merged with imports)
+        Parsed dictionary (merged with imports and env overrides)
 
     Raises:
         FileNotFoundError: If file does not exist
@@ -84,10 +86,21 @@ def load_yaml_with_env(path: str) -> Dict[str, Any]:
                 full_import_path = import_path
 
             # Recursive load
-            imported_data = load_yaml_with_env(full_import_path)
+            # Note: We pass env down to imported files too
+            imported_data = load_yaml_with_env(full_import_path, env=env)
             merged_data = _deep_merge(merged_data, imported_data)
 
         # Merge current data on top of imported data
         data = _deep_merge(merged_data, data)
+
+    # Apply Environment Overrides
+    if env:
+        environments = data.get("environments", {})
+        if env in environments:
+            override = environments[env]
+            data = _deep_merge(data, override)
+            # Remove environments block after merging to keep config clean
+            # but keep it if needed for reference? Usually we consume it.
+            # Let's keep it in data["environments"] but the root is merged.
 
     return data

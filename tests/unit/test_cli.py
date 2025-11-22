@@ -79,6 +79,8 @@ class TestRunCommand:
         args = Mock()
         args.config = "test.yaml"
         args.dry_run = False
+        args.env = "dev"
+        args.resume = False
 
         mock_result = Mock()
         mock_result.failed = []
@@ -91,8 +93,8 @@ class TestRunCommand:
             result = run_command(args)
 
             assert result == 0  # Success
-            MockManager.from_yaml.assert_called_once_with("test.yaml")
-            mock_manager.run.assert_called_once()
+            MockManager.from_yaml.assert_called_once_with("test.yaml", env="dev")
+            mock_manager.run.assert_called_once_with(dry_run=False, resume_from_failure=False)
 
 
 class TestValidateCommand:

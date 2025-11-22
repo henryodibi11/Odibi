@@ -43,7 +43,7 @@ def run_command(args):
         if config_path.parent != Path.cwd():
             load_extensions(Path.cwd())
 
-        manager = PipelineManager.from_yaml(args.config)
+        manager = PipelineManager.from_yaml(args.config, env=args.env)
         results = manager.run(dry_run=args.dry_run, resume_from_failure=args.resume)
 
         # Check results for failures
