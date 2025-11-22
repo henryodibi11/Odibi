@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 import pandas as pd
 from odibi.node import Node
-from odibi.config import NodeConfig, RetryConfig
+from odibi.config import NodeConfig
 from odibi.context import PandasContext
 from odibi.transformations.registry import get_registry
 

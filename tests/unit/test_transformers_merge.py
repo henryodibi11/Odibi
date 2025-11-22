@@ -1,8 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch
 import pandas as pd
 import os
-import shutil
 from odibi.context import PandasContext, SparkContext
 from odibi.transformers.merge import merge
 
