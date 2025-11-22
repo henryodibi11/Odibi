@@ -137,7 +137,7 @@ class TestSparkEngineLogic:
         # Note: We need to patch where it is IMPORTED, which is inside the method
         # Or we can patch sys.modules or similar.
         # Since the import is inside the method `from odibi.utils.encoding import detect_encoding`
-        # simple patch("odibi.engine.spark_engine.detect_encoding") won't work if it's not top-level.
+        # simple patch("odibi.engine.spark_engine.detect_encoding") won't work if it's not top-level
         # However, patch.dict('sys.modules', ...) is hard.
         # Wait, the code does: `from odibi.utils.encoding import detect_encoding`.
         # If I patch `odibi.utils.encoding.detect_encoding`, it should work.
@@ -165,27 +165,25 @@ class TestSparkEngineLogic:
 
     def test_validate_data_logic(self, spark_engine, mock_spark_df):
         """Verify validation logic."""
-        from odibi.config import ValidationConfig
-
         # Mock count behavior
         mock_spark_df.isEmpty.return_value = False
-
+        
         # 1. Check no_nulls
         # We need to mock count_nulls method of engine OR mock sql functions
         # Easier to mock engine.count_nulls if we only test validate_data flow
-
+        
         with patch.object(spark_engine, "count_nulls") as mock_count_nulls:
             mock_count_nulls.return_value = {"col1": 5}  # 5 nulls
-
+            
             config = MagicMock()
             config.not_empty = True
             config.no_nulls = ["col1"]
             config.schema_validation = None
             config.ranges = None
             config.allowed_values = None
-
+            
             failures = spark_engine.validate_data(mock_spark_df, config)
-
+            
             assert len(failures) == 1
             assert "has 5 null values" in failures[0]
 
@@ -227,8 +225,8 @@ class TestSparkEngineLogic:
         mock_spark_df.withColumnRenamed.side_effect = [df1, df2]
         df1.withColumnRenamed.return_value = df2
 
-        result = spark_engine.execute_operation("rename", params, mock_spark_df)
-
+        spark_engine.execute_operation("rename", params, mock_spark_df)
+        
         # Should be called twice
         assert mock_spark_df.withColumnRenamed.call_count >= 1
         # Since dict iteration order, check args exist
