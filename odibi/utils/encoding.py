@@ -81,7 +81,7 @@ def _read_sample_bytes(connection: Any, path: str, size: int) -> Optional[bytes]
 def _is_valid_encoding(sample: bytes, encoding: str) -> bool:
     """Check if bytes can be decoded with encoding and look reasonable."""
     try:
-        text = sample.decode(encoding)
+        sample.decode(encoding)
 
         # Check for replacement characters (if decoder doesn't fail but inserts them)
         # Note: strict errors would raise exception, but some encodings might be loose.
