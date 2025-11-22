@@ -101,7 +101,37 @@ def _merge_spark(context, source_df, target, keys, strategy, audit_cols, params)
                     # Skip created_col in update
                     if audit_cols and audit_cols.get("created_col") == col_name:
                         continue
+                    
+                    # Note: When Delta Merge UPDATE SET uses column names from source that 
+                    # do NOT exist in target, it throws UNRESOLVED_EXPRESSION if schema evolution 
+                    # is not enabled or handled automatically by the merge operation for updates.
+                    # The merge operation usually handles schema evolution for INSERTs automatically 
+                    # if configured, but for UPDATEs, the columns must exist or be handled.
+                    #
+                    # However, `delta-spark` merge should support schema evolution if enabled.
+                    # By default it might not.
+                    # 
+                    # WORKAROUND: 
+                    # We are trying to update `record_updated_at` (which is in source) into target 
+                    # (where it doesn't exist yet).
+                    # Delta Merge Insert (whenNotMatchedInsertAll) will create the column in target 
+                    # if schema evolution is ON.
+                    # But Update (whenMatchedUpdate) happens first or concurrently logic-wise.
+                    # If the column doesn't exist in target, we can't update it.
+                    # 
+                    # To fix this for the "first run" where target lacks audit cols:
+                    # We should rely on Delta's schema evolution.
+                    # 
+                    # But `whenMatchedUpdate(set=...)` requires keys to resolve in target.
+                    
+                    # If we use `whenMatchedUpdateAll()`, it might handle it if we enable evolution?
+                    # Let's try enabling schema evolution on the Spark session or the write.
+                    
                     update_expr[col_name] = f"source.{col_name}"
+
+                # Enable automatic schema evolution for the merge
+                # This is critical for adding new columns (like audit cols)
+                spark.conf.set("spark.databricks.delta.schema.autoMerge.enabled", "true")
 
                 merger = merger.whenMatchedUpdate(set=update_expr)
                 merger = merger.whenNotMatchedInsertAll()
