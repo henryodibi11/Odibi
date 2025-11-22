@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import os
 from odibi.context import PandasContext, SparkContext
-from odibi.transformers.merge import merge
+from odibi.transformers.merge_transformer import merge
 
 
 class TestMergeTransformerPandas:
@@ -149,7 +149,7 @@ class TestMergeTransformerSpark:
         context = SparkContext(spark)
         return context
 
-    @patch("odibi.transformers.merge.DeltaTable")
+    @patch("odibi.transformers.merge_transformer.DeltaTable")
     def test_spark_merge_upsert(self, MockDeltaTable, mock_spark_context):
         # Setup
         mock_delta_table = MagicMock()
@@ -181,7 +181,7 @@ class TestMergeTransformerSpark:
         mock_merger.whenMatchedUpdate.assert_called_once()
         mock_merger.whenNotMatchedInsertAll.assert_called_once()
 
-    @patch("odibi.transformers.merge.DeltaTable")
+    @patch("odibi.transformers.merge_transformer.DeltaTable")
     def test_spark_merge_append_only(self, MockDeltaTable, mock_spark_context):
         # Setup
         mock_delta_table = MagicMock()
@@ -205,7 +205,7 @@ class TestMergeTransformerSpark:
         mock_merger.whenMatchedUpdate.assert_not_called()  # Should not update
         mock_merger.whenNotMatchedInsertAll.assert_called_once()
 
-    @patch("odibi.transformers.merge.DeltaTable")
+    @patch("odibi.transformers.merge_transformer.DeltaTable")
     def test_spark_merge_delete_match(self, MockDeltaTable, mock_spark_context):
         # Setup
         mock_delta_table = MagicMock()

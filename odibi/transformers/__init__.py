@@ -1,3 +1,3 @@
-from .merge import merge
+from .merge_transformer import merge
 
 __all__ = ["merge"]

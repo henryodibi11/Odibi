@@ -89,7 +89,7 @@ class TestTransformerNodeIntegration:
         )
 
         # We need to patch _merge_pandas to avoid actual file I/O and dep issues
-        with patch("odibi.transformers.merge._merge_pandas") as mock_merge_impl:
+        with patch("odibi.transformers.merge_transformer._merge_pandas") as mock_merge_impl:
             mock_merge_impl.return_value = input_df
 
             node = Node(config, context, engine, connections)
