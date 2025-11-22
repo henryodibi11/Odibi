@@ -1,10 +1,12 @@
 # Odibi Roadmap (v2.1+)
 
 **Version Strategy:** Semantic Versioning (SemVer)  
-**Current Core Version:** v2.0.0  
+**Current Core Version:** v2.1.0-alpha (Target)  
 **Last Updated:** November 22, 2025  
 
-Odibi v2.0.0 completes Phases 1–6, 9, and 10. This document focuses on **what comes next**.  
+Odibi v2.0.0 completed Phases 1–6, 9, and 10.  
+This document tracks active and future development.
+
 For a detailed history of all completed phases, see:  
 ➡️ [`docs/_archive/PHASES_HISTORY.md`](docs/_archive/PHASES_HISTORY.md)
 
@@ -14,178 +16,49 @@ For a detailed history of all completed phases, see:
 
 - **Latest Release:** `v2.0.0` – Enterprise + Ecosystem
 - **Completed Phases:** 1–6, 9, 10
-- **Stability:** Production-ready; >400 tests; ~80% coverage
-- **Focus Shift:** From building the core to **Delta-first pipelines**, ecosystem integration, and intelligent tooling.
+- **Currently Active:** Phase 2.1 (Delta-First Foundation)
+- **Stability:** Production-ready; >500 tests; ~80% coverage
 
 ---
 
-## Phase 2.1 — The Delta-First Foundation (Immediate Priority)
+## Phase 2.1 — The Delta-First Foundation (COMPLETED)
 
 **Goal:** Make Odibi’s **Delta-first** medallion architecture (Landing → Raw → …) the *default, batteries-included* experience across Pandas and Spark.
 
-### 2.1.1 Built-in `merge` / `upsert` Transformer (Spark & Pandas)
+### 2.1.1 Built-in `merge` / `upsert` Transformer (Spark & Pandas) ✅
 
-**Problem:**  
-Today, upsert/merge patterns are ad-hoc (custom SQL, manual joins, or user-written transforms). For Delta-first pipelines, we need a **first-class, engine-agnostic** merge primitive.
+**Status:** **Completed**
 
-**Design Goals:**
+**Delivered Features:**
+- **Unified API:** `transformer: merge` works identically for Spark (Delta) and Pandas (Parquet/Delta).
+- **Strategies:** `upsert`, `append_only`, `delete_match`.
+- **Audit Columns:** Auto-injection of `created_at` / `updated_at`.
+- **Schema Evolution:** Automatic schema merging for Spark Delta operations.
+- **Streaming Support:** Seamless `foreachBatch` wrapping for Spark Structured Streaming.
 
-- **Unified API:** One YAML/config shape that works for both **Spark (Delta)** and **Pandas**.
-- **Delta-First:** Optimized for Delta Lake tables (Landing → Raw, Raw → Silver).
-- **Safe by Default:** Explicit keys and column lists; no silent “update everything”.
-- **Predictable Semantics:** Clear behavior for matched vs non-matched rows.
+**Implementation:**
+- `odibi/transformers/merge_transformer.py`
+- Integration into `Node` and `Pipeline`.
+- Unit and Integration tests.
 
-#### a) Configuration Shape (High-Level)
-
-Example (Spark / Delta):
-
-```yaml
-- id: customers_raw_merge
-  type: transform
-  engine: spark           # or "pandas"
-  transformer: merge      # NEW: built-in transformer
-  params:
-    target:
-      ref: customers_raw  # existing node or table ref
-    source:
-      ref: customers_landing_clean
-    keys:
-      - customer_id
-    update_columns:
-      - name
-      - email
-      - updated_at
-    insert_columns:
-      - customer_id
-      - name
-      - email
-      - created_at
-    insert_when_not_matched: true
-    delete_when_not_matched: false   # optional (for slowly-changing dimensions, etc.)
-    options:
-      # engine-specific hints (optional, non-breaking)
-      delta:
-        condition: "target.customer_id = source.customer_id"
-        # reserved for future: "cdc" modes, predicates, etc.
-```
-
-Example (Pandas upsert into a file/table):
-
-```yaml
-- id: customers_upsert_pandas
-  type: transform
-  engine: pandas
-  transformer: merge
-  params:
-    target:
-      path: data/raw/customers.parquet
-      format: parquet
-    source:
-      ref: customers_staging
-    keys: [customer_id]
-    update_columns: [name, email, updated_at]
-    insert_columns: [customer_id, name, email, created_at]
-    insert_when_not_matched: true
-```
-
-#### b) Semantics
-
-- **Inputs:**
-  - `target`: an existing node or table (Delta table, Parquet/CSV file, or engine-native table).
-  - `source`: a node producing a DataFrame to merge into `target`.
-- **Keys (`keys`):**
-  - Required, list of column names.
-  - Must exist in both `target` and `source`.
-- **Update behavior:**
-  - Only columns in `update_columns` are updated on matches.
-  - Columns not listed remain unchanged in `target`.
-- **Insert behavior:**
-  - If `insert_when_not_matched: true`, rows in `source` with no key match are appended using `insert_columns`.
-  - If false, unmatched rows are ignored.
-- **Delete behavior (optional / future-friendly):**
-  - `delete_when_not_matched: false` by default.
-  - If true, target rows with no matching source key can be removed (for full-sync patterns).
-- **Engine mapping:**
-  - **Spark / Delta:** Translates into a `MERGE INTO` statement using the configured condition/keys.
-  - **Pandas:** Implements an in-memory merge/upsert followed by a write, respecting file format and write mode (non-breaking with existing engine semantics).
-
-#### c) Scope for v2.1
-
-- Implemented for:
-  - `SparkEngine` with Delta format.
-  - `PandasEngine` for supported file/table targets (Parquet, CSV, Delta via delta-rs or equivalent connector as already supported).
-- Docs & examples:
-  - Landing → Raw medallion examples using `merge`.
-  - Reference snippets for common patterns: CDC-style upsert, full reload, “only inserts”.
-
----
-
-### 2.1.2 `odibi init-pipeline` Templates
+### 2.1.2 `odibi init-pipeline` Templates (Next Priority)
 
 **Goal:** Make it trivial to start a **Delta-first** Odibi project with best practices baked in.
 
-**Deliverables:**
-
-- New CLI command:  
-
-  ```bash
-  odibi init-pipeline <name> --engine {pandas,spark} --template {local-medallion,azure-delta,...} --env dev
-  ```
-
-- Initial template set:
-  1. **Local Medallion (Pandas + local Delta/Parquet):**
-     - Landing → Raw → Silver with `merge` transformer.
-     - Local file storage; minimal secrets.
-  2. **Azure Delta Medallion (Spark + ADLS):**
-     - ADLS-based Landing/Raw/Silver tables.
-     - Pre-wired Key Vault + connection config (building on existing v2.0 capabilities).
-  3. **Reference-Project Lite (OdibiFlix-style):**
-     - Small “Gauntlet” example with a couple of `merge` nodes.
-
-- Each template includes:
-  - `odibi.yaml` (with env-aware structure).
-  - `env/` config overrides (see 2.1.3).
-  - Minimal README with how to run + how to extend.
-
----
+**Planned Deliverables:**
+- New CLI command: `odibi init-pipeline <name> --template {local-medallion,azure-delta,...}`
+- Templates:
+  1. **Local Medallion:** Pandas + Local Parquet/Delta.
+  2. **Azure Delta Medallion:** Spark + ADLS + Key Vault.
+  3. **Reference-Lite:** Minimal "Gauntlet" style.
 
 ### 2.1.3 `env` Config Structure
 
-**Goal:** Normalize how environments (`dev`, `test`, `prod`) are expressed and overridden in Odibi configs, building on the existing `--env` capabilities.
+**Goal:** Normalize how environments (`dev`, `test`, `prod`) are expressed and overridden.
 
-**Principles:**
-
-- **Single Source of Truth:** Base config + env overlays; no duplication.
-- **CLI-First:** `odibi run --env dev` “just works”.
-- **Composable:** Plays nicely with template imports (from Phase 7 DX work).
-
-**Planned Structure (conceptual):**
-
-- Base project config (e.g. `odibi.yaml`) with logical environment slots, for example:
-
-  ```yaml
-  envs:
-    default: dev
-    available: [dev, test, prod]
-  ```
-
-- Env-specific overrides in dedicated files (examples):
-
-  ```bash
-  config/
-    base.yaml          # base pipeline definition
-    env.dev.yaml       # dev overrides (local paths, test secrets)
-    env.test.yaml      # test/staging overrides
-    env.prod.yaml      # prod ADLS/SQL, real Key Vault
-  ```
-
-- Resolution rules:
-  - Start with `base.yaml` (or imports).
-  - Apply `env.<name>.yaml` overlay last.
-  - Support `imports: [...]` pattern (from existing Phase 7 DX work).
-- CLI behavior:
-  - `--env` selects overlay.
-  - Env used is recorded in stories / logs for traceability.
+**Planned Structure:**
+- Base config (`odibi.yaml`) + Environment overlays (`env.dev.yaml`, `env.prod.yaml`).
+- CLI support for `--env` flag to auto-merge configs.
 
 ---
 
