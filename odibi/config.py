@@ -26,6 +26,8 @@ class WriteMode(str, Enum):
 
     OVERWRITE = "overwrite"
     APPEND = "append"
+    UPSERT = "upsert"
+    APPEND_ONCE = "append_once"
 
 
 class LogLevel(str, Enum):
