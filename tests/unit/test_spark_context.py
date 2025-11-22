@@ -62,12 +62,13 @@ def test_thread_safety(spark_context):
     # This is hard to deterministically prove fail without lock,
     # but we run it to ensure no deadlocks or errors.
 
-    def register_many():
+    def register_many(thread_idx):
         for i in range(100):
             df = MockDataFrame()
-            spark_context.register(f"node_{threading.get_ident()}_{i}", df)
+            # Use explicit thread index to avoid ID reuse collisions in CI environments
+            spark_context.register(f"node_{thread_idx}_{i}", df)
 
-    threads = [threading.Thread(target=register_many) for _ in range(10)]
+    threads = [threading.Thread(target=register_many, args=(t_idx,)) for t_idx in range(10)]
     for t in threads:
         t.start()
     for t in threads:
