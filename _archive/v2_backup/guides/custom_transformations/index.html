@@ -1,0 +1,2158 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/v2_backup/guides/custom_transformations/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Transformation Writing Guide - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#transformation-writing-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Transformation Writing Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="transformation-writing-guide">Transformation Writing Guide</h1>
+<p><strong>Learn to create your own custom operations for Odibi pipelines.</strong></p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#quick-example">Quick Example</a></li>
+<li><a href="#the-transformation-decorator">The @transformation Decorator</a></li>
+<li><a href="#adding-explanations">Adding Explanations</a></li>
+<li><a href="#using-context">Using Context</a></li>
+<li><a href="#explanation-templates">Explanation Templates</a></li>
+<li><a href="#testing-your-transformations">Testing Your Transformations</a></li>
+<li><a href="#best-practices">Best Practices</a></li>
+</ol>
+<hr />
+<h2 id="quick-example">Quick Example</h2>
+<p>Here's a complete custom transformation in <strong>30 lines</strong>:</p>
+<pre><code class="language-python"># my_transformations.py
+
+from odibi import transformation
+from odibi.transformations.templates import purpose_detail_result
+
+@transformation(&quot;remove_outliers&quot;, category=&quot;cleaning&quot;, tags=[&quot;quality&quot;, &quot;filter&quot;])
+def remove_outliers(df, column, threshold=3):
+    &quot;&quot;&quot;
+    Remove outliers using standard deviation method.
+
+    Args:
+        df: Input DataFrame
+        column: Column to check for outliers
+        threshold: Number of standard deviations (default: 3)
+
+    Returns:
+        DataFrame with outliers removed
+    &quot;&quot;&quot;
+    mean = df[column].mean()
+    std = df[column].std()
+
+    lower_bound = mean - (threshold * std)
+    upper_bound = mean + (threshold * std)
+
+    return df[(df[column] &gt;= lower_bound) &amp; (df[column] &lt;= upper_bound)]
+
+@remove_outliers.explain
+def explain(column, threshold=3, **context):
+    plant = context.get('plant', 'the dataset')
+
+    return purpose_detail_result(
+        purpose=f&quot;Remove statistical outliers from {plant} data&quot;,
+        details=[
+            f&quot;Analyzes column: `{column}`&quot;,
+            f&quot;Uses ±{threshold} standard deviations as threshold&quot;,
+            &quot;Removes extreme values that may be errors or anomalies&quot;
+        ],
+        result=&quot;Clean dataset with outliers removed, ready for analysis&quot;
+    )
+</code></pre>
+<p><strong>That's it!</strong> Now use it in YAML:</p>
+<pre><code class="language-yaml">- name: clean_temperature_data
+  transform:
+    steps:
+      - operation: remove_outliers
+        params:
+          column: temperature
+          threshold: 3
+</code></pre>
+<hr />
+<h2 id="the-transformation-decorator">The @transformation Decorator</h2>
+<h3 id="basic-usage">Basic Usage</h3>
+<pre><code class="language-python">from odibi import transformation
+
+@transformation(&quot;my_operation&quot;)
+def my_operation(df, param1, param2):
+    &quot;&quot;&quot;
+    Your operation description here.
+    Minimum 10 characters required!
+    &quot;&quot;&quot;
+    # Your logic
+    return transformed_df
+</code></pre>
+<h3 id="with-metadata">With Metadata</h3>
+<pre><code class="language-python">@transformation(
+    &quot;my_operation&quot;,
+    version=&quot;1.0.0&quot;,
+    category=&quot;filtering&quot;,  # Group operations
+    tags=[&quot;quality&quot;, &quot;validation&quot;]  # For discovery
+)
+def my_operation(df, ...):
+    &quot;&quot;&quot;...&quot;&quot;&quot;
+    return df
+</code></pre>
+<p><strong>Categories:</strong>
+- <code>reshaping</code> - pivot, unpivot, melt, stack
+- <code>filtering</code> - remove rows, select columns
+- <code>aggregation</code> - group by, summarize
+- <code>calculation</code> - derive new columns
+- <code>combining</code> - join, concat, merge
+- <code>cleaning</code> - remove nulls, deduplicate
+- <code>validation</code> - check quality, flag issues</p>
+<h3 id="required-docstring">Required: Docstring</h3>
+<pre><code class="language-python"># ❌ Fails - no docstring
+@transformation(&quot;bad&quot;)
+def bad(df):
+    return df
+
+# ❌ Fails - docstring too short
+@transformation(&quot;bad&quot;)
+def bad(df):
+    &quot;&quot;&quot;Bad.&quot;&quot;&quot;
+    return df
+
+# ✅ Good - meaningful docstring
+@transformation(&quot;good&quot;)
+def good(df):
+    &quot;&quot;&quot;Remove duplicate rows from DataFrame.&quot;&quot;&quot;
+    return df
+</code></pre>
+<hr />
+<h2 id="adding-explanations">Adding Explanations</h2>
+<h3 id="why-explanations-matter">Why Explanations Matter</h3>
+<p>Explanations appear in:
+- ✅ Documentation stories (for stakeholders)
+- ✅ Auto-generated docs
+- ✅ Pipeline documentation</p>
+<p><strong>Without explanation:</strong></p>
+<blockquote>
+<p>"Operation: deduplicate"</p>
+</blockquote>
+<p><strong>With explanation:</strong></p>
+<blockquote>
+<p>"Removes duplicate temperature readings for NKC Plant Germ Dryer 1, ensuring each timestamp appears only once for accurate trend analysis."</p>
+</blockquote>
+<h3 id="basic-explanation">Basic Explanation</h3>
+<pre><code class="language-python">@transformation(&quot;deduplicate&quot;)
+def deduplicate(df, subset=None):
+    &quot;&quot;&quot;Remove duplicate rows.&quot;&quot;&quot;
+    return df.drop_duplicates(subset=subset)
+
+@deduplicate.explain
+def explain(subset=None, **context):
+    details = [&quot;Removes duplicate rows&quot;]
+
+    if subset:
+        details.append(f&quot;Based on columns: {', '.join(subset)}&quot;)
+    else:
+        details.append(&quot;Based on all columns&quot;)
+
+    return purpose_detail_result(
+        purpose=&quot;Remove duplicate records&quot;,
+        details=details,
+        result=&quot;Deduplicated dataset with unique records&quot;
+    )
+</code></pre>
+<h3 id="context-aware-explanation">Context-Aware Explanation</h3>
+<pre><code class="language-python">@my_transform.explain
+def explain(threshold, **context):
+    # Extract context
+    plant = context.get('plant', 'Unknown')
+    asset = context.get('asset', 'Unknown')
+    pipeline = context.get('pipeline', 'Unknown')
+
+    # Use in explanation
+    return purpose_detail_result(
+        purpose=f&quot;Quality control for {plant} - {asset}&quot;,
+        details=[
+            f&quot;Part of {pipeline} pipeline&quot;,
+            f&quot;Removes values below {threshold}&quot;,
+            &quot;Ensures data quality standards&quot;
+        ],
+        result=&quot;Validated dataset meeting quality thresholds&quot;
+    )
+</code></pre>
+<p><strong>Context automatically includes:</strong>
+- <code>plant</code> - From YAML project config
+- <code>asset</code> - From YAML project config
+- <code>business_unit</code> - From YAML
+- <code>project</code> - From YAML
+- <code>pipeline</code> - Pipeline name
+- <code>node</code> - Node name
+- <code>operation</code> - Operation name</p>
+<hr />
+<h2 id="explanation-templates">Explanation Templates</h2>
+<h3 id="1-purpose-detail-result-standard">1. Purpose-Detail-Result (Standard)</h3>
+<pre><code class="language-python">from odibi.transformations.templates import purpose_detail_result
+
+return purpose_detail_result(
+    purpose=&quot;What this does in one sentence&quot;,
+    details=[
+        &quot;Detail point 1&quot;,
+        &quot;Detail point 2&quot;,
+        &quot;Detail point 3&quot;
+    ],
+    result=&quot;What you get at the end&quot;
+)
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code>**Purpose:** What this does in one sentence
+
+**Details:**
+- Detail point 1
+- Detail point 2
+- Detail point 3
+
+**Result:** What you get at the end
+</code></pre>
+<h3 id="2-with-formula">2. With Formula</h3>
+<pre><code class="language-python">from odibi.transformations.templates import with_formula
+
+return with_formula(
+    purpose=&quot;Calculate thermal efficiency&quot;,
+    details=[
+        &quot;Uses fuel consumption and heat output&quot;,
+        &quot;Industry-standard calculation&quot;
+    ],
+    formula=&quot;efficiency = (heat_output / fuel_input) × 100&quot;,
+    result=&quot;Efficiency percentage for performance tracking&quot;
+)
+</code></pre>
+<p><strong>Output includes:</strong></p>
+<pre><code>**Formula:**
+</code></pre>
+<p>efficiency = (heat_output / fuel_input) × 100</p>
+<pre><code></code></pre>
+<h3 id="3-with-table">3. With Table</h3>
+<pre><code class="language-python">from odibi.transformations.templates import table_explanation
+
+table_data = [
+    {&quot;Input&quot;: &quot;Temperature&quot;, &quot;Output&quot;: &quot;temp_celsius&quot;, &quot;Transform&quot;: &quot;F → C conversion&quot;},
+    {&quot;Input&quot;: &quot;Pressure&quot;, &quot;Output&quot;: &quot;pressure_bar&quot;, &quot;Transform&quot;: &quot;PSI → bar&quot;}
+]
+
+return table_explanation(
+    purpose=&quot;Standardize units&quot;,
+    details=[&quot;Converts all measurements to metric&quot;],
+    table_data=table_data,
+    result=&quot;Standardized measurements&quot;
+)
+</code></pre>
+<hr />
+<h2 id="using-context">Using Context</h2>
+<h3 id="available-context-fields">Available Context Fields</h3>
+<pre><code class="language-python">@my_op.explain
+def explain(param1, **context):
+    # Always available:
+    node = context.get('node')           # &quot;my_node_name&quot;
+    operation = context.get('operation') # &quot;my_operation&quot;
+    pipeline = context.get('pipeline')   # &quot;my_pipeline&quot;
+
+    # If provided in YAML:
+    project = context.get('project')     # &quot;My Project&quot;
+    plant = context.get('plant')         # &quot;NKC Plant&quot;
+    asset = context.get('asset')         # &quot;Germ Dryer 1&quot;
+    business_unit = context.get('business_unit')  # &quot;Operations&quot;
+
+    # Use with defaults:
+    plant = context.get('plant', 'Unknown Plant')
+</code></pre>
+<h3 id="context-example">Context Example</h3>
+<pre><code class="language-python">@transformation(&quot;aggregate_metrics&quot;)
+def aggregate_metrics(df, group_by, metrics):
+    &quot;&quot;&quot;Aggregate metrics by grouping columns.&quot;&quot;&quot;
+    return df.groupby(group_by)[metrics].mean()
+
+@aggregate_metrics.explain
+def explain(group_by, metrics, **context):
+    plant = context.get('plant', 'Unknown')
+    asset = context.get('asset', 'Unknown')
+
+    if isinstance(group_by, str):
+        group_by = [group_by]
+    if isinstance(metrics, str):
+        metrics = [metrics]
+
+    return purpose_detail_result(
+        purpose=f&quot;Calculate average metrics for {plant} {asset}&quot;,
+        details=[
+            f&quot;Groups by: {', '.join(group_by)}&quot;,
+            f&quot;Aggregates: {', '.join(metrics)}&quot;,
+            &quot;Uses mean() for averaging&quot;,
+            &quot;Produces one row per unique group combination&quot;
+        ],
+        result=f&quot;Aggregated metrics for {plant} performance analysis&quot;
+    )
+</code></pre>
+<hr />
+<h2 id="testing-your-transformations">Testing Your Transformations</h2>
+<h3 id="test-structure">Test Structure</h3>
+<pre><code class="language-python"># tests/test_my_operations.py
+
+import pandas as pd
+import pytest
+from odibi.transformations import get_registry
+
+class TestMyOperation:
+    @classmethod
+    def setup_class(cls):
+        &quot;&quot;&quot;Import to register operation.&quot;&quot;&quot;
+        import my_transformations  # ← Registers it
+
+    def test_basic_functionality(self):
+        &quot;&quot;&quot;Should perform basic operation.&quot;&quot;&quot;
+        df = pd.DataFrame({&quot;value&quot;: [1, 2, 100, 3]})
+
+        registry = get_registry()
+        func = registry.get(&quot;remove_outliers&quot;)
+
+        result = func(df, column=&quot;value&quot;, threshold=2)
+
+        # Outlier (100) should be removed
+        assert len(result) == 3
+        assert 100 not in result[&quot;value&quot;].values
+
+    def test_explanation(self):
+        &quot;&quot;&quot;Should generate explanation.&quot;&quot;&quot;
+        registry = get_registry()
+        func = registry.get(&quot;remove_outliers&quot;)
+
+        explanation = func.get_explanation(
+            column=&quot;temperature&quot;,
+            threshold=3,
+            plant=&quot;NKC&quot;,
+            asset=&quot;Dryer 1&quot;
+        )
+
+        assert &quot;**Purpose:**&quot; in explanation
+        assert &quot;NKC&quot; in explanation
+        assert &quot;temperature&quot; in explanation
+</code></pre>
+<h3 id="run-your-tests">Run Your Tests</h3>
+<pre><code class="language-bash"># Run your test file
+pytest tests/test_my_operations.py -v
+
+# Should see:
+# ✅ test_basic_functionality PASSED
+# ✅ test_explanation PASSED
+</code></pre>
+<hr />
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="1-keep-it-simple">1. Keep It Simple</h3>
+<pre><code class="language-python"># ❌ Complex
+@transformation(&quot;complex_op&quot;)
+def complex_op(df, param1, param2, param3, param4, param5):
+    # 100 lines of logic
+    ...
+
+# ✅ Simple
+@transformation(&quot;simple_op&quot;)
+def simple_op(df, threshold):
+    &quot;&quot;&quot;Filter above threshold.&quot;&quot;&quot;
+    return df[df.value &gt; threshold]
+</code></pre>
+<p><strong>Rule:</strong> If logic is complex, use SQL operation instead!</p>
+<h3 id="2-handle-string-and-list-parameters">2. Handle String and List Parameters</h3>
+<pre><code class="language-python">@transformation(&quot;my_op&quot;)
+def my_op(df, columns):
+    # Accept both string and list
+    if isinstance(columns, str):
+        columns = [columns]
+
+    return df[columns]
+</code></pre>
+<p><strong>Why?</strong> YAML users might write:</p>
+<pre><code class="language-yaml">params:
+  columns: ID            # String
+  columns: [ID, Name]    # List
+</code></pre>
+<h3 id="3-validate-inputs">3. Validate Inputs</h3>
+<pre><code class="language-python">@transformation(&quot;safe_divide&quot;)
+def safe_divide(df, numerator, denominator):
+    &quot;&quot;&quot;Divide two columns safely.&quot;&quot;&quot;
+    if numerator not in df.columns:
+        raise ValueError(f&quot;Column '{numerator}' not found in DataFrame&quot;)
+    if denominator not in df.columns:
+        raise ValueError(f&quot;Column '{denominator}' not found in DataFrame&quot;)
+
+    return df.assign(result=df[numerator] / df[denominator])
+</code></pre>
+<h3 id="4-write-helpful-docstrings">4. Write Helpful Docstrings</h3>
+<pre><code class="language-python">@transformation(&quot;my_op&quot;)
+def my_op(df, threshold, mode=&quot;strict&quot;):
+    &quot;&quot;&quot;
+    Filter records based on threshold value.
+
+    Args:
+        df: Input DataFrame
+        threshold: Minimum value to keep
+        mode: Filtering mode ('strict' or 'relaxed')
+
+    Returns:
+        Filtered DataFrame with rows &gt;= threshold
+
+    Example:
+        Input:  | ID | Value |
+                |----|-------|
+                | A  | 100   |
+                | B  | 50    |
+
+        With threshold=75:
+        Output: | ID | Value |
+                |----|-------|
+                | A  | 100   |
+    &quot;&quot;&quot;
+    if mode == &quot;strict&quot;:
+        return df[df.value &gt; threshold]
+    else:
+        return df[df.value &gt;= threshold]
+</code></pre>
+<h3 id="5-use-explanation-templates">5. Use Explanation Templates</h3>
+<pre><code class="language-python"># ✅ Good - uses template
+from odibi.transformations.templates import purpose_detail_result
+
+@my_op.explain
+def explain(**kwargs):
+    return purpose_detail_result(...)
+
+# ❌ Bad - manual formatting
+@my_op.explain
+def explain(**kwargs):
+    return &quot;Purpose: ...\nDetails: ...&quot;  # Inconsistent!
+</code></pre>
+<hr />
+<h2 id="advanced-techniques">Advanced Techniques</h2>
+<h3 id="multi-dataframe-operations">Multi-DataFrame Operations</h3>
+<pre><code class="language-python">@transformation(&quot;merge_with_lookup&quot;)
+def merge_with_lookup(df, lookup_df, on, how=&quot;left&quot;):
+    &quot;&quot;&quot;
+    Merge DataFrame with a lookup table.
+
+    Args:
+        df: Main DataFrame
+        lookup_df: Lookup DataFrame (from another node)
+        on: Column to join on
+        how: Join type
+
+    Returns:
+        Merged DataFrame
+    &quot;&quot;&quot;
+    return df.merge(lookup_df, on=on, how=how)
+</code></pre>
+<p><strong>Use in YAML:</strong></p>
+<pre><code class="language-yaml">- name: load_main
+  read:
+    path: main_data.csv
+
+- name: load_lookup
+  read:
+    path: lookup.csv
+
+- name: merge_datasets
+  depends_on: [load_main, load_lookup]
+  transform:
+    operation: merge_with_lookup
+    lookup_df: load_lookup  # Reference other node!
+    on: ID
+</code></pre>
+<h3 id="conditional-logic">Conditional Logic</h3>
+<pre><code class="language-python">@transformation(&quot;conditional_transform&quot;)
+def conditional_transform(df, condition_column, threshold, operation):
+    &quot;&quot;&quot;
+    Apply transformation conditionally.
+
+    Args:
+        df: Input DataFrame
+        condition_column: Column to check
+        threshold: Threshold value
+        operation: 'scale' or 'flag'
+
+    Returns:
+        Transformed DataFrame
+    &quot;&quot;&quot;
+    mask = df[condition_column] &gt; threshold
+
+    if operation == &quot;scale&quot;:
+        df.loc[mask, condition_column] = df.loc[mask, condition_column] * 1.1
+    elif operation == &quot;flag&quot;:
+        df['quality_flag'] = mask.map({True: 'high', False: 'normal'})
+
+    return df
+</code></pre>
+<h3 id="stateful-operations-advanced">Stateful Operations (Advanced)</h3>
+<pre><code class="language-python">@transformation(&quot;running_average&quot;)
+def running_average(df, column, window=5):
+    &quot;&quot;&quot;
+    Calculate running average.
+
+    Args:
+        df: Input DataFrame (must be sorted by time)
+        column: Column to average
+        window: Window size
+
+    Returns:
+        DataFrame with running_avg column
+    &quot;&quot;&quot;
+    df = df.copy()
+    df['running_avg'] = df[column].rolling(window=window).mean()
+    return df
+</code></pre>
+<hr />
+<h2 id="complete-example-real-world-operation">Complete Example: Real-World Operation</h2>
+<pre><code class="language-python"># efficiency_calculator.py
+
+from odibi import transformation
+from odibi.transformations.templates import with_formula
+import pandas as pd
+
+@transformation(
+    &quot;calculate_thermal_efficiency&quot;,
+    version=&quot;1.0.0&quot;,
+    category=&quot;calculation&quot;,
+    tags=[&quot;energy&quot;, &quot;efficiency&quot;, &quot;manufacturing&quot;]
+)
+def calculate_thermal_efficiency(
+    df,
+    fuel_column,
+    output_column,
+    target_column=None,
+    flag_low_performance=True,
+    low_threshold=0.6
+):
+    &quot;&quot;&quot;
+    Calculate thermal efficiency from fuel and output measurements.
+
+    Thermal efficiency = (useful energy output / energy input) × 100
+
+    Args:
+        df: Input DataFrame with fuel and output columns
+        fuel_column: Column containing fuel consumption (energy input)
+        output_column: Column containing useful output (energy output)
+        target_column: Optional target efficiency for comparison
+        flag_low_performance: Whether to flag low-performing records
+        low_threshold: Threshold for low performance (default: 0.6 = 60%)
+
+    Returns:
+        DataFrame with additional columns:
+        - efficiency: Calculated thermal efficiency (0-1 range)
+        - efficiency_pct: Efficiency as percentage
+        - performance_flag: 'Low', 'Medium', or 'High' (if flagging enabled)
+        - vs_target: Difference from target (if target provided)
+
+    Example:
+        Input:
+        | Timestamp | Fuel | Output |
+        |-----------|------|--------|
+        | 10:00     | 100  | 75     |
+        | 11:00     | 100  | 85     |
+
+        Output (with target=0.8):
+        | Timestamp | Fuel | Output | efficiency | efficiency_pct | performance_flag | vs_target |
+        |-----------|------|--------|-----------|----------------|------------------|-----------|
+        | 10:00     | 100  | 75     | 0.75      | 75.0           | Medium           | -0.05     |
+        | 11:00     | 100  | 85     | 0.85      | 85.0           | High             | +0.05     |
+    &quot;&quot;&quot;
+    # Validate inputs
+    if fuel_column not in df.columns:
+        raise ValueError(f&quot;Column '{fuel_column}' not found&quot;)
+    if output_column not in df.columns:
+        raise ValueError(f&quot;Column '{output_column}' not found&quot;)
+
+    # Calculate efficiency
+    df = df.copy()
+    df['efficiency'] = df[output_column] / df[fuel_column]
+    df['efficiency_pct'] = df['efficiency'] * 100
+
+    # Flag performance if requested
+    if flag_low_performance:
+        df['performance_flag'] = pd.cut(
+            df['efficiency'],
+            bins=[0, low_threshold, 0.8, 1.0],
+            labels=['Low', 'Medium', 'High']
+        )
+
+    # Compare to target if provided
+    if target_column and target_column in df.columns:
+        df['vs_target'] = df['efficiency'] - df[target_column]
+
+    return df
+
+@calculate_thermal_efficiency.explain
+def explain(
+    fuel_column,
+    output_column,
+    target_column=None,
+    flag_low_performance=True,
+    low_threshold=0.6,
+    **context
+):
+    &quot;&quot;&quot;Generate context-aware explanation.&quot;&quot;&quot;
+    plant = context.get('plant', 'facility')
+    asset = context.get('asset', 'equipment')
+
+    details = [
+        f&quot;Input energy: `{fuel_column}` column&quot;,
+        f&quot;Useful output: `{output_column}` column&quot;,
+        &quot;Calculates efficiency ratio and percentage&quot;
+    ]
+
+    if flag_low_performance:
+        details.append(f&quot;Flags records below {low_threshold*100:.0f}% efficiency as low performance&quot;)
+
+    if target_column:
+        details.append(f&quot;Compares against target values in `{target_column}`&quot;)
+
+    result_desc = f&quot;Efficiency metrics for {plant} {asset} performance monitoring&quot;
+    if flag_low_performance:
+        result_desc += &quot; with quality flags&quot;
+
+    return with_formula(
+        purpose=f&quot;Calculate thermal efficiency for {plant} {asset}&quot;,
+        details=details,
+        formula=&quot;efficiency = output / fuel&quot;,
+        result=result_desc
+    )
+</code></pre>
+<p><strong>Use in YAML:</strong></p>
+<pre><code class="language-yaml">- name: calculate_boiler_efficiency
+  depends_on: [load_sensor_data]
+  transform:
+    steps:
+      - operation: calculate_thermal_efficiency
+        params:
+          fuel_column: fuel_consumption_kwh
+          output_column: heat_output_kwh
+          target_column: efficiency_target
+          flag_low_performance: true
+          low_threshold: 0.65
+</code></pre>
+<hr />
+<h2 id="explanation-quality-rules">Explanation Quality Rules</h2>
+<h3 id="what-gets-validated">What Gets Validated</h3>
+<p>The <code>ExplanationLinter</code> checks:</p>
+<p><strong>1. Minimum Length</strong></p>
+<pre><code class="language-python"># ❌ Too short
+return &quot;Filters data&quot;
+
+# ✅ Good length
+return purpose_detail_result(
+    purpose=&quot;Filter records based on quality criteria&quot;,
+    details=[&quot;Removes invalid entries&quot;, &quot;Keeps only verified data&quot;],
+    result=&quot;Clean, validated dataset&quot;
+)
+</code></pre>
+<p><strong>2. Required Sections</strong></p>
+<pre><code class="language-python"># ❌ Missing sections
+return &quot;Just text here&quot;
+
+# ✅ Has Purpose, Details, Result
+return purpose_detail_result(
+    purpose=&quot;...&quot;,  # ✅
+    details=[...],  # ✅
+    result=&quot;...&quot;    # ✅
+)
+</code></pre>
+<p><strong>3. No Lazy Phrases</strong></p>
+<pre><code class="language-python"># ❌ Generic
+&quot;Calculates stuff&quot;
+&quot;Does things with data&quot;
+&quot;Processes records&quot;
+&quot;TODO: write this&quot;
+
+# ✅ Specific
+&quot;Calculates thermal efficiency from fuel and output measurements&quot;
+&quot;Removes duplicate temperature readings based on timestamp&quot;
+&quot;Filters records where quality_flag = 'GOOD'&quot;
+</code></pre>
+<hr />
+<h2 id="testing-checklist">Testing Checklist</h2>
+<p>For each new transformation, test:</p>
+<ul>
+<li>[ ] Basic functionality works</li>
+<li>[ ] Handles string and list parameters</li>
+<li>[ ] Validates inputs (rejects invalid data)</li>
+<li>[ ] Explanation generates without errors</li>
+<li>[ ] Explanation includes required sections</li>
+<li>[ ] Explanation uses context when provided</li>
+<li>[ ] Metadata registered correctly</li>
+<li>[ ] Edge cases handled (empty DataFrame, nulls, etc.)</li>
+</ul>
+<p><strong>Example test suite:</strong></p>
+<pre><code class="language-python">class TestMyOperation:
+    @classmethod
+    def setup_class(cls):
+        import my_operations  # Register
+
+    def test_basic(self):
+        &quot;&quot;&quot;Basic functionality.&quot;&quot;&quot;
+        ...
+
+    def test_with_string_param(self):
+        &quot;&quot;&quot;String parameter variant.&quot;&quot;&quot;
+        ...
+
+    def test_with_list_param(self):
+        &quot;&quot;&quot;List parameter variant.&quot;&quot;&quot;
+        ...
+
+    def test_empty_dataframe(self):
+        &quot;&quot;&quot;Handle empty DataFrame.&quot;&quot;&quot;
+        ...
+
+    def test_explanation(self):
+        &quot;&quot;&quot;Generates valid explanation.&quot;&quot;&quot;
+        ...
+
+    def test_explanation_with_context(self):
+        &quot;&quot;&quot;Uses context in explanation.&quot;&quot;&quot;
+        ...
+
+    def test_metadata(self):
+        &quot;&quot;&quot;Has correct metadata.&quot;&quot;&quot;
+        ...
+</code></pre>
+<p><strong>Aim for 8-10 tests per operation.</strong></p>
+<hr />
+<h2 id="real-world-examples">Real-World Examples</h2>
+<h3 id="example-1-data-normalization">Example 1: Data Normalization</h3>
+<pre><code class="language-python">@transformation(&quot;normalize_columns&quot;)
+def normalize_columns(df, columns):
+    &quot;&quot;&quot;
+    Normalize numeric columns to 0-1 range.
+
+    Uses min-max normalization: (x - min) / (max - min)
+    &quot;&quot;&quot;
+    if isinstance(columns, str):
+        columns = [columns]
+
+    df = df.copy()
+    for col in columns:
+        min_val = df[col].min()
+        max_val = df[col].max()
+        df[col] = (df[col] - min_val) / (max_val - min_val)
+
+    return df
+
+@normalize_columns.explain
+def explain(columns, **context):
+    if isinstance(columns, str):
+        columns = [columns]
+
+    return with_formula(
+        purpose=&quot;Normalize values to 0-1 range&quot;,
+        details=[
+            f&quot;Normalizes columns: {', '.join(columns)}&quot;,
+            &quot;Uses min-max normalization&quot;,
+            &quot;Preserves relative relationships&quot;
+        ],
+        formula=&quot;normalized = (value - min) / (max - min)&quot;,
+        result=&quot;Normalized data suitable for machine learning or comparison&quot;
+    )
+</code></pre>
+<h3 id="example-2-time-based-filtering">Example 2: Time-Based Filtering</h3>
+<pre><code class="language-python">@transformation(&quot;filter_recent&quot;)
+def filter_recent(df, timestamp_column, days=7):
+    &quot;&quot;&quot;
+    Keep only recent records.
+
+    Args:
+        df: Input DataFrame
+        timestamp_column: Column with timestamps
+        days: Number of days to keep (default: 7)
+
+    Returns:
+        Filtered DataFrame with recent records
+    &quot;&quot;&quot;
+    df = df.copy()
+    df[timestamp_column] = pd.to_datetime(df[timestamp_column])
+
+    cutoff = pd.Timestamp.now() - pd.Timedelta(days=days)
+    return df[df[timestamp_column] &gt;= cutoff]
+
+@filter_recent.explain
+def explain(timestamp_column, days=7, **context):
+    return purpose_detail_result(
+        purpose=f&quot;Keep only records from last {days} days&quot;,
+        details=[
+            f&quot;Filters based on `{timestamp_column}` column&quot;,
+            f&quot;Keeps records from last {days} days&quot;,
+            &quot;Older records are removed&quot;
+        ],
+        result=f&quot;Dataset with recent data (last {days} days)&quot;
+    )
+</code></pre>
+<h3 id="example-3-quality-scoring">Example 3: Quality Scoring</h3>
+<pre><code class="language-python">@transformation(&quot;calculate_quality_score&quot;)
+def calculate_quality_score(df, metrics, weights=None):
+    &quot;&quot;&quot;
+    Calculate weighted quality score.
+
+    Args:
+        df: Input DataFrame
+        metrics: List of metric columns
+        weights: Optional weights (equal if None)
+
+    Returns:
+        DataFrame with quality_score column
+    &quot;&quot;&quot;
+    if isinstance(metrics, str):
+        metrics = [metrics]
+
+    if weights is None:
+        weights = [1.0 / len(metrics)] * len(metrics)
+
+    df = df.copy()
+    df['quality_score'] = sum(
+        df[metric] * weight
+        for metric, weight in zip(metrics, weights)
+    )
+
+    return df
+
+@calculate_quality_score.explain
+def explain(metrics, weights=None, **context):
+    if isinstance(metrics, str):
+        metrics = [metrics]
+
+    details = [f&quot;Combines {len(metrics)} metrics into single score&quot;]
+
+    if weights:
+        details.append(&quot;Uses weighted average:&quot;)
+        for metric, weight in zip(metrics, weights):
+            details.append(f&quot;  - {metric}: {weight*100:.0f}% weight&quot;)
+    else:
+        details.append(&quot;Uses equal weighting for all metrics&quot;)
+
+    return purpose_detail_result(
+        purpose=&quot;Calculate composite quality score&quot;,
+        details=details,
+        result=&quot;Single quality_score column for ranking/filtering&quot;
+    )
+</code></pre>
+<hr />
+<h2 id="packaging-your-transformations">Packaging Your Transformations</h2>
+<h3 id="option-1-single-file">Option 1: Single File</h3>
+<pre><code class="language-python"># my_company_ops.py
+
+from odibi import transformation
+
+@transformation(&quot;op1&quot;)
+def op1(...): ...
+
+@transformation(&quot;op2&quot;)
+def op2(...): ...
+
+# Use: import my_company_ops before running pipeline
+</code></pre>
+<h3 id="option-2-package">Option 2: Package</h3>
+<pre><code>my_company_ops/
+├── __init__.py          # Import all operations
+├── quality_ops.py       # Quality-related operations
+├── manufacturing_ops.py # Manufacturing-specific
+└── reporting_ops.py     # Reporting operations
+</code></pre>
+<pre><code class="language-python"># __init__.py
+from .quality_ops import *
+from .manufacturing_ops import *
+from .reporting_ops import *
+</code></pre>
+<h3 id="option-3-plugin-advanced">Option 3: Plugin (Advanced)</h3>
+<p>Create installable package:</p>
+<pre><code>my-odibi-ops/
+├── setup.py
+├── my_odibi_ops/
+│   ├── __init__.py
+│   └── operations.py
+└── tests/
+    └── test_operations.py
+</code></pre>
+<pre><code class="language-bash">pip install my-odibi-ops
+</code></pre>
+<hr />
+<h2 id="common-mistakes">Common Mistakes</h2>
+<h3 id="mistake-1-modifying-dataframe-in-place">Mistake 1: Modifying DataFrame In-Place</h3>
+<pre><code class="language-python"># ❌ Bad - modifies original
+@transformation(&quot;bad_op&quot;)
+def bad_op(df, col):
+    df[col] = df[col] * 2  # Modifies original!
+    return df
+
+# ✅ Good - creates copy
+@transformation(&quot;good_op&quot;)
+def good_op(df, col):
+    df = df.copy()  # Safe!
+    df[col] = df[col] * 2
+    return df
+</code></pre>
+<h3 id="mistake-2-no-error-handling">Mistake 2: No Error Handling</h3>
+<pre><code class="language-python"># ❌ Bad - crashes on missing column
+@transformation(&quot;bad_op&quot;)
+def bad_op(df, col):
+    return df[df[col] &gt; 100]
+
+# ✅ Good - validates first
+@transformation(&quot;good_op&quot;)
+def good_op(df, col):
+    if col not in df.columns:
+        raise ValueError(f&quot;Column '{col}' not found. Available: {df.columns.tolist()}&quot;)
+    return df[df[col] &gt; 100]
+</code></pre>
+<h3 id="mistake-3-generic-explanations">Mistake 3: Generic Explanations</h3>
+<pre><code class="language-python"># ❌ Bad - too generic
+@my_op.explain
+def explain(**context):
+    return &quot;This operation processes data&quot;
+
+# ✅ Good - specific and contextual
+@my_op.explain
+def explain(threshold, **context):
+    plant = context.get('plant', 'facility')
+    return purpose_detail_result(
+        purpose=f&quot;Filter high-value records for {plant}&quot;,
+        details=[f&quot;Keeps only values above {threshold}&quot;],
+        result=&quot;High-value records for further analysis&quot;
+    )
+</code></pre>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<p><strong>You can now create custom transformations!</strong></p>
+<p>Continue learning:
+- <strong><a href="04_ARCHITECTURE_GUIDE.md">Architecture Guide</a></strong> - Understand the system
+- <strong><a href="06_TROUBLESHOOTING.md">Troubleshooting</a></strong> - Debug issues
+- <strong>Look at existing operations</strong> in <code>odibi/operations/</code> for inspiration</p>
+<p><strong>Try it yourself:</strong>
+1. Create <code>my_operations.py</code>
+2. Write a simple transformation
+3. Add explanation
+4. Write tests
+5. Use it in a pipeline!</p>
+<hr />
+<p><strong>Pro tip:</strong> Look at <code>odibi/operations/unpivot.py</code> - it's only 75 lines and shows everything you need to know! 📖</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

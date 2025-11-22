@@ -1,0 +1,2019 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/v2_backup/guides/contributing/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Developer Guide - Understanding Odibi Internals - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#developer-guide-understanding-odibi-internals" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Developer Guide - Understanding Odibi Internals
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="developer-guide-understanding-odibi-internals">Developer Guide - Understanding Odibi Internals</h1>
+<p><strong>Learn how Odibi works under the hood so you can extend and debug it.</strong></p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#core-architecture">Core Architecture</a></li>
+<li><a href="#module-overview">Module Overview</a></li>
+<li><a href="#transformation-system">Transformation System</a></li>
+<li><a href="#story-generation">Story Generation</a></li>
+<li><a href="#how-to-learn-the-codebase">How to Learn the Codebase</a></li>
+<li><a href="#extension-points">Extension Points</a></li>
+</ol>
+<hr />
+<h2 id="core-architecture">Core Architecture</h2>
+<h3 id="the-big-picture">The Big Picture</h3>
+<pre><code>Config YAML → ProjectConfig → Pipeline → Nodes → Engine → Stories
+                                  ↓
+                            Dependencies → Execution Order
+                                  ↓
+                            Transformations Registry
+</code></pre>
+<p><strong>Flow:</strong>
+1. User writes YAML config
+2. Odibi parses to <code>ProjectConfig</code> (Pydantic models)
+3. Pipeline builds dependency graph
+4. Nodes execute in topological order
+5. Each node uses transformations from registry
+6. Stories auto-generated during execution</p>
+<hr />
+<h2 id="module-overview">Module Overview</h2>
+<h3 id="directory-structure">Directory Structure</h3>
+<pre><code>odibi/
+├── config.py              # Pydantic models for YAML configs
+├── pipeline.py            # Pipeline orchestrator
+├── node.py                # Node executor
+├── graph.py               # Dependency graph builder
+├── context.py             # Data context (DataFrame storage)
+├── engine/                # Execution engines
+│   ├── base.py           # Engine interface
+│   ├── pandas_engine.py  # Pandas implementation
+│   └── spark_engine.py   # Spark implementation
+├── connections/           # Storage connectors
+│   ├── base.py
+│   ├── local.py
+│   ├── azure_adls.py
+│   └── azure_sql.py
+├── transformations/       # Transformation system
+│   ├── registry.py       # Global registry
+│   ├── decorators.py     # @transformation decorator
+│   ├── explanation.py    # @func.explain decorator
+│   ├── context.py        # Context passing
+│   └── templates.py      # Explanation helpers
+├── operations/            # Built-in operations
+│   ├── pivot.py
+│   ├── unpivot.py
+│   ├── join.py
+│   └── sql.py
+├── story/                 # Story generation
+│   ├── metadata.py       # Metadata tracking
+│   ├── generator.py      # Legacy generator
+│   ├── renderers.py      # HTML/MD/JSON renderers
+│   ├── doc_story.py      # Doc story generator
+│   ├── themes.py         # Theme system
+│   └── templates/        # HTML templates
+├── validation/            # Quality enforcement
+│   └── explanation_linter.py
+├── cli/                   # Command-line interface
+│   ├── main.py
+│   ├── run.py
+│   ├── validate.py
+│   ├── story.py
+│   ├── stress.py         # Fuzz testing
+│   ├── doctor.py         # Environment debugging
+│   └── generate.py       # Scaffolding
+└── utils/                 # Utilities
+    └── setup_helpers.py
+</code></pre>
+<h3 id="key-files-to-understand">Key Files to Understand</h3>
+<p><strong>Start with these 5 files:</strong></p>
+<ol>
+<li><strong><code>operations/unpivot.py</code></strong> (75 lines)</li>
+<li>Shows how transformations work</li>
+<li>Has explain() method</li>
+<li>
+<p>Very readable</p>
+</li>
+<li>
+<p><strong><code>transformations/registry.py</code></strong> (150 lines)</p>
+</li>
+<li>The heart of the system</li>
+<li>How operations register</li>
+<li>
+<p>How lookups work</p>
+</li>
+<li>
+<p><strong><code>transformations/decorators.py</code></strong> (60 lines)</p>
+</li>
+<li>The <code>@transformation</code> decorator</li>
+<li>
+<p>How registration happens</p>
+</li>
+<li>
+<p><strong><code>story/metadata.py</code></strong> (175 lines)</p>
+</li>
+<li>What gets tracked during runs</li>
+<li>
+<p>How metrics are calculated</p>
+</li>
+<li>
+<p><strong><code>pipeline.py</code></strong> (300 lines)</p>
+</li>
+<li>How pipelines execute</li>
+<li>Dependency resolution</li>
+<li>Error handling</li>
+</ol>
+<hr />
+<h2 id="transformation-system">Transformation System</h2>
+<h3 id="how-it-works">How It Works</h3>
+<p><strong>1. Registration (at import time)</strong></p>
+<pre><code class="language-python"># odibi/operations/unpivot.py
+
+from odibi.transformations import transformation
+
+@transformation(&quot;unpivot&quot;, category=&quot;reshaping&quot;)
+def unpivot(df, id_vars, ...):
+    &quot;&quot;&quot;Unpivot operation.&quot;&quot;&quot;
+    return df.melt(...)
+
+# When this file is imported:
+# - @transformation decorator runs
+# - Calls registry.register(&quot;unpivot&quot;, unpivot_func)
+# - Function is now globally available
+</code></pre>
+<p><strong>2. Lookup (at runtime)</strong></p>
+<pre><code class="language-python"># odibi/node.py (simplified)
+
+from odibi.transformations import get_registry
+
+registry = get_registry()
+func = registry.get(&quot;unpivot&quot;)  # Gets the function!
+result = func(df, id_vars=&quot;ID&quot;)  # Calls it!
+</code></pre>
+<p><strong>3. Explanation (for stories)</strong></p>
+<pre><code class="language-python"># Getting explanation:
+func = registry.get(&quot;unpivot&quot;)
+explanation = func.get_explanation(
+    id_vars=&quot;ID&quot;,
+    plant=&quot;NKC&quot;  # Context
+)
+# Returns formatted markdown explanation
+</code></pre>
+<h3 id="the-registry-pattern">The Registry Pattern</h3>
+<p><strong>Why use a registry?</strong>
+- ✅ Centralized lookup
+- ✅ Easy to list all operations
+- ✅ Metadata storage
+- ✅ Validation enforcement</p>
+<p><strong>Global singleton:</strong></p>
+<pre><code class="language-python"># There's ONE registry for the entire process
+_global_registry = TransformationRegistry()
+
+def get_registry():
+    return _global_registry
+</code></pre>
+<p><strong>All operations register themselves:</strong></p>
+<pre><code class="language-python"># When you import odibi.operations.pivot:
+@transformation(&quot;pivot&quot;)  # ← Registers immediately
+def pivot(...): ...
+</code></pre>
+<hr />
+<h2 id="story-generation">Story Generation</h2>
+<h3 id="how-stories-work">How Stories Work</h3>
+<p><strong>During Pipeline Execution:</strong></p>
+<pre><code class="language-python"># In pipeline.py (simplified)
+
+story_metadata = PipelineStoryMetadata(pipeline_name=&quot;my_pipeline&quot;)
+
+for node in execution_order:
+    start = time.time()
+
+    # Execute node
+    result = node.execute()
+
+    duration = time.time() - start
+
+    # Track metadata
+    node_meta = NodeExecutionMetadata(
+        node_name=node.name,
+        operation=node.operation,
+        duration=duration,
+        rows_out=len(result_df),
+        status=&quot;success&quot; if result.success else &quot;failed&quot;
+    )
+
+    # Calculate changes
+    node_meta.calculate_row_change()
+    node_meta.calculate_schema_changes()
+
+    story_metadata.add_node(node_meta)
+
+# At the end, render story
+renderer = get_renderer(&quot;html&quot;)
+renderer.render_to_file(story_metadata, &quot;stories/runs/pipeline_123.html&quot;)
+</code></pre>
+<p><strong>No user intervention required!</strong> Automatic.</p>
+<h3 id="renderers">Renderers</h3>
+<p>Three output formats:</p>
+<p><strong>HTMLStoryRenderer:</strong></p>
+<pre><code class="language-python">from odibi.story import HTMLStoryRenderer
+
+renderer = HTMLStoryRenderer(theme=DARK_THEME)
+html = renderer.render(metadata)
+# Beautiful interactive HTML
+</code></pre>
+<p><strong>MarkdownStoryRenderer:</strong></p>
+<pre><code class="language-python">from odibi.story import MarkdownStoryRenderer
+
+renderer = MarkdownStoryRenderer()
+markdown = renderer.render(metadata)
+# GitHub-flavored markdown
+</code></pre>
+<p><strong>JSONStoryRenderer:</strong></p>
+<pre><code class="language-python">from odibi.story import JSONStoryRenderer
+
+renderer = JSONStoryRenderer()
+json_str = renderer.render(metadata)
+# Machine-readable JSON
+</code></pre>
+<hr />
+<h2 id="how-to-learn-the-codebase">How to Learn the Codebase</h2>
+<h3 id="strategy-tests-are-your-teacher">Strategy: Tests Are Your Teacher</h3>
+<p><strong>Step 1: Pick something you want to understand</strong></p>
+<p>Example: "How does unpivot work?"</p>
+<p><strong>Step 2: Find its test</strong></p>
+<pre><code class="language-bash"># Search for tests
+grep -r &quot;test.*unpivot&quot; tests/
+# Result: tests/unit/test_operations.py
+</code></pre>
+<p><strong>Step 3: Read the test</strong></p>
+<pre><code class="language-python"># tests/unit/test_operations.py
+
+def test_unpivot_basic(self):
+    &quot;&quot;&quot;Should unpivot DataFrame from wide to long format.&quot;&quot;&quot;
+    df = pd.DataFrame({&quot;ID&quot;: [&quot;A&quot;], &quot;X&quot;: [10], &quot;Y&quot;: [20]})
+
+    unpivot_func = registry.get(&quot;unpivot&quot;)
+    result = unpivot_func(df, id_vars=&quot;ID&quot;)
+
+    assert len(result) == 2
+    assert result[&quot;variable&quot;].tolist() == [&quot;X&quot;, &quot;Y&quot;]
+</code></pre>
+<p><strong>This tells you:</strong>
+- ✅ How to get the function (<code>registry.get()</code>)
+- ✅ How to call it (<code>id_vars="ID"</code>)
+- ✅ What it returns (long-format DataFrame)</p>
+<p><strong>Step 4: Look at implementation</strong></p>
+<pre><code class="language-python"># odibi/operations/unpivot.py
+
+@transformation(&quot;unpivot&quot;, category=&quot;reshaping&quot;)
+def unpivot(df, id_vars, value_vars=None, var_name=&quot;variable&quot;, value_name=&quot;value&quot;):
+    if isinstance(id_vars, str):
+        id_vars = [id_vars]
+
+    return df.melt(
+        id_vars=id_vars,
+        value_vars=value_vars,
+        var_name=var_name,
+        value_name=value_name,
+    )
+</code></pre>
+<p><strong>Aha!</strong> It's just pandas <code>.melt()</code>! Simple.</p>
+<h3 id="learning-path">Learning Path</h3>
+<p><strong>Week 1: Operations (Easy)</strong>
+1. Read tests in <code>tests/unit/test_operations.py</code>
+2. Read implementations in <code>odibi/operations/</code>
+3. Try creating your own operation</p>
+<p><strong>Week 2: Transformations (Core concept)</strong>
+1. Read <code>tests/unit/test_registry.py</code>
+2. Read <code>odibi/transformations/registry.py</code>
+3. Read <code>odibi/transformations/decorators.py</code>
+4. Understand how <code>@transformation</code> works</p>
+<p><strong>Week 3: Stories (Powerful feature)</strong>
+1. Read <code>tests/unit/test_story_metadata.py</code>
+2. Read <code>odibi/story/metadata.py</code>
+3. Read <code>tests/unit/test_story_renderers.py</code>
+4. Read <code>odibi/story/renderers.py</code></p>
+<p><strong>Week 4: Pipeline Execution</strong>
+1. Read <code>tests/test_pipeline.py</code>
+2. Read <code>odibi/pipeline.py</code>
+3. Read <code>odibi/graph.py</code> (dependency resolution)
+4. Trace a pipeline run end-to-end</p>
+<hr />
+<h2 id="extension-points">Extension Points</h2>
+<h3 id="1-create-custom-operations">1. Create Custom Operations</h3>
+<pre><code class="language-python"># my_operations.py
+
+from odibi import transformation
+from odibi.transformations.templates import purpose_detail_result
+
+@transformation(&quot;deduplicate&quot;, category=&quot;cleaning&quot;)
+def deduplicate(df, subset=None):
+    &quot;&quot;&quot;Remove duplicate rows.&quot;&quot;&quot;
+    return df.drop_duplicates(subset=subset)
+
+@deduplicate.explain
+def explain(subset=None, **context):
+    plant = context.get('plant', 'Unknown')
+
+    details = [&quot;Removes duplicate rows&quot;]
+    if subset:
+        details.append(f&quot;Based on columns: {', '.join(subset)}&quot;)
+    else:
+        details.append(&quot;Based on all columns&quot;)
+
+    return purpose_detail_result(
+        purpose=f&quot;Remove duplicate records for {plant}&quot;,
+        details=details,
+        result=&quot;Deduplicated dataset&quot;
+    )
+
+# To use: Import before running pipeline
+import my_operations
+# Now &quot;deduplicate&quot; is available in your YAML!
+</code></pre>
+<h3 id="2-create-custom-themes">2. Create Custom Themes</h3>
+<pre><code class="language-yaml"># my_theme.yaml
+
+name: company_theme
+primary_color: &quot;#8B0000&quot;
+success_color: &quot;#006400&quot;
+font_family: &quot;Calibri, Arial, sans-serif&quot;
+company_name: &quot;My Company Inc.&quot;
+logo_url: &quot;https://example.com/logo.png&quot;
+footer_text: &quot;© 2025 My Company&quot;
+</code></pre>
+<p><strong>Use it:</strong></p>
+<pre><code class="language-bash">odibi story generate config.yaml --theme my_theme.yaml
+</code></pre>
+<h3 id="3-create-custom-renderers">3. Create Custom Renderers</h3>
+<pre><code class="language-python"># my_renderer.py
+
+from odibi.story.metadata import PipelineStoryMetadata
+
+class PDFStoryRenderer:
+    def render(self, metadata: PipelineStoryMetadata) -&gt; bytes:
+        # Your PDF generation logic
+        pass
+</code></pre>
+<h3 id="4-add-custom-connections">4. Add Custom Connections</h3>
+<pre><code class="language-python"># my_connection.py
+
+from odibi.connections.base import BaseConnection
+
+class S3Connection(BaseConnection):
+    def __init__(self, bucket, region):
+        self.bucket = bucket
+        self.region = region
+
+    def get_path(self, relative_path):
+        return f&quot;s3://{self.bucket}/{relative_path}&quot;
+
+    def validate(self):
+        if not self.bucket:
+            raise ValueError(&quot;S3 requires bucket name&quot;)
+</code></pre>
+<hr />
+<h2 id="common-patterns">Common Patterns</h2>
+<h3 id="pattern-1-registry-lookup">Pattern 1: Registry Lookup</h3>
+<p><strong>Everywhere in the codebase:</strong></p>
+<pre><code class="language-python">from odibi.transformations import get_registry
+
+registry = get_registry()
+func = registry.get(&quot;operation_name&quot;)
+</code></pre>
+<h3 id="pattern-2-pydantic-validation">Pattern 2: Pydantic Validation</h3>
+<p><strong>All configs use Pydantic:</strong></p>
+<pre><code class="language-python">from odibi.config import NodeConfig
+
+# Pydantic validates automatically:
+node = NodeConfig(
+    name=&quot;test&quot;,
+    read=ReadConfig(...)  # Validated!
+)
+</code></pre>
+<h3 id="pattern-3-context-passing">Pattern 3: Context Passing</h3>
+<p><strong>Context flows through everything:</strong></p>
+<pre><code class="language-python"># In transformation
+@transformation(&quot;my_op&quot;)
+def my_op(df, threshold, **context):
+    plant = context.get('plant')  # From YAML!
+    # Use plant in logic...
+
+@my_op.explain
+def explain(threshold, **context):
+    plant = context.get('plant')  # Same context!
+    return f&quot;Filter for {plant}...&quot;
+</code></pre>
+<h3 id="pattern-4-dependency-injection">Pattern 4: Dependency Injection</h3>
+<p><strong>Connections injected into engines:</strong></p>
+<pre><code class="language-python"># pipeline.py
+engine = PandasEngine()
+
+for node in nodes:
+    result = node.execute(
+        engine=engine,
+        connections=connections  # Injected!
+    )
+</code></pre>
+<hr />
+<h2 id="understanding-tests">Understanding Tests</h2>
+<h3 id="test-structure">Test Structure</h3>
+<pre><code>tests/
+├── unit/                  # Test individual components
+│   ├── test_operations.py      # Operation tests
+│   ├── test_registry.py        # Registry tests
+│   ├── test_story_metadata.py  # Metadata tests
+│   └── ...
+├── integration/           # Test components together
+│   └── test_cli_integration.py
+└── test_pipeline.py       # End-to-end pipeline tests
+</code></pre>
+<h3 id="test-patterns">Test Patterns</h3>
+<p><strong>Pattern 1: Setup with Fixtures</strong></p>
+<pre><code class="language-python">@pytest.fixture
+def sample_data():
+    return pd.DataFrame({&quot;ID&quot;: [1, 2], &quot;Value&quot;: [100, 200]})
+
+def test_something(sample_data):
+    # Use sample_data
+    assert len(sample_data) == 2
+</code></pre>
+<p><strong>Pattern 2: Mock External Dependencies</strong></p>
+<pre><code class="language-python">@patch('sqlalchemy.create_engine')
+def test_azure_sql(mock_create_engine):
+    mock_engine = Mock()
+    mock_create_engine.return_value = mock_engine
+
+    # Now test without real database!
+</code></pre>
+<p><strong>Pattern 3: Test Setup/Teardown</strong></p>
+<pre><code class="language-python">class TestOperations:
+    def setup_method(self):
+        &quot;&quot;&quot;Run before each test.&quot;&quot;&quot;
+        get_registry().clear()  # Clean state
+
+    def test_something(self):
+        # Test runs with clean registry
+</code></pre>
+<h3 id="how-to-run-specific-tests">How to Run Specific Tests</h3>
+<pre><code class="language-bash"># Run all tests
+pytest
+
+# Run specific file
+pytest tests/unit/test_operations.py
+
+# Run specific test
+pytest tests/unit/test_operations.py::TestPivotOperation::test_pivot_basic
+
+# Run with verbose output
+pytest -v
+
+# Run with coverage
+pytest --cov=odibi
+
+# Stop on first failure
+pytest -x
+</code></pre>
+<hr />
+<h2 id="debugging-techniques">Debugging Techniques</h2>
+<h3 id="technique-1-add-print-statements-to-tests">Technique 1: Add Print Statements to Tests</h3>
+<pre><code class="language-python">def test_pivot_basic(self):
+    df = pd.DataFrame(...)
+    result = pivot_func(df, ...)
+
+    print(&quot;\n=== DEBUG ===&quot;)
+    print(f&quot;Input:\n{df}&quot;)
+    print(f&quot;Output:\n{result}&quot;)
+    print(f&quot;Columns: {result.columns.tolist()}&quot;)
+    print(&quot;=============\n&quot;)
+
+    assert ...
+</code></pre>
+<p>Run with <code>-s</code> to see prints:</p>
+<pre><code class="language-bash">pytest tests/unit/test_operations.py::test_pivot_basic -v -s
+</code></pre>
+<h3 id="technique-2-use-python-debugger">Technique 2: Use Python Debugger</h3>
+<pre><code class="language-python">def test_something(self):
+    import pdb; pdb.set_trace()  # Breakpoint!
+
+    result = func(...)
+    # Debugger stops here
+</code></pre>
+<h3 id="technique-3-interactive-testing">Technique 3: Interactive Testing</h3>
+<pre><code class="language-python"># Start Python REPL
+python
+
+&gt;&gt;&gt; from odibi.transformations import get_registry
+&gt;&gt;&gt; import odibi.operations.unpivot  # Registers operation
+&gt;&gt;&gt;
+&gt;&gt;&gt; registry = get_registry()
+&gt;&gt;&gt; unpivot = registry.get(&quot;unpivot&quot;)
+&gt;&gt;&gt;
+&gt;&gt;&gt; import pandas as pd
+&gt;&gt;&gt; df = pd.DataFrame({&quot;ID&quot;: [&quot;A&quot;], &quot;X&quot;: [10], &quot;Y&quot;: [20]})
+&gt;&gt;&gt; result = unpivot(df, id_vars=&quot;ID&quot;)
+&gt;&gt;&gt; print(result)
+  ID variable  value
+0  A        X     10
+1  A        Y     20
+</code></pre>
+<h3 id="technique-4-trace-execution">Technique 4: Trace Execution</h3>
+<p>Add logging:</p>
+<pre><code class="language-python"># In any file
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+logger = logging.getLogger(__name__)
+
+def my_function():
+    logger.debug(&quot;Entering my_function&quot;)
+    logger.debug(f&quot;Parameters: {locals()}&quot;)
+    # ...
+</code></pre>
+<hr />
+<h2 id="how-each-system-works">How Each System Works</h2>
+<h3 id="the-transformation-registry">The Transformation Registry</h3>
+<p><strong>Location:</strong> <code>odibi/transformations/registry.py</code></p>
+<p><strong>Core concept:</strong> Global dictionary</p>
+<pre><code class="language-python">class TransformationRegistry:
+    def __init__(self):
+        self._transformations = {}  # name -&gt; function
+        self._metadata = {}         # name -&gt; metadata
+
+    def register(self, name, func, **metadata):
+        self._transformations[name] = func
+        self._metadata[name] = metadata
+
+    def get(self, name):
+        return self._transformations.get(name)
+</code></pre>
+<p><strong>That's it!</strong> Just a dict with some validation.</p>
+<h3 id="the-transformation-decorator">The @transformation Decorator</h3>
+<p><strong>Location:</strong> <code>odibi/transformations/decorators.py</code></p>
+<pre><code class="language-python">def transformation(name, version=&quot;1.0.0&quot;, category=None, tags=None):
+    def decorator(func):
+        registry = get_registry()
+        registry.register(
+            name=name,
+            func=func,
+            version=version,
+            category=category,
+            tags=tags
+        )
+        return func  # Return original function
+
+    return decorator
+</code></pre>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-python">@transformation(&quot;my_op&quot;)  # decorator(func) is called
+def my_op(df):
+    return df
+
+# Equivalent to:
+# my_op = transformation(&quot;my_op&quot;)(my_op)
+# Which calls: registry.register(&quot;my_op&quot;, my_op)
+</code></pre>
+<h3 id="the-funcexplain-decorator">The @func.explain Decorator</h3>
+<p><strong>Location:</strong> <code>odibi/transformations/explanation.py</code></p>
+<p><strong>How it works:</strong></p>
+<pre><code class="language-python">class ExplainableFunction:
+    def __init__(self, func):
+        self.func = func
+        self.explain_func = None
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)  # Normal call
+
+    def explain(self, explain_func):
+        &quot;&quot;&quot;Decorator for adding explain method.&quot;&quot;&quot;
+        self.explain_func = explain_func
+        return self
+
+    def get_explanation(self, **kwargs):
+        if self.explain_func:
+            return self.explain_func(**kwargs)
+        return &quot;No explanation available&quot;
+</code></pre>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-python">@transformation(&quot;my_op&quot;)
+def my_op(df):
+    return df
+
+@my_op.explain  # ← Attaches to my_op
+def explain(**context):
+    return &quot;Explanation here&quot;
+
+# Now you can call:
+my_op.get_explanation(plant=&quot;NKC&quot;)
+</code></pre>
+<h3 id="the-dependency-graph">The Dependency Graph</h3>
+<p><strong>Location:</strong> <code>odibi/graph.py</code></p>
+<p><strong>Algorithm:</strong> Topological sort</p>
+<pre><code class="language-python">class DependencyGraph:
+    def __init__(self, nodes):
+        self.nodes = {node.name: node for node in nodes}
+        self._build_graph()
+
+    def _build_graph(self):
+        # For each node, track what depends on it
+        for node in self.nodes.values():
+            for dep in node.depends_on:
+                # Record dependency
+
+    def get_execution_order(self):
+        # Topological sort
+        # Returns: [node1, node2, node3, ...]
+        # Guarantees: dependencies execute first
+</code></pre>
+<p><strong>Why it matters:</strong></p>
+<pre><code class="language-yaml">nodes:
+  - name: C
+    depends_on: [A, B]  # C needs A and B
+  - name: B
+    depends_on: [A]      # B needs A  
+  - name: A              # A first
+
+# Execution order: A → B → C
+</code></pre>
+<hr />
+<h2 id="key-design-decisions">Key Design Decisions</h2>
+<h3 id="1-why-global-registry">1. Why Global Registry?</h3>
+<p><strong>Alternative:</strong> Pass registry everywhere</p>
+<pre><code class="language-python"># BAD: Pass registry to everything
+def execute(registry, node, ...):
+    func = registry.get(node.operation)
+</code></pre>
+<p><strong>Good:</strong> Global singleton</p>
+<pre><code class="language-python"># GOOD: Just import and use
+from odibi.transformations import get_registry
+func = get_registry().get(&quot;operation&quot;)
+</code></pre>
+<h3 id="2-why-pydantic-for-config">2. Why Pydantic for Config?</h3>
+<p><strong>Benefits:</strong>
+- ✅ Automatic validation
+- ✅ Type checking
+- ✅ Great error messages
+- ✅ JSON schema generation</p>
+<pre><code class="language-python">class NodeConfig(BaseModel):
+    name: str  # ← Must be string, validated automatically!
+    description: Optional[str]  # ← Optional
+</code></pre>
+<h3 id="3-why-separate-metadata-from-generation">3. Why Separate Metadata from Generation?</h3>
+<p><strong>Metadata</strong> (data):</p>
+<pre><code class="language-python">metadata = PipelineStoryMetadata(...)
+metadata.add_node(...)
+</code></pre>
+<p><strong>Renderers</strong> (presentation):</p>
+<pre><code class="language-python">HTMLStoryRenderer().render(metadata)
+MarkdownStoryRenderer().render(metadata)
+</code></pre>
+<p><strong>Why?</strong> One metadata source, multiple output formats!</p>
+<h3 id="4-why-context-passing-with-kwargs">4. Why Context Passing with **kwargs?</h3>
+<p><strong>Flexible:</strong></p>
+<pre><code class="language-python">@my_op.explain
+def explain(threshold, **context):
+    plant = context.get('plant')  # Use if available
+    asset = context.get('asset')  # Ignore if missing
+</code></pre>
+<p>Forward-compatible - add new context fields without breaking old code!</p>
+<hr />
+<h2 id="code-reading-tips">Code Reading Tips</h2>
+<h3 id="tip-1-start-small">Tip 1: Start Small</h3>
+<p><strong>Don't read <code>pipeline.py</code> first</strong> (300 lines, complex)</p>
+<p><strong>Do read <code>operations/unpivot.py</code> first</strong> (75 lines, simple)</p>
+<h3 id="tip-2-follow-the-imports">Tip 2: Follow the Imports</h3>
+<pre><code class="language-python">from odibi.transformations import transformation
+
+# Where is this?
+# 1. Check odibi/transformations/__init__.py
+# 2. See: from .decorators import transformation
+# 3. Go to: odibi/transformations/decorators.py
+# 4. Read the function!
+</code></pre>
+<h3 id="tip-3-use-ide-go-to-definition">Tip 3: Use IDE "Go to Definition"</h3>
+<ul>
+<li>Click <code>transformation</code> → jumps to definition</li>
+<li>Click <code>get_registry()</code> → jumps to implementation</li>
+<li>Trace the entire call stack!</li>
+</ul>
+<h3 id="tip-4-run-tests-while-reading">Tip 4: Run Tests While Reading</h3>
+<pre><code class="language-bash"># Terminal 1: Read the code
+vim odibi/operations/pivot.py
+
+# Terminal 2: Run its tests
+pytest tests/unit/test_operations.py::TestPivotOperation -v
+
+# See it in action!
+</code></pre>
+<hr />
+<h2 id="common-questions">Common Questions</h2>
+<h3 id="q-where-do-operations-get-registered">Q: Where do operations get registered?</h3>
+<p><strong>A:</strong> During import.</p>
+<pre><code class="language-python">import odibi.operations.pivot  # ← @transformation runs now!
+registry = get_registry()
+func = registry.get(&quot;pivot&quot;)   # ← It's there!
+</code></pre>
+<h3 id="q-how-does-the-pipeline-know-which-nodes-to-run-first">Q: How does the pipeline know which nodes to run first?</h3>
+<p><strong>A:</strong> <code>DependencyGraph</code> in <code>odibi/graph.py</code></p>
+<p>It builds a directed graph and does topological sort.</p>
+<h3 id="q-where-are-dataframes-stored-between-nodes">Q: Where are DataFrames stored between nodes?</h3>
+<p><strong>A:</strong> <code>Context</code> object in <code>odibi/context.py</code></p>
+<pre><code class="language-python"># After node1 executes:
+context.set(&quot;node1&quot;, df_result)
+
+# When node2 runs:
+df_input = context.get(&quot;node1&quot;)
+</code></pre>
+<h3 id="q-how-do-explain-methods-get-context">Q: How do explain() methods get context?</h3>
+<p><strong>A:</strong> Built in <code>pipeline.py</code> and passed via <code>**kwargs</code></p>
+<pre><code class="language-python">context = {
+    'plant': config.plant,
+    'asset': config.asset,
+    # ... more fields ...
+}
+
+explanation = func.get_explanation(**node.params, **context)
+</code></pre>
+<h3 id="q-what-happens-when-a-test-fails">Q: What happens when a test fails?</h3>
+<p><strong>A:</strong> Read the error message carefully:</p>
+<pre><code>AssertionError: assert 'expected' in 'actual result here'
+</code></pre>
+<p>The actual result is shown! Use it to understand what's happening.</p>
+<hr />
+<h2 id="development-workflow">Development Workflow</h2>
+<h3 id="making-changes">Making Changes</h3>
+<pre><code class="language-bash"># 1. Create a branch
+git checkout -b feature/my-feature
+
+# 2. Make changes
+edit odibi/operations/my_new_operation.py
+
+# 3. Write tests FIRST (TDD)
+edit tests/unit/test_my_operation.py
+
+# 4. Run tests
+pytest tests/unit/test_my_operation.py -v
+
+# 5. Run ALL tests
+pytest
+
+# 6. Format code
+black odibi/
+
+# 7. Commit
+git add .
+git commit -m &quot;Add my_new_operation&quot;
+</code></pre>
+<h3 id="test-driven-development">Test-Driven Development</h3>
+<p><strong>Write test first:</strong></p>
+<pre><code class="language-python"># tests/unit/test_my_operation.py
+
+def test_my_operation():
+    df = pd.DataFrame({&quot;value&quot;: [1, 2, 3]})
+    result = my_operation(df, threshold=2)
+    assert len(result) == 1  # Only value=3
+</code></pre>
+<p><strong>Then implement:</strong></p>
+<pre><code class="language-python"># odibi/operations/my_operation.py
+
+@transformation(&quot;my_operation&quot;)
+def my_operation(df, threshold):
+    &quot;&quot;&quot;Filter values above threshold.&quot;&quot;&quot;
+    return df[df.value &gt; threshold]
+</code></pre>
+<p><strong>Test passes!</strong> ✅</p>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<p>You now understand how Odibi works internally!</p>
+<p><strong>Continue learning:</strong>
+- <strong><a href="../../explanation/architecture/">Architecture Guide</a></strong> - Visual diagrams of the system
+- <strong><a href="../custom_transformations/">Transformation Guide</a></strong> - Write your own operations
+- <strong><a href="../troubleshooting/">Troubleshooting</a></strong> - Debug common issues</p>
+<p><strong>Want to contribute?</strong>
+- Read <code>CONTRIBUTING.md</code>
+- Check open issues
+- All tests must pass before PR!</p>
+<hr />
+<p><strong>You've got this!</strong> The tests are your teacher. 🎓</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

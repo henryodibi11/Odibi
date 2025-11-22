@@ -1,0 +1,2108 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/v2_backup/guides/troubleshooting/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Troubleshooting Guide - Common Issues & Solutions - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting-guide-common-issues-solutions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting Guide - Common Issues &amp; Solutions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="troubleshooting-guide-common-issues-solutions">Troubleshooting Guide - Common Issues &amp; Solutions</h1>
+<p><strong>Quick solutions to common problems. Get unblocked fast!</strong></p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#installation-issues">Installation Issues</a></li>
+<li><a href="#configuration-errors">Configuration Errors</a></li>
+<li><a href="#runtime-errors">Runtime Errors</a></li>
+<li><a href="#performance-issues">Performance Issues</a></li>
+<li><a href="#story-generation-issues">Story Generation Issues</a></li>
+<li><a href="#connection-problems">Connection Problems</a></li>
+</ol>
+<hr />
+<h2 id="installation-issues">Installation Issues</h2>
+<h3 id="problem-no-module-named-odibi">Problem: "No module named 'odibi'"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code class="language-bash">&gt;&gt;&gt; import odibi
+ModuleNotFoundError: No module named 'odibi'
+</code></pre>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># Install Odibi
+pip install odibi
+
+# Or install from source
+cd /path/to/odibi
+pip install -e .
+</code></pre>
+<p><strong>Verify:</strong></p>
+<pre><code class="language-bash">python -c &quot;import odibi; print(odibi.__version__)&quot;
+</code></pre>
+<hr />
+<h3 id="problem-no-module-named-pyspark">Problem: "No module named 'pyspark'"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code class="language-bash">odibi run config.yaml
+ImportError: pyspark is not installed
+</code></pre>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># Install Spark extras
+pip install &quot;odibi[spark]&quot;
+
+# Or just Spark
+pip install pyspark delta-spark
+</code></pre>
+<hr />
+<h3 id="problem-duckdb-not-found">Problem: "DuckDB not found"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code class="language-bash">ImportError: DuckDB is required for SQL operations
+</code></pre>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># DuckDB is optional but recommended
+pip install duckdb
+</code></pre>
+<p><strong>Alternative:</strong> Use pandas operations instead of SQL</p>
+<hr />
+<h2 id="configuration-errors">Configuration Errors</h2>
+<h3 id="problem-validation-error-for-nodeconfig">Problem: "Validation error for NodeConfig"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>pydantic_core._pydantic_core.ValidationError: 1 validation error for NodeConfig
+name
+  Field required [type=missing]
+</code></pre>
+<p><strong>Cause:</strong> Missing required field in YAML</p>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-yaml"># ❌ Bad
+nodes:
+  - description: My node
+    read: ...
+
+# ✅ Good
+nodes:
+  - name: my_node  # ← Required!
+    description: My node
+    read: ...
+</code></pre>
+<p><strong>Common required fields:</strong>
+- <code>name</code> (every node)
+- <code>connection</code> (in read/write configs)
+- <code>path</code> or <code>table</code> (in read/write configs)</p>
+<hr />
+<h3 id="problem-circular-dependency-detected">Problem: "Circular dependency detected"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>DependencyError: Circular dependency detected: A → B → C → A
+</code></pre>
+<p><strong>Cause:</strong> Nodes depend on each other in a loop</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-yaml">nodes:
+  - name: A
+    depends_on: [C]  # ← A needs C
+  - name: B
+    depends_on: [A]  # B needs A
+  - name: C
+    depends_on: [B]  # C needs B → LOOP!
+</code></pre>
+<p><strong>Solution:</strong> Break the cycle</p>
+<pre><code class="language-yaml">nodes:
+  - name: A  # First
+  - name: B
+    depends_on: [A]
+  - name: C
+    depends_on: [B]
+# Linear: A → B → C ✅
+</code></pre>
+<hr />
+<h3 id="problem-connection-xyz-not-found">Problem: "Connection 'xyz' not found"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>ValueError: Connection 'bronze_storage' not found
+</code></pre>
+<p><strong>Cause:</strong> Typo in connection name or connection not defined</p>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-yaml"># Define connection first
+connections:
+  bronze_storage:  # ← Must match exactly
+    type: local
+    base_path: ./data
+
+# Use in node
+nodes:
+  - name: load
+    read:
+      connection: bronze_storage  # ← Same name
+      path: data.csv
+</code></pre>
+<hr />
+<h3 id="problem-operation-xyz-not-registered">Problem: "Operation 'xyz' not registered"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>ValueError: Operation 'unpivott' not found
+</code></pre>
+<p><strong>Cause:</strong> Typo in operation name</p>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-yaml"># ❌ Wrong
+transform:
+  operation: unpivott  # Typo!
+
+# ✅ Correct
+transform:
+  operation: unpivot  # Built-in operation
+</code></pre>
+<p><strong>List available operations:</strong></p>
+<pre><code class="language-python">from odibi.transformations import get_registry
+print(list(get_registry().list_all().keys()))
+# ['pivot', 'unpivot', 'join', 'sql']
+</code></pre>
+<hr />
+<h2 id="runtime-errors">Runtime Errors</h2>
+<h3 id="problem-column-xyz-not-found">Problem: "Column 'xyz' not found"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>KeyError: 'temperature'
+</code></pre>
+<p><strong>Cause:</strong> SQL query or transformation references non-existent column</p>
+<p><strong>Solution:</strong></p>
+<p><strong>1. Check column names:</strong></p>
+<pre><code class="language-yaml"># Before transformation, add debug node:
+- name: check_schema
+  transform:
+    operation: sql
+    query: &quot;SELECT * FROM df LIMIT 5&quot;
+# Check story to see actual column names
+</code></pre>
+<p><strong>2. Fix query:</strong></p>
+<pre><code class="language-yaml"># ❌ Wrong column name
+query: &quot;SELECT temperature FROM df&quot;
+
+# ✅ Correct column name
+query: &quot;SELECT Temperature FROM df&quot;  # Case-sensitive!
+</code></pre>
+<hr />
+<h3 id="problem-no-data-in-context">Problem: "No data in context"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>ContextError: Node 'transform' has no data
+</code></pre>
+<p><strong>Cause:</strong> Node has transform but no depends_on and no read</p>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-yaml"># ❌ Bad - where does data come from?
+- name: transform
+  transform:
+    operation: sql
+    query: &quot;SELECT * FROM df&quot;
+
+# ✅ Good - reads data first
+- name: load
+  read:
+    connection: local
+    path: data.csv
+
+- name: transform
+  depends_on: [load]  # ← Gets data from load
+  transform:
+    operation: sql
+    query: &quot;SELECT * FROM df&quot;
+</code></pre>
+<hr />
+<h3 id="problem-division-by-zero">Problem: "Division by zero"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>ZeroDivisionError: division by zero
+</code></pre>
+<p><strong>Cause:</strong> Calculation divides by zero</p>
+<p><strong>Solution:</strong> Add null check in SQL</p>
+<pre><code class="language-yaml"># ❌ Bad
+query: &quot;SELECT output / input AS ratio FROM df&quot;
+
+# ✅ Good
+query: |
+  SELECT
+    CASE
+      WHEN input = 0 OR input IS NULL THEN NULL
+      ELSE output / input
+    END AS ratio
+  FROM df
+</code></pre>
+<hr />
+<h3 id="problem-memory-error-with-large-files">Problem: "Memory error with large files"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>MemoryError: Unable to allocate array
+</code></pre>
+<p><strong>Cause:</strong> DataFrame too large for available RAM</p>
+<p><strong>Solutions:</strong></p>
+<p><strong>1. Use Parquet instead of CSV</strong></p>
+<pre><code class="language-yaml"># Parquet is compressed and faster
+format: parquet  # Instead of csv
+</code></pre>
+<p><strong>2. Filter early:</strong></p>
+<pre><code class="language-yaml"># ❌ Bad - load everything then filter
+- name: load_all
+  read:
+    path: huge_file.csv  # 10GB
+- name: filter
+  transform:
+    query: &quot;SELECT * FROM df WHERE plant = 'NKC'&quot;
+
+# ✅ Good - filter during read (if possible)
+read:
+  path: huge_file.csv
+  query: &quot;SELECT * FROM df WHERE plant = 'NKC'&quot;  # Load less
+</code></pre>
+<p><strong>3. Use Spark engine:</strong></p>
+<pre><code class="language-yaml">engine: spark  # Handles large data
+</code></pre>
+<hr />
+<h2 id="performance-issues">Performance Issues</h2>
+<h3 id="problem-pipeline-runs-slowly">Problem: Pipeline runs slowly</h3>
+<p><strong>Symptoms:</strong> Pipeline takes minutes instead of seconds</p>
+<p><strong>Debug steps:</strong></p>
+<p><strong>1. Check story for slow nodes</strong></p>
+<p>Open <code>stories/runs/pipeline_xxx.html</code>:
+- Look at duration column
+- Find slowest node
+- Investigate that node specifically</p>
+<p><strong>2. Common slow operations:</strong></p>
+<p><strong>Slow: Multiple small SQL queries</strong></p>
+<pre><code class="language-yaml"># ❌ Slow - multiple transforms
+- name: filter1
+  transform:
+    query: &quot;SELECT * FROM df WHERE condition1&quot;
+- name: filter2
+  transform:
+    query: &quot;SELECT * FROM df WHERE condition2&quot;
+
+# ✅ Fast - combine in one query
+- name: filter_all
+  transform:
+    query: |
+      SELECT * FROM df
+      WHERE condition1 AND condition2
+</code></pre>
+<p><strong>Slow: CSV reads</strong></p>
+<pre><code class="language-yaml"># ❌ Slow
+format: csv
+
+# ✅ Fast
+format: parquet
+</code></pre>
+<p><strong>Slow: Cartesian joins</strong></p>
+<pre><code class="language-yaml"># ❌ Creates 1M × 1M = 1 trillion rows!
+operation: join
+how: outer  # Dangerous with large datasets
+</code></pre>
+<p><strong>Solutions:</strong>
+- Combine SQL operations
+- Use Parquet format
+- Add WHERE clauses to limit data
+- Switch to Spark for large data</p>
+<hr />
+<h2 id="story-generation-issues">Story Generation Issues</h2>
+<h3 id="problem-stories-not-being-generated">Problem: "Stories not being generated"</h3>
+<p><strong>Symptoms:</strong> No files in <code>stories/runs/</code></p>
+<p><strong>Causes &amp; Solutions:</strong></p>
+<p><strong>1. Story connection not configured:</strong></p>
+<pre><code class="language-yaml"># Add story config:
+story:
+  connection: local
+  path: stories/
+</code></pre>
+<p><strong>2. Directory permissions:</strong></p>
+<pre><code class="language-bash"># Ensure directory exists and is writable
+mkdir -p stories/runs
+chmod 755 stories/runs
+</code></pre>
+<p><strong>3. Check pipeline code:</strong></p>
+<pre><code class="language-python"># In your code, ensure:
+generate_story=True  # Default, but check if overridden
+</code></pre>
+<hr />
+<h3 id="problem-story-shows-failed-but-pipeline-reported-success">Problem: "Story shows ❌ Failed but pipeline reported success"</h3>
+<p><strong>Cause:</strong> Node failed but error was caught</p>
+<p><strong>Solution:</strong> Check story for error details</p>
+<p>Open HTML story → Look for error boxes → Read error message</p>
+<hr />
+<h3 id="problem-odibi-story-generate-fails">Problem: "odibi story generate fails"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>ValueError: No pipelines found in configuration
+</code></pre>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-yaml"># Ensure pipelines section exists:
+pipelines:  # ← Required
+  - pipeline: my_pipeline
+    nodes: [...]
+</code></pre>
+<hr />
+<h2 id="connection-problems">Connection Problems</h2>
+<h3 id="problem-azure-adls-authentication-failed">Problem: "Azure ADLS authentication failed"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>AuthenticationError: Unable to authenticate to Azure storage
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<p><strong>1. Check auth mode:</strong></p>
+<pre><code class="language-yaml">connections:
+  azure:
+    auth_mode: key_vault  # Or 'direct_key'
+</code></pre>
+<p><strong>2. Verify Key Vault access:</strong></p>
+<pre><code class="language-python"># Test Key Vault access
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
+
+credential = DefaultAzureCredential()
+client = SecretClient(
+    vault_url=&quot;https://myvault.vault.azure.net&quot;,
+    credential=credential
+)
+secret = client.get_secret(&quot;storage-key&quot;)
+print(&quot;✅ Key Vault access works!&quot;)
+</code></pre>
+<p><strong>3. Use direct key for local development:</strong></p>
+<pre><code class="language-yaml">connections:
+  azure:
+    auth_mode: direct_key
+    account_key: &quot;your_key_here&quot;  # For testing only!
+</code></pre>
+<hr />
+<h3 id="problem-azure-sql-connection-timeout">Problem: "Azure SQL connection timeout"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>TimeoutError: Connection timeout after 30s
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<p><strong>1. Increase timeout:</strong></p>
+<pre><code class="language-yaml">connections:
+  sql_db:
+    server: myserver.database.windows.net
+    database: mydb
+    timeout: 60  # Increase to 60 seconds
+</code></pre>
+<p><strong>2. Check firewall rules:</strong>
+- Azure SQL → Firewall settings
+- Add your IP address
+- Or enable "Allow Azure services"</p>
+<p><strong>3. Check authentication:</strong></p>
+<pre><code class="language-yaml"># If using SQL auth:
+auth_mode: sql
+username: myuser
+password: mypassword
+
+# If using AAD:
+auth_mode: aad_msi
+</code></pre>
+<hr />
+<h3 id="problem-file-not-found-with-local-connection">Problem: "File not found" with local connection</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>FileNotFoundError: data/input.csv not found
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<p><strong>1. Check base_path:</strong></p>
+<pre><code class="language-yaml">connections:
+  local:
+    base_path: ./data  # Relative to where you run command
+</code></pre>
+<p><strong>2. Use absolute paths:</strong></p>
+<pre><code class="language-yaml">connections:
+  local:
+    base_path: /absolute/path/to/data
+</code></pre>
+<p><strong>3. Check current directory:</strong></p>
+<pre><code class="language-bash">pwd  # Where are you?
+ls data/input.csv  # Does file exist here?
+</code></pre>
+<hr />
+<h2 id="debugging-techniques">Debugging Techniques</h2>
+<h3 id="technique-1-check-the-story">Technique 1: Check the Story</h3>
+<p><strong>Every run creates a story!</strong></p>
+<ol>
+<li>Run pipeline (even if it fails)</li>
+<li>Open <code>stories/runs/pipeline_xxx.html</code></li>
+<li>Look for:</li>
+<li>❌ Which node failed?</li>
+<li>📊 Unexpected row counts?</li>
+<li>🔄 Missing columns?</li>
+<li>⏱️ Slow nodes?</li>
+</ol>
+<p><strong>Stories tell you EXACTLY what happened.</strong></p>
+<h3 id="technique-2-add-debug-nodes">Technique 2: Add Debug Nodes</h3>
+<pre><code class="language-yaml">nodes:
+  - name: load_data
+    read: ...
+
+  - name: debug_check_schema  # ← Debug node
+    depends_on: [load_data]
+    transform:
+      operation: sql
+      query: &quot;SELECT * FROM df LIMIT 5&quot;
+  # Check story to see what columns actually exist!
+
+  - name: actual_transform
+    depends_on: [load_data]
+    transform:
+      query: &quot;SELECT correct_column FROM df&quot;
+</code></pre>
+<h3 id="technique-3-validate-configuration">Technique 3: Validate Configuration</h3>
+<pre><code class="language-bash"># Always validate before running
+odibi validate config.yaml
+
+# Catches:
+# - Missing fields
+# - Invalid connections
+# - Circular dependencies
+# - Typos
+</code></pre>
+<h3 id="technique-4-test-transformations-in-python">Technique 4: Test Transformations in Python</h3>
+<pre><code class="language-python"># Interactive testing
+python
+
+&gt;&gt;&gt; from odibi.transformations import get_registry
+&gt;&gt;&gt; import odibi.operations.unpivot
+&gt;&gt;&gt;
+&gt;&gt;&gt; registry = get_registry()
+&gt;&gt;&gt; unpivot = registry.get(&quot;unpivot&quot;)
+&gt;&gt;&gt;
+&gt;&gt;&gt; import pandas as pd
+&gt;&gt;&gt; df = pd.DataFrame({&quot;ID&quot;: [&quot;A&quot;], &quot;X&quot;: [10], &quot;Y&quot;: [20]})
+&gt;&gt;&gt; result = unpivot(df, id_vars=&quot;ID&quot;)
+&gt;&gt;&gt; print(result)
+# See if it works!
+</code></pre>
+<h3 id="technique-5-use-verbose-mode">Technique 5: Use Verbose Mode</h3>
+<pre><code class="language-bash"># Run with verbose output (future feature)
+odibi run config.yaml --verbose
+
+# For now, check stories for detailed execution info
+</code></pre>
+<hr />
+<h2 id="error-messages-decoded">Error Messages Decoded</h2>
+<h3 id="field-required-typemissing">"Field required [type=missing]"</h3>
+<p><strong>Means:</strong> Pydantic validation failed - you forgot a required field</p>
+<p><strong>Fix:</strong> Add the missing field to your YAML</p>
+<pre><code class="language-yaml"># Error says: &quot;name: Field required&quot;
+# Fix: Add name field
+- name: my_node  # ← Add this
+  read: ...
+</code></pre>
+<hr />
+<h3 id="operation-xyz-not-found-in-registry">"Operation 'xyz' not found in registry"</h3>
+<p><strong>Means:</strong> No transformation registered with that name</p>
+<p><strong>Fixes:</strong>
+1. Check spelling: <code>unpivot</code> not <code>unpivott</code>
+2. Import your custom operations before running
+3. List available: <code>registry.list_all().keys()</code></p>
+<hr />
+<h3 id="transformation-must-have-a-docstring">"Transformation must have a docstring"</h3>
+<p><strong>Means:</strong> Your custom transformation has no/short docstring</p>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-python"># ❌ Bad
+@transformation(&quot;my_op&quot;)
+def my_op(df):
+    return df
+
+# ✅ Good
+@transformation(&quot;my_op&quot;)
+def my_op(df):
+    &quot;&quot;&quot;Detailed description of what this does.&quot;&quot;&quot;
+    return df
+</code></pre>
+<hr />
+<h3 id="connection-validation-failed">"Connection validation failed"</h3>
+<p><strong>Means:</strong> Connection config is incomplete</p>
+<p><strong>Fix:</strong> Add required fields</p>
+<pre><code class="language-yaml"># Each connection type has required fields:
+
+local:
+  type: local
+  base_path: ./data  # ← Required
+
+azure_adls:
+  type: azure_adls
+  account: xxx       # ← Required
+  container: xxx     # ← Required
+
+azure_sql:
+  type: azure_sql
+  server: xxx        # ← Required
+  database: xxx      # ← Required
+</code></pre>
+<hr />
+<h2 id="common-yaml-mistakes">Common YAML Mistakes</h2>
+<h3 id="mistake-1-indentation">Mistake 1: Indentation</h3>
+<pre><code class="language-yaml"># ❌ Wrong indentation
+nodes:
+- name: my_node
+description: My description  # ← Wrong level!
+  read:
+    connection: local
+
+# ✅ Correct indentation
+nodes:
+  - name: my_node
+    description: My description  # ← Correct level
+    read:
+      connection: local
+</code></pre>
+<p><strong>YAML is whitespace-sensitive!</strong> Use 2 spaces per level.</p>
+<h3 id="mistake-2-missing-colons">Mistake 2: Missing Colons</h3>
+<pre><code class="language-yaml"># ❌ Missing colon
+nodes
+  - name: my_node  # ← YAML error!
+
+# ✅ Has colon
+nodes:  # ← Correct
+  - name: my_node
+</code></pre>
+<h3 id="mistake-3-quotes-in-strings">Mistake 3: Quotes in Strings</h3>
+<pre><code class="language-yaml"># Usually optional
+path: data/file.csv
+
+# Required if special characters:
+path: &quot;data/file with spaces.csv&quot;
+path: &quot;data/file:with:colons.csv&quot;
+
+# Required in SQL with quotes:
+query: 'SELECT * FROM df WHERE name = &quot;Alice&quot;'
+# Or escape:
+query: &quot;SELECT * FROM df WHERE name = 'Alice'&quot;
+</code></pre>
+<hr />
+<h2 id="performance-troubleshooting">Performance Troubleshooting</h2>
+<h3 id="slow-pipeline-check-this">Slow Pipeline? Check This</h3>
+<p><strong>1. Open the story HTML</strong></p>
+<p>Look at duration column:</p>
+<pre><code>load_data:      0.5s   ✅ Fast
+transform:     45.2s   ❌ SLOW!  ← Problem here
+save_data:      0.8s   ✅ Fast
+</code></pre>
+<p><strong>2. Investigate the slow node</strong></p>
+<p>Common causes:
+- Large CSV file → Use Parquet
+- Complex SQL → Optimize query
+- Cartesian join → Add WHERE clause
+- No indexes → Not applicable (DataFrames don't have indexes)</p>
+<p><strong>3. Optimize:</strong></p>
+<pre><code class="language-yaml"># Before: Slow SQL
+query: |
+  SELECT a.*, b.*
+  FROM df a, df b  # ← Cartesian product! 1M × 1M rows!
+
+# After: Fast SQL  
+query: |
+  SELECT a.*, b.*
+  FROM df a
+  JOIN df b ON a.id = b.id  # ← Proper join
+</code></pre>
+<hr />
+<h2 id="file-format-issues">File Format Issues</h2>
+<h3 id="problem-cannot-read-file-xyzcsv">Problem: "Cannot read file xyz.csv"</h3>
+<p><strong>Solutions:</strong></p>
+<p><strong>1. Check encoding:</strong></p>
+<pre><code class="language-yaml">read:
+  path: data.csv
+  format: csv
+  options:
+    encoding: utf-8  # Or cp1252, iso-8859-1, etc.
+</code></pre>
+<p><strong>2. Check delimiter:</strong></p>
+<pre><code class="language-yaml">options:
+  sep: &quot;;&quot;  # Or tab: &quot;\t&quot;, pipe: &quot;|&quot;
+</code></pre>
+<p><strong>3. Skip bad rows:</strong></p>
+<pre><code class="language-yaml">options:
+  on_bad_lines: skip  # Skip rows that don't parse
+</code></pre>
+<hr />
+<h3 id="problem-parquet-file-schema-mismatch">Problem: "Parquet file schema mismatch"</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>ArrowInvalid: Schema mismatch
+</code></pre>
+<p><strong>Cause:</strong> Trying to append data with different schema</p>
+<p><strong>Solution:</strong></p>
+<p><strong>Option 1:</strong> Use overwrite mode</p>
+<pre><code class="language-yaml">write:
+  mode: overwrite  # Replace file
+</code></pre>
+<p><strong>Option 2:</strong> Match schema</p>
+<pre><code class="language-yaml"># Ensure columns match before writing:
+- name: align_schema
+  transform:
+    operation: sql
+    query: |
+      SELECT
+        id,
+        name,
+        value  -- Same columns as existing file
+      FROM df
+</code></pre>
+<hr />
+<h2 id="testing-issues">Testing Issues</h2>
+<h3 id="problem-tests-fail-in-ci-but-pass-locally">Problem: "Tests fail in CI but pass locally"</h3>
+<p><strong>Causes:</strong>
+1. Different Python versions
+2. Missing dependencies
+3. Path differences (Windows vs Linux)
+4. Timezone issues</p>
+<p><strong>Solutions:</strong></p>
+<p><strong>1. Test multiple Python versions:</strong></p>
+<pre><code class="language-bash"># Use tox or test manually:
+python3.9 -m pytest
+python3.10 -m pytest
+python3.11 -m pytest
+python3.12 -m pytest
+</code></pre>
+<p><strong>2. Pin dependencies:</strong></p>
+<pre><code class="language-bash">pip freeze &gt; requirements.txt
+</code></pre>
+<p><strong>3. Use Path objects:</strong></p>
+<pre><code class="language-python"># ❌ Platform-specific
+path = &quot;data/file.csv&quot;  # / vs \ issue
+
+# ✅ Cross-platform
+from pathlib import Path
+path = Path(&quot;data&quot;) / &quot;file.csv&quot;
+</code></pre>
+<hr />
+<h2 id="story-specific-issues">Story-Specific Issues</h2>
+<h3 id="problem-html-story-not-rendering-properly">Problem: "HTML story not rendering properly"</h3>
+<p><strong>Solutions:</strong></p>
+<p><strong>1. Check browser:</strong>
+- Open in Chrome/Firefox/Edge
+- Some old browsers don't support modern CSS</p>
+<p><strong>2. Check file encoding:</strong></p>
+<pre><code class="language-bash"># Should be UTF-8
+file --mime-encoding story.html
+</code></pre>
+<p><strong>3. Try markdown format:</strong></p>
+<pre><code class="language-bash">odibi story generate config.yaml --format markdown
+</code></pre>
+<hr />
+<h3 id="problem-theme-not-applying">Problem: "Theme not applying"</h3>
+<p><strong>Symptoms:</strong> Story looks like default theme</p>
+<p><strong>Solutions:</strong></p>
+<p><strong>1. Check theme name:</strong></p>
+<pre><code class="language-bash"># List available themes:
+python -c &quot;from odibi.story import list_themes; print(list_themes().keys())&quot;
+# dict_keys(['default', 'corporate', 'dark', 'minimal'])
+</code></pre>
+<p><strong>2. Use correct theme:</strong></p>
+<pre><code class="language-bash">odibi story generate config.yaml --theme dark
+</code></pre>
+<p><strong>3. For custom theme, check YAML:</strong></p>
+<pre><code class="language-yaml"># custom_theme.yaml
+name: my_theme
+primary_color: &quot;#ff0000&quot;
+# ... other settings ...
+</code></pre>
+<pre><code class="language-bash">odibi story generate config.yaml --theme custom_theme.yaml
+</code></pre>
+<hr />
+<h2 id="getting-help">Getting Help</h2>
+<h3 id="quick-debug-checklist">Quick Debug Checklist</h3>
+<p>When something goes wrong:</p>
+<ul>
+<li>[ ] Run <code>odibi validate config.yaml</code></li>
+<li>[ ] Check the error message carefully</li>
+<li>[ ] Look at the story HTML (even if pipeline failed)</li>
+<li>[ ] Test transformation interactively in Python</li>
+<li>[ ] Check this troubleshooting guide</li>
+<li>[ ] Look at existing tests for similar patterns</li>
+</ul>
+<h3 id="where-to-look">Where to Look</h3>
+<p><strong>1. Error messages</strong>
+- Read carefully - they're usually helpful!
+- Pydantic errors tell you exact field
+- Stack traces show where it failed</p>
+<p><strong>2. Stories</strong>
+- Every run creates a story
+- Shows what actually happened
+- Error details included</p>
+<p><strong>3. Tests</strong>
+- See how operations should be used
+- Example: <code>tests/unit/test_operations.py</code></p>
+<p><strong>4. Examples</strong>
+- Check <code>examples/</code> directory
+- Working configurations</p>
+<p><strong>5. Documentation</strong>
+- These guides!
+- Code docstrings</p>
+<hr />
+<h2 id="still-stuck">Still Stuck?</h2>
+<h3 id="create-a-minimal-reproduction">Create a Minimal Reproduction</h3>
+<pre><code class="language-yaml"># minimal_config.yaml - simplest possible version
+
+project: Debug Test
+
+connections:
+  local:
+    type: local
+    base_path: ./data
+
+story:
+  connection: local
+  path: stories/
+
+pipelines:
+  - pipeline: minimal
+    nodes:
+      - name: test
+        read:
+          connection: local
+          path: test.csv
+          format: csv
+</code></pre>
+<pre><code class="language-bash"># Create tiny test file
+echo &quot;id,value&quot; &gt; data/test.csv
+echo &quot;1,100&quot; &gt;&gt; data/test.csv
+
+# Run minimal config
+odibi run minimal_config.yaml
+</code></pre>
+<p><strong>If this works:</strong> Problem is in your complex config. Simplify step by step.</p>
+<p><strong>If this fails:</strong> Problem is with installation/environment.</p>
+<hr />
+<h2 id="pro-tips">Pro Tips</h2>
+<h3 id="tip-1-use-stories-for-everything">Tip 1: Use Stories for Everything</h3>
+<p>Stories are your best debugging tool:
+- See actual execution
+- See actual data shapes
+- See actual timings
+- See actual errors</p>
+<p><strong>Always check the story first!</strong></p>
+<h3 id="tip-2-test-incrementally">Tip 2: Test Incrementally</h3>
+<pre><code class="language-yaml"># Don't build entire pipeline at once!
+
+# Step 1: Just load
+nodes:
+  - name: load
+    read: ...
+
+# Test: odibi run config.yaml
+# Check story: ✅ Works!
+
+# Step 2: Add one transform
+nodes:
+  - name: load
+    read: ...
+  - name: transform1  # ← Add one at a time
+    transform: ...
+
+# Test: odibi run config.yaml
+# Check story: ✅ Works!
+
+# Continue adding nodes one by one...
+</code></pre>
+<h3 id="tip-3-use-sql-for-complex-logic">Tip 3: Use SQL for Complex Logic</h3>
+<p>Instead of writing Python:</p>
+<pre><code class="language-python">@transformation(&quot;complex_calc&quot;)
+def complex_calc(df, col1, col2, col3):
+    # 50 lines of pandas code...
+</code></pre>
+<p>Use SQL:</p>
+<pre><code class="language-yaml">transform:
+  operation: sql
+  query: |
+    SELECT *,
+      (col1 + col2) / col3 AS result
+    FROM df
+    WHERE col1 &gt; 0
+</code></pre>
+<p>SQL is:
+- ✅ Easier to read
+- ✅ Easier to debug
+- ✅ Easier to modify
+- ✅ Works with DuckDB (fast!)</p>
+<hr />
+<h2 id="faq">FAQ</h2>
+<p><strong>Q: Pipeline worked yesterday, fails today. What changed?</strong></p>
+<p><strong>A:</strong> Compare stories!</p>
+<pre><code class="language-bash">odibi story diff yesterday.json today.json --detailed
+</code></pre>
+<p>Shows exactly what's different.</p>
+<hr />
+<p><strong>Q: How do I debug a transformation?</strong></p>
+<p><strong>A:</strong> Test it interactively:</p>
+<pre><code class="language-python">python
+&gt;&gt;&gt; from odibi.transformations import get_registry
+&gt;&gt;&gt; func = registry.get(&quot;my_operation&quot;)
+&gt;&gt;&gt; import pandas as pd
+&gt;&gt;&gt; df = pd.DataFrame(...)  # Your test data
+&gt;&gt;&gt; result = func(df, param1=..., param2=...)
+&gt;&gt;&gt; print(result)
+</code></pre>
+<hr />
+<p><strong>Q: Can I see intermediate results?</strong></p>
+<p><strong>A:</strong> Yes! Check the story or add debug nodes:</p>
+<pre><code class="language-yaml">- name: step1
+  transform: ...
+
+- name: debug_step1  # ← Check result
+  depends_on: [step1]
+  write:
+    path: debug_step1.csv  # ← Save it
+
+- name: step2
+  depends_on: [step1]  # Continue pipeline
+  transform: ...
+</code></pre>
+<hr />
+<p><strong>Q: Tests pass but pipeline fails?</strong></p>
+<p><strong>A:</strong> Common causes:
+1. Test uses mock data, pipeline uses real data with edge cases
+2. Test DataFrame small, real DataFrame triggers memory issues
+3. Missing data in real files</p>
+<p><strong>Solution:</strong> Make tests use realistic data</p>
+<hr />
+<h2 id="emergency-procedures">Emergency Procedures</h2>
+<h3 id="pipeline-stuck">Pipeline Stuck?</h3>
+<p><strong>Ctrl+C</strong> to cancel</p>
+<h3 id="need-to-skip-a-node">Need to Skip a Node?</h3>
+<pre><code class="language-yaml"># Comment it out temporarily:
+nodes:
+  - name: working_node
+    read: ...
+
+  # - name: broken_node  # ← Commented out
+  #   transform: ...
+
+  - name: after_node
+    depends_on: [working_node]  # Skip broken_node
+    write: ...
+</code></pre>
+<h3 id="data-corrupted">Data Corrupted?</h3>
+<pre><code class="language-yaml"># Rerun from source:
+- name: load_from_original_source
+  read:
+    connection: original_source
+    path: backup/data.csv
+
+# Use mode: overwrite to replace bad data
+write:
+  mode: overwrite  # ← Replaces corrupted file
+</code></pre>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<p><strong>You now know how to troubleshoot Odibi!</strong></p>
+<p><strong>Remember:</strong>
+1. ✅ Stories are your best friend
+2. ✅ Validate often
+3. ✅ Test incrementally
+4. ✅ Read error messages carefully</p>
+<p><strong>Still have questions?</strong>
+- Check other guides
+- Read the tests
+- Look at working examples</p>
+<hr />
+<p><strong>Most issues can be solved by checking the story!</strong> 📊</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

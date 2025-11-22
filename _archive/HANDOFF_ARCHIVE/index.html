@@ -1,0 +1,2393 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/HANDOFF_ARCHIVE/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>ODIBI Open-Source Preparation - Handoff Document - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#odibi-open-source-preparation-handoff-document" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ODIBI Open-Source Preparation - Handoff Document
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="odibi-open-source-preparation-handoff-document">ODIBI Open-Source Preparation - Handoff Document</h1>
+<p><strong>Thread:</strong> T-e73a4321-4a01-4841-b252-a121b8ae1911<br />
+<strong>Original Date:</strong> 2025-11-06<br />
+<strong>Last Updated:</strong> 2025-11-07<br />
+<strong>Status:</strong> ✅ Phase 1 Complete (100%) - Ready for Phase 2</p>
+<hr />
+<h2 id="objective">🎯 Objective</h2>
+<p>Prepare ODIBI framework to become an official open-source project with:
+- ✅ Open-source governance files (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, CODEOWNERS, CHANGELOG)
+- ✅ Scaffolded Spark engine and Azure connections (Phase 1 - stubs only, no full implementation)
+- ✅ CI/CD and testing infrastructure
+- ✅ Documentation for community onboarding
+- ✅ Comprehensive walkthroughs with explanations
+- ✅ <strong>Critical constraint</strong>: All 78 existing Pandas tests MUST still pass</p>
+<hr />
+<h2 id="phase-1-complete-all-work-finished">✅ Phase 1 Complete - All Work Finished</h2>
+<h3 id="summary">Summary</h3>
+<p>Phase 1 scaffolding and walkthroughs are 100% complete. The project is production-ready and prepared for Phase 2 (CLI &amp; Testing Utilities).</p>
+<p><strong>Completed Phases:</strong>
+- ✅ Phase 1A-E: Governance, scaffolding, CI/CD, docs, examples
+- ✅ Phase 1F: Walkthroughs with comprehensive explanations and troubleshooting</p>
+<p><strong>Release Tags:</strong>
+- <code>v1.1.0-alpha.1-ci-setup</code> - Initial scaffolding
+- <code>v1.1.0-alpha.2-walkthroughs</code> - Walkthroughs complete</p>
+<hr />
+<h2 id="detailed-completion-log">📋 Detailed Completion Log</h2>
+<h3 id="1-analysis">1. Analysis</h3>
+<ul>
+<li>Reviewed existing framework structure</li>
+<li>Confirmed v1.0.0 Pandas MVP is stable (78 passing tests)</li>
+<li>Consulted Oracle for open-source best practices</li>
+<li>Created 18-item TODO checklist</li>
+</ul>
+<h3 id="2-package-configuration">2. Package Configuration</h3>
+<ul>
+<li><strong>Fixed</strong> <code>pyproject.toml</code>:</li>
+<li>Flattened <code>[all]</code> extras (was self-referencing, now lists dependencies directly)</li>
+<li>Commented out CLI entry point (not implemented yet)</li>
+<li><strong>Added</strong> <code>odibi/py.typed</code> for type information distribution</li>
+</ul>
+<h3 id="3-governance-files">3. Governance Files</h3>
+<ul>
+<li>✅ <strong>Created</strong> <code>CONTRIBUTING.md</code> - Complete contributor guide</li>
+<li>✅ <strong>Created</strong> <code>CODE_OF_CONDUCT.md</code> - Contributor Covenant v2.1</li>
+<li>✅ <strong>Created</strong> <code>SECURITY.md</code> - Vulnerability reporting process</li>
+<li>✅ <strong>Created</strong> <code>CODEOWNERS</code> - Maintainer assignments</li>
+<li>✅ <strong>Created</strong> <code>CHANGELOG.md</code> - Version history tracking</li>
+<li>✅ <strong>Confirmed</strong> <code>LICENSE</code> - MIT License (Henry Odibi 2025)</li>
+</ul>
+<h3 id="4-code-scaffolding">4. Code Scaffolding</h3>
+<ul>
+<li>✅ <strong>Created</strong> <code>odibi/engine/spark_engine.py</code> - Spark engine with import guards</li>
+<li>✅ <strong>Created</strong> <code>odibi/connections/azure_adls.py</code> - Azure Data Lake connector</li>
+<li>✅ <strong>Created</strong> <code>odibi/connections/azure_sql.py</code> - Azure SQL connector</li>
+<li>✅ <strong>Created</strong> <code>odibi/connections/local_dbfs.py</code> - Mock DBFS for testing</li>
+<li>✅ <strong>Created</strong> <code>tests/test_extras_imports.py</code> - Import guard tests</li>
+<li>✅ <strong>All 78 Pandas tests</strong> still passing</li>
+</ul>
+<h3 id="5-cicd-infrastructure">5. CI/CD Infrastructure</h3>
+<ul>
+<li>✅ <strong>Created</strong> <code>.github/workflows/ci.yml</code> - Multi-Python CI pipeline</li>
+<li>✅ <strong>Created</strong> <code>.pre-commit-config.yaml</code> - Code quality hooks</li>
+<li>✅ <strong>Created</strong> GitHub issue templates (bug_report, feature_request)</li>
+<li>✅ <strong>Created</strong> Pull request template</li>
+</ul>
+<h3 id="6-documentation">6. Documentation</h3>
+<ul>
+<li>✅ <strong>Created</strong> <code>docs/setup_databricks.md</code> - Databricks setup guide</li>
+<li>✅ <strong>Created</strong> <code>docs/setup_azure.md</code> - Azure connection guide</li>
+<li>✅ <strong>Updated</strong> <code>README.md</code> - Badges, installation, extras, contributing links</li>
+</ul>
+<h3 id="7-examples">7. Examples</h3>
+<ul>
+<li>✅ <strong>Created</strong> <code>examples/example_spark.yaml</code> - Spark pipeline template</li>
+<li>✅ <strong>Updated</strong> <code>examples/example_local.yaml</code> - Simplified Pandas example</li>
+</ul>
+<h3 id="8-walkthroughs-phase-1f-november-2025">8. Walkthroughs (Phase 1F - November 2025)</h3>
+<ul>
+<li>✅ <strong>Created</strong> 6 comprehensive Jupyter notebooks:</li>
+<li><code>00_setup_environment.ipynb</code> - Setup and ODIBI mental model</li>
+<li><code>01_local_pipeline_pandas.ipynb</code> - Full pipeline with explanations</li>
+<li><code>02_cli_and_testing.ipynb</code> - Testing patterns and CLI preview</li>
+<li><code>03_spark_preview_stub.ipynb</code> - Spark architecture overview</li>
+<li><code>04_ci_cd_and_precommit.ipynb</code> - Code quality automation</li>
+<li><code>05_build_new_pipeline.ipynb</code> - Build from scratch tutorial</li>
+<li>✅ <strong>Added</strong> concept explanations (Config vs Runtime, SQL-over-Pandas)</li>
+<li>✅ <strong>Added</strong> troubleshooting sections with common errors</li>
+<li>✅ <strong>Added</strong> debugging guidance for pipeline failures</li>
+<li>✅ <strong>Fixed</strong> API issues (connection instantiation, YAML parsing, encoding)</li>
+<li>✅ <strong>Tested</strong> all notebooks execute cell-by-cell successfully</li>
+</ul>
+<h3 id="9-release-management">9. Release Management</h3>
+<ul>
+<li>✅ <strong>Tagged</strong> <code>v1.1.0-alpha.1-ci-setup</code> - Initial scaffolding complete</li>
+<li>✅ <strong>Tagged</strong> <code>v1.1.0-alpha.2-walkthroughs</code> - Walkthroughs complete</li>
+<li>✅ <strong>Updated</strong> <code>CHANGELOG.md</code> with all Phase 1 changes</li>
+</ul>
+<hr />
+<h2 id="next-phase-phase-2-cli-tools-testing-utilities">🎯 Next Phase: Phase 2 - CLI Tools + Testing Utilities</h2>
+<p>Phase 1 is complete. Ready to begin Phase 2 development.</p>
+<p>See PHASES.md for Phase 2 specifications and deliverables.</p>
+<h4 id="1-code_of_conductmd">1. CODE_OF_CONDUCT.md</h4>
+<pre><code class="language-markdown">Location: /d:/odibi/CODE_OF_CONDUCT.md
+Content: Contributor Covenant v2.1
+Reference: https://www.contributor-covenant.org/version/2/1/code_of_conduct/
+</code></pre>
+<h4 id="2-securitymd">2. SECURITY.md</h4>
+<pre><code class="language-markdown">Location: /d:/odibi/SECURITY.md
+Content:
+- Supported versions (v1.0.0+)
+- Reporting process (email to henry.odibi@ingredion.com or GitHub Security Advisories)
+- Response timeline (72 hours acknowledgment)
+</code></pre>
+<h4 id="3-codeowners">3. CODEOWNERS</h4>
+<pre><code>Location: /d:/odibi/CODEOWNERS
+Content:
+* @henryodibi11
+/odibi/engine/ @henryodibi11
+/docs/ @henryodibi11
+</code></pre>
+<h4 id="4-changelogmd">4. CHANGELOG.md</h4>
+<pre><code class="language-markdown">Location: /d:/odibi/CHANGELOG.md
+Format: Keep a Changelog (https://keepachangelog.com/)
+Content:
+## [Unreleased]
+
+## [1.1.0-alpha.1] - TBD
+
+### Added
+- Scaffolded Spark engine with import guards (Phase 1)
+- Scaffolded Azure connections: ADLS, SQL, local DBFS mock
+- Open-source governance: CONTRIBUTING, CODE_OF_CONDUCT, SECURITY
+- CI/CD with multi-Python testing (3.9-3.12)
+- Pre-commit hooks for code quality
+
+### Changed
+- Flattened optional dependencies in pyproject.toml
+
+## [1.0.0] - 2025-11-05
+
+### Added
+- Initial release: Pandas MVP with 78 passing tests
+- Core framework: Context, Registry, Graph, Pipeline
+- Local filesystem connection
+- Pydantic-based configuration
+- Complete examples and documentation
+</code></pre>
+<hr />
+<h3 id="phase-b-scaffolding-critical-2-hours"><strong>PHASE B: Scaffolding (Critical - 2 hours)</strong></h3>
+<h4 id="5-spark-engine">5. Spark Engine</h4>
+<p><strong>File:</strong> <code>/d:/odibi/odibi/engine/spark_engine.py</code></p>
+<pre><code class="language-python">&quot;&quot;&quot;Spark execution engine (Phase 1: Scaffolding only).
+
+Status: Experimental - Basic introspection implemented.
+Full read/write/SQL implementation planned for Phase 3.
+See PHASES.md lines 171-173 for roadmap.
+&quot;&quot;&quot;
+
+from typing import Any, Dict, List, Tuple, Optional
+from .base import Engine
+
+
+class SparkEngine(Engine):
+    &quot;&quot;&quot;Spark execution engine with PySpark backend.
+
+    Phase 1 (Current): Import guards + introspection methods only
+    Phase 3 (Planned): read(), write(), execute_sql() implementation
+    &quot;&quot;&quot;
+
+    name = &quot;spark&quot;
+
+    def __init__(self, session=None, config: Optional[Dict[str, Any]] = None):
+        &quot;&quot;&quot;Initialize Spark engine with import guard.
+
+        Args:
+            session: Existing SparkSession (optional, creates new if None)
+            config: Engine configuration (optional)
+
+        Raises:
+            ImportError: If pyspark not installed
+        &quot;&quot;&quot;
+        try:
+            from pyspark.sql import SparkSession
+        except ImportError as e:
+            raise ImportError(
+                &quot;Spark support requires 'pip install odibi[spark]'. &quot;
+                &quot;See docs/setup_databricks.md for setup instructions.&quot;
+            ) from e
+
+        from pyspark.sql import SparkSession
+        self.spark = session or SparkSession.builder.appName(&quot;odibi&quot;).getOrCreate()
+        self.config = config or {}
+
+    def get_schema(self, df) -&gt; List[Tuple[str, str]]:
+        &quot;&quot;&quot;Get DataFrame schema as list of (name, type) tuples.&quot;&quot;&quot;
+        return [(f.name, f.dataType.simpleString()) for f in df.schema]
+
+    def get_shape(self, df) -&gt; Tuple[int, int]:
+        &quot;&quot;&quot;Get DataFrame shape as (rows, columns).&quot;&quot;&quot;
+        return (df.count(), len(df.columns))
+
+    def count_rows(self, df) -&gt; int:
+        &quot;&quot;&quot;Count rows in DataFrame.&quot;&quot;&quot;
+        return df.count()
+
+    # Phase 3 stubs
+    def read(self, *args, **kwargs):
+        raise NotImplementedError(
+            &quot;SparkEngine.read() will be implemented in Phase 3. &quot;
+            &quot;See PHASES.md line 171 for implementation plan.&quot;
+        )
+
+    def write(self, *args, **kwargs):
+        raise NotImplementedError(
+            &quot;SparkEngine.write() will be implemented in Phase 3. &quot;
+            &quot;See PHASES.md line 172 for implementation plan.&quot;
+        )
+
+    def execute_sql(self, *args, **kwargs):
+        raise NotImplementedError(
+            &quot;SparkEngine.execute_sql() will be implemented in Phase 3. &quot;
+            &quot;See PHASES.md line 171 for implementation plan.&quot;
+        )
+
+    def execute_transform(self, *args, **kwargs):
+        raise NotImplementedError(
+            &quot;SparkEngine.execute_transform() will be implemented in Phase 3. &quot;
+            &quot;See PHASES.md for implementation plan.&quot;
+        )
+</code></pre>
+<p><strong>Update:</strong> <code>/d:/odibi/odibi/engine/__init__.py</code></p>
+<pre><code class="language-python"># Add at end:
+# Lazy import for Spark (optional dependency)
+def get_spark_engine():
+    from .spark_engine import SparkEngine
+    return SparkEngine
+</code></pre>
+<hr />
+<h4 id="6-azure-adls-connection">6. Azure ADLS Connection</h4>
+<p><strong>File:</strong> <code>/d:/odibi/odibi/connections/azure_adls.py</code></p>
+<pre><code class="language-python">&quot;&quot;&quot;Azure Data Lake Storage Gen2 connection (Phase 1: Path resolution only).&quot;&quot;&quot;
+
+import posixpath
+from typing import Optional
+from .base import BaseConnection
+
+
+class AzureADLS(BaseConnection):
+    &quot;&quot;&quot;Azure Data Lake Storage Gen2 connection.
+
+    Phase 1: Path/URI resolution only (no network I/O)
+    Phase 3: Read/write implementation with azure-storage-blob
+    &quot;&quot;&quot;
+
+    def __init__(
+        self,
+        account: str,
+        container: str,
+        path_prefix: str = &quot;&quot;,
+        auth_mode: str = &quot;managed_identity&quot;,
+        **kwargs
+    ):
+        &quot;&quot;&quot;Initialize ADLS connection.
+
+        Args:
+            account: Storage account name (e.g., 'mystorageaccount')
+            container: Container/filesystem name
+            path_prefix: Optional prefix for all paths
+            auth_mode: Authentication mode (managed_identity, cli, sas)
+        &quot;&quot;&quot;
+        self.account = account
+        self.container = container
+        self.path_prefix = path_prefix.strip(&quot;/&quot;)
+        self.auth_mode = auth_mode
+
+    def uri(self, path: str) -&gt; str:
+        &quot;&quot;&quot;Build abfss:// URI for given path.
+
+        Args:
+            path: Relative path within container
+
+        Returns:
+            Full abfss:// URI
+
+        Example:
+            &gt;&gt;&gt; conn = AzureADLS(account=&quot;myaccount&quot;, container=&quot;data&quot;)
+            &gt;&gt;&gt; conn.uri(&quot;folder/file.csv&quot;)
+            'abfss://data@myaccount.dfs.core.windows.net/folder/file.csv'
+        &quot;&quot;&quot;
+        if self.path_prefix:
+            full_path = posixpath.join(self.path_prefix, path.lstrip(&quot;/&quot;))
+        else:
+            full_path = path.lstrip(&quot;/&quot;)
+
+        return f&quot;abfss://{self.container}@{self.account}.dfs.core.windows.net/{full_path}&quot;
+</code></pre>
+<hr />
+<h4 id="7-azure-sql-connection">7. Azure SQL Connection</h4>
+<p><strong>File:</strong> <code>/d:/odibi/odibi/connections/azure_sql.py</code></p>
+<pre><code class="language-python">&quot;&quot;&quot;Azure SQL Database connection (Phase 1: DSN builder only).&quot;&quot;&quot;
+
+from typing import Optional
+from .base import BaseConnection
+
+
+class AzureSQL(BaseConnection):
+    &quot;&quot;&quot;Azure SQL Database connection.
+
+    Phase 1: ODBC DSN string generation only
+    Phase 3: Read/write via SQLAlchemy + pyodbc
+    &quot;&quot;&quot;
+
+    def __init__(
+        self,
+        server: str,
+        database: str,
+        driver: str = &quot;ODBC Driver 18 for SQL Server&quot;,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        **kwargs
+    ):
+        &quot;&quot;&quot;Initialize Azure SQL connection.
+
+        Args:
+            server: SQL server hostname (without 'tcp:' prefix)
+            database: Database name
+            driver: ODBC driver name
+            username: SQL auth username (optional, uses Azure AD if None)
+            password: SQL auth password (optional)
+        &quot;&quot;&quot;
+        self.server = server
+        self.database = database
+        self.driver = driver
+        self.username = username
+        self.password = password
+
+    def odbc_dsn(self) -&gt; str:
+        &quot;&quot;&quot;Build ODBC connection string.
+
+        Returns:
+            ODBC DSN string
+
+        Example:
+            &gt;&gt;&gt; conn = AzureSQL(server=&quot;myserver.database.windows.net&quot;, database=&quot;mydb&quot;)
+            &gt;&gt;&gt; conn.odbc_dsn()
+            'Driver={ODBC Driver 18 for SQL Server};Server=tcp:myserver...'
+        &quot;&quot;&quot;
+        dsn = (
+            f&quot;Driver={{{self.driver}}};&quot;
+            f&quot;Server=tcp:{self.server},1433;&quot;
+            f&quot;Database={self.database};&quot;
+            f&quot;Encrypt=yes;&quot;
+            f&quot;TrustServerCertificate=no;&quot;
+            f&quot;Connection Timeout=30;&quot;
+        )
+
+        if self.username and self.password:
+            dsn += f&quot;UID={self.username};PWD={self.password};&quot;
+        else:
+            dsn += &quot;Authentication=ActiveDirectoryMsi;&quot;
+
+        return dsn
+</code></pre>
+<hr />
+<h4 id="8-local-dbfs-mock">8. Local DBFS Mock</h4>
+<p><strong>File:</strong> <code>/d:/odibi/odibi/connections/local_dbfs.py</code></p>
+<pre><code class="language-python">&quot;&quot;&quot;Local DBFS mock for testing Databricks pipelines locally.&quot;&quot;&quot;
+
+import os
+from pathlib import Path
+from typing import Union
+from .base import BaseConnection
+
+
+class LocalDBFS(BaseConnection):
+    &quot;&quot;&quot;Mock DBFS connection for local development.
+
+    Maps dbfs:/ paths to local filesystem for testing.
+    Useful for developing Databricks pipelines locally.
+    &quot;&quot;&quot;
+
+    def __init__(self, root: Union[str, Path] = &quot;.dbfs&quot;):
+        &quot;&quot;&quot;Initialize local DBFS mock.
+
+        Args:
+            root: Local directory to use as DBFS root (default: .dbfs)
+        &quot;&quot;&quot;
+        self.root = Path(root).resolve()
+
+    def resolve(self, path: str) -&gt; str:
+        &quot;&quot;&quot;Resolve dbfs:/ path to local filesystem path.
+
+        Args:
+            path: DBFS path (e.g., 'dbfs:/FileStore/data.csv')
+
+        Returns:
+            Absolute local filesystem path
+
+        Example:
+            &gt;&gt;&gt; conn = LocalDBFS(root=&quot;/tmp/dbfs&quot;)
+            &gt;&gt;&gt; conn.resolve(&quot;dbfs:/FileStore/data.csv&quot;)
+            '/tmp/dbfs/FileStore/data.csv'
+        &quot;&quot;&quot;
+        # Remove dbfs:/ prefix
+        clean_path = path.replace(&quot;dbfs:/&quot;, &quot;&quot;).lstrip(&quot;/&quot;)
+
+        # Join with root
+        local_path = self.root / clean_path
+
+        return str(local_path)
+
+    def ensure_dir(self, path: str) -&gt; None:
+        &quot;&quot;&quot;Create parent directories for given path.
+
+        Args:
+            path: DBFS path
+        &quot;&quot;&quot;
+        local_path = Path(self.resolve(path))
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+</code></pre>
+<p><strong>Update:</strong> <code>/d:/odibi/odibi/connections/__init__.py</code></p>
+<pre><code class="language-python"># Add at end:
+from .azure_adls import AzureADLS
+from .azure_sql import AzureSQL
+from .local_dbfs import LocalDBFS
+
+__all__ = [&quot;BaseConnection&quot;, &quot;LocalConnection&quot;, &quot;AzureADLS&quot;, &quot;AzureSQL&quot;, &quot;LocalDBFS&quot;]
+</code></pre>
+<hr />
+<h3 id="phase-c-testing-critical-1-hour"><strong>PHASE C: Testing (Critical - 1 hour)</strong></h3>
+<h4 id="9-extras-import-tests">9. Extras Import Tests</h4>
+<p><strong>File:</strong> <code>/d:/odibi/tests/test_extras_imports.py</code></p>
+<pre><code class="language-python">&quot;&quot;&quot;Test optional dependency imports and guards.&quot;&quot;&quot;
+
+import pytest
+
+
+@pytest.mark.extras
+def test_spark_engine_import_without_pyspark(monkeypatch):
+    &quot;&quot;&quot;SparkEngine should raise helpful error when pyspark missing.&quot;&quot;&quot;
+    # Hide pyspark
+    monkeypatch.setitem(__import__('sys').modules, 'pyspark', None)
+    monkeypatch.setitem(__import__('sys').modules, 'pyspark.sql', None)
+
+    from odibi.engine.spark_engine import SparkEngine
+
+    with pytest.raises(ImportError, match=&quot;pip install odibi\\[spark\\]&quot;):
+        SparkEngine()
+
+
+@pytest.mark.extras
+@pytest.mark.skipif(
+    not pytest.importorskip(&quot;pyspark&quot;, minversion=&quot;3.4&quot;),
+    reason=&quot;pyspark not installed&quot;
+)
+def test_spark_engine_import_with_pyspark():
+    &quot;&quot;&quot;SparkEngine should initialize when pyspark is available.&quot;&quot;&quot;
+    from odibi.engine.spark_engine import SparkEngine
+
+    engine = SparkEngine()
+    assert engine.name == &quot;spark&quot;
+    assert hasattr(engine, 'get_schema')
+    assert hasattr(engine, 'get_shape')
+
+
+@pytest.mark.extras
+def test_spark_engine_methods_not_implemented():
+    &quot;&quot;&quot;SparkEngine stubs should raise NotImplementedError with helpful messages.&quot;&quot;&quot;
+    pytest.importorskip(&quot;pyspark&quot;)
+    from odibi.engine.spark_engine import SparkEngine
+
+    engine = SparkEngine()
+
+    with pytest.raises(NotImplementedError, match=&quot;Phase 3&quot;):
+        engine.read()
+
+    with pytest.raises(NotImplementedError, match=&quot;Phase 3&quot;):
+        engine.write()
+
+    with pytest.raises(NotImplementedError, match=&quot;Phase 3&quot;):
+        engine.execute_sql()
+</code></pre>
+<hr />
+<h4 id="10-connection-path-tests">10. Connection Path Tests</h4>
+<p><strong>File:</strong> <code>/d:/odibi/tests/test_connections_paths.py</code></p>
+<pre><code class="language-python">&quot;&quot;&quot;Test connection path resolution (no network I/O).&quot;&quot;&quot;
+
+import pytest
+from odibi.connections.azure_adls import AzureADLS
+from odibi.connections.azure_sql import AzureSQL
+from odibi.connections.local_dbfs import LocalDBFS
+
+
+def test_azure_adls_uri_basic():
+    &quot;&quot;&quot;Test ADLS URI generation.&quot;&quot;&quot;
+    conn = AzureADLS(account=&quot;myaccount&quot;, container=&quot;data&quot;)
+    uri = conn.uri(&quot;folder/file.csv&quot;)
+
+    assert uri == &quot;abfss://data@myaccount.dfs.core.windows.net/folder/file.csv&quot;
+
+
+def test_azure_adls_uri_with_prefix():
+    &quot;&quot;&quot;Test ADLS URI with path prefix.&quot;&quot;&quot;
+    conn = AzureADLS(account=&quot;myaccount&quot;, container=&quot;data&quot;, path_prefix=&quot;raw/&quot;)
+    uri = conn.uri(&quot;file.csv&quot;)
+
+    assert uri == &quot;abfss://data@myaccount.dfs.core.windows.net/raw/file.csv&quot;
+
+
+def test_azure_sql_dsn_with_managed_identity():
+    &quot;&quot;&quot;Test Azure SQL DSN with managed identity.&quot;&quot;&quot;
+    conn = AzureSQL(server=&quot;myserver.database.windows.net&quot;, database=&quot;mydb&quot;)
+    dsn = conn.odbc_dsn()
+
+    assert &quot;Driver={ODBC Driver 18 for SQL Server}&quot; in dsn
+    assert &quot;Server=tcp:myserver.database.windows.net,1433&quot; in dsn
+    assert &quot;Database=mydb&quot; in dsn
+    assert &quot;Authentication=ActiveDirectoryMsi&quot; in dsn
+
+
+def test_azure_sql_dsn_with_credentials():
+    &quot;&quot;&quot;Test Azure SQL DSN with SQL authentication.&quot;&quot;&quot;
+    conn = AzureSQL(
+        server=&quot;myserver.database.windows.net&quot;,
+        database=&quot;mydb&quot;,
+        username=&quot;admin&quot;,
+        password=&quot;secret&quot;
+    )
+    dsn = conn.odbc_dsn()
+
+    assert &quot;UID=admin&quot; in dsn
+    assert &quot;PWD=secret&quot; in dsn
+    assert &quot;Authentication&quot; not in dsn
+
+
+def test_local_dbfs_resolve():
+    &quot;&quot;&quot;Test local DBFS path resolution.&quot;&quot;&quot;
+    conn = LocalDBFS(root=&quot;/tmp/test-dbfs&quot;)
+    path = conn.resolve(&quot;dbfs:/FileStore/data.csv&quot;)
+
+    assert path == &quot;/tmp/test-dbfs/FileStore/data.csv&quot;
+
+
+def test_local_dbfs_resolve_no_prefix():
+    &quot;&quot;&quot;Test DBFS resolution handles missing dbfs:/ prefix.&quot;&quot;&quot;
+    conn = LocalDBFS(root=&quot;/tmp/test-dbfs&quot;)
+    path = conn.resolve(&quot;FileStore/data.csv&quot;)
+
+    assert path == &quot;/tmp/test-dbfs/FileStore/data.csv&quot;
+</code></pre>
+<p><strong>Update:</strong> <code>/d:/odibi/pytest.ini</code></p>
+<pre><code class="language-ini"># Add to existing markers section:
+markers =
+    extras: tests requiring optional dependencies (pyspark, azure)
+    slow: slow tests (deselect with '-m &quot;not slow&quot;')
+</code></pre>
+<hr />
+<h3 id="phase-d-cicd-critical-30-min"><strong>PHASE D: CI/CD (Critical - 30 min)</strong></h3>
+<h4 id="11-github-actions-ci">11. GitHub Actions CI</h4>
+<p><strong>File:</strong> <code>/d:/odibi/.github/workflows/ci.yml</code></p>
+<pre><code class="language-yaml">name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-base:
+    name: Test Base (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [&quot;3.9&quot;, &quot;3.10&quot;, &quot;3.11&quot;, &quot;3.12&quot;]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Run linting
+        run: |
+          black --check odibi/ tests/
+          ruff check odibi/ tests/
+
+      - name: Run base tests (Pandas only)
+        run: |
+          pytest -v --cov=odibi --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        if: matrix.python-version == '3.11'
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  test-extras:
+    name: Test Extras (Spark/Azure)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: &quot;3.11&quot;
+
+      - name: Install with extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev,spark,azure]
+
+      - name: Run extras tests
+        run: |
+          pytest -v -k &quot;extras or connections_paths&quot;
+</code></pre>
+<hr />
+<h4 id="12-pre-commit-config">12. Pre-commit Config</h4>
+<p><strong>File:</strong> <code>/d:/odibi/.pre-commit-config.yaml</code></p>
+<pre><code class="language-yaml">repos:
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        language_version: python3.11
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.15
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+</code></pre>
+<hr />
+<h3 id="phase-e-documentation-1-hour"><strong>PHASE E: Documentation (1 hour)</strong></h3>
+<h4 id="13-databricks-setup-guide">13. Databricks Setup Guide</h4>
+<p><strong>File:</strong> <code>/d:/odibi/docs/setup_databricks.md</code></p>
+<pre><code class="language-markdown"># Databricks &amp; Spark Setup
+
+Guide for using ODIBI with Databricks and Spark.
+
+## Installation
+
+### On Databricks Cluster
+
+```python
+# Install from PyPI (when published)
+%pip install odibi[spark]
+
+# Or install from GitHub
+%pip install git+https://github.com/henryodibi11/Odibi.git#egg=odibi[spark]
+</code></pre>
+<h3 id="local-development">Local Development</h3>
+<pre><code class="language-bash"># Install with Spark support
+pip install odibi[spark]
+</code></pre>
+<h2 id="local-testing-with-mock-dbfs">Local Testing with Mock DBFS</h2>
+<p>Use <code>LocalDBFS</code> to test Databricks pipelines locally:</p>
+<pre><code class="language-yaml"># project.yaml
+project: Local Databricks Test
+engine: pandas  # Use pandas locally, spark on Databricks
+
+connections:
+  dbfs:
+    type: local_dbfs
+    root: ./.dbfs  # Local directory mimicking DBFS
+</code></pre>
+<pre><code class="language-yaml"># pipelines/test.yaml
+pipeline: local_test
+
+nodes:
+  - name: load_data
+    read:
+      connection: dbfs
+      path: dbfs:/FileStore/input.csv  # Maps to ./.dbfs/FileStore/input.csv
+      format: csv
+</code></pre>
+<h2 id="cluster-configuration">Cluster Configuration</h2>
+<p><strong>Recommended settings:</strong>
+- Databricks Runtime: 13.3 LTS or higher
+- Spark version: 3.4+
+- Python: 3.10 or 3.11</p>
+<h2 id="using-spark-engine">Using Spark Engine</h2>
+<p><strong>Status:</strong> Phase 1 - Basic introspection only. Full implementation in Phase 3.</p>
+<pre><code class="language-yaml"># project.yaml
+project: Spark Pipeline
+engine: spark  # Requires pyspark installed
+
+connections:
+  adls:
+    type: azure_adls
+    account: myaccount
+    container: data
+</code></pre>
+<p><strong>Currently Available:</strong>
+- Schema inspection
+- Row counting
+- Shape queries</p>
+<p><strong>Coming in Phase 3:</strong>
+- Read/write operations
+- SQL execution
+- Full transform support</p>
+<h2 id="authentication">Authentication</h2>
+<p>Databricks clusters have Azure credentials pre-configured. No additional auth needed for ADLS when using managed identity.</p>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="setup_azure.md">Azure Setup Guide</a></li>
+<li><a href="../PHASES.md">PHASES.md</a> - Roadmap for Spark features</li>
+</ul>
+<pre><code>
+---
+
+#### 14. Azure Setup Guide
+**File:** `/d:/odibi/docs/setup_azure.md`
+
+```markdown
+# Azure Integration Setup
+
+Guide for using ODIBI with Azure services.
+
+## Installation
+
+```bash
+pip install odibi[azure]
+</code></pre>
+<h2 id="azure-data-lake-storage-gen2-adls">Azure Data Lake Storage Gen2 (ADLS)</h2>
+<h3 id="configuration">Configuration</h3>
+<pre><code class="language-yaml">connections:
+  adls:
+    type: azure_adls
+    account: mystorageaccount
+    container: data
+    path_prefix: raw/  # Optional
+    auth_mode: managed_identity  # or cli, sas
+</code></pre>
+<h3 id="authentication-modes">Authentication Modes</h3>
+<p><strong>1. Managed Identity (Recommended for Databricks/VMs)</strong></p>
+<pre><code class="language-yaml">auth_mode: managed_identity
+</code></pre>
+<p>No credentials needed - uses Azure Managed Identity.</p>
+<p><strong>2. Azure CLI</strong></p>
+<pre><code class="language-yaml">auth_mode: cli
+</code></pre>
+<p>Uses credentials from <code>az login</code>.</p>
+<p><strong>3. SAS Token</strong></p>
+<pre><code class="language-yaml">auth_mode: sas
+sas_token: ${AZURE_SAS_TOKEN}  # From environment variable
+</code></pre>
+<h3 id="permissions-required">Permissions Required</h3>
+<p><strong>For read operations:</strong>
+- Storage Blob Data Reader</p>
+<p><strong>For write operations:</strong>
+- Storage Blob Data Contributor</p>
+<h3 id="path-resolution">Path Resolution</h3>
+<p>ADLS connection builds <code>abfss://</code> URIs:</p>
+<pre><code class="language-python"># Config:
+# account: myaccount
+# container: data
+# path_prefix: raw/
+
+# Path: &quot;folder/file.csv&quot;
+# Resolves to: abfss://data@myaccount.dfs.core.windows.net/raw/folder/file.csv
+</code></pre>
+<h2 id="azure-sql-database">Azure SQL Database</h2>
+<h3 id="configuration_1">Configuration</h3>
+<pre><code class="language-yaml">connections:
+  azure_sql:
+    type: azure_sql
+    server: myserver.database.windows.net
+    database: mydb
+    driver: &quot;ODBC Driver 18 for SQL Server&quot;  # Optional
+</code></pre>
+<h3 id="authentication_1">Authentication</h3>
+<p><strong>Managed Identity (Recommended):</strong></p>
+<pre><code class="language-yaml"># No username/password - uses Azure AD identity
+server: myserver.database.windows.net
+database: mydb
+</code></pre>
+<p><strong>SQL Authentication:</strong></p>
+<pre><code class="language-yaml">server: myserver.database.windows.net
+database: mydb
+username: ${SQL_USER}
+password: ${SQL_PASSWORD}
+</code></pre>
+<h3 id="required-drivers">Required Drivers</h3>
+<p><strong>Windows:</strong>
+- ODBC Driver 18 for SQL Server (pre-installed on recent Windows)</p>
+<p><strong>Linux/macOS:</strong></p>
+<pre><code class="language-bash"># Ubuntu/Debian
+curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list &gt; /etc/apt/sources.list.d/mssql-release.list
+apt-get update
+ACCEPT_EULA=Y apt-get install -y msodbcsql18
+
+# macOS
+brew tap microsoft/mssql-release https://github.com/Microsoft/homebrew-mssql-release
+brew install msodbcsql18
+</code></pre>
+<h2 id="phase-1-status">Phase 1 Status</h2>
+<p><strong>Currently Available:</strong>
+- Path/URI resolution
+- Connection validation
+- DSN string generation</p>
+<p><strong>Coming in Phase 3:</strong>
+- Actual read/write operations
+- Integration with Spark/Pandas engines</p>
+<h2 id="security-best-practices">Security Best Practices</h2>
+<ol>
+<li><strong>Never commit credentials</strong> - Use environment variables</li>
+<li><strong>Use Managed Identity</strong> when running on Azure</li>
+<li><strong>Rotate SAS tokens</strong> regularly</li>
+<li><strong>Use least privilege</strong> - grant minimum required permissions</li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>Import error when using Azure connections:</strong></p>
+<pre><code class="language-bash">pip install odibi[azure]
+</code></pre>
+<p><strong>ODBC driver errors:</strong>
+- Verify driver installed: <code>odbcinst -q -d</code>
+- Check driver name matches config</p>
+<p><strong>Authentication failures:</strong>
+- Verify Azure AD permissions
+- Test <code>az login</code> works
+- Check managed identity assignment</p>
+<h2 id="see-also_1">See Also</h2>
+<ul>
+<li><a href="setup_databricks.md">Databricks Setup</a></li>
+<li><a href="../PHASES.md">PHASES.md</a> - Azure feature roadmap</li>
+</ul>
+<pre><code>
+---
+
+#### 15. Example Spark YAML
+**File:** `/d:/odibi/examples/example_spark.yaml`
+
+```yaml
+# Example Spark pipeline configuration
+# Phase 1: Template only - full execution in Phase 3
+
+project: Spark Example Pipeline
+engine: spark  # Requires: pip install odibi[spark]
+
+connections:
+  adls:
+    type: azure_adls
+    account: mystorageaccount
+    container: data
+    path_prefix: raw/
+    auth_mode: managed_identity
+
+  dbfs:
+    type: local_dbfs
+    root: ./.dbfs  # For local testing
+
+pipelines:
+  - name: spark_etl
+    nodes:
+      - name: load_sales
+        # Phase 3: Will read from ADLS
+        read:
+          connection: adls
+          path: sales/2024/*.parquet
+          format: parquet
+        cache: true
+
+      - name: aggregate
+        depends_on: [load_sales]
+        # Phase 3: Will execute Spark SQL
+        transform:
+          steps:
+            - |
+              SELECT
+                region,
+                SUM(amount) as total_sales,
+                COUNT(*) as transaction_count
+              FROM load_sales
+              GROUP BY region
+
+      - name: write_results
+        depends_on: [aggregate]
+        # Phase 3: Will write to ADLS
+        write:
+          connection: adls
+          path: aggregated/sales_by_region.parquet
+          format: parquet
+          mode: overwrite
+</code></pre>
+<hr />
+<h4 id="16-github-issue-templates">16. GitHub Issue Templates</h4>
+<p><strong>File:</strong> <code>/d:/odibi/.github/ISSUE_TEMPLATE/bug_report.md</code></p>
+<pre><code class="language-markdown">---
+name: Bug Report
+about: Report a bug in ODIBI
+title: &quot;[BUG] &quot;
+labels: bug
+assignees: ''
+---
+
+## Bug Description
+A clear description of the bug.
+
+## Environment
+- **ODIBI version:** (run `pip show odibi`)
+- **Python version:** (run `python --version`)
+- **OS:** Windows/Linux/macOS
+- **Installed extras:** [spark/azure/none]
+
+## Reproduction Steps
+1. Create config...
+2. Run command...
+3. See error...
+
+## Expected Behavior
+What should happen.
+
+## Actual Behavior
+What actually happens.
+
+## Error Message
+</code></pre>
+<p>Paste full error traceback here</p>
+<pre><code>
+## Minimal Config
+```yaml
+# Smallest config that reproduces the issue
+</code></pre>
+<h2 id="additional-context">Additional Context</h2>
+<p>Any other relevant information.</p>
+<pre><code>
+**File:** `/d:/odibi/.github/ISSUE_TEMPLATE/feature_request.md`
+```markdown
+---
+name: Feature Request
+about: Suggest a feature for ODIBI
+title: &quot;[FEATURE] &quot;
+labels: enhancement
+assignees: ''
+---
+
+## Problem
+What problem does this solve?
+
+## Proposed Solution
+How should it work?
+
+## Alternatives Considered
+Other approaches you've thought about.
+
+## Phase Alignment
+Which phase does this fit into? (see PHASES.md)
+
+## Additional Context
+Mockups, examples, references.
+</code></pre>
+<p><strong>File:</strong> <code>/d:/odibi/.github/PULL_REQUEST_TEMPLATE.md</code></p>
+<pre><code class="language-markdown">## What
+Brief description of changes.
+
+## Why
+Problem being solved or feature being added.
+
+## How
+Implementation approach.
+
+## Testing
+- [ ] All existing tests pass
+- [ ] New tests added for new functionality
+- [ ] Code formatted with Black
+- [ ] Linting passes (Ruff)
+- [ ] Documentation updated
+
+## Phase
+Which phase deliverable does this address? (see PHASES.md)
+
+## Checklist
+- [ ] CHANGELOG.md updated
+- [ ] No decrease in test coverage
+- [ ] Breaking changes documented (if any)
+</code></pre>
+<hr />
+<h4 id="17-update-readme">17. Update README</h4>
+<p><strong>Changes needed in</strong> <code>/d:/odibi/README.md</code>:</p>
+<ol>
+<li><strong>Add badges after title:</strong></li>
+</ol>
+<pre><code class="language-markdown"># ODIBI Framework
+
+[![CI Status](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+</code></pre>
+<ol>
+<li><strong>Update Installation section</strong> (after line 27):</li>
+</ol>
+<pre><code class="language-markdown">### Installation
+
+```bash
+# Basic installation (Pandas engine)
+pip install odibi
+
+# With Spark support
+pip install odibi[spark]
+
+# With Azure support
+pip install odibi[azure]
+
+# With all extras
+pip install odibi[all]
+
+# Development installation
+git clone https://github.com/henryodibi11/Odibi.git
+cd Odibi
+pip install -e .[dev]
+</code></pre>
+<pre><code>
+3. **Replace &quot;Contributing&quot; section** (around line 227):
+```markdown
+## Contributing
+
+**ODIBI is open source and welcomes contributions!**
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup
+- Coding standards
+- Testing requirements
+- Pull request process
+
+Check [PHASES.md](PHASES.md) for current roadmap and available work.
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
+</code></pre>
+<ol>
+<li><strong>Update Roadmap section</strong> (around line 220):</li>
+</ol>
+<pre><code class="language-markdown">### Roadmap
+
+See [PHASES.md](PHASES.md) for detailed roadmap.
+
+**Current:** Phase 1 - Spark &amp; Azure scaffolding (v1.1.0-alpha.1)  
+**Next:** Phase 2 - CLI tools &amp; testing utilities (v1.2.0)
+
+- ✅ v1.0.0: Pandas MVP (78 tests passing)
+- 🚧 v1.1.0: Spark engine + Azure connections (scaffolding)
+- ⏳ v1.2.0: CLI tools, testing utilities
+- ⏳ v1.3.0: Stories, advanced connectors
+- ⏳ v2.0.0: Community ecosystem, plugin system
+</code></pre>
+<hr />
+<h2 id="success-criteria">✅ Success Criteria</h2>
+<p>Before considering Phase 1 complete:</p>
+<ol>
+<li><strong>All 78 existing Pandas tests pass</strong> (no regressions)</li>
+<li><strong>New tests pass</strong> (import guards, path resolution)</li>
+<li><strong>CI is green</strong> on test-base job (required)</li>
+<li><strong>Spark/Azure clearly marked</strong> as experimental in all docs</li>
+<li><strong>No breaking changes</strong> to existing Pandas pipelines</li>
+<li><strong>Import guards work</strong> - helpful errors when extras not installed</li>
+<li><strong>Documentation complete</strong> - CONTRIBUTING, setup guides, examples</li>
+</ol>
+<hr />
+<h2 id="testing-instructions">🧪 Testing Instructions</h2>
+<pre><code class="language-bash"># Run all base tests (must pass)
+pytest -v
+
+# Verify 78 tests still passing
+pytest --co -q | grep &quot;test session starts&quot;
+
+# Run with coverage
+pytest --cov=odibi --cov-report=term-missing
+
+# Test extras (if pyspark installed)
+pytest -k &quot;extras&quot; -v
+
+# Test connections
+pytest tests/test_connections_paths.py -v
+</code></pre>
+<hr />
+<h2 id="file-creation-checklist">📦 File Creation Checklist</h2>
+<ul>
+<li>[ ] CODE_OF_CONDUCT.md</li>
+<li>[ ] SECURITY.md</li>
+<li>[ ] CODEOWNERS</li>
+<li>[ ] CHANGELOG.md</li>
+<li>[ ] odibi/engine/spark_engine.py</li>
+<li>[ ] odibi/connections/azure_adls.py</li>
+<li>[ ] odibi/connections/azure_sql.py</li>
+<li>[ ] odibi/connections/local_dbfs.py</li>
+<li>[ ] tests/test_extras_imports.py</li>
+<li>[ ] tests/test_connections_paths.py</li>
+<li>[ ] .github/workflows/ci.yml</li>
+<li>[ ] .github/ISSUE_TEMPLATE/bug_report.md</li>
+<li>[ ] .github/ISSUE_TEMPLATE/feature_request.md</li>
+<li>[ ] .github/PULL_REQUEST_TEMPLATE.md</li>
+<li>[ ] .pre-commit-config.yaml</li>
+<li>[ ] docs/setup_databricks.md</li>
+<li>[ ] docs/setup_azure.md</li>
+<li>[ ] examples/example_spark.yaml</li>
+<li>[ ] Update README.md (4 sections)</li>
+<li>[ ] Update odibi/engine/<strong>init</strong>.py</li>
+<li>[ ] Update odibi/connections/<strong>init</strong>.py</li>
+<li>[ ] Update pytest.ini</li>
+</ul>
+<hr />
+<h2 id="oracle-recommendations-summary">🎯 Oracle Recommendations Summary</h2>
+<p>Key guidance from Oracle consultation:</p>
+<ol>
+<li><strong>Keep Pandas untouched</strong> - All new code is additive only</li>
+<li><strong>Import guards everywhere</strong> - No top-level imports of optional deps</li>
+<li><strong>Stub with clear messages</strong> - NotImplementedError pointing to PHASES.md</li>
+<li><strong>No network I/O in Phase 1</strong> - Path resolution and validation only</li>
+<li><strong>Mark extras tests optional</strong> - CI can fail on extras job</li>
+<li><strong>Flatten pyproject.toml extras</strong> - ✅ Already done</li>
+<li><strong>Add py.typed</strong> - ✅ Already done</li>
+</ol>
+<hr />
+<h2 id="next-thread-actions">📞 Next Thread Actions</h2>
+<p><strong>Recommended approach:</strong></p>
+<ol>
+<li><strong>Start with governance</strong> (PHASE A) - Quick wins, no code risk</li>
+<li><strong>Then scaffolding</strong> (PHASE B) - Core work, follow patterns exactly</li>
+<li><strong>Add tests</strong> (PHASE C) - Ensure quality gates</li>
+<li><strong>Setup CI</strong> (PHASE D) - Automation</li>
+<li><strong>Finish docs</strong> (PHASE E) - Community enablement</li>
+<li><strong>Run full test suite</strong> - Verify nothing broke</li>
+<li><strong>Create summary</strong> - Document changes for review</li>
+</ol>
+<p><strong>Time estimate:</strong> 4-6 hours for complete Phase 1 scaffolding.</p>
+<hr />
+<p><strong>Files to reference:</strong>
+- <code>/d:/odibi/PHASES.md</code> - Phase 1 deliverables (lines 21-98)
+- <code>/d:/odibi/CONTRIBUTING.md</code> - Coding standards (just created)
+- <code>/d:/odibi/pyproject.toml</code> - Package config (already updated)
+- <code>/d:/odibi/odibi/engine/base.py</code> - Engine interface to implement
+- <code>/d:/odibi/odibi/connections/base.py</code> - Connection interface to implement</p>
+<p><strong>Test to verify nothing broke:</strong></p>
+<pre><code class="language-bash">cd /d:/odibi
+pytest -v
+# Should show: 78 passed
+</code></pre>
+<hr />
+<p><strong>End of handoff. Good luck! 🚀</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

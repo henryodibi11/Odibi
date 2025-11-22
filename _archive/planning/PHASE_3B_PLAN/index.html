@@ -1,0 +1,1664 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/planning/PHASE_3B_PLAN/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Phase 3B: Stories (Run & Doc Story Engines) - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#phase-3b-stories-run-doc-story-engines" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Phase 3B: Stories (Run &amp; Doc Story Engines)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="phase-3b-stories-run-doc-story-engines">Phase 3B: Stories (Run &amp; Doc Story Engines)</h1>
+<p><strong>Duration:</strong> 3 weeks<br />
+<strong>Prerequisites:</strong> Phase 3A complete<br />
+<strong>Goal:</strong> Build comprehensive story generation for pipeline runs and stakeholder documentation</p>
+<hr />
+<h2 id="overview">Overview</h2>
+<p>Phase 3B enhances Odibi's story generation capabilities to provide:
+1. <strong>Run Stories</strong> - Automatic audit trails of every pipeline execution
+2. <strong>Doc Stories</strong> - Stakeholder-ready documentation with explanations
+3. <strong>Theme System</strong> - Customizable branding and formatting</p>
+<p><strong>Principle:</strong> Every run is documented. Every operation explains itself.</p>
+<hr />
+<h2 id="week-1-enhanced-run-story-engine">Week 1: Enhanced Run Story Engine</h2>
+<h3 id="goals">Goals</h3>
+<ul>
+<li>Enhance existing story generator with detailed metadata</li>
+<li>Capture timing, row counts, schema changes automatically</li>
+<li>Add HTML output format alongside Markdown</li>
+<li>Implement story metadata tracking</li>
+</ul>
+<h3 id="day-1-2-story-metadata-enhancement">Day 1-2: Story Metadata Enhancement</h3>
+<p><strong>File:</strong> <code>odibi/story/metadata.py</code> (NEW)</p>
+<pre><code class="language-python">&quot;&quot;&quot;Story metadata tracking.&quot;&quot;&quot;
+
+from typing import Dict, Any, List, Optional
+from dataclasses import dataclass, field
+from datetime import datetime
+
+
+@dataclass
+class NodeExecutionMetadata:
+    &quot;&quot;&quot;Metadata for a single node execution.&quot;&quot;&quot;
+
+    node_name: str
+    operation: str
+    status: str  # &quot;success&quot;, &quot;failed&quot;, &quot;skipped&quot;
+    duration: float
+
+    # Data metrics
+    rows_in: Optional[int] = None
+    rows_out: Optional[int] = None
+    rows_change: Optional[int] = None
+    rows_change_pct: Optional[float] = None
+
+    # Schema tracking
+    schema_in: Optional[List[str]] = None
+    schema_out: Optional[List[str]] = None
+    columns_added: List[str] = field(default_factory=list)
+    columns_removed: List[str] = field(default_factory=list)
+    columns_renamed: List[str] = field(default_factory=list)
+
+    # Error info
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+
+    # Timestamps
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+@dataclass
+class PipelineStoryMetadata:
+    &quot;&quot;&quot;Complete metadata for a pipeline run story.&quot;&quot;&quot;
+
+    pipeline_name: str
+    pipeline_layer: Optional[str] = None
+
+    # Execution info
+    started_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    completed_at: Optional[str] = None
+    duration: float = 0.0
+
+    # Status
+    total_nodes: int = 0
+    completed_nodes: int = 0
+    failed_nodes: int = 0
+    skipped_nodes: int = 0
+
+    # Node details
+    nodes: List[NodeExecutionMetadata] = field(default_factory=list)
+
+    # Project context
+    project: Optional[str] = None
+    plant: Optional[str] = None
+    asset: Optional[str] = None
+    business_unit: Optional[str] = None
+
+    # Story settings
+    theme: str = &quot;default&quot;
+    include_samples: bool = True
+    max_sample_rows: int = 10
+
+    def add_node(self, node_metadata: NodeExecutionMetadata):
+        &quot;&quot;&quot;Add node execution metadata.&quot;&quot;&quot;
+        self.nodes.append(node_metadata)
+        self.total_nodes += 1
+
+        if node_metadata.status == &quot;success&quot;:
+            self.completed_nodes += 1
+        elif node_metadata.status == &quot;failed&quot;:
+            self.failed_nodes += 1
+        elif node_metadata.status == &quot;skipped&quot;:
+            self.skipped_nodes += 1
+
+    def to_dict(self) -&gt; Dict[str, Any]:
+        &quot;&quot;&quot;Convert to dictionary.&quot;&quot;&quot;
+        return {
+            &quot;pipeline_name&quot;: self.pipeline_name,
+            &quot;pipeline_layer&quot;: self.pipeline_layer,
+            &quot;started_at&quot;: self.started_at,
+            &quot;completed_at&quot;: self.completed_at,
+            &quot;duration&quot;: self.duration,
+            &quot;total_nodes&quot;: self.total_nodes,
+            &quot;completed_nodes&quot;: self.completed_nodes,
+            &quot;failed_nodes&quot;: self.failed_nodes,
+            &quot;skipped_nodes&quot;: self.skipped_nodes,
+            &quot;nodes&quot;: [
+                {
+                    &quot;node_name&quot;: n.node_name,
+                    &quot;operation&quot;: n.operation,
+                    &quot;status&quot;: n.status,
+                    &quot;duration&quot;: n.duration,
+                    &quot;rows_in&quot;: n.rows_in,
+                    &quot;rows_out&quot;: n.rows_out,
+                    &quot;rows_change&quot;: n.rows_change,
+                    &quot;rows_change_pct&quot;: n.rows_change_pct,
+                }
+                for n in self.nodes
+            ],
+            &quot;project&quot;: self.project,
+            &quot;plant&quot;: self.plant,
+            &quot;asset&quot;: self.asset,
+        }
+</code></pre>
+<p><strong>Deliverables:</strong>
+- NodeExecutionMetadata class
+- PipelineStoryMetadata class
+- Automatic schema change detection
+- Row count delta tracking</p>
+<hr />
+<h3 id="day-3-4-html-story-templates">Day 3-4: HTML Story Templates</h3>
+<p><strong>File:</strong> <code>odibi/story/templates/run_story.html</code> (NEW)</p>
+<p>Create professional HTML template with:
+- Responsive design
+- Syntax highlighting for SQL/code
+- Collapsible sections
+- Timeline visualization
+- Status indicators (✅ ❌ ⏭️)</p>
+<p><strong>File:</strong> <code>odibi/story/renderers.py</code> (NEW)</p>
+<pre><code class="language-python">&quot;&quot;&quot;Story renderers for different output formats.&quot;&quot;&quot;
+
+from typing import Dict, Any
+from pathlib import Path
+from jinja2 import Template
+
+class HTMLStoryRenderer:
+    &quot;&quot;&quot;Renders stories as HTML.&quot;&quot;&quot;
+
+    def __init__(self, template_path: Optional[str] = None):
+        &quot;&quot;&quot;Initialize renderer.&quot;&quot;&quot;
+        self.template_path = template_path or self._default_template()
+
+    def render(self, metadata: PipelineStoryMetadata, context: Any) -&gt; str:
+        &quot;&quot;&quot;Render story as HTML.&quot;&quot;&quot;
+        template = self._load_template()
+        return template.render(
+            metadata=metadata,
+            context=context
+        )
+</code></pre>
+<p><strong>Deliverables:</strong>
+- HTML template with professional styling
+- HTMLStoryRenderer class
+- MarkdownStoryRenderer (enhanced)
+- JSON export option</p>
+<hr />
+<h2 id="week-2-doc-story-generator">Week 2: Doc Story Generator</h2>
+<h3 id="goals_1">Goals</h3>
+<ul>
+<li>Build doc story generator for stakeholder communication</li>
+<li>Pull operation explanations automatically</li>
+<li>Support custom descriptions and references</li>
+<li>Quality validation before generation</li>
+</ul>
+<h3 id="day-5-7-doc-story-engine">Day 5-7: Doc Story Engine</h3>
+<p><strong>File:</strong> <code>odibi/story/doc_story.py</code> (NEW)</p>
+<pre><code class="language-python">&quot;&quot;&quot;Documentation story generator.&quot;&quot;&quot;
+
+from typing import Dict, Any, List, Optional
+from odibi.transformations import get_registry
+from odibi.validation import ExplanationLinter
+
+
+class DocStoryGenerator:
+    &quot;&quot;&quot;Generates stakeholder documentation stories.&quot;&quot;&quot;
+
+    def __init__(self, pipeline_config: PipelineConfig, project_config: ProjectConfig):
+        &quot;&quot;&quot;Initialize doc story generator.&quot;&quot;&quot;
+        self.pipeline_config = pipeline_config
+        self.project_config = project_config
+        self.registry = get_registry()
+        self.linter = ExplanationLinter()
+
+    def generate(self, validate: bool = True) -&gt; str:
+        &quot;&quot;&quot;
+        Generate documentation story.
+
+        Args:
+            validate: Whether to validate explanation quality
+
+        Returns:
+            Path to generated documentation
+        &quot;&quot;&quot;
+        # Build documentation sections
+        sections = []
+
+        # 1. Pipeline overview
+        sections.append(self._generate_overview())
+
+        # 2. Data flow diagram (ASCII or Mermaid)
+        sections.append(self._generate_flow_diagram())
+
+        # 3. Operation details (with explanations)
+        sections.append(self._generate_operation_details(validate))
+
+        # 4. Expected outputs
+        sections.append(self._generate_outputs())
+
+        # Render to HTML/Markdown
+        return self._render(sections)
+
+    def _generate_operation_details(self, validate: bool) -&gt; Dict[str, Any]:
+        &quot;&quot;&quot;Generate detailed operation explanations.&quot;&quot;&quot;
+        operations = []
+
+        for node in self.pipeline_config.nodes:
+            # Get operation function
+            func = self.registry.get(node.operation)
+
+            if func and hasattr(func, 'get_explanation'):
+                # Get explanation
+                explanation = func.get_explanation(
+                    **node.params,
+                    **self._build_context(node)
+                )
+
+                # Validate if required
+                if validate:
+                    issues = self.linter.lint(explanation, node.operation)
+                    if self.linter.has_errors():
+                        raise ValueError(
+                            f&quot;Operation '{node.operation}' has explanation quality issues:\n&quot;
+                            f&quot;{self.linter.format_issues()}&quot;
+                        )
+
+                operations.append({
+                    'node': node.node,
+                    'operation': node.operation,
+                    'explanation': explanation,
+                    'params': node.params
+                })
+
+        return {'operations': operations}
+</code></pre>
+<p><strong>Deliverables:</strong>
+- DocStoryGenerator class
+- Automatic explanation extraction
+- Quality validation integration
+- Flow diagram generation</p>
+<hr />
+<h3 id="day-8-9-cli-integration">Day 8-9: CLI Integration</h3>
+<p><strong>File:</strong> <code>odibi/cli/story.py</code> (NEW)</p>
+<pre><code class="language-bash"># Generate doc story
+odibi story generate config.yaml --output docs/pipeline_doc.html
+
+# Generate doc story without validation (draft mode)
+odibi story generate config.yaml --no-validate --output draft.md
+
+# Generate from last run
+odibi story from-run stories/runs/pipeline_20250110_143022.json --format html
+</code></pre>
+<p><strong>Deliverables:</strong>
+- <code>odibi story generate</code> command
+- <code>odibi story from-run</code> command<br />
+- Format selection (--format html|markdown|json)
+- Validation controls</p>
+<hr />
+<h2 id="week-3-theme-system-polish">Week 3: Theme System &amp; Polish</h2>
+<h3 id="goals_2">Goals</h3>
+<ul>
+<li>Implement theme system for customizable branding</li>
+<li>Support custom CSS and templates</li>
+<li>Add charts and visualizations</li>
+<li>Final polish and testing</li>
+</ul>
+<h3 id="day-10-12-theme-system">Day 10-12: Theme System</h3>
+<p><strong>File:</strong> <code>odibi/story/themes.py</code> (NEW)</p>
+<pre><code class="language-python">&quot;&quot;&quot;Theme system for story customization.&quot;&quot;&quot;
+
+from typing import Dict, Any
+from dataclasses import dataclass
+
+
+@dataclass
+class StoryTheme:
+    &quot;&quot;&quot;Story theme configuration.&quot;&quot;&quot;
+
+    name: str
+
+    # Colors
+    primary_color: str = &quot;#0066cc&quot;
+    success_color: str = &quot;#28a745&quot;
+    error_color: str = &quot;#dc3545&quot;
+    warning_color: str = &quot;#ffc107&quot;
+
+    # Typography
+    font_family: str = &quot;system-ui, -apple-system, sans-serif&quot;
+    heading_font: str = &quot;Georgia, serif&quot;
+    code_font: str = &quot;Consolas, Monaco, monospace&quot;
+
+    # Branding
+    logo_url: Optional[str] = None
+    company_name: Optional[str] = None
+    footer_text: Optional[str] = None
+
+    # Layout
+    max_width: str = &quot;1200px&quot;
+    sidebar: bool = True
+
+    # Custom CSS
+    custom_css: Optional[str] = None
+
+    def to_css_vars(self) -&gt; Dict[str, str]:
+        &quot;&quot;&quot;Convert theme to CSS variables.&quot;&quot;&quot;
+        return {
+            '--primary-color': self.primary_color,
+            '--success-color': self.success_color,
+            '--error-color': self.error_color,
+            '--warning-color': self.warning_color,
+            '--font-family': self.font_family,
+            '--heading-font': self.heading_font,
+            '--code-font': self.code_font,
+        }
+
+
+# Built-in themes
+DEFAULT_THEME = StoryTheme(name=&quot;default&quot;)
+
+CORPORATE_THEME = StoryTheme(
+    name=&quot;corporate&quot;,
+    primary_color=&quot;#003366&quot;,
+    font_family=&quot;Arial, sans-serif&quot;,
+    heading_font=&quot;Arial, sans-serif&quot;
+)
+
+DARK_THEME = StoryTheme(
+    name=&quot;dark&quot;,
+    primary_color=&quot;#00bfff&quot;,
+    success_color=&quot;#4caf50&quot;,
+    error_color=&quot;#f44336&quot;,
+    custom_css=&quot;&quot;&quot;
+    body { background: #1e1e1e; color: #e0e0e0; }
+    &quot;&quot;&quot;
+)
+</code></pre>
+<p><strong>Deliverables:</strong>
+- StoryTheme class
+- Built-in themes (default, corporate, dark)
+- Custom theme loading from YAML
+- Theme preview command</p>
+<hr />
+<h3 id="day-13-14-visualizations-charts">Day 13-14: Visualizations &amp; Charts</h3>
+<p>Add visual elements to stories:
+- <strong>Timeline chart</strong> - Node execution order and duration
+- <strong>Row count flow</strong> - Sankey diagram showing data flow
+- <strong>Schema changes</strong> - Visual diff of column changes
+- <strong>Success rate</strong> - Historical trends (if available)</p>
+<p>Use lightweight charting (Chart.js or similar, embedded in HTML)</p>
+<p><strong>Deliverables:</strong>
+- Timeline visualization
+- Row count flow diagram
+- Schema diff visualization
+- Embedded charts in HTML stories</p>
+<hr />
+<h2 id="phase-3b-acceptance-criteria">Phase 3B Acceptance Criteria</h2>
+<p><strong>Run Stories:</strong>
+- [ ] Every pipeline run auto-generates story
+- [ ] Stories capture timing, row counts, schema changes
+- [ ] Stories saved to <code>stories/runs/</code> automatically
+- [ ] HTML and Markdown formats supported
+- [ ] 20+ tests for run story generation</p>
+<p><strong>Doc Stories:</strong>
+- [ ] <code>odibi story generate</code> command works
+- [ ] Pulls explanations from registered operations
+- [ ] Validates explanation quality before generation
+- [ ] Supports custom descriptions
+- [ ] 15+ tests for doc story generation</p>
+<p><strong>Theme System:</strong>
+- [ ] Multiple built-in themes available
+- [ ] Custom themes loadable from YAML
+- [ ] Theme applies to HTML output
+- [ ] 10+ tests for theme system</p>
+<p><strong>Overall:</strong>
+- [ ] 50+ new tests passing
+- [ ] All existing tests still pass
+- [ ] Documentation complete
+- [ ] Examples provided</p>
+<hr />
+<h2 id="testing-strategy">Testing Strategy</h2>
+<h3 id="unit-tests">Unit Tests</h3>
+<ul>
+<li>Story metadata tracking</li>
+<li>HTML/Markdown rendering</li>
+<li>Theme loading and application</li>
+<li>Explanation extraction</li>
+</ul>
+<h3 id="integration-tests">Integration Tests</h3>
+<ul>
+<li>Full pipeline → story generation</li>
+<li>CLI story commands</li>
+<li>Theme application in rendered output</li>
+</ul>
+<h3 id="visual-tests">Visual Tests</h3>
+<ul>
+<li>HTML story manual review</li>
+<li>Theme variations visual check</li>
+<li>Chart rendering verification</li>
+</ul>
+<hr />
+<p><strong>Next:</strong> See <a href="PHASE_3C_PLAN.md">PHASE_3C_PLAN.md</a> for CLI + Diffing (2 weeks)</p>
+<hr />
+<p><strong>Last Updated:</strong> 2025-11-10<br />
+<strong>Maintainer:</strong> Henry Odibi</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

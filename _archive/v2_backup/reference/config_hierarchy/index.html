@@ -1,0 +1,1903 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/v2_backup/reference/config_hierarchy/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>ODIBI Configuration Hierarchy - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#odibi-configuration-hierarchy" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ODIBI Configuration Hierarchy
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="odibi-configuration-hierarchy">ODIBI Configuration Hierarchy</h1>
+<p>This document details the complete hierarchy of configuration objects available in the ODIBI framework.</p>
+<h2 id="visual-hierarchy">🌳 Visual Hierarchy</h2>
+<pre><code>ProjectConfig
+├── project: str (Required)
+├── engine: &quot;pandas&quot; | &quot;spark&quot; (Default: &quot;pandas&quot;)
+├── description: str (Optional)
+├── version: str (Default: &quot;1.0.0&quot;)
+├── owner: str (Optional)
+├── connections: Dict[str, ConnectionConfig]
+│   ├── type: &quot;local&quot;
+│   │   ├── validation_mode: &quot;lazy&quot; | &quot;eager&quot;
+│   │   └── base_path: str (Default: &quot;./data&quot;)
+│   ├── type: &quot;azure_blob&quot;
+│   │   ├── validation_mode: &quot;lazy&quot; | &quot;eager&quot;
+│   │   ├── account_name: str
+│   │   ├── container: str
+│   │   └── auth: Dict[str, str]
+│   ├── type: &quot;delta&quot;
+│   │   ├── validation_mode: &quot;lazy&quot; | &quot;eager&quot;
+│   │   ├── catalog: str
+│   │   └── schema: str
+│   └── type: &quot;sql_server&quot;
+│       ├── validation_mode: &quot;lazy&quot; | &quot;eager&quot;
+│       ├── host: str
+│       ├── database: str
+│       ├── port: int (Default: 1433)
+│       └── auth: Dict[str, str]
+├── pipelines: List[PipelineConfig]
+│   └── PipelineConfig
+│       ├── pipeline: str (Required)
+│       ├── description: str (Optional)
+│       ├── layer: str (Optional)
+│       └── nodes: List[NodeConfig]
+│           └── NodeConfig
+│               ├── name: str (Required)
+│               ├── description: str (Optional)
+│               ├── depends_on: List[str] (Default: [])
+│               ├── cache: bool (Default: False)
+│               ├── read: ReadConfig (Optional)
+│               │   ├── connection: str
+│               │   ├── format: str
+│               │   ├── path: str (File based)
+│               │   ├── table: str (SQL/Delta based)
+│               │   └── options: Dict[str, Any]
+│               ├── transform: TransformConfig (Optional)
+│               │   └── steps: List[TransformStep | str]
+│               │       ├── str (SQL Query)
+│               │       └── TransformStep
+│               │           ├── sql: str
+│               │           ├── function: str
+│               │           ├── operation: str
+│               │           └── params: Dict[str, Any]
+│               ├── write: WriteConfig (Optional)
+│               │   ├── connection: str
+│               │   ├── format: str
+│               │   ├── mode: &quot;overwrite&quot; | &quot;append&quot;
+│               │   ├── path: str (File based)
+│               │   ├── table: str (SQL/Delta based)
+│               │   └── options: Dict[str, Any]
+│               └── validation: ValidationConfig (Optional)
+│                   ├── schema: Dict[str, Any]
+│                   ├── not_empty: bool (Default: False)
+│                   └── no_nulls: List[str] (Default: [])
+├── story: StoryConfig (Required)
+│   ├── connection: str
+│   ├── path: str
+│   ├── max_sample_rows: int (Default: 10)
+│   └── auto_generate: bool (Default: True)
+├── retry: RetryConfig (Optional)
+│   ├── enabled: bool (Default: True)
+│   ├── max_attempts: int (Default: 3)
+│   └── backoff: &quot;exponential&quot; | &quot;linear&quot; | &quot;constant&quot;
+└── logging: LoggingConfig (Optional)
+    ├── level: &quot;DEBUG&quot; | &quot;INFO&quot; | &quot;WARNING&quot; | &quot;ERROR&quot;
+    ├── structured: bool (Default: False)
+    └── metadata: Dict[str, Any]
+</code></pre>
+<hr />
+<h2 id="detailed-reference">📚 Detailed Reference</h2>
+<h3 id="1-project-configuration-projectconfig">1. Project Configuration (<code>ProjectConfig</code>)</h3>
+<p>The top-level configuration object.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>project</code></td>
+<td><code>str</code></td>
+<td>Yes</td>
+<td>-</td>
+<td>Name of the project.</td>
+</tr>
+<tr>
+<td><code>engine</code></td>
+<td><code>str</code></td>
+<td>No</td>
+<td><code>"pandas"</code></td>
+<td>Execution engine: <code>"spark"</code> or <code>"pandas"</code>.</td>
+</tr>
+<tr>
+<td><code>connections</code></td>
+<td><code>Dict</code></td>
+<td>Yes</td>
+<td>-</td>
+<td>Dictionary of connection definitions.</td>
+</tr>
+<tr>
+<td><code>pipelines</code></td>
+<td><code>List</code></td>
+<td>Yes</td>
+<td>-</td>
+<td>List of pipeline definitions.</td>
+</tr>
+<tr>
+<td><code>story</code></td>
+<td><code>StoryConfig</code></td>
+<td>Yes</td>
+<td>-</td>
+<td>Configuration for story generation.</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Project description.</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td><code>str</code></td>
+<td>No</td>
+<td><code>"1.0.0"</code></td>
+<td>Project version.</td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td><code>str</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Project owner/contact.</td>
+</tr>
+<tr>
+<td><code>retry</code></td>
+<td><code>RetryConfig</code></td>
+<td>No</td>
+<td><code>{}</code></td>
+<td>Global retry settings.</td>
+</tr>
+<tr>
+<td><code>logging</code></td>
+<td><code>LoggingConfig</code></td>
+<td>No</td>
+<td><code>{}</code></td>
+<td>Global logging settings.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-connection-configurations">2. Connection Configurations</h3>
+<p>Configured in the <code>connections</code> dictionary. The <code>type</code> field determines the class used.</p>
+<h4 id="common-fields">Common Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td><code>"local"</code>, <code>"azure_blob"</code>, <code>"delta"</code>, or <code>"sql_server"</code></td>
+</tr>
+<tr>
+<td><code>validation_mode</code></td>
+<td><code>str</code></td>
+<td><code>"lazy"</code></td>
+<td><code>"lazy"</code> or <code>"eager"</code> connection validation</td>
+</tr>
+</tbody>
+</table>
+<h4 id="local-connection-type-local">Local Connection (<code>type: local</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>base_path</code></td>
+<td><code>str</code></td>
+<td><code>"./data"</code></td>
+<td>Base directory for local files.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="azure-blob-connection-type-azure_blob">Azure Blob Connection (<code>type: azure_blob</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>account_name</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td>Azure storage account name.</td>
+</tr>
+<tr>
+<td><code>container</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td>Container name.</td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td><code>Dict</code></td>
+<td><code>{}</code></td>
+<td>Authentication details (e.g., SAS token, account key).</td>
+</tr>
+</tbody>
+</table>
+<h4 id="delta-lake-connection-type-delta">Delta Lake Connection (<code>type: delta</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>catalog</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td>Delta catalog name.</td>
+</tr>
+<tr>
+<td><code>schema</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td>Schema (database) name. (Alias for <code>schema_name</code>)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="sql-server-connection-type-sql_server">SQL Server Connection (<code>type: sql_server</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td>Server hostname.</td>
+</tr>
+<tr>
+<td><code>database</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td>Database name.</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td><code>int</code></td>
+<td><code>1433</code></td>
+<td>Port number.</td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td><code>Dict</code></td>
+<td><code>{}</code></td>
+<td>Authentication (username, password).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-pipeline-configuration-pipelineconfig">3. Pipeline Configuration (<code>PipelineConfig</code>)</h3>
+<p>Defines a sequence of data processing nodes.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pipeline</code></td>
+<td><code>str</code></td>
+<td>Yes</td>
+<td>-</td>
+<td>Unique name for the pipeline.</td>
+</tr>
+<tr>
+<td><code>nodes</code></td>
+<td><code>List[NodeConfig]</code></td>
+<td>Yes</td>
+<td>-</td>
+<td>List of processing nodes.</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Description of the pipeline's purpose.</td>
+</tr>
+<tr>
+<td><code>layer</code></td>
+<td><code>str</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Logical layer (e.g., <code>"bronze"</code>, <code>"silver"</code>).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-node-configuration-nodeconfig">4. Node Configuration (<code>NodeConfig</code>)</h3>
+<p>A single unit of work (Read -&gt; Transform -&gt; Write).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td>Yes</td>
+<td>-</td>
+<td>Unique name for the node.</td>
+</tr>
+<tr>
+<td><code>depends_on</code></td>
+<td><code>List[str]</code></td>
+<td>No</td>
+<td><code>[]</code></td>
+<td>List of node names this node waits for.</td>
+</tr>
+<tr>
+<td><code>read</code></td>
+<td><code>ReadConfig</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Configuration for reading data.</td>
+</tr>
+<tr>
+<td><code>transform</code></td>
+<td><code>TransformConfig</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Configuration for data transformation.</td>
+</tr>
+<tr>
+<td><code>write</code></td>
+<td><code>WriteConfig</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Configuration for writing data.</td>
+</tr>
+<tr>
+<td><code>cache</code></td>
+<td><code>bool</code></td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Whether to cache the result in memory.</td>
+</tr>
+<tr>
+<td><code>validation</code></td>
+<td><code>ValidationConfig</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Data quality rules.</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Node description.</td>
+</tr>
+</tbody>
+</table>
+<p><em>(Note: At least one of <code>read</code>, <code>transform</code>, or <code>write</code> is required.)</em></p>
+<h3 id="5-operation-configurations">5. Operation Configurations</h3>
+<h4 id="read-configuration-readconfig">Read Configuration (<code>ReadConfig</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>connection</code></td>
+<td><code>str</code></td>
+<td>Yes</td>
+<td>Name of a connection defined in <code>connections</code>.</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td><code>str</code></td>
+<td>Yes</td>
+<td>format (e.g., <code>"csv"</code>, <code>"parquet"</code>, <code>"delta"</code>).</td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td><code>str</code></td>
+<td>*</td>
+<td>File path (relative to connection base).</td>
+</tr>
+<tr>
+<td><code>table</code></td>
+<td><code>str</code></td>
+<td>*</td>
+<td>Table name (for SQL/Delta).</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><code>Dict</code></td>
+<td>No</td>
+<td>Engine-specific options (e.g., <code>header=True</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><em>(</em> Either <code>path</code> or <code>table</code> is required)*</p>
+<h4 id="transform-configuration-transformconfig">Transform Configuration (<code>TransformConfig</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>steps</code></td>
+<td><code>List</code></td>
+<td>Yes</td>
+<td>List of SQL strings or <code>TransformStep</code> objects.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Transform Step (<code>TransformStep</code>)</strong>
+| Field | Type | Description |
+|-------|------|-------------|
+| <code>sql</code> | <code>str</code> | SQL query string. |
+| <code>function</code> | <code>str</code> | Registered Python function name. |
+| <code>operation</code> | <code>str</code> | Built-in operation name. |
+| <code>params</code> | <code>Dict</code> | Parameters passed to the function/operation. |</p>
+<p><em>(</em> Exactly one of <code>sql</code>, <code>function</code>, or <code>operation</code> is required per step)*</p>
+<h4 id="write-configuration-writeconfig">Write Configuration (<code>WriteConfig</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>connection</code></td>
+<td><code>str</code></td>
+<td>Yes</td>
+<td>Name of a connection defined in <code>connections</code>.</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td><code>str</code></td>
+<td>Yes</td>
+<td>format.</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td><code>str</code></td>
+<td>No</td>
+<td><code>"overwrite"</code> (default) or <code>"append"</code>.</td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td><code>str</code></td>
+<td>*</td>
+<td>Output file path.</td>
+</tr>
+<tr>
+<td><code>table</code></td>
+<td><code>str</code></td>
+<td>*</td>
+<td>Output table name.</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><code>Dict</code></td>
+<td>No</td>
+<td>Engine-specific write options.</td>
+</tr>
+</tbody>
+</table>
+<p><em>(</em> Either <code>path</code> or <code>table</code> is required)*</p>
+<h4 id="validation-configuration-validationconfig">Validation Configuration (<code>ValidationConfig</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema</code></td>
+<td><code>Dict</code></td>
+<td><code>None</code></td>
+<td>Schema definition for validation.</td>
+</tr>
+<tr>
+<td><code>not_empty</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Fail if result dataframe is empty.</td>
+</tr>
+<tr>
+<td><code>no_nulls</code></td>
+<td><code>List[str]</code></td>
+<td><code>[]</code></td>
+<td>List of columns that cannot contain nulls.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="6-support-configurations">6. Support Configurations</h3>
+<h4 id="story-configuration-storyconfig">Story Configuration (<code>StoryConfig</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>connection</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td>Connection name to store stories.</td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td><code>str</code></td>
+<td>Required</td>
+<td>Path to store story files.</td>
+</tr>
+<tr>
+<td><code>max_sample_rows</code></td>
+<td><code>int</code></td>
+<td><code>10</code></td>
+<td>Max rows to show in data samples.</td>
+</tr>
+<tr>
+<td><code>auto_generate</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Whether to generate stories automatically.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="retry-configuration-retryconfig">Retry Configuration (<code>RetryConfig</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Enable/disable retries.</td>
+</tr>
+<tr>
+<td><code>max_attempts</code></td>
+<td><code>int</code></td>
+<td><code>3</code></td>
+<td>Maximum retry attempts.</td>
+</tr>
+<tr>
+<td><code>backoff</code></td>
+<td><code>str</code></td>
+<td><code>"exponential"</code></td>
+<td>Backoff strategy (<code>"exponential"</code>, <code>"linear"</code>, <code>"constant"</code>).</td>
+</tr>
+</tbody>
+</table>
+<h4 id="logging-configuration-loggingconfig">Logging Configuration (<code>LoggingConfig</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>level</code></td>
+<td><code>str</code></td>
+<td><code>"INFO"</code></td>
+<td><code>"DEBUG"</code>, <code>"INFO"</code>, <code>"WARNING"</code>, <code>"ERROR"</code>.</td>
+</tr>
+<tr>
+<td><code>structured</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Enable JSON structured logging.</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>Dict</code></td>
+<td><code>{}</code></td>
+<td>Extra static metadata for logs.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

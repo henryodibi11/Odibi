@@ -1,0 +1,3182 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/planning/ODIBI_FRAMEWORK_PLAN/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>ODIBI Framework - Complete Implementation Plan - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#odibi-framework-complete-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ODIBI Framework - Complete Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="odibi-framework-complete-implementation-plan">ODIBI Framework - Complete Implementation Plan</h1>
+<p><strong>Framework Name:</strong> ODIBI<br />
+<strong>Version:</strong> 1.0 (Clean slate, no backward compatibility with v2)<br />
+<strong>Timeline:</strong> ~2 months for Phase 1<br />
+<strong>Philosophy:</strong> Explicit over implicit, Stories over magic, Simple over clever</p>
+<hr />
+<h2 id="document-status">📋 <strong>Document Status</strong></h2>
+<p><strong>⚠️ This document describes the original Phase 1 implementation (v1.0.0 Pandas MVP) - now complete.</strong></p>
+<ul>
+<li><strong>Original Phase 1:</strong> ✅ Complete (v1.0.0) - Pandas MVP implementation</li>
+<li><strong>Current Status:</strong> See <a href="../PHASES.md">PHASES.md</a> for ongoing roadmap (v1.1.0+)</li>
+<li><strong>Purpose:</strong> This document serves as historical design documentation and architecture reference</li>
+</ul>
+<p><strong>For current project status and roadmap:</strong>
+- See <a href="../STATUS.md">STATUS.md</a> - Current phase completion status<br />
+- See <a href="../PHASES.md">PHASES.md</a> - Phases 1-5 roadmap for open-source evolution</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#vision--principles">Vision &amp; Principles</a></li>
+<li><a href="#architecture">Architecture</a></li>
+<li><a href="#core-concepts">Core Concepts</a></li>
+<li><a href="#config-structure">Config Structure</a></li>
+<li><a href="#node-specification">Node Specification</a></li>
+<li><a href="#execution-model">Execution Model</a></li>
+<li><a href="#what-we-keep-from-v2">What We Keep from v2</a></li>
+<li><a href="#what-we-build-new">What We Build New</a></li>
+<li><a href="#what-we-drop-from-v2">What We Drop from v2</a></li>
+<li><a href="#phase-1-scope">Phase 1 Scope</a></li>
+<li><a href="#implementation-details">Implementation Details</a></li>
+<li><a href="#success-criteria">Success Criteria</a></li>
+<li><a href="#installation--usage">Installation &amp; Usage</a></li>
+</ol>
+<hr />
+<h2 id="vision-principles">Vision &amp; Principles</h2>
+<h3 id="the-problem-odibi-solves"><strong>The Problem ODIBI Solves</strong></h3>
+<p>Data engineering work should be:
+- <strong>Transparent</strong>: Know exactly what happened and why
+- <strong>Traceable</strong>: Full lineage from source to destination
+- <strong>Repeatable</strong>: Same config, same results
+- <strong>Debuggable</strong>: When things fail, know exactly where and why
+- <strong>Teachable</strong>: New users can understand and use it quickly</p>
+<h3 id="core-principles"><strong>Core Principles</strong></h3>
+<ol>
+<li>✅ <strong>Everything is a Node</strong> (reads → transform → creates)</li>
+<li>✅ <strong>Everything explicit</strong> (if it's in the story, it must be in the config)</li>
+<li>✅ <strong>Connections centralized</strong> (define once, reference by name)</li>
+<li>✅ <strong>Dependencies explicit</strong> (clear dependency graph, no magic)</li>
+<li>✅ <strong>Stories automatic</strong> (every node execution documented)</li>
+<li>✅ <strong>Engine-agnostic</strong> (same config works on Spark/Pandas)</li>
+<li>✅ <strong>Start simple, grow naturally</strong> (explicit configs → templates emerge from patterns)</li>
+</ol>
+<h3 id="key-design-decision"><strong>Key Design Decision</strong></h3>
+<blockquote>
+<p><strong>"If it appears in the story, it must be in the config."</strong></p>
+</blockquote>
+<p>This means:
+- User controls everything visible in the output
+- No hidden optimizations or automatic decisions
+- Framework can suggest, but user decides</p>
+<hr />
+<h2 id="architecture">Architecture</h2>
+<h3 id="layered-architecture"><strong>Layered Architecture</strong></h3>
+<pre><code>┌─────────────────────────────────────────┐
+│  USER LAYER                             │
+│  - project.yaml (manifest)              │
+│  - pipelines/*.yaml (configs)           │
+│  - transformation functions (Python)    │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│  ORCHESTRATION LAYER                    │
+│  - Config loader (YAML → Pydantic)      │
+│  - Dependency graph builder             │
+│  - Pipeline executor (parallel)         │
+│  - Story generator                      │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│  NODE LAYER                             │
+│  - Node (base abstraction)              │
+│  - ReadNode                             │
+│  - TransformNode                        │
+│  - WriteNode                            │
+│  - Context (data passing between nodes) │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│  ENGINE LAYER (adapt from v2)           │
+│  - ReaderProvider (dispatch)            │
+│  - SaverProvider (dispatch)             │
+│  - SparkWorkflowNode                    │
+│  - PandasWorkflowNode (create new)      │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│  CONNECTION LAYER (keep from v2)        │
+│  - BaseConnection (interface)           │
+│  - AzureBlobConnection                  │
+│  - DeltaConnection                      │
+│  - SQLConnection                        │
+│  - LocalConnection                      │
+└─────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────┐
+│  IMPLEMENTATION LAYER (keep from v2)    │
+│  - PandasDataReader/Saver               │
+│  - SparkDataReader/Saver                │
+│  - Actual I/O operations                │
+└─────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="core-concepts">Core Concepts</h2>
+<h3 id="1-node"><strong>1. Node</strong></h3>
+<p>A Node is the fundamental unit of work. Every node follows the pattern:</p>
+<p><strong>reads → transform → creates</strong></p>
+<pre><code class="language-yaml">- name: node_name           # Required (for lineage)
+  depends_on: [...]         # Optional (explicit dependencies)
+
+  read:                     # Optional (what it reads)
+    connection: name
+    table/path: ...
+
+  transform:                # Optional (what it does)
+    steps: [...]
+
+  write:                    # Optional (what it creates)
+    connection: name
+    table/path: ...
+
+  cache: true/false         # Optional (explicit optimization)
+</code></pre>
+<p><strong>At least ONE of read/transform/write must be present.</strong></p>
+<p><strong>Node Types:</strong></p>
+<ul>
+<li><strong>Read-only</strong>: Loads data into context</li>
+<li><strong>Transform-only</strong>: Processes data in memory</li>
+<li><strong>Write-only</strong>: Persists data from context</li>
+<li><strong>Full pipeline</strong>: Does all three</li>
+</ul>
+<h3 id="2-pipeline"><strong>2. Pipeline</strong></h3>
+<p>A collection of nodes with explicit dependencies. Each project can have multiple pipelines.</p>
+<pre><code class="language-yaml">pipeline: nkc_dryer_1
+
+nodes:
+  - name: aspentags
+    read: {...}
+
+  - name: process_data
+    depends_on: [aspentags]
+    transform: {...}
+
+  - name: save_result
+    depends_on: [process_data]
+    write: {...}
+</code></pre>
+<h3 id="3-project"><strong>3. Project</strong></h3>
+<p>A self-contained data engineering project with:
+- Connections (infrastructure)
+- Multiple pipelines (work definitions)
+- Optional layers (execution ordering)
+- Global settings</p>
+<p>Each project = one git repo = one Python package (like Energy Efficiency).</p>
+<h3 id="4-connection"><strong>4. Connection</strong></h3>
+<p>Infrastructure for accessing data. Defined once in project manifest, referenced by name everywhere.</p>
+<pre><code class="language-yaml">connections:
+  azure_bronze:
+    type: azure_blob
+    account: ${AZURE_ACCOUNT}
+    container: bronze
+
+  delta_silver:
+    type: delta
+    catalog: main
+    schema: silver
+</code></pre>
+<h3 id="5-dependency-graph"><strong>5. Dependency Graph</strong></h3>
+<p>Explicit graph built from <code>depends_on</code> declarations. Enables:
+- Topological sort (execution order)
+- Parallel execution (independent nodes)
+- Lineage tracking (what depends on what)
+- Resume capability (skip completed nodes)</p>
+<h3 id="6-story"><strong>6. Story</strong></h3>
+<p>Automatic documentation generated for every pipeline run showing:
+- What happened in each node
+- Before/after data samples
+- Schema changes
+- Rows processed
+- Duration
+- Success/Failure/Skip status
+- Retry attempts</p>
+<h3 id="7-context"><strong>7. Context</strong></h3>
+<p>Data passing mechanism between nodes:</p>
+<p><strong>Spark:</strong> Temp views registered and referenced by name</p>
+<pre><code class="language-python">context.register_view(&quot;aspentags&quot;, df)
+# Later: spark.sql(&quot;SELECT * FROM aspentags&quot;)
+</code></pre>
+<p><strong>Pandas:</strong> Dictionary of DataFrames</p>
+<pre><code class="language-python">context.data[&quot;aspentags&quot;] = df
+# Later: context.data[&quot;aspentags&quot;]
+</code></pre>
+<hr />
+<h2 id="config-structure">Config Structure</h2>
+<h3 id="project-manifest-projectyaml"><strong>Project Manifest (project.yaml)</strong></h3>
+<p>Located at project root. Defines infrastructure and discovery.</p>
+<pre><code class="language-yaml"># ============================================
+# PROJECT METADATA
+# ============================================
+project: Energy Efficiency
+version: &quot;1.0.0&quot;
+description: &quot;Manufacturing energy efficiency analytics&quot;
+owner: henry.odibi@ingredion.com
+engine: spark  # Default engine (spark or pandas)
+
+# ============================================
+# CONNECTIONS (Infrastructure)
+# ============================================
+connections:
+  azure_bronze:
+    type: azure_blob
+    account_name: ${AZURE_ACCOUNT}  # Environment variables
+    container: bronze
+    auth:
+      key: ${AZURE_KEY}
+
+  azure_silver:
+    type: azure_blob
+    account_name: ${AZURE_ACCOUNT}
+    container: silver
+    auth:
+      key: ${AZURE_KEY}
+
+  sql_warehouse:
+    type: sql_server
+    host: db.company.com
+    database: manufacturing
+    auth:
+      user: ${SQL_USER}
+      password: ${SQL_PASSWORD}
+
+# ============================================
+# PIPELINE DISCOVERY
+# ============================================
+pipelines:
+  # Glob patterns to find all pipeline configs
+  - path: pipelines/bronze/**/*.yaml
+    layer: bronze
+
+  - path: pipelines/silver/**/*.yaml
+    layer: silver
+
+  - path: pipelines/gold/**/*.yaml
+    layer: gold
+
+# ============================================
+# EXECUTION LAYERS (Optional - for ordering)
+# ============================================
+layers:
+  bronze:
+    depends_on: []
+    parallel: true  # All bronze pipelines run in parallel
+
+  silver_1:
+    depends_on: [bronze]
+    parallel: true
+
+  silver_2:
+    depends_on: [silver_1]
+    parallel: true
+
+  gold:
+    depends_on: [silver_2]
+    parallel: false  # Run sequentially
+
+# ============================================
+# GLOBAL DEFAULTS
+# ============================================
+defaults:
+  retry:
+    enabled: true
+    max_attempts: 3
+    backoff: exponential  # 1s, 2s, 4s
+
+  logging:
+    level: INFO  # DEBUG, INFO, WARNING, ERROR
+    structured: false  # JSON logs if true
+    metadata:  # Optional: added to all logs
+      project: Energy Efficiency
+      environment: prod
+
+  story:
+    auto_generate: true
+    max_sample_rows: 10
+    output_path: stories/
+
+# ============================================
+# ENVIRONMENTS (Optional)
+# ============================================
+environments:
+  qat:
+    database_prefix: qat_
+    logging:
+      level: DEBUG
+
+  prod:
+    database_prefix: prod_
+    logging:
+      level: WARNING
+</code></pre>
+<h3 id="pipeline-config-pipelinessilverdryer_1yaml"><strong>Pipeline Config (pipelines/silver/dryer_1.yaml)</strong></h3>
+<p>Individual pipeline definition. Can be organized however makes sense for the project.</p>
+<pre><code class="language-yaml"># ============================================
+# PIPELINE METADATA
+# ============================================
+pipeline: nkc_dryer_1
+description: &quot;NKC Germ Dryer 1 - Silver layer processing&quot;
+layer: silver  # Optional: for organization
+
+# ============================================
+# NODES
+# ============================================
+nodes:
+  # Node 1: Load reference data
+  - name: aspentags
+    description: &quot;Load equipment tag configuration&quot;
+    read:
+      connection: azure_bronze
+      path: delta/aspentags
+      format: delta  # Delta is a format, not a connection
+    cache: true  # Used by many downstream nodes
+
+  # Node 2: Load bronze data
+  - name: dryer_bronze
+    description: &quot;Load raw dryer sensor data&quot;
+    read:
+      connection: azure_bronze
+      path: delta/nkc_dryer_1_bronze
+      format: delta
+
+  # Node 3: Enrich and transform
+  - name: dryer_cleaned
+    description: &quot;Join with tags, pivot, calculate metrics&quot;
+    depends_on: [aspentags, dryer_bronze]
+    transform:
+      steps:
+        # SQL step
+        - &quot;SELECT * FROM dryer_bronze&quot;
+
+        # Pivot operation (config)
+        - operation: pivot
+          params:
+            group_by: [Time_Stamp, Plant, Asset]
+            pivot_column: Description
+            value_column: Value
+            agg_func: first
+
+        # Python function with params (tuple)
+        - function: get_asset_constants
+          params:
+            tags_table: aspentags
+            plant: NKC
+            asset: &quot;Germ Dryer 1&quot;
+
+        # Another Python function
+        - function: calc_efficiency
+          params:
+            enthalpy_col: Dryer_Steam_h
+
+    # Optional validation
+    validate:
+      schema:
+        required_columns: [Time_Stamp, Plant, Asset, Efficiency]
+        types:
+          Efficiency: float
+      not_empty: true
+
+  # Node 4: Write to silver
+  - name: dryer_output
+    description: &quot;Persist cleaned data to silver layer&quot;
+    depends_on: [dryer_cleaned]
+    write:
+      connection: azure_silver
+      path: delta/nkc_dryer_1_cleaned
+      format: delta
+      mode: overwrite
+</code></pre>
+<hr />
+<h2 id="node-specification">Node Specification</h2>
+<h3 id="node-schema-pydantic"><strong>Node Schema (Pydantic)</strong></h3>
+<pre><code class="language-python">from pydantic import BaseModel
+from typing import Optional, List, Dict, Any, Union
+
+class ReadConfig(BaseModel):
+    connection: str  # References project.yaml connection
+    format: str  # Required: csv, parquet, json, delta, avro, sql, etc.
+    table: Optional[str]  # For SQL/Delta tables
+    path: Optional[str]   # For file-based sources
+    options: Dict[str, Any] = {}  # Format-specific options
+
+class TransformConfig(BaseModel):
+    steps: List[Union[str, Dict, tuple]]  # SQL, config, or (function, params)
+
+class WriteConfig(BaseModel):
+    connection: str
+    format: str  # Required: csv, parquet, json, delta, avro, sql, etc.
+    table: Optional[str]  # For SQL/Delta tables
+    path: Optional[str]   # For file-based destinations
+    mode: str = &quot;overwrite&quot;  # overwrite, append
+    options: Dict[str, Any] = {}  # Format-specific options
+
+class ValidationConfig(BaseModel):
+    schema: Optional[Dict] = None
+    not_empty: bool = False
+    no_nulls: List[str] = []
+
+class NodeConfig(BaseModel):
+    name: str  # Required for lineage
+    description: Optional[str] = None
+    depends_on: List[str] = []
+
+    # At least one required
+    read: Optional[ReadConfig] = None
+    transform: Optional[TransformConfig] = None
+    write: Optional[WriteConfig] = None
+
+    # Optional
+    cache: bool = False
+    validate: Optional[ValidationConfig] = None
+
+    @validator('name')
+    def validate_at_least_one_operation(cls, v, values):
+        if not any([values.get('read'), values.get('transform'), values.get('write')]):
+            raise ValueError(&quot;Node must have at least one of: read, transform, write&quot;)
+        return v
+</code></pre>
+<hr />
+<h2 id="execution-model">Execution Model</h2>
+<h3 id="execution-flow"><strong>Execution Flow</strong></h3>
+<pre><code>1. LOAD PROJECT MANIFEST
+   ├─ Parse project.yaml
+   ├─ Resolve environment variables
+   ├─ Initialize connections
+   └─ Discover pipeline configs (glob patterns)
+
+2. LOAD PIPELINE CONFIGS
+   ├─ Parse all pipeline YAML files
+   ├─ Validate with Pydantic schemas
+   └─ Build complete list of nodes
+
+3. BUILD DEPENDENCY GRAPH
+   ├─ Parse all depends_on declarations
+   ├─ Validate all dependencies exist
+   ├─ Check for circular dependencies
+   └─ Topological sort for execution order
+
+4. EXECUTE NODES
+   ├─ Identify nodes ready to run (no pending dependencies)
+   ├─ Execute in parallel (ThreadPoolExecutor)
+   │  ├─ Resolve connection by name
+   │  ├─ Execute read (if present)
+   │  ├─ Execute transform (if present)
+   │  ├─ Execute write (if present)
+   │  ├─ Capture metadata (duration, rows, etc.)
+   │  └─ Store result in context
+   ├─ Mark completed
+   ├─ Find newly ready nodes
+   └─ Repeat until all nodes complete or fail
+
+5. HANDLE FAILURES
+   ├─ Retry failed node (if configured)
+   ├─ If all retries fail: mark as FAILED
+   ├─ Skip dependent nodes (mark as SKIPPED)
+   └─ Continue with independent nodes
+
+6. GENERATE STORY
+   ├─ Collect metadata from all nodes
+   ├─ Build before/after snapshots
+   ├─ Generate HTML story
+   └─ Save to configured location
+</code></pre>
+<h3 id="parallel-execution-strategy"><strong>Parallel Execution Strategy</strong></h3>
+<pre><code class="language-python">from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def execute_pipeline(nodes, context):
+    completed = set()
+    failed = set()
+    skipped = set()
+
+    # Build dependency map
+    deps = {node.name: node.depends_on for node in nodes}
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        while len(completed) + len(failed) + len(skipped) &lt; len(nodes):
+            # Find ready nodes
+            ready = [
+                node for node in nodes
+                if node.name not in completed
+                and node.name not in failed
+                and node.name not in skipped
+                and all(dep in completed for dep in node.depends_on)
+            ]
+
+            if not ready and not running:
+                # No more nodes can run
+                break
+
+            # Submit ready nodes
+            futures = {
+                executor.submit(execute_node, node, context): node
+                for node in ready
+            }
+
+            # Wait for completion
+            for future in as_completed(futures):
+                node = futures[future]
+                try:
+                    result = future.result()
+                    if result.success:
+                        completed.add(node.name)
+                    else:
+                        failed.add(node.name)
+                        # Skip all dependents
+                        skip_dependents(node, deps, skipped)
+                except Exception as e:
+                    failed.add(node.name)
+                    skip_dependents(node, deps, skipped)
+
+    return completed, failed, skipped
+</code></pre>
+<h3 id="retry-logic"><strong>Retry Logic</strong></h3>
+<pre><code class="language-python">def execute_node_with_retry(node, context, max_attempts=3):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            logger.info(f&quot;→ {node.name} (attempt {attempt}/{max_attempts})&quot;)
+            result = node.execute(context)
+            logger.info(f&quot;  ✓ {node.name} completed ({result.duration:.1f}s)&quot;)
+            return result
+        except Exception as e:
+            logger.warning(f&quot;  ✗ {node.name} failed (attempt {attempt}): {e}&quot;)
+            if attempt == max_attempts:
+                logger.error(f&quot;  ✗ {node.name} FAILED after {max_attempts} attempts&quot;)
+                raise
+            # Exponential backoff
+            time.sleep(2 ** (attempt - 1))
+</code></pre>
+<h3 id="resume-capability"><strong>Resume Capability</strong></h3>
+<pre><code class="language-python">def should_skip_node(node, context, resume=False):
+    &quot;&quot;&quot;Check if node output already exists and is recent&quot;&quot;&quot;
+    if not resume:
+        return False
+
+    if not node.write:
+        return False  # Transform-only nodes always run
+
+    # Check if output exists
+    if node.write.table:
+        exists = context.check_table_exists(
+            connection=node.write.connection,
+            table=node.write.table
+        )
+        if exists:
+            logger.info(f&quot;  ⊙ {node.name} SKIPPED (output exists)&quot;)
+            return True
+
+    return False
+</code></pre>
+<hr />
+<h2 id="what-we-keep-from-v2">What We Keep from v2</h2>
+<h3 id="connection-layer-95-as-is"><strong>Connection Layer (95% as-is)</strong></h3>
+<p>✅ <strong>Keep entirely:</strong>
+- <code>BaseConnection</code> interface
+- <code>AzureBlobConnection</code>
+- <code>SQLConnection</code>
+- <code>LocalConnection</code></p>
+<p><strong>Why:</strong> Clean abstraction, works perfectly, easy to extend (AWS/GCP).</p>
+<p><strong>Note:</strong> Delta is a <strong>format</strong>, not a connection type. Delta tables are read/written via storage connections (Azure, S3, local) with <code>format: delta</code>.</p>
+<p><strong>Location in v2:</strong></p>
+<pre><code>odibi_de_v2/connector/
+  ├── base_connector.py
+  ├── azure/azure_blob_connector.py
+  ├── sql/sql_database_connection.py
+  └── local/local_connection.py
+</code></pre>
+<p><strong>Delta Format Support:</strong></p>
+<p>Delta tables are handled by readers/savers, not connections:</p>
+<p><strong>Spark (native support):</strong></p>
+<pre><code class="language-python"># Read
+df = spark.read.format(&quot;delta&quot;).load(path)
+
+# Write
+df.write.format(&quot;delta&quot;).mode(&quot;overwrite&quot;).save(path)
+</code></pre>
+<p><strong>Pandas (requires deltalake package):</strong></p>
+<pre><code class="language-python">from deltalake import DeltaTable, write_deltalake
+
+# Read
+dt = DeltaTable(path)
+df = dt.to_pandas()
+
+# Write
+write_deltalake(path, df, mode=&quot;overwrite&quot;)
+</code></pre>
+<p><strong>Installation:</strong></p>
+<pre><code class="language-bash">pip install odibi[spark]  # Includes native Delta support
+pip install odibi[delta]  # Adds deltalake for Pandas Delta support
+</code></pre>
+<h3 id="provider-pattern-100-as-is"><strong>Provider Pattern (100% as-is)</strong></h3>
+<p>✅ <strong>Keep entirely:</strong>
+- <code>ReaderProvider</code> (engine dispatch)
+- <code>SaverProvider</code> (engine dispatch)</p>
+<p><strong>Why:</strong> Perfect for engine-agnostic node execution.</p>
+<p><strong>Location in v2:</strong></p>
+<pre><code>odibi_de_v2/ingestion/reader_provider.py
+odibi_de_v2/storage/saver_provider.py
+</code></pre>
+<h3 id="readersaver-implementations-100-as-is"><strong>Reader/Saver Implementations (100% as-is)</strong></h3>
+<p>✅ <strong>Keep entirely:</strong>
+- <code>PandasDataReader</code>
+- <code>SparkDataReader</code>
+- <code>PandasDataSaver</code>
+- <code>SparkDataSaver</code>
+- All format support (CSV, Parquet, JSON, AVRO, SQL, etc.)</p>
+<p><strong>Why:</strong> Battle-tested, handles all formats, works.</p>
+<p><strong>Location in v2:</strong></p>
+<pre><code>odibi_de_v2/ingestion/pandas/pandas_data_reader.py
+odibi_de_v2/ingestion/spark/spark_data_reader.py
+odibi_de_v2/storage/pandas/pandas_data_saver.py
+odibi_de_v2/storage/spark/spark_data_saver.py
+</code></pre>
+<h3 id="sparkworkflownode-100-as-is"><strong>SparkWorkflowNode (100% as-is)</strong></h3>
+<p>✅ <strong>Keep entirely:</strong>
+- Accepts SQL strings
+- Accepts Python functions
+- Accepts config operations
+- Temp view management
+- Step-by-step execution</p>
+<p><strong>Why:</strong> Core transform pattern that works perfectly.</p>
+<p><strong>Location in v2:</strong></p>
+<pre><code>odibi_de_v2/transformer/spark/spark_workflow_node.py
+</code></pre>
+<h3 id="transformationstory-extend"><strong>TransformationStory (Extend)</strong></h3>
+<p>✅ <strong>Keep and extend:</strong>
+- Before/after snapshots
+- Schema change tracking
+- HTML generation
+- Collapsible sections</p>
+<p><strong>Add:</strong>
+- Read node visualization
+- Write node visualization
+- Full pipeline narrative
+- Retry tracking
+- Skip tracking</p>
+<p><strong>Location in v2:</strong></p>
+<pre><code>odibi_de_v2/transformer/visualization/transformation_story.py
+</code></pre>
+<h3 id="core-enums-keep"><strong>Core Enums (Keep)</strong></h3>
+<p>✅ <strong>Keep:</strong>
+- <code>Framework</code> (SPARK, PANDAS, LOCAL)
+- <code>DataType</code> (CSV, PARQUET, JSON, SQL, etc.)</p>
+<p><strong>Location in v2:</strong></p>
+<pre><code>odibi_de_v2/core/enums.py
+</code></pre>
+<h3 id="utilities-selective"><strong>Utilities (Selective)</strong></h3>
+<p>✅ <strong>Keep:</strong>
+- <code>@benchmark</code> decorator (for timing)
+- Type checking utilities
+- String utilities</p>
+<p>❌ <strong>Drop:</strong>
+- <code>@log_call</code> decorator (use standard logging)
+- <code>@enforce_types</code> (use Pydantic + type hints)
+- Complex metadata manager (use stories)</p>
+<p><strong>Location in v2:</strong></p>
+<pre><code>odibi_de_v2/utils/decorators/
+</code></pre>
+<hr />
+<h2 id="what-we-build-new">What We Build New</h2>
+<h3 id="1-config-system"><strong>1. Config System</strong></h3>
+<p><strong>New components:</strong>
+- YAML parser
+- Pydantic schemas for validation
+- Project manifest loader
+- Environment variable resolution
+- Pipeline discovery (glob patterns)</p>
+<p><strong>Structure:</strong></p>
+<pre><code>odibi/config/
+  ├── schemas.py          # Pydantic models
+  ├── loader.py           # YAML loading + validation
+  ├── manifest.py         # Project manifest handling
+  └── env.py              # Environment variable resolution
+</code></pre>
+<h3 id="2-orchestration-engine"><strong>2. Orchestration Engine</strong></h3>
+<p><strong>New components:</strong>
+- Dependency graph builder
+- Topological sort
+- Parallel executor (ThreadPoolExecutor)
+- Retry logic
+- Skip logic (on dependency failure)
+- Resume logic (skip completed nodes)</p>
+<p><strong>Structure:</strong></p>
+<pre><code>odibi/orchestration/
+  ├── graph.py            # Dependency graph builder
+  ├── executor.py         # Parallel execution engine
+  ├── retry.py            # Retry logic
+  └── resume.py           # Resume capability
+</code></pre>
+<h3 id="3-node-abstraction"><strong>3. Node Abstraction</strong></h3>
+<p><strong>New components:</strong>
+- Base Node class
+- ReadNode, TransformNode, WriteNode
+- Context (Spark temp views / Pandas dict)
+- Metadata capture</p>
+<p><strong>Structure:</strong></p>
+<pre><code>odibi/nodes/
+  ├── base.py             # Base Node abstraction
+  ├── read.py             # ReadNode
+  ├── transform.py        # TransformNode
+  ├── write.py            # WriteNode
+  └── context.py          # Context for data passing
+</code></pre>
+<h3 id="4-pandasworkflownode"><strong>4. PandasWorkflowNode</strong></h3>
+<p><strong>New component:</strong>
+- Same interface as SparkWorkflowNode
+- Accepts SQL strings (via <strong>DuckDB</strong> - fast, feature-rich, industry standard)
+- Accepts Python functions
+- Accepts config operations (pivot, unpivot, derived)
+- DataFrame passing</p>
+<p><strong>Why DuckDB:</strong>
+- Fast (C++ implementation)
+- Full SQL support (window functions, CTEs, complex joins)
+- Direct Pandas integration: <code>duckdb.query("SELECT * FROM df")</code>
+- Matches SparkWorkflowNode feature parity
+- Industry momentum (used by dbt, Jupyter, Ibis)</p>
+<p><strong>Structure:</strong></p>
+<pre><code>odibi/transform/
+  ├── spark_workflow.py   # SparkWorkflowNode (from v2)
+  └── pandas_workflow.py  # PandasWorkflowNode (new, uses DuckDB for SQL)
+</code></pre>
+<h3 id="5-story-generator"><strong>5. Story Generator</strong></h3>
+<p><strong>Extend v2's TransformationStory:</strong>
+- Add pipeline-level story
+- Add read node stories
+- Add write node stories
+- Add retry visualization
+- Add skip visualization</p>
+<p><strong>Structure:</strong></p>
+<pre><code>odibi/story/
+  ├── generator.py        # Story generation orchestration
+  ├── templates.py        # HTML templates
+  └── formatters.py       # Data formatting for display
+</code></pre>
+<h3 id="6-logging"><strong>6. Logging</strong></h3>
+<p><strong>New: Simple Python logging integration:</strong>
+- Standard logging module
+- Configurable levels
+- Optional structured (JSON) logging
+- Metadata injection</p>
+<p><strong>Structure:</strong></p>
+<pre><code>odibi/logging/
+  ├── setup.py            # Logger setup
+  └── formatters.py       # JSON formatter (optional)
+</code></pre>
+<hr />
+<h2 id="what-we-drop-from-v2">What We Drop from v2</h2>
+<h3 id="sql-based-config-system"><strong>❌ SQL-based Config System</strong></h3>
+<p><strong>Drop:</strong>
+- <code>ConfigUtils</code>
+- Config tables in databases
+- <code>TransformerOrchestrator</code> (old orchestration)
+- Config UI helpers</p>
+<p><strong>Reason:</strong> YAML is simpler, more portable, git-friendly.</p>
+<h3 id="heavy-logging-infrastructure"><strong>❌ Heavy Logging Infrastructure</strong></h3>
+<p><strong>Drop:</strong>
+- Singleton logger
+- Custom logging decorators (<code>@log_call</code>)
+- Metadata manager (separate from stories)</p>
+<p><strong>Reason:</strong> Standard Python logging is simpler and sufficient.</p>
+<h3 id="specific-transformers-move-to-separate-package"><strong>❌ Specific Transformers (Move to separate package)</strong></h3>
+<p><strong>Drop from core, move to <code>odibi-transformers</code>:</strong>
+- <code>ColumnAdder</code>
+- <code>ColumnDropper</code>
+- <code>ColumnRenamer</code>
+- <code>ValueReplacer</code>
+- etc.</p>
+<p><strong>Reason:</strong> Users can write their own, or install optional package.</p>
+<h3 id="databricks-specific-bootstrap"><strong>❌ Databricks-specific Bootstrap</strong></h3>
+<p><strong>Drop from core:</strong>
+- <code>init_spark_with_azure_secrets</code>
+- Databricks job helpers
+- Specific orchestration patterns</p>
+<p><strong>Reason:</strong> Make it optional plugin/example, not core dependency.</p>
+<h3 id="over-engineering"><strong>❌ Over-engineering</strong></h3>
+<p><strong>Drop:</strong>
+- Multiple factory layers
+- Unused abstractions
+- Complex decorator chains
+- Premature optimizations</p>
+<p><strong>Reason:</strong> Simplicity and maintainability.</p>
+<hr />
+<h2 id="phase-1-scope-original-v100">Phase 1 Scope (Original - v1.0.0)</h2>
+<p><strong>Status:</strong> ✅ Complete<br />
+<strong>Version:</strong> v1.0.0<br />
+<strong>Completion Date:</strong> October 2025</p>
+<h3 id="deliverables"><strong>Deliverables</strong></h3>
+<p><strong>Week 1-2: Foundation</strong>
+- [x] Pydantic schemas (ProjectConfig, PipelineConfig, NodeConfig)
+- [x] YAML loader with validation
+- [x] Environment variable resolution
+- [x] Project manifest loading
+- [x] Connection validation (on load + lazy validation)
+- [x] Format handling (explicit format required)
+- [x] Basic unit tests (schemas, loader, validation)</p>
+<p><strong>Week 3-4: Orchestration</strong>
+- [x] Dependency graph builder
+- [x] Topological sort
+- [x] Circular dependency detection
+- [x] Node abstraction (base class)
+- [x] Context implementation (Spark temp views + Pandas DuckDB)
+- [x] Unit tests (graph, nodes, context)</p>
+<p><strong>Week 5-6: Execution</strong>
+- [x] Node execution logic (read/transform/write)
+- [x] Provider integration (reuse v2 readers/savers)
+- [x] PandasWorkflowNode (with DuckDB for SQL)
+- [x] Parallel executor (ThreadPoolExecutor)
+- [x] Retry logic
+- [x] Skip logic (dependency failures)
+- [x] Resume logic (skip completed)
+- [x] Integration tests (end-to-end pipelines)</p>
+<p><strong>Week 7-8: Stories &amp; Polish</strong>
+- [x] Extend TransformationStory for full pipeline
+- [x] Read/Write node story visualization
+- [x] Retry/Skip visualization in stories
+- [x] Logging integration (Python logging)
+- [x] Error messages (clear, actionable)
+- [x] Python API (complete interface)
+- [x] Test with Energy Efficiency project (full migration)
+- [x] Package setup (setup.py, dependencies)
+- [x] Documentation (README, examples)
+- [x] Final testing (unit + integration)</p>
+<h3 id="success-criteria"><strong>Success Criteria</strong></h3>
+<p>✅ <strong>Functional:</strong>
+- Energy Efficiency project runs on ODIBI
+- Same config works on Spark AND Pandas
+- 40+ bronze pipelines execute in parallel
+- Dependencies honored correctly
+- Retry on failure works
+- Resume from failure works</p>
+<p>✅ <strong>Quality:</strong>
+- Complete story generated for every run
+- Clear error messages
+- All nodes show success/failure/skip status
+- Lineage graph accurate
+- Performance acceptable (not slower than v2)</p>
+<p>✅ <strong>Usability:</strong>
+- Config structure intuitive
+- Easy to add new pipeline
+- Easy to debug failures
+- Documentation clear</p>
+<h3 id="out-of-scope-for-phase-1"><strong>Out of Scope for Phase 1</strong></h3>
+<p>⏸️ <strong>Phase 2+ features:</strong>
+- CLI beyond Python API
+- Transformer library (separate package)
+- SQL config option
+- Advanced dry-run
+- UI for stories (beyond HTML files)
+- Cost tracking
+- Advanced monitoring</p>
+<hr />
+<h2 id="implementation-details">Implementation Details</h2>
+<h3 id="project-structure"><strong>Project Structure</strong></h3>
+<pre><code>odibi/
+├── config/
+│   ├── __init__.py
+│   ├── schemas.py          # Pydantic models
+│   ├── loader.py           # YAML loading
+│   ├── manifest.py         # Project manifest
+│   └── env.py              # Env var resolution
+│
+├── orchestration/
+│   ├── __init__.py
+│   ├── graph.py            # Dependency graph
+│   ├── executor.py         # Execution engine
+│   ├── retry.py            # Retry logic
+│   └── resume.py           # Resume logic
+│
+├── nodes/
+│   ├── __init__.py
+│   ├── base.py             # Base Node
+│   ├── read.py             # ReadNode
+│   ├── transform.py        # TransformNode
+│   ├── write.py            # WriteNode
+│   └── context.py          # Context
+│
+├── engine/
+│   ├── __init__.py
+│   ├── providers/
+│   │   ├── reader.py       # ReaderProvider (from v2)
+│   │   └── saver.py        # SaverProvider (from v2)
+│   ├── readers/
+│   │   ├── pandas.py       # PandasDataReader (from v2)
+│   │   └── spark.py        # SparkDataReader (from v2)
+│   ├── savers/
+│   │   ├── pandas.py       # PandasDataSaver (from v2)
+│   │   └── spark.py        # SparkDataSaver (from v2)
+│   └── workflow/
+│       ├── spark.py        # SparkWorkflowNode (from v2)
+│       └── pandas.py       # PandasWorkflowNode (new)
+│
+├── connections/
+│   ├── __init__.py
+│   ├── base.py             # BaseConnection (from v2)
+│   ├── azure.py            # AzureBlobConnection (from v2)
+│   ├── sql.py              # SQLConnection (from v2)
+│   └── local.py            # LocalConnection (from v2)
+│
+├── story/
+│   ├── __init__.py
+│   ├── generator.py        # Story generation
+│   ├── templates.py        # HTML templates
+│   └── formatters.py       # Data formatting
+│
+├── logging/
+│   ├── __init__.py
+│   ├── setup.py            # Logger configuration
+│   └── formatters.py       # JSON formatter
+│
+├── utils/
+│   ├── __init__.py
+│   ├── decorators.py       # @benchmark, etc.
+│   └── helpers.py          # General utilities
+│
+├── __init__.py
+├── __version__.py
+└── api.py                  # Main API
+</code></pre>
+<h3 id="key-classes"><strong>Key Classes</strong></h3>
+<p><strong>Node Base:</strong></p>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+from typing import Optional, Any
+
+class Node(ABC):
+    def __init__(self, config: NodeConfig, context: Context):
+        self.config = config
+        self.context = context
+        self.metadata = {}
+
+    @abstractmethod
+    def execute(self) -&gt; NodeResult:
+        &quot;&quot;&quot;Execute node logic&quot;&quot;&quot;
+        pass
+
+    def capture_metadata(self, result: Any):
+        &quot;&quot;&quot;Capture execution metadata&quot;&quot;&quot;
+        self.metadata = {
+            &quot;name&quot;: self.config.name,
+            &quot;duration&quot;: ...,
+            &quot;rows&quot;: ...,
+            &quot;success&quot;: True/False
+        }
+</code></pre>
+<p><strong>Context:</strong></p>
+<pre><code class="language-python">class Context:
+    def __init__(self, engine: str):
+        self.engine = engine
+        self.data = {}  # For Pandas
+        self.views = {}  # For Spark
+        self.spark = None
+
+    def register(self, name: str, data: Any):
+        &quot;&quot;&quot;Register data for downstream nodes&quot;&quot;&quot;
+        if self.engine == &quot;spark&quot;:
+            data.createOrReplaceTempView(name)
+            self.views[name] = data
+        else:
+            self.data[name] = data
+
+    def get(self, name: str) -&gt; Any:
+        &quot;&quot;&quot;Get data by name&quot;&quot;&quot;
+        if self.engine == &quot;spark&quot;:
+            return self.spark.table(name)
+        else:
+            return self.data[name]
+</code></pre>
+<p><strong>Pipeline Executor:</strong></p>
+<pre><code class="language-python">class PipelineExecutor:
+    def __init__(self, pipeline_config, project_config):
+        self.pipeline = pipeline_config
+        self.project = project_config
+        self.context = Context(project_config.engine)
+
+    def execute(self):
+        # Build graph
+        graph = DependencyGraph(self.pipeline.nodes)
+
+        # Execute
+        results = execute_parallel(
+            nodes=graph.topological_sort(),
+            context=self.context,
+            retry_config=self.project.defaults.retry
+        )
+
+        # Generate story
+        story = StoryGenerator(results).generate()
+
+        return results, story
+</code></pre>
+<hr />
+<h2 id="success-criteria_1">Success Criteria</h2>
+<h3 id="phase-1-complete-when"><strong>Phase 1 Complete When:</strong></h3>
+<p><strong>Functional:</strong>
+1. ✅ Energy Efficiency project runs successfully on ODIBI
+2. ✅ All 40+ bronze pipelines execute in parallel
+3. ✅ Silver layer pipelines execute with correct dependencies
+4. ✅ Gold layer pipelines combine data correctly
+5. ✅ Same pipeline config works on both Spark and Pandas
+6. ✅ Node failures trigger retries (configurable)
+7. ✅ Failed nodes skip dependents, continue with independent nodes
+8. ✅ Resume runs skip already-completed nodes</p>
+<p><strong>Quality:</strong>
+1. ✅ Story generated for every pipeline run
+2. ✅ Story shows all nodes (read/transform/write)
+3. ✅ Story shows success/failure/skip/retry status
+4. ✅ Story shows before/after data samples
+5. ✅ Story shows schema changes
+6. ✅ Lineage graph accurate
+7. ✅ Error messages clear and actionable</p>
+<p><strong>Performance:</strong>
+1. ✅ Parallel execution works (40 pipelines run concurrently)
+2. ✅ Not slower than v2 for same workload
+3. ✅ Memory usage reasonable</p>
+<p><strong>Usability:</strong>
+1. ✅ Config structure intuitive (can explain to others)
+2. ✅ Easy to add new pipeline (copy/modify existing)
+3. ✅ Easy to debug failures (story + logs)
+4. ✅ Installation simple (<code>pip install odibi</code>)</p>
+<hr />
+<h2 id="installation-usage">Installation &amp; Usage</h2>
+<h3 id="installation"><strong>Installation</strong></h3>
+<pre><code class="language-bash"># Basic installation
+pip install odibi
+
+# With Spark support
+pip install odibi[spark]
+
+# Development installation
+git clone https://github.com/henryodibi/odibi.git
+cd odibi
+pip install -e .
+</code></pre>
+<h3 id="project-setup"><strong>Project Setup</strong></h3>
+<pre><code class="language-bash"># Create new project
+mkdir my-data-project
+cd my-data-project
+
+# Create structure
+mkdir -p pipelines/bronze pipelines/silver pipelines/gold
+touch project.yaml
+
+# Initialize git
+git init
+</code></pre>
+<h3 id="basic-usage"><strong>Basic Usage</strong></h3>
+<p><strong>Python API:</strong></p>
+<pre><code class="language-python">from odibi import Pipeline
+
+# Run pipeline
+pipeline = Pipeline.from_yaml(&quot;project.yaml&quot;)
+results = pipeline.run()
+
+# Run specific pipeline
+results = pipeline.run(&quot;pipelines/silver/dryer_1.yaml&quot;)
+
+# Resume from failure
+results = pipeline.run(resume=True)
+
+# Run with different engine
+results = pipeline.run(engine=&quot;pandas&quot;)
+</code></pre>
+<p><strong>Command Line (Phase 2):</strong></p>
+<pre><code class="language-bash"># Run all pipelines
+odibi run
+
+# Run specific pipeline
+odibi run pipelines/silver/dryer_1.yaml
+
+# Validate configs
+odibi validate
+
+# Show dependency graph
+odibi graph
+
+# Resume from failure
+odibi run --resume
+</code></pre>
+<h3 id="example-minimal-pipeline"><strong>Example: Minimal Pipeline</strong></h3>
+<p><strong>project.yaml:</strong></p>
+<pre><code class="language-yaml">project: My Project
+engine: pandas
+
+connections:
+  local:
+    type: local
+
+pipelines:
+  - path: pipelines/*.yaml
+</code></pre>
+<p><strong>pipelines/simple.yaml:</strong></p>
+<pre><code class="language-yaml">pipeline: simple_example
+
+nodes:
+  - name: read_csv
+    read:
+      connection: local
+      path: data/input.csv
+
+  - name: filter_data
+    depends_on: [read_csv]
+    transform:
+      steps:
+        - &quot;SELECT * FROM read_csv WHERE amount &gt; 0&quot;
+
+  - name: save_result
+    depends_on: [filter_data]
+    write:
+      connection: local
+      path: data/output.csv
+</code></pre>
+<p><strong>Run:</strong></p>
+<pre><code class="language-python">from odibi import Pipeline
+
+pipeline = Pipeline.from_yaml(&quot;project.yaml&quot;)
+results = pipeline.run()
+
+# Story automatically saved to stories/simple_example_&lt;timestamp&gt;.html
+</code></pre>
+<hr />
+<h2 id="package-dependencies">Package Dependencies</h2>
+<h3 id="core-dependencies-required"><strong>Core Dependencies (required)</strong></h3>
+<pre><code class="language-toml">[project]
+dependencies = [
+    &quot;pydantic&gt;=2.0.0&quot;,      # Config validation
+    &quot;pyyaml&gt;=6.0.0&quot;,        # YAML parsing
+    &quot;typing-extensions&gt;=4.0.0&quot;,  # Type hints
+]
+</code></pre>
+<h3 id="optional-dependencies"><strong>Optional Dependencies</strong></h3>
+<pre><code class="language-toml">[project.optional-dependencies]
+spark = [
+    &quot;pyspark&gt;=3.3.0&quot;,       # Spark engine
+]
+
+pandas = [
+    &quot;pandas&gt;=1.5.0&quot;,        # Pandas engine
+    &quot;duckdb&gt;=0.9.0&quot;,        # SQL support for PandasWorkflowNode
+]
+
+delta = [
+    &quot;deltalake&gt;=0.10.0&quot;,    # Delta Lake for Pandas
+]
+
+azure = [
+    &quot;azure-storage-blob&gt;=12.0.0&quot;,  # Azure Blob Storage
+    &quot;adlfs&gt;=2023.0.0&quot;,             # ADLS support
+]
+
+formats = [
+    &quot;pyarrow&gt;=10.0.0&quot;,      # Parquet support
+    &quot;fastavro&gt;=1.7.0&quot;,      # Avro support
+]
+
+all = [
+    &quot;pyspark&gt;=3.3.0&quot;,
+    &quot;pandas&gt;=1.5.0&quot;,
+    &quot;duckdb&gt;=0.9.0&quot;,
+    &quot;deltalake&gt;=0.10.0&quot;,
+    &quot;azure-storage-blob&gt;=12.0.0&quot;,
+    &quot;adlfs&gt;=2023.0.0&quot;,
+    &quot;pyarrow&gt;=10.0.0&quot;,
+    &quot;fastavro&gt;=1.7.0&quot;,
+]
+
+dev = [
+    &quot;pytest&gt;=7.0.0&quot;,
+    &quot;pytest-cov&gt;=4.0.0&quot;,
+    &quot;black&gt;=23.0.0&quot;,
+    &quot;mypy&gt;=1.0.0&quot;,
+]
+</code></pre>
+<h3 id="installation-examples"><strong>Installation Examples</strong></h3>
+<pre><code class="language-bash"># Minimal (Pandas only)
+pip install odibi
+
+# With Spark
+pip install odibi[spark]
+
+# With Pandas + DuckDB
+pip install odibi[pandas]
+
+# Everything
+pip install odibi[all]
+
+# Development
+pip install odibi[dev]
+</code></pre>
+<hr />
+<h2 id="python-api-specification">Python API Specification</h2>
+<h3 id="basic-usage_1"><strong>Basic Usage</strong></h3>
+<pre><code class="language-python">from odibi import Pipeline
+
+# Load and run entire project
+pipeline = Pipeline.from_yaml(&quot;project.yaml&quot;)
+results = pipeline.run()
+
+# Access results
+print(f&quot;Completed: {len(results.completed)}&quot;)
+print(f&quot;Failed: {len(results.failed)}&quot;)
+print(f&quot;Skipped: {len(results.skipped)}&quot;)
+
+# Get story
+story_path = results.story_path
+print(f&quot;Story saved to: {story_path}&quot;)
+</code></pre>
+<h3 id="run-specific-pipeline"><strong>Run Specific Pipeline</strong></h3>
+<pre><code class="language-python"># Run one pipeline file
+results = pipeline.run_pipeline(&quot;pipelines/silver/dryer_1.yaml&quot;)
+
+# Run by name
+results = pipeline.run_pipeline(name=&quot;nkc_dryer_1&quot;)
+</code></pre>
+<h3 id="run-with-options"><strong>Run with Options</strong></h3>
+<pre><code class="language-python"># Resume from failure
+results = pipeline.run(resume=True)
+
+# Override engine
+results = pipeline.run(engine=&quot;pandas&quot;)
+
+# Run specific node only
+results = pipeline.run_node(&quot;dryer_cleaned&quot;)
+
+# Dry-run (validate only)
+validation = pipeline.validate()
+print(validation.errors)
+</code></pre>
+<h3 id="results-object"><strong>Results Object</strong></h3>
+<pre><code class="language-python">class PipelineResults:
+    completed: List[str]        # Node names that succeeded
+    failed: List[str]           # Node names that failed
+    skipped: List[str]          # Node names that were skipped
+    metadata: Dict[str, Dict]   # Metadata per node
+    story_path: str             # Path to generated story
+    duration: float             # Total execution time
+
+    def get_node_result(self, name: str) -&gt; NodeResult:
+        &quot;&quot;&quot;Get detailed result for specific node&quot;&quot;&quot;
+
+    def to_dict(self) -&gt; Dict:
+        &quot;&quot;&quot;Convert to dictionary&quot;&quot;&quot;
+</code></pre>
+<h3 id="error-handling"><strong>Error Handling</strong></h3>
+<pre><code class="language-python">from odibi import Pipeline
+from odibi.exceptions import (
+    ConfigValidationError,
+    ConnectionError,
+    DependencyError,
+    NodeExecutionError
+)
+
+try:
+    pipeline = Pipeline.from_yaml(&quot;project.yaml&quot;)
+    results = pipeline.run()
+except ConfigValidationError as e:
+    print(f&quot;Config error: {e.message}&quot;)
+    print(f&quot;Location: {e.file}:{e.line}&quot;)
+except ConnectionError as e:
+    print(f&quot;Connection '{e.connection_name}' failed: {e.reason}&quot;)
+except DependencyError as e:
+    print(f&quot;Circular dependency detected: {e.cycle}&quot;)
+except NodeExecutionError as e:
+    print(f&quot;Node '{e.node_name}' failed: {e.error}&quot;)
+    print(f&quot;See story for details: {e.story_path}&quot;)
+</code></pre>
+<h3 id="programmatic-pipeline-building"><strong>Programmatic Pipeline Building</strong></h3>
+<pre><code class="language-python">from odibi import Pipeline, Node, ReadConfig, TransformConfig, WriteConfig
+
+# Build pipeline in Python (alternative to YAML)
+pipeline = Pipeline(
+    project=&quot;My Project&quot;,
+    engine=&quot;pandas&quot;,
+    connections={
+        &quot;local&quot;: LocalConnection()
+    }
+)
+
+# Add nodes
+pipeline.add_node(
+    Node(
+        name=&quot;read_data&quot;,
+        read=ReadConfig(
+            connection=&quot;local&quot;,
+            path=&quot;data/input.csv&quot;,
+            format=&quot;csv&quot;
+        )
+    )
+)
+
+pipeline.add_node(
+    Node(
+        name=&quot;transform&quot;,
+        depends_on=[&quot;read_data&quot;],
+        transform=TransformConfig(
+            steps=[&quot;SELECT * FROM read_data WHERE amount &gt; 0&quot;]
+        )
+    )
+)
+
+results = pipeline.run()
+</code></pre>
+<hr />
+<h2 id="format-handling">Format Handling</h2>
+<h3 id="supported-formats"><strong>Supported Formats</strong></h3>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Spark</th>
+<th>Pandas</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>csv</strong></td>
+<td>✅</td>
+<td>✅</td>
+<td>Native support</td>
+</tr>
+<tr>
+<td><strong>parquet</strong></td>
+<td>✅</td>
+<td>✅</td>
+<td>Requires pyarrow</td>
+</tr>
+<tr>
+<td><strong>json</strong></td>
+<td>✅</td>
+<td>✅</td>
+<td>Native support</td>
+</tr>
+<tr>
+<td><strong>delta</strong></td>
+<td>✅</td>
+<td>✅</td>
+<td>Pandas requires deltalake package</td>
+</tr>
+<tr>
+<td><strong>avro</strong></td>
+<td>✅</td>
+<td>✅</td>
+<td>Requires fastavro</td>
+</tr>
+<tr>
+<td><strong>sql</strong></td>
+<td>✅</td>
+<td>✅</td>
+<td>SQL tables/databases</td>
+</tr>
+</tbody>
+</table>
+<h3 id="format-configuration"><strong>Format Configuration</strong></h3>
+<p><strong>Always explicit (required field):</strong></p>
+<pre><code class="language-yaml">read:
+  connection: azure_bronze
+  path: data/sales.csv
+  format: csv  # REQUIRED - never inferred
+  options:
+    delimiter: &quot;,&quot;
+    header: true
+</code></pre>
+<p><strong>Format-specific options:</strong></p>
+<pre><code class="language-yaml"># CSV
+read:
+  format: csv
+  options:
+    delimiter: &quot;,&quot;
+    header: true
+    encoding: utf-8
+
+# Parquet
+read:
+  format: parquet
+  options:
+    compression: snappy
+
+# Delta
+read:
+  format: delta
+  options:
+    version: 5  # Time travel
+    # OR
+    timestamp: &quot;2025-01-01&quot;
+
+# SQL
+read:
+  format: sql
+  table: sales_fact
+  options:
+    query: &quot;SELECT * FROM sales WHERE year = 2025&quot;
+</code></pre>
+<h3 id="why-explicit-format"><strong>Why Explicit Format?</strong></h3>
+<p>Aligns with core principle: <strong>"If it appears in the story, it must be in the config."</strong></p>
+<ul>
+<li>✅ No magic behavior</li>
+<li>✅ Story shows exactly what user configured</li>
+<li>✅ Clear for teaching/documentation</li>
+<li>✅ Handles edge cases (<code>.dat</code>, <code>.txt</code>, custom extensions)</li>
+<li>✅ Simple validation</li>
+</ul>
+<hr />
+<h2 id="connection-validation-strategy">Connection Validation Strategy</h2>
+<h3 id="two-phase-validation"><strong>Two-Phase Validation</strong></h3>
+<p><strong>Phase 1: Config Validation (on load)</strong></p>
+<pre><code class="language-python"># When loading project.yaml
+- Validate YAML structure (Pydantic)
+- Check required fields present
+- Validate connection types supported
+- Check environment variables defined
+</code></pre>
+<p><strong>Phase 2: Connection Validation (lazy)</strong></p>
+<pre><code class="language-python"># When node first uses connection
+- Test connectivity
+- Validate credentials
+- Check permissions
+- Cache validation result
+</code></pre>
+<h3 id="validation-behavior"><strong>Validation Behavior</strong></h3>
+<pre><code class="language-yaml"># project.yaml
+connections:
+  azure_bronze:
+    type: azure_blob
+    account: ${AZURE_ACCOUNT}
+    validate: eager  # Optional: validate on load (default: lazy)
+</code></pre>
+<p><strong>Eager validation:</strong>
+- Tests all connections when loading project
+- Slower startup
+- Fail-fast (catches connection issues before execution)</p>
+<p><strong>Lazy validation (default):</strong>
+- Tests connection on first use
+- Faster startup
+- Fails when node runs</p>
+<h3 id="error-messages"><strong>Error Messages</strong></h3>
+<pre><code>✗ Connection validation failed: azure_bronze
+  Reason: Unable to authenticate with Azure Blob Storage
+  Account: myaccount
+  Container: bronze
+  Error: AuthenticationError: Invalid credentials
+
+  Check:
+  1. Environment variable AZURE_KEY is set
+  2. Key has correct permissions for container 'bronze'
+  3. Account name 'myaccount' is correct
+</code></pre>
+<hr />
+<h2 id="testing-strategy">Testing Strategy</h2>
+<h3 id="unit-tests"><strong>Unit Tests</strong></h3>
+<p><strong>Config Layer:</strong>
+- [ ] Pydantic schema validation
+- [ ] YAML parsing (valid + invalid)
+- [ ] Environment variable resolution
+- [ ] Connection validation</p>
+<p><strong>Orchestration Layer:</strong>
+- [ ] Dependency graph builder
+- [ ] Topological sort
+- [ ] Circular dependency detection
+- [ ] Parallel execution logic</p>
+<p><strong>Node Layer:</strong>
+- [ ] Node execution (read/transform/write)
+- [ ] Context (Spark + Pandas)
+- [ ] Retry logic
+- [ ] Skip logic</p>
+<p><strong>Engine Layer:</strong>
+- [ ] Provider dispatch
+- [ ] Format handling
+- [ ] Connection resolution</p>
+<h3 id="integration-tests"><strong>Integration Tests</strong></h3>
+<p><strong>End-to-end pipelines:</strong></p>
+<pre><code class="language-python">def test_simple_pipeline():
+    &quot;&quot;&quot;Test: CSV read → transform → Parquet write&quot;&quot;&quot;
+    pipeline = Pipeline.from_yaml(&quot;tests/fixtures/simple.yaml&quot;)
+    results = pipeline.run()
+
+    assert len(results.completed) == 3
+    assert len(results.failed) == 0
+    assert output_file_exists(&quot;output.parquet&quot;)
+
+def test_parallel_execution():
+    &quot;&quot;&quot;Test: 10 independent nodes run in parallel&quot;&quot;&quot;
+    start = time.time()
+    results = pipeline.run()
+    duration = time.time() - start
+
+    # Should take ~1x time, not 10x (parallel)
+    assert duration &lt; 2.0  # Each node takes 1s
+    assert len(results.completed) == 10
+
+def test_retry_and_skip():
+    &quot;&quot;&quot;Test: Node fails → retries → skips dependents&quot;&quot;&quot;
+    results = pipeline.run()
+
+    assert &quot;failing_node&quot; in results.failed
+    assert &quot;dependent_node&quot; in results.skipped
+    assert results.metadata[&quot;failing_node&quot;][&quot;attempts&quot;] == 3
+</code></pre>
+<h3 id="test-fixtures"><strong>Test Fixtures</strong></h3>
+<pre><code>tests/
+├── fixtures/
+│   ├── simple.yaml          # Simple 3-node pipeline
+│   ├── parallel.yaml        # 10 parallel nodes
+│   ├── dependencies.yaml    # Complex dependency graph
+│   ├── data/
+│   │   ├── input.csv
+│   │   └── reference.json
+└── test_*.py
+</code></pre>
+<h3 id="mocking"><strong>Mocking</strong></h3>
+<pre><code class="language-python">from unittest.mock import Mock
+from odibi.connections import AzureBlobConnection
+
+def test_azure_connection():
+    &quot;&quot;&quot;Test connection without actual Azure credentials&quot;&quot;&quot;
+    mock_conn = Mock(spec=AzureBlobConnection)
+    mock_conn.get_file_path.return_value = &quot;abfss://container/path&quot;
+
+    node = ReadNode(connection=mock_conn, path=&quot;data.csv&quot;)
+    # Test node logic without real Azure
+</code></pre>
+<hr />
+<h2 id="migration-from-v2-to-odibi">Migration from v2 to ODIBI</h2>
+<h3 id="example-energy-efficiency-dryer-pipeline"><strong>Example: Energy Efficiency Dryer Pipeline</strong></h3>
+<p><strong>v2 (Python function):</strong></p>
+<pre><code class="language-python">def process_nkc_germ_dryer_1(**kwargs):
+    steps = [
+        (get_energy_efficiency_data, {
+            &quot;source_table&quot;: &quot;qat_energy_efficiency.nkc_germ_dryer_1_bronze&quot;,
+            &quot;tags_table&quot;: &quot;qat_energy_efficiency.aspentags&quot;,
+        }),
+        {&quot;step_type&quot;: &quot;config&quot;, &quot;step_value&quot;: &quot;pivot&quot;, &quot;params&quot;: {...}},
+        (get_asset_constants, {...}),
+    ]
+    return run_standard_transformation(steps=steps, ...)
+</code></pre>
+<p><strong>ODIBI (YAML config):</strong></p>
+<pre><code class="language-yaml">pipeline: nkc_germ_dryer_1
+
+nodes:
+  - name: aspentags
+    read:
+      connection: azure_bronze
+      path: delta/aspentags
+      format: delta
+    cache: true
+
+  - name: dryer_bronze
+    read:
+      connection: azure_bronze
+      path: delta/nkc_germ_dryer_1_bronze
+      format: delta
+
+  - name: dryer_enriched
+    depends_on: [aspentags, dryer_bronze]
+    transform:
+      steps:
+        - function: get_energy_efficiency_data
+          params:
+            source_table: dryer_bronze
+            tags_table: aspentags
+        - operation: pivot
+          params: {...}
+        - function: get_asset_constants
+          params: {...}
+
+  - name: dryer_output
+    depends_on: [dryer_enriched]
+    write:
+      connection: azure_silver
+      path: delta/nkc_germ_dryer_1_cleaned
+      format: delta
+      mode: overwrite
+</code></pre>
+<h3 id="key-changes"><strong>Key Changes</strong></h3>
+<ol>
+<li>✅ <strong>Python → YAML</strong>: Logic in config, not code</li>
+<li>✅ <strong>Explicit dependencies</strong>: <code>depends_on</code> instead of implicit flow</li>
+<li>✅ <strong>Explicit nodes</strong>: Each operation is a named node</li>
+<li>✅ <strong>Connections</strong>: Defined once, referenced by name</li>
+<li>✅ <strong>Format</strong>: Always explicit</li>
+</ol>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<h3 id="after-phase-1"><strong>After Phase 1:</strong></h3>
+<p><strong>Phase 2: Polish &amp; Extend</strong>
+- CLI tools
+- Advanced validation (dry-run)
+- Performance optimizations
+- More connection types (AWS S3, GCP)</p>
+<p><strong>Phase 3: Ecosystem</strong>
+- <code>odibi-transformers</code> package (pre-built transformers)
+- <code>odibi-databricks</code> plugin (Databricks helpers)
+- Template generators
+- Migration tools (v2 → ODIBI)</p>
+<p><strong>Phase 4: Community</strong>
+- Documentation site
+- Tutorial videos
+- Example projects
+- Community contributions</p>
+<hr />
+<h2 id="questions-decisions-log">Questions &amp; Decisions Log</h2>
+<p><strong>Q: Should connections be nodes?</strong><br />
+<strong>A:</strong> No. Connections are infrastructure, defined in project.yaml. Nodes reference them by name.</p>
+<p><strong>Q: Should references be auto-available?</strong><br />
+<strong>A:</strong> No. Everything must be an explicit node with dependencies.</p>
+<p><strong>Q: Should caching be automatic?</strong><br />
+<strong>A:</strong> No. User decides via <code>cache: true</code> in config.</p>
+<p><strong>Q: Should logging be complex?</strong><br />
+<strong>A:</strong> No. Use Python's standard logging module. Stories capture everything else.</p>
+<p><strong>Q: Should we use events?</strong><br />
+<strong>A:</strong> No. Direct execution with metadata capture is simpler.</p>
+<p><strong>Q: Backward compatibility with v2?</strong><br />
+<strong>A:</strong> No. Clean slate. ODIBI is a new framework.</p>
+<p><strong>Q: Should we stop on first failure?</strong><br />
+<strong>A:</strong> No. Retry, then skip dependents, continue with independent nodes.</p>
+<p><strong>Q: Should everything be in one repo?</strong><br />
+<strong>A:</strong> Core in one repo. Transformers in separate package later.</p>
+<p><strong>Q: Should we use layers for execution ordering?</strong><br />
+<strong>A:</strong> No. Node dependencies already provide ordering. Layers are redundant and add complexity. Use folder organization for human readability only.</p>
+<hr />
+<h2 id="implementation-refinements">Implementation Refinements</h2>
+<h3 id="simplifications-applied"><strong>Simplifications Applied</strong></h3>
+<h4 id="1-layers-deprecated-optional-future-feature"><strong>1. Layers Deprecated (Optional Future Feature)</strong></h4>
+<p><strong>Decision:</strong> Drop layers from v1.0. Node dependencies provide all necessary ordering and parallelization.</p>
+<p><strong>Rationale:</strong>
+- Dependency graph already handles execution order
+- Layers add second dependency system that can conflict
+- Lineage tracking uses node <code>depends_on</code>, not layers
+- Storage defined per node in <code>write.connection</code>/<code>write.path</code></p>
+<p><strong>Keep:</strong> Folder structure for organization (<code>pipelines/bronze/</code>, <code>/silver/</code>, <code>/gold/</code>)<br />
+<strong>Drop:</strong> Layer execution enforcement in project.yaml</p>
+<p>If needed later, layers can be added as a visualization/grouping feature without affecting execution.</p>
+<hr />
+<h4 id="2-unified-context-api"><strong>2. Unified Context API</strong></h4>
+<p><strong>Problem:</strong> Different APIs for Spark vs Pandas breaks engine-agnostic transforms.</p>
+<p><strong>Solution:</strong> Single interface that works for both engines:</p>
+<pre><code class="language-python">class Context:
+    &quot;&quot;&quot;Unified data context for node execution.&quot;&quot;&quot;
+
+    def register(self, name: str, df: Union[SparkDF, PandasDF]) -&gt; None:
+        &quot;&quot;&quot;Register DataFrame for use in downstream nodes.&quot;&quot;&quot;
+
+    def get(self, name: str) -&gt; Union[SparkDF, PandasDF]:
+        &quot;&quot;&quot;Retrieve registered DataFrame.&quot;&quot;&quot;
+
+    def has(self, name: str) -&gt; bool:
+        &quot;&quot;&quot;Check if DataFrame exists in context.&quot;&quot;&quot;
+</code></pre>
+<p><strong>Implementation:</strong>
+- <strong>Spark backend:</strong> Uses temp views (<code>createOrReplaceTempView</code>)
+- <strong>Pandas backend:</strong> Uses dictionary storage
+- <strong>Transform functions:</strong> Engine-agnostic by default</p>
+<pre><code class="language-yaml"># Same config works on both engines
+transform:
+  steps:
+    - &quot;SELECT * FROM aspentags WHERE plant = 'NKC'&quot;
+    - function: enrich_data
+      params:
+        reference_table: aspentags  # Works on both engines
+</code></pre>
+<hr />
+<h4 id="3-smart-format-inference-v11-feature"><strong>3. Smart Format Inference (v1.1 Feature)</strong></h4>
+<p><strong>v1.0:</strong> Format required (explicit over implicit)</p>
+<pre><code class="language-yaml">read:
+  path: data/sales.csv
+  format: csv  # REQUIRED
+</code></pre>
+<p><strong>v1.1:</strong> Infer from extension, allow override</p>
+<pre><code class="language-yaml"># Inferred (80% of cases)
+read:
+  path: data/sales.csv  # format: csv (auto-detected)
+
+# Explicit override (edge cases)
+read:
+  path: data/export.dat
+  format: csv  # .dat file is actually CSV
+</code></pre>
+<p><strong>Story always shows actual format used</strong> (whether inferred or explicit).</p>
+<hr />
+<h3 id="critical-missing-pieces"><strong>Critical Missing Pieces</strong></h3>
+<h4 id="1-function-registry-with-type-system"><strong>1. Function Registry with Type System</strong></h4>
+<p><strong>Problem:</strong> Users can't discover available functions or required params.</p>
+<p><strong>Solution:</strong> Decorator-based registry with type hints:</p>
+<pre><code class="language-python"># In user's transformation module
+from odibi import transform
+from odibi.context import Context
+from typing import Optional
+import pandas as pd
+
+@transform
+def get_asset_constants(
+    context: Context,
+    tags_table: str,
+    plant: str,
+    asset: str,
+    default_efficiency: Optional[float] = 0.85
+) -&gt; pd.DataFrame:
+    &quot;&quot;&quot;Get constant values for specific asset from tags table.
+
+    Args:
+        tags_table: Name of registered tags DataFrame
+        plant: Plant code (e.g., 'NKC')
+        asset: Asset name (e.g., 'Germ Dryer 1')
+        default_efficiency: Fallback efficiency value
+
+    Returns:
+        DataFrame with asset constants
+    &quot;&quot;&quot;
+    tags = context.get(tags_table)
+    filtered = tags[
+        (tags['Plant'] == plant) &amp;
+        (tags['Asset'] == asset)
+    ]
+    return filtered
+
+# Usage in YAML (with validation)
+transform:
+  steps:
+    - function: get_asset_constants
+      params:
+        tags_table: aspentags
+        plant: NKC
+        asset: &quot;Germ Dryer 1&quot;
+        # default_efficiency: optional, uses 0.85
+</code></pre>
+<p><strong>Benefits:</strong>
+- Runtime param validation against function signature
+- Auto-generated docs from docstrings
+- IDE autocomplete (via JSON schema generation)
+- Clear error: <code>Missing required parameter 'plant' for function 'get_asset_constants'</code></p>
+<p><strong>Implementation:</strong></p>
+<pre><code class="language-python">class FunctionRegistry:
+    &quot;&quot;&quot;Global registry of transform functions.&quot;&quot;&quot;
+
+    _functions: Dict[str, Callable] = {}
+
+    @classmethod
+    def register(cls, func: Callable) -&gt; Callable:
+        &quot;&quot;&quot;Register transform function.&quot;&quot;&quot;
+        cls._functions[func.__name__] = func
+        return func
+
+    @classmethod
+    def get(cls, name: str) -&gt; Callable:
+        &quot;&quot;&quot;Retrieve registered function.&quot;&quot;&quot;
+        if name not in cls._functions:
+            raise ValueError(f&quot;Transform function '{name}' not found&quot;)
+        return cls._functions[name]
+
+    @classmethod
+    def validate_params(cls, name: str, params: Dict) -&gt; None:
+        &quot;&quot;&quot;Validate params against function signature.&quot;&quot;&quot;
+        import inspect
+        func = cls.get(name)
+        sig = inspect.signature(func)
+        # Validate required params, types, etc.
+</code></pre>
+<hr />
+<h4 id="2-development-workflow-tools"><strong>2. Development Workflow Tools</strong></h4>
+<p><strong>CLI Commands:</strong></p>
+<pre><code class="language-bash"># Validate config without execution
+odibi validate project.yaml
+
+# Run single node with mock data
+odibi run-node dryer_cleaned \
+  --project project.yaml \
+  --mock aspentags=data/test_tags.csv \
+  --mock dryer_bronze=data/test_bronze.csv \
+  --show-output
+
+# Show dependency graph
+odibi graph --pipeline nkc_dryer_1
+
+# List all nodes in pipeline
+odibi list --pipeline nkc_dryer_1
+
+# Run with debug logging
+odibi run project.yaml --log-level DEBUG
+</code></pre>
+<p><strong>Python API for interactive development:</strong></p>
+<pre><code class="language-python">from odibi import Pipeline
+import pandas as pd
+
+# Load pipeline
+p = Pipeline.from_yaml(&quot;project.yaml&quot;)
+
+# Run single node with test data (bypass dependencies)
+result = p.run_node(
+    &quot;dryer_cleaned&quot;,
+    mock_data={
+        &quot;aspentags&quot;: pd.read_csv(&quot;test_tags.csv&quot;),
+        &quot;dryer_bronze&quot;: pd.read_csv(&quot;test_bronze.csv&quot;)
+    }
+)
+
+# Inspect output
+print(result.df.head())
+print(result.metadata)
+print(result.duration)
+
+# Test individual transform function
+from my_transforms import get_asset_constants
+output = get_asset_constants(
+    context=mock_context,
+    tags_table=&quot;aspentags&quot;,
+    plant=&quot;NKC&quot;,
+    asset=&quot;Germ Dryer 1&quot;
+)
+</code></pre>
+<hr />
+<h4 id="3-context-aware-error-messages"><strong>3. Context-Aware Error Messages</strong></h4>
+<p><strong>Problem:</strong> Stack traces through YAML config are confusing.</p>
+<p><strong>Solution:</strong> Capture execution context and provide actionable errors:</p>
+<pre><code class="language-python">class ExecutionContext:
+    &quot;&quot;&quot;Runtime context for error reporting.&quot;&quot;&quot;
+    node_name: str
+    config_file: str
+    config_line: int
+    step_index: int
+    total_steps: int
+    input_schema: List[str]
+    input_shape: Tuple[int, int]
+    previous_steps: List[str]
+</code></pre>
+<p><strong>Error output example:</strong></p>
+<pre><code>✗ Node execution failed: dryer_cleaned
+  Location: pipelines/silver/dryer_1.yaml:382
+  Step: 2 of 4 (pivot operation)
+
+  Error: KeyError: 'Description'
+  Column 'Description' not found in DataFrame
+
+  Available columns: ['Time_Stamp', 'Plant', 'Asset', 'Value']
+
+  Context:
+    Input shape: (1000, 4)
+    Previous step: &quot;SELECT * FROM dryer_bronze&quot; ✓
+    Failed step:
+      operation: pivot
+      params:
+        pivot_column: Description  ← Missing column
+
+  Suggestions:
+    1. Check that dryer_bronze contains 'Description' column
+    2. Verify previous step output: odibi run-node dryer_bronze --show-output
+    3. Enable debug mode: odibi run --log-level DEBUG
+
+  Story: stories/nkc_dryer_1_2025-11-05_14-30-22.md
+</code></pre>
+<p><strong>Implementation:</strong></p>
+<pre><code class="language-python">class NodeExecutionError(Exception):
+    &quot;&quot;&quot;Enhanced error with execution context.&quot;&quot;&quot;
+
+    def __init__(
+        self,
+        message: str,
+        context: ExecutionContext,
+        suggestions: List[str] = None
+    ):
+        self.message = message
+        self.context = context
+        self.suggestions = suggestions or []
+        super().__init__(self._format_error())
+
+    def _format_error(self) -&gt; str:
+        &quot;&quot;&quot;Generate rich error message.&quot;&quot;&quot;
+        # Format with context, suggestions, etc.
+</code></pre>
+<hr />
+<h2 id="updated-phase-1-scope">Updated Phase 1 Scope</h2>
+<h3 id="v10-deliverables-mvp"><strong>v1.0 Deliverables (MVP)</strong></h3>
+<p><strong>Core Engine:</strong>
+- ✅ Pydantic config schemas (project, pipeline, node)
+- ✅ Unified Context API (<code>register</code>/<code>get</code>)
+- ✅ Node execution (read/transform/write)
+- ✅ Function registry with type validation
+- ✅ Dependency graph builder (topological sort, cycle detection)
+- ✅ Pipeline executor (parallel execution, retry logic)
+- ✅ Story generator (automatic documentation)
+- ✅ Context-aware error messages</p>
+<p><strong>Connections (adapt from v2):</strong>
+- ✅ LocalConnection (file system)
+- ✅ AzureBlobConnection
+- ✅ DeltaConnection</p>
+<p><strong>Engines:</strong>
+- ✅ Pandas engine (primary)
+- ✅ Spark engine (adapt from v2)</p>
+<p><strong>CLI:</strong>
+- ✅ <code>odibi run project.yaml</code>
+- ✅ <code>odibi validate project.yaml</code>
+- ✅ <code>odibi run-node &lt;name&gt; --project project.yaml</code></p>
+<p><strong>Testing:</strong>
+- ✅ Unit tests (config, graph, node execution)
+- ✅ Integration tests (end-to-end pipelines)
+- ✅ Test fixtures (simple/parallel/dependencies)</p>
+<p><strong>Documentation:</strong>
+- ✅ README with quick start
+- ✅ API reference (auto-generated from docstrings)
+- ✅ Migration guide (v2 → ODIBI)</p>
+<h3 id="deferred-to-v11"><strong>Deferred to v1.1</strong></h3>
+<ul>
+<li>Smart format inference</li>
+<li>Graph visualization</li>
+<li>Advanced CLI (interactive mode)</li>
+<li>More connection types (AWS S3, GCP, SQL Server)</li>
+<li>Performance optimizations (lazy loading, caching)</li>
+<li>Layer support (if needed for visualization)</li>
+</ul>
+<hr />
+<h2 id="implementation-priority">Implementation Priority</h2>
+<p><strong>Week 1-2: Foundation</strong>
+1. Project structure + packaging (pyproject.toml)
+2. Pydantic schemas (config validation)
+3. Unified Context API
+4. Function registry</p>
+<p><strong>Week 3-4: Core Engine</strong>
+5. Node base class + execution
+6. Dependency graph builder
+7. Pipeline executor (serial execution first)
+8. Error handling + context</p>
+<p><strong>Week 5-6: I/O Layer</strong>
+9. Connection abstraction (adapt v2)
+10. ReaderProvider/SaverProvider (adapt v2)
+11. Pandas engine
+12. Spark engine (adapt v2)</p>
+<p><strong>Week 7-8: Polish</strong>
+13. Story generator
+14. CLI tools
+15. Tests (unit + integration)
+16. Documentation</p>
+<hr />
+<p><strong>Document Version:</strong> 1.1<br />
+<strong>Last Updated:</strong> 2025-11-05<br />
+<strong>Status:</strong> Ready for implementation (with refinements applied)</p>
+<hr />
+<p><strong>Ready to build ODIBI v1.0!</strong> 🚀</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

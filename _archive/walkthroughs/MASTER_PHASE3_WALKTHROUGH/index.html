@@ -1,0 +1,2714 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/walkthroughs/MASTER_PHASE3_WALKTHROUGH/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Odibi Phase 3 Internals: A Guided Walkthrough - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#odibi-phase-3-internals-a-guided-walkthrough" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Odibi Phase 3 Internals: A Guided Walkthrough
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="odibi-phase-3-internals-a-guided-walkthrough">Odibi Phase 3 Internals: A Guided Walkthrough</h1>
+<p><strong>Goal:</strong> Master Odibi's internals (Phases 1-3) through hands-on building<br />
+<strong>Duration:</strong> 2-3 hours<br />
+<strong>Approach:</strong> Learn by doing - build, break, understand, repeat</p>
+<hr />
+<h2 id="learning-strategy">🎯 Learning Strategy</h2>
+<p><strong>The Oracle's Wisdom:</strong></p>
+<blockquote>
+<p>"Teach by building one tiny pipeline end-to-end on Pandas, then spiral inward: transformation → registry/decorator → node/graph → explanations → stories/CLI → Azure SQL."</p>
+</blockquote>
+<p><strong>What You'll Build:</strong>
+- A custom transformation from scratch
+- A multi-node pipeline with dependencies
+- Self-documenting stories
+- An Azure SQL connector pipeline</p>
+<p><strong>Why This Works:</strong>
+- ✅ Short read-then-do loops (10-30 min each)
+- ✅ Hands-on with immediate feedback
+- ✅ Focus on 8-10 core files (not the whole codebase)
+- ✅ Checkpoints to verify understanding</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#stage-0-orientation--first-run-10-15-min">Stage 0: Orientation &amp; First Run</a> (10-15 min)</li>
+<li><a href="#stage-1-transformations-101-15-20-min">Stage 1: Transformations 101</a> (15-20 min)</li>
+<li><a href="#stage-2-execution-path-node--graph--pipeline-20-25-min">Stage 2: Execution Path</a> (20-25 min)</li>
+<li><a href="#stage-3-explanation-system-15-20-min">Stage 3: Explanation System</a> (15-20 min)</li>
+<li><a href="#stage-4-story-generation-25-30-min">Stage 4: Story Generation</a> (25-30 min)</li>
+<li><a href="#stage-5-sql-transformation--engine-boundary-15-20-min">Stage 5: SQL Transformation</a> (15-20 min)</li>
+<li><a href="#stage-6-azure-sql-connector-20-25-min">Stage 6: Azure SQL Connector</a> (20-25 min)</li>
+<li><a href="#stage-7-quality--guardrails-10-15-min">Stage 7: Quality Enforcement</a> (10-15 min)</li>
+</ul>
+<hr />
+<h2 id="stage-0-orientation-first-run-10-15-min">Stage 0: Orientation &amp; First Run (10-15 min)</h2>
+<h3 id="goal">🎯 Goal</h3>
+<p>Get a working mental model and one successful local run.</p>
+<h3 id="read-5-min">📖 Read (5 min)</h3>
+<p><strong>The Big Picture Flow:</strong></p>
+<pre><code>YAML Config → ProjectConfig → Pipeline → Nodes → Engine → Stories
+                                   ↓
+                             Dependencies → Execution Order
+                                   ↓
+                             Transformations Registry
+</code></pre>
+<p><strong>Files to Peek:</strong>
+1. <code>odibi/config.py</code> - Look at <code>ProjectConfig</code> class (lines 1-50)
+2. <code>examples/example_local.yaml</code> - See a real config</p>
+<h3 id="do-10-min">🛠️ Do (10 min)</h3>
+<p><strong>Run your first pipeline:</strong></p>
+<pre><code class="language-python"># Create: scratch/stage0_first_run.py
+
+from odibi.config import ProjectConfig
+import pandas as pd
+
+# Load example config
+config = ProjectConfig.from_yaml(&quot;examples/example_local.yaml&quot;)
+
+# Print structure
+print(&quot;Pipeline name:&quot;, config.pipelines[0].name)
+print(&quot;Number of nodes:&quot;, len(config.pipelines[0].nodes))
+print(&quot;Connections:&quot;, list(config.connections.keys()))
+
+# Run the pipeline
+from odibi.pipeline import Pipeline
+
+pipeline = Pipeline(config.pipelines[0], config)
+result = pipeline.run()
+
+print(f&quot;\n✅ Success! Pipeline completed in {result.duration:.2f}s&quot;)
+print(f&quot;📊 Nodes executed: {len(result.node_results)}&quot;)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">cd /d:/odibi
+python scratch/stage0_first_run.py
+</code></pre>
+<p><strong>Observe:</strong>
+- The pipeline executes in order
+- Check <code>stories/runs/</code> for auto-generated story
+- Check <code>data/</code> for output files</p>
+<h3 id="checkpoint">✅ Checkpoint</h3>
+<p>Can you answer these?
+- [ ] What's the flow from YAML to execution?
+- [ ] Where do transformations come from? (Registry!)
+- [ ] Where are DataFrames stored between nodes? (Context!)
+- [ ] What gets auto-generated? (Stories!)</p>
+<p><strong>If yes, move to Stage 1. If no, re-run and trace the output.</strong></p>
+<hr />
+<h2 id="stage-1-transformations-101-15-20-min">Stage 1: Transformations 101 (15-20 min)</h2>
+<h3 id="goal_1">🎯 Goal</h3>
+<p>Internalize how a transformation is implemented and registered.</p>
+<h3 id="read-8-min">📖 Read (8 min)</h3>
+<p><strong>Read these 3 files in order:</strong></p>
+<ol>
+<li><strong><code>odibi/operations/unpivot.py</code></strong> (75 lines) - The simplest transformation</li>
+<li>See the <code>@transformation</code> decorator</li>
+<li>See the function implementation</li>
+<li>
+<p>See the <code>@unpivot.explain</code> decorator</p>
+</li>
+<li>
+<p><strong><code>odibi/transformations/decorators.py</code></strong> (60 lines) - The magic decorator</p>
+</li>
+<li>How <code>@transformation</code> works</li>
+<li>
+<p>When registration happens (import time!)</p>
+</li>
+<li>
+<p><strong><code>odibi/transformations/registry.py</code></strong> (150 lines) - The global registry</p>
+</li>
+<li>How functions are stored</li>
+<li>How lookups work</li>
+<li>The singleton pattern</li>
+</ol>
+<p><strong>Key Insight:</strong></p>
+<pre><code class="language-python"># When this runs:
+import odibi.operations.unpivot
+
+# This happens:
+# 1. @transformation(&quot;unpivot&quot;) decorator runs
+# 2. Calls registry.register(&quot;unpivot&quot;, unpivot_func)
+# 3. Function is now globally available!
+</code></pre>
+<h3 id="do-12-min">🛠️ Do (12 min)</h3>
+<p><strong>Build your first transformation:</strong></p>
+<pre><code class="language-python"># Create: scratch/stage1_my_transformation.py
+
+from odibi.transformations import transformation, get_registry
+from odibi.transformations.templates import purpose_detail_result
+import pandas as pd
+
+# 1. DEFINE YOUR TRANSFORMATION
+@transformation(&quot;filter_threshold&quot;, category=&quot;filtering&quot;, version=&quot;1.0.0&quot;)
+def filter_threshold(df, column, threshold, operation=&quot;greater_than&quot;):
+    &quot;&quot;&quot;Filter rows based on a threshold value.&quot;&quot;&quot;
+    if operation == &quot;greater_than&quot;:
+        return df[df[column] &gt; threshold]
+    elif operation == &quot;less_than&quot;:
+        return df[df[column] &lt; threshold]
+    elif operation == &quot;equals&quot;:
+        return df[df[column] == threshold]
+    else:
+        raise ValueError(f&quot;Unknown operation: {operation}&quot;)
+
+# 2. ADD EXPLANATION
+@filter_threshold.explain
+def explain(column, threshold, operation=&quot;greater_than&quot;, **context):
+    &quot;&quot;&quot;Explain what this transformation does.&quot;&quot;&quot;
+    plant = context.get('plant', 'Unknown Plant')
+
+    op_text = {
+        &quot;greater_than&quot;: f&quot;greater than {threshold}&quot;,
+        &quot;less_than&quot;: f&quot;less than {threshold}&quot;,
+        &quot;equals&quot;: f&quot;equal to {threshold}&quot;
+    }
+
+    return purpose_detail_result(
+        purpose=f&quot;Filter {plant} data based on {column}&quot;,
+        details=[
+            f&quot;Keep only rows where **{column}** is {op_text.get(operation, operation)}&quot;,
+            f&quot;Threshold value: `{threshold}`&quot;,
+            &quot;Rows not meeting criteria are removed&quot;
+        ],
+        result=f&quot;Filtered dataset with {column} {op_text.get(operation)}&quot;
+    )
+
+# 3. TEST IT
+if __name__ == &quot;__main__&quot;:
+    # Get from registry
+    registry = get_registry()
+    func = registry.get(&quot;filter_threshold&quot;)
+
+    print(&quot;✅ Found in registry:&quot;, func is not None)
+
+    # Create test data
+    df = pd.DataFrame({
+        &quot;plant&quot;: [&quot;NKC&quot;, &quot;NKC&quot;, &quot;BWA&quot;, &quot;BWA&quot;],
+        &quot;value&quot;: [100, 50, 200, 25],
+        &quot;status&quot;: [&quot;OK&quot;, &quot;OK&quot;, &quot;ALERT&quot;, &quot;OK&quot;]
+    })
+
+    print(&quot;\n📊 Original data:&quot;)
+    print(df)
+
+    # Apply transformation
+    result = func(df, column=&quot;value&quot;, threshold=75, operation=&quot;greater_than&quot;)
+
+    print(&quot;\n📊 Filtered data (value &gt; 75):&quot;)
+    print(result)
+
+    # Get explanation
+    explanation = func.get_explanation(
+        column=&quot;value&quot;,
+        threshold=75,
+        operation=&quot;greater_than&quot;,
+        plant=&quot;NKC Power Station&quot;
+    )
+
+    print(&quot;\n📝 Explanation:&quot;)
+    print(explanation)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">python scratch/stage1_my_transformation.py
+</code></pre>
+<p><strong>Experiment:</strong>
+- Change threshold to 150
+- Try operation="less_than"
+- Add a new operation type
+- Change the explanation text</p>
+<h3 id="checkpoint_1">✅ Checkpoint</h3>
+<p>Can you answer these?
+- [ ] When does registration happen? (Import time!)
+- [ ] How do you get a function from the registry?
+- [ ] What's the purpose of <code>@func.explain</code>?
+- [ ] What does <code>**context</code> do?</p>
+<p><strong>Try this:</strong> Without looking, explain the flow from <code>@transformation</code> to <code>registry.get()</code>.</p>
+<hr />
+<h2 id="stage-2-execution-path-node-graph-pipeline-20-25-min">Stage 2: Execution Path: Node → Graph → Pipeline (20-25 min)</h2>
+<h3 id="goal_2">🎯 Goal</h3>
+<p>Understand how config becomes ordered execution.</p>
+<h3 id="read-10-min">📖 Read (10 min)</h3>
+<p><strong>Read these files:</strong></p>
+<ol>
+<li><strong><code>odibi/context.py</code></strong> (100 lines) - Where DataFrames live</li>
+<li>See <code>set()</code> and <code>get()</code> methods</li>
+<li>
+<p>This is just a dict wrapper with validation</p>
+</li>
+<li>
+<p><strong><code>odibi/node.py</code></strong> (200 lines) - How nodes execute</p>
+</li>
+<li>Focus on <code>execute()</code> method (lines 100-200)</li>
+<li>See how it gets input from context</li>
+<li>See how it calls registry.get()</li>
+<li>
+<p>See how it stores output in context</p>
+</li>
+<li>
+<p><strong><code>odibi/graph.py</code></strong> (150 lines) - Dependency resolution</p>
+</li>
+<li>See <code>_build_graph()</code> method</li>
+<li>
+<p>See topological sort in <code>get_execution_order()</code></p>
+</li>
+<li>
+<p><strong><code>odibi/pipeline.py</code></strong> (300 lines) - SKIM ONLY</p>
+</li>
+<li>Just read the <code>run()</code> method loop (lines 150-250)</li>
+<li>Don't deep dive - we'll come back later</li>
+</ol>
+<p><strong>Key Insight:</strong></p>
+<pre><code class="language-python"># Pipeline execution flow:
+# 1. Build dependency graph from nodes
+# 2. Get topological order (A → B → C)
+# 3. For each node:
+#    - Get input from context
+#    - Get transformation from registry
+#    - Execute transformation
+#    - Store result in context
+#    - Track metadata for story
+</code></pre>
+<h3 id="do-15-min">🛠️ Do (15 min)</h3>
+<p><strong>Build a multi-node pipeline:</strong></p>
+<pre><code class="language-yaml"># Create: scratch/stage2_dependency_pipeline.yaml
+
+story:
+  connection: local_data
+  format: markdown
+
+connections:
+  local_data:
+    type: local
+    base_path: ./scratch/stage2_output
+
+pipelines:
+  - name: dependency_demo
+    plant: &quot;Learning Lab&quot;
+    asset: &quot;Tutorial&quot;
+
+    nodes:
+      # Node 1: Load data
+      - name: load_raw
+        read:
+          connection: local_data
+          path: input/raw_data.csv
+          format: csv
+
+      # Node 2: Filter (depends on load_raw)
+      - name: filter_high_values
+        depends_on: [load_raw]
+        transform:
+          operation: filter_threshold  # YOUR custom operation!
+          params:
+            column: value
+            threshold: 100
+            operation: greater_than
+
+      # Node 3: Another filter (depends on load_raw - parallel with Node 2!)
+      - name: filter_critical
+        depends_on: [load_raw]
+        transform:
+          operation: filter_threshold
+          params:
+            column: status
+            threshold: &quot;CRITICAL&quot;
+            operation: equals
+
+      # Node 4: Combine (depends on both filters)
+      - name: combine_results
+        depends_on: [filter_high_values, filter_critical]
+        transform:
+          operation: sql
+          params:
+            query: |
+              SELECT DISTINCT * FROM (
+                SELECT * FROM filter_high_values
+                UNION ALL
+                SELECT * FROM filter_critical
+              )
+        write:
+          connection: local_data
+          path: output/final_results.csv
+          format: csv
+</code></pre>
+<p><strong>Setup and run:</strong></p>
+<pre><code class="language-python"># Create: scratch/stage2_run_pipeline.py
+
+import pandas as pd
+import os
+from odibi.config import ProjectConfig
+from odibi.pipeline import Pipeline
+
+# Import your custom transformation
+import sys
+sys.path.insert(0, '/d:/odibi/scratch')
+from stage1_my_transformation import filter_threshold  # Registers automatically!
+
+# Create input data
+os.makedirs('scratch/stage2_output/input', exist_ok=True)
+
+df = pd.DataFrame({
+    &quot;plant&quot;: [&quot;NKC&quot;]*5 + [&quot;BWA&quot;]*5,
+    &quot;value&quot;: [50, 150, 200, 75, 300, 25, 400, 10, 125, 80],
+    &quot;status&quot;: [&quot;OK&quot;, &quot;WARNING&quot;, &quot;CRITICAL&quot;, &quot;OK&quot;, &quot;CRITICAL&quot;,
+               &quot;OK&quot;, &quot;CRITICAL&quot;, &quot;OK&quot;, &quot;WARNING&quot;, &quot;OK&quot;]
+})
+df.to_csv('scratch/stage2_output/input/raw_data.csv', index=False)
+
+print(&quot;📊 Created input data:&quot;)
+print(df)
+
+# Load and run pipeline
+config = ProjectConfig.from_yaml(&quot;scratch/stage2_dependency_pipeline.yaml&quot;)
+pipeline = Pipeline(config.pipelines[0], config)
+
+# ANALYZE EXECUTION ORDER
+from odibi.graph import DependencyGraph
+graph = DependencyGraph(config.pipelines[0].nodes)
+order = graph.get_execution_order()
+
+print(&quot;\n🔍 Execution order:&quot;)
+for i, node in enumerate(order, 1):
+    deps = node.depends_on or []
+    print(f&quot;  {i}. {node.name} (depends on: {deps or 'nothing'})&quot;)
+
+# RUN IT
+result = pipeline.run()
+
+print(f&quot;\n✅ Pipeline completed in {result.duration:.2f}s&quot;)
+
+# Check output
+output = pd.read_csv('scratch/stage2_output/output/final_results.csv')
+print(f&quot;\n📊 Final output ({len(output)} rows):&quot;)
+print(output)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">python scratch/stage2_run_pipeline.py
+</code></pre>
+<p><strong>Observe:</strong>
+- Execution order: load_raw → (filter_high_values + filter_critical in parallel) → combine_results
+- Context stores intermediate DataFrames
+- Your custom transformation works in a real pipeline!</p>
+<h3 id="checkpoint_2">✅ Checkpoint</h3>
+<p>Can you answer these?
+- [ ] How does the graph determine execution order?
+- [ ] Where are DataFrames stored between nodes?
+- [ ] Can nodes run in parallel if they don't depend on each other?
+- [ ] How does a node get its input DataFrame?</p>
+<p><strong>Challenge:</strong> Add a 5th node that depends on combine_results. Predict the new execution order.</p>
+<hr />
+<h2 id="stage-3-explanation-system-15-20-min">Stage 3: Explanation System (15-20 min)</h2>
+<h3 id="goal_3">🎯 Goal</h3>
+<p>Attach human explanations to transformations and pass runtime context safely.</p>
+<h3 id="read-7-min">📖 Read (7 min)</h3>
+<p><strong>Read these files:</strong></p>
+<ol>
+<li><strong><code>odibi/transformations/explanation.py</code></strong> (120 lines)</li>
+<li>See <code>ExplainableFunction</code> class</li>
+<li>See how <code>.explain</code> decorator works</li>
+<li>
+<p>See <code>get_explanation()</code> method</p>
+</li>
+<li>
+<p><strong><code>odibi/transformations/templates.py</code></strong> (80 lines)</p>
+</li>
+<li>See helper functions: <code>purpose_detail_result</code>, <code>bold</code>, <code>code</code></li>
+<li>
+<p>These make explanations consistent</p>
+</li>
+<li>
+<p><strong><code>odibi/transformations/context.py</code></strong> (50 lines)</p>
+</li>
+<li>See how context is built and passed</li>
+</ol>
+<p><strong>Key Insight:</strong></p>
+<pre><code class="language-python"># The explain pattern:
+@transformation(&quot;my_op&quot;)
+def my_op(df, threshold, **context):
+    plant = context.get('plant')  # Runtime context from YAML
+    return df[df.value &gt; threshold]
+
+@my_op.explain
+def explain(threshold, **context):
+    plant = context.get('plant')  # Same context!
+    return f&quot;Filter {plant} data where value &gt; {threshold}&quot;
+</code></pre>
+<h3 id="do-13-min">🛠️ Do (13 min)</h3>
+<p><strong>Enhance your transformation with rich explanations:</strong></p>
+<pre><code class="language-python"># Create: scratch/stage3_rich_explanation.py
+
+from odibi.transformations import transformation
+from odibi.transformations.templates import (
+    purpose_detail_result,
+    bold,
+    code,
+    section
+)
+import pandas as pd
+
+@transformation(&quot;smart_filter&quot;, category=&quot;advanced_filtering&quot;, version=&quot;1.0.0&quot;)
+def smart_filter(df, column, threshold, include_equals=False, **context):
+    &quot;&quot;&quot;Smart filtering with context awareness.&quot;&quot;&quot;
+    if include_equals:
+        return df[df[column] &gt;= threshold]
+    else:
+        return df[df[column] &gt; threshold]
+
+@smart_filter.explain
+def explain(column, threshold, include_equals=False, **context):
+    &quot;&quot;&quot;Rich explanation with context.&quot;&quot;&quot;
+
+    # Extract context
+    plant = context.get('plant', 'Unknown Plant')
+    asset = context.get('asset', 'Unknown Asset')
+    pipeline_name = context.get('pipeline_name', 'Pipeline')
+
+    # Build comparison text
+    comparison = f&quot;≥ {threshold}&quot; if include_equals else f&quot;&gt; {threshold}&quot;
+
+    # Build explanation sections
+    purpose = f&quot;Filter {plant} {asset} data based on {bold(column)} threshold&quot;
+
+    details = [
+        f&quot;Target column: {code(column)}&quot;,
+        f&quot;Threshold: {code(threshold)}&quot;,
+        f&quot;Condition: Keep rows where {code(column)} {comparison}&quot;,
+        f&quot;Include boundary: {code(include_equals)}&quot;,
+    ]
+
+    # Add context-aware details
+    if threshold &gt; 1000:
+        details.append(&quot;⚠️ High threshold - expect significant data reduction&quot;)
+
+    if include_equals:
+        details.append(&quot;✅ Including boundary values (threshold included)&quot;)
+    else:
+        details.append(&quot;🚫 Excluding boundary values (threshold excluded)&quot;)
+
+    # Calculate expected impact (if input data available in context)
+    result_text = f&quot;Filtered dataset for {pipeline_name}&quot;
+    if 'input_rows' in context:
+        result_text += f&quot; (from {context['input_rows']} input rows)&quot;
+
+    # Use template
+    return purpose_detail_result(
+        purpose=purpose,
+        details=details,
+        result=result_text
+    )
+
+# TEST IT
+if __name__ == &quot;__main__&quot;:
+    from odibi.transformations import get_registry
+
+    func = get_registry().get(&quot;smart_filter&quot;)
+
+    # Test with minimal context
+    print(&quot;📝 Explanation (minimal context):&quot;)
+    print(func.get_explanation(
+        column=&quot;temperature&quot;,
+        threshold=100,
+        include_equals=True
+    ))
+
+    print(&quot;\n&quot; + &quot;=&quot;*60 + &quot;\n&quot;)
+
+    # Test with rich context
+    print(&quot;📝 Explanation (rich context):&quot;)
+    print(func.get_explanation(
+        column=&quot;temperature&quot;,
+        threshold=2500,
+        include_equals=False,
+        plant=&quot;Northridge Power Station&quot;,
+        asset=&quot;Turbine 3&quot;,
+        pipeline_name=&quot;Safety Monitoring&quot;,
+        input_rows=15000
+    ))
+
+    # Test execution
+    df = pd.DataFrame({
+        &quot;temperature&quot;: [500, 1500, 2500, 3500, 4500],
+        &quot;pressure&quot;: [10, 20, 30, 40, 50]
+    })
+
+    print(&quot;\n📊 Original data:&quot;)
+    print(df)
+
+    result = func(df, column=&quot;temperature&quot;, threshold=2500, include_equals=True)
+    print(f&quot;\n📊 Filtered data (&gt;= 2500): {len(result)} rows&quot;)
+    print(result)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">python scratch/stage3_rich_explanation.py
+</code></pre>
+<p><strong>Experiment:</strong>
+- Add more template helpers (section, italic, etc.)
+- Add conditional explanations based on context
+- Try <code>get_explanation()</code> with different context values</p>
+<h3 id="checkpoint_3">✅ Checkpoint</h3>
+<p>Can you answer these?
+- [ ] Why use <code>**context</code> instead of explicit parameters?
+- [ ] What's the benefit of template helpers?
+- [ ] Where does context come from at runtime?
+- [ ] How do explanations become part of stories?</p>
+<p><strong>Test:</strong> Can you add a context-aware warning to your explanation?</p>
+<hr />
+<h2 id="stage-4-story-generation-25-30-min">Stage 4: Story Generation (25-30 min)</h2>
+<h3 id="goal_4">🎯 Goal</h3>
+<p>See how runs self-document and produce HTML/MD/JSON.</p>
+<h3 id="read-12-min">📖 Read (12 min)</h3>
+<p><strong>Read these files:</strong></p>
+<ol>
+<li><strong><code>odibi/story/metadata.py</code></strong> (175 lines)</li>
+<li>See <code>PipelineStoryMetadata</code> class</li>
+<li>See <code>NodeExecutionMetadata</code> class</li>
+<li>
+<p>See what gets tracked: duration, rows, schema, status</p>
+</li>
+<li>
+<p><strong><code>odibi/story/renderers.py</code></strong> (200 lines)</p>
+</li>
+<li>See <code>HTMLStoryRenderer</code>, <code>MarkdownStoryRenderer</code>, <code>JSONStoryRenderer</code></li>
+<li>
+<p>See how they convert metadata to output</p>
+</li>
+<li>
+<p><strong><code>odibi/cli/story.py</code></strong> (150 lines) - SKIM</p>
+</li>
+<li>See CLI commands: generate, list, diff</li>
+</ol>
+<p><strong>Key Insight:</strong></p>
+<pre><code class="language-python"># During pipeline execution:
+# 1. Track start time
+# 2. Execute node
+# 3. Track duration, rows, schema
+# 4. Store in NodeExecutionMetadata
+# 5. Add to PipelineStoryMetadata
+# 6. After all nodes, render to HTML/MD/JSON
+</code></pre>
+<h3 id="do-18-min">🛠️ Do (18 min)</h3>
+<p><strong>Generate and explore stories:</strong></p>
+<pre><code class="language-python"># Create: scratch/stage4_story_generation.py
+
+import pandas as pd
+import os
+from odibi.config import ProjectConfig
+from odibi.pipeline import Pipeline
+from odibi.story import HTMLStoryRenderer, MarkdownStoryRenderer, JSONStoryRenderer
+from odibi.story.themes import DARK_THEME, LIGHT_THEME, CORPORATE_THEME
+
+# Import custom transformation
+import sys
+sys.path.insert(0, '/d:/odibi/scratch')
+from stage3_rich_explanation import smart_filter
+
+# Create test data
+os.makedirs('scratch/stage4_output/input', exist_ok=True)
+os.makedirs('scratch/stage4_output/stories', exist_ok=True)
+
+df = pd.DataFrame({
+    &quot;timestamp&quot;: pd.date_range(&quot;2025-01-01&quot;, periods=1000, freq=&quot;h&quot;),
+    &quot;temperature&quot;: [1000 + i*2 + (i % 100)*10 for i in range(1000)],
+    &quot;pressure&quot;: [50 + i*0.5 for i in range(1000)],
+    &quot;status&quot;: [&quot;OK&quot;]*800 + [&quot;WARNING&quot;]*150 + [&quot;CRITICAL&quot;]*50
+})
+df.to_csv('scratch/stage4_output/input/sensor_data.csv', index=False)
+
+# Create pipeline YAML
+yaml_content = &quot;&quot;&quot;
+story:
+  connection: local_data
+  format: html
+  theme: dark
+
+connections:
+  local_data:
+    type: local
+    base_path: ./scratch/stage4_output
+
+pipelines:
+  - name: story_demo_pipeline
+    plant: &quot;Demo Power Station&quot;
+    asset: &quot;Sensor Array A1&quot;
+    description: &quot;Demonstrate story generation with rich metadata&quot;
+
+    nodes:
+      - name: load_sensors
+        description: &quot;Load raw sensor readings from CSV&quot;
+        read:
+          connection: local_data
+          path: input/sensor_data.csv
+          format: csv
+
+      - name: filter_high_temp
+        description: &quot;Identify high temperature events&quot;
+        depends_on: [load_sensors]
+        transform:
+          operation: smart_filter
+          params:
+            column: temperature
+            threshold: 2000
+            include_equals: false
+
+      - name: filter_critical
+        description: &quot;Isolate critical status events&quot;
+        depends_on: [load_sensors]
+        transform:
+          operation: smart_filter
+          params:
+            column: status
+            threshold: &quot;CRITICAL&quot;
+            include_equals: true
+        transform_type: python
+
+      - name: pivot_summary
+        description: &quot;Pivot data by status&quot;
+        depends_on: [load_sensors]
+        transform:
+          operation: pivot
+          params:
+            index: status
+            columns: []
+            values: temperature
+            aggfunc: mean
+
+      - name: unpivot_for_export
+        description: &quot;Reshape to long format for export&quot;
+        depends_on: [pivot_summary]
+        transform:
+          operation: unpivot
+          params:
+            id_vars: status
+        write:
+          connection: local_data
+          path: output/summary_long.csv
+          format: csv
+&quot;&quot;&quot;
+
+with open('scratch/stage4_pipeline.yaml', 'w') as f:
+    f.write(yaml_content)
+
+# Run pipeline
+print(&quot;🚀 Running pipeline with story generation...&quot;)
+config = ProjectConfig.from_yaml(&quot;scratch/stage4_pipeline.yaml&quot;)
+pipeline = Pipeline(config.pipelines[0], config)
+result = pipeline.run()
+
+print(f&quot;✅ Pipeline completed in {result.duration:.2f}s&quot;)
+print(f&quot;📊 Nodes executed: {len(result.node_results)}&quot;)
+
+# The story is auto-generated! But let's also generate custom formats
+
+# Get the story metadata
+metadata = result.metadata
+
+print(&quot;\n📝 Story Metadata Summary:&quot;)
+print(f&quot;  Pipeline: {metadata.pipeline_name}&quot;)
+print(f&quot;  Duration: {metadata.duration:.2f}s&quot;)
+print(f&quot;  Nodes: {len(metadata.nodes)}&quot;)
+print(f&quot;  Status: {metadata.status}&quot;)
+
+for node_meta in metadata.nodes:
+    print(f&quot;\n  Node: {node_meta.node_name}&quot;)
+    print(f&quot;    Duration: {node_meta.duration:.2f}s&quot;)
+    print(f&quot;    Rows: {node_meta.rows_in} → {node_meta.rows_out} ({node_meta.row_change:+d})&quot;)
+    print(f&quot;    Cols: {node_meta.cols_in} → {node_meta.cols_out}&quot;)
+
+# Generate multiple formats
+print(&quot;\n📄 Generating stories in different formats...&quot;)
+
+# HTML with DARK theme
+html_renderer = HTMLStoryRenderer(theme=DARK_THEME)
+html_output = html_renderer.render(metadata)
+with open('scratch/stage4_output/stories/story_dark.html', 'w', encoding='utf-8') as f:
+    f.write(html_output)
+print(&quot;  ✅ HTML (Dark theme): scratch/stage4_output/stories/story_dark.html&quot;)
+
+# HTML with LIGHT theme
+html_renderer_light = HTMLStoryRenderer(theme=LIGHT_THEME)
+html_output_light = html_renderer_light.render(metadata)
+with open('scratch/stage4_output/stories/story_light.html', 'w', encoding='utf-8') as f:
+    f.write(html_output_light)
+print(&quot;  ✅ HTML (Light theme): scratch/stage4_output/stories/story_light.html&quot;)
+
+# Markdown
+md_renderer = MarkdownStoryRenderer()
+md_output = md_renderer.render(metadata)
+with open('scratch/stage4_output/stories/story.md', 'w', encoding='utf-8') as f:
+    f.write(md_output)
+print(&quot;  ✅ Markdown: scratch/stage4_output/stories/story.md&quot;)
+
+# JSON
+json_renderer = JSONStoryRenderer()
+json_output = json_renderer.render(metadata)
+with open('scratch/stage4_output/stories/story.json', 'w', encoding='utf-8') as f:
+    f.write(json_output)
+print(&quot;  ✅ JSON: scratch/stage4_output/stories/story.json&quot;)
+
+print(&quot;\n🎨 Open the HTML files in your browser to see the stories!&quot;)
+print(&quot;📖 Check the Markdown for a text-based view&quot;)
+print(&quot;🔧 Inspect the JSON for programmatic access&quot;)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">python scratch/stage4_story_generation.py
+</code></pre>
+<p><strong>Explore:</strong>
+- Open <code>scratch/stage4_output/stories/story_dark.html</code> in browser
+- Open <code>scratch/stage4_output/stories/story_light.html</code> in browser<br />
+- Read <code>scratch/stage4_output/stories/story.md</code>
+- Parse <code>scratch/stage4_output/stories/story.json</code></p>
+<p><strong>Try CLI commands (if available):</strong></p>
+<pre><code class="language-bash"># List all stories
+odibi story list scratch/stage4_output/
+
+# Generate story from config
+odibi story generate scratch/stage4_pipeline.yaml
+
+# Make a change to the YAML (e.g., change threshold to 2500)
+# Then run again and diff
+odibi story diff scratch/stage4_output/stories/run_1.json scratch/stage4_output/stories/run_2.json
+</code></pre>
+<h3 id="checkpoint_4">✅ Checkpoint</h3>
+<p>Can you answer these?
+- [ ] What metadata is captured during execution?
+- [ ] How are durations measured?
+- [ ] What's the difference between renderers?
+- [ ] When are stories generated?</p>
+<p><strong>Explore:</strong> Can you find where in <code>pipeline.py</code> the story metadata is built?</p>
+<hr />
+<h2 id="stage-5-sql-transformation-engine-boundary-15-20-min">Stage 5: SQL Transformation &amp; Engine Boundary (15-20 min)</h2>
+<h3 id="goal_5">🎯 Goal</h3>
+<p>Cement the "SQL-over-Pandas" idea and engine-agnostic boundary.</p>
+<h3 id="read-8-min_1">📖 Read (8 min)</h3>
+<p><strong>Read these files:</strong></p>
+<ol>
+<li><strong><code>odibi/engine/base.py</code></strong> (100 lines)</li>
+<li>See the <code>Engine</code> interface</li>
+<li>
+<p>See abstract methods: <code>read()</code>, <code>write()</code>, <code>execute_sql()</code></p>
+</li>
+<li>
+<p><strong><code>odibi/engine/pandas_engine.py</code></strong> (250 lines)</p>
+</li>
+<li>See how Pandas implements the Engine interface</li>
+<li>
+<p>Focus on <code>execute_sql()</code> - it uses DuckDB!</p>
+</li>
+<li>
+<p><strong><code>odibi/operations/sql.py</code></strong> (60 lines)</p>
+</li>
+<li>See how SQL operation calls <code>engine.execute_sql()</code></li>
+<li>Note: It doesn't care which engine!</li>
+</ol>
+<p><strong>Key Insight:</strong></p>
+<pre><code class="language-python"># Engine-agnostic design:
+#
+# Operation doesn't know about Pandas or Spark:
+def sql_operation(df, query, engine):
+    return engine.execute_sql(query, {&quot;input&quot;: df})
+#
+# Engine abstraction:
+# - PandasEngine: Uses DuckDB for SQL
+# - SparkEngine: Uses Spark SQL
+# - Same operation, different backends!
+</code></pre>
+<h3 id="do-12-min_1">🛠️ Do (12 min)</h3>
+<p><strong>Test SQL operations:</strong></p>
+<pre><code class="language-python"># Create: scratch/stage5_sql_demo.py
+
+import pandas as pd
+from odibi.config import ProjectConfig
+from odibi.pipeline import Pipeline
+import os
+
+# Create test data
+os.makedirs('scratch/stage5_output/input', exist_ok=True)
+
+# Sales data
+sales = pd.DataFrame({
+    &quot;product&quot;: [&quot;Widget&quot;, &quot;Gadget&quot;, &quot;Widget&quot;, &quot;Gadget&quot;, &quot;Widget&quot;, &quot;Gizmo&quot;],
+    &quot;region&quot;: [&quot;North&quot;, &quot;North&quot;, &quot;South&quot;, &quot;South&quot;, &quot;East&quot;, &quot;East&quot;],
+    &quot;revenue&quot;: [1000, 1500, 1200, 1800, 900, 2000],
+    &quot;units&quot;: [10, 15, 12, 18, 9, 20]
+})
+sales.to_csv('scratch/stage5_output/input/sales.csv', index=False)
+
+# Customer data
+customers = pd.DataFrame({
+    &quot;region&quot;: [&quot;North&quot;, &quot;South&quot;, &quot;East&quot;, &quot;West&quot;],
+    &quot;population&quot;: [500000, 750000, 600000, 450000],
+    &quot;stores&quot;: [5, 8, 6, 4]
+})
+customers.to_csv('scratch/stage5_output/input/customers.csv', index=False)
+
+# Create pipeline with SQL
+yaml_content = &quot;&quot;&quot;
+story:
+  connection: local_data
+  format: markdown
+
+connections:
+  local_data:
+    type: local
+    base_path: ./scratch/stage5_output
+
+pipelines:
+  - name: sql_demo
+    plant: &quot;Analytics Lab&quot;
+    asset: &quot;Sales Data&quot;
+
+    nodes:
+      - name: load_sales
+        read:
+          connection: local_data
+          path: input/sales.csv
+          format: csv
+
+      - name: load_customers
+        read:
+          connection: local_data
+          path: input/customers.csv
+          format: csv
+
+      # SQL: Aggregate sales by region
+      - name: sales_summary
+        depends_on: [load_sales]
+        transform:
+          operation: sql
+          params:
+            query: |
+              SELECT
+                region,
+                COUNT(*) as transactions,
+                SUM(revenue) as total_revenue,
+                SUM(units) as total_units,
+                ROUND(AVG(revenue), 2) as avg_revenue,
+                ROUND(SUM(revenue) * 1.0 / SUM(units), 2) as revenue_per_unit
+              FROM load_sales
+              GROUP BY region
+              ORDER BY total_revenue DESC
+
+      # SQL: Join sales with customers
+      - name: regional_analysis
+        depends_on: [sales_summary, load_customers]
+        transform:
+          operation: sql
+          params:
+            query: |
+              SELECT
+                s.region,
+                s.total_revenue,
+                s.total_units,
+                c.population,
+                c.stores,
+                ROUND(s.total_revenue * 1.0 / c.population, 2) as revenue_per_capita,
+                ROUND(s.total_revenue * 1.0 / c.stores, 2) as revenue_per_store
+              FROM sales_summary s
+              LEFT JOIN load_customers c ON s.region = c.region
+              ORDER BY revenue_per_capita DESC
+        write:
+          connection: local_data
+          path: output/regional_analysis.csv
+          format: csv
+
+      # SQL: Advanced window functions
+      - name: product_rankings
+        depends_on: [load_sales]
+        transform:
+          operation: sql
+          params:
+            query: |
+              SELECT
+                product,
+                region,
+                revenue,
+                units,
+                ROW_NUMBER() OVER (PARTITION BY region ORDER BY revenue DESC) as rank_in_region,
+                ROUND(revenue * 100.0 / SUM(revenue) OVER (PARTITION BY region), 2) as pct_of_regional_revenue,
+                ROUND(AVG(revenue) OVER (PARTITION BY product), 2) as avg_product_revenue
+              FROM load_sales
+              ORDER BY region, rank_in_region
+        write:
+          connection: local_data
+          path: output/product_rankings.csv
+          format: csv
+&quot;&quot;&quot;
+
+with open('scratch/stage5_sql_pipeline.yaml', 'w') as f:
+    f.write(yaml_content)
+
+# Run pipeline
+print(&quot;🚀 Running SQL pipeline...&quot;)
+config = ProjectConfig.from_yaml(&quot;scratch/stage5_sql_pipeline.yaml&quot;)
+pipeline = Pipeline(config.pipelines[0], config)
+result = pipeline.run()
+
+print(f&quot;\n✅ Pipeline completed in {result.duration:.2f}s&quot;)
+
+# Show results
+print(&quot;\n📊 Regional Analysis:&quot;)
+analysis = pd.read_csv('scratch/stage5_output/output/regional_analysis.csv')
+print(analysis)
+
+print(&quot;\n📊 Product Rankings:&quot;)
+rankings = pd.read_csv('scratch/stage5_output/output/product_rankings.csv')
+print(rankings)
+
+print(&quot;\n🔍 Key Insight:&quot;)
+print(&quot;  - SQL runs on Pandas DataFrames via DuckDB&quot;)
+print(&quot;  - Same SQL would work with SparkEngine via Spark SQL&quot;)
+print(&quot;  - Operations are engine-agnostic!&quot;)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">python scratch/stage5_sql_demo.py
+</code></pre>
+<p><strong>Observe:</strong>
+- Complex SQL (JOINs, window functions) work on Pandas DataFrames
+- Check the story - SQL queries are included in explanations
+- Try running with <code>engine: spark</code> (if you have Spark installed)</p>
+<h3 id="checkpoint_5">✅ Checkpoint</h3>
+<p>Can you answer these?
+- [ ] What engine does PandasEngine use for SQL? (DuckDB!)
+- [ ] What engine does SparkEngine use for SQL? (Spark SQL!)
+- [ ] Why do operations receive <code>engine</code> as a parameter?
+- [ ] How does this enable portability?</p>
+<p><strong>Test:</strong> Can you write a SQL query with a CTE (Common Table Expression)?</p>
+<hr />
+<h2 id="stage-6-azure-sql-connector-20-25-min">Stage 6: Azure SQL Connector (20-25 min)</h2>
+<h3 id="goal_6">🎯 Goal</h3>
+<p>Know how to read/write to Azure SQL from a pipeline with safe auth patterns.</p>
+<h3 id="read-10-min_1">📖 Read (10 min)</h3>
+<p><strong>Read these files:</strong></p>
+<ol>
+<li><strong><code>odibi/connections/azure_sql.py</code></strong> (200 lines)</li>
+<li>See <code>AzureSQLConnection</code> class</li>
+<li>See two auth modes: <code>azure_ad</code> and <code>sql_auth</code></li>
+<li>See connection string building</li>
+<li>
+<p>See validation logic</p>
+</li>
+<li>
+<p><strong><code>odibi/config.py</code></strong> - Search for "AzureSQLConnectionConfig"</p>
+</li>
+<li>
+<p>See how connections are configured in YAML</p>
+</li>
+<li>
+<p><strong><code>docs/setup_azure.md</code></strong> (if exists) - SKIM</p>
+</li>
+<li>See environment variable patterns</li>
+<li>See local development guidance</li>
+</ol>
+<p><strong>Key Insight:</strong></p>
+<pre><code class="language-python"># Two authentication modes:
+#
+# 1. Azure AD (recommended for production):
+#    Uses DefaultAzureCredential (managed identity)
+#
+# 2. SQL Auth (local development):
+#    Uses username/password (not recommended for prod)
+#
+# Connection is validated eagerly (fail fast)
+</code></pre>
+<h3 id="do-15-min_1">🛠️ Do (15 min)</h3>
+<p><strong>Configure Azure SQL (mock for local testing):</strong></p>
+<pre><code class="language-python"># Create: scratch/stage6_azure_sql_demo.py
+
+import pandas as pd
+import os
+from odibi.config import ProjectConfig
+from odibi.pipeline import Pipeline
+
+# Create test data
+os.makedirs('scratch/stage6_output/input', exist_ok=True)
+
+df = pd.DataFrame({
+    &quot;id&quot;: [1, 2, 3, 4, 5],
+    &quot;name&quot;: [&quot;Alice&quot;, &quot;Bob&quot;, &quot;Charlie&quot;, &quot;Diana&quot;, &quot;Eve&quot;],
+    &quot;department&quot;: [&quot;Engineering&quot;, &quot;Sales&quot;, &quot;Engineering&quot;, &quot;Marketing&quot;, &quot;Sales&quot;],
+    &quot;salary&quot;: [95000, 65000, 87000, 72000, 68000]
+})
+df.to_csv('scratch/stage6_output/input/employees.csv', index=False)
+
+# Create pipeline YAML with Azure SQL connection
+# Note: This is a TEMPLATE - adjust for your environment
+yaml_content = &quot;&quot;&quot;
+story:
+  connection: local_data
+  format: markdown
+
+connections:
+  local_data:
+    type: local
+    base_path: ./scratch/stage6_output
+
+  # Azure SQL connection (configure for your environment)
+  azure_db:
+    type: azure_sql
+    server: your-server.database.windows.net  # Change this
+    database: your-database                     # Change this
+    auth_mode: sql_auth                         # or azure_ad for production
+    # For sql_auth mode:
+    username: ${AZURE_SQL_USER}                # Use env vars for secrets!
+    password: ${AZURE_SQL_PASSWORD}
+    # For azure_ad mode: no username/password needed
+
+pipelines:
+  - name: azure_sql_demo
+    plant: &quot;Data Warehouse&quot;
+    asset: &quot;Employee Analytics&quot;
+
+    nodes:
+      # Load from local
+      - name: load_employees
+        read:
+          connection: local_data
+          path: input/employees.csv
+          format: csv
+
+      # Transform
+      - name: calculate_metrics
+        depends_on: [load_employees]
+        transform:
+          operation: sql
+          params:
+            query: |
+              SELECT
+                department,
+                COUNT(*) as employee_count,
+                ROUND(AVG(salary), 2) as avg_salary,
+                MIN(salary) as min_salary,
+                MAX(salary) as max_salary
+              FROM load_employees
+              GROUP BY department
+              ORDER BY avg_salary DESC
+
+      # Write to Azure SQL
+      - name: export_to_azure
+        depends_on: [calculate_metrics]
+        write:
+          connection: azure_db
+          path: department_metrics  # Table name
+          format: sql
+          mode: replace            # or append
+&quot;&quot;&quot;
+
+with open('scratch/stage6_azure_sql.yaml', 'w') as f:
+    f.write(yaml_content)
+
+print(&quot;📝 Created Azure SQL pipeline template&quot;)
+print(&quot;\n⚠️  Configuration needed:&quot;)
+print(&quot;  1. Update server and database in YAML&quot;)
+print(&quot;  2. Set environment variables:&quot;)
+print(&quot;     export AZURE_SQL_USER='your_username'&quot;)
+print(&quot;     export AZURE_SQL_PASSWORD='your_password'&quot;)
+print(&quot;  3. Or switch to auth_mode: azure_ad for production&quot;)
+
+# For DEMO purposes, let's validate the config structure
+print(&quot;\n🔍 Validating configuration structure...&quot;)
+
+try:
+    config = ProjectConfig.from_yaml(&quot;scratch/stage6_azure_sql.yaml&quot;)
+    print(&quot;  ✅ Config structure is valid!&quot;)
+    print(f&quot;  ✅ Found {len(config.connections)} connections:&quot;)
+    for name, conn in config.connections.items():
+        print(f&quot;     - {name}: {conn.type}&quot;)
+
+    # Don't run pipeline without real Azure SQL credentials
+    print(&quot;\n⏸️  Skipping execution (no Azure SQL credentials)&quot;)
+    print(&quot;   To actually run: python scratch/stage6_azure_sql_demo.py --run&quot;)
+
+except Exception as e:
+    print(f&quot;  ❌ Config error: {e}&quot;)
+
+# Show how to use Azure AD auth (recommended for production)
+print(&quot;\n📚 Production Best Practice - Azure AD Authentication:&quot;)
+print(&quot;&quot;&quot;
+connections:
+  azure_db_prod:
+    type: azure_sql
+    server: prod-server.database.windows.net
+    database: prod-database
+    auth_mode: azure_ad  # Uses managed identity in Azure
+
+This approach:
+  ✅ No passwords in config or env vars
+  ✅ Uses Azure managed identity
+  ✅ Supports DefaultAzureCredential chain
+  ✅ Audit logs track actual user identity
+&quot;&quot;&quot;)
+
+print(&quot;\n🔐 Local Development - SQL Auth:&quot;)
+print(&quot;&quot;&quot;
+connections:
+  azure_db_dev:
+    type: azure_sql
+    server: dev-server.database.windows.net
+    database: dev-database
+    auth_mode: sql_auth
+    username: ${AZURE_SQL_USER}
+    password: ${AZURE_SQL_PASSWORD}
+
+This approach:
+  ⚠️  Only for local development
+  ⚠️  Never commit credentials
+  ⚠️  Use env vars or Key Vault
+&quot;&quot;&quot;)
+
+# If --run flag provided and credentials available
+import sys
+if '--run' in sys.argv:
+    print(&quot;\n🚀 Running pipeline with Azure SQL...&quot;)
+    try:
+        pipeline = Pipeline(config.pipelines[0], config)
+        result = pipeline.run()
+        print(f&quot;✅ Pipeline completed in {result.duration:.2f}s&quot;)
+        print(&quot;📊 Data written to Azure SQL!&quot;)
+    except Exception as e:
+        print(f&quot;❌ Execution error: {e}&quot;)
+        print(&quot;   Check your Azure SQL credentials and connection&quot;)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash"># Validate config structure
+python scratch/stage6_azure_sql_demo.py
+
+# Actually run (if you have Azure SQL setup)
+export AZURE_SQL_USER='your_username'
+export AZURE_SQL_PASSWORD='your_password'
+python scratch/stage6_azure_sql_demo.py --run
+</code></pre>
+<p><strong>Key Takeaways:</strong>
+- Never commit credentials to YAML
+- Use environment variables or Key Vault
+- Prefer Azure AD auth in production
+- Connection validation happens early (fail fast)</p>
+<h3 id="checkpoint_6">✅ Checkpoint</h3>
+<p>Can you answer these?
+- [ ] What are the two authentication modes?
+- [ ] Which mode is recommended for production?
+- [ ] How do you avoid hardcoding passwords?
+- [ ] When is the connection validated?</p>
+<p><strong>Security check:</strong> Can you spot the security issue if you hardcode a password in YAML?</p>
+<hr />
+<h2 id="stage-7-quality-guardrails-10-15-min">Stage 7: Quality &amp; Guardrails (10-15 min)</h2>
+<h3 id="goal_7">🎯 Goal</h3>
+<p>Enforce explanation quality; get familiar with failure modes.</p>
+<h3 id="read-5-min_1">📖 Read (5 min)</h3>
+<p><strong>Read these files:</strong></p>
+<ol>
+<li><strong><code>odibi/validation/explanation_linter.py</code></strong> (100 lines)</li>
+<li>See what gets validated</li>
+<li>
+<p>See quality rules</p>
+</li>
+<li>
+<p><strong><code>docs/guides/06_TROUBLESHOOTING.md</code></strong> - SKIM</p>
+</li>
+<li>See common errors</li>
+<li>See where failures happen (config vs runtime)</li>
+</ol>
+<p><strong>Key Insight:</strong></p>
+<pre><code class="language-python"># Quality enforcement:
+# 1. Every transformation should have explain()
+# 2. Explanations should be informative (not just &quot;does stuff&quot;)
+# 3. Should use templates for consistency
+# 4. Linter catches violations before production
+</code></pre>
+<h3 id="do-10-min_1">🛠️ Do (10 min)</h3>
+<p><strong>Run the linter:</strong></p>
+<pre><code class="language-python"># Create: scratch/stage7_quality_check.py
+
+from odibi.transformations import transformation, get_registry
+from odibi.validation.explanation_linter import lint_transformation
+import pandas as pd
+
+# BAD EXAMPLE - No explanation
+@transformation(&quot;bad_op&quot;, category=&quot;test&quot;)
+def bad_operation(df, threshold):
+    &quot;&quot;&quot;Bad operation with no explanation.&quot;&quot;&quot;
+    return df[df.value &gt; threshold]
+
+# GOOD EXAMPLE - Has explanation  
+@transformation(&quot;good_op&quot;, category=&quot;test&quot;)
+def good_operation(df, threshold):
+    &quot;&quot;&quot;Good operation with explanation.&quot;&quot;&quot;
+    return df[df.value &gt; threshold]
+
+@good_operation.explain
+def explain(threshold, **context):
+    &quot;&quot;&quot;Proper explanation.&quot;&quot;&quot;
+    from odibi.transformations.templates import purpose_detail_result
+    return purpose_detail_result(
+        purpose=f&quot;Filter data based on threshold&quot;,
+        details=[f&quot;Threshold: {threshold}&quot;, &quot;Removes low values&quot;],
+        result=&quot;Filtered dataset&quot;
+    )
+
+# Run linter
+print(&quot;🔍 Linting transformations...\n&quot;)
+
+print(&quot;1. Bad operation (missing explanation):&quot;)
+issues_bad = lint_transformation(&quot;bad_op&quot;)
+if issues_bad:
+    for issue in issues_bad:
+        print(f&quot;   ❌ {issue}&quot;)
+else:
+    print(&quot;   ✅ No issues&quot;)
+
+print(&quot;\n2. Good operation (has explanation):&quot;)
+issues_good = lint_transformation(&quot;good_op&quot;)
+if issues_good:
+    for issue in issues_good:
+        print(f&quot;   ❌ {issue}&quot;)
+else:
+    print(&quot;   ✅ No issues&quot;)
+
+# Lint all your custom operations
+print(&quot;\n3. Your custom operations:&quot;)
+for name in [&quot;filter_threshold&quot;, &quot;smart_filter&quot;]:
+    print(f&quot;\n   Checking '{name}':&quot;)
+    try:
+        issues = lint_transformation(name)
+        if issues:
+            for issue in issues:
+                print(f&quot;     ❌ {issue}&quot;)
+        else:
+            print(f&quot;     ✅ No issues&quot;)
+    except Exception as e:
+        print(f&quot;     ⚠️  Not found (may need to import): {e}&quot;)
+
+print(&quot;\n&quot; + &quot;=&quot;*60)
+print(&quot;📚 Quality Rules:&quot;)
+print(&quot;  ✅ Every transformation must have explain()&quot;)
+print(&quot;  ✅ Explanations should be informative&quot;)
+print(&quot;  ✅ Use templates for consistency&quot;)
+print(&quot;  ✅ Include context-aware details&quot;)
+print(&quot;  ✅ Test explanations with different context values&quot;)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">python scratch/stage7_quality_check.py
+</code></pre>
+<p><strong>Common failure modes:</strong></p>
+<pre><code class="language-python"># Create: scratch/stage7_troubleshooting.py
+
+from odibi.config import ProjectConfig
+from odibi.pipeline import Pipeline
+import pandas as pd
+
+print(&quot;📚 Common Failure Modes &amp; Where They Occur:\n&quot;)
+
+# 1. Config validation error
+print(&quot;1. Config Validation (ProjectConfig instantiation):&quot;)
+print(&quot;   When: Loading YAML&quot;)
+print(&quot;   Example: Missing required field, invalid type&quot;)
+print(&quot;   Fix: Check YAML structure, use VSCode YAML extension\n&quot;)
+
+try:
+    bad_yaml = &quot;&quot;&quot;
+    story:
+      connection: missing_connection  # This connection doesn't exist!
+
+    connections: {}
+
+    pipelines: []
+    &quot;&quot;&quot;
+    with open('scratch/bad_config.yaml', 'w') as f:
+        f.write(bad_yaml)
+
+    config = ProjectConfig.from_yaml('scratch/bad_config.yaml')
+except Exception as e:
+    print(f&quot;   ❌ Caught: {type(e).__name__}: {e}\n&quot;)
+
+# 2. Graph validation error
+print(&quot;2. Dependency Graph (DependencyGraph.validate()):&quot;)
+print(&quot;   When: Building execution order&quot;)
+print(&quot;   Example: Circular dependency, missing node&quot;)
+print(&quot;   Fix: Check depends_on references\n&quot;)
+
+try:
+    bad_yaml = &quot;&quot;&quot;
+    story:
+      connection: local
+      format: markdown
+
+    connections:
+      local:
+        type: local
+        base_path: ./scratch
+
+    pipelines:
+      - name: bad_deps
+        nodes:
+          - name: node_a
+            depends_on: [node_b]  # Circular!
+          - name: node_b
+            depends_on: [node_a]  # Circular!
+    &quot;&quot;&quot;
+    with open('scratch/bad_deps.yaml', 'w') as f:
+        f.write(bad_yaml)
+
+    config = ProjectConfig.from_yaml('scratch/bad_deps.yaml')
+    pipeline = Pipeline(config.pipelines[0], config)
+    # Graph validation happens here
+except Exception as e:
+    print(f&quot;   ❌ Caught: {type(e).__name__}: {e}\n&quot;)
+
+# 3. Runtime execution error
+print(&quot;3. Node Execution (Node.execute()):&quot;)
+print(&quot;   When: Running transformation&quot;)
+print(&quot;   Example: Missing column, type error, file not found&quot;)
+print(&quot;   Fix: Check data, operation parameters\n&quot;)
+
+# 4. Connection error
+print(&quot;4. Connection Error (Connection.validate()):&quot;)
+print(&quot;   When: Accessing storage&quot;)
+print(&quot;   Example: Invalid credentials, network timeout&quot;)
+print(&quot;   Fix: Check connection config, credentials\n&quot;)
+
+print(&quot;=&quot;*60)
+print(&quot;🔧 Debugging Tips:&quot;)
+print(&quot;  1. Read error messages carefully (they show exact location)&quot;)
+print(&quot;  2. Check YAML syntax first (most common issue)&quot;)
+print(&quot;  3. Validate config structure before running&quot;)
+print(&quot;  4. Use --log-level DEBUG for detailed output&quot;)
+print(&quot;  5. Check stories for node-level details&quot;)
+print(&quot;  6. Run linter before production deployment&quot;)
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">python scratch/stage7_troubleshooting.py
+</code></pre>
+<h3 id="checkpoint_7">✅ Checkpoint</h3>
+<p>Can you answer these?
+- [ ] What does the linter check for?
+- [ ] Where do config errors occur?
+- [ ] Where do runtime errors occur?
+- [ ] How do you debug a failed pipeline?</p>
+<p><strong>Final test:</strong> Run the linter on all your custom operations. Fix any issues.</p>
+<hr />
+<h2 id="graduation-challenge">🎓 Graduation Challenge</h2>
+<p>You've completed all 7 stages! Time to put it all together.</p>
+<h3 id="challenge-build-a-complete-analytics-pipeline">Challenge: Build a Complete Analytics Pipeline</h3>
+<p><strong>Requirements:</strong>
+1. Create a custom transformation with rich explanations
+2. Build a 5+ node pipeline with dependencies
+3. Use SQL for at least one transformation
+4. Generate stories in all 3 formats (HTML, MD, JSON)
+5. Pass the linter with zero issues
+6. Include at least one write operation</p>
+<p><strong>Bonus points:</strong>
+- Use multiple connections
+- Include error handling
+- Add data quality checks
+- Use window functions in SQL
+- Customize story theme</p>
+<p><strong>Solution template:</strong></p>
+<pre><code class="language-python"># scratch/graduation_challenge.py
+
+# 1. Define custom transformation
+# 2. Create comprehensive pipeline YAML
+# 3. Generate test data
+# 4. Run pipeline
+# 5. Generate stories
+# 6. Run linter
+# 7. Analyze results
+
+# YOUR CODE HERE
+</code></pre>
+<hr />
+<h2 id="next-steps">📚 Next Steps</h2>
+<p>You now understand Odibi's internals up to Phase 3!</p>
+<p><strong>Keep learning:</strong>
+- Read <code>docs/guides/04_ARCHITECTURE_GUIDE.md</code> - Visual diagrams
+- Read <code>docs/guides/05_TRANSFORMATION_GUIDE.md</code> - Advanced patterns
+- Explore Spark engine: <code>odibi/engine/spark_engine.py</code>
+- Explore Azure ADLS: <code>walkthroughs/phase2a_adls_test.ipynb</code>
+- Explore Delta Lake: <code>walkthroughs/phase2b_delta_lake.ipynb</code></p>
+<p><strong>Build something real:</strong>
+- Migrate an existing ETL script to Odibi
+- Build a medallion architecture (Bronze/Silver/Gold)
+- Create custom connectors
+- Contribute back to the project!</p>
+<p><strong>Get help:</strong>
+- Check <code>docs/guides/06_TROUBLESHOOTING.md</code>
+- Read <code>CONTRIBUTING.md</code>
+- Open GitHub issues
+- Review existing walkthroughs</p>
+<hr />
+<h2 id="learning-progress-tracker">📊 Learning Progress Tracker</h2>
+<p>Track your progress through the stages:</p>
+<ul>
+<li>[ ] Stage 0: First successful pipeline run</li>
+<li>[ ] Stage 1: Built custom transformation</li>
+<li>[ ] Stage 2: Understand dependency resolution</li>
+<li>[ ] Stage 3: Added rich explanations</li>
+<li>[ ] Stage 4: Generated stories in all formats</li>
+<li>[ ] Stage 5: Used SQL transformations</li>
+<li>[ ] Stage 6: Configured Azure SQL (or understood how)</li>
+<li>[ ] Stage 7: Passed linter checks</li>
+<li>[ ] 🎓 Completed graduation challenge</li>
+</ul>
+<p><strong>Estimated completion time:</strong> 2-3 hours<br />
+<strong>Your actual time:</strong> _____ hours</p>
+<p><strong>What was hardest?</strong> <strong><em>_</em></strong><strong><em>_</em></strong><strong><em>_</em></strong></p>
+<p><strong>What clicked fastest?</strong> <strong><em>_</em></strong><strong><em>_</em></strong><strong><em>_</em></strong></p>
+<p><strong>Next topic to explore:</strong> <strong><em>_</em></strong><strong><em>_</em></strong><strong><em>_</em></strong></p>
+<hr />
+<h2 id="key-concepts-summary">🔑 Key Concepts Summary</h2>
+<h3 id="transformation-system">Transformation System</h3>
+<ul>
+<li><code>@transformation</code> decorator registers functions at import time</li>
+<li>Global registry stores all transformations</li>
+<li><code>@func.explain</code> adds human explanations</li>
+<li><code>**context</code> enables forward-compatible context passing</li>
+</ul>
+<h3 id="execution-flow">Execution Flow</h3>
+<ul>
+<li>YAML → ProjectConfig → Pipeline → Nodes → Engine → Stories</li>
+<li>DependencyGraph sorts nodes topologically</li>
+<li>Context stores DataFrames between nodes</li>
+<li>Metadata tracks everything for stories</li>
+</ul>
+<h3 id="stories">Stories</h3>
+<ul>
+<li>Auto-generated during execution</li>
+<li>Metadata: duration, rows, schema, explanations</li>
+<li>Renderers: HTML, Markdown, JSON</li>
+<li>Themes: Dark, Light, Corporate, Minimal</li>
+</ul>
+<h3 id="engine-abstraction">Engine Abstraction</h3>
+<ul>
+<li>Operations are engine-agnostic</li>
+<li>PandasEngine: Uses DuckDB for SQL</li>
+<li>SparkEngine: Uses Spark SQL</li>
+<li>Same operations work on both engines</li>
+</ul>
+<h3 id="quality">Quality</h3>
+<ul>
+<li>Explanation linter enforces standards</li>
+<li>Fail-fast validation (config, graph, connections)</li>
+<li>Rich error messages with context</li>
+<li>Stories provide execution transparency</li>
+</ul>
+<hr />
+<p><strong>You're now ready to build production pipelines with Odibi!</strong> 🚀</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

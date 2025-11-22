@@ -1,0 +1,1630 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/v2_backup/guides/setup_azure/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Azure Integration Setup Guide - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#azure-integration-setup-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Azure Integration Setup Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="azure-integration-setup-guide">Azure Integration Setup Guide</h1>
+<p>This guide covers authenticating and connecting ODIBI to Azure services (ADLS Gen2, Azure SQL).</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>Azure subscription</li>
+<li>Azure CLI installed: <a href="https://learn.microsoft.com/en-us/cli/azure/install-azure-cli">Install Azure CLI</a></li>
+<li>ODIBI installed with Azure extras: <code>pip install "odibi[azure]"</code></li>
+</ul>
+<hr />
+<h2 id="azure-data-lake-storage-gen2-adls">Azure Data Lake Storage Gen2 (ADLS)</h2>
+<p>ODIBI's <code>AzureADLS</code> connection builds <code>abfss://</code> URIs for Spark and Azure Storage SDK.</p>
+<h3 id="1-create-storage-account">1. Create Storage Account</h3>
+<pre><code class="language-bash"># Login to Azure
+az login
+
+# Create resource group
+az group create --name odibi-rg --location eastus
+
+# Create storage account with hierarchical namespace (ADLS Gen2)
+az storage account create \
+  --name odibistorage \
+  --resource-group odibi-rg \
+  --location eastus \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --hierarchical-namespace true
+
+# Create container
+az storage container create \
+  --name data \
+  --account-name odibistorage \
+  --auth-mode login
+</code></pre>
+<h3 id="2-authentication-methods">2. Authentication Methods</h3>
+<h4 id="option-a-managed-identity-recommended-for-azure-vmsdatabricks">Option A: Managed Identity (Recommended for Azure VMs/Databricks)</h4>
+<p><strong>Use when:</strong> Running on Azure Databricks, Azure VMs, or Azure Functions</p>
+<pre><code class="language-yaml">connections:
+  adls:
+    type: azure_adls
+    account: odibistorage
+    container: data
+    path_prefix: raw/
+    auth_mode: managed_identity
+</code></pre>
+<p><strong>Setup:</strong>
+1. Enable managed identity on your Databricks cluster or VM
+2. Grant <strong>Storage Blob Data Contributor</strong> role:
+   <code>bash
+   az role assignment create \
+     --role "Storage Blob Data Contributor" \
+     --assignee-object-id &lt;managed-identity-object-id&gt; \
+     --scope /subscriptions/&lt;sub-id&gt;/resourceGroups/odibi-rg/providers/Microsoft.Storage/storageAccounts/odibistorage</code></p>
+<h4 id="option-b-azure-cli-developmentlocal">Option B: Azure CLI (Development/Local)</h4>
+<p><strong>Use when:</strong> Running locally on your development machine</p>
+<pre><code class="language-yaml">connections:
+  adls:
+    type: azure_adls
+    account: odibistorage
+    container: data
+    auth_mode: cli
+</code></pre>
+<p><strong>Setup:</strong></p>
+<pre><code class="language-bash"># Login with your Azure account
+az login
+
+# Grant yourself access (if not already granted)
+az role assignment create \
+  --role &quot;Storage Blob Data Contributor&quot; \
+  --assignee &lt;your-email@domain.com&gt; \
+  --scope /subscriptions/&lt;sub-id&gt;/resourceGroups/odibi-rg/providers/Microsoft.Storage/storageAccounts/odibistorage
+</code></pre>
+<h4 id="option-c-service-principal-cicd-pipelines">Option C: Service Principal (CI/CD Pipelines)</h4>
+<p><strong>Use when:</strong> Running in GitHub Actions, Azure DevOps, or other automation</p>
+<pre><code class="language-yaml">connections:
+  adls:
+    type: azure_adls
+    account: odibistorage
+    container: data
+    auth_mode: service_principal
+    tenant_id: ${AZURE_TENANT_ID}
+    client_id: ${AZURE_CLIENT_ID}
+    client_secret: ${AZURE_CLIENT_SECRET}
+</code></pre>
+<p><strong>Setup:</strong></p>
+<pre><code class="language-bash"># Create service principal
+az ad sp create-for-rbac \
+  --name odibi-sp \
+  --role &quot;Storage Blob Data Contributor&quot; \
+  --scopes /subscriptions/&lt;sub-id&gt;/resourceGroups/odibi-rg/providers/Microsoft.Storage/storageAccounts/odibistorage
+
+# Save output (tenant, appId, password) to environment variables
+export AZURE_TENANT_ID=&quot;&lt;tenant-id&gt;&quot;
+export AZURE_CLIENT_ID=&quot;&lt;app-id&gt;&quot;
+export AZURE_CLIENT_SECRET=&quot;&lt;password&gt;&quot;
+</code></pre>
+<p><strong>Environment file (<code>.env</code>):</strong></p>
+<pre><code class="language-bash">AZURE_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+AZURE_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+AZURE_CLIENT_SECRET=your-secret-here
+</code></pre>
+<p>Load in Python:</p>
+<pre><code class="language-python">from dotenv import load_dotenv
+load_dotenv()  # Loads variables from .env file
+</code></pre>
+<h4 id="option-d-account-key-via-azure-key-vault-enterprise-approved">Option D: Account Key via Azure Key Vault (Enterprise-Approved)</h4>
+<p><strong>Use when:</strong> Managed Identity is not available but secrets are stored securely in Azure Key Vault</p>
+<pre><code class="language-yaml">connections:
+  adls:
+    type: azure_adls
+    account: odibistorage
+    container: data
+    path_prefix: bronze/
+    auth_mode: account_key
+    key_vault_name: odibi-kv
+    key_vault_secret: adls-storage-key
+</code></pre>
+<p><strong>Setup Steps:</strong></p>
+<ol>
+<li>
+<p><strong>Create Azure Key Vault:</strong>
+   <code>bash
+   az keyvault create \
+     --name odibi-kv \
+     --resource-group odibi-rg \
+     --location eastus</code></p>
+</li>
+<li>
+<p><strong>Store your storage account key securely:</strong>
+   ```bash
+   # Get storage account key
+   STORAGE_KEY=$(az storage account keys list \
+     --resource-group odibi-rg \
+     --account-name odibistorage \
+     --query '[0].value' -o tsv)</p>
+</li>
+</ol>
+<p># Store in Key Vault
+   az keyvault secret set \
+     --vault-name odibi-kv \
+     --name adls-storage-key \
+     --value "$STORAGE_KEY"
+   ```</p>
+<ol>
+<li><strong>Assign Key Vault Secrets User role:</strong>
+   ```bash
+   # For your user account (local development)
+   az role assignment create \
+     --role "Key Vault Secrets User" \
+     --assignee <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#121;&#111;&#117;&#114;&#45;&#101;&#109;&#97;&#105;&#108;&#64;&#100;&#111;&#109;&#97;&#105;&#110;&#46;&#99;&#111;&#109;">&#121;&#111;&#117;&#114;&#45;&#101;&#109;&#97;&#105;&#108;&#64;&#100;&#111;&#109;&#97;&#105;&#110;&#46;&#99;&#111;&#109;</a> \
+     --scope /subscriptions/<sub-id>/resourceGroups/odibi-rg/providers/Microsoft.KeyVault/vaults/odibi-kv</li>
+</ol>
+<p># For managed identity (production)
+   az role assignment create \
+     --role "Key Vault Secrets User" \
+     --assignee-object-id <managed-identity-object-id> \
+     --scope /subscriptions/<sub-id>/resourceGroups/odibi-rg/providers/Microsoft.KeyVault/vaults/odibi-kv
+   ```</p>
+<ol>
+<li><strong>In ODIBI, retrieve key dynamically:</strong>
+   ```python
+   from azure.identity import DefaultAzureCredential
+   from azure.keyvault.secrets import SecretClient</li>
+</ol>
+<p># Authenticate using managed identity, CLI, or service principal
+   credential = DefaultAzureCredential()
+   client = SecretClient(
+       vault_url="https://odibi-kv.vault.azure.net/",
+       credential=credential
+   )</p>
+<p># Retrieve storage key securely
+   storage_key = client.get_secret("adls-storage-key").value
+   print("✅ Retrieved key securely from Key Vault")
+   ```</p>
+<p><strong>Note:</strong> This pattern is <strong>enterprise-approved</strong> for production environments where Managed Identity is not yet available. Keys are never stored in code or configuration files.</p>
+<hr />
+<h2 id="azure-sql-database">Azure SQL Database</h2>
+<p>ODIBI's <code>AzureSQL</code> connection generates ODBC connection strings for Pandas and Spark.</p>
+<h3 id="1-create-azure-sql-database">1. Create Azure SQL Database</h3>
+<pre><code class="language-bash"># Create SQL server
+az sql server create \
+  --name odibi-sql-server \
+  --resource-group odibi-rg \
+  --location eastus \
+  --admin-user odibiadmin \
+  --admin-password '&lt;Strong!Password123&gt;'
+
+# Create database
+az sql db create \
+  --resource-group odibi-rg \
+  --server odibi-sql-server \
+  --name odibi-db \
+  --service-objective S0  # Standard tier
+
+# Allow Azure services to access server
+az sql server firewall-rule create \
+  --resource-group odibi-rg \
+  --server odibi-sql-server \
+  --name AllowAzureServices \
+  --start-ip-address 0.0.0.0 \
+  --end-ip-address 0.0.0.0
+
+# Allow your IP (for local development)
+az sql server firewall-rule create \
+  --resource-group odibi-rg \
+  --server odibi-sql-server \
+  --name AllowMyIP \
+  --start-ip-address &lt;your-public-ip&gt; \
+  --end-ip-address &lt;your-public-ip&gt;
+</code></pre>
+<h3 id="2-connection-configuration">2. Connection Configuration</h3>
+<h4 id="managed-identity-recommended">Managed Identity (Recommended)</h4>
+<pre><code class="language-yaml">connections:
+  azure_sql:
+    type: azure_sql
+    server: odibi-sql-server.database.windows.net
+    database: odibi-db
+    # No username/password - uses managed identity
+</code></pre>
+<p><strong>Setup:</strong>
+1. Enable managed identity on your VM/Databricks cluster
+2. Create SQL user for managed identity:
+   <code>sql
+   CREATE USER [odibi-databricks] FROM EXTERNAL PROVIDER;
+   ALTER ROLE db_datareader ADD MEMBER [odibi-databricks];
+   ALTER ROLE db_datawriter ADD MEMBER [odibi-databricks];</code></p>
+<h4 id="sql-authentication-development">SQL Authentication (Development)</h4>
+<pre><code class="language-yaml">connections:
+  azure_sql:
+    type: azure_sql
+    server: odibi-sql-server.database.windows.net
+    database: odibi-db
+    username: ${SQL_USER}
+    password: ${SQL_PASSWORD}
+</code></pre>
+<p><strong>Environment file (<code>.env</code>):</strong></p>
+<pre><code class="language-bash">SQL_USER=odibiadmin
+SQL_PASSWORD=&lt;Strong!Password123&gt;
+</code></pre>
+<h3 id="3-install-odbc-driver">3. Install ODBC Driver</h3>
+<p><strong>Windows:</strong> Pre-installed on recent versions</p>
+<p><strong>Linux (Ubuntu/Debian):</strong></p>
+<pre><code class="language-bash">curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list &gt; /etc/apt/sources.list.d/mssql-release.list
+apt-get update
+ACCEPT_EULA=Y apt-get install -y msodbcsql18
+</code></pre>
+<p><strong>macOS:</strong></p>
+<pre><code class="language-bash">brew tap microsoft/mssql-release https://github.com/Microsoft/homebrew-mssql-release
+brew install msodbcsql18
+</code></pre>
+<p><strong>Verify installation:</strong></p>
+<pre><code class="language-bash">odbcinst -q -d
+# Should show: [ODBC Driver 18 for SQL Server]
+</code></pre>
+<hr />
+<h2 id="permission-checklist">Permission Checklist</h2>
+<h3 id="for-adls-gen2">For ADLS Gen2:</h3>
+<ul>
+<li>[ ] Storage account created with <strong>hierarchical namespace enabled</strong></li>
+<li>[ ] Container created (e.g., <code>data</code>)</li>
+<li>[ ] Identity (user/SP/managed identity) has <strong>Storage Blob Data Contributor</strong> role</li>
+<li>[ ] Firewall allows access (or set to allow all Azure services)</li>
+</ul>
+<h3 id="for-azure-sql">For Azure SQL:</h3>
+<ul>
+<li>[ ] SQL server firewall rule created for your IP/Azure services</li>
+<li>[ ] Database created with appropriate tier (S0 for dev, higher for prod)</li>
+<li>[ ] SQL user created (via managed identity or SQL auth)</li>
+<li>[ ] User has <code>db_datareader</code> and <code>db_datawriter</code> roles</li>
+<li>[ ] ODBC Driver 18 installed on client machine</li>
+</ul>
+<h3 id="for-key-vault-if-using-option-d">For Key Vault (if using Option D):</h3>
+<ul>
+<li>[ ] Key Vault created in same resource group</li>
+<li>[ ] Storage account key stored as secret</li>
+<li>[ ] Identity has <strong>Key Vault Secrets User</strong> role</li>
+<li>[ ] Key Vault network settings allow access</li>
+</ul>
+<hr />
+<h2 id="path-resolution-examples">Path Resolution Examples</h2>
+<h3 id="adls-uri-construction">ADLS URI Construction</h3>
+<pre><code class="language-python">from odibi.connections import AzureADLS
+
+conn = AzureADLS(
+    account=&quot;odibistorage&quot;,
+    container=&quot;data&quot;,
+    path_prefix=&quot;bronze&quot;
+)
+
+uri = conn.uri(&quot;sales/2024/transactions.parquet&quot;)
+print(uri)
+# Output: abfss://data@odibistorage.dfs.core.windows.net/bronze/sales/2024/transactions.parquet
+</code></pre>
+<h3 id="azure-sql-dsn">Azure SQL DSN</h3>
+<pre><code class="language-python">from odibi.connections import AzureSQL
+
+conn = AzureSQL(
+    server=&quot;odibi-sql-server.database.windows.net&quot;,
+    database=&quot;odibi-db&quot;
+)
+
+dsn = conn.odbc_dsn()
+print(dsn)
+# Output: Driver={ODBC Driver 18 for SQL Server};Server=tcp:odibi-sql-server...;Authentication=ActiveDirectoryMsi;
+</code></pre>
+<hr />
+<h2 id="security-best-practices">Security Best Practices</h2>
+<ol>
+<li><strong>Never commit secrets to Git</strong></li>
+<li>Use <code>.env</code> files and add <code>.env</code> to <code>.gitignore</code></li>
+<li>Use environment variables in CI/CD pipelines</li>
+<li>
+<p>Use Azure Key Vault for production secrets</p>
+</li>
+<li>
+<p><strong>Use Managed Identity when possible</strong></p>
+</li>
+<li>No credentials to rotate or leak</li>
+<li>Automatic authentication in Azure environments</li>
+<li>
+<p>Simplifies deployment and configuration</p>
+</li>
+<li>
+<p><strong>Least Privilege Access</strong></p>
+</li>
+<li>Grant only <code>Storage Blob Data Reader</code> if pipelines are read-only</li>
+<li>Use separate service principals for dev/staging/prod</li>
+<li>
+<p>Regularly audit role assignments</p>
+</li>
+<li>
+<p><strong>Rotate Secrets Regularly</strong></p>
+</li>
+<li>Rotate service principal secrets every 90 days</li>
+<li>Use Azure Key Vault secret rotation policies</li>
+<li>
+<p>Monitor for expired credentials</p>
+</li>
+<li>
+<p><strong>Enable Audit Logging</strong></p>
+</li>
+<li>Enable diagnostic settings on storage accounts</li>
+<li>Track who accessed what data and when</li>
+<li>Set up alerts for suspicious activity</li>
+</ol>
+<hr />
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="error-this-request-is-not-authorized-to-perform-this-operation">Error: "This request is not authorized to perform this operation"</h3>
+<p><strong>Cause:</strong> Missing <strong>Storage Blob Data Contributor</strong> role</p>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-bash">az role assignment create \
+  --role &quot;Storage Blob Data Contributor&quot; \
+  --assignee &lt;user-or-sp-object-id&gt; \
+  --scope /subscriptions/&lt;sub-id&gt;/resourceGroups/&lt;rg&gt;/providers/Microsoft.Storage/storageAccounts/&lt;account&gt;
+</code></pre>
+<h3 id="error-cannot-open-server-requested-by-the-login">Error: "Cannot open server ... requested by the login"</h3>
+<p><strong>Cause:</strong> Firewall blocking connection to Azure SQL</p>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-bash"># Get your public IP
+curl ifconfig.me
+
+# Add firewall rule
+az sql server firewall-rule create \
+  --resource-group odibi-rg \
+  --server odibi-sql-server \
+  --name AllowMyIP \
+  --start-ip-address &lt;your-ip&gt; \
+  --end-ip-address &lt;your-ip&gt;
+</code></pre>
+<h3 id="error-no-module-named-azurestorageblob">Error: "No module named 'azure.storage.blob'"</h3>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-bash">pip install &quot;odibi[azure]&quot;
+</code></pre>
+<h3 id="error-client-does-not-have-permission-to-perform-action-on-key-vault">Error: "Client does not have permission to perform action on Key Vault"</h3>
+<p><strong>Cause:</strong> Missing <strong>Key Vault Secrets User</strong> role</p>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-bash">az role assignment create \
+  --role &quot;Key Vault Secrets User&quot; \
+  --assignee &lt;user-or-managed-identity-object-id&gt; \
+  --scope /subscriptions/&lt;sub-id&gt;/resourceGroups/&lt;rg&gt;/providers/Microsoft.KeyVault/vaults/&lt;vault-name&gt;
+</code></pre>
+<hr />
+<h2 id="feature-status">Feature Status</h2>
+<p><strong>Available:</strong>
+- ✅ ADLS path/URI resolution
+- ✅ Azure SQL DSN string generation
+- ✅ Connection validation and configuration
+- ✅ Key Vault integration
+- ✅ Actual read/write operations via <code>SparkEngine</code>
+- ✅ Integration with Pandas engine for Azure SQL</p>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<ul>
+<li>See <a href="../setup_databricks/">setup_databricks.md</a> for Databricks cluster setup</li>
+<li>Check <a href="../examples/templates/azure_spark.yaml">examples/templates/azure_spark.yaml</a> for Azure pipeline examples</li>
+<li>Review <a href="../PHASES.md">PHASES.md</a> for roadmap</li>
+</ul>
+<hr />
+<p><strong>Questions?</strong> Open an issue: https://github.com/henryodibi11/Odibi/issues</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

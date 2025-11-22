@@ -1,0 +1,2580 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/design/PHASE2_DESIGN_DECISIONS/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Phase 2 Design Decisions - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#phase-2-design-decisions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Phase 2 Design Decisions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="phase-2-design-decisions">Phase 2 Design Decisions</h1>
+<p><strong>Status:</strong> ✅ Design Refinement Complete<br />
+<strong>Last Updated:</strong> 2025-11-08<br />
+<strong>Sessions:</strong>
+- Config Refactor + Azure Auth Strategy Planning
+- Design Refinement - Critical Implementation Details (Testing, Delta, Performance, Session Management)</p>
+<hr />
+<h2 id="purpose">Purpose</h2>
+<p>This document captures the architectural decisions made during Phase 2 planning. These decisions guide the implementation of Spark engine, Azure ADLS integration, and credential management.</p>
+<p><strong>Key Principle:</strong> These are <strong>design decisions</strong>, not implementation. Code will be written in Phase 2 execution based on this plan.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-transform-pattern">Transform Pattern</a></li>
+<li><a href="#2-multi-account-storage-strategy">Multi-Account Storage Strategy</a></li>
+<li><a href="#3-authentication-strategy">Authentication Strategy</a></li>
+<li><a href="#4-databricks-integration">Databricks Integration</a></li>
+<li><a href="#5-user-onboarding-tools">User Onboarding Tools</a></li>
+<li><a href="#6-validation-strategy">Validation Strategy</a></li>
+<li><a href="#7-delta-lake-strategy">Delta Lake Strategy</a></li>
+<li><a href="#8-spark-session-management">Spark Session Management</a></li>
+<li><a href="#9-testing-strategy">Testing Strategy</a></li>
+<li><a href="#10-key-vault-performance">Key Vault Performance</a></li>
+<li><a href="#11-local-development-experience">Local Development Experience</a></li>
+<li><a href="#12-out-of-scope-phase-2">Out of Scope</a></li>
+<li><a href="#13-implementation-roadmap">Implementation Roadmap</a></li>
+<li><a href="#14-implementation-checklist">Implementation Checklist</a></li>
+</ol>
+<hr />
+<h2 id="1-transform-pattern">1. Transform Pattern</h2>
+<h3 id="decision">Decision</h3>
+<p><strong>Transforms NEVER need connections</strong> - they operate on data already in context.</p>
+<h3 id="rationale">Rationale</h3>
+<ul>
+<li><strong>Read</strong> nodes bring data INTO context (requires connection for I/O)</li>
+<li><strong>Transform</strong> nodes operate on data ALREADY in context (no I/O, pure computation)</li>
+<li><strong>Write</strong> nodes send data OUT of context (requires connection for I/O)</li>
+</ul>
+<h3 id="works-for">Works For</h3>
+<ul>
+<li>✅ Pandas (in-memory DataFrames)</li>
+<li>✅ Spark (lazy execution DataFrames)</li>
+<li>✅ Both development and production</li>
+<li>✅ Testing (mock data in context, no connection needed)</li>
+</ul>
+<h3 id="example">Example</h3>
+<pre><code class="language-yaml">pipelines:
+  - pipeline: bronze_to_silver
+    nodes:
+      # Read: Needs connection (I/O)
+      - name: load_raw
+        read:
+          connection: bronze
+          path: raw/sales.csv
+
+      # Transform: No connection (operates on data in context)
+      - name: clean_data
+        depends_on: [load_raw]
+        transform:
+          steps:
+            - &quot;SELECT * FROM load_raw WHERE amount &gt; 0&quot;
+
+      # Write: Needs connection (I/O)
+      - name: save_clean
+        depends_on: [clean_data]
+        write:
+          connection: silver
+          path: cleaned/sales.parquet
+</code></pre>
+<h3 id="testing-pattern">Testing Pattern</h3>
+<pre><code class="language-python">def test_transform():
+    # No connection needed
+    context = PandasContext()
+    context.register('raw_data', test_df)
+
+    result = engine.execute_sql(&quot;SELECT * FROM raw_data WHERE ...&quot;, context)
+
+    assert len(result) == expected_count
+</code></pre>
+<hr />
+<h2 id="2-multi-account-storage-strategy">2. Multi-Account Storage Strategy</h2>
+<h3 id="decision_1">Decision</h3>
+<p>Support multiple Azure storage accounts simultaneously with <strong>different strategies</strong> for Spark vs Pandas.</p>
+<h3 id="spark-global-configuration">Spark: Global Configuration</h3>
+<p><strong>Pattern:</strong> Set all storage account configs upfront when SparkEngine initializes.</p>
+<p><strong>Why it works:</strong> Spark config keys are scoped by account name - no clashes.</p>
+<pre><code class="language-python"># Each account gets unique config key
+spark.conf.set(&quot;fs.azure.account.key.account1.dfs.core.windows.net&quot;, &quot;key1&quot;)
+spark.conf.set(&quot;fs.azure.account.key.account2.dfs.core.windows.net&quot;, &quot;key2&quot;)
+
+# All reads automatically use correct config
+df1 = spark.read.parquet(&quot;abfss://container@account1.../data.parquet&quot;)
+df2 = spark.read.parquet(&quot;abfss://container@account2.../data.parquet&quot;)
+</code></pre>
+<p><strong>Implementation:</strong></p>
+<pre><code class="language-python">class SparkEngine:
+    def __init__(self, connections):
+        self.spark = SparkSession.builder.getOrCreate()
+        self._configure_all_connections(connections)  # ← Set all at init
+</code></pre>
+<h3 id="pandas-per-operation-injection">Pandas: Per-Operation Injection</h3>
+<p><strong>Pattern:</strong> Each read/write gets <code>storage_options</code> injected from its connection.</p>
+<p><strong>Why it works:</strong> Pandas has no global config - each operation is independent.</p>
+<pre><code class="language-python"># Each read gets its own storage_options
+df1 = pd.read_parquet(
+    &quot;abfss://container@account1.../data.parquet&quot;,
+    storage_options={&quot;account_name&quot;: &quot;account1&quot;, &quot;account_key&quot;: &quot;key1&quot;}
+)
+
+df2 = pd.read_parquet(
+    &quot;abfss://container@account2.../data.parquet&quot;,
+    storage_options={&quot;account_name&quot;: &quot;account2&quot;, &quot;account_key&quot;: &quot;key2&quot;}
+)
+</code></pre>
+<p><strong>Implementation:</strong></p>
+<pre><code class="language-python">class PandasEngine:
+    def read(self, connection, path, format, options=None):
+        options = self._merge_storage_options(connection, options)
+        return pd.read_parquet(full_path, **options)
+
+    def _merge_storage_options(self, connection, options):
+        # Inject connection credentials, allow user override
+        conn_opts = connection.pandas_storage_options()
+        user_opts = options.get(&quot;storage_options&quot;, {})
+        merged = {**conn_opts, **user_opts}
+        return {**options, &quot;storage_options&quot;: merged}
+</code></pre>
+<h3 id="example-configuration">Example Configuration</h3>
+<pre><code class="language-yaml">connections:
+  bronze:
+    type: azure_adls
+    account: account1
+    container: bronze
+    auth_mode: key_vault
+    key_vault_name: company-kv
+    secret_name: bronze-key
+
+  silver:
+    type: azure_adls
+    account: account2  # Different storage account
+    container: silver
+    auth_mode: key_vault
+    key_vault_name: company-kv
+    secret_name: silver-key
+
+  gold:
+    type: azure_adls
+    account: account3  # Third storage account
+    container: gold
+    auth_mode: key_vault
+    key_vault_name: company-kv
+    secret_name: gold-key
+</code></pre>
+<p><strong>All three accounts work simultaneously - no configuration conflicts.</strong></p>
+<hr />
+<h2 id="3-authentication-strategy">3. Authentication Strategy</h2>
+<h3 id="decision_2">Decision</h3>
+<p>Support <strong>two authentication modes</strong> with Key Vault as the recommended default.</p>
+<h3 id="supported-modes">Supported Modes</h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Use Case</th>
+<th>Priority</th>
+<th>Security</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key_vault</code></td>
+<td>Production (recommended)</td>
+<td>Primary</td>
+<td>✅ High</td>
+</tr>
+<tr>
+<td><code>direct_key</code></td>
+<td>Local dev, testing</td>
+<td>Fallback</td>
+<td>🟡 Medium</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mode-key_vault-recommended">Mode: key_vault (Recommended)</h3>
+<p><strong>Configuration:</strong></p>
+<pre><code class="language-yaml">connections:
+  storage:
+    type: azure_adls
+    account: mystorageaccount
+    container: mycontainer
+    auth_mode: key_vault  # ← Default
+    key_vault_name: company-keyvault
+    secret_name: storage-account-key
+</code></pre>
+<p><strong>How it works:</strong>
+1. Connection uses <code>DefaultAzureCredential</code> to authenticate to Key Vault
+2. Fetches storage account key from specified secret
+3. Caches key for duration of pipeline run
+4. Uses key for all Spark/Pandas operations</p>
+<p><strong>Benefits:</strong>
+- ✅ Secrets never in YAML files (safe to commit to git)
+- ✅ Centralized secret management
+- ✅ Automatic key rotation (change in Key Vault, no code changes)
+- ✅ Audit trail (Key Vault logs who accessed what)
+- ✅ Works in Databricks (workspace managed identity)</p>
+<h3 id="mode-direct_key-fallback">Mode: direct_key (Fallback)</h3>
+<p><strong>Configuration:</strong></p>
+<pre><code class="language-yaml">connections:
+  dev_storage:
+    type: azure_adls
+    account: devaccount
+    container: dev
+    auth_mode: direct_key
+    account_key: &quot;${STORAGE_KEY}&quot;  # From environment variable
+</code></pre>
+<p><strong>How it works:</strong>
+1. User provides key directly (usually via environment variable)
+2. Connection uses key as-is
+3. No Key Vault access needed</p>
+<p><strong>When to use:</strong>
+- Local development (Azure CLI auth to Key Vault not configured)
+- CI/CD pipelines (using pipeline secrets)
+- Quick prototyping/testing
+- Environments without Key Vault access</p>
+<p><strong>Warning behavior:</strong>
+- If <code>ODIBI_ENV=production</code>, warns user that <code>direct_key</code> is not recommended
+- Validation ensures <code>account_key</code> is provided when using this mode</p>
+<h3 id="implementation">Implementation</h3>
+<pre><code class="language-python">class AzureADLS(BaseConnection):
+    def __init__(
+        self,
+        account: str,
+        container: str,
+        path_prefix: str = &quot;&quot;,
+        auth_mode: str = &quot;key_vault&quot;,  # ← Default to best practice
+        key_vault_name: str = None,
+        secret_name: str = None,
+        account_key: str = None,
+        validate: bool = True
+    ):
+        # ... store params ...
+        self._cached_key = None
+
+        if validate:
+            self.validate()  # Fail fast
+
+    def validate(self):
+        &quot;&quot;&quot;Validate config based on auth mode.&quot;&quot;&quot;
+        if self.auth_mode == &quot;key_vault&quot;:
+            if not self.key_vault_name or not self.secret_name:
+                raise ValueError(
+                    f&quot;key_vault mode requires 'key_vault_name' and 'secret_name'&quot;
+                )
+        elif self.auth_mode == &quot;direct_key&quot;:
+            if not self.account_key:
+                raise ValueError(f&quot;direct_key mode requires 'account_key'&quot;)
+
+            # Warn in production
+            if os.getenv(&quot;ODIBI_ENV&quot;) == &quot;production&quot;:
+                warnings.warn(
+                    f&quot;⚠️  Using direct_key in production not recommended. &quot;
+                    f&quot;Use auth_mode: key_vault. Connection: {self.account}&quot;,
+                    UserWarning
+                )
+        else:
+            raise ValueError(
+                f&quot;Unsupported auth_mode: {self.auth_mode}. &quot;
+                f&quot;Use 'key_vault' or 'direct_key'.&quot;
+            )
+
+    def get_storage_key(self) -&gt; str:
+        &quot;&quot;&quot;Get storage account key (cached).&quot;&quot;&quot;
+        if self._cached_key:
+            return self._cached_key
+
+        if self.auth_mode == &quot;key_vault&quot;:
+            from azure.identity import DefaultAzureCredential
+            from azure.keyvault.secrets import SecretClient
+
+            credential = DefaultAzureCredential()
+            kv_uri = f&quot;https://{self.key_vault_name}.vault.azure.net&quot;
+            client = SecretClient(vault_url=kv_uri, credential=credential)
+
+            secret = client.get_secret(self.secret_name)
+            self._cached_key = secret.value
+            return self._cached_key
+
+        elif self.auth_mode == &quot;direct_key&quot;:
+            return self.account_key
+
+    def pandas_storage_options(self) -&gt; dict:
+        &quot;&quot;&quot;Storage options for pandas.&quot;&quot;&quot;
+        return {
+            &quot;account_name&quot;: self.account,
+            &quot;account_key&quot;: self.get_storage_key()
+        }
+
+    def configure_spark(self, spark):
+        &quot;&quot;&quot;Configure Spark with storage key.&quot;&quot;&quot;
+        config_key = f&quot;fs.azure.account.key.{self.account}.dfs.core.windows.net&quot;
+        spark.conf.set(config_key, self.get_storage_key())
+</code></pre>
+<h3 id="key-design-principles">Key Design Principles</h3>
+<ol>
+<li><strong>Default to security:</strong> <code>auth_mode: key_vault</code> is the default</li>
+<li><strong>Validate early:</strong> Check config on connection init, not first use</li>
+<li><strong>Cache credentials:</strong> Fetch once, reuse throughout pipeline</li>
+<li><strong>Warn insecure patterns:</strong> Alert when <code>direct_key</code> used in production</li>
+<li><strong>Support flexibility:</strong> Allow <code>direct_key</code> for legitimate dev/test use cases</li>
+</ol>
+<hr />
+<h2 id="4-databricks-integration">4. Databricks Integration</h2>
+<h3 id="discovery">Discovery</h3>
+<p><strong>Azure Databricks workspace managed identity + DefaultAzureCredential WORKS!</strong> ✅</p>
+<p>This was validated during planning session.</p>
+<h3 id="how-it-works">How It Works</h3>
+<ol>
+<li><strong>Databricks workspace</strong> has system-assigned managed identity (auto-created by Azure)</li>
+<li><strong>DefaultAzureCredential</strong> (from <code>azure-identity</code> package) automatically detects and uses workspace identity</li>
+<li><strong>Grant workspace identity</strong> access to Key Vault via access policy</li>
+<li><strong>ODIBI code works unchanged</strong> in Databricks - no special handling needed</li>
+</ol>
+<h3 id="setup-requirements">Setup Requirements</h3>
+<p><strong>One-time per workspace:</strong></p>
+<ol>
+<li><strong>Find workspace managed identity Object ID</strong></li>
+<li>Portal: Databricks Workspace → Identity → System assigned → Object ID</li>
+<li>CLI: <code>az databricks workspace show --query identity.principalId</code></li>
+<li>
+<p><strong>Or use ODIBI setup notebook</strong> (recommended - automates this)</p>
+</li>
+<li>
+<p><strong>Grant Key Vault access</strong>
+   <code>bash
+   az keyvault set-policy \
+     --name company-keyvault \
+     --object-id &lt;workspace-object-id&gt; \
+     --secret-permissions get list</code></p>
+</li>
+<li>
+<p><strong>Install dependencies in cluster</strong>
+   <code>python
+   %pip install azure-identity azure-keyvault-secrets adlfs</code></p>
+</li>
+</ol>
+<h3 id="permissions">Permissions</h3>
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>Required?</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get</code></td>
+<td>✅ Yes</td>
+<td>Read secret values (ODIBI needs this)</td>
+</tr>
+<tr>
+<td><code>list</code></td>
+<td>🟡 Recommended</td>
+<td>List secrets (helpful for troubleshooting/validation)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recommendation:</strong> Grant both <code>get</code> and <code>list</code> for better developer experience.</p>
+<h3 id="security-notes">Security Notes</h3>
+<ul>
+<li>Workspace managed identity is <strong>Azure-managed</strong> (no credentials to rotate)</li>
+<li>Access is <strong>workspace-scoped</strong> (all notebooks in workspace inherit it)</li>
+<li>Key Vault <strong>logs all access</strong> (audit trail for compliance)</li>
+<li>Works with <strong>cross-subscription</strong> Key Vaults (if access granted)</li>
+</ul>
+<hr />
+<h2 id="5-user-onboarding-tools">5. User Onboarding Tools</h2>
+<h3 id="decision_3">Decision</h3>
+<p>Provide <strong>automated setup tools</strong> instead of manual documentation (CLI, portal screenshots).</p>
+<h3 id="tools-to-build">Tools to Build</h3>
+<h4 id="1-setup-notebook-setupdatabricks_setupipynb">1. Setup Notebook (<code>setup/databricks_setup.ipynb</code>)</h4>
+<p><strong>Purpose:</strong> Interactive, guided setup for Databricks + Key Vault integration.</p>
+<p><strong>Features:</strong>
+- Auto-detect workspace managed identity (Object ID, App ID, Tenant ID)
+- Display identity information clearly
+- Generate exact Azure CLI command to grant Key Vault access
+- Test Key Vault connection
+- List available secrets (validate setup worked)
+- Provide helpful error messages if setup incomplete</p>
+<p><strong>User Experience:</strong>
+1. Upload notebook to Databricks workspace
+2. Run cells sequentially
+3. Copy/paste generated command
+4. Verify with built-in tests
+5. Done!</p>
+<p><strong>Cell structure:</strong></p>
+<pre><code class="language-python"># Cell 1: Install dependencies
+%pip install azure-identity azure-keyvault-secrets
+
+# Cell 2: Get identity info
+# Shows: Object ID, App ID, Tenant ID
+
+# Cell 3: Generate CLI command
+# Outputs exact `az keyvault set-policy` command to run
+
+# Cell 4: Test connection
+# Validates Key Vault access, lists secrets
+</code></pre>
+<h4 id="2-utility-helper-odibiutilssetup_helperspy">2. Utility Helper (<code>odibi/utils/setup_helpers.py</code>)</h4>
+<p><strong>Purpose:</strong> Programmatic access to setup info for advanced users.</p>
+<p><strong>Functions:</strong></p>
+<pre><code class="language-python">def get_databricks_identity_info() -&gt; dict:
+    &quot;&quot;&quot;
+    Get workspace managed identity information.
+
+    Returns:
+        dict: {
+            &quot;app_id&quot;: &quot;...&quot;,
+            &quot;object_id&quot;: &quot;...&quot;,
+            &quot;tenant_id&quot;: &quot;...&quot;
+        }
+
+    Raises:
+        RuntimeError: If not running in Databricks or identity unavailable
+    &quot;&quot;&quot;
+
+def print_keyvault_setup_instructions(key_vault_name: str):
+    &quot;&quot;&quot;
+    Print complete setup instructions for given Key Vault.
+
+    Args:
+        key_vault_name: Name of your Key Vault
+
+    Prints:
+        - Workspace identity info
+        - Exact Azure CLI command to run
+        - Verification steps
+    &quot;&quot;&quot;
+</code></pre>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-python">from odibi.utils import print_keyvault_setup_instructions
+
+# One-liner for users
+print_keyvault_setup_instructions(&quot;company-keyvault&quot;)
+</code></pre>
+<h3 id="what-were-not-doing">What We're NOT Doing</h3>
+<p>❌ <strong>Azure CLI documentation</strong> - Users find terminal commands confusing<br />
+❌ <strong>Portal screenshots</strong> - Get outdated quickly, hard to maintain<br />
+❌ <strong>Manual step-by-step guides</strong> - Automated tools are better UX</p>
+<h3 id="documentation-strategy">Documentation Strategy</h3>
+<p><strong>README.md:</strong></p>
+<pre><code class="language-markdown">## Databricks Setup (5 minutes)
+
+### Quick Start
+
+1. Upload `setup/databricks_setup.ipynb` to your workspace
+2. Run the notebook - it shows you exactly what to do
+3. Copy/paste the command it generates
+4. Done! Start using ODIBI with Key Vault
+
+### Alternative (Programmatic)
+
+```python
+from odibi.utils import print_keyvault_setup_instructions
+print_keyvault_setup_instructions(&quot;your-keyvault-name&quot;)
+</code></pre>
+<pre><code>
+**Focus:** Make setup **as easy as possible** while enforcing **best practices** (Key Vault).
+
+---
+
+## 6. Validation Strategy
+
+### Decision
+
+**Validate eagerly** (on connection init), not lazily (on first use).
+
+### Rationale
+
+**Eager validation (chosen):**
+- ✅ **Fail fast** - Catch config errors before pipeline runs
+- ✅ **Clear errors** - Validation context vs runtime context
+- ✅ **Better UX** - Immediate feedback on config mistakes
+
+**Lazy validation (rejected):**
+- ❌ **Fail late** - Errors surface deep in pipeline execution
+- ❌ **Confusing errors** - Runtime failures harder to debug
+- ❌ **Wastes time** - Pipeline runs for minutes before failing
+
+### Implementation
+
+```python
+class AzureADLS(BaseConnection):
+    def __init__(self, ..., validate=True):
+        # ... store params ...
+
+        if validate:
+            self.validate()  # ← Called immediately
+
+    def validate(self):
+        &quot;&quot;&quot;Validate configuration (fail fast).&quot;&quot;&quot;
+        # Check required fields based on auth_mode
+        if self.auth_mode == &quot;key_vault&quot;:
+            if not self.key_vault_name or not self.secret_name:
+                raise ValueError(&quot;...&quot;)
+        # ... etc ...
+</code></pre>
+<h3 id="what-gets-validated">What Gets Validated</h3>
+<p>✅ <strong>Config structure:</strong>
+- Required fields present
+- Field types correct
+- Auth mode valid</p>
+<p>✅ <strong>Logical consistency:</strong>
+- Auth mode has required fields
+- Referenced connections exist (in PipelineConfig)</p>
+<p>❌ <strong>NOT validated:</strong>
+- Network connectivity to Key Vault (too slow, network-dependent)
+- Storage account accessibility (requires credentials)
+- Secret existence in Key Vault (could change between validation and use)</p>
+<p><strong>Philosophy:</strong> Validate what's <strong>knowable from config</strong>, not what requires <strong>network I/O</strong>.</p>
+<h3 id="testing-support">Testing Support</h3>
+<p>For testing, validation can be disabled:</p>
+<pre><code class="language-python"># Production: validate=True (default)
+conn = AzureADLS(account=&quot;...&quot;, ..., validate=True)
+
+# Testing: can skip validation
+conn = AzureADLS(account=&quot;...&quot;, ..., validate=False)
+</code></pre>
+<hr />
+<h2 id="7-delta-lake-strategy">7. Delta Lake Strategy</h2>
+<h3 id="decision_4">Decision</h3>
+<p><strong>Delta Lake is the default file format</strong> for all write operations. Enforce best practices while supporting legacy formats when needed.</p>
+<h3 id="why-delta-as-default">Why Delta as Default</h3>
+<p>Delta Lake provides critical features over Parquet/CSV:
+- ✅ <strong>ACID transactions</strong> - No partial writes if job fails
+- ✅ <strong>Schema evolution</strong> - Add columns without breaking readers
+- ✅ <strong>Time travel</strong> - Audit trail, rollback, debugging
+- ✅ <strong>Better updates/deletes</strong> - Don't rewrite entire dataset
+- ✅ <strong>Data quality</strong> - Built-in validation and consistency
+- ✅ <strong>Same performance</strong> - Still Parquet underneath</p>
+<h3 id="implementation-strategy">Implementation Strategy</h3>
+<p><strong>Both Engines Support Delta:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Delta Library</th>
+<th>Capabilities</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pandas</strong></td>
+<td><code>deltalake</code> (delta-rs)</td>
+<td>Read, write, VACUUM, time travel, partitioning</td>
+</tr>
+<tr>
+<td><strong>Spark</strong></td>
+<td><code>delta-spark</code></td>
+<td>Full Delta features (all Pandas features + OPTIMIZE, MERGE)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="configuration">Configuration</h3>
+<pre><code class="language-yaml">nodes:
+  - name: write_output
+    write:
+      connection: silver
+      path: sales.delta
+      # format: delta  # ← Default, can be omitted
+      mode: append
+</code></pre>
+<h3 id="warn-on-non-delta-formats">Warn on Non-Delta Formats</h3>
+<pre><code class="language-python"># Production environment
+if format in [&quot;parquet&quot;, &quot;csv&quot;] and os.getenv(&quot;ODIBI_ENV&quot;) == &quot;production&quot;:
+    warnings.warn(
+        f&quot;⚠️  Writing to {format} format. &quot;
+        f&quot;Consider using format='delta' for ACID transactions, &quot;
+        f&quot;schema evolution, and time travel.&quot;,
+        UserWarning
+    )
+</code></pre>
+<h3 id="phase-2-delta-features">Phase 2 Delta Features</h3>
+<p><strong>Core Operations (Both Engines):</strong>
+- ✅ Read/Write Delta tables
+- ✅ Delta as default format
+- ✅ Append/Overwrite modes
+- ✅ Time travel (read specific versions via <code>versionAsOf</code>)
+- ✅ VACUUM (cleanup old files, save storage costs)
+- ✅ History (list all versions/commits)
+- ✅ Restore (rollback to previous version)
+- ✅ Schema evolution (automatic)
+- ✅ Works with ADLS/S3/GCS</p>
+<p><strong>Partitioning (Optional, Not Enforced):</strong></p>
+<pre><code class="language-yaml"># Optional partitioning for large datasets
+write:
+  path: sensors.delta
+  partition_by: [year, month]  # ← Optional
+</code></pre>
+<p><strong>Warning on partitioning anti-patterns:</strong></p>
+<pre><code class="language-python"># Warn if too many partitions (&gt; 1000)
+# Warn if partitions too small (&lt; 1000 rows per partition)
+</code></pre>
+<h3 id="phase-3-advanced-features-deferred">Phase 3 Advanced Features (Deferred)</h3>
+<p>❌ <strong>OPTIMIZE</strong> - File compaction (Spark only, medium complexity)<br />
+❌ <strong>MERGE/UPSERT</strong> - Update existing records (Spark only, complex)<br />
+❌ <strong>Z-ORDER</strong> - Clustering optimization (Spark only, advanced)<br />
+❌ <strong>Streaming writes</strong> - Structured Streaming to Delta (complex)</p>
+<h3 id="dependencies">Dependencies</h3>
+<pre><code class="language-toml">[project.dependencies]
+deltalake = &quot;&gt;=0.15.0&quot;  # Delta for Pandas (core dependency)
+
+[project.optional-dependencies]
+spark = [
+    &quot;pyspark&gt;=3.3.0&quot;,
+    &quot;delta-spark&gt;=2.3.0&quot;,  # Delta for Spark
+]
+</code></pre>
+<h3 id="examples">Examples</h3>
+<p><strong>Read Delta (with time travel):</strong></p>
+<pre><code class="language-yaml">read:
+  connection: bronze
+  path: sales.delta
+  format: delta
+  options:
+    versionAsOf: 5  # Read version 5
+</code></pre>
+<p><strong>Write Delta (with partitioning):</strong></p>
+<pre><code class="language-yaml">write:
+  connection: silver
+  path: sensors.delta
+  format: delta
+  partition_by: [year, month]
+  mode: append
+</code></pre>
+<p><strong>Maintenance (VACUUM):</strong></p>
+<pre><code class="language-python"># Cleanup old files (save storage costs)
+engine.vacuum_delta(
+    connection=&quot;silver&quot;,
+    path=&quot;sales.delta&quot;,
+    retention_hours=168  # Keep last 7 days
+)
+</code></pre>
+<hr />
+<h2 id="8-spark-session-management">8. Spark Session Management</h2>
+<h3 id="decision_5">Decision</h3>
+<p>SparkEngine accepts <strong>optional <code>spark_session</code> parameter</strong> with intelligent fallback.</p>
+<h3 id="implementation_1">Implementation</h3>
+<pre><code class="language-python">class SparkEngine:
+    def __init__(self, connections, spark_session=None):
+        from pyspark.sql import SparkSession
+
+        if spark_session:
+            # User provided session - use it
+            self.spark = spark_session
+        else:
+            # Get existing session or create new one
+            self.spark = SparkSession.builder \
+                .appName(&quot;ODIBI&quot;) \
+                .getOrCreate()
+
+        # Configure all ADLS storage accounts
+        self._configure_all_connections(connections)
+</code></pre>
+<h3 id="how-it-works_1">How It Works</h3>
+<p><strong>Databricks (existing session):</strong></p>
+<pre><code class="language-python"># Databricks has active session
+engine = SparkEngine(connections)
+# Uses existing Databricks session via getOrCreate()
+</code></pre>
+<p><strong>Local development (auto-create):</strong></p>
+<pre><code class="language-python"># No active session
+engine = SparkEngine(connections)
+# Creates new local session via getOrCreate()
+</code></pre>
+<p><strong>Custom session (advanced):</strong></p>
+<pre><code class="language-python"># User creates session with custom config
+spark = SparkSession.builder \
+    .config(&quot;spark.executor.memory&quot;, &quot;8g&quot;) \
+    .getOrCreate()
+
+engine = SparkEngine(connections, spark_session=spark)
+# Uses user's custom session
+</code></pre>
+<h3 id="rationale_1">Rationale</h3>
+<p><strong>Simple approach:</strong>
+- <code>getOrCreate()</code> handles both Databricks and local scenarios
+- No need to track session ownership
+- No need for PySpark version detection
+- Python handles cleanup automatically</p>
+<p><strong>Can optimize later</strong> if needed (session pooling, explicit stop, etc.).</p>
+<hr />
+<h2 id="9-testing-strategy">9. Testing Strategy</h2>
+<h3 id="decision_6">Decision</h3>
+<p><strong>Mock everything for automated tests</strong>, use Databricks Community Edition for manual verification.</p>
+<h3 id="automated-testing-cicd">Automated Testing (CI/CD)</h3>
+<p><strong>Test locally without cloud resources:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Test Layer</th>
+<th>Approach</th>
+<th>Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Spark logic</strong></td>
+<td>Local Spark session (<code>master("local[1]")</code>)</td>
+<td>pytest + pyspark</td>
+</tr>
+<tr>
+<td><strong>Azure credentials</strong></td>
+<td>Mock Azure SDK</td>
+<td>pytest + unittest.mock</td>
+</tr>
+<tr>
+<td><strong>Key Vault</strong></td>
+<td>Mock SecretClient</td>
+<td>pytest + monkeypatch</td>
+</tr>
+<tr>
+<td><strong>Cloud I/O</strong></td>
+<td>Skip in CI (test manually)</td>
+<td>pytest.mark.skip</td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-mock-key-vault">Example: Mock Key Vault</h3>
+<pre><code class="language-python">@pytest.fixture
+def mock_key_vault(monkeypatch):
+    &quot;&quot;&quot;Mock Azure Key Vault SecretClient.&quot;&quot;&quot;
+    from unittest.mock import MagicMock
+
+    mock_secret = MagicMock()
+    mock_secret.value = &quot;test-storage-key-12345&quot;
+
+    mock_client = MagicMock()
+    mock_client.get_secret.return_value = mock_secret
+
+    monkeypatch.setattr(
+        &quot;azure.keyvault.secrets.SecretClient&quot;,
+        lambda **kwargs: mock_client
+    )
+    return mock_client
+
+def test_key_vault_auth_mode(mock_key_vault):
+    &quot;&quot;&quot;Test Key Vault authentication fetches and caches key.&quot;&quot;&quot;
+    conn = AzureADLS(
+        account=&quot;testaccount&quot;,
+        container=&quot;test&quot;,
+        auth_mode=&quot;key_vault&quot;,
+        key_vault_name=&quot;test-kv&quot;,
+        secret_name=&quot;test-secret&quot;
+    )
+
+    key1 = conn.get_storage_key()
+    key2 = conn.get_storage_key()  # Should use cache
+
+    assert key1 == &quot;test-storage-key-12345&quot;
+    assert key2 == key1
+    mock_key_vault.get_secret.assert_called_once()
+</code></pre>
+<h3 id="example-test-spark-config">Example: Test Spark Config</h3>
+<pre><code class="language-python">def test_spark_multi_account_config():
+    &quot;&quot;&quot;Test SparkEngine configures multiple storage accounts.&quot;&quot;&quot;
+    conn1 = AzureADLS(
+        account=&quot;account1&quot;,
+        container=&quot;c1&quot;,
+        auth_mode=&quot;direct_key&quot;,
+        account_key=&quot;fake-key-1&quot;,
+        validate=False
+    )
+    conn2 = AzureADLS(
+        account=&quot;account2&quot;,
+        container=&quot;c2&quot;,
+        auth_mode=&quot;direct_key&quot;,
+        account_key=&quot;fake-key-2&quot;,
+        validate=False
+    )
+
+    engine = SparkEngine(connections={&quot;bronze&quot;: conn1, &quot;silver&quot;: conn2})
+
+    # Verify Spark config was set correctly
+    key1 = engine.spark.conf.get(
+        &quot;fs.azure.account.key.account1.dfs.core.windows.net&quot;
+    )
+    key2 = engine.spark.conf.get(
+        &quot;fs.azure.account.key.account2.dfs.core.windows.net&quot;
+    )
+
+    assert key1 == &quot;fake-key-1&quot;
+    assert key2 == &quot;fake-key-2&quot;
+</code></pre>
+<h3 id="manual-testing-databricks-ce">Manual Testing (Databricks CE)</h3>
+<p><strong>When to test manually:</strong>
+- End-to-end pipeline runs
+- Real Key Vault integration
+- Real ADLS read/write
+- Delta table operations on cloud storage</p>
+<p><strong>Not for CI/CD</strong> - too slow, requires Azure resources, network-dependent.</p>
+<h3 id="what-were-testing">What We're Testing</h3>
+<p>✅ <strong>Our code's logic</strong> (configuration, validation, caching)<br />
+✅ <strong>Integration patterns</strong> (does our code call Azure SDK correctly?)<br />
+❌ <strong>Not testing Azure</strong> (Key Vault works, Spark works - Microsoft's job)</p>
+<hr />
+<h2 id="10-key-vault-performance">10. Key Vault Performance</h2>
+<h3 id="decision_7">Decision</h3>
+<p><strong>Parallel credential fetching</strong> with proper error handling and timeouts.</p>
+<h3 id="performance-characteristics">Performance Characteristics</h3>
+<p><strong>Key Vault latency:</strong>
+- Same region: 50-150ms per secret
+- Cross-region: 150-500ms per secret</p>
+<p><strong>Sequential vs Parallel:</strong></p>
+<pre><code>Sequential (5 connections): 5 × 100ms = 500ms
+Parallel (5 connections):   ~150ms total
+</code></pre>
+<h3 id="implementation_2">Implementation</h3>
+<pre><code class="language-python">import concurrent.futures
+
+def _configure_all_connections(self, connections, timeout=30):
+    &quot;&quot;&quot;Fetch all Key Vault secrets in parallel.&quot;&quot;&quot;
+    adls_connections = [
+        (name, conn) for name, conn in connections.items()
+        if isinstance(conn, AzureADLS)
+    ]
+
+    if not adls_connections:
+        return
+
+    errors = {}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        # Submit all fetch tasks
+        future_to_conn = {
+            executor.submit(conn.get_storage_key): (name, conn)
+            for name, conn in adls_connections
+        }
+
+        # Wait for all with timeout
+        done, not_done = concurrent.futures.wait(
+            future_to_conn.keys(),
+            timeout=timeout,
+            return_when=concurrent.futures.ALL_COMPLETED
+        )
+
+        # Handle timeouts
+        if not_done:
+            for future in not_done:
+                name, conn = future_to_conn[future]
+                future.cancel()
+                errors[name] = TimeoutError(
+                    f&quot;Key Vault fetch timed out after {timeout}s&quot;
+                )
+
+        # Collect results and errors
+        for future in done:
+            name, conn = future_to_conn[future]
+            try:
+                future.result()
+            except Exception as e:
+                errors[name] = e
+
+    # Fail fast if any errors
+    if errors:
+        error_details = &quot;\n&quot;.join([
+            f&quot;  - {name}: {str(e)}&quot;
+            for name, e in errors.items()
+        ])
+        raise RuntimeError(
+            f&quot;Failed to fetch storage keys for {len(errors)} connection(s):\n&quot;
+            f&quot;{error_details}&quot;
+        )
+
+    # Configure Spark with cached keys
+    for name, conn in adls_connections:
+        conn.configure_spark(self.spark)
+</code></pre>
+<h3 id="error-handling">Error Handling</h3>
+<p><strong>All errors reported clearly:</strong></p>
+<pre><code>RuntimeError: Failed to fetch storage keys for 2 connection(s):
+  - bronze: Secret 'bronze-key' not found in vault 'company-kv'
+  - gold: Access denied to vault 'company-kv' (403 Forbidden)
+</code></pre>
+<h3 id="additional-optimizations">Additional Optimizations</h3>
+<p><strong>1. Shared DefaultAzureCredential:</strong></p>
+<pre><code class="language-python"># Global credential (reused across connections)
+_azure_credential = None
+
+def get_azure_credential():
+    global _azure_credential
+    if not _azure_credential:
+        from azure.identity import DefaultAzureCredential
+        _azure_credential = DefaultAzureCredential()
+    return _azure_credential
+</code></pre>
+<p><strong>2. Shared SecretClient per Key Vault:</strong></p>
+<pre><code class="language-python"># Cache clients by vault name
+_secret_clients = {}
+
+def get_secret_client(key_vault_name):
+    if key_vault_name not in _secret_clients:
+        credential = get_azure_credential()
+        vault_url = f&quot;https://{key_vault_name}.vault.azure.net&quot;
+        _secret_clients[key_vault_name] = SecretClient(
+            vault_url=vault_url,
+            credential=credential
+        )
+    return _secret_clients[key_vault_name]
+</code></pre>
+<h3 id="expected-performance">Expected Performance</h3>
+<table>
+<thead>
+<tr>
+<th>Connections</th>
+<th>Startup Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>~100ms</td>
+</tr>
+<tr>
+<td>5</td>
+<td>~150ms (parallel)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>~200ms (parallel)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Good enough for Phase 2.</strong> Can optimize further in Phase 3 if needed.</p>
+<hr />
+<h2 id="11-local-development-experience">11. Local Development Experience</h2>
+<h3 id="decision_8">Decision</h3>
+<p><strong>Explicit config files</strong> for local vs production environments. No magic auto-detection.</p>
+<h3 id="pattern-separate-config-files">Pattern: Separate Config Files</h3>
+<pre><code class="language-yaml"># config.prod.yaml (committed to git)
+connections:
+  bronze:
+    type: azure_adls
+    account: storageaccount
+    container: bronze
+    auth_mode: key_vault  # ← Explicit
+    key_vault_name: company-kv
+    secret_name: bronze-key
+</code></pre>
+<pre><code class="language-yaml"># config.local.yaml (in .gitignore, developer creates)
+connections:
+  bronze:
+    type: azure_adls
+    account: storageaccount
+    container: bronze
+    auth_mode: direct_key  # ← Explicit
+    account_key: &quot;${BRONZE_KEY}&quot;  # From .env file
+</code></pre>
+<h3 id="developer-setup">Developer Setup</h3>
+<p><strong>One-time setup:</strong>
+1. Copy <code>config.prod.yaml</code> to <code>config.local.yaml</code>
+2. Change <code>auth_mode: key_vault</code> to <code>auth_mode: direct_key</code>
+3. Add <code>account_key: "${BRONZE_KEY}"</code>
+4. Create <code>.env</code> file with storage keys
+5. Add <code>config.local.yaml</code> and <code>.env</code> to <code>.gitignore</code></p>
+<p><strong>Daily usage:</strong></p>
+<pre><code class="language-bash"># Local development
+python run_pipeline.py --config config.local.yaml
+
+# Production (Databricks)
+python run_pipeline.py --config config.prod.yaml
+</code></pre>
+<h3 id="rationale_2">Rationale</h3>
+<p><strong>Why explicit configs:</strong>
+- ✅ No magic behavior (ODIBI_ENV auto-detection rejected)
+- ✅ Clear intent (can see which auth mode from YAML)
+- ✅ Simple to understand
+- ✅ Safe (can't accidentally run prod config locally)</p>
+<p><strong>Why direct_key for local dev:</strong>
+- ✅ Simpler setup than Azure CLI auth
+- ✅ Works on any laptop
+- ✅ No Azure permissions needed
+- ✅ Faster (no Key Vault calls)</p>
+<h3 id="gitignore">.gitignore</h3>
+<pre><code># Local development configs (contain secrets)
+config.local.yaml
+.env
+*.local.yaml
+</code></pre>
+<hr />
+<h2 id="12-out-of-scope-phase-2">12. Out of Scope (Phase 2)</h2>
+<h3 id="explicitly-not-implementing">Explicitly NOT Implementing</h3>
+<p>The following were considered but <strong>excluded from Phase 2</strong> to keep scope manageable:</p>
+<h4 id="authentication-methods">Authentication Methods</h4>
+<p>❌ <strong>SAS tokens</strong> - Storage account keys via Key Vault are sufficient<br />
+❌ <strong>Service principal auth</strong> - DefaultAzureCredential + managed identity is simpler<br />
+❌ <strong>Azure CLI credential passthrough</strong> - DefaultAzureCredential handles this automatically<br />
+❌ <strong>Databricks secrets scope</strong> - Key Vault integration is more direct  </p>
+<p><strong>Rationale:</strong> Start with account keys (simplest, most common). Add SAS/service principal in Phase 3+ if users request.</p>
+<h4 id="advanced-features">Advanced Features</h4>
+<p>❌ <strong>Cross-tenant Key Vault</strong> - Complex edge case, rarely needed<br />
+❌ <strong>Multiple Key Vaults per connection</strong> - One Key Vault per project is sufficient<br />
+❌ <strong>Dynamic secret rotation mid-pipeline</strong> - Re-run pipeline if keys rotate<br />
+❌ <strong>Connection pooling/reuse</strong> - Premature optimization  </p>
+<h4 id="other-cloud-providers">Other Cloud Providers</h4>
+<p>❌ <strong>AWS credential management</strong> - Phase 3+ (AWS S3 connection type)<br />
+❌ <strong>GCP credential management</strong> - Phase 3+ (GCS connection type)  </p>
+<p><strong>Rationale:</strong> Focus on Azure (target environment). Other clouds are different <strong>connection types</strong>, not variations of Azure.</p>
+<h4 id="documentation-formats">Documentation Formats</h4>
+<p>❌ <strong>Portal screenshots</strong> - Outdated quickly, hard to maintain<br />
+❌ <strong>Azure CLI manual docs</strong> - Automated tools (setup notebook) are better<br />
+❌ <strong>Video tutorials</strong> - Not maintainable in early stages  </p>
+<p><strong>Rationale:</strong> Automated tools (setup notebook + utility) provide better UX and stay current.</p>
+<h3 id="why-these-exclusions-matter">Why These Exclusions Matter</h3>
+<p><strong>Focus principle:</strong> Phase 2 should deliver <strong>solid foundation</strong> for Azure + Databricks, not every possible feature.</p>
+<p><strong>Can add later:</strong> All excluded items can be added in Phase 3+ if users request them.</p>
+<p><strong>User escape hatch:</strong> <code>direct_key</code> mode provides flexibility if Key Vault doesn't work for someone.</p>
+<hr />
+<h2 id="13-implementation-roadmap">13. Implementation Roadmap</h2>
+<h3 id="decision-3-phase-delivery-3-weeks">Decision: 3-Phase Delivery (3 Weeks)</h3>
+<p>Phase 2 is divided into 3 mini-phases for incremental delivery and clear milestones.</p>
+<p><strong>Phase 2A: Foundation (Week 1)</strong>
+- Goal: Get ADLS working with Key Vault auth
+- Deliverable: Multi-account ADLS integration with Parquet/CSV support</p>
+<p><strong>Phase 2B: Delta Lake (Week 2)</strong>
+- Goal: Add modern data engineering capabilities
+- Deliverable: Production-ready Delta Lake support</p>
+<p><strong>Phase 2C: Performance &amp; Polish (Week 3)</strong>
+- Goal: Production-grade performance and documentation
+- Deliverable: Enterprise-ready ODIBI</p>
+<hr />
+<h2 id="14-implementation-checklist">14. Implementation Checklist</h2>
+<h3 id="phase-2a-foundation-week-1">Phase 2A: Foundation (Week 1)</h3>
+<h4 id="code-changes">Code Changes</h4>
+<h4 id="odibiconnectionsazure_adlspy"><code>odibi/connections/azure_adls.py</code></h4>
+<ul>
+<li>[ ] Add parameters: <code>auth_mode</code>, <code>key_vault_name</code>, <code>secret_name</code>, <code>account_key</code></li>
+<li>[ ] Set <code>auth_mode="key_vault"</code> as default</li>
+<li>[ ] Add <code>validate()</code> method (eager validation)</li>
+<li>[ ] Add <code>get_storage_key()</code> method (Key Vault fetch + caching - sequential for 2A)</li>
+<li>[ ] Add <code>pandas_storage_options()</code> method (returns dict for fsspec)</li>
+<li>[ ] Add <code>configure_spark()</code> method (sets Spark config)</li>
+<li>[ ] Add warning when <code>direct_key</code> used in production (<code>ODIBI_ENV</code> check)</li>
+</ul>
+<h4 id="odibienginepandas_enginepy"><code>odibi/engine/pandas_engine.py</code></h4>
+<ul>
+<li>[ ] Add <code>_merge_storage_options()</code> helper</li>
+<li>[ ] Update <code>read()</code> to support Parquet and CSV formats</li>
+<li>[ ] Update <code>write()</code> to support Parquet and CSV formats</li>
+<li>[ ] Call <code>_merge_storage_options()</code> before all reads/writes</li>
+<li>[ ] Skip <code>mkdir</code> for remote URIs (<code>abfss://</code>, <code>s3://</code>, etc.)</li>
+</ul>
+<h4 id="odibienginespark_enginepy"><code>odibi/engine/spark_engine.py</code></h4>
+<ul>
+<li>[ ] Add <code>spark_session</code> parameter to <code>__init__</code> (optional)</li>
+<li>[ ] Use <code>getOrCreate()</code> if no session provided</li>
+<li>[ ] Add <code>_configure_all_connections()</code> method (sequential for 2A)</li>
+<li>[ ] Call <code>_configure_all_connections()</code> in <code>__init__</code></li>
+<li>[ ] Loop through connections, call <code>configure_spark()</code> on each ADLS connection</li>
+<li>[ ] Support Parquet and CSV read/write</li>
+</ul>
+<h4 id="testing-phase-2a">Testing (Phase 2A)</h4>
+<ul>
+<li>[ ] <code>tests/test_azure_adls_auth.py</code> (NEW):</li>
+<li>Test validation for both auth modes</li>
+<li>Test Key Vault fetch (mocked, sequential)</li>
+<li>Test <code>pandas_storage_options()</code> returns correct dict</li>
+<li>Test <code>configure_spark()</code> sets correct Spark config</li>
+<li>Test caching behavior</li>
+<li>
+<p>Test production warning for <code>direct_key</code></p>
+</li>
+<li>
+<p>[ ] <code>tests/test_spark_session.py</code> (NEW):</p>
+</li>
+<li>Test session parameter acceptance</li>
+<li>Test getOrCreate() fallback</li>
+<li>
+<p>Test multi-account configuration</p>
+</li>
+<li>
+<p>[ ] Manual test in Databricks CE:</p>
+</li>
+<li>Basic pipeline with Key Vault</li>
+<li>Multi-account Parquet read/write</li>
+</ul>
+<h4 id="documentation-phase-2a">Documentation (Phase 2A)</h4>
+<ul>
+<li>[ ] <code>examples/template_full.yaml</code> - Basic ADLS example with Key Vault</li>
+<li>[ ] <code>README.md</code> - Quick start guide for ADLS + Key Vault</li>
+<li>[ ] <code>docs/LOCAL_DEVELOPMENT.md</code> (NEW) - config.local.yaml setup</li>
+</ul>
+<h4 id="dependencies-phase-2a">Dependencies (Phase 2A)</h4>
+<ul>
+<li>[ ] Add to <code>pyproject.toml</code>:
+  <code>toml
+  [project.optional-dependencies]
+  azure = [
+      "azure-identity&gt;=1.12.0",
+      "azure-keyvault-secrets&gt;=4.7.0",
+      "adlfs&gt;=2023.1.0",
+  ]</code></li>
+</ul>
+<hr />
+<h3 id="phase-2b-delta-lake-week-2">Phase 2B: Delta Lake (Week 2)</h3>
+<h4 id="code-changes_1">Code Changes</h4>
+<h4 id="odibienginepandas_enginepy_1"><code>odibi/engine/pandas_engine.py</code></h4>
+<ul>
+<li>[ ] Add Delta support: <code>read()</code> with <code>deltalake.DeltaTable</code></li>
+<li>[ ] Add Delta support: <code>write()</code> with <code>write_deltalake()</code></li>
+<li>[ ] Add <code>vacuum_delta()</code> method</li>
+<li>[ ] Add <code>get_delta_history()</code> method</li>
+<li>[ ] Add <code>restore_delta()</code> method</li>
+<li>[ ] Support <code>partition_by</code> parameter for Delta writes</li>
+<li>[ ] Support <code>filters</code> parameter for partition pruning</li>
+<li>[ ] Warn on partitioning anti-patterns (&gt;1000 partitions, tiny partitions)</li>
+<li>[ ] Default format to <code>delta</code> in <code>write()</code> method</li>
+<li>[ ] Warn when using Parquet/CSV in production</li>
+</ul>
+<h4 id="odibienginespark_enginepy_1"><code>odibi/engine/spark_engine.py</code></h4>
+<ul>
+<li>[ ] Add Delta support: <code>read()</code>, <code>write()</code> with delta format</li>
+<li>[ ] Add <code>vacuum_delta()</code> method</li>
+<li>[ ] Add <code>get_delta_history()</code> method</li>
+<li>[ ] Add <code>restore_delta()</code> method</li>
+<li>[ ] Support <code>partition_by</code> parameter for Delta writes</li>
+<li>[ ] Support <code>filters</code> parameter for partition pruning</li>
+<li>[ ] Default format to <code>delta</code> in <code>write()</code> method</li>
+</ul>
+<h4 id="testing-phase-2b">Testing (Phase 2B)</h4>
+<ul>
+<li>[ ] <code>tests/test_delta_support.py</code> (NEW):</li>
+<li>Test Delta read/write (both engines, mocked)</li>
+<li>Test VACUUM operation</li>
+<li>Test history and restore</li>
+<li>Test partitioning support</li>
+<li>Test partition filtering</li>
+<li>Test warnings on partitioning anti-patterns</li>
+<li>
+<p>Test default format is Delta</p>
+</li>
+<li>
+<p>[ ] Manual test in Databricks CE:</p>
+</li>
+<li>Delta read/write/VACUUM on ADLS</li>
+<li>Partitioned Delta tables</li>
+<li>Time travel, history, restore</li>
+</ul>
+<h4 id="documentation-phase-2b">Documentation (Phase 2B)</h4>
+<ul>
+<li>[ ] <code>docs/FILE_FORMATS.md</code> (NEW):</li>
+<li>Explain Delta Lake vs Parquet vs CSV</li>
+<li>When to use each format</li>
+<li>Delta best practices</li>
+<li>Partitioning guide (when to use, anti-patterns)</li>
+<li>
+<p>Examples of Delta operations (VACUUM, history, restore)</p>
+</li>
+<li>
+<p>[ ] Update <code>examples/template_full.yaml</code> - Delta examples with partitioning</p>
+</li>
+</ul>
+<h4 id="dependencies-phase-2b">Dependencies (Phase 2B)</h4>
+<ul>
+<li>[ ] Add to <code>pyproject.toml</code>:
+  ```toml
+  [project.dependencies]
+  deltalake = "&gt;=0.15.0"  # Delta for Pandas</li>
+</ul>
+<p>[project.optional-dependencies]
+  spark = [
+      "pyspark&gt;=3.3.0",
+      "delta-spark&gt;=2.3.0",
+  ]
+  ```</p>
+<hr />
+<h3 id="phase-2c-performance-polish-week-3">Phase 2C: Performance &amp; Polish (Week 3)</h3>
+<h4 id="code-changes_2">Code Changes</h4>
+<h4 id="odibiconnectionsazure_adlspy_1"><code>odibi/connections/azure_adls.py</code></h4>
+<ul>
+<li>[ ] Implement shared <code>DefaultAzureCredential</code> (global singleton)</li>
+<li>[ ] Implement shared <code>SecretClient</code> per Key Vault (cache clients)</li>
+</ul>
+<h4 id="odibienginespark_enginepy_2"><code>odibi/engine/spark_engine.py</code></h4>
+<ul>
+<li>[ ] Refactor <code>_configure_all_connections()</code> to parallel fetching</li>
+<li>[ ] Implement timeout protection (30s default)</li>
+<li>[ ] Collect all errors and report clearly</li>
+<li>[ ] Add comprehensive error messages</li>
+</ul>
+<h4 id="odibiutilssetup_helperspy-new"><code>odibi/utils/setup_helpers.py</code> (NEW)</h4>
+<ul>
+<li>[ ] Create file</li>
+<li>[ ] Add <code>get_databricks_identity_info()</code> function</li>
+<li>[ ] Add <code>print_keyvault_setup_instructions()</code> function</li>
+<li>[ ] Add docstrings with examples</li>
+<li>[ ] Handle errors gracefully (not in Databricks, identity unavailable, etc.)</li>
+</ul>
+<h4 id="setup-tools-phase-2c">Setup Tools (Phase 2C)</h4>
+<ul>
+<li>[ ] <code>setup/databricks_setup.ipynb</code> (NEW):</li>
+<li>Cell 1: Install dependencies</li>
+<li>Cell 2: Get and display workspace identity info</li>
+<li>Cell 3: Generate Azure CLI command with user's Key Vault name</li>
+<li>Cell 4: Test Key Vault connection</li>
+<li>Cell 5: List available secrets (validate setup)</li>
+<li>Add markdown explanations between cells</li>
+<li>Add troubleshooting section</li>
+</ul>
+<h4 id="testing-phase-2c">Testing (Phase 2C)</h4>
+<ul>
+<li>[ ] Add to <code>tests/test_azure_adls_auth.py</code>:</li>
+<li>Test parallel Key Vault fetching</li>
+<li>Test error handling (missing secrets, timeout)</li>
+<li>
+<p>Test shared credential/client caching</p>
+</li>
+<li>
+<p>[ ] Performance testing:</p>
+</li>
+<li>Measure startup time with 5 connections (target: &lt;200ms)</li>
+<li>
+<p>Test timeout protection (simulate hung Key Vault)</p>
+</li>
+<li>
+<p>[ ] End-to-end test in Databricks CE:</p>
+</li>
+<li>Full pipeline with all features</li>
+<li>Multi-account, Delta, partitioned</li>
+<li>Setup notebook walkthrough</li>
+</ul>
+<h4 id="documentation-phase-2c">Documentation (Phase 2C)</h4>
+<ul>
+<li>[ ] <code>docs/databricks_setup.md</code> (NEW):</li>
+<li>Comprehensive setup guide</li>
+<li>Explain why Key Vault (security, rotation, audit)</li>
+<li>Document setup notebook usage</li>
+<li>Document utility helper usage</li>
+<li>Add troubleshooting section</li>
+<li>
+<p>Link to Azure Key Vault documentation</p>
+</li>
+<li>
+<p>[ ] <code>docs/CONFIGURATION_EXPLAINED.md</code>:</p>
+</li>
+<li>Add section on Azure authentication modes</li>
+<li>Explain Key Vault vs direct_key trade-offs</li>
+<li>Add examples with both modes</li>
+<li>
+<p>Link to databricks_setup.md</p>
+</li>
+<li>
+<p>[ ] Update <code>README.md</code>:</p>
+</li>
+<li>Databricks Setup section (5-minute setup)</li>
+<li>Link to setup notebook</li>
+<li>Key Vault configuration example</li>
+<li>
+<p>Note about direct_key fallback</p>
+</li>
+<li>
+<p>[ ] Create example pipelines:</p>
+</li>
+<li><code>examples/example_multi_account.yaml</code></li>
+<li><code>examples/example_delta_pipeline.yaml</code></li>
+<li><code>examples/example_partitioned_delta.yaml</code></li>
+</ul>
+<hr />
+<h2 id="success-criteria">Success Criteria</h2>
+<p><strong>Phase 2 design is complete when:</strong></p>
+<ul>
+<li>✅ All design decisions documented in this file</li>
+<li>✅ Implementation roadmap created (3 phases)</li>
+<li>✅ Dependencies identified</li>
+<li>✅ User onboarding plan defined</li>
+<li>✅ Testing strategy outlined</li>
+<li>✅ Out-of-scope items explicitly listed</li>
+<li>✅ Critical implementation details addressed (testing, Delta, performance, sessions)</li>
+</ul>
+<p><strong>Phase 2A complete when:</strong>
+- ADLS connection working with Key Vault auth
+- Multi-account support (Spark + Pandas)
+- Parquet/CSV read/write functional
+- Basic tests passing
+- Can deploy basic pipelines to Databricks</p>
+<p><strong>Phase 2B complete when:</strong>
+- Delta Lake support in both engines
+- VACUUM, history, restore working
+- Partitioning supported with warnings
+- Delta-specific tests passing
+- Can deploy production Delta pipelines</p>
+<p><strong>Phase 2C complete when:</strong>
+- Parallel Key Vault fetching implemented
+- Startup time &lt;200ms for 5 connections
+- Setup notebook tested in Databricks
+- Comprehensive documentation complete
+- Example pipelines work end-to-end
+- All Phase 2 features production-ready</p>
+<hr />
+<h2 id="design-decisions-summary">Design Decisions Summary</h2>
+<p><strong>Core Decisions:</strong>
+1. ✅ <strong>Transforms never need connections</strong> - operate on data in context
+2. ✅ <strong>Multi-account support</strong> - Spark global config, Pandas per-operation injection
+3. ✅ <strong>Key Vault auth default</strong> - with direct_key fallback for local dev
+4. ✅ <strong>Delta Lake default format</strong> - enforce best practices, support legacy formats
+5. ✅ <strong>Mock everything for tests</strong> - Databricks CE for manual verification only
+6. ✅ <strong>Parallel Key Vault fetching</strong> - 150ms vs 500ms for 5 connections
+7. ✅ <strong>Explicit configs</strong> - no ODIBI_ENV magic, separate local/prod files
+8. ✅ <strong>Simple Spark session</strong> - accept optional param, getOrCreate() fallback</p>
+<p><strong>Key Features Added in Refinement:</strong>
+- Delta support in both engines (deltalake + delta-spark)
+- VACUUM, history, restore operations
+- Optional partitioning with anti-pattern warnings
+- Parallel credential fetching with error handling
+- Timeout protection for Key Vault calls
+- Comprehensive test mocking strategy</p>
+<hr />
+<h2 id="implementation-timeline">Implementation Timeline</h2>
+<p><strong>Week 1 (Phase 2A): Foundation</strong>
+- Day 1-2: Azure ADLS connection + Key Vault auth
+- Day 3-4: Multi-account support + Spark session management
+- Day 5: Testing + basic documentation
+- <strong>Deliverable:</strong> Working ADLS integration</p>
+<p><strong>Week 2 (Phase 2B): Delta Lake</strong>
+- Day 1-2: Delta read/write (both engines)
+- Day 3: VACUUM, history, restore
+- Day 4: Partitioning support
+- Day 5: Testing + Delta documentation
+- <strong>Deliverable:</strong> Production-ready Delta support</p>
+<p><strong>Week 3 (Phase 2C): Performance &amp; Polish</strong>
+- Day 1-2: Parallel Key Vault fetching + error handling
+- Day 3: Setup notebook + utilities
+- Day 4: Comprehensive documentation
+- Day 5: End-to-end testing + examples
+- <strong>Deliverable:</strong> Enterprise-ready ODIBI</p>
+<p><strong>Total:</strong> 3 weeks (15 days)</p>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<ol>
+<li><strong>Week 1 Start:</strong> Begin Phase 2A implementation</li>
+<li><strong>Daily testing:</strong> Run mocked tests locally</li>
+<li><strong>Weekly milestones:</strong> Test in Databricks CE at end of each phase</li>
+<li><strong>Ship incrementally:</strong> Each phase delivers value</li>
+</ol>
+<hr />
+<p><strong>Status:</strong> ✅ Design Refinement Complete - 3-Phase Roadmap Defined<br />
+<strong>Document Owner:</strong> @henryodibi11<br />
+<strong>Last Review:</strong> 2025-11-08<br />
+<strong>Implementation Start:</strong> TBD</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1773 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/_archive/v2_backup/reference/pydantic_cheatsheet/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Pydantic Cheatsheet for ODIBI - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pydantic-cheatsheet-for-odibi" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Pydantic Cheatsheet for ODIBI
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/guides/writing_transformations.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/tutorials/databricks_setup.ipynb" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="pydantic-cheatsheet-for-odibi">Pydantic Cheatsheet for ODIBI</h1>
+<p><strong>What is Pydantic?</strong> A Python library that validates data using type hints and gives you clear error messages when data is wrong.</p>
+<p><strong>Why we use it:</strong> Our YAML configs get converted to Python objects. Pydantic ensures they're valid BEFORE execution.</p>
+<hr />
+<h2 id="basic-concepts">Basic Concepts</h2>
+<h3 id="1-models-data-structures-with-validation">1. Models = Data Structures with Validation</h3>
+<p>Think of a Pydantic model like a strict dictionary with rules.</p>
+<pre><code class="language-python">from pydantic import BaseModel
+
+# Define the structure
+class Person(BaseModel):
+    name: str          # Required field, must be string
+    age: int           # Required field, must be integer
+    email: str         # Required field, must be string
+
+# Valid data
+person = Person(name=&quot;Alice&quot;, age=30, email=&quot;alice@example.com&quot;)
+print(person.name)  # &quot;Alice&quot;
+print(person.age)   # 30
+
+# Invalid data - Pydantic raises ValidationError
+try:
+    bad_person = Person(name=&quot;Bob&quot;, age=&quot;thirty&quot;)  # age should be int, not str
+except ValidationError as e:
+    print(e)  # Shows exactly what's wrong
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code>1 validation error for Person
+age
+  Input should be a valid integer, unable to parse string as an integer
+</code></pre>
+<hr />
+<h2 id="2-field-types">2. Field Types</h2>
+<h3 id="required-vs-optional">Required vs Optional</h3>
+<pre><code class="language-python">from typing import Optional
+from pydantic import BaseModel
+
+class Config(BaseModel):
+    # Required - MUST be provided
+    name: str
+    port: int
+
+    # Optional - can be None
+    description: Optional[str] = None
+    timeout: Optional[int] = None
+</code></pre>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-python"># Valid - only required fields
+config1 = Config(name=&quot;server&quot;, port=8080)
+print(config1.description)  # None
+
+# Valid - with optional fields
+config2 = Config(name=&quot;server&quot;, port=8080, description=&quot;Main server&quot;)
+print(config2.description)  # &quot;Main server&quot;
+
+# Invalid - missing required field
+config3 = Config(name=&quot;server&quot;)  # ❌ Missing 'port'
+</code></pre>
+<hr />
+<h3 id="default-values">Default Values</h3>
+<pre><code class="language-python">class ServerConfig(BaseModel):
+    host: str = &quot;localhost&quot;      # Default: &quot;localhost&quot;
+    port: int = 8080             # Default: 8080
+    debug: bool = False          # Default: False
+    max_connections: int = 100   # Default: 100
+</code></pre>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-python"># Use all defaults
+server1 = ServerConfig()
+print(server1.host)  # &quot;localhost&quot;
+print(server1.port)  # 8080
+
+# Override some defaults
+server2 = ServerConfig(port=9000, debug=True)
+print(server2.port)  # 9000
+print(server2.debug)  # True
+print(server2.host)  # &quot;localhost&quot; (still default)
+</code></pre>
+<hr />
+<h2 id="3-field-advanced-configuration">3. Field() - Advanced Configuration</h2>
+<p><code>Field()</code> adds metadata and validation to fields.</p>
+<pre><code class="language-python">from pydantic import BaseModel, Field
+
+class NodeConfig(BaseModel):
+    name: str = Field(
+        description=&quot;Unique node identifier&quot;
+    )
+
+    retry_count: int = Field(
+        default=3,
+        ge=1,           # Greater than or equal to 1
+        le=10,          # Less than or equal to 10
+        description=&quot;Number of retry attempts&quot;
+    )
+
+    cache: bool = Field(
+        default=False,
+        description=&quot;Cache node results&quot;
+    )
+</code></pre>
+<p><strong>Common Field parameters:</strong>
+- <code>default=value</code> - Default value
+- <code>description="..."</code> - Human-readable description
+- <code>ge=n</code> - Greater than or equal to n
+- <code>le=n</code> - Less than or equal to n
+- <code>gt=n</code> - Greater than n
+- <code>lt=n</code> - Less than n
+- <code>min_length=n</code> - Minimum string/list length
+- <code>max_length=n</code> - Maximum string/list length
+- <code>pattern="regex"</code> - String must match regex</p>
+<p><strong>Example with validation:</strong></p>
+<pre><code class="language-python">class Person(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    age: int = Field(ge=0, le=150)
+    email: str = Field(pattern=r&quot;^[\w\.-]+@[\w\.-]+\.\w+$&quot;)
+
+# Valid
+person = Person(name=&quot;Alice&quot;, age=30, email=&quot;alice@example.com&quot;)
+
+# Invalid - age too high
+person = Person(name=&quot;Bob&quot;, age=200, email=&quot;bob@example.com&quot;)
+# ValidationError: age should be less than or equal to 150
+</code></pre>
+<hr />
+<h2 id="4-complex-types">4. Complex Types</h2>
+<h3 id="lists">Lists</h3>
+<pre><code class="language-python">from typing import List
+
+class PipelineConfig(BaseModel):
+    nodes: List[str]                    # List of strings
+    tags: List[str] = []                # Optional list (default empty)
+    priorities: List[int] = [1, 2, 3]  # List with default values
+</code></pre>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-python">pipeline = PipelineConfig(
+    nodes=[&quot;node1&quot;, &quot;node2&quot;, &quot;node3&quot;]
+)
+print(pipeline.tags)  # []
+</code></pre>
+<hr />
+<h3 id="dictionaries">Dictionaries</h3>
+<pre><code class="language-python">from typing import Dict, Any
+
+class ProjectConfig(BaseModel):
+    connections: Dict[str, Any]           # Dict with any values
+    settings: Dict[str, str] = {}         # Dict with string values
+    metadata: Dict[str, int] = {}         # Dict with int values
+</code></pre>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-python">project = ProjectConfig(
+    connections={
+        &quot;db1&quot;: {&quot;type&quot;: &quot;postgres&quot;, &quot;host&quot;: &quot;localhost&quot;},
+        &quot;db2&quot;: {&quot;type&quot;: &quot;mysql&quot;, &quot;port&quot;: 3306}
+    }
+)
+print(project.connections[&quot;db1&quot;][&quot;type&quot;])  # &quot;postgres&quot;
+</code></pre>
+<hr />
+<h3 id="nested-models">Nested Models</h3>
+<pre><code class="language-python">class ReadConfig(BaseModel):
+    connection: str
+    path: str
+
+class NodeConfig(BaseModel):
+    name: str
+    read: ReadConfig  # Nested model
+
+# Create nested structure
+node = NodeConfig(
+    name=&quot;load_data&quot;,
+    read=ReadConfig(
+        connection=&quot;local&quot;,
+        path=&quot;data.csv&quot;
+    )
+)
+
+print(node.read.connection)  # &quot;local&quot;
+</code></pre>
+<p>Or use dict:</p>
+<pre><code class="language-python">node = NodeConfig(
+    name=&quot;load_data&quot;,
+    read={
+        &quot;connection&quot;: &quot;local&quot;,
+        &quot;path&quot;: &quot;data.csv&quot;
+    }
+)
+# Pydantic automatically converts dict to ReadConfig
+</code></pre>
+<hr />
+<h3 id="optional-nested-models">Optional Nested Models</h3>
+<pre><code class="language-python">class NodeConfig(BaseModel):
+    name: str
+    read: Optional[ReadConfig] = None
+    write: Optional[WriteConfig] = None
+
+# Valid - no read or write
+node1 = NodeConfig(name=&quot;transform_only&quot;)
+
+# Valid - with read
+node2 = NodeConfig(
+    name=&quot;read_node&quot;,
+    read=ReadConfig(connection=&quot;local&quot;, path=&quot;data.csv&quot;)
+)
+</code></pre>
+<hr />
+<h2 id="5-enums-limited-choices">5. Enums - Limited Choices</h2>
+<pre><code class="language-python">from enum import Enum
+
+class EngineType(str, Enum):
+    SPARK = &quot;spark&quot;
+    PANDAS = &quot;pandas&quot;
+
+class ProjectConfig(BaseModel):
+    engine: EngineType = EngineType.PANDAS
+
+# Valid
+project = ProjectConfig(engine=&quot;pandas&quot;)
+project = ProjectConfig(engine=EngineType.SPARK)
+
+# Invalid
+project = ProjectConfig(engine=&quot;dask&quot;)  # ❌ Not in enum
+</code></pre>
+<hr />
+<h2 id="6-validators-custom-validation-logic">6. Validators - Custom Validation Logic</h2>
+<h3 id="field-validator">Field Validator</h3>
+<p>Validates a single field.</p>
+<pre><code class="language-python">from pydantic import BaseModel, field_validator
+
+class NodeConfig(BaseModel):
+    name: str
+    depends_on: List[str] = []
+
+    @field_validator('name')
+    @classmethod
+    def name_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('name cannot be empty')
+        return v.strip()  # Clean up whitespace
+
+# Valid
+node = NodeConfig(name=&quot;  my_node  &quot;, depends_on=[])
+print(node.name)  # &quot;my_node&quot; (whitespace removed)
+
+# Invalid
+node = NodeConfig(name=&quot;   &quot;)  # ❌ name cannot be empty
+</code></pre>
+<hr />
+<h3 id="model-validator">Model Validator</h3>
+<p>Validates across multiple fields.</p>
+<pre><code class="language-python">from pydantic import BaseModel, model_validator
+
+class ReadConfig(BaseModel):
+    connection: str
+    table: Optional[str] = None
+    path: Optional[str] = None
+
+    @model_validator(mode='after')
+    def check_table_or_path(self):
+        &quot;&quot;&quot;Ensure either table or path is provided.&quot;&quot;&quot;
+        if not self.table and not self.path:
+            raise ValueError(&quot;Either 'table' or 'path' must be provided&quot;)
+        return self
+
+# Valid
+config1 = ReadConfig(connection=&quot;db&quot;, table=&quot;users&quot;)
+config2 = ReadConfig(connection=&quot;local&quot;, path=&quot;data.csv&quot;)
+
+# Invalid
+config3 = ReadConfig(connection=&quot;db&quot;)  # ❌ Need table OR path
+</code></pre>
+<p><strong>Modes:</strong>
+- <code>mode='before'</code> - Run before field validation
+- <code>mode='after'</code> - Run after field validation (most common)</p>
+<hr />
+<h2 id="7-union-types-multiple-possible-types">7. Union Types - Multiple Possible Types</h2>
+<pre><code class="language-python">from typing import Union
+
+class TransformStep(BaseModel):
+    sql: Optional[str] = None
+    function: Optional[str] = None
+
+    @model_validator(mode='after')
+    def check_exactly_one(self):
+        if not any([self.sql, self.function]):
+            raise ValueError(&quot;Must provide sql OR function&quot;)
+        if self.sql and self.function:
+            raise ValueError(&quot;Cannot provide both sql AND function&quot;)
+        return self
+
+# Valid
+step1 = TransformStep(sql=&quot;SELECT * FROM table&quot;)
+step2 = TransformStep(function=&quot;my_transform&quot;)
+
+# Invalid
+step3 = TransformStep()  # ❌ Need one
+step4 = TransformStep(sql=&quot;...&quot;, function=&quot;...&quot;)  # ❌ Can't have both
+</code></pre>
+<hr />
+<h2 id="8-real-odibi-examples">8. Real ODIBI Examples</h2>
+<h3 id="example-1-nodeconfig">Example 1: NodeConfig</h3>
+<pre><code class="language-python">class NodeConfig(BaseModel):
+    name: str = Field(description=&quot;Unique node name&quot;)
+    description: Optional[str] = Field(default=None, description=&quot;Human-readable description&quot;)
+    depends_on: List[str] = Field(default_factory=list, description=&quot;List of node dependencies&quot;)
+
+    # Operations (at least one required)
+    read: Optional[ReadConfig] = None
+    transform: Optional[TransformConfig] = None
+    write: Optional[WriteConfig] = None
+
+    # Optional features
+    cache: bool = Field(default=False, description=&quot;Cache result for reuse&quot;)
+
+    @model_validator(mode='after')
+    def check_at_least_one_operation(self):
+        &quot;&quot;&quot;Ensure at least one operation is defined.&quot;&quot;&quot;
+        if not any([self.read, self.transform, self.write]):
+            raise ValueError(
+                f&quot;Node '{self.name}' must have at least one of: read, transform, write&quot;
+            )
+        return self
+</code></pre>
+<p><strong>What this does:</strong>
+- <code>name</code> is required
+- <code>description</code> is optional (defaults to None)
+- <code>depends_on</code> is optional list (defaults to empty list)
+- Must have at least one of: read, transform, write
+- <code>cache</code> defaults to False</p>
+<hr />
+<h3 id="example-2-readconfig">Example 2: ReadConfig</h3>
+<pre><code class="language-python">class ReadConfig(BaseModel):
+    connection: str = Field(description=&quot;Connection name from project.yaml&quot;)
+    format: str = Field(description=&quot;Data format (csv, parquet, delta, etc.)&quot;)
+    table: Optional[str] = Field(default=None, description=&quot;Table name for SQL/Delta&quot;)
+    path: Optional[str] = Field(default=None, description=&quot;Path for file-based sources&quot;)
+    options: Dict[str, Any] = Field(default_factory=dict, description=&quot;Format-specific options&quot;)
+
+    @model_validator(mode='after')
+    def check_table_or_path(self):
+        &quot;&quot;&quot;Ensure either table or path is provided.&quot;&quot;&quot;
+        if not self.table and not self.path:
+            raise ValueError(&quot;Either 'table' or 'path' must be provided for read config&quot;)
+        return self
+</code></pre>
+<p><strong>What this does:</strong>
+- <code>connection</code> and <code>format</code> are required
+- Must provide either <code>table</code> OR <code>path</code> (but not neither)
+- <code>options</code> defaults to empty dict</p>
+<hr />
+<h2 id="9-working-with-yaml">9. Working with YAML</h2>
+<h3 id="loading-yaml-pydantic">Loading YAML → Pydantic</h3>
+<pre><code class="language-python">import yaml
+from pydantic import BaseModel
+
+# YAML file content
+yaml_content = &quot;&quot;&quot;
+name: load_data
+description: Load CSV data
+read:
+  connection: local
+  format: csv
+  path: input.csv
+cache: true
+&quot;&quot;&quot;
+
+# Parse YAML
+data = yaml.safe_load(yaml_content)
+
+# Validate with Pydantic
+try:
+    node = NodeConfig(**data)  # ** unpacks dict
+    print(f&quot;✅ Valid node: {node.name}&quot;)
+except ValidationError as e:
+    print(f&quot;❌ Invalid config:&quot;)
+    print(e)
+</code></pre>
+<hr />
+<h2 id="10-common-patterns-in-odibi">10. Common Patterns in ODIBI</h2>
+<h3 id="pattern-1-required-field-with-description">Pattern 1: Required Field with Description</h3>
+<pre><code class="language-python">name: str = Field(description=&quot;Node name&quot;)
+</code></pre>
+<h3 id="pattern-2-optional-field-with-default">Pattern 2: Optional Field with Default</h3>
+<pre><code class="language-python">cache: bool = Field(default=False, description=&quot;Cache results&quot;)
+</code></pre>
+<h3 id="pattern-3-optional-field-none-by-default">Pattern 3: Optional Field (None by default)</h3>
+<pre><code class="language-python">description: Optional[str] = Field(default=None, description=&quot;Human-readable description&quot;)
+</code></pre>
+<h3 id="pattern-4-list-with-default-empty">Pattern 4: List with Default Empty</h3>
+<pre><code class="language-python">depends_on: List[str] = Field(default_factory=list, description=&quot;Dependencies&quot;)
+</code></pre>
+<p><strong>Why <code>default_factory=list</code>?</strong>
+- ✅ Each instance gets its own list
+- ❌ <code>default=[]</code> would share the same list across instances (dangerous!)</p>
+<h3 id="pattern-5-dict-with-default-empty">Pattern 5: Dict with Default Empty</h3>
+<pre><code class="language-python">options: Dict[str, Any] = Field(default_factory=dict, description=&quot;Options&quot;)
+</code></pre>
+<hr />
+<h2 id="11-error-messages">11. Error Messages</h2>
+<h3 id="example-error">Example Error</h3>
+<pre><code class="language-python">try:
+    node = NodeConfig(
+        name=&quot;&quot;,  # Empty name
+        # Missing read/transform/write
+    )
+except ValidationError as e:
+    print(e)
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code>2 validation errors for NodeConfig
+name
+  Value error, name cannot be empty
+NodeConfig
+  Value error, Node '' must have at least one of: read, transform, write
+</code></pre>
+<p><strong>Understanding errors:</strong>
+- Shows which field failed
+- Shows what went wrong
+- Can have multiple errors at once</p>
+<hr />
+<h2 id="12-accessing-fields">12. Accessing Fields</h2>
+<pre><code class="language-python">node = NodeConfig(
+    name=&quot;my_node&quot;,
+    read=ReadConfig(connection=&quot;local&quot;, format=&quot;csv&quot;, path=&quot;data.csv&quot;)
+)
+
+# Access fields like normal attributes
+print(node.name)              # &quot;my_node&quot;
+print(node.read.connection)   # &quot;local&quot;
+print(node.read.format)       # &quot;csv&quot;
+print(node.cache)             # False (default)
+print(node.depends_on)        # [] (default)
+
+# Convert to dict
+node_dict = node.model_dump()
+print(node_dict)
+# {
+#   &quot;name&quot;: &quot;my_node&quot;,
+#   &quot;read&quot;: {&quot;connection&quot;: &quot;local&quot;, &quot;format&quot;: &quot;csv&quot;, &quot;path&quot;: &quot;data.csv&quot;, ...},
+#   &quot;cache&quot;: False,
+#   ...
+# }
+</code></pre>
+<hr />
+<h2 id="13-quick-reference">13. Quick Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Example</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>field: str</code></td>
+<td><code>name: str</code></td>
+<td>Required string</td>
+</tr>
+<tr>
+<td><code>field: int</code></td>
+<td><code>age: int</code></td>
+<td>Required integer</td>
+</tr>
+<tr>
+<td><code>field: bool</code></td>
+<td><code>active: bool</code></td>
+<td>Required boolean</td>
+</tr>
+<tr>
+<td><code>field: Optional[str]</code></td>
+<td><code>desc: Optional[str] = None</code></td>
+<td>Optional string (can be None)</td>
+</tr>
+<tr>
+<td><code>field: List[str]</code></td>
+<td><code>tags: List[str]</code></td>
+<td>Required list of strings</td>
+</tr>
+<tr>
+<td><code>field: Dict[str, Any]</code></td>
+<td><code>opts: Dict[str, Any]</code></td>
+<td>Required dictionary</td>
+</tr>
+<tr>
+<td><code>field: str = "default"</code></td>
+<td><code>host: str = "localhost"</code></td>
+<td>String with default value</td>
+</tr>
+<tr>
+<td><code>field: List[str] = Field(default_factory=list)</code></td>
+<td><code>deps: List[str] = Field(default_factory=list)</code></td>
+<td>Empty list by default</td>
+</tr>
+<tr>
+<td><code>field: str = Field(description="...")</code></td>
+<td><code>name: str = Field(description="Node name")</code></td>
+<td>With description</td>
+</tr>
+<tr>
+<td><code>field: int = Field(ge=1, le=10)</code></td>
+<td><code>retry: int = Field(ge=1, le=10)</code></td>
+<td>Integer between 1-10</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="14-tips">14. Tips</h2>
+<ol>
+<li><strong>Always use <code>Optional[T]</code></strong> when field can be None</li>
+<li><strong>Use <code>Field(default_factory=list)</code></strong> for lists, not <code>default=[]</code></li>
+<li><strong>Add descriptions</strong> - helps with documentation and errors</li>
+<li><strong>Use validators</strong> for complex logic (either/or, dependencies)</li>
+<li><strong>Use Enums</strong> for limited choices (engine type, modes, etc.)</li>
+<li><strong>Test with invalid data</strong> - see what errors users will get</li>
+</ol>
+<hr />
+<h2 id="15-debugging-validation-errors">15. Debugging Validation Errors</h2>
+<pre><code class="language-python">from pydantic import ValidationError
+
+try:
+    config = NodeConfig(**data)
+except ValidationError as e:
+    print(&quot;Validation failed!&quot;)
+
+    # Get all errors
+    for error in e.errors():
+        print(f&quot;Field: {error['loc']}&quot;)      # Which field
+        print(f&quot;Error: {error['msg']}&quot;)       # What's wrong
+        print(f&quot;Type: {error['type']}&quot;)       # Error type
+        print(f&quot;Input: {error['input']}&quot;)     # What was provided
+        print(&quot;---&quot;)
+</code></pre>
+<hr />
+<h2 id="summary">Summary</h2>
+<p><strong>Pydantic = Type hints + Validation + Clear errors</strong></p>
+<p>In ODIBI, Pydantic:
+1. Validates YAML configs before execution
+2. Converts YAML → Python objects automatically
+3. Gives clear error messages ("Missing field X", "Field Y must be integer")
+4. Prevents runtime errors (catch config mistakes early)
+5. Self-documents the config structure</p>
+<p><strong>Next step:</strong> Look at <code>odibi/config.py</code> with this cheatsheet open!</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
