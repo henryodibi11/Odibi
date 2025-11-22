@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from odibi.config import NodeConfig, RetryConfig
 from odibi.context import Context
 from odibi.registry import FunctionRegistry
+from odibi.transformations.registry import get_registry as get_transformation_registry
 from odibi.exceptions import NodeExecutionError, TransformError, ValidationError, ExecutionContext
 
 
@@ -285,6 +286,16 @@ class Node:
                     # Don't fail execution if sampling fails
                     pass
 
+        # Transformer Phase (New Phase 2.1)
+        if self.config.transformer:
+            if result_df is None and input_df is not None:
+                result_df = input_df
+
+            result_df = self._execute_transformer_node(result_df)
+            self._execution_steps.append(
+                f"Applied transformer '{self.config.transformer}'"
+            )
+
         # Transform phase
         if self.config.transform:
             if result_df is None and input_df is not None:
@@ -407,6 +418,34 @@ class Node:
         )
 
         return df
+
+    def _execute_transformer_node(self, input_df: Optional[Any]) -> Any:
+        """Execute transformer.
+
+        Args:
+            input_df: Input DataFrame
+
+        Returns:
+            Transformed DataFrame
+        """
+        transformer_name = self.config.transformer
+        params = self.config.params
+
+        registry = get_transformation_registry()
+        func = registry.get(transformer_name)
+
+        if not func:
+            raise ValueError(f"Transformer '{transformer_name}' not found.")
+
+        # Execute
+        # We call func(context=self.context, current=input_df, **params)
+        try:
+            result = func(self.context, current=input_df, **params)
+        except Exception as e:
+             # Wrap error
+             raise TransformError(f"Transformer '{transformer_name}' failed: {e}") from e
+
+        return result
 
     def _execute_transform(self, input_df: Optional[Any]) -> Any:
         """Execute transformation steps.

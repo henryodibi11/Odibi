@@ -230,6 +230,12 @@ class NodeConfig(BaseModel):
     read: Optional[ReadConfig] = None
     transform: Optional[TransformConfig] = None
     write: Optional[WriteConfig] = None
+    transformer: Optional[str] = Field(
+        default=None, description="Name of transformer to apply"
+    )
+    params: Dict[str, Any] = Field(
+        default_factory=dict, description="Parameters for transformer"
+    )
 
     # Optional features
     cache: bool = Field(default=False, description="Cache result for reuse")
@@ -247,9 +253,9 @@ class NodeConfig(BaseModel):
     @model_validator(mode="after")
     def check_at_least_one_operation(self):
         """Ensure at least one operation is defined."""
-        if not any([self.read, self.transform, self.write]):
+        if not any([self.read, self.transform, self.write, self.transformer]):
             raise ValueError(
-                f"Node '{self.name}' must have at least one of: read, transform, write"
+                f"Node '{self.name}' must have at least one of: read, transform, write, transformer"
             )
         return self
 

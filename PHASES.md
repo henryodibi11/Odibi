@@ -1,472 +1,277 @@
-# ODIBI Framework - Evolution Phases
+# Odibi Roadmap (v2.1+)
 
 **Version Strategy:** Semantic Versioning (SemVer)  
-**Current Version:** v2.0.0  
-**Last Updated:** November 20, 2025  
-**Status:** ✅ Phase 5 Complete - Ecosystem Ready!
+**Current Core Version:** v2.0.0  
+**Last Updated:** November 22, 2025  
+
+Odibi v2.0.0 completes Phases 1–6, 9, and 10. This document focuses on **what comes next**.  
+For a detailed history of all completed phases, see:  
+➡️ [`docs/_archive/PHASES_HISTORY.md`](docs/_archive/PHASES_HISTORY.md)
 
 ---
 
-## 📊 Current Status
+## 📊 Snapshot: Where We Are
 
-### Phase 5: Enterprise + Ecosystem
-- **Status:** ✅ Complete
-- **Current Version:** v2.0.0
-- **Focus:** Observability, Plugins, and Community
-
-| Phase | Status | Version | Completion |
-|-------|--------|---------|------------|
-| **Phase 1: Scaffolding** | ✅ Complete | v1.1.0 | Nov 2025 |
-| **Phase 2: Azure + Spark** | ✅ Complete | v1.2.0 | Nov 2025 |
-| **Phase 3: CLI + Stories** | ✅ Complete | v1.3.0 | Nov 2025 |
-| **Phase 4: Production** | ✅ Complete | v1.4.0 | Nov 2025 |
-| **Phase 6: Reference Project** | ✅ Complete | v2.0.0 | Nov 2025 |
-| **Phase 9: Stress Testing** | ✅ Complete | v2.0.0 | Nov 2025 |
-| **Phase 10: Documentation** | ✅ Complete | v2.0.0 | Nov 2025 |
-
-### Quick Links
-- **CI Status:** [![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
-- **Tests:** 416 passing
-- **Coverage:** ~80%
-- **Python:** 3.9, 3.10, 3.11, 3.12
-- **License:** MIT
+- **Latest Release:** `v2.0.0` – Enterprise + Ecosystem
+- **Completed Phases:** 1–6, 9, 10
+- **Stability:** Production-ready; >400 tests; ~80% coverage
+- **Focus Shift:** From building the core to **Delta-first pipelines**, ecosystem integration, and intelligent tooling.
 
 ---
 
-## Overview
+## Phase 2.1 — The Delta-First Foundation (Immediate Priority)
 
-ODIBI has evolved through 5 distinct phases, culminating in a production-ready, enterprise-grade data engineering framework.
+**Goal:** Make Odibi’s **Delta-first** medallion architecture (Landing → Raw → …) the *default, batteries-included* experience across Pandas and Spark.
+
+### 2.1.1 Built-in `merge` / `upsert` Transformer (Spark & Pandas)
+
+**Problem:**  
+Today, upsert/merge patterns are ad-hoc (custom SQL, manual joins, or user-written transforms). For Delta-first pipelines, we need a **first-class, engine-agnostic** merge primitive.
+
+**Design Goals:**
+
+- **Unified API:** One YAML/config shape that works for both **Spark (Delta)** and **Pandas**.
+- **Delta-First:** Optimized for Delta Lake tables (Landing → Raw, Raw → Silver).
+- **Safe by Default:** Explicit keys and column lists; no silent “update everything”.
+- **Predictable Semantics:** Clear behavior for matched vs non-matched rows.
+
+#### a) Configuration Shape (High-Level)
+
+Example (Spark / Delta):
+
+```yaml
+- id: customers_raw_merge
+  type: transform
+  engine: spark           # or "pandas"
+  transformer: merge      # NEW: built-in transformer
+  params:
+    target:
+      ref: customers_raw  # existing node or table ref
+    source:
+      ref: customers_landing_clean
+    keys:
+      - customer_id
+    update_columns:
+      - name
+      - email
+      - updated_at
+    insert_columns:
+      - customer_id
+      - name
+      - email
+      - created_at
+    insert_when_not_matched: true
+    delete_when_not_matched: false   # optional (for slowly-changing dimensions, etc.)
+    options:
+      # engine-specific hints (optional, non-breaking)
+      delta:
+        condition: "target.customer_id = source.customer_id"
+        # reserved for future: "cdc" modes, predicates, etc.
+```
+
+Example (Pandas upsert into a file/table):
+
+```yaml
+- id: customers_upsert_pandas
+  type: transform
+  engine: pandas
+  transformer: merge
+  params:
+    target:
+      path: data/raw/customers.parquet
+      format: parquet
+    source:
+      ref: customers_staging
+    keys: [customer_id]
+    update_columns: [name, email, updated_at]
+    insert_columns: [customer_id, name, email, created_at]
+    insert_when_not_matched: true
+```
+
+#### b) Semantics
+
+- **Inputs:**
+  - `target`: an existing node or table (Delta table, Parquet/CSV file, or engine-native table).
+  - `source`: a node producing a DataFrame to merge into `target`.
+- **Keys (`keys`):**
+  - Required, list of column names.
+  - Must exist in both `target` and `source`.
+- **Update behavior:**
+  - Only columns in `update_columns` are updated on matches.
+  - Columns not listed remain unchanged in `target`.
+- **Insert behavior:**
+  - If `insert_when_not_matched: true`, rows in `source` with no key match are appended using `insert_columns`.
+  - If false, unmatched rows are ignored.
+- **Delete behavior (optional / future-friendly):**
+  - `delete_when_not_matched: false` by default.
+  - If true, target rows with no matching source key can be removed (for full-sync patterns).
+- **Engine mapping:**
+  - **Spark / Delta:** Translates into a `MERGE INTO` statement using the configured condition/keys.
+  - **Pandas:** Implements an in-memory merge/upsert followed by a write, respecting file format and write mode (non-breaking with existing engine semantics).
+
+#### c) Scope for v2.1
+
+- Implemented for:
+  - `SparkEngine` with Delta format.
+  - `PandasEngine` for supported file/table targets (Parquet, CSV, Delta via delta-rs or equivalent connector as already supported).
+- Docs & examples:
+  - Landing → Raw medallion examples using `merge`.
+  - Reference snippets for common patterns: CDC-style upsert, full reload, “only inserts”.
+
+---
+
+### 2.1.2 `odibi init-pipeline` Templates
+
+**Goal:** Make it trivial to start a **Delta-first** Odibi project with best practices baked in.
+
+**Deliverables:**
+
+- New CLI command:  
+
+  ```bash
+  odibi init-pipeline <name> --engine {pandas,spark} --template {local-medallion,azure-delta,...} --env dev
+  ```
+
+- Initial template set:
+  1. **Local Medallion (Pandas + local Delta/Parquet):**
+     - Landing → Raw → Silver with `merge` transformer.
+     - Local file storage; minimal secrets.
+  2. **Azure Delta Medallion (Spark + ADLS):**
+     - ADLS-based Landing/Raw/Silver tables.
+     - Pre-wired Key Vault + connection config (building on existing v2.0 capabilities).
+  3. **Reference-Project Lite (OdibiFlix-style):**
+     - Small “Gauntlet” example with a couple of `merge` nodes.
+
+- Each template includes:
+  - `odibi.yaml` (with env-aware structure).
+  - `env/` config overrides (see 2.1.3).
+  - Minimal README with how to run + how to extend.
+
+---
+
+### 2.1.3 `env` Config Structure
+
+**Goal:** Normalize how environments (`dev`, `test`, `prod`) are expressed and overridden in Odibi configs, building on the existing `--env` capabilities.
 
 **Principles:**
-- **Non-breaking:** New engines and connectors are opt-in via extras
-- **Tested:** All features require tests before promotion to stable
-- **Documented:** New capabilities include examples and setup guides
-- **Transparent:** CHANGELOG.md tracks all changes
+
+- **Single Source of Truth:** Base config + env overlays; no duplication.
+- **CLI-First:** `odibi run --env dev` “just works”.
+- **Composable:** Plays nicely with template imports (from Phase 7 DX work).
+
+**Planned Structure (conceptual):**
+
+- Base project config (e.g. `odibi.yaml`) with logical environment slots, for example:
+
+  ```yaml
+  envs:
+    default: dev
+    available: [dev, test, prod]
+  ```
+
+- Env-specific overrides in dedicated files (examples):
+
+  ```bash
+  config/
+    base.yaml          # base pipeline definition
+    env.dev.yaml       # dev overrides (local paths, test secrets)
+    env.test.yaml      # test/staging overrides
+    env.prod.yaml      # prod ADLS/SQL, real Key Vault
+  ```
+
+- Resolution rules:
+  - Start with `base.yaml` (or imports).
+  - Apply `env.<name>.yaml` overlay last.
+  - Support `imports: [...]` pattern (from existing Phase 7 DX work).
+- CLI behavior:
+  - `--env` selects overlay.
+  - Env used is recorded in stories / logs for traceability.
 
 ---
 
-## Phase 1 — Spark Engine + Azure Integrations (Scaffolding)
+## Phase 7 — Ecosystem & Platform (Next)
 
-**Target Version:** v1.1.0-alpha.1 → v1.1.0  
-**Status:** ✅ Complete (v1.1.0-alpha.2-walkthroughs)  
-**Completed:** November 2025
+> Source: Consolidated and adapted from the prior `PHASES_NEXT.md`.
 
-### Goals
-- ✅ Scaffold Spark engine and Azure connections **without breaking Pandas**
-- ✅ Provide structure, docs, and examples to enable contributions
-- ✅ Establish open-source governance and community standards
+**Goal:** Move from a “library” to a “platform” by deepening ecosystem integration and operational tooling.
 
-### Deliverables
+### 7.1 Developer Experience (DX) – Follow-On Work
 
-#### Code Scaffolding
-- [x] **Engine:** `odibi/engine/spark_engine.py`
-  - Class `SparkEngine` implementing `Engine` interface
-  - Import-guarded (raises helpful error if `pyspark` not installed)
-  - Methods stubbed with `NotImplementedError` and PHASES.md references
-  - Basic introspection methods implemented (`get_schema`, `get_shape`, `count_rows`)
+Some DX work is already done (e.g. templates, config imports). Follow-ons:
 
-- [x] **Connections:** Azure and mock DBFS
-  - `odibi/connections/azure_adls.py` - Azure Data Lake Storage Gen2 path resolver
-  - `odibi/connections/azure_sql.py` - Azure SQL connection config
-  - `odibi/connections/local_dbfs.py` - Mock DBFS for local testing
-  - All implement `BaseConnection` interface
-  - No network I/O in validation phase
+- **Project Templates:** Extend `odibi init-pipeline` / `odibi create` with:
+  - Opinionated templates for Spark-only, Pandas-only, mixed-engine, and “Gauntlet” style projects.
+- **Editor & IDE Support:**
+  - Continue VS Code schema/intellisense improvements.
+  - Keep JSON/YAML schema in sync with new `merge`/env config.
+- **Engine Hardening:**
+  - Close remaining functional gaps discovered via Phase 9 (“Infinite Gauntlet”).
+  - Stabilize public API for engine plugins.
 
-#### Documentation
-- [x] **Setup Guides:**
-  - `docs/setup_databricks.md` - Databricks cluster setup, notebook integration
-  - `docs/setup_azure.md` - Authentication options, permissions, connection templates
+### 7.2 Orchestration Generators (Deferred → Next)
 
-- [x] **Examples:**
-  - `examples/example_spark.yaml` - Spark engine template with ADLS/DBFS
-  - `examples/example_local.yaml` - Simplified local Pandas example
+**Status:** On hold, but next major ecosystem lever.
 
-#### Open-Source Standards
-- [x] **Governance:**
-  - `CONTRIBUTING.md` - Contribution workflow, coding standards, testing
-  - `CODE_OF_CONDUCT.md` - Contributor Covenant v2.1
-  - `SECURITY.md` - Vulnerability reporting process
-  - `CODEOWNERS` - Maintainer assignments
-  - `CHANGELOG.md` - Version history (Keep a Changelog format)
+**Planned Features:**
 
-- [x] **GitHub Templates:**
-  - `.github/ISSUE_TEMPLATE/bug_report.md`
-  - `.github/ISSUE_TEMPLATE/feature_request.md`
-  - `.github/PULL_REQUEST_TEMPLATE.md`
+- Generators for:
+  - **Databricks Jobs** (JSON/YAML spec from Odibi configs).
+  - **Azure Data Factory / Synapse Pipelines**.
+  - **GitHub Actions** workflows for scheduled runs.
+- Philosophy:
+  - Generators should be **pure**: no hidden state, idempotent.
+  - Treat orchestration as a *view* over Odibi configs, not a second source of truth.
 
-- [x] **CI/CD:**
-  - `.github/workflows/ci.yml` - Multi-Python version testing
-  - Job: `test-base` (required) - Pandas tests on Python 3.9–3.12
-  - Job: `test-extras` (optional) - Spark/Azure import tests
-  - `.pre-commit-config.yaml` - black, ruff, trailing whitespace
+### 7.3 “Control Plane” UI (Deferred)
 
-#### README Updates
-- [x] Add badges (build status, Python versions, license, PyPI)
-- [x] Document installation with extras (`pip install "odibi[spark]"`)
-- [x] Update roadmap section to reference PHASES.md
-- [x] Link to CONTRIBUTING.md and CODE_OF_CONDUCT.md
+**Goal:** A simple web UI for:
 
-#### Testing
-- [x] Import tests for new modules (skip if extras not installed)
-- [x] Path resolution tests for Azure connections (no network calls)
-- [x] All 78 existing Pandas tests still pass
+- Viewing runs, stories, and metrics.
+- Triggering pipelines manually.
+- Inspecting environment and connection health.
 
-#### Walkthroughs (Phase 1F)
-- [x] **6 Jupyter notebooks** covering all core features
-  - `00_setup_environment.ipynb` - Setup and mental model
-  - `01_local_pipeline_pandas.ipynb` - Full pipeline example with explanations
-  - `02_cli_and_testing.ipynb` - Testing patterns and CLI preview
-  - `03_spark_preview_stub.ipynb` - Spark architecture overview
-  - `04_ci_cd_and_precommit.ipynb` - Code quality automation
-  - `05_build_new_pipeline.ipynb` - Build from scratch tutorial
-- [x] **Concept explanations:** Config vs Runtime, SQL-over-Pandas
-- [x] **Troubleshooting sections:** Common errors with solutions
-- [x] **All notebooks tested** and verified to run cell-by-cell
-
-#### Release
-- [x] Git tag: `v1.1.0-alpha.1-ci-setup` (scaffolding release)
-- [x] Git tag: `v1.1.0-alpha.2-walkthroughs` (walkthroughs complete)
-- [x] Update CHANGELOG.md with scaffolding notes
-- [x] GitHub Release with clear "experimental" status
-
-### Acceptance Criteria
-- [x] All 78 Pandas tests pass with zero modifications
-- [x] New modules raise clear errors when extras not installed
-- [x] CI green on base job (Pandas); extras job can succeed
-- [x] Examples and docs clearly mark Spark/Azure as experimental
-- [x] No breaking changes to existing Pandas pipelines
+**Constraint:** Only justified if real-world usage shows that CLI + existing observability are insufficient; otherwise this stays deferred.
 
 ---
 
-## Phase 2 — Spark Engine + Azure ADLS (Production-Ready)
+## Phase 8 — Advanced Intelligence (Future)
 
-**Target Version:** v1.2.0  
-**Status:** ✅ Complete  
-**Completed:** November 2025
+> Adapted from the “Advanced Intelligence” section in the prior `PHASES_NEXT.md`.
 
-**Design Document:** [docs/PHASE2_DESIGN_DECISIONS.md](docs/PHASE2_DESIGN_DECISIONS.md)
+**Goal:** Use LLMs to assist with pipeline creation, debugging, and maintenance without making the core framework dependent on external AI services.
 
-### Goals
-- Implement production-ready Spark engine (read, write, transform)
-- Complete Azure ADLS integration with Key Vault authentication
-- Enable multi-account storage scenarios (Databricks production use case)
-- Provide seamless Databricks onboarding experience
+### 8.1 “Auto-Heal” (Dev-Mode Only)
 
-### Deliverables
+- If a node fails with a **SQL syntax error** or a simple, localized config issue:
+  - Capture failing SQL/config and error message.
+  - Propose a fix using an LLM (pluggable, opt-in).
+  - In dev mode, optionally retry automatically with the suggested fix.
+- Guardrails:
+  - Never auto-apply changes in `prod`.
+  - Always log “before vs after” for reproducibility.
 
-#### Spark Engine Implementation
-- [x] `SparkEngine.read()` - Parquet, CSV, Delta from ADLS/DBFS
-- [x] `SparkEngine.write()` - Parquet, CSV, Delta with modes (overwrite/append)
-- [x] `SparkEngine.execute_sql()` - SQL transforms with temp view registration
-- [x] Connection configuration at engine init (all storage accounts)
-- [x] Integration tests with local Spark session (skipped if Java missing)
+### 8.2 Natural Language Querying
 
-#### Azure ADLS Authentication
-- [x] **Two auth modes:** `key_vault` (default) and `direct_key` (fallback)
-- [x] Key Vault integration using `DefaultAzureCredential` (Databricks managed identity)
-- [x] Credential caching (fetch once per connection)
-- [x] Storage options injection for Pandas (`pandas_storage_options()`)
-- [x] Spark config setup for all accounts (`configure_spark()`)
-- [x] Eager validation (fail fast on connection init)
-- [x] Production warning when using `direct_key` mode
+- Command-line helper, for example:
 
-#### Phase 2A Completion (Nov 2025) ✅
-- [x] AzureADLS connection with Key Vault + direct_key authentication
-- [x] PandasEngine `_merge_storage_options()` - Inject connection credentials
-- [x] PandasEngine ADLS support - All formats (CSV, Parquet, JSON, Excel, Avro)
-- [x] SparkEngine read/write implementation
-- [x] SparkEngine multi-account configuration
-- [x] Skip `mkdir` for remote URIs (abfss://, s3://, etc.)
-- [x] 21 comprehensive ADLS tests (110 total passing)
-- [x] `docs/LOCAL_DEVELOPMENT.md` - Local setup guide
-- [x] `docs/SUPPORTED_FORMATS.md` - Complete format reference
-- [x] `examples/template_full_adls.yaml` - Multi-account example
-- [x] `walkthroughs/phase2a_adls_test.ipynb` - Real ADLS validation
-- [x] CI/CD integration with Azure packages
+  ```bash
+  odibi query "Show me the average order value by city over the last 30 days"
+  ```
 
-#### Phase 2B - Delta Lake ✅
-- [x] Delta Lake read/write (PandasEngine)
-- [x] Delta Lake read/write (SparkEngine)
-- [x] VACUUM, history, restore operations
-- [x] Partitioning support with warnings
-- [x] Delta-specific tests (12 comprehensive tests)
-
-#### Phase 2C - Performance & Tools ✅ (Databricks Validated)
-- [x] `setup/databricks_setup.ipynb` - Interactive Databricks + Key Vault setup
-- [x] `odibi/utils/setup_helpers.py` - Programmatic setup utilities
-- [x] Parallel Key Vault fetching (3x+ performance improvement)
-- [x] Timeout protection (30s default) for Key Vault operations
-- [x] Enhanced error handling and reporting
-- [x] Comprehensive tests (15 new tests, 137 total passing)
-- [x] Databricks validation (multi-account ADLS, Delta time travel, cross-account transfer)
-- [x] Bug fixes: SparkEngine.execute_sql() temp view registration
-
-#### Phase 2D - Final Verification (Databricks) ✅
-- [x] `examples/spark_feature_verification.py` - Tested Validation, Redaction, Error Handling
-- [x] `examples/spark_delta_verification.py` - Tested Upsert, Time Travel, History, Vacuum
-- [x] Verified 100% of Spark engine features on live Databricks cluster
-
-### Phase 2A Acceptance Criteria ✅
-- [x] Spark engine executes read/write operations
-- [x] Multi-account storage works (tested with 2 accounts)
-- [x] Key Vault auth implemented (mocked + real tested)
-- [x] All tests pass (110/110)
-- [x] Documentation complete and validated
+- Behavior:
+  - Generates a **temporary pipeline** and SQL based on existing tables/nodes.
+  - Executes it and returns a tabular result and/or a story snippet.
+- Long-term:
+  - Option to export the generated pipeline as a starting template.
 
 ---
 
-## Phase 3 — CLI Tools + Advanced Features (Azure-First)
+## Phase History & Contributions
 
-**Target Version:** v1.3.0  
-**Status:** ✅ Complete  
-**Completed:** November 2025
+- Full historical details of Phases 1–6, 9, 10 and v1.0.0–v2.0.0:  
+  ➡️ [`docs/_archive/PHASES_HISTORY.md`](docs/_archive/PHASES_HISTORY.md)
+- Phase 5 detailed roadmap:  
+  ➡️ [`docs/_archive/PHASE5_ROADMAP_COMPLETED.md`](docs/_archive/PHASE5_ROADMAP_COMPLETED.md)
 
-### Goals
-- Improve developer experience with polished CLI tools
-- Enhance story/report generation for pipeline runs
-- Add testing utilities and fixtures
-- Complete Azure SQL connector implementation
-- **Defer:** AWS S3, GCP (Phase 5 - when needed/community contributions)
-
-#### Phase 3 - Orchestration & Production (Phase 3)
-- [x] **Environments:** Support `dev`/`prod` config overrides (CLI `--env` flag)
-- [x] **Secrets:** CLI tools (`odibi secrets`) and Key Vault integration verified
-- [ ] **Scheduler:** Generate Airflow/Databricks Jobs (Deferred to v2.1)
-
-### Deliverables
-
-#### CLI Enhancement
-- [x] `odibi validate <config>` - Validate YAML without execution
-- [x] `odibi run <config>` - Execute pipeline from CLI
-- [x] `odibi graph <config>` - Visualize dependency graph (ASCII art or export to DOT)
-- [x] `odibi doctor <config>` - Lint YAML, show resolved connections, check env
-- [x] Rich error messages with suggestions and context
-- [x] `--log-level` flag (DEBUG, INFO, WARNING, ERROR)
-- [x] `--dry-run` mode
-
-#### Testing Utilities
-- [x] `odibi.testing.fixtures` - Temporary directories, sample data generators
-- [x] `odibi.testing.spark` - Mock Spark session factory (skipped if missing)
-- [x] `odibi.testing.assertions` - DataFrame equality helpers (engine-agnostic)
-- [x] Example datasets compatible with both Pandas and Spark
-
-#### Story Generator Enhancements
-- [x] `odibi.story` module enhancement
-- [x] Capture run metadata: timestamps, node durations, success/failure
-- [x] Sample data snapshots (first N rows per node)
-- [x] Schema tracking (detect schema changes between nodes)
-- [x] Export formats: Markdown, JSON, HTML (basic)
-- [ ] **Verbosity Levels:** Control detail (Summary vs. Audit vs. Debug) (Deferred)
-- [x] **Contextual Metadata:** Capture Environment, Git Commit, Odibi Version (Reproducibility)
-- [x] **Config Snapshot:** Embed effective configuration in the story (Traceability)
-- [ ] **Rendered Logic:** Show actual SQL/Params executed (Transparency) (Deferred)
-- [ ] **Data Quality Evidence:** Show *why* data failed (e.g., "Top 5 invalid values") rather than just "Failed" (Deferred)
-- [ ] **I/O Manifest:** Log exact file paths, ETags, and modification times for provenance (Deferred)
-- [ ] **Visual Lineage:** Embed pipeline graph (Mermaid/ASCII) directly in the story (Deferred)
-- [ ] **Resource Telemetry:** Track peak memory usage and CPU time (Efficiency Truth) (Deferred)
-- [ ] **Reproduction Token:** Exact CLI command to reproduce this specific run (Deferred)
-
-#### Azure Connector Completion
-- [x] `connections/azure_sql.py` - Implement read/write via SQLAlchemy + ODBC
-- [x] Azure-specific error handling improvements
-- [ ] Azure connection examples and best practices
-- [x] Connection factory: YAML `type` field → class instantiation
-
-#### Cloud Connectors (Deferred to Phase 5 Plugins)
-- [ ] `connections/s3.py` - AWS S3 (deferred - use plugin)
-- [ ] `connections/gcs.py` - Google Cloud Storage (deferred - use plugin)
-- **Rationale:** Focus on Azure (production platform). Add S3/GCS via community plugins.
-
-#### Examples
-- [x] `examples/spark_sql_pipeline/` - End-to-end Spark SQL transformation
-- [x] `examples/azure_etl/` - ADLS read → transform → Azure SQL write
-- [x] `examples/story_demo/` - Pipeline showcasing story generation
-- [x] `examples/medallion_architecture/` - Complete Bronze/Silver/Gold example
-
-### Acceptance Criteria
-- [x] CLI tools functional and documented
-- [x] Stories generated with useful metadata
-- [x] Testing utilities available for users
-- [x] Azure SQL connector implemented with tests
-- [x] ~25 new tests for CLI, stories, and Azure SQL
-- [x] Zero breaking changes to Phase 2 features
-
----
-
-## Phase 4 — Performance + Production Hardening
-
-**Target Version:** v1.4.0  
-**Status:** ✅ Complete  
-**Completed:** November 2025
-
-### Goals
-- Stabilize API contracts and error semantics
-- Optimize performance for production workloads (Chunking, Parallelism)
-- Add retry logic, idempotency, and checkpointing
-- Enable enterprise features (PII redaction, Alerting, Env vars)
-
-### Deliverables
-
-#### Infrastructure (Pre-requisite)
-- [x] **Spark CI Hardening:** Ensure GitHub Actions runs Spark tests (install Java/Hadoop)
-- [x] **Local Spark Setup:** Scripts/Docs for local Spark testing
-  - Windows (Interactive): `examples/run_local_spark.bat`
-  - WSL (Recommended): `docs/WSL_GUIDE.md`
-
-#### Performance
-- [x] Engine benchmarks (Pandas vs Spark for common operations)
-- [x] Lazy evaluation strategies where applicable (Delta Lake implementation)
-- [x] Parallel node execution (ThreadPoolExecutor)
-- [x] **Memory Safety:** Automatic chunking for Pandas engine
-- [x] Benchmark suite in `tests/benchmarks/`
-- [x] Performance guide (`docs/performance.md`)
-
-#### Reliability
-- [x] Retry/backoff for connection failures (configurable)
-- [x] Idempotent write modes (append-once, upsert patterns)
-- [x] **Checkpointing:** `--resume-from-failure` support
-- [x] Schema validation improvements (consistent across engines)
-- [x] Structured logging (JSON output option)
-- [x] Log level controls per node
-
-#### Security & Operations
-- [x] **PII Redaction:** `sensitive: true` masking in stories/logs
-- [x] **Alerting Hooks:** `on_failure` webhooks (Slack/Teams)
-- [x] **Config Templating:** Environment variable substitution (`${VAR}`)
-- [x] **Artifact Retention:** Auto-cleanup of old stories
-- [x] Standardized error types across engines
-- [x] Error context preservation through stack
-- [x] Detailed error messages with actionable suggestions
-- [x] Error recovery strategies (skip, retry, fail-fast)
-
-#### Documentation
-- [x] Production deployment guide (`docs/production.md`)
-- [x] Monitoring and observability guide
-- [x] Performance tuning recommendations
-
-### Acceptance Criteria
-- [x] Benchmarks published and documented
-- [x] Retry logic tested with simulated failures
-- [x] Error messages consistently helpful across engines
-- [x] Zero regressions in test suite
-
----
-
-## Phase 5 — Enterprise + Ecosystem
-
-**Target Version:** v2.0.0  
-**Status:** ✅ Complete  
-**Completed:** November 2025
-
-**Detailed Roadmap:** [docs/_archive/PHASE5_ROADMAP_COMPLETED.md](docs/_archive/PHASE5_ROADMAP_COMPLETED.md)
-
-### Goals
-- **Enterprise Scale:** Observability (OTel), Concurrency Safety (Locking), Secret Management.
-- **Ecosystem:** Plugin system, Extensions.
-- **Community:** Documentation site, Governance.
-
-### Deliverables
-
-#### 5A: Operational Safety
-- [x] **Process Locking:** Prevent state corruption during concurrent runs (`portalocker`).
-- [x] **Secret Redaction:** Auto-mask keys/passwords in all logs.
-- [x] **Secret Tools:** CLI commands to manage local environment secrets.
-
-#### 5B: Observability (OpenTelemetry)
-- [x] **Instrumentation:** Traces and Metrics for Pipeline/Node execution.
-- [x] **Standard Integration:** Support OTLP exporters (Azure Monitor, Datadog, etc.).
-
-#### 5C: Ecosystem
-- [x] **Documentation Site:** MkDocs with API reference.
-- [x] **Plugin System:** Entry-points for 3rd party engines/connectors.
-- [x] **Community Connectors:** Postgres (via plugins), S3/GCP (deferred).
-
-### Acceptance Criteria
-- [x] Parallel runs do not corrupt state file.
-- [x] Secrets never appear in logs, even on error.
-- [x] Metrics flow to a local OTel collector (verified via Docker).
-- [x] Documentation site is live.
-
----
-
-## Phase 6 — Reference Project (OdibiFlix)
-
-**Target Version:** v2.0.0  
-**Status:** ✅ Complete  
-**Completed:** November 2025
-
-### Goals
-- Prove capability with large-scale simulation
-- Implement Medallion Architecture (Bronze/Silver/Gold)
-- Deliver 10 reference implementations ("The Gauntlet")
-
-### Deliverables
-- [x] `examples/reference_project/` structure
-- [x] Synthetic data generation scripts
-- [x] Identity Resolution logic
-- [x] SCD Type 2 implementation
-
----
-
-## Phase 9 — Infinite Gauntlet (Automated Stress Testing)
-
-**Target Version:** v2.0.0  
-**Status:** ✅ Complete  
-**Completed:** November 2025
-
-### Goals
-- Automated fuzz testing against Kaggle/HuggingFace datasets
-- Project Scaffolding generator
-
-### Deliverables
-- [x] `odibi generate-project` command
-- [x] `odibi stress` command
-- [x] Integration with Kaggle API for test data
-- [x] Hardened Pandas engine against dirty CSVs
-
----
-
-## Phase 10 — Documentation & Education
-
-**Target Version:** v2.0.0  
-**Status:** ✅ Complete  
-**Completed:** November 2025
-
-### Goals
-- Diátaxis Documentation Overhaul
-- Create "Master CLI Guide" and "Cheatsheet"
-- Sales-ready README and Getting Started flow
-
-### Deliverables
-- [x] `docs/tutorials/` (Getting Started)
-- [x] `docs/guides/` (CLI, Production, Custom Transforms)
-- [x] `docs/reference/` (Cheatsheet, Configuration)
-- [x] `docs/explanation/` (Architecture, Case Studies)
-- [x] `examples/templates/security_pii.yaml` (Privacy showcase)
-
----
-
-## Version History
-
-| Version | Status | Description | Date |
-|---------|--------|-------------|------|
-| v1.0.0 | ✅ Released | Pandas MVP - Core framework complete | 2025-11-05 |
-| v1.1.0 | ✅ Released | Phase 1 stable + Phase 2 CLI tools | 2025-11-15 |
-| v1.2.0 | ✅ Released | Phase 2 stable - Spark + ADLS | 2025-11-18 |
-| v1.3.0 | ✅ Released | Phase 3 - Stories + Connectors | 2025-11-19 |
-| v1.4.0 | ✅ Released | Phase 4 - Performance + Production | 2025-11-20 |
-| v2.0.0 | ✅ Released | Phase 5 - Community + Ecosystem | 2025-11-20 |
-
----
-
-## Contributing to Future Releases
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved.
-
-**Current Focus:** Maintenance & Community Plugins
-**Next Up:** Gathering feedback for v2.1 feature set
-
----
-
-**Last Updated:** 2025-11-20  
-**Maintainer:** @henryodibi11
+For contribution guidelines and how to participate in these roadmap items, see:  
+➡️ [`CONTRIBUTING.md`](CONTRIBUTING.md)

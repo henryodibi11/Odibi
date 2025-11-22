@@ -24,6 +24,7 @@ from odibi.utils.logging import logger, configure_logging
 from odibi.state import StateManager
 from odibi.utils.alerting import send_alert
 from odibi.plugins import load_plugins, get_connection_factory
+import odibi.transformers  # Register built-in transformers
 
 
 @dataclass

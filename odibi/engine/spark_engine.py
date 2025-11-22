@@ -45,11 +45,18 @@ class SparkEngine(Engine):
         try:
             from delta import configure_spark_with_delta_pip
 
-            builder = SparkSession.builder.appName("odibi")
+            builder = SparkSession.builder.appName("odibi").config(
+                "spark.sql.sources.partitionOverwriteMode", "dynamic"
+            )
             self.spark = spark_session or configure_spark_with_delta_pip(builder).getOrCreate()
         except ImportError:
             # Delta not available - use regular Spark
-            self.spark = spark_session or SparkSession.builder.appName("odibi").getOrCreate()
+            self.spark = (
+                spark_session
+                or SparkSession.builder.appName("odibi")
+                .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
+                .getOrCreate()
+            )
 
         self.config = config or {}
         self.connections = connections or {}
