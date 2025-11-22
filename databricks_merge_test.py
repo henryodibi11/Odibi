@@ -19,47 +19,47 @@ if os.path.exists(BASE_PATH):
     try:
         shutil.rmtree(BASE_PATH)
     except Exception as e:
-        print(
-            f"Warning: Could not delete {BASE_PATH} locally (might be DBFS/Cloud path): {e}"
-        )
+        print(f"Warning: Could not delete {BASE_PATH} locally (might be DBFS/Cloud path): {e}")
 
-# Get Spark Session
-spark = SparkSession.builder.appName("OdibiSmokeTest").getOrCreate()
 
-print(">>> Setting up Test Data...")
+def main():
+    # Get Spark Session
+    spark = SparkSession.builder.appName("OdibiSmokeTest").getOrCreate()
 
-# 1. Create Initial Target Table (Delta)
-# --------------------------------------
-initial_data = [
-    (1, "Order_1", "OPEN", "2024-01-01"),
-    (2, "Order_2", "OPEN", "2024-01-01"),
-]
-df_initial = spark.createDataFrame(
-    initial_data, ["order_id", "customer", "status", "created_date"]
-)
-df_initial.write.format("delta").mode("overwrite").save(TARGET_PATH)
+    print(">>> Setting up Test Data...")
 
-print(f"Created Target Delta Table at: {TARGET_PATH}")
-spark.read.format("delta").load(TARGET_PATH).show()
+    # 1. Create Initial Target Table (Delta)
+    # --------------------------------------
+    initial_data = [
+        (1, "Order_1", "OPEN", "2024-01-01"),
+        (2, "Order_2", "OPEN", "2024-01-01"),
+    ]
+    df_initial = spark.createDataFrame(
+        initial_data, ["order_id", "customer", "status", "created_date"]
+    )
+    df_initial.write.format("delta").mode("overwrite").save(TARGET_PATH)
 
-# 2. Create Source Updates (Parquet)
-# ----------------------------------
-# Update Order_1 -> CLOSED
-# Insert Order_3 -> OPEN
-update_data = [
-    (1, "Order_1", "CLOSED", "2024-01-02"),
-    (3, "Order_3", "OPEN", "2024-01-02"),
-]
-df_updates = spark.createDataFrame(
-    update_data, ["order_id", "customer", "status", "created_date"]
-)
-df_updates.write.mode("overwrite").parquet(SOURCE_PATH)
+    print(f"Created Target Delta Table at: {TARGET_PATH}")
+    spark.read.format("delta").load(TARGET_PATH).show()
 
-print(f"Created Source Updates at: {SOURCE_PATH}")
+    # 2. Create Source Updates (Parquet)
+    # ----------------------------------
+    # Update Order_1 -> CLOSED
+    # Insert Order_3 -> OPEN
+    update_data = [
+        (1, "Order_1", "CLOSED", "2024-01-02"),
+        (3, "Order_3", "OPEN", "2024-01-02"),
+    ]
+    df_updates = spark.createDataFrame(
+        update_data, ["order_id", "customer", "status", "created_date"]
+    )
+    df_updates.write.mode("overwrite").parquet(SOURCE_PATH)
 
-# 3. Create Odibi Config
-# ----------------------
-config_yaml = f"""
+    print(f"Created Source Updates at: {SOURCE_PATH}")
+
+    # 3. Create Odibi Config
+    # ----------------------
+    config_yaml = f"""
 project: Databricks_Merge_Test
 engine: spark
 
@@ -96,55 +96,58 @@ pipelines:
             updated_col: record_updated_at
 """
 
-with open(CONFIG_PATH, "w") as f:
-    f.write(config_yaml)
+    with open(CONFIG_PATH, "w") as f:
+        f.write(config_yaml)
 
-print(f"Created Config at: {CONFIG_PATH}")
+    print(f"Created Config at: {CONFIG_PATH}")
 
-# 4. Run Pipeline
-# ---------------
-print("\n>>> Running Odibi Pipeline...")
+    # 4. Run Pipeline
+    # ---------------
+    print("\n>>> Running Odibi Pipeline...")
 
-# Initialize Manager
-manager = PipelineManager.from_yaml(CONFIG_PATH)
+    # Initialize Manager
+    manager = PipelineManager.from_yaml(CONFIG_PATH)
 
-# Run
-results = manager.run()
+    # Run
+    results = manager.run()
 
-print("\n>>> Pipeline Results:")
-print(f"Success: {not bool(results.failed)}")
-print(f"Failed Nodes: {results.failed}")
+    print("\n>>> Pipeline Results:")
+    print(f"Success: {not bool(results.failed)}")
+    print(f"Failed Nodes: {results.failed}")
+
+    # 5. Verify Results
+    # -----------------
+    print("\n>>> Verifying Delta Table State...")
+
+    df_final = spark.read.format("delta").load(TARGET_PATH).orderBy("order_id")
+    df_final.show(truncate=False)
+
+    rows = df_final.collect()
+
+    # Assertions
+    assert len(rows) == 3, f"Expected 3 rows, got {len(rows)}"
+
+    # Check Order 1 (Updated)
+    row_1 = [r for r in rows if r.order_id == 1][0]
+    assert row_1.status == "CLOSED", f"Order 1 should be CLOSED, got {row_1.status}"
+    assert row_1.record_updated_at is not None, "Order 1 should have updated_at"
+
+    # Check Order 2 (Untouched)
+    row_2 = [r for r in rows if r.order_id == 2][0]
+    assert row_2.status == "OPEN", "Order 2 should remain OPEN"
+    # Note: record_created_at/updated_at might be null for existing rows
+    # if schema evolution didn't backfill,
+    # or if merge added columns they will be null for non-matched rows.
+    # The merge transformer adds audit cols to source. Target schema evolves.
+
+    # Check Order 3 (Inserted)
+    row_3 = [r for r in rows if r.order_id == 3][0]
+    assert row_3.status == "OPEN", "Order 3 should be OPEN"
+    assert row_3.record_created_at is not None, "Order 3 should have created_at"
+    assert row_3.record_updated_at is not None, "Order 3 should have updated_at"
+
+    print("\n>>> TEST PASSED SUCCESSFULLY! <<<")
 
 
-# 5. Verify Results
-# -----------------
-print("\n>>> Verifying Delta Table State...")
-
-df_final = spark.read.format("delta").load(TARGET_PATH).orderBy("order_id")
-df_final.show(truncate=False)
-
-rows = df_final.collect()
-
-# Assertions
-assert len(rows) == 3, f"Expected 3 rows, got {len(rows)}"
-
-# Check Order 1 (Updated)
-row_1 = [r for r in rows if r.order_id == 1][0]
-assert row_1.status == "CLOSED", f"Order 1 should be CLOSED, got {row_1.status}"
-assert row_1.record_updated_at is not None, "Order 1 should have updated_at"
-
-# Check Order 2 (Untouched)
-row_2 = [r for r in rows if r.order_id == 2][0]
-assert row_2.status == "OPEN", "Order 2 should remain OPEN"
-# Note: record_created_at/updated_at might be null for existing rows
-# if schema evolution didn't backfill,
-# or if merge added columns they will be null for non-matched rows.
-# The merge transformer adds audit cols to source. Target schema evolves.
-
-# Check Order 3 (Inserted)
-row_3 = [r for r in rows if r.order_id == 3][0]
-assert row_3.status == "OPEN", "Order 3 should be OPEN"
-assert row_3.record_created_at is not None, "Order 3 should have created_at"
-assert row_3.record_updated_at is not None, "Order 3 should have updated_at"
-
-print("\n>>> TEST PASSED SUCCESSFULLY! <<<")
+if __name__ == "__main__":
+    main()
