@@ -167,23 +167,23 @@ class TestSparkEngineLogic:
         """Verify validation logic."""
         # Mock count behavior
         mock_spark_df.isEmpty.return_value = False
-        
+
         # 1. Check no_nulls
         # We need to mock count_nulls method of engine OR mock sql functions
         # Easier to mock engine.count_nulls if we only test validate_data flow
-        
+
         with patch.object(spark_engine, "count_nulls") as mock_count_nulls:
             mock_count_nulls.return_value = {"col1": 5}  # 5 nulls
-            
+
             config = MagicMock()
             config.not_empty = True
             config.no_nulls = ["col1"]
             config.schema_validation = None
             config.ranges = None
             config.allowed_values = None
-            
+
             failures = spark_engine.validate_data(mock_spark_df, config)
-            
+
             assert len(failures) == 1
             assert "has 5 null values" in failures[0]
 
@@ -226,7 +226,7 @@ class TestSparkEngineLogic:
         df1.withColumnRenamed.return_value = df2
 
         spark_engine.execute_operation("rename", params, mock_spark_df)
-        
+
         # Should be called twice
         assert mock_spark_df.withColumnRenamed.call_count >= 1
         # Since dict iteration order, check args exist
