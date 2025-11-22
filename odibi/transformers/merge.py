@@ -1,19 +1,13 @@
-from typing import Any, Dict, List, Optional, Union
 import logging
 import os
-import sys
 
 from odibi.transformations import transformation
 from odibi.context import SparkContext, PandasContext
 
 try:
     from delta.tables import DeltaTable
-    from pyspark.sql.functions import col, current_timestamp, lit
 except ImportError:
     DeltaTable = None
-    col = None
-    current_timestamp = None
-    lit = None
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +50,9 @@ def _merge_spark(context, source_df, target, keys, strategy, audit_cols, params)
         raise ImportError("Spark Merge Transformer requires 'delta-spark' package.")
 
     spark = context.spark
+
+    # Import Spark functions inside the function to avoid module-level unused imports
+    from pyspark.sql.functions import current_timestamp
 
     # Add Audit Columns to Source
     if audit_cols:

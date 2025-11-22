@@ -1,15 +1,12 @@
 import os
 import sys
 import shutil
-from datetime import datetime
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, expr
 
 # Ensure odibi is in path if running from repo
 sys.path.append(os.getcwd())
 
-from odibi.pipeline import PipelineManager
-from odibi.utils.logging import configure_logging
+from odibi.pipeline import PipelineManager  # noqa: E402
 
 # Setup Paths
 BASE_PATH = "/tmp/odibi_databricks_test"
@@ -21,8 +18,10 @@ CONFIG_PATH = f"{BASE_PATH}/project.yaml"
 if os.path.exists(BASE_PATH):
     try:
         shutil.rmtree(BASE_PATH)
-    except:
-        print(f"Warning: Could not delete {BASE_PATH} locally (might be DBFS/Cloud path)")
+    except Exception as e:
+        print(
+            f"Warning: Could not delete {BASE_PATH} locally (might be DBFS/Cloud path): {e}"
+        )
 
 # Get Spark Session
 spark = SparkSession.builder.appName("OdibiSmokeTest").getOrCreate()
@@ -35,7 +34,9 @@ initial_data = [
     (1, "Order_1", "OPEN", "2024-01-01"),
     (2, "Order_2", "OPEN", "2024-01-01"),
 ]
-df_initial = spark.createDataFrame(initial_data, ["order_id", "customer", "status", "created_date"])
+df_initial = spark.createDataFrame(
+    initial_data, ["order_id", "customer", "status", "created_date"]
+)
 df_initial.write.format("delta").mode("overwrite").save(TARGET_PATH)
 
 print(f"Created Target Delta Table at: {TARGET_PATH}")
@@ -49,7 +50,9 @@ update_data = [
     (1, "Order_1", "CLOSED", "2024-01-02"),
     (3, "Order_3", "OPEN", "2024-01-02"),
 ]
-df_updates = spark.createDataFrame(update_data, ["order_id", "customer", "status", "created_date"])
+df_updates = spark.createDataFrame(
+    update_data, ["order_id", "customer", "status", "created_date"]
+)
 df_updates.write.mode("overwrite").parquet(SOURCE_PATH)
 
 print(f"Created Source Updates at: {SOURCE_PATH}")
@@ -64,7 +67,7 @@ connections:
   local_tmp:
     type: local
     base_path: {BASE_PATH}
-  
+
   # Dummy connection for story output (required by validation)
   story_conn:
     type: local
@@ -82,7 +85,7 @@ pipelines:
           connection: local_tmp
           format: parquet
           path: bronze/orders_updates
-        
+
         transformer: merge
         params:
           target: {TARGET_PATH}  # Using absolute path for simplicity in test
@@ -133,7 +136,8 @@ assert row_1.record_updated_at is not None, "Order 1 should have updated_at"
 # Check Order 2 (Untouched)
 row_2 = [r for r in rows if r.order_id == 2][0]
 assert row_2.status == "OPEN", "Order 2 should remain OPEN"
-# Note: record_created_at/updated_at might be null for existing rows if schema evolution didn't backfill,
+# Note: record_created_at/updated_at might be null for existing rows
+# if schema evolution didn't backfill,
 # or if merge added columns they will be null for non-matched rows.
 # The merge transformer adds audit cols to source. Target schema evolves.
 
