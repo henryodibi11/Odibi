@@ -96,6 +96,9 @@ pipelines:
             updated_col: record_updated_at
 """
 
+    # Ensure directory exists before writing config
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+
     with open(CONFIG_PATH, "w") as f:
         f.write(config_yaml)
 
