@@ -143,10 +143,42 @@ class SparkEngine(Engine):
         elif path:
             # File Path
             full_path = connection.get_path(path)
+
+            # Auto-detect encoding for CSV
+            if format == "csv" and options.get("auto_encoding"):
+                # Create copy to not modify original options
+                options = options.copy()
+                options.pop("auto_encoding")
+
+                if "encoding" not in options:
+                    try:
+                        from odibi.utils.encoding import detect_encoding
+
+                        # Local import to avoid circular dependency if any
+                        import logging
+
+                        logger = logging.getLogger(__name__)
+
+                        detected = detect_encoding(connection, path)
+                        if detected:
+                            options["encoding"] = detected
+                            logger.info(f"Detected encoding '{detected}' for {path}")
+                    except ImportError:
+                        pass  # optional dependencies might be missing
+                    except Exception as e:
+                        import logging
+
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Encoding detection failed for {path}: {e}")
+
             reader = self.spark.read.format(format)
 
             # Apply options
             for key, value in options.items():
+                # Normalize header for Spark (True -> "true")
+                if key == "header" and isinstance(value, bool):
+                    value = str(value).lower()
+
                 reader = reader.option(key, value)
 
             return reader.load(full_path)
@@ -338,7 +370,27 @@ class SparkEngine(Engine):
         """
         params = params or {}
 
-        if operation == "drop_duplicates":
+        if operation == "pivot":
+            # Spark implementation of pivot
+            # Params: group_by, pivot_column, value_column, agg_func
+            group_by = params.get("group_by", [])
+            pivot_column = params.get("pivot_column")
+            value_column = params.get("value_column")
+            agg_func = params.get("agg_func", "first")
+
+            if not pivot_column or not value_column:
+                raise ValueError("Pivot requires 'pivot_column' and 'value_column'")
+
+            if isinstance(group_by, str):
+                group_by = [group_by]
+
+            # Simple mapping for aggregation functions
+            # Spark's agg accepts dict {col: func_name}
+            agg_expr = {value_column: agg_func}
+
+            return df.groupBy(*group_by).pivot(pivot_column).agg(agg_expr)
+
+        elif operation == "drop_duplicates":
             # Spark uses dropDuplicates(subset=...)
             subset = params.get("subset")
             if subset:

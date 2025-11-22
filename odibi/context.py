@@ -1,5 +1,5 @@
-"""Unified context for data passing between nodes."""
-
+import threading
+import re
 from typing import Dict, Any, Optional, Union
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -131,8 +131,43 @@ class SparkContext(Context):
         Args:
             spark_session: Active SparkSession
         """
+        try:
+            from pyspark.sql import DataFrame as SparkDataFrame
+        except ImportError:
+            # Fallback for when pyspark is not installed (e.g. testing without spark)
+            SparkDataFrame = Any
+
         self.spark = spark_session
+        self._spark_df_type = SparkDataFrame
+
+        # Track registered views for cleanup
         self._registered_views: set[str] = set()
+
+        # Lock for thread safety
+        self._lock = threading.RLock()
+
+    def _validate_name(self, name: str) -> None:
+        """Validate that node name is a valid Spark identifier.
+
+        Spark SQL views should be alphanumeric + underscore.
+        Spaces and special characters (hyphens) cause issues in SQL generation.
+
+        Args:
+            name: Node name to validate
+
+        Raises:
+            ValueError: If name is invalid
+        """
+        # Regex: alphanumeric and underscore only
+        if not re.match(r"^[a-zA-Z0-9_]+$", name):
+            raise ValueError(
+                f"Invalid node name '{name}' for Spark engine. "
+                "Names must contain only alphanumeric characters and underscores "
+                "(no spaces or hyphens). Please rename this node in your configuration."
+            )
+
+        # Check for starting digit? Spark handles it but it's bad practice.
+        # For now, let's stick to the user's request: "spaces or special characters".
 
     def register(self, name: str, df: Any) -> None:
         """Register a Spark DataFrame as temp view.
@@ -141,14 +176,22 @@ class SparkContext(Context):
             name: Identifier for the DataFrame
             df: Spark DataFrame
         """
-        # Validate it's a Spark DataFrame
-        df_type = type(df).__name__
-        if df_type != "DataFrame":
-            raise TypeError(f"Expected Spark DataFrame, got {df_type}")
+        # 1. Validate Type
+        if self._spark_df_type is not Any and not isinstance(df, self._spark_df_type):
+            if not hasattr(df, "createOrReplaceTempView"):
+                raise TypeError(
+                    f"Expected pyspark.sql.DataFrame, got {type(df).__module__}.{type(df).__name__}"
+                )
 
-        # Create or replace temp view
+        # 2. Validate Name (Explicit rule)
+        self._validate_name(name)
+
+        # 3. Register
+        with self._lock:
+            self._registered_views.add(name)
+
+        # Create view (metadata op)
         df.createOrReplaceTempView(name)
-        self._registered_views.add(name)
 
     def get(self, name: str) -> Any:
         """Retrieve a registered Spark DataFrame.
@@ -162,9 +205,11 @@ class SparkContext(Context):
         Raises:
             KeyError: If name not found in context
         """
-        if name not in self._registered_views:
-            available = ", ".join(self._registered_views) if self._registered_views else "none"
-            raise KeyError(f"DataFrame '{name}' not found in context. " f"Available: {available}")
+        with self._lock:
+            if name not in self._registered_views:
+                available = ", ".join(self._registered_views) if self._registered_views else "none"
+                raise KeyError(f"DataFrame '{name}' not found in context. Available: {available}")
+
         return self.spark.table(name)
 
     def has(self, name: str) -> bool:
@@ -176,7 +221,8 @@ class SparkContext(Context):
         Returns:
             True if exists, False otherwise
         """
-        return name in self._registered_views
+        with self._lock:
+            return name in self._registered_views
 
     def list_names(self) -> list[str]:
         """List all registered DataFrame names.
@@ -184,13 +230,20 @@ class SparkContext(Context):
         Returns:
             List of registered names
         """
-        return list(self._registered_views)
+        with self._lock:
+            return list(self._registered_views)
 
     def clear(self) -> None:
         """Clear all registered temp views."""
-        for name in self._registered_views:
-            self.spark.catalog.dropTempView(name)
-        self._registered_views.clear()
+        with self._lock:
+            views_to_drop = list(self._registered_views)
+            self._registered_views.clear()
+
+        for name in views_to_drop:
+            try:
+                self.spark.catalog.dropTempView(name)
+            except Exception:
+                pass
 
 
 def create_context(engine: str, spark_session: Optional[Any] = None) -> Context:

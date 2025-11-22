@@ -135,6 +135,18 @@ class StoryGenerator:
         lines.append("---")
         lines.append("")
 
+        # Pipeline Config
+        if config:
+            lines.append("## Pipeline Configuration")
+            lines.append("")
+            lines.append("```yaml")
+            clean_config = self._clean_config_for_dump(config)
+            lines.append(yaml.dump(clean_config, sort_keys=False, default_flow_style=False))
+            lines.append("```")
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
         # Node details
         all_nodes = completed + failed + skipped
         for node_name in all_nodes:
