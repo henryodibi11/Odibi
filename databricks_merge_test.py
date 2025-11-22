@@ -10,8 +10,8 @@ from odibi.pipeline import PipelineManager  # noqa: E402
 
 # Setup Paths
 BASE_PATH = "/tmp/odibi_databricks_test"
-TARGET_PATH = f"{BASE_PATH}/silver/orders"
-SOURCE_PATH = f"{BASE_PATH}/bronze/orders_updates"
+SILVER_PATH = f"{BASE_PATH}/silver/orders"
+BRONZE_PATH = f"{BASE_PATH}/bronze/orders_updates"
 CONFIG_PATH = f"{BASE_PATH}/project.yaml"
 
 # Cleanup previous run
@@ -44,29 +44,14 @@ def main():
     df_initial = spark.createDataFrame(
         initial_data, ["order_id", "customer", "status", "created_date"]
     )
-    df_initial.write.format("delta").mode("overwrite").save(TARGET_PATH)
+    df_initial.write.format("delta").mode("overwrite").save(SILVER_PATH)
 
-    print(f"Created Target Delta Table at: {TARGET_PATH}")
-    spark.read.format("delta").load(TARGET_PATH).show()
-
-    # 2. Create Source Updates (Parquet)
-    # ----------------------------------
-    # Update Order_1 -> CLOSED
-    # Insert Order_3 -> OPEN
-    update_data = [
-        (1, "Order_1", "CLOSED", "2024-01-02"),
-        (3, "Order_3", "OPEN", "2024-01-02"),
-    ]
-    df_updates = spark.createDataFrame(
-        update_data, ["order_id", "customer", "status", "created_date"]
-    )
-    df_updates.write.mode("overwrite").parquet(SOURCE_PATH)
-
-    print(f"Created Source Updates at: {SOURCE_PATH}")
-
-    # 3. Create Odibi Config
-    # ----------------------
-    config_yaml = f"""
+    print(f"Created Target Delta Table at: {SILVER_PATH}")
+    
+    # 2. Config Template (Parameterized for reuse)
+    # -------------------------------------------
+    def create_config(pipeline_name, strategy, source_path):
+        config_yaml = f"""
 project: Databricks_Merge_Test
 engine: spark
 
@@ -75,7 +60,6 @@ connections:
     type: local
     base_path: {BASE_PATH}
 
-  # Dummy connection for story output (required by validation)
   story_conn:
     type: local
     base_path: {BASE_PATH}/stories
@@ -85,87 +69,113 @@ story:
   path: /
 
 pipelines:
-  - pipeline: merge_orders_pipeline
+  - pipeline: {pipeline_name}
     nodes:
       - name: apply_merge
         read:
           connection: local_tmp
           format: parquet
-          path: bronze/orders_updates
+          path: {source_path}
 
         transformer: merge
         params:
-          target: {TARGET_PATH}  # Using absolute path for simplicity in test
+          target: {SILVER_PATH}
           keys: [order_id]
-          strategy: upsert
+          strategy: {strategy}
           audit_cols:
             created_col: record_created_at
             updated_col: record_updated_at
 """
+        os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+        with open(CONFIG_PATH, "w") as f:
+            f.write(config_yaml)
 
-    # Ensure directory exists before writing config
-    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    # ==========================================
+    # TEST 1: UPSERT STRATEGY
+    # ==========================================
+    print("\n=== TEST 1: UPSERT STRATEGY ===")
+    
+    # Source: Update 1, Insert 3
+    upsert_data = [
+        (1, "Order_1", "CLOSED", "2024-01-02"),
+        (3, "Order_3", "OPEN", "2024-01-02"),
+    ]
+    spark.createDataFrame(upsert_data, ["order_id", "customer", "status", "created_date"]).write.mode("overwrite").parquet(f"{BRONZE_PATH}_upsert")
+    
+    create_config("pipeline_upsert", "upsert", "bronze/orders_updates_upsert")
+    PipelineManager.from_yaml(CONFIG_PATH).run()
+    
+    # Verify Upsert
+    rows = spark.read.format("delta").load(SILVER_PATH).orderBy("order_id").collect()
+    assert len(rows) == 3
+    
+    r1 = [r for r in rows if r.order_id == 1][0]
+    assert r1.status == "CLOSED", "Order 1 should be updated"
+    assert r1.record_updated_at is not None
+    
+    r2 = [r for r in rows if r.order_id == 2][0]
+    assert r2.status == "OPEN", "Order 2 should be untouched"
+    
+    r3 = [r for r in rows if r.order_id == 3][0]
+    assert r3.status == "OPEN", "Order 3 should be inserted"
+    assert r3.record_created_at is not None
+    
+    print("✅ Upsert Verified")
 
-    with open(CONFIG_PATH, "w") as f:
-        f.write(config_yaml)
+    # ==========================================
+    # TEST 2: APPEND_ONLY STRATEGY
+    # ==========================================
+    print("\n=== TEST 2: APPEND_ONLY STRATEGY ===")
+    
+    # Source: Update 3 (Should Ignore), Insert 4
+    append_data = [
+        (3, "Order_3", "CLOSED", "2024-01-03"), # Should be ignored (it exists)
+        (4, "Order_4", "OPEN", "2024-01-03"),   # Should be inserted
+    ]
+    spark.createDataFrame(append_data, ["order_id", "customer", "status", "created_date"]).write.mode("overwrite").parquet(f"{BRONZE_PATH}_append")
+    
+    create_config("pipeline_append", "append_only", "bronze/orders_updates_append")
+    PipelineManager.from_yaml(CONFIG_PATH).run()
+    
+    # Verify Append
+    rows = spark.read.format("delta").load(SILVER_PATH).orderBy("order_id").collect()
+    assert len(rows) == 4
+    
+    r3 = [r for r in rows if r.order_id == 3][0]
+    assert r3.status == "OPEN", "Order 3 update should be ignored in append_only"
+    
+    r4 = [r for r in rows if r.order_id == 4][0]
+    assert r4.status == "OPEN", "Order 4 should be inserted"
+    
+    print("✅ Append-Only Verified")
 
-    print(f"Created Config at: {CONFIG_PATH}")
+    # ==========================================
+    # TEST 3: DELETE_MATCH STRATEGY
+    # ==========================================
+    print("\n=== TEST 3: DELETE_MATCH STRATEGY ===")
+    
+    # Source: Match 2, 4 (Should Delete)
+    delete_data = [
+        (2, "Order_2", "ANY", "2024-01-01"),
+        (4, "Order_4", "ANY", "2024-01-03"),
+    ]
+    spark.createDataFrame(delete_data, ["order_id", "customer", "status", "created_date"]).write.mode("overwrite").parquet(f"{BRONZE_PATH}_delete")
+    
+    create_config("pipeline_delete", "delete_match", "bronze/orders_updates_delete")
+    PipelineManager.from_yaml(CONFIG_PATH).run()
+    
+    # Verify Delete
+    rows = spark.read.format("delta").load(SILVER_PATH).orderBy("order_id").collect()
+    assert len(rows) == 2 # Should have 1 and 3 left
+    
+    ids = [r.order_id for r in rows]
+    assert 2 not in ids, "Order 2 should be deleted"
+    assert 4 not in ids, "Order 4 should be deleted"
+    assert 1 in ids and 3 in ids, "Orders 1 and 3 should remain"
+    
+    print("✅ Delete-Match Verified")
 
-    # 4. Run Pipeline
-    # ---------------
-    print("\n>>> Running Odibi Pipeline...")
-
-    # Initialize Manager
-    manager = PipelineManager.from_yaml(CONFIG_PATH)
-
-    # Run
-    results = manager.run()
-
-    print("\n>>> Pipeline Results:")
-    print(f"Success: {not bool(results.failed)}")
-    print(f"Failed Nodes: {results.failed}")
-
-    if results.failed:
-        print("\n>>> Failure Details:")
-        for node_name in results.failed:
-            res = results.get_node_result(node_name)
-            if res and res.error:
-                print(f"Node '{node_name}' Error: {res.error}")
-                # Also print string representation of exception to see type
-                print(f"Error Type: {type(res.error)}")
-
-    # 5. Verify Results
-    # -----------------
-    print("\n>>> Verifying Delta Table State...")
-
-    df_final = spark.read.format("delta").load(TARGET_PATH).orderBy("order_id")
-    df_final.show(truncate=False)
-
-    rows = df_final.collect()
-
-    # Assertions
-    assert len(rows) == 3, f"Expected 3 rows, got {len(rows)}"
-
-    # Check Order 1 (Updated)
-    row_1 = [r for r in rows if r.order_id == 1][0]
-    assert row_1.status == "CLOSED", f"Order 1 should be CLOSED, got {row_1.status}"
-    assert row_1.record_updated_at is not None, "Order 1 should have updated_at"
-
-    # Check Order 2 (Untouched)
-    row_2 = [r for r in rows if r.order_id == 2][0]
-    assert row_2.status == "OPEN", "Order 2 should remain OPEN"
-    # Note: record_created_at/updated_at might be null for existing rows
-    # if schema evolution didn't backfill,
-    # or if merge added columns they will be null for non-matched rows.
-    # The merge transformer adds audit cols to source. Target schema evolves.
-
-    # Check Order 3 (Inserted)
-    row_3 = [r for r in rows if r.order_id == 3][0]
-    assert row_3.status == "OPEN", "Order 3 should be OPEN"
-    assert row_3.record_created_at is not None, "Order 3 should have created_at"
-    assert row_3.record_updated_at is not None, "Order 3 should have updated_at"
-
-    print("\n>>> TEST PASSED SUCCESSFULLY! <<<")
+    print("\n>>> ALL TESTS PASSED SUCCESSFULLY! <<<")
 
 
 if __name__ == "__main__":
