@@ -145,7 +145,7 @@ def validate_command(args) -> int:
         Exit code
     """
     exit_code = 0
-    
+
     print("Checking Environment Variables...")
     try:
         # Load .env if it exists
