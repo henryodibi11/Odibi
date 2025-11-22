@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import MagicMock, patch
-import pandas as pd
 from odibi.engine.spark_engine import SparkEngine
 
 
