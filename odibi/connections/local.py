@@ -1,6 +1,5 @@
 """Local filesystem connection."""
 
-import os
 from pathlib import Path
 from odibi.connections.base import BaseConnection
 
