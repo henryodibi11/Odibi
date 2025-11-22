@@ -34,14 +34,25 @@ class TestReadConfig:
         assert config.path is None
 
     def test_read_config_requires_path_or_table(self):
-        """Config must have either path or table."""
+        """Config must have either path or table or query in options."""
         with pytest.raises(ValidationError) as exc_info:
             ReadConfig(
                 connection="local",
                 format="csv",
-                # Missing both path and table
+                # Missing path, table, AND query option
             )
         assert "Either 'table' or 'path' must be provided" in str(exc_info.value)
+
+    def test_valid_read_config_with_query_option(self):
+        """Valid config with query in options should parse correctly without table/path."""
+        config = ReadConfig(
+            connection="sql",
+            format="sql_server",
+            options={"query": "SELECT * FROM users"},
+        )
+        assert config.table is None
+        assert config.path is None
+        assert config.options["query"] == "SELECT * FROM users"
 
     def test_read_config_with_options(self):
         """Config can include format-specific options."""

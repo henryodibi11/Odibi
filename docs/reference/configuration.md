@@ -1011,9 +1011,11 @@ pipelines:
         # At least ONE of these:
         read:
           connection: string  # Connection name
-          path: string        # Relative to connection base_path
-          format: csv|parquet|json|excel|avro
+          path: string        # Relative to connection base_path (Required unless 'query' used)
+          table: string       # Table name (alternative to path)
+          format: csv|parquet|json|excel|avro|sql_server
           options: dict       # Format-specific (optional)
+            query: string     # SQL query (substitutes for path/table in sql_server)
 
         transform:
           steps:              # List of SQL strings or function calls

@@ -149,8 +149,11 @@ class ReadConfig(BaseModel):
     @model_validator(mode="after")
     def check_table_or_path(self):
         """Ensure either table or path is provided."""
-        if not self.table and not self.path:
-            raise ValueError("Either 'table' or 'path' must be provided for read config")
+        # Allow query in options to substitute for table/path
+        has_query = self.options and "query" in self.options
+        if not self.table and not self.path and not has_query:
+            raise ValueError(
+                "Either 'table' or 'path' must be provided for read config (or 'query' in options)")
         return self
 
 

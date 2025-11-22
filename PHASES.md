@@ -232,7 +232,6 @@ ODIBI has evolved through 5 distinct phases, culminating in a production-ready, 
 - [x] **Environments:** Support `dev`/`prod` config overrides (CLI `--env` flag)
 - [x] **Secrets:** CLI tools (`odibi secrets`) and Key Vault integration verified
 - [ ] **Scheduler:** Generate Airflow/Databricks Jobs (Deferred to v2.1)
-- [ ] **Interactive Mode:** `odibi ide` improvements (Deferred to v2.1)
 
 ### Deliverables
 
