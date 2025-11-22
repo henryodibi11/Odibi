@@ -430,6 +430,12 @@ class Node:
                     previous_steps=self._execution_steps,
                 )
 
+                # Temporarily register current_df for SQL steps
+                # This allows SQL steps to refer to the intermediate result of previous step
+                # e.g. "SELECT * FROM current_df"
+                if current_df is not None:
+                    self.context.register("current_df", current_df)
+
                 if isinstance(step, str):
                     # SQL step
                     current_df = self._execute_sql_step(step)
