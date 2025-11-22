@@ -24,7 +24,14 @@ if os.path.exists(BASE_PATH):
 
 def main():
     # Get Spark Session
-    spark = SparkSession.builder.appName("OdibiSmokeTest").getOrCreate()
+    try:
+        from delta import configure_spark_with_delta_pip
+        builder = SparkSession.builder.appName("OdibiSmokeTest") \
+            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        spark = configure_spark_with_delta_pip(builder).getOrCreate()
+    except ImportError:
+        spark = SparkSession.builder.appName("OdibiSmokeTest").getOrCreate()
 
     print(">>> Setting up Test Data...")
 
@@ -117,6 +124,15 @@ pipelines:
     print("\n>>> Pipeline Results:")
     print(f"Success: {not bool(results.failed)}")
     print(f"Failed Nodes: {results.failed}")
+
+    if results.failed:
+        print("\n>>> Failure Details:")
+        for node_name in results.failed:
+            res = results.get_node_result(node_name)
+            if res and res.error:
+                print(f"Node '{node_name}' Error: {res.error}")
+                # Also print string representation of exception to see type
+                print(f"Error Type: {type(res.error)}")
 
     # 5. Verify Results
     # -----------------
