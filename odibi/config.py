@@ -153,7 +153,8 @@ class ReadConfig(BaseModel):
         has_query = self.options and "query" in self.options
         if not self.table and not self.path and not has_query:
             raise ValueError(
-                "Either 'table' or 'path' must be provided for read config (or 'query' in options)")
+                "Either 'table' or 'path' must be provided for read config (or 'query' in options)"
+            )
         return self
 
 
