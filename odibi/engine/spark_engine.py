@@ -223,7 +223,7 @@ class SparkEngine(Engine):
             elif "dbtable" not in merged_options:
                 raise ValueError("SQL format requires 'table' config or 'dbtable' option")
 
-            # Map mode
+    # Map mode
             # Spark JDBC supports overwrite, append, ignore, error
             # If mode is 'upsert', we can't do it natively easily without custom SQL.
             if mode not in ["overwrite", "append", "ignore", "error"]:
@@ -233,7 +233,9 @@ class SparkEngine(Engine):
                     mode = "error"
                 else:
                     # upsert not supported in JDBC write generically
-                    raise ValueError(f"Write mode '{mode}' not supported for Spark SQL write")
+                    raise ValueError(
+                        f"Write mode '{mode}' not supported for Spark SQL write"
+                    )
 
             df.write.format("jdbc").options(**merged_options).mode(mode).save()
             return
