@@ -176,7 +176,9 @@ class TestPandasEngineRead:
                 captured["storage_options"] = storage_options
                 captured["version"] = version
 
-            def to_pandas(self):
+            # Updated Mock to accept kwargs (arrow_options, partitions)
+            def to_pandas(self, **kwargs):
+                captured["to_pandas_kwargs"] = kwargs
                 return pd.DataFrame({"a": [1]})
 
         fake_mod = types.SimpleNamespace(DeltaTable=FakeDeltaTable)

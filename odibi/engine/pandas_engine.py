@@ -215,7 +215,16 @@ class PandasEngine(Engine):
 
             if self.use_arrow:
                 # Zero-copy to Arrow, then to Pandas with Arrow dtypes
-                return dt.to_pandas(partitions=None, arrow_options={"types_mapper": pd.ArrowDtype})
+                # Check if to_pandas supports arrow_options (deltalake >= 0.15.0)
+                import inspect
+                sig = inspect.signature(dt.to_pandas)
+                
+                if "arrow_options" in sig.parameters:
+                    return dt.to_pandas(partitions=None, arrow_options={"types_mapper": pd.ArrowDtype})
+                else:
+                    # Fallback for older deltalake versions
+                    # Convert via Arrow manually to ensure pyarrow backed
+                    return dt.to_pyarrow_table().to_pandas(types_mapper=pd.ArrowDtype)
             else:
                 return dt.to_pandas()
         elif format == "avro":
