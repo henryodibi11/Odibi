@@ -553,6 +553,7 @@ class PipelineManager:
                 pipeline_config=pipeline_config,
                 engine=project_config.engine,
                 connections=connections,
+                generate_story=story_config.get("auto_generate", True),
                 story_config=story_config,
                 retry_config=project_config.retry,
                 alerts=project_config.alerts,
