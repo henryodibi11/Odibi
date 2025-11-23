@@ -94,13 +94,13 @@ For a detailed history of all completed phases, see:
 
 ---
 
-## Phase 7 — Ecosystem & Platform (Deferred)
+## Phase 7 — Ecosystem & Platform (Next)
 
 > Source: Consolidated and adapted from the prior `PHASES_NEXT.md`.
 
 **Goal:** Move from a “library” to a “platform” by deepening ecosystem integration and operational tooling.
 
-**Status:** Deferred to allow focus on core performance and stability.
+**Status:** Active development.
 
 ### 7.1 Developer Experience (DX) – Follow-On Work
 
@@ -114,10 +114,11 @@ Some DX work is already done (e.g. templates, config imports). Follow-ons:
 - **Engine Hardening:**
   - Close remaining functional gaps discovered via Phase 9 (“Infinite Gauntlet”).
   - Stabilize public API for engine plugins.
+  - **External Table Registration (Spark):** Support auto-registration of file-based writes (e.g., `register_table: my_table`) for easier querying in Databricks/Hive. ✅ (Done in v2.2)
 
 ### 7.2 Orchestration Generators
 
-**Status:** On hold, but next major ecosystem lever.
+**Status:** Next major ecosystem lever.
 
 **Planned Features:**
 
