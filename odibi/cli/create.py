@@ -13,7 +13,7 @@ TEMPLATE = """# ================================================================
 # =============================================================================
 
 project: my_new_project
-version: "2.1.0"
+version: "2.2.0"
 description: "A data pipeline project"
 owner: "Data Team"
 
@@ -270,6 +270,9 @@ pipelines:
         #   path: silver/external_table/
         #   register_table: silver.external_table  # Registers the path as a queryable table
         #   mode: overwrite
+        #   options:
+        #     cluster_by: [region, date]  # Liquid Clustering (Spark 3.5+ / DBR 13.3+)
+        #     optimize_write: true        # Automatic compaction after write
 
 # ==========================================
 # 3. Data Story (Documentation/Audit)

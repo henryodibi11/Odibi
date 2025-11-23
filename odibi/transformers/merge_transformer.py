@@ -29,6 +29,12 @@ def merge(context, current, **params):
     strategy = params.get("strategy", "upsert")
     audit_cols = params.get("audit_cols")
 
+    # Optimization params
+    optimize_write = params.get("optimize_write", False)
+    zorder_by = params.get("zorder_by")
+
+    cluster_by = params.get("cluster_by")
+
     if not target:
         raise ValueError("Merge transformer requires 'target' parameter")
     if not keys:
@@ -38,14 +44,36 @@ def merge(context, current, **params):
         keys = [keys]
 
     if isinstance(context, SparkContext):
-        return _merge_spark(context, current, target, keys, strategy, audit_cols, params)
+        return _merge_spark(
+            context,
+            current,
+            target,
+            keys,
+            strategy,
+            audit_cols,
+            optimize_write,
+            zorder_by,
+            cluster_by,
+            params,
+        )
     elif isinstance(context, PandasContext):
         return _merge_pandas(context, current, target, keys, strategy, audit_cols, params)
     else:
         raise ValueError(f"Unsupported context type: {type(context)}")
 
 
-def _merge_spark(context, source_df, target, keys, strategy, audit_cols, params):
+def _merge_spark(
+    context,
+    source_df,
+    target,
+    keys,
+    strategy,
+    audit_cols,
+    optimize_write,
+    zorder_by,
+    cluster_by,
+    params,
+):
     if DeltaTable is None:
         raise ImportError("Spark Merge Transformer requires 'delta-spark' package.")
 
@@ -151,12 +179,60 @@ def _merge_spark(context, source_df, target, keys, strategy, audit_cols, params)
                 return
 
             # Initial write
-            writer = batch_df.write.format("delta").mode("overwrite")
+            # If cluster_by is present, we delegate to engine.write logic?
+            # Or implement CTAS here similar to engine.write
 
-            if "/" in target or "\\" in target or ":" in target or target.startswith("."):
-                writer.save(target)
+            if cluster_by:
+                # Use CTAS logic for Liquid Clustering creation
+                if isinstance(cluster_by, str):
+                    cluster_cols = [cluster_by]
+                else:
+                    cluster_cols = cluster_by
+
+                cols = ", ".join(cluster_cols)
+                # Create temp view
+                temp_view = f"odibi_merge_init_{abs(hash(target))}"
+                batch_df.createOrReplaceTempView(temp_view)
+
+                # Determine target type (path vs table)
+                is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
+                target_identifier = f"delta.`{target}`" if is_path else target
+
+                spark.sql(
+                    f"CREATE TABLE IF NOT EXISTS {target_identifier} USING DELTA CLUSTER BY ({cols}) AS SELECT * FROM {temp_view}"
+                )
+                spark.catalog.dropTempView(temp_view)
             else:
-                writer.saveAsTable(target)
+                writer = batch_df.write.format("delta").mode("overwrite")
+
+                if "/" in target or "\\" in target or ":" in target or target.startswith("."):
+                    writer.save(target)
+                else:
+                    writer.saveAsTable(target)
+
+        # --- Post-Merge Optimization ---
+        if optimize_write or zorder_by:
+            try:
+                # Identify if target is table or path
+                is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
+
+                if is_path:
+                    sql = f"OPTIMIZE delta.`{target}`"
+                else:
+                    sql = f"OPTIMIZE {target}"
+
+                if zorder_by:
+                    if isinstance(zorder_by, str):
+                        zorder_cols = [zorder_by]
+                    else:
+                        zorder_cols = zorder_by
+                        
+                    cols = ", ".join(zorder_cols)
+                    sql += f" ZORDER BY ({cols})"
+
+                spark.sql(sql)
+            except Exception as e:
+                logger.warning(f"Optimization failed for {target}: {e}")
 
     if source_df.isStreaming:
         # For streaming, wraps logic in foreachBatch

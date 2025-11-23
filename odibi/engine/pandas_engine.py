@@ -5,6 +5,8 @@ import pandas as pd
 from pathlib import Path
 from urllib.parse import urlparse
 import glob
+import os
+from concurrent.futures import ThreadPoolExecutor
 
 from odibi.engine.base import Engine
 from odibi.context import Context, PandasContext
@@ -77,12 +79,35 @@ class PandasEngine(Engine):
 
         return options
 
+    def _read_parallel(self, read_func: Any, paths: List[str], **kwargs) -> pd.DataFrame:
+        """Read multiple files in parallel using threads.
+
+        Args:
+            read_func: Pandas read function (e.g. pd.read_csv)
+            paths: List of file paths
+            kwargs: Arguments to pass to read_func
+
+        Returns:
+            Concatenated DataFrame
+        """
+        # Conservative worker count to avoid OOM on large files
+        max_workers = min(8, os.cpu_count() or 4)
+
+        dfs = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # map preserves order
+            results = executor.map(lambda p: read_func(p, **kwargs), paths)
+            dfs = list(results)
+
+        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
     def read(
         self,
         connection: Any,
         format: str,
         table: Optional[str] = None,
         path: Optional[str] = None,
+        streaming: bool = False,
         options: Optional[Dict[str, Any]] = None,
     ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
         """Read data using Pandas.
@@ -92,11 +117,18 @@ class PandasEngine(Engine):
             format: Data format
             table: Table name
             path: File path
+            streaming: Streaming flag (NOT SUPPORTED in Pandas)
             options: Format-specific options (including chunksize)
 
         Returns:
             Pandas DataFrame or Iterator[pd.DataFrame]
         """
+        if streaming:
+            raise ValueError(
+                "Streaming is not supported in the Pandas engine. "
+                "Please use 'engine: spark' for streaming pipelines."
+            )
+
         options = options or {}
 
         # Get full path from connection
@@ -159,8 +191,7 @@ class PandasEngine(Engine):
         if format == "csv":
             try:
                 if is_glob and isinstance(full_path, list):
-                    dfs = [pd.read_csv(f, **read_kwargs) for f in full_path]
-                    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                    return self._read_parallel(pd.read_csv, full_path, **read_kwargs)
                 return pd.read_csv(full_path, **read_kwargs)
             except UnicodeDecodeError:
                 # Retry with common fallbacks
@@ -169,23 +200,20 @@ class PandasEngine(Engine):
                 # Simplify: Just update encoding in kwargs
                 read_kwargs["encoding"] = "latin1"
                 if is_glob and isinstance(full_path, list):
-                    dfs = [pd.read_csv(f, **read_kwargs) for f in full_path]
-                    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                    return self._read_parallel(pd.read_csv, full_path, **read_kwargs)
                 return pd.read_csv(full_path, **read_kwargs)
             except pd.errors.ParserError:
                 # Retry with bad lines skipped
                 read_kwargs["on_bad_lines"] = "skip"
                 if is_glob and isinstance(full_path, list):
-                    dfs = [pd.read_csv(f, **read_kwargs) for f in full_path]
-                    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                    return self._read_parallel(pd.read_csv, full_path, **read_kwargs)
                 return pd.read_csv(full_path, **read_kwargs)
         elif format == "parquet":
             # read_parquet handles list of files
             return pd.read_parquet(full_path, **read_kwargs)
         elif format == "json":
             if is_glob and isinstance(full_path, list):
-                dfs = [pd.read_json(f, **read_kwargs) for f in full_path]
-                return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                return self._read_parallel(pd.read_json, full_path, **read_kwargs)
 
             return pd.read_json(full_path, **read_kwargs)
         elif format == "excel":

@@ -412,6 +412,7 @@ class Node:
             format=read_config.format,
             table=read_config.table,
             path=read_config.path,
+            streaming=read_config.streaming,
             options=read_config.options,
         )
 

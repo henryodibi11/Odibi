@@ -84,6 +84,44 @@ class SparkEngine(Engine):
             if hasattr(connection, "configure_spark"):
                 connection.configure_spark(self.spark)
 
+    def _optimize_delta_write(
+        self, target: str, options: Dict[str, Any], is_table: bool = False
+    ) -> None:
+        """Run Delta Lake optimization (OPTIMIZE / ZORDER).
+
+        Args:
+            target: Table name or file path
+            options: Write options containing 'optimize_write' and 'zorder_by'
+            is_table: True if target is a table name, False if path
+        """
+        should_optimize = options.get("optimize_write", False)
+        zorder_by = options.get("zorder_by")
+
+        if not should_optimize and not zorder_by:
+            return
+
+        try:
+            # Construct SQL command
+            if is_table:
+                sql = f"OPTIMIZE {target}"
+            else:
+                sql = f"OPTIMIZE delta.`{target}`"
+
+            if zorder_by:
+                if isinstance(zorder_by, str):
+                    zorder_by = [zorder_by]
+                # Join columns
+                cols = ", ".join(zorder_by)
+                sql += f" ZORDER BY ({cols})"
+
+            self.spark.sql(sql)
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Optimization failed for {target}: {e}")
+
     def get_schema(self, df) -> List[str]:
         """Get DataFrame schema as list of column names.
 
@@ -109,6 +147,7 @@ class SparkEngine(Engine):
         format: str,
         table: Optional[str] = None,
         path: Optional[str] = None,
+        streaming: bool = False,
         options: Optional[Dict[str, Any]] = None,
     ):
         """Read data using Spark.
@@ -118,15 +157,19 @@ class SparkEngine(Engine):
             format: Data format (csv, parquet, json, delta, sql_server)
             table: Table name
             path: File path
+            streaming: Whether to read as a stream (readStream)
             options: Format-specific options (including versionAsOf for Delta time travel)
 
         Returns:
-            Spark DataFrame
+            Spark DataFrame (or Streaming DataFrame)
         """
         options = options or {}
 
         # SQL Server / Azure SQL Support
         if format in ["sql_server", "azure_sql"]:
+            if streaming:
+                raise ValueError("Streaming not supported for SQL Server / Azure SQL yet.")
+
             if not hasattr(connection, "get_spark_options"):
                 raise ValueError(
                     f"Connection type '{type(connection).__name__}' does not support Spark SQL read"
@@ -149,7 +192,10 @@ class SparkEngine(Engine):
         # Read based on format
         if table:
             # Managed/External Table (Catalog)
-            reader = self.spark.read.format(format)
+            if streaming:
+                reader = self.spark.readStream.format(format)
+            else:
+                reader = self.spark.read.format(format)
 
             # Apply options
             for key, value in options.items():
@@ -161,8 +207,8 @@ class SparkEngine(Engine):
             # File Path
             full_path = connection.get_path(path)
 
-            # Auto-detect encoding for CSV
-            if format == "csv" and options.get("auto_encoding"):
+            # Auto-detect encoding for CSV (Batch only)
+            if not streaming and format == "csv" and options.get("auto_encoding"):
                 # Create copy to not modify original options
                 options = options.copy()
                 options.pop("auto_encoding")
@@ -188,7 +234,19 @@ class SparkEngine(Engine):
                         logger = logging.getLogger(__name__)
                         logger.warning(f"Encoding detection failed for {path}: {e}")
 
-            reader = self.spark.read.format(format)
+            if streaming:
+                reader = self.spark.readStream.format(format)
+                # Handle schema inference for CSV/JSON in streaming (required)
+                if (
+                    format in ["csv", "json"]
+                    and "schema" not in options
+                    and "inferSchema" not in options
+                ):
+                    # Force inference for better UX, though usually recommended to provide schema
+                    # For now, we let Spark fail or user provide it.
+                    pass
+            else:
+                reader = self.spark.read.format(format)
 
             # Apply options
             for key, value in options.items():
@@ -270,6 +328,9 @@ class SparkEngine(Engine):
                 writer = writer.option(key, value)
 
             writer.saveAsTable(table)
+
+            if format == "delta":
+                self._optimize_delta_write(table, options, is_table=True)
             return
 
         elif path:
@@ -280,8 +341,21 @@ class SparkEngine(Engine):
         # Extract partition_by option
         partition_by = options.pop("partition_by", None) or options.pop("partitionBy", None)
 
+        # Extract cluster_by option (Liquid Clustering)
+        cluster_by = options.pop("cluster_by", None)
+
         # Warn about partitioning anti-patterns
-        if partition_by:
+        if partition_by and cluster_by:
+            import warnings
+
+            warnings.warn(
+                "⚠️  Conflict: Both 'partition_by' and 'cluster_by' (Liquid Clustering) are set. "
+                "Liquid Clustering supersedes partitioning. 'partition_by' will be ignored "
+                "if the table is being created now.",
+                UserWarning,
+            )
+
+        elif partition_by:
             import warnings
 
             warnings.warn(
@@ -322,6 +396,8 @@ class SparkEngine(Engine):
                     self.spark.sql(
                         f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
                     )
+
+                self._optimize_delta_write(full_path, options, is_table=False)
                 return
             else:
                 # Table does not exist, fall back to standard write (create)
@@ -329,6 +405,75 @@ class SparkEngine(Engine):
                 mode = "overwrite"
 
         # Write based on format (Path-based)
+
+        # Handle Liquid Clustering (New Table Creation via SQL)
+        # We only do this if we are creating a new table (overwrite or append-to-non-existent)
+        # For Delta, CTAS (Create Table As Select) is the most reliable way to set CLUSTER BY
+        if format == "delta" and cluster_by:
+            # Check if we should use CTAS
+            # If table exists and mode is append, we just append (clustering is already set)
+            # If table exists and mode is overwrite, we REPLACE TABLE ... CLUSTER BY
+
+            should_create = False
+            target_name = None
+
+            if table:
+                target_name = table
+                if mode == "overwrite":
+                    should_create = True
+                elif mode == "append":
+                    # Check existence
+                    if not self.spark.catalog.tableExists(table):
+                        should_create = True
+            elif path:
+                full_path = connection.get_path(path)
+                target_name = f"delta.`{full_path}`"
+                if mode == "overwrite":
+                    should_create = True
+                elif mode == "append":
+                    # Check existence via DeltaTable
+                    try:
+                        from delta.tables import DeltaTable
+
+                        if not DeltaTable.isDeltaTable(self.spark, full_path):
+                            should_create = True
+                    except ImportError:
+                        pass
+
+            if should_create:
+                if isinstance(cluster_by, str):
+                    cluster_by = [cluster_by]
+
+                cols = ", ".join(cluster_by)
+                temp_view = f"odibi_temp_writer_{abs(hash(str(target_name)))}"
+                df.createOrReplaceTempView(temp_view)
+
+                create_cmd = (
+                    "CREATE OR REPLACE TABLE"
+                    if mode == "overwrite"
+                    else "CREATE TABLE IF NOT EXISTS"
+                )
+
+                sql = f"{create_cmd} {target_name} USING DELTA CLUSTER BY ({cols}) AS SELECT * FROM {temp_view}"
+
+                self.spark.sql(sql)
+                self.spark.catalog.dropTempView(temp_view)
+
+                # Register as External Table if requested (Path-based)
+                if register_table and path:
+                    try:
+                        self.spark.sql(
+                            f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
+                        )
+                    except Exception:
+                        pass
+
+                if format == "delta":
+                    self._optimize_delta_write(
+                        target_name if table else full_path, options, is_table=bool(table)
+                    )
+                return
+
         writer = df.write.format(format).mode(mode)
 
         # Apply partitioning if specified
@@ -342,6 +487,9 @@ class SparkEngine(Engine):
             writer = writer.option(key, value)
 
         writer.save(full_path)
+
+        if format == "delta":
+            self._optimize_delta_write(full_path, options, is_table=False)
 
         # Register as External Table if requested
         if register_table and format == "delta":

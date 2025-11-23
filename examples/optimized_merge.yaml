@@ -1,0 +1,36 @@
+project: optimized_merge_demo
+engine: spark  # Required for Z-Order optimization
+connections:
+  local_data:
+    type: local
+    base_path: ./data
+
+pipelines:
+  - pipeline: sales_ingestion
+    nodes:
+      - name: read_sales
+        read:
+          connection: local_data
+          format: csv
+          path: raw/sales_*.csv
+          options: {header: true}
+
+      - name: merge_and_optimize
+        depends_on: [read_sales]
+        transformer: merge
+        params:
+          target: silver/sales_optimized
+          keys: [transaction_id]
+          strategy: upsert
+          audit_cols: 
+            created_col: created_at
+            updated_col: updated_at
+          
+          # Performance Optimization Config
+          # This triggers OPTIMIZE silver/sales_optimized ZORDER BY (region, date)
+          optimize_write: true
+          zorder_by: [region, date]
+
+story:
+  connection: local_data
+  path: stories/

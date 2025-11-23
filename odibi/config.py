@@ -144,6 +144,7 @@ class ReadConfig(BaseModel):
     format: str = Field(description="Data format (csv, parquet, delta, etc.)")
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based sources")
+    streaming: bool = Field(default=False, description="Enable streaming read (Spark only)")
     options: Dict[str, Any] = Field(default_factory=dict, description="Format-specific options")
 
     @model_validator(mode="after")
@@ -233,6 +234,7 @@ class NodeConfig(BaseModel):
     read: Optional[ReadConfig] = None
     transform: Optional[TransformConfig] = None
     write: Optional[WriteConfig] = None
+    streaming: bool = Field(default=False, description="Enable streaming execution for this node")
     transformer: Optional[str] = Field(default=None, description="Name of transformer to apply")
     params: Dict[str, Any] = Field(default_factory=dict, description="Parameters for transformer")
 

@@ -14,6 +14,10 @@ TEMPLATES = {
 project: {project_name}
 engine: pandas
 
+# Performance Tuning (Added in v2.2)
+performance:
+  use_arrow: true
+
 connections:
   local_lake:
     type: local
@@ -56,6 +60,9 @@ pipelines:
           target_path: silver/customers.delta
           merge_keys: ["id"]
           strategy: upsert
+          # Performance Optimization (Added in v2.2)
+          # optimize_write: true
+          # zorder_by: ["region"] # Only for Spark engine
 """,
     },
     "azure-delta": {
@@ -66,6 +73,10 @@ pipelines:
         "config": """
 project: {project_name}
 engine: spark
+
+# Performance Tuning (Added in v2.2)
+performance:
+  use_arrow: true
 
 connections:
   # Example ADLS connection (requires env vars)
@@ -101,6 +112,9 @@ pipelines:
           table: raw_events
           format: delta
           mode: append
+          options:
+            optimize_write: true  # Compaction
+            # cluster_by: [event_type] # Liquid Clustering (if creating new table)
 
   - pipeline: aggregation
     description: Aggregate events

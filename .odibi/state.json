@@ -406,19 +406,19 @@
       }
     },
     "alert_test": {
-      "last_run": "2025-11-21T21:53:20.009761",
+      "last_run": "2025-11-22T20:05:51.036909",
       "nodes": {}
     },
     "parallel_test": {
-      "last_run": "2025-11-21T21:53:23.467556",
+      "last_run": "2025-11-22T20:05:56.330772",
       "nodes": {
-        "node_b": {
-          "success": true,
-          "timestamp": "2025-11-21T21:53:23.467556"
-        },
         "node_a": {
           "success": false,
           "timestamp": null
+        },
+        "node_b": {
+          "success": true,
+          "timestamp": "2025-11-22T20:05:56.328592"
         },
         "node_c": {
           "success": false,
@@ -427,46 +427,46 @@
       }
     },
     "test_read": {
-      "last_run": "2025-11-21T21:53:23.504288",
+      "last_run": "2025-11-22T20:05:56.361652",
       "nodes": {
         "load_data": {
           "success": true,
-          "timestamp": "2025-11-21T21:53:23.503234"
+          "timestamp": "2025-11-22T20:05:56.346832"
         }
       }
     },
     "test_deps": {
-      "last_run": "2025-11-21T21:53:24.235954",
+      "last_run": "2025-11-22T20:05:56.862833",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-21T21:53:24.235954"
+          "timestamp": "2025-11-22T20:05:56.831641"
         },
         "transform": {
           "success": true,
-          "timestamp": "2025-11-21T21:53:24.235954"
+          "timestamp": "2025-11-22T20:05:56.861780"
         }
       }
     },
     "test_write": {
-      "last_run": "2025-11-21T21:53:25.043686",
+      "last_run": "2025-11-22T20:05:57.231226",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-21T21:53:25.026510"
+          "timestamp": "2025-11-22T20:05:57.231226"
         },
         "save": {
           "success": true,
-          "timestamp": "2025-11-21T21:53:25.043686"
+          "timestamp": "2025-11-22T20:05:57.231226"
         }
       }
     },
     "test_failure": {
-      "last_run": "2025-11-21T21:53:25.835108",
+      "last_run": "2025-11-22T20:05:57.648864",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-21T21:53:25.835108"
+          "timestamp": "2025-11-22T20:05:57.648864"
         },
         "fail": {
           "success": false,
@@ -479,11 +479,11 @@
       }
     },
     "test_independent": {
-      "last_run": "2025-11-21T21:53:26.862829",
+      "last_run": "2025-11-22T20:05:58.164908",
       "nodes": {
         "success1": {
           "success": true,
-          "timestamp": "2025-11-21T21:53:26.847201"
+          "timestamp": "2025-11-22T20:05:58.164908"
         },
         "fail": {
           "success": false,
@@ -491,20 +491,20 @@
         },
         "success2": {
           "success": true,
-          "timestamp": "2025-11-21T21:53:26.862829"
+          "timestamp": "2025-11-22T20:05:58.164908"
         }
       }
     },
     "test_spark": {
-      "last_run": "2025-11-21T21:54:01.902927",
+      "last_run": "2025-11-22T20:06:27.979844",
       "nodes": {
         "node1": {
           "success": true,
-          "timestamp": "2025-11-21T21:54:01.887833"
+          "timestamp": "2025-11-22T20:06:27.979844"
         },
         "node2": {
           "success": true,
-          "timestamp": "2025-11-21T21:54:01.902927"
+          "timestamp": "2025-11-22T20:06:27.979844"
         }
       }
     },
