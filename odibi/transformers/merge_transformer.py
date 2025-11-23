@@ -226,7 +226,7 @@ def _merge_spark(
                         zorder_cols = [zorder_by]
                     else:
                         zorder_cols = zorder_by
-                        
+
                     cols = ", ".join(zorder_cols)
                     sql += f" ZORDER BY ({cols})"
 
