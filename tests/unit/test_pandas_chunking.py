@@ -36,7 +36,9 @@ def test_csv_chunking(tmp_path):
     chunks = list(result)
     assert len(chunks) == 10
     # Compare values only (ignore dtypes since Arrow backend changes them)
-    pd.testing.assert_frame_equal(chunks[0], df_source.iloc[0:10].reset_index(drop=True), check_dtype=False)
+    pd.testing.assert_frame_equal(
+        chunks[0], df_source.iloc[0:10].reset_index(drop=True), check_dtype=False
+    )
 
     # 5. Write iterator
     # Create a generator again because previous one is exhausted
