@@ -181,6 +181,17 @@ class TestPandasEngineRead:
                 captured["to_pandas_kwargs"] = kwargs
                 return pd.DataFrame({"a": [1]})
 
+            def to_pyarrow_table(self):
+                # Mock for older deltalake version fallback
+                captured["to_pyarrow_table_called"] = True
+
+                # Return a mock PyArrow Table that has to_pandas
+                class MockArrowTable:
+                    def to_pandas(self, **kwargs):
+                        return pd.DataFrame({"a": [1]})
+
+                return MockArrowTable()
+
         fake_mod = types.SimpleNamespace(DeltaTable=FakeDeltaTable)
         monkeypatch.setitem(sys.modules, "deltalake", fake_mod)
 
