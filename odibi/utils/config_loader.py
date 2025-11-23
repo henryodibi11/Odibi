@@ -93,14 +93,23 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
         # Merge current data on top of imported data
         data = _deep_merge(merged_data, data)
 
-    # Apply Environment Overrides
+    # Apply Environment Overrides from "environments" block in main file
     if env:
         environments = data.get("environments", {})
         if env in environments:
             override = environments[env]
             data = _deep_merge(data, override)
-            # Remove environments block after merging to keep config clean
-            # but keep it if needed for reference? Usually we consume it.
-            # Let's keep it in data["environments"] but the root is merged.
+
+    # Apply Environment Overrides from external env.{env}.yaml file
+    if env:
+        env_file_name = f"env.{env}.yaml"
+        env_file_path = os.path.join(base_dir, env_file_name)
+        if os.path.exists(env_file_path):
+            # Load the env file (recursively, so it can have imports too)
+            # We pass env=None to avoid infinite recursion if it somehow references itself,
+            # though strictly it shouldn't matter as we look for env.{env}.yaml based on the passed env.
+            # But logically, an env specific file shouldn't load other env specific files for the same env.
+            env_data = load_yaml_with_env(env_file_path, env=None)
+            data = _deep_merge(data, env_data)
 
     return data

@@ -406,15 +406,15 @@
       }
     },
     "alert_test": {
-      "last_run": "2025-11-21T15:49:46.125874",
+      "last_run": "2025-11-21T21:53:20.009761",
       "nodes": {}
     },
     "parallel_test": {
-      "last_run": "2025-11-21T15:49:48.434216",
+      "last_run": "2025-11-21T21:53:23.467556",
       "nodes": {
         "node_b": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:48.434216"
+          "timestamp": "2025-11-21T21:53:23.467556"
         },
         "node_a": {
           "success": false,
@@ -427,46 +427,46 @@
       }
     },
     "test_read": {
-      "last_run": "2025-11-21T15:49:48.465889",
+      "last_run": "2025-11-21T21:53:23.504288",
       "nodes": {
         "load_data": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:48.465889"
+          "timestamp": "2025-11-21T21:53:23.503234"
         }
       }
     },
     "test_deps": {
-      "last_run": "2025-11-21T15:49:49.301809",
+      "last_run": "2025-11-21T21:53:24.235954",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:49.301809"
+          "timestamp": "2025-11-21T21:53:24.235954"
         },
         "transform": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:49.301809"
+          "timestamp": "2025-11-21T21:53:24.235954"
         }
       }
     },
     "test_write": {
-      "last_run": "2025-11-21T15:49:50.054198",
+      "last_run": "2025-11-21T21:53:25.043686",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:50.038383"
+          "timestamp": "2025-11-21T21:53:25.026510"
         },
         "save": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:50.054198"
+          "timestamp": "2025-11-21T21:53:25.043686"
         }
       }
     },
     "test_failure": {
-      "last_run": "2025-11-21T15:49:50.840184",
+      "last_run": "2025-11-21T21:53:25.835108",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:50.840184"
+          "timestamp": "2025-11-21T21:53:25.835108"
         },
         "fail": {
           "success": false,
@@ -479,11 +479,11 @@
       }
     },
     "test_independent": {
-      "last_run": "2025-11-21T15:49:51.704699",
+      "last_run": "2025-11-21T21:53:26.862829",
       "nodes": {
         "success1": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:51.689075"
+          "timestamp": "2025-11-21T21:53:26.847201"
         },
         "fail": {
           "success": false,
@@ -491,7 +491,63 @@
         },
         "success2": {
           "success": true,
-          "timestamp": "2025-11-21T15:49:51.704699"
+          "timestamp": "2025-11-21T21:53:26.862829"
+        }
+      }
+    },
+    "test_spark": {
+      "last_run": "2025-11-21T21:54:01.902927",
+      "nodes": {
+        "node1": {
+          "success": true,
+          "timestamp": "2025-11-21T21:54:01.887833"
+        },
+        "node2": {
+          "success": true,
+          "timestamp": "2025-11-21T21:54:01.902927"
+        }
+      }
+    },
+    "validation_test": {
+      "last_run": "2025-11-21T21:44:17.207214",
+      "nodes": {
+        "read_val": {
+          "success": true,
+          "timestamp": "2025-11-21T21:44:14.187627"
+        },
+        "validate_fail": {
+          "success": false,
+          "timestamp": null
+        }
+      }
+    },
+    "redaction_test": {
+      "last_run": "2025-11-21T21:44:18.127028",
+      "nodes": {
+        "read_sens": {
+          "success": true,
+          "timestamp": "2025-11-21T21:44:18.095241"
+        },
+        "redact_specific": {
+          "success": true,
+          "timestamp": "2025-11-21T21:44:18.127028"
+        },
+        "redact_all": {
+          "success": true,
+          "timestamp": "2025-11-21T21:44:18.127028"
+        }
+      }
+    },
+    "fail_fast_test": {
+      "last_run": "2025-11-21T21:44:22.128809",
+      "nodes": {
+        "node_success": {
+          "success": true,
+          "timestamp": "2025-11-21T21:44:18.878346"
+        },
+        "node_fail": {
+          "success": false,
+          "timestamp": null
         }
       }
     }

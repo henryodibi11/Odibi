@@ -208,6 +208,9 @@ class WriteConfig(BaseModel):
     format: str = Field(description="Output format (csv, parquet, delta, etc.)")
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based outputs")
+    register_table: Optional[str] = Field(
+        default=None, description="Register file output as external table (Spark/Delta only)"
+    )
     mode: WriteMode = Field(default=WriteMode.OVERWRITE, description="Write mode")
     options: Dict[str, Any] = Field(default_factory=dict, description="Format-specific options")
 
@@ -301,6 +304,15 @@ class LoggingConfig(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Extra metadata in logs")
 
 
+class PerformanceConfig(BaseModel):
+    """Performance tuning configuration."""
+
+    use_arrow: bool = Field(
+        default=True,
+        description="Use Apache Arrow-backed DataFrames (Pandas only). Reduces memory and speeds up I/O.",
+    )
+
+
 class StoryConfig(BaseModel):
     """Story generation configuration.
 
@@ -351,6 +363,9 @@ class ProjectConfig(BaseModel):
     retry: RetryConfig = Field(default_factory=RetryConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     alerts: List[AlertConfig] = Field(default_factory=list, description="Alert configurations")
+    performance: PerformanceConfig = Field(
+        default_factory=PerformanceConfig, description="Performance tuning"
+    )
 
     # === PHASE 3 ===
     environments: Optional[Dict[str, Dict[str, Any]]] = Field(

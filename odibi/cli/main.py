@@ -13,6 +13,7 @@ from odibi.cli.stress import add_stress_parser, run_stress_test
 from odibi.cli.schema import schema_command
 from odibi.cli.ide import add_ide_parser, init_vscode_command
 from odibi.cli.create import add_create_parser, create_command
+from odibi.cli.init_pipeline import add_init_pipeline_parser, init_pipeline_command
 from odibi.utils.telemetry import setup_telemetry
 
 
@@ -100,6 +101,9 @@ Examples:
     # odibi create
     add_create_parser(subparsers)
 
+    # odibi init-pipeline
+    add_init_pipeline_parser(subparsers)
+
     args = parser.parse_args()
 
     # Configure logging
@@ -133,6 +137,8 @@ Examples:
         return init_vscode_command(args)
     elif args.command == "create":
         return create_command(args)
+    elif args.command == "init-pipeline":
+        return init_pipeline_command(args)
     else:
         parser.print_help()
         return 1

@@ -37,7 +37,7 @@ try:
 except Exception:
     pass
 
-print(f"🚀 Running E2E Test")
+print("🚀 Running E2E Test")
 print(f"📂 Python Path: {PYTHON_ROOT}")
 print(f"⚡ Spark Path:  {SPARK_ROOT}")
 
@@ -64,7 +64,7 @@ def generate_data():
     }
     df_sales = pd.DataFrame(sales_data)
     df_sales.to_csv(f"{DATA_DIR}/sales_dirty.csv", index=False, encoding="latin1")
-    print(f"✅ Generated sales_dirty.csv")
+    print("✅ Generated sales_dirty.csv")
 
     # 2. Customers Data (JSON)
     cust_data = {
@@ -74,7 +74,7 @@ def generate_data():
     }
     df_cust = pd.DataFrame(cust_data)
     df_cust.to_json(f"{DATA_DIR}/customers.json", orient="records", lines=True)
-    print(f"✅ Generated customers.json")
+    print("✅ Generated customers.json")
 
 
 # --- 2. Odibi Configuration ---

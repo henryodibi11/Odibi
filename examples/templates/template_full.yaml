@@ -23,6 +23,10 @@ engine: pandas
 # Global Settings (Optional)
 # ==========================================
 
+# Performance Tuning (New in v2.2)
+performance:
+  use_arrow: true  # Use Arrow-backed DataFrames (Faster I/O, Lower Memory)
+
 # Retry Policy (for network/connection flakiness)
 retry:
   enabled: true
@@ -163,7 +167,7 @@ pipelines:
         # log_level: DEBUG
 
       # ---------------------------------------------------------
-      # Node 2: Transform & Validate
+      # Node 2: Standard Transform (SQL / Operations)
       # ---------------------------------------------------------
       - name: clean_data
         depends_on: [read_input]
@@ -173,52 +177,49 @@ pipelines:
             # --- Option A: SQL (Most Common) ---
             - sql: "SELECT * FROM read_input WHERE amount > 0"
 
-            # --- Option B: Built-in Operations (Engine Agnostic) ---
-            # 1. Drop Duplicates
+            # --- Option B: Built-in Operations ---
             # - operation: drop_duplicates
             #   params: {subset: ["id"], keep: "first"}
             
-            # 2. Fill Nulls
             # - operation: fillna
             #   params: {value: 0, subset: ["amount"]}
-            
-            # 3. Drop Columns
-            # - operation: drop
-            #   params: {columns: ["temp_col"]}
-            
-            # 4. Rename Columns
-            # - operation: rename
-            #   params: {columns: {"old_name": "new_name"}}
-
-            # --- Option C: Custom Python (Advanced) ---
-            # 1. Create a file named 'transforms.py' in this folder.
-            # 2. Add:
-            #    from odibi import transform
-            #    @transform
-            #    def clean_currency(context, current, currency_code):
-            #        return current
-            # 3. Reference it here:
-            # - function: clean_currency
-            #   params: {currency_code: "USD"}
         
-        # Data Quality Checks (Runs AFTER transform)
+        # Data Quality Checks
         validation:
           not_empty: true
           no_nulls: [id, transaction_date]
-          
-          # Schema Enforcement (Check column types)
-          # schema:
-          #   id: int
-          #   amount: float
-          #   name: string
-          
-          ranges:
-            amount: {min: 0, max: 1000000}
-          allowed_values:
-            status: [completed, pending, failed]
+          ranges: {amount: {min: 0, max: 1000000}}
         
-        # Error Handling Strategy
-        on_error: fail_fast  # Options: fail_fast (stop), fail_later (skip dependents), ignore
+        on_error: fail_fast
+
+      # ---------------------------------------------------------
+      # Node 3: Merge Transformer (Upsert Pattern)
+      # ---------------------------------------------------------
+      # This node demonstrates using a high-level transformer instead of manual steps.
+      # The 'merge' transformer handles the Write logic internally.
+      # - name: upsert_to_silver
+      #   depends_on: [clean_data]
+      #   transformer: merge
+      #   params:
+      #     target: silver/transactions.delta
+      #     keys: ["id"]
+      #     strategy: upsert  # or append_only, delete_match
+      #     audit_cols: {created_col: "created_at", updated_col: "updated_at"}
+
+      # ---------------------------------------------------------
+      # Node 4: Custom Python Transform
+      # ---------------------------------------------------------
+      # - name: custom_logic
+      #   depends_on: [clean_data]
+      #   transform:
+      #     steps:
+      #       # Requires 'transforms.py' with @transform decorated function
+      #       - function: clean_currency
+      #         params: {currency_code: "USD"}
+      #   write:
+      #     connection: local_data
+      #     format: parquet
+      #     path: gold/final.parquet
 
       # ---------------------------------------------------------
       # Node 3: Write & Protect
@@ -257,6 +258,14 @@ pipelines:
         #   mode: overwrite
         #   options:
         #     partitionBy: ["year", "month"]
+
+        # --- Scenario D: External Table (Hybrid) ---
+        # write:
+        #   connection: my_datalake
+        #   format: delta
+        #   path: silver/external_table/
+        #   register_table: silver.external_table  # Registers the path as a queryable table
+        #   mode: overwrite
 
 # ==========================================
 # 3. Data Story (Documentation/Audit)

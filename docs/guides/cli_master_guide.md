@@ -58,7 +58,20 @@ odibi doctor odibi.yaml
 
 ---
 
-## 4. `odibi generate-project` (Scaffold)
+## 4. `odibi init-pipeline` (New Project)
+
+Start fresh with best practices.
+
+```bash
+odibi init-pipeline my_new_project --template local-medallion
+```
+
+**Available Templates:**
+*   `local-medallion`: Pandas-based, local folders for Bronze/Silver/Gold. Best for starting out.
+*   `azure-delta`: Spark-based, configured for ADLS + Delta Lake.
+*   `reference-lite`: Minimal example for quick tests.
+
+## 5. `odibi generate-project` (Scaffold from Data)
 
 Don't write boilerplate.
 
@@ -74,7 +87,7 @@ This command:
 
 ---
 
-## 5. `odibi secrets` (Secret Management)
+## 6. `odibi secrets` (Secret Management)
 
 Manage local secrets securely.
 
@@ -83,7 +96,7 @@ Manage local secrets securely.
 odibi secrets init odibi.yaml
 ```
 
-## 6. `odibi graph` (Visualization)
+## 7. `odibi graph` (Visualization)
 
 Visualize your pipeline dependencies.
 
@@ -94,7 +107,7 @@ odibi graph odibi.yaml
 
 ---
 
-## 7. `odibi story` (Reporting)
+## 8. `odibi story` (Reporting)
 
 Manage the execution reports ("Stories").
 

@@ -45,21 +45,28 @@ id, name,           email,              joined_at
 
 ## 3. Generate Your Project
 
-Instead of writing configuration files from scratch, use the Odibi Generator. It analyzes your data and builds a project skeleton for you.
+Instead of writing configuration files from scratch, use the **Odibi Initializer**. It creates a project skeleton with best practices baked in.
 
 Run this command in your terminal:
 
 ```bash
-odibi generate-project --input ./raw_data --output ./my_first_project
+odibi init-pipeline my_first_project --template local-medallion
 ```
 
-You should see output like:
-```text
-✅ Analyzed raw_data/customers.csv (4 columns)
-✨ Generated odibi.yaml
-✨ Generated cleaning SQL
-📂 Project created at ./my_first_project
+This creates a new folder `my_first_project` with a standard structure:
+*   **`odibi.yaml`**: The pipeline configuration.
+*   **`data/`**: Folders for your data layers (landing, raw, silver, etc.).
+*   **`README.md`**: Instructions for your project.
+
+Move your sample data into the landing zone:
+```bash
+# On Windows (PowerShell)
+mv raw_data/customers.csv my_first_project/data/landing/
+# On Mac/Linux
+mv raw_data/customers.csv my_first_project/data/landing/
 ```
+
+> **Note:** You can also generate a project *from existing data* using `odibi generate-project`, but `init-pipeline` is the recommended way to start fresh.
 
 ---
 
@@ -78,8 +85,10 @@ You will see a file structure like this:
 *   **`data/`**: (Created automatically) Where data will be stored.
 
 Open `odibi.yaml` in your text editor. You will see two "nodes" (steps):
-1.  **Bronze Node:** Reads the CSV file.
-2.  **Silver Node:** Applies cleaning logic (trimming spaces, casting types).
+1.  **Ingestion Node:** Reads the `customers.csv` from `landing/`.
+2.  **Refinement Node:** Merges the data into `silver/`.
+
+Since we used the template, the config is already set up to look for `landing/customers.csv`.
 
 ---
 
@@ -92,9 +101,9 @@ odibi run odibi.yaml
 ```
 
 Odibi will:
-1.  Read `customers.csv`.
-2.  Execute the SQL transformations to clean it.
-3.  Save the result as a Parquet file (a fast, compressed format).
+1.  Read `customers.csv` from `landing/`.
+2.  Convert it to Parquet in `raw/`.
+3.  Merge it into a Delta/Parquet table in `silver/`.
 4.  Generate a "Data Story".
 
 ---

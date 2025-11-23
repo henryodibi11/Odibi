@@ -14,9 +14,41 @@ from odibi.exceptions import TransformError
 class PandasEngine(Engine):
     """Pandas-based execution engine."""
 
-    def __init__(self):
-        """Initialize Pandas engine."""
-        pass
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """Initialize Pandas engine.
+
+        Args:
+            config: Engine configuration (optional)
+        """
+        self.config = config or {}
+        # Check for performance flags
+        performance = self.config.get("performance", {})
+
+        # Determine desired state
+        if hasattr(performance, "use_arrow"):
+            desired_use_arrow = performance.use_arrow
+        elif isinstance(performance, dict):
+            desired_use_arrow = performance.get("use_arrow", True)
+        else:
+            desired_use_arrow = True
+
+        # Verify availability
+        if desired_use_arrow:
+            try:
+                import pyarrow  # noqa: F401
+
+                self.use_arrow = True
+            except ImportError:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    "Apache Arrow not found. Disabling Arrow optimizations. "
+                    "Install 'pyarrow' to enable."
+                )
+                self.use_arrow = False
+        else:
+            self.use_arrow = False
 
     def _merge_storage_options(
         self, connection: Any, options: Optional[Dict[str, Any]] = None
@@ -116,38 +148,53 @@ class PandasEngine(Engine):
                 full_path = matched_files
                 is_glob = True
 
+        # Prepare read options
+        read_kwargs = merged_options.copy()
+        if self.use_arrow:
+            # Use PyArrow backend for memory efficiency and speed
+            # Available in Pandas 2.0+
+            read_kwargs["dtype_backend"] = "pyarrow"
+
         # Read based on format
         if format == "csv":
             try:
                 if is_glob and isinstance(full_path, list):
-                    dfs = [pd.read_csv(f, **merged_options) for f in full_path]
+                    dfs = [pd.read_csv(f, **read_kwargs) for f in full_path]
                     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
-                return pd.read_csv(full_path, **merged_options)
+                return pd.read_csv(full_path, **read_kwargs)
             except UnicodeDecodeError:
                 # Retry with common fallbacks
-                merged_options["encoding"] = "latin1"
+                # Note: Arrow engine might be stricter, so we might need to drop it for retry?
+                # But let's try keeping it if possible, or fallback completely.
+                # Simplify: Just update encoding in kwargs
+                read_kwargs["encoding"] = "latin1"
                 if is_glob and isinstance(full_path, list):
-                    dfs = [pd.read_csv(f, **merged_options) for f in full_path]
+                    dfs = [pd.read_csv(f, **read_kwargs) for f in full_path]
                     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
-                return pd.read_csv(full_path, **merged_options)
+                return pd.read_csv(full_path, **read_kwargs)
             except pd.errors.ParserError:
                 # Retry with bad lines skipped
-                merged_options["on_bad_lines"] = "skip"
+                read_kwargs["on_bad_lines"] = "skip"
                 if is_glob and isinstance(full_path, list):
-                    dfs = [pd.read_csv(f, **merged_options) for f in full_path]
+                    dfs = [pd.read_csv(f, **read_kwargs) for f in full_path]
                     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
-                return pd.read_csv(full_path, **merged_options)
+                return pd.read_csv(full_path, **read_kwargs)
         elif format == "parquet":
             # read_parquet handles list of files
-            return pd.read_parquet(full_path, **merged_options)
+            return pd.read_parquet(full_path, **read_kwargs)
         elif format == "json":
             if is_glob and isinstance(full_path, list):
-                dfs = [pd.read_json(f, **merged_options) for f in full_path]
+                dfs = [pd.read_json(f, **read_kwargs) for f in full_path]
                 return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
-            return pd.read_json(full_path, **merged_options)
+            return pd.read_json(full_path, **read_kwargs)
         elif format == "excel":
-            return pd.read_excel(full_path, **merged_options)
+            # Excel doesn't support dtype_backend arg directly in older versions or engine dependent
+            # But Pandas 2.0 might. Let's check safely.
+            # read_excel does NOT support dtype_backend as of 2.0.3 typically.
+            # We skip arrow backend for Excel for now to be safe.
+            excel_kwargs = merged_options.copy()
+            return pd.read_excel(full_path, **excel_kwargs)
         elif format == "delta":
             try:
                 from deltalake import DeltaTable
@@ -165,7 +212,12 @@ class PandasEngine(Engine):
 
             # Read Delta table
             dt = DeltaTable(full_path, storage_options=storage_opts, version=version)
-            return dt.to_pandas()
+
+            if self.use_arrow:
+                # Zero-copy to Arrow, then to Pandas with Arrow dtypes
+                return dt.to_pandas(partitions=None, arrow_options={"types_mapper": pd.ArrowDtype})
+            else:
+                return dt.to_pandas()
         elif format == "avro":
             try:
                 import fastavro

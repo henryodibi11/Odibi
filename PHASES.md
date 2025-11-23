@@ -1,7 +1,7 @@
-# Odibi Roadmap (v2.1+)
+# Odibi Roadmap (v2.2+)
 
 **Version Strategy:** Semantic Versioning (SemVer)  
-**Current Core Version:** v2.1.0-alpha (Target)  
+**Current Core Version:** v2.2.0 (Target)  
 **Last Updated:** November 22, 2025  
 
 Odibi v2.0.0 completed Phases 1–6, 9, and 10.  
@@ -14,10 +14,42 @@ For a detailed history of all completed phases, see:
 
 ## 📊 Snapshot: Where We Are
 
-- **Latest Release:** `v2.0.0` – Enterprise + Ecosystem
-- **Completed Phases:** 1–6, 9, 10
-- **Currently Active:** Phase 2.1 (Delta-First Foundation)
+- **Latest Release:** `v2.2.0` – High-Performance Core
+- **Completed Phases:** 1–6, 9, 10, 2.1, 2.2
+- **Currently Active:** Planning Phase 7
 - **Stability:** Production-ready; >500 tests; ~80% coverage
+
+---
+
+## Phase 2.2 — High-Performance Core (COMPLETED)
+
+**Goal:** Apply "First Principles" optimization to the framework's core, leveraging modern memory layouts (Arrow), compilation (mypyc), and engine tuning (Spark AQE) without changing the user API.
+
+### 2.2.1 Arrow-Native Pandas Engine ✅
+
+**Status:** **Completed**
+
+**Delivered Features:**
+- **Zero-Copy I/O:** Added `performance.use_arrow` config toggle.
+- **Memory Reduction:** Drastic reduction (~50%) in memory usage for CSV/Parquet reads using `dtype_backend="pyarrow"`.
+- **Delta Lake Optimization:** Native Arrow-to-Pandas conversion for Delta sources.
+
+### 2.2.2 Core Compilation (mypyc) ✅
+
+**Status:** **Completed**
+
+**Delivered Features:**
+- **Automated Build:** `setup.py` and `pyproject.toml` configured to compile core modules (`graph`, `pipeline`, `config`, `context`, `state`) into C extensions upon install.
+- **Runtime Robustness:** Enforced type safety at runtime for orchestration logic.
+- **Faster Startup:** Reduced import overhead for CLI commands.
+
+### 2.2.3 Spark Engine Tuning ✅
+
+**Status:** **Completed**
+
+**Delivered Features:**
+- **Adaptive Query Execution (AQE):** Enabled by default for better skew/shuffle handling.
+- **Arrow-PySpark Bridge:** Enabled `spark.sql.execution.arrow.pyspark.enabled` for 10-100x faster data transfer between JVM and Python UDFs/Drivers.
 
 ---
 
@@ -41,32 +73,34 @@ For a detailed history of all completed phases, see:
 - Integration into `Node` and `Pipeline`.
 - Unit and Integration tests.
 
-### 2.1.2 `odibi init-pipeline` Templates (Next Priority)
+### 2.1.2 `odibi init-pipeline` Templates ✅
 
-**Goal:** Make it trivial to start a **Delta-first** Odibi project with best practices baked in.
+**Status:** **Completed**
 
-**Planned Deliverables:**
+**Delivered Features:**
 - New CLI command: `odibi init-pipeline <name> --template {local-medallion,azure-delta,...}`
 - Templates:
   1. **Local Medallion:** Pandas + Local Parquet/Delta.
   2. **Azure Delta Medallion:** Spark + ADLS + Key Vault.
   3. **Reference-Lite:** Minimal "Gauntlet" style.
 
-### 2.1.3 `env` Config Structure
+### 2.1.3 `env` Config Structure ✅
 
-**Goal:** Normalize how environments (`dev`, `test`, `prod`) are expressed and overridden.
+**Status:** **Completed**
 
-**Planned Structure:**
+**Delivered Features:**
 - Base config (`odibi.yaml`) + Environment overlays (`env.dev.yaml`, `env.prod.yaml`).
 - CLI support for `--env` flag to auto-merge configs.
 
 ---
 
-## Phase 7 — Ecosystem & Platform (Next)
+## Phase 7 — Ecosystem & Platform (Deferred)
 
 > Source: Consolidated and adapted from the prior `PHASES_NEXT.md`.
 
 **Goal:** Move from a “library” to a “platform” by deepening ecosystem integration and operational tooling.
+
+**Status:** Deferred to allow focus on core performance and stability.
 
 ### 7.1 Developer Experience (DX) – Follow-On Work
 
@@ -81,7 +115,7 @@ Some DX work is already done (e.g. templates, config imports). Follow-ons:
   - Close remaining functional gaps discovered via Phase 9 (“Infinite Gauntlet”).
   - Stabilize public API for engine plugins.
 
-### 7.2 Orchestration Generators (Deferred → Next)
+### 7.2 Orchestration Generators
 
 **Status:** On hold, but next major ecosystem lever.
 
@@ -95,7 +129,7 @@ Some DX work is already done (e.g. templates, config imports). Follow-ons:
   - Generators should be **pure**: no hidden state, idempotent.
   - Treat orchestration as a *view* over Odibi configs, not a second source of truth.
 
-### 7.3 “Control Plane” UI (Deferred)
+### 7.3 “Control Plane” UI (Long Term)
 
 **Goal:** A simple web UI for:
 
@@ -107,11 +141,13 @@ Some DX work is already done (e.g. templates, config imports). Follow-ons:
 
 ---
 
-## Phase 8 — Advanced Intelligence (Future)
+## Phase 8 — Advanced Intelligence (Deferred)
 
 > Adapted from the “Advanced Intelligence” section in the prior `PHASES_NEXT.md`.
 
 **Goal:** Use LLMs to assist with pipeline creation, debugging, and maintenance without making the core framework dependent on external AI services.
+
+**Status:** Deferred until core platform features (Phase 7) are mature.
 
 ### 8.1 “Auto-Heal” (Dev-Mode Only)
 

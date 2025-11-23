@@ -989,6 +989,12 @@ connections:
     validation_mode: lazy|eager   # optional, defaults to 'lazy'
     <type-specific-config>
 
+# ENVIRONMENTS (optional)
+environments:
+  <env_name>:
+    <overrides>: ...
+    # Or use external file: env.<env_name>.yaml
+
 # STORY (required)
 story:
   connection: string        # Name of connection to write stories
@@ -1026,7 +1032,9 @@ pipelines:
         write:
           connection: string
           path: string
-          format: csv|parquet|json|excel|avro
+          table: string       # Table name (alternative to path)
+          register_table: string # Register file output as external table (Spark/Delta only)
+          format: csv|parquet|json|excel|avro|delta
           mode: overwrite|append
           options: dict (optional)
 ```

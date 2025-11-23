@@ -82,6 +82,7 @@ class Pipeline:
         story_config: Optional[Dict[str, Any]] = None,
         retry_config: Optional[RetryConfig] = None,
         alerts: Optional[List[AlertConfig]] = None,
+        performance_config: Optional[Any] = None,
     ):
         """Initialize pipeline.
 
@@ -93,6 +94,7 @@ class Pipeline:
             story_config: Story generator configuration
             retry_config: Retry configuration
             alerts: Alert configurations
+            performance_config: Performance tuning configuration
         """
         self.config = pipeline_config
         self.project_config = None  # Set by PipelineManager if available
@@ -101,6 +103,7 @@ class Pipeline:
         self.generate_story = generate_story
         self.retry_config = retry_config
         self.alerts = alerts or []
+        self.performance_config = performance_config
 
         # Initialize story generator
         story_config = story_config or {}
@@ -113,8 +116,16 @@ class Pipeline:
         )
 
         # Initialize engine
+        engine_config = {}
+        if performance_config:
+            engine_config["performance"] = (
+                performance_config.dict()
+                if hasattr(performance_config, "dict")
+                else performance_config
+            )
+
         if engine == "pandas":
-            self.engine = PandasEngine()
+            self.engine = PandasEngine(config=engine_config)
         elif engine == "spark":
             if SparkEngine is None:
                 raise ImportError(
@@ -124,7 +135,7 @@ class Pipeline:
 
             # SparkEngine can take existing session if needed, but here we let it create/get one
             # We might need to pass connections to it for ADLS auth config
-            self.engine = SparkEngine(connections=connections)
+            self.engine = SparkEngine(connections=connections, config=engine_config)
         else:
             raise ValueError(f"Unsupported engine: {engine}")
 
@@ -545,6 +556,7 @@ class PipelineManager:
                 story_config=story_config,
                 retry_config=project_config.retry,
                 alerts=project_config.alerts,
+                performance_config=project_config.performance,
             )
             # Inject project config into pipeline for richer context
             self._pipelines[pipeline_name].project_config = project_config

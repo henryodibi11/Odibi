@@ -48,15 +48,25 @@ class SparkEngine(Engine):
             builder = SparkSession.builder.appName("odibi").config(
                 "spark.sql.sources.partitionOverwriteMode", "dynamic"
             )
+
+            # Performance Optimizations
+            # 1. Enable Arrow for PySpark (faster conversion to/from Pandas)
+            builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
+            # 2. Enable Adaptive Query Execution (usually default in 3.x, but ensuring it)
+            builder = builder.config("spark.sql.adaptive.enabled", "true")
+
             self.spark = spark_session or configure_spark_with_delta_pip(builder).getOrCreate()
         except ImportError:
             # Delta not available - use regular Spark
-            self.spark = (
-                spark_session
-                or SparkSession.builder.appName("odibi")
-                .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
-                .getOrCreate()
+            builder = SparkSession.builder.appName("odibi").config(
+                "spark.sql.sources.partitionOverwriteMode", "dynamic"
             )
+
+            # Performance Optimizations
+            builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
+            builder = builder.config("spark.sql.adaptive.enabled", "true")
+
+            self.spark = spark_session or builder.getOrCreate()
 
         self.config = config or {}
         self.connections = connections or {}
@@ -199,6 +209,7 @@ class SparkEngine(Engine):
         format: str,
         table: Optional[str] = None,
         path: Optional[str] = None,
+        register_table: Optional[str] = None,
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -210,6 +221,7 @@ class SparkEngine(Engine):
             format: Output format (csv, parquet, json, delta)
             table: Table name
             path: File path
+            register_table: Name to register as external table (if path is used)
             mode: Write mode (overwrite, append, error, ignore)
             options: Format-specific options (including partition_by for partitioning)
         """
@@ -217,6 +229,7 @@ class SparkEngine(Engine):
 
         # SQL Server / Azure SQL Support
         if format in ["sql_server", "azure_sql"]:
+            # ... existing SQL logic ...
             if not hasattr(connection, "get_spark_options"):
                 raise ValueError(
                     f"Connection type '{type(connection).__name__}' does not support Spark SQL write"
@@ -231,15 +244,10 @@ class SparkEngine(Engine):
                 raise ValueError("SQL format requires 'table' config or 'dbtable' option")
 
             # Map mode
-            # Spark JDBC supports overwrite, append, ignore, error
-            # If mode is 'upsert', we can't do it natively easily without custom SQL.
             if mode not in ["overwrite", "append", "ignore", "error"]:
-                # Fallback or error?
-                # For now, map 'fail' to 'error'
                 if mode == "fail":
                     mode = "error"
                 else:
-                    # upsert not supported in JDBC write generically
                     raise ValueError(f"Write mode '{mode}' not supported for Spark SQL write")
 
             df.write.format("jdbc").options(**merged_options).mode(mode).save()
@@ -308,6 +316,12 @@ class SparkEngine(Engine):
                     merger.whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
                 else:  # append_once
                     merger.whenNotMatchedInsertAll().execute()
+
+                # Register if requested (even after merge)
+                if register_table:
+                    self.spark.sql(
+                        f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
+                    )
                 return
             else:
                 # Table does not exist, fall back to standard write (create)
@@ -328,6 +342,20 @@ class SparkEngine(Engine):
             writer = writer.option(key, value)
 
         writer.save(full_path)
+
+        # Register as External Table if requested
+        if register_table and format == "delta":
+            # Only Delta supports easy external registration like this usually
+            # Parquet can too, but Delta is the main use case.
+            try:
+                self.spark.sql(
+                    f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
+                )
+            except Exception as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to register external table '{register_table}': {e}")
 
     def execute_sql(self, sql: str, context) -> Any:
         """Execute SQL query using Spark SQL.

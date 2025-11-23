@@ -10,7 +10,51 @@ Odibi uses a **Base Configuration + Override** model:
 
 ## Configuration Structure
 
+Odibi supports two ways to define environments:
+1.  **Inline Block:** Using an `environments` block in your main config file.
+2.  **External Files:** Using separate `env.{env}.yaml` files (e.g., `env.prod.yaml`).
+
+### Method 1: Inline Block
+
 Add an `environments` section to your `project.yaml`:
+
+```yaml
+# ... base config ...
+environments:
+  prod:
+    engine: spark
+```
+
+### Method 2: External Files (Recommended for large configs)
+
+Keep your main `odibi.yaml` clean by putting overrides in separate files.
+
+**File: `odibi.yaml`**
+```yaml
+project: Sales Data Pipeline
+engine: pandas
+connections:
+  data_lake:
+    type: local
+    base_path: ./data
+```
+
+**File: `env.prod.yaml`**
+```yaml
+# Automatically merged when running with --env prod
+engine: spark
+connections:
+  data_lake:
+    type: azure_adls
+    account: prod_acc
+```
+
+When you run `odibi run odibi.yaml --env prod`, Odibi will:
+1. Load `odibi.yaml`.
+2. Look for `env.prod.yaml` in the same directory.
+3. Merge the prod config on top of the base config.
+
+## Inline Example (Method 1)
 
 ```yaml
 # --- 1. Base Configuration (Default / Local) ---
