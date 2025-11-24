@@ -2,12 +2,12 @@
 
 **Version Strategy:** Semantic Versioning (SemVer)  
 **Current Core Version:** v2.2.0 (Target)  
-**Last Updated:** November 22, 2025  
+**Last Updated:** November 24, 2025
 
-Odibi v2.0.0 completed Phases 1–6, 9, and 10.  
+Odibi v2.4.0 completes Phases 1–7.
 This document tracks active and future development.
 
-For a detailed history of all completed phases, see:  
+For a detailed history of all completed phases, see:
 ➡️ [`docs/_archive/PHASES_HISTORY.md`](docs/_archive/PHASES_HISTORY.md)
 
 ---
@@ -16,8 +16,8 @@ For a detailed history of all completed phases, see:
 
 - **Latest Release:** `v2.4.0` – Deep Observability & Visual Diagnostics
 - **Completed Phases:** 1–6, 9, 10, 2.1, 2.2, 2.3, 7
-- **Currently Active:** Planning Phase 8
-- **Stability:** Production-ready; >500 tests; ~85% coverage
+- **Currently Active:** Maintenance & Stability (Pre-Phase 8)
+- **Stability:** Production-ready; >500 tests; ~98% coverage; Clean Linting
 
 ---
 
@@ -32,8 +32,8 @@ For a detailed history of all completed phases, see:
 - **Explicit SQL Lineage:** Automatically captures and logs all SQL executed via `context.sql()` in Python transformers, eliminating "black box" transformations.
 - **Delta Lake Version Tracking:** Native integration with Delta Lake transaction logs to capture version, timestamp, and operation metrics for every write.
 - **Data Drift Diagnostics:**
-  - **Row-Level Diffing:** Ability to identify exactly *which* rows were added or removed between runs using `get_delta_diff`.
-  - **Visual Stories:** Generated stories now include a "Data Changes" section showing samples of added/removed rows with schema evolution highlighting.
+  - **Row-Level Diffing:** Identifies exactly *which* rows were added, removed, or updated between runs (Pandas & Spark).
+  - **Visual Stories:** Generated stories now include a "Data Changes" section showing samples of added/removed/updated rows with schema evolution highlighting.
   - **Null Profiler:** Automated null percentage calculation for all columns, displayed as badges in schema reports.
 - **Run Comparison:** `odibi.diagnostics` module to programmatically compare pipeline runs (`run-diff`) for logic and data drift.
 - **Rich Metadata:**
