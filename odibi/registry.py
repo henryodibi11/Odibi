@@ -10,20 +10,28 @@ class FunctionRegistry:
 
     _functions: Dict[str, Callable] = {}
     _signatures: Dict[str, inspect.Signature] = {}
+    _param_models: Dict[str, Any] = {}  # New: Store Pydantic models
 
     @classmethod
-    def register(cls, func: Callable) -> Callable:
+    def register(cls, func: Callable, name: str = None, param_model: Any = None) -> Callable:
         """Register a transform function.
 
         Args:
             func: Function to register
+            name: Optional name override (default: func.__name__)
+            param_model: Optional Pydantic model for validation
 
         Returns:
-            The original function (for use as decorator)
+            The original function
         """
-        name = func.__name__
+        if name is None:
+            name = func.__name__
+
         cls._functions[name] = func
         cls._signatures[name] = inspect.signature(func)
+        if param_model:
+            cls._param_models[name] = param_model
+
         return func
 
     @classmethod
@@ -42,13 +50,13 @@ class FunctionRegistry:
         if name not in cls._functions:
             available = ", ".join(cls._functions.keys()) if cls._functions else "none"
             raise ValueError(
-                f"Transform function '{name}' not registered. " f"Available functions: {available}"
+                f"Transform function '{name}' not registered. Available functions: {available}"
             )
         return cls._functions[name]
 
     @classmethod
     def validate_params(cls, name: str, params: Dict[str, Any]) -> None:
-        """Validate parameters against function signature.
+        """Validate parameters against function signature or Pydantic model.
 
         Args:
             name: Function name
@@ -58,9 +66,19 @@ class FunctionRegistry:
             ValueError: If parameters are invalid
             TypeError: If parameter types don't match
         """
-        if name not in cls._signatures:
+        if name not in cls._functions:
             raise ValueError(f"Function '{name}' not registered")
 
+        # Priority: Check Pydantic Model
+        if name in cls._param_models:
+            model = cls._param_models[name]
+            try:
+                model(**params)
+                return  # Validated successfully
+            except Exception as e:
+                raise ValueError(f"Validation failed for '{name}': {e}")
+
+        # Fallback: Check function signature (Legacy)
         sig = cls._signatures[name]
 
         # Get function parameters (excluding 'context' and 'current' which are injected)

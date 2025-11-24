@@ -59,6 +59,21 @@ For a detailed history of all completed phases, see:
 - **Parallel File I/O (Pandas):** Multi-threaded reading for CSV/JSON glob patterns, leveraging `ThreadPoolExecutor` for linear speedups on multi-core systems.
 - **Auto-Optimize (Spark):** Native support for `optimize_write` and `zorder_by` in `write` operations to automatically compact and cluster Delta tables.
 
+### 2.2.5 Standard Transformation Library ✅
+
+**Status:** **Completed**
+
+**Goal:** Provide a comprehensive "Standard Library" of 25+ reusable transformations to reduce boilerplate and ensure SQL-first optimization.
+
+**Delivered Features:**
+- **Core SQL:** `filter_rows`, `derive_columns`, `cast_columns`, `clean_text`, `split_part`, `case_when`.
+- **Date/Time:** `extract_date_parts`, `date_add`, `date_trunc`, `date_diff`, `convert_timezone`.
+- **Multi-Table:** `join`, `union` (engine-agnostic).
+- **Reshaping:** `pivot`, `unpivot`, `explode_list_column`.
+- **Advanced:** `deduplicate`, `window_calculation`, `dict_based_mapping`, `regex_replace`.
+- **Quality & Utils:** `validate_and_flag`, `unpack_struct`, `hash_columns`.
+- **Architecture:** Introduced `EngineContext` for unified state management and Pydantic-based validation for all transforms.
+
 ---
 
 ## Phase 2.1 — The Delta-First Foundation (COMPLETED)

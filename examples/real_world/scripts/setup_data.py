@@ -139,7 +139,7 @@ def explode_data(multiplier=10):
                     temp_df[col] = temp_df[col] + f"_{i}"
 
                 temp_df.to_csv(output_path, index=False, header=False, mode="a")
-                print(f"    Append {i+1}/{multiplier-1}...", end="\r")
+                print(f"    Append {i + 1}/{multiplier - 1}...", end="\r")
 
             print(f"\n  [OK] {f}: {original_len} -> {original_len * multiplier} rows")
 

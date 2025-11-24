@@ -186,7 +186,7 @@ def run_delta_verification():
     # 3. Time Travel
     print("\n[INFO] Verifying Time Travel (Reading Version 0)...")
     res_tt = manager.run("delta_time_travel")
-    node_tt = res_tt.get_node_result("read_v0")
+    res_tt.get_node_result("read_v0")
 
     # Check the data in the result (it's registered in context)
     # Note: In pipeline run, result df is not directly in NodeResult,

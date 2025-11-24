@@ -230,7 +230,7 @@ class DocStoryGenerator:
 
         for i, node in enumerate(self.pipeline_config.nodes):
             # Node representation
-            lines.append(f"{i+1}. [{node.name}]")
+            lines.append(f"{i + 1}. [{node.name}]")
             lines.append(f"   Operation: {self._get_operation_name(node)}")
 
             if node.depends_on:
@@ -256,7 +256,7 @@ class DocStoryGenerator:
             from jinja2 import Template
         except ImportError:
             raise ImportError(
-                "jinja2 is required for HTML rendering. " "Install with: pip install jinja2"
+                "jinja2 is required for HTML rendering. Install with: pip install jinja2"
             )
 
         # HTML template for doc story

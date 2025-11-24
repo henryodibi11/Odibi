@@ -198,7 +198,7 @@ def _process_dataset(item, i, args, output_dir):
         run_id = item.replace("/", "_")
         dataset_name = item
     else:
-        run_id = f"run_{i+1}"
+        run_id = f"run_{i + 1}"
         dataset_name = None
 
     run_dir = output_dir / run_id

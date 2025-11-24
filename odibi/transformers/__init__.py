@@ -1,3 +1,69 @@
-from .merge_transformer import merge
+from odibi.registry import FunctionRegistry
 
-__all__ = ["merge"]
+# Import all transform modules
+from odibi.transformers import sql_core
+from odibi.transformers import relational
+from odibi.transformers import advanced
+
+# List of all standard library modules
+_MODULES = [sql_core, relational, advanced]
+
+
+def register_standard_library():
+    """
+    Registers all standard transformations into the global registry.
+    This is called automatically when the framework initializes.
+    """
+    # Helper to register functions from a module
+    # We look for functions that match the transform signature or are explicitly exported
+    # For now, we manually register the known list to be safe and explicit.
+
+    registry = FunctionRegistry
+
+    # SQL Core
+    registry.register(sql_core.filter_rows, "filter_rows", sql_core.FilterRowsParams)
+    registry.register(sql_core.derive_columns, "derive_columns", sql_core.DeriveColumnsParams)
+    registry.register(sql_core.cast_columns, "cast_columns", sql_core.CastColumnsParams)
+    registry.register(sql_core.clean_text, "clean_text", sql_core.CleanTextParams)
+    registry.register(sql_core.extract_date_parts, "extract_date_parts", sql_core.ExtractDateParams)
+    registry.register(sql_core.normalize_schema, "normalize_schema", sql_core.NormalizeSchemaParams)
+    registry.register(sql_core.sort, "sort", sql_core.SortParams)
+    registry.register(sql_core.limit, "limit", sql_core.LimitParams)
+    registry.register(sql_core.sample, "sample", sql_core.SampleParams)
+    registry.register(sql_core.distinct, "distinct", sql_core.DistinctParams)
+    registry.register(sql_core.fill_nulls, "fill_nulls", sql_core.FillNullsParams)
+    registry.register(sql_core.split_part, "split_part", sql_core.SplitPartParams)
+    registry.register(sql_core.date_add, "date_add", sql_core.DateAddParams)
+    registry.register(sql_core.date_trunc, "date_trunc", sql_core.DateTruncParams)
+    registry.register(sql_core.date_diff, "date_diff", sql_core.DateDiffParams)
+    registry.register(sql_core.case_when, "case_when", sql_core.CaseWhenParams)
+    registry.register(sql_core.convert_timezone, "convert_timezone", sql_core.ConvertTimezoneParams)
+
+    # Relational
+    registry.register(relational.join, "join", relational.JoinParams)
+    registry.register(relational.union, "union", relational.UnionParams)
+    registry.register(relational.pivot, "pivot", relational.PivotParams)
+    registry.register(relational.unpivot, "unpivot", relational.UnpivotParams)
+    registry.register(relational.aggregate, "aggregate", relational.AggregateParams)
+
+    # Advanced
+    registry.register(advanced.deduplicate, "deduplicate", advanced.DeduplicateParams)
+    registry.register(advanced.explode_list_column, "explode_list_column", advanced.ExplodeParams)
+    registry.register(advanced.dict_based_mapping, "dict_based_mapping", advanced.DictMappingParams)
+    registry.register(advanced.regex_replace, "regex_replace", advanced.RegexReplaceParams)
+    registry.register(advanced.unpack_struct, "unpack_struct", advanced.UnpackStructParams)
+    registry.register(advanced.hash_columns, "hash_columns", advanced.HashParams)
+    registry.register(
+        advanced.validate_and_flag, "validate_and_flag", advanced.ValidateAndFlagParams
+    )
+    registry.register(
+        advanced.window_calculation, "window_calculation", advanced.WindowCalculationParams
+    )
+
+    # Transformers (High-level Node Transformers)
+    # Note: 'merge' is auto-registered via decorator in merge_transformer.py upon import.
+    # We don't need to register it manually here unless we want to override it.
+
+
+# Auto-register on import
+register_standard_library()

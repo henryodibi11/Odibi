@@ -39,9 +39,7 @@ def sql(df, query, table_name="df"):
     try:
         import duckdb
     except ImportError:
-        raise ImportError(
-            "DuckDB is required for SQL operations. " "Install with: pip install duckdb"
-        )
+        raise ImportError("DuckDB is required for SQL operations. Install with: pip install duckdb")
 
     # Execute query using DuckDB
     result = duckdb.query(query).df()

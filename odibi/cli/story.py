@@ -282,9 +282,9 @@ def list_command(args):
             if size < 1024:
                 size_str = f"{size}B"
             elif size < 1024 * 1024:
-                size_str = f"{size/1024:.1f}KB"
+                size_str = f"{size / 1024:.1f}KB"
             else:
-                size_str = f"{size/1024/1024:.1f}MB"
+                size_str = f"{size / 1024 / 1024:.1f}MB"
 
             print(f"\n  📄 {story_file.name}")
             print(f"     Modified: {modified.strftime('%Y-%m-%d %H:%M:%S')}")

@@ -122,6 +122,7 @@ def _merge_spark(
             condition = " AND ".join([f"target.{k} = source.{k}" for k in keys])
             merger = delta_table.alias("target").merge(batch_df.alias("source"), condition)
 
+            orig_auto_merge = None
             if strategy == "upsert":
                 # Construct update map
                 update_expr = {}
@@ -159,6 +160,11 @@ def _merge_spark(
 
                 # Enable automatic schema evolution for the merge
                 # This is critical for adding new columns (like audit cols)
+
+                # Capture original state to avoid side effects
+                orig_auto_merge = spark.conf.get(
+                    "spark.databricks.delta.schema.autoMerge.enabled", "false"
+                )
                 spark.conf.set("spark.databricks.delta.schema.autoMerge.enabled", "true")
 
                 merger = merger.whenMatchedUpdate(set=update_expr)
@@ -170,7 +176,14 @@ def _merge_spark(
             elif strategy == "delete_match":
                 merger = merger.whenMatchedDelete()
 
-            merger.execute()
+            try:
+                merger.execute()
+            finally:
+                # Restore configuration if we changed it
+                if orig_auto_merge is not None:
+                    spark.conf.set(
+                        "spark.databricks.delta.schema.autoMerge.enabled", orig_auto_merge
+                    )
 
         else:
             # Table does not exist

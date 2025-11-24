@@ -52,7 +52,7 @@ class HTMLStoryRenderer:
             from jinja2 import Template
         except ImportError:
             raise ImportError(
-                "jinja2 is required for HTML rendering. " "Install with: pip install jinja2"
+                "jinja2 is required for HTML rendering. Install with: pip install jinja2"
             )
 
         # Load template
@@ -302,7 +302,7 @@ def get_renderer(format: str):
     renderer_class = renderers.get(format.lower())
     if not renderer_class:
         raise ValueError(
-            f"Unsupported format: {format}. " f"Supported formats: {', '.join(renderers.keys())}"
+            f"Unsupported format: {format}. Supported formats: {', '.join(renderers.keys())}"
         )
 
     return renderer_class()

@@ -201,7 +201,7 @@ def get_theme(name: str) -> StoryTheme:
         return BUILTIN_THEMES[name.lower()]
 
     raise ValueError(
-        f"Theme '{name}' not found. " f"Available themes: {', '.join(BUILTIN_THEMES.keys())}"
+        f"Theme '{name}' not found. Available themes: {', '.join(BUILTIN_THEMES.keys())}"
     )
 
 

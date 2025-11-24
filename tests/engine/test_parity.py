@@ -60,7 +60,6 @@ def spark_engine(mock_spark_session):
 
 
 class TestSparkEngineLogic:
-
     def test_pivot_logic(self, spark_engine, mock_spark_df):
         """Verify pivot calls correct Spark methods."""
         params = {

@@ -709,8 +709,7 @@ class SparkEngine(Engine):
 
                 if actual_type not in expected_dtypes:
                     failures.append(
-                        f"Column '{col_name}' has type '{actual_type}', "
-                        f"expected '{expected_type}'"
+                        f"Column '{col_name}' has type '{actual_type}', expected '{expected_type}'"
                     )
 
         return failures

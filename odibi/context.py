@@ -4,6 +4,65 @@ from typing import Dict, Any, Optional, Union
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 import pandas as pd
+from odibi.enums import EngineType
+
+
+class EngineContext:
+    """
+    The context passed to transformations.
+    Wraps the global context (other datasets) and the local state (current dataframe).
+    Provides uniform API for SQL and Data operations.
+    """
+
+    def __init__(
+        self,
+        context: "Context",
+        df: Any,
+        engine_type: EngineType,
+        sql_executor: Optional[Any] = None,
+    ):
+        self.context = context
+        self.df = df
+        self.engine_type = engine_type
+        self.sql_executor = sql_executor
+
+    @property
+    def columns(self) -> list[str]:
+        if hasattr(self.df, "columns"):
+            return list(self.df.columns)
+        # Spark
+        if hasattr(self.df, "schema"):
+            return self.df.columns
+        return []
+
+    def with_df(self, df: Any) -> "EngineContext":
+        """Returns a new context with updated DataFrame."""
+        return EngineContext(self.context, df, self.engine_type, self.sql_executor)
+
+    def get(self, name: str) -> Any:
+        """Get a dataset from global context."""
+        return self.context.get(name)
+
+    def register_temp_view(self, name: str, df: Any) -> None:
+        """Register a temporary view for SQL."""
+        self.context.register(name, df)
+
+    def sql(self, query: str) -> "EngineContext":
+        """Execute SQL on the current DataFrame (aliased as 'df')."""
+        if self.sql_executor:
+            # Workaround: Register current df as 'df' in the context
+            # Note: We might be overwriting a 'df' if it existed, but 'df' is reserved for current.
+            # Context implementations usually allow overwriting.
+            self.context.register("df", self.df)
+            try:
+                res = self.sql_executor(query, self.context)
+                return self.with_df(res)
+            finally:
+                # Optional: Cleanup 'df' from context to avoid pollution?
+                # For now, keep it simple.
+                pass
+
+        raise NotImplementedError("EngineContext.sql requires sql_executor to be set.")
 
 
 class Context(ABC):
@@ -95,7 +154,7 @@ class PandasContext(Context):
         """
         if name not in self._data:
             available = ", ".join(self._data.keys()) if self._data else "none"
-            raise KeyError(f"DataFrame '{name}' not found in context. " f"Available: {available}")
+            raise KeyError(f"DataFrame '{name}' not found in context. Available: {available}")
         return self._data[name]
 
     def has(self, name: str) -> bool:
@@ -165,9 +224,6 @@ class SparkContext(Context):
                 "Names must contain only alphanumeric characters and underscores "
                 "(no spaces or hyphens). Please rename this node in your configuration."
             )
-
-        # Check for starting digit? Spark handles it but it's bad practice.
-        # For now, let's stick to the user's request: "spaces or special characters".
 
     def register(self, name: str, df: Any) -> None:
         """Register a Spark DataFrame as temp view.

@@ -13,7 +13,7 @@ def generate_patients(n=100):
             {
                 "patient_id": f"P-{i:04d}",
                 "name": f"Patient {i}",
-                "ssn": f"{random.randint(100,999)}-{random.randint(10,99)}-{random.randint(1000,9999)}",
+                "ssn": f"{random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(1000, 9999)}",
                 "phone": f"555-01{i:02d}",
                 "email": f"patient{i}@example.com",
                 "diagnosis_code": "A01",
