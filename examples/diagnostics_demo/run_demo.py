@@ -25,12 +25,17 @@ from odibi.diagnostics.delta import get_delta_diff
 from odibi.transformations.registry import get_registry
 
 # --- 1. Setup Environment ---
+import time
+
+timestamp = int(time.time())
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-STORY_DIR = os.path.join(BASE_DIR, "stories")
+# Use unique output dir to avoid Windows file locking/permission issues
+OUTPUT_DIR = os.path.join(BASE_DIR, f"output_{timestamp}")
+STORY_DIR = os.path.join(BASE_DIR, f"stories_{timestamp}")
 
-# Clean previous runs
+# Clean previous runs (best effort)
+# ...
 if os.path.exists(OUTPUT_DIR):
     try:
         shutil.rmtree(OUTPUT_DIR)
@@ -314,26 +319,50 @@ if len(runs) >= 2:
 
 
 # --- 7. API Usage: Delta Diff ---
-print("\n3. Delta Deep Dive:")
+print("\n3. Delta Deep Dive (Spark Powered):")
 # Direct path to the Delta table
 delta_path = os.path.join(OUTPUT_DIR, "enriched_customers")
 
+# Try to initialize Spark for advanced diff
+spark = None
+try:
+    from pyspark.sql import SparkSession
+    from delta import configure_spark_with_delta_pip
+
+    print("   [INFO] Initializing Spark for Deep Diagnostics...")
+    builder = (
+        SparkSession.builder.appName("odibi_demo")
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config(
+            "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+        )
+        .config("spark.executor.memory", "1g")
+        .config("spark.driver.memory", "1g")
+    )
+
+    spark = configure_spark_with_delta_pip(builder).getOrCreate()
+    spark.sparkContext.setLogLevel("ERROR")
+except ImportError:
+    print("   [WARN] PySpark/Delta not found. Falling back to Pandas implementation.")
+except Exception as e:
+    print(f"   [WARN] Spark initialization failed: {e}. Falling back to Pandas.")
+
 # Compare latest version (v1) vs previous (v0)
-# Note: In this run, we did Overwrite, so v1 is a full rewrite.
-# Delta Diff will show full replacement or difference depending on how delta handles overwrite.
-# Let's see.
 delta_diff = get_delta_diff(
     table_path=delta_path,
     version_a=0,
     version_b=1,
     deep=True,  # Enable row-level diff
     keys=["id"],  # Use keys to detect updates
+    spark=spark,  # Use Spark if available
 )
 
 print(f"   Table: {delta_path}")
 print(f"   Rows Changed: {delta_diff.rows_change}")
 print(f"   Rows Added: {delta_diff.rows_added}")
+print(f"   Rows Removed: {delta_diff.rows_removed}")
 print(f"   Rows Updated: {delta_diff.rows_updated}")
+
 print(f"   Files Added/Removed: {delta_diff.files_change}")
 
 if delta_diff.sample_updated:
