@@ -240,7 +240,7 @@ class Node:
 
         # 1. Read Phase
         result_df = self._execute_read_phase()
-        
+
         # If no direct read, check dependencies
         if result_df is None and self.config.depends_on:
             # If this is a transform/write node, get data from dependency
@@ -293,9 +293,7 @@ class Node:
         self._execution_steps.append("Dry run: Skipping actual execution")
 
         if self.config.read:
-            self._execution_steps.append(
-                f"Dry run: Would read from {self.config.read.connection}"
-            )
+            self._execution_steps.append(f"Dry run: Would read from {self.config.read.connection}")
 
         if self.config.transform:
             self._execution_steps.append(
@@ -303,9 +301,7 @@ class Node:
             )
 
         if self.config.write:
-            self._execution_steps.append(
-                f"Dry run: Would write to {self.config.write.connection}"
-            )
+            self._execution_steps.append(f"Dry run: Would write to {self.config.write.connection}")
 
         return NodeResult(
             node_name=self.config.name,
@@ -319,14 +315,16 @@ class Node:
         """Execute read operation."""
         if not self.config.read:
             return None
-            
+
         result_df = self._execute_read()
         self._execution_steps.append(f"Read from {self.config.read.connection}")
         return result_df
 
-    def _execute_transform_phase(self, result_df: Optional[Any], input_df: Optional[Any]) -> Optional[Any]:
+    def _execute_transform_phase(
+        self, result_df: Optional[Any], input_df: Optional[Any]
+    ) -> Optional[Any]:
         """Execute transformer and transform steps."""
-        
+
         # Transformer Node (Phase 2.1)
         if self.config.transformer:
             # If transform-only node, ensure we have input
@@ -345,7 +343,7 @@ class Node:
             self._execution_steps.append(
                 f"Applied {len(self.config.transform.steps)} transform steps"
             )
-            
+
         return result_df
 
     def _execute_validation_phase(self, result_df: Any) -> None:
@@ -588,15 +586,17 @@ class Node:
 
         if delta_info:
             self._delta_write_info = delta_info
-            self._calculate_delta_diagnostics(delta_info, connection, write_config, deep_diag, diff_keys)
+            self._calculate_delta_diagnostics(
+                delta_info, connection, write_config, deep_diag, diff_keys
+            )
 
     def _calculate_delta_diagnostics(
-        self, 
-        delta_info: Dict[str, Any], 
-        connection: Any, 
-        write_config: Any, 
-        deep_diag: bool, 
-        diff_keys: Optional[List[str]]
+        self,
+        delta_info: Dict[str, Any],
+        connection: Any,
+        write_config: Any,
+        deep_diag: bool,
+        diff_keys: Optional[List[str]],
     ) -> None:
         """Calculate Delta Lake diagnostics/diff."""
         # Calculate Data Diff if version > 0
@@ -607,9 +607,7 @@ class Node:
                 from odibi.diagnostics import get_delta_diff
 
                 # Determine table path
-                full_path = (
-                    connection.get_path(write_config.path) if write_config.path else None
-                )
+                full_path = connection.get_path(write_config.path) if write_config.path else None
 
                 if full_path:
                     # For Spark engine, we need to pass the spark session
@@ -662,14 +660,15 @@ class Node:
 
             except Exception as e:
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to calculate data diff: {e}")
 
     def _collect_metadata(
-        self, 
-        df: Optional[Any], 
-        input_schema: Optional[Any] = None, 
-        input_sample: Optional[List[Dict[str, Any]]] = None
+        self,
+        df: Optional[Any],
+        input_schema: Optional[Any] = None,
+        input_sample: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Collect metadata about execution.
 
@@ -689,12 +688,14 @@ class Node:
 
         try:
             import pandas as pd
+
             pandas_version = pd.__version__
         except ImportError:
             pandas_version = None
 
         try:
             import pyspark
+
             pyspark_version = pyspark.__version__
         except ImportError:
             pyspark_version = None
@@ -734,10 +735,10 @@ class Node:
 
         if self._delta_write_info:
             from odibi.story.metadata import DeltaWriteInfo
-            
+
             ts = self._delta_write_info.get("timestamp")
             # Spark returns datetime object usually, but let's be safe
-            
+
             metadata["delta_info"] = DeltaWriteInfo(
                 version=self._delta_write_info["version"],
                 timestamp=ts,
@@ -778,37 +779,41 @@ class Node:
 
         # Redact input sample if present
         if "sample_data_in" in metadata:
-            metadata["sample_data_in"] = self._redact_sample_list(metadata["sample_data_in"], self.config.sensitive)
+            metadata["sample_data_in"] = self._redact_sample_list(
+                metadata["sample_data_in"], self.config.sensitive
+            )
 
         return metadata
 
     def _get_redacted_sample(self, df: Any, sensitive_config: Any) -> List[Dict[str, Any]]:
         """Get sample data with redaction."""
         if sensitive_config is True:
-             # Redact all
-             return [{"message": "[REDACTED: Sensitive Data]"}]
-        
+            # Redact all
+            return [{"message": "[REDACTED: Sensitive Data]"}]
+
         try:
             sample = self.engine.get_sample(df, n=self.max_sample_rows)
             return self._redact_sample_list(sample, sensitive_config)
         except Exception:
             return []
 
-    def _redact_sample_list(self, sample: List[Dict[str, Any]], sensitive_config: Any) -> List[Dict[str, Any]]:
+    def _redact_sample_list(
+        self, sample: List[Dict[str, Any]], sensitive_config: Any
+    ) -> List[Dict[str, Any]]:
         """Redact list of rows based on config."""
         if not sample:
             return []
-            
+
         if sensitive_config is True:
             return [{"message": "[REDACTED: Sensitive Data]"}]
-            
+
         if isinstance(sensitive_config, list):
             # Redact specific columns
             for row in sample:
                 for col in sensitive_config:
                     if col in row:
                         row[col] = "[REDACTED]"
-        
+
         return sample
 
     def _get_schema(self, df: Any) -> Any:

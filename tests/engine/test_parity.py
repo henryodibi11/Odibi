@@ -298,15 +298,15 @@ class TestSparkEngineLogic:
         # We should patch where it is used, which is odibi.pipeline.get_engine_class
         # OR patch the registry module itself.
         # Since we imported Pipeline from odibi.pipeline, patching 'odibi.pipeline.get_engine_class' is safest.
-        
+
         # However, Pipeline imports `from odibi.engine.registry import get_engine_class`
         # So we patch `odibi.pipeline.get_engine_class`
-        
+
         with patch("odibi.pipeline.get_engine_class") as MockGetEngineClass:
             # Configure the mock engine class and instance
             MockSparkEngineClass = MagicMock()
             MockGetEngineClass.return_value = MockSparkEngineClass
-            
+
             mock_engine_instance = MockSparkEngineClass.return_value
             mock_engine_instance.spark = mock_spark_session
             mock_engine_instance.name = "spark"

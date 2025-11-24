@@ -403,7 +403,7 @@ class PandasEngine(Engine):
         # Delta Lake Write
         if format == "delta":
             return self._write_delta(df, full_path, mode, merged_options)
-        
+
         # Handle Generic Upsert/Append-Once for non-Delta
         if mode in ["upsert", "append_once"]:
             df, mode = self._handle_generic_upsert(df, full_path, format, mode, merged_options)
@@ -501,6 +501,7 @@ class PandasEngine(Engine):
         partition_by = options.get("partition_by") or options.get("partitionBy")
         if partition_by:
             import warnings
+
             warnings.warn(
                 "⚠️  Partitioning can cause performance issues if misused. "
                 "Only partition on low-cardinality columns (< 1000 unique values) "
@@ -525,7 +526,7 @@ class PandasEngine(Engine):
             )
 
         storage_opts = merged_options.get("storage_options", {})
-        
+
         # Map modes
         delta_mode = "overwrite"
         if mode == "append":
@@ -534,16 +535,16 @@ class PandasEngine(Engine):
             delta_mode = "error"
         elif mode == "ignore":
             delta_mode = "ignore"
-        
+
         # Handle upsert/append_once logic
         if mode == "upsert":
             keys = merged_options.get("keys")
             if not keys:
                 raise ValueError("Upsert requires 'keys' in options")
-            
+
             if isinstance(keys, str):
                 keys = [keys]
-                
+
             dt = DeltaTable(full_path, storage_options=storage_opts)
             (
                 dt.merge(
@@ -560,10 +561,10 @@ class PandasEngine(Engine):
             keys = merged_options.get("keys")
             if not keys:
                 raise ValueError("Append_once requires 'keys' in options")
-                
+
             if isinstance(keys, str):
                 keys = [keys]
-                
+
             dt = DeltaTable(full_path, storage_options=storage_opts)
             (
                 dt.merge(
@@ -578,23 +579,28 @@ class PandasEngine(Engine):
         else:
             # Filter options supported by write_deltalake
             write_kwargs = {
-                k: v for k, v in merged_options.items() 
-                if k in ["partition_by", "mode", "overwrite_schema", "name", "description", "configuration"]
+                k: v
+                for k, v in merged_options.items()
+                if k
+                in [
+                    "partition_by",
+                    "mode",
+                    "overwrite_schema",
+                    "name",
+                    "description",
+                    "configuration",
+                ]
             }
-            
+
             write_deltalake(
-                full_path,
-                df,
-                mode=delta_mode,
-                storage_options=storage_opts,
-                **write_kwargs
+                full_path, df, mode=delta_mode, storage_options=storage_opts, **write_kwargs
             )
 
         # Return commit info
         dt = DeltaTable(full_path, storage_options=storage_opts)
         history = dt.history(limit=1)
         latest = history[0]
-        
+
         return {
             "version": dt.version(),
             "timestamp": datetime.fromtimestamp(latest.get("timestamp", 0) / 1000),
@@ -624,7 +630,7 @@ class PandasEngine(Engine):
         try:
             read_opts = options.copy()
             read_opts.pop("keys", None)
-            
+
             if format == "csv":
                 existing_df = pd.read_csv(full_path, **read_opts)
             elif format == "parquet":
@@ -635,10 +641,10 @@ class PandasEngine(Engine):
                 existing_df = pd.read_excel(full_path, **read_opts)
         except Exception:
             # File doesn't exist or can't be read
-            return df, "overwrite" # Treat as new write
+            return df, "overwrite"  # Treat as new write
 
         if existing_df is None:
-             return df, "overwrite"
+            return df, "overwrite"
 
         if mode == "append_once":
             # Check if keys exist
@@ -663,15 +669,13 @@ class PandasEngine(Engine):
                 raise KeyError(f"Keys {missing_keys} not found in input data")
 
             # 1. Remove rows from existing that are in input
-            merged_indicator = existing_df.merge(
-                df[keys], on=keys, how="left", indicator=True
-            )
+            merged_indicator = existing_df.merge(df[keys], on=keys, how="left", indicator=True)
             rows_to_keep = existing_df[merged_indicator["_merge"] == "left_only"]
 
             # 2. Concat rows_to_keep + input df
             # 3. Write mode becomes overwrite
             return pd.concat([rows_to_keep, df], ignore_index=True), "overwrite"
-            
+
         return df, mode
 
     def _write_file(
@@ -685,10 +689,10 @@ class PandasEngine(Engine):
         """Handle standard file writing (CSV, Parquet, etc.)."""
         writer_options = merged_options.copy()
         writer_options.pop("keys", None)
-        
+
         # Remove storage_options for local pandas writers usually?
         # Some pandas writers accept storage_options (parquet, csv with fsspec)
-        
+
         if format == "csv":
             mode_param = "w"
             if mode == "append":
@@ -700,9 +704,9 @@ class PandasEngine(Engine):
                     # If appending, don't write header unless explicit
                     if "header" not in writer_options:
                         writer_options["header"] = False
-            
+
             df.to_csv(full_path, index=False, mode=mode_param, **writer_options)
-            
+
         elif format == "parquet":
             if mode == "append":
                 # Pandas read_parquet doesn't support append directly usually.
@@ -710,19 +714,19 @@ class PandasEngine(Engine):
                 if os.path.exists(full_path):
                     existing = pd.read_parquet(full_path, **merged_options)
                     df = pd.concat([existing, df], ignore_index=True)
-            
+
             df.to_parquet(full_path, index=False, **writer_options)
-            
+
         elif format == "json":
             if mode == "append":
                 writer_options["mode"] = "a"
-            
+
             # Default to records if not specified
             if "orient" not in writer_options:
                 writer_options["orient"] = "records"
-                
+
             df.to_json(full_path, **writer_options)
-            
+
         elif format == "excel":
             if mode == "append":
                 # Simple append for excel
@@ -732,16 +736,16 @@ class PandasEngine(Engine):
                     return
 
             df.to_excel(full_path, index=False, **writer_options)
-            
+
         elif format == "avro":
             try:
                 import fastavro
             except ImportError:
                 raise ImportError("Avro support requires 'pip install fastavro'")
-                
+
             records = df.to_dict("records")
             schema = self._infer_avro_schema(df)
-            
+
             # Use fsspec for remote URIs (abfss://, s3://, etc.)
             parsed = urlparse(full_path)
             if parsed.scheme and parsed.scheme not in ["file", ""]:
@@ -757,7 +761,7 @@ class PandasEngine(Engine):
                 open_mode = "wb"
                 if mode == "append" and os.path.exists(full_path):
                     open_mode = "a+b"
-                    
+
                 with open(full_path, open_mode) as f:
                     fastavro.writer(f, schema, records)
         else:
