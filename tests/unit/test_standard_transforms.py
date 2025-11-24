@@ -497,15 +497,10 @@ def test_parse_json(pandas_context):
         output_col="parsed_meta",
     )
 
-    try:
-        result = advanced.parse_json(pandas_context, params).df
-        assert "parsed_meta" in result.columns
-        # Check if not null
-        assert result.iloc[0]["parsed_meta"] is not None
-    except Exception as e:
-        # Fallback: If DuckDB version is too old for json_parse, we skip
-
-        print(f"Skipping JSON test due to DuckDB limitation: {e}")
+    result = advanced.parse_json(pandas_context, params).df
+    assert "parsed_meta" in result.columns
+    # Check if not null
+    assert result.iloc[0]["parsed_meta"] is not None
 
 
 def test_window_calculation(pandas_context):

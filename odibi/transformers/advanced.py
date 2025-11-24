@@ -323,10 +323,10 @@ def parse_json(context: EngineContext, params: ParseJsonParams) -> EngineContext
         # Spark's schema string "a INT, b STRING" is not valid DuckDB STRUCT(a INT, b VARCHAR).
 
         # For V1 of this function, we will focus on Spark (where it's critical).
-        # For DuckDB, we will use `json_parse(col)` which makes it a JSON object,
-        # and future `unpack_struct` calls usually handle JSON types in DuckDB 0.10+.
+        # For DuckDB, we will use `CAST(col AS JSON)` which is the standard way to parse JSON string to JSON type.
+        # `json_parse` is an alias in some versions but CAST is more stable.
 
-        expr = f"json_parse({params.column})"
+        expr = f"CAST({params.column} AS JSON)"
 
     sql_query = f"SELECT *, {expr} AS {target} FROM df"
     return context.sql(sql_query)
