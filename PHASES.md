@@ -14,12 +14,26 @@ For a detailed history of all completed phases, see:
 
 ## 📊 Snapshot: Where We Are
 
-- **Latest Release:** `v2.2.0` – High-Performance Core
-- **Completed Phases:** 1–6, 9, 10, 2.1, 2.2
+- **Latest Release:** `v2.3.0` – Deep Observability
+- **Completed Phases:** 1–6, 9, 10, 2.1, 2.2, 2.3
 - **Currently Active:** Planning Phase 7
 - **Stability:** Production-ready; >500 tests; ~80% coverage
 
 ---
+
+## Phase 2.3 — Deep Observability (COMPLETED)
+
+**Goal:** Transform ODIBI into a platform with first-class troubleshooting, lineage, and drift detection without requiring user instrumentation.
+
+**Status:** **Completed**
+
+**Delivered Features:**
+- **Explicit SQL Lineage:** Automatically captures and logs all SQL executed via `context.sql()` in Python transformers, eliminating "black box" transformations.
+- **Delta Lake Version Tracking:** Native integration with Delta Lake transaction logs to capture version, timestamp, and operation metrics for every write.
+- **Data Drift Diagnostics:**
+  - **Row-Level Diffing:** Ability to identify exactly *which* rows were added or removed between runs using `get_delta_diff`.
+  - **Visual Stories:** Generated stories now include a "Data Changes" section showing samples of added/removed rows.
+- **Run Comparison:** `odibi.diagnostics` module to programmatically compare pipeline runs (`run-diff`) for logic and data drift.
 
 ## Phase 2.2 — High-Performance Core (COMPLETED)
 
