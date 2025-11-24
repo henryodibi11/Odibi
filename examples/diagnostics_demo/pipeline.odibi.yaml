@@ -1,0 +1,32 @@
+connections:
+  local:
+    base_path: .
+    type: local
+engine: pandas
+pipelines:
+- nodes:
+  - name: raw_customers
+    read:
+      connection: local
+      format: csv
+      path: d:\odibi\examples\diagnostics_demo\data\customers.csv
+    write:
+      connection: local
+      format: delta
+      mode: append
+      path: d:\odibi\examples\diagnostics_demo\output\customers_delta
+  - depends_on:
+    - raw_customers
+    name: enriched_customers
+    transformer: examples.diagnostics_demo.logic.enrich_customers
+    write:
+      connection: local
+      format: delta
+      mode: append
+      path: d:\odibi\examples\diagnostics_demo\output\enriched_delta
+  pipeline: diagnostics_demo
+project: diagnostics_demo
+story:
+  connection: local
+  path: examples/diagnostics_demo/stories
+version: 0.1.0

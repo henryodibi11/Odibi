@@ -6,7 +6,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 import glob
 import os
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+
 
 from odibi.engine.base import Engine
 from odibi.context import Context, PandasContext
@@ -15,6 +17,8 @@ from odibi.exceptions import TransformError
 
 class PandasEngine(Engine):
     """Pandas-based execution engine."""
+
+    name = "pandas"
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize Pandas engine.
@@ -316,7 +320,7 @@ class PandasEngine(Engine):
         path: Optional[str] = None,
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> Optional[Dict[str, Any]]:
         """Write data using Pandas.
 
         Args:
@@ -327,6 +331,9 @@ class PandasEngine(Engine):
             path: File path
             mode: Write mode
             options: Format-specific options
+
+        Returns:
+             Optional dictionary containing Delta commit metadata (if format=delta)
         """
         options = options or {}
 
@@ -363,7 +370,12 @@ class PandasEngine(Engine):
                     options=current_options,
                 )
                 first_chunk = False
-            return
+
+            # For iterator, we can't easily return metadata for "the" write since it's many writes.
+            # For Delta, subsequent appends create new versions.
+            # We could return the *last* commit info?
+            # Or just None for now to be safe.
+            return None
 
         # SQL Server / Azure SQL Support
         if format in ["sql_server", "azure_sql"]:
@@ -397,7 +409,7 @@ class PandasEngine(Engine):
                 if_exists=if_exists,
                 chunksize=chunksize,
             )
-            return
+            return None
 
         # Get full path from connection
         if path:
@@ -418,7 +430,7 @@ class PandasEngine(Engine):
         # Custom Writers
         if format in self._custom_writers:
             self._custom_writers[format](df, full_path, mode=mode, **writer_options)
-            return
+            return None
 
         # Only create local directories (skip for remote URIs like abfss://, s3://)
         parsed = urlparse(full_path)
@@ -430,9 +442,91 @@ class PandasEngine(Engine):
         if not parsed.scheme or parsed.scheme == "file" or is_windows_drive:
             Path(full_path).parent.mkdir(parents=True, exist_ok=True)
 
+        # --- Delta Lake Write Support ---
+        if format == "delta":
+            try:
+                from deltalake import write_deltalake, DeltaTable
+            except ImportError:
+                raise ImportError(
+                    "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
+                    "See README.md for installation instructions."
+                )
+
+            storage_opts = merged_options.get("storage_options", {})
+
+            # write_deltalake supports: mode='error' | 'append' | 'overwrite' | 'ignore'
+            # We map our modes to these.
+            delta_mode = mode
+
+            # Clean writer_options (remove storage_options as it is passed explicitly)
+            if "storage_options" in writer_options:
+                del writer_options["storage_options"]
+
+            if mode == "upsert":
+                # deltalake >= 0.10.0 supports merge, but write_deltalake doesn't handle it directly in same API usually?
+                # It does via `engine="rust"` usually?
+                # Actually, write_deltalake does NOT support upsert directly as a mode string in basic usage.
+                # We need to use DeltaTable.merge() for upserts.
+
+                if "keys" not in options:
+                    raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
+
+                dt = DeltaTable(full_path, storage_options=storage_opts)
+                keys = options["keys"]
+                if isinstance(keys, str):
+                    keys = [keys]
+
+                # Build merge condition
+                # source is new data, target is existing table
+                # condition: target.key = source.key
+                predicate = " AND ".join([f"target.{k} = source.{k}" for k in keys])
+
+                dt.merge(
+                    source=df, predicate=predicate, source_alias="source", target_alias="target"
+                ).when_matched_update_all().when_not_matched_insert_all().execute()
+
+            elif mode == "append_once":
+                # Merge with insert-only
+                if "keys" not in options:
+                    raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
+
+                dt = DeltaTable(full_path, storage_options=storage_opts)
+                keys = options["keys"]
+                if isinstance(keys, str):
+                    keys = [keys]
+
+                predicate = " AND ".join([f"target.{k} = source.{k}" for k in keys])
+
+                dt.merge(
+                    source=df, predicate=predicate, source_alias="source", target_alias="target"
+                ).when_not_matched_insert_all().execute()
+
+            else:
+                # Standard write (overwrite, append)
+                write_deltalake(
+                    full_path,
+                    df,
+                    mode=mode if mode != "fail" else "error",
+                    storage_options=storage_opts,
+                    **writer_options,
+                )
+
+            # Fetch Metadata
+            dt = DeltaTable(full_path, storage_options=storage_opts)
+            last_commit = dt.history(1)[0]
+
+            return {
+                "version": last_commit["version"],
+                "timestamp": datetime.fromtimestamp(
+                    last_commit["timestamp"] / 1000
+                ),  # ms to datetime
+                "operation": last_commit["operation"],
+                "operation_metrics": last_commit.get("operationMetrics", {}),
+            }
+
         # --- Generic Upsert/Append-Once Logic for File Formats (CSV, Parquet, JSON) ---
-        # Delta Lake has its own native implementation below.
-        if mode in ["upsert", "append_once"] and format != "delta":
+        # Delta Lake has its own native implementation above.
+        if mode in ["upsert", "append_once"]:
             if "keys" not in options:
                 raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
 

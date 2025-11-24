@@ -25,6 +25,7 @@ class EngineContext:
         self.df = df
         self.engine_type = engine_type
         self.sql_executor = sql_executor
+        self._sql_history: list[str] = []
 
     @property
     def columns(self) -> list[str]:
@@ -37,7 +38,21 @@ class EngineContext:
 
     def with_df(self, df: Any) -> "EngineContext":
         """Returns a new context with updated DataFrame."""
-        return EngineContext(self.context, df, self.engine_type, self.sql_executor)
+        new_ctx = EngineContext(self.context, df, self.engine_type, self.sql_executor)
+        # Preserve history? No, we want history per-transformation scope usually.
+        # But wait, if we chain, we might want to pass it?
+        # For now, let's keep history tied to the specific context instance used in a transform.
+        # The Node will check the context instance it passed to the function.
+        # However, if the function returns a new context (via with_df), we lose the reference.
+        # Actually, the user functions usually return a DataFrame, not a Context.
+        # Context is just the helper.
+        # So we can accumulate in the *original* context passed to the function?
+        # No, context is immutable-ish.
+        # Let's make sql_history shared if we branch?
+        # Actually, simple approach: The user calls context.sql(). That context instance records it.
+        # If they chain .sql().sql(), we need the new context to share the history list.
+        new_ctx._sql_history = self._sql_history
+        return new_ctx
 
     def get(self, name: str) -> Any:
         """Get a dataset from global context."""
@@ -49,6 +64,9 @@ class EngineContext:
 
     def sql(self, query: str) -> "EngineContext":
         """Execute SQL on the current DataFrame (aliased as 'df')."""
+        # Track SQL
+        self._sql_history.append(query)
+
         if self.sql_executor:
             # Workaround: Register current df as 'df' in the context
             # Note: We might be overwriting a 'df' if it existed, but 'df' is reserved for current.

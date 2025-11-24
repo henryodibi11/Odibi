@@ -406,19 +406,19 @@
       }
     },
     "alert_test": {
-      "last_run": "2025-11-22T20:05:51.036909",
+      "last_run": "2025-11-24T08:25:36.223681",
       "nodes": {}
     },
     "parallel_test": {
-      "last_run": "2025-11-22T20:05:56.330772",
+      "last_run": "2025-11-24T08:25:37.225687",
       "nodes": {
+        "node_b": {
+          "success": true,
+          "timestamp": "2025-11-24T08:25:37.224687"
+        },
         "node_a": {
           "success": false,
           "timestamp": null
-        },
-        "node_b": {
-          "success": true,
-          "timestamp": "2025-11-22T20:05:56.328592"
         },
         "node_c": {
           "success": false,
@@ -427,46 +427,46 @@
       }
     },
     "test_read": {
-      "last_run": "2025-11-22T20:05:56.361652",
+      "last_run": "2025-11-24T08:25:37.244688",
       "nodes": {
         "load_data": {
           "success": true,
-          "timestamp": "2025-11-22T20:05:56.346832"
+          "timestamp": "2025-11-24T08:25:37.244688"
         }
       }
     },
     "test_deps": {
-      "last_run": "2025-11-22T20:05:56.862833",
+      "last_run": "2025-11-24T08:25:37.328293",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-22T20:05:56.831641"
+          "timestamp": "2025-11-24T08:25:37.326293"
         },
         "transform": {
           "success": true,
-          "timestamp": "2025-11-22T20:05:56.861780"
+          "timestamp": "2025-11-24T08:25:37.328293"
         }
       }
     },
     "test_write": {
-      "last_run": "2025-11-22T20:05:57.231226",
+      "last_run": "2025-11-24T08:25:37.415809",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-22T20:05:57.231226"
+          "timestamp": "2025-11-24T08:25:37.414810"
         },
         "save": {
           "success": true,
-          "timestamp": "2025-11-22T20:05:57.231226"
+          "timestamp": "2025-11-24T08:25:37.415809"
         }
       }
     },
     "test_failure": {
-      "last_run": "2025-11-22T20:05:57.648864",
+      "last_run": "2025-11-24T08:25:37.474320",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-22T20:05:57.648864"
+          "timestamp": "2025-11-24T08:25:37.474320"
         },
         "fail": {
           "success": false,
@@ -479,11 +479,11 @@
       }
     },
     "test_independent": {
-      "last_run": "2025-11-22T20:05:58.164908",
+      "last_run": "2025-11-24T08:25:37.526318",
       "nodes": {
         "success1": {
           "success": true,
-          "timestamp": "2025-11-22T20:05:58.164908"
+          "timestamp": "2025-11-24T08:25:37.524319"
         },
         "fail": {
           "success": false,
@@ -491,20 +491,20 @@
         },
         "success2": {
           "success": true,
-          "timestamp": "2025-11-22T20:05:58.164908"
+          "timestamp": "2025-11-24T08:25:37.526318"
         }
       }
     },
     "test_spark": {
-      "last_run": "2025-11-22T20:06:27.979844",
+      "last_run": "2025-11-24T08:25:29.772901",
       "nodes": {
         "node1": {
           "success": true,
-          "timestamp": "2025-11-22T20:06:27.979844"
+          "timestamp": "2025-11-24T08:25:29.771900"
         },
         "node2": {
-          "success": true,
-          "timestamp": "2025-11-22T20:06:27.979844"
+          "success": false,
+          "timestamp": null
         }
       }
     },
@@ -548,6 +548,19 @@
         "node_fail": {
           "success": false,
           "timestamp": null
+        }
+      }
+    },
+    "diagnostics_demo": {
+      "last_run": "2025-11-24T08:21:17.765818",
+      "nodes": {
+        "raw_customers": {
+          "success": true,
+          "timestamp": "2025-11-24T08:21:17.721664"
+        },
+        "enriched_customers": {
+          "success": true,
+          "timestamp": "2025-11-24T08:21:17.764818"
         }
       }
     }

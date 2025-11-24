@@ -50,9 +50,16 @@ class TestTransformerNodeIntegration:
         mock_transformer.assert_called_once()
 
         # Verify params passed
-        # The first arg is context, second is current (None), kwargs are params
+        # The first arg is context (now wrapped in EngineContext), second is current (None), kwargs are params
+        # Since Node wraps context, we need to unwrap or check type
         call_args = mock_transformer.call_args
-        assert call_args[0][0] == context
+        # Check if it's EngineContext wrapping our mock context
+        from odibi.context import EngineContext
+
+        passed_context = call_args[0][0]
+        assert isinstance(passed_context, EngineContext)
+        assert passed_context.context == context
+
         assert call_args[1]["current"] is None
         assert call_args[1]["foo"] == "bar"
 

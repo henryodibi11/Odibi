@@ -11,6 +11,20 @@ from datetime import datetime
 
 
 @dataclass
+class DeltaWriteInfo:
+    """
+    Metadata specific to Delta Lake writes.
+    """
+
+    version: int
+    timestamp: Optional[datetime] = None
+    operation: Optional[str] = None
+    operation_metrics: Dict[str, Any] = field(default_factory=dict)
+    # For linking back to specific commit info if needed
+    read_version: Optional[int] = None  # The version we read FROM (if applicable)
+
+
+@dataclass
 class NodeExecutionMetadata:
     """
     Metadata for a single node execution.
@@ -37,6 +51,11 @@ class NodeExecutionMetadata:
     columns_added: List[str] = field(default_factory=list)
     columns_removed: List[str] = field(default_factory=list)
     columns_renamed: List[str] = field(default_factory=list)
+
+    # Execution Logic & Lineage
+    executed_sql: List[str] = field(default_factory=list)
+    delta_info: Optional[DeltaWriteInfo] = None
+    data_diff: Optional[Dict[str, Any]] = None  # Stores diff summary (added/removed samples)
 
     # Error info
     error_message: Optional[str] = None
@@ -66,7 +85,7 @@ class NodeExecutionMetadata:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return {
+        base_dict = {
             "node_name": self.node_name,
             "operation": self.operation,
             "status": self.status,
@@ -84,7 +103,22 @@ class NodeExecutionMetadata:
             "error_type": self.error_type,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
+            "executed_sql": self.executed_sql,
+            "data_diff": self.data_diff,
         }
+
+        if self.delta_info:
+            base_dict["delta_info"] = {
+                "version": self.delta_info.version,
+                "timestamp": (
+                    self.delta_info.timestamp.isoformat() if self.delta_info.timestamp else None
+                ),
+                "operation": self.delta_info.operation,
+                "operation_metrics": self.delta_info.operation_metrics,
+                "read_version": self.delta_info.read_version,
+            }
+
+        return base_dict
 
 
 @dataclass

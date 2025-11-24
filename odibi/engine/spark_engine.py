@@ -122,6 +122,43 @@ class SparkEngine(Engine):
             logger = logging.getLogger(__name__)
             logger.warning(f"Optimization failed for {target}: {e}")
 
+    def _get_last_delta_commit_info(
+        self, target: str, is_table: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """Get metadata for the most recent Delta commit.
+
+        Args:
+            target: Table name or file path
+            is_table: True if target is a table name
+
+        Returns:
+            Dictionary with version, timestamp, operation, metrics
+        """
+        try:
+            from delta.tables import DeltaTable
+
+            if is_table:
+                dt = DeltaTable.forName(self.spark, target)
+            else:
+                dt = DeltaTable.forPath(self.spark, target)
+
+            # Get last commit
+            last_commit = dt.history(1).collect()[0]
+
+            return {
+                "version": last_commit["version"],
+                "timestamp": last_commit["timestamp"],
+                "operation": last_commit["operation"],
+                "operation_metrics": last_commit["operationMetrics"],
+                "read_version": last_commit.get("readVersion"),
+            }
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to fetch Delta commit info for {target}: {e}")
+            return None
+
     def get_schema(self, df) -> List[str]:
         """Get DataFrame schema as list of column names.
 
@@ -270,7 +307,7 @@ class SparkEngine(Engine):
         register_table: Optional[str] = None,
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> Optional[Dict[str, Any]]:
         """Write data using Spark.
 
         Args:
@@ -282,6 +319,9 @@ class SparkEngine(Engine):
             register_table: Name to register as external table (if path is used)
             mode: Write mode (overwrite, append, error, ignore)
             options: Format-specific options (including partition_by for partitioning)
+
+        Returns:
+            Optional dictionary containing Delta commit metadata (if format=delta)
         """
         options = options or {}
 
@@ -331,7 +371,8 @@ class SparkEngine(Engine):
 
             if format == "delta":
                 self._optimize_delta_write(table, options, is_table=True)
-            return
+                return self._get_last_delta_commit_info(table, is_table=True)
+            return None
 
         elif path:
             full_path = connection.get_path(path)
@@ -398,7 +439,7 @@ class SparkEngine(Engine):
                     )
 
                 self._optimize_delta_write(full_path, options, is_table=False)
-                return
+                return self._get_last_delta_commit_info(full_path, is_table=False)
             else:
                 # Table does not exist, fall back to standard write (create)
                 # Usually initial write is overwrite/create
@@ -472,7 +513,10 @@ class SparkEngine(Engine):
                     self._optimize_delta_write(
                         target_name if table else full_path, options, is_table=bool(table)
                     )
-                return
+                    return self._get_last_delta_commit_info(
+                        target_name if table else full_path, is_table=bool(table)
+                    )
+                return None
 
         writer = df.write.format(format).mode(mode)
 
@@ -504,6 +548,11 @@ class SparkEngine(Engine):
 
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to register external table '{register_table}': {e}")
+
+        if format == "delta":
+            return self._get_last_delta_commit_info(full_path, is_table=False)
+
+        return None
 
     def execute_sql(self, sql: str, context) -> Any:
         """Execute SQL query using Spark SQL.

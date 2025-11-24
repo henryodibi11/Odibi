@@ -6,7 +6,8 @@ import time
 from pydantic import BaseModel, Field
 
 from odibi.config import NodeConfig, RetryConfig
-from odibi.context import Context
+from odibi.context import Context, EngineContext
+from odibi.enums import EngineType
 from odibi.registry import FunctionRegistry
 from odibi.transformations.registry import get_registry as get_transformation_registry
 from odibi.exceptions import NodeExecutionError, TransformError, ValidationError, ExecutionContext
@@ -65,6 +66,8 @@ class Node:
 
         self._cached_result: Optional[Any] = None
         self._execution_steps: List[str] = []
+        self._executed_sql: List[str] = []
+        self._delta_write_info: Optional[Dict[str, Any]] = None
 
     def restore(self) -> bool:
         """Restore node state from previous execution (if persisted).
@@ -436,10 +439,24 @@ class Node:
         if not func:
             raise ValueError(f"Transformer '{transformer_name}' not found.")
 
+        # Create EngineContext to support sql() and tracking
+        engine_type = EngineType.PANDAS if self.engine.name == "pandas" else EngineType.SPARK
+        engine_ctx = EngineContext(
+            context=self.context,
+            df=input_df,
+            engine_type=engine_type,
+            sql_executor=self.engine.execute_sql,
+        )
+
         # Execute
-        # We call func(context=self.context, current=input_df, **params)
+        # We call func(context=engine_ctx, current=input_df, **params)
         try:
-            result = func(self.context, current=input_df, **params)
+            result = func(engine_ctx, current=input_df, **params)
+
+            # Capture SQL history
+            if engine_ctx._sql_history:
+                self._executed_sql.extend(engine_ctx._sql_history)
+
         except Exception as e:
             # Wrap error
             raise TransformError(f"Transformer '{transformer_name}' failed: {e}") from e
@@ -519,6 +536,7 @@ class Node:
         Returns:
             Result DataFrame
         """
+        self._executed_sql.append(sql)
         return self.engine.execute_sql(sql, self.context)
 
     def _execute_function_step(
@@ -544,12 +562,29 @@ class Node:
 
         # Check if function accepts 'current' parameter
         sig = inspect.signature(func)
+
+        # Create EngineContext
+        engine_type = EngineType.PANDAS if self.engine.name == "pandas" else EngineType.SPARK
+        engine_ctx = EngineContext(
+            context=self.context,
+            df=current_df,
+            engine_type=engine_type,
+            sql_executor=self.engine.execute_sql,
+        )
+
+        # Capture SQL history before execution (technically 0 for new context)
+        # initial_sql_count = len(self.context._sql_history)
+
         if "current" in sig.parameters:
             # Inject current DataFrame
-            result = func(self.context, current=current_df, **params)
+            result = func(engine_ctx, current=current_df, **params)
         else:
             # Original behavior - context only
-            result = func(self.context, **params)
+            result = func(engine_ctx, **params)
+
+        # Capture new SQL queries executed during function call
+        if engine_ctx._sql_history:
+            self._executed_sql.extend(engine_ctx._sql_history)
 
         return result
 
@@ -601,7 +636,7 @@ class Node:
             )
 
         # Delegate to engine-specific writer
-        self.engine.write(
+        delta_info = self.engine.write(
             df=df,
             connection=connection,
             format=write_config.format,
@@ -610,6 +645,53 @@ class Node:
             mode=write_config.mode,
             options=write_config.options,
         )
+
+        if delta_info:
+            self._delta_write_info = delta_info
+
+            # Calculate Data Diff if version > 0
+            # Use isinstance to protect against Mocks in tests
+            ver = delta_info.get("version", 0)
+            if isinstance(ver, int) and ver > 0:
+                try:
+                    # Import here to avoid circular dependency if any
+                    from odibi.diagnostics import get_delta_diff
+
+                    # Determine table path
+                    full_path = (
+                        connection.get_path(write_config.path) if write_config.path else None
+                    )
+                    # If table based, we need to resolve it or pass spark.
+                    # get_delta_diff handles path.
+
+                    if full_path:
+                        # For Spark engine, we need to pass the spark session
+                        spark_session = getattr(self.engine, "spark", None)
+
+                        # Current version
+                        curr_ver = delta_info["version"]
+                        prev_ver = curr_ver - 1
+
+                        diff = get_delta_diff(
+                            table_path=full_path,
+                            version_a=prev_ver,
+                            version_b=curr_ver,
+                            spark=spark_session,
+                        )
+
+                        # Store lightweight summary
+                        self._delta_write_info["data_diff"] = {
+                            "rows_change": diff.rows_change,
+                            "sample_added": diff.sample_added,
+                            "sample_removed": diff.sample_removed,
+                        }
+                except Exception as e:
+                    # Don't fail the pipeline if diagnostics fail
+                    # Just log it
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to calculate data diff: {e}")
 
     def _collect_metadata(self, df: Optional[Any]) -> Dict[str, Any]:
         """Collect metadata about execution.
@@ -623,7 +705,30 @@ class Node:
         metadata = {
             "timestamp": datetime.now().isoformat(),
             "steps": self._execution_steps.copy(),
+            "executed_sql": self._executed_sql.copy(),
         }
+
+        if self._delta_write_info:
+            from odibi.story.metadata import DeltaWriteInfo
+
+            # Convert timestamp string/object to datetime if needed
+            # Spark returns datetime object usually, but let's be safe
+            ts = self._delta_write_info.get("timestamp")
+            if isinstance(ts, str):
+                # Parse if string (unlikely from Spark result, but possible if serialized)
+                # Assuming it's a datetime object from Spark Row
+                pass
+
+            metadata["delta_info"] = DeltaWriteInfo(
+                version=self._delta_write_info["version"],
+                timestamp=ts,
+                operation=self._delta_write_info.get("operation"),
+                operation_metrics=self._delta_write_info.get("operation_metrics", {}),
+                read_version=self._delta_write_info.get("read_version"),
+            )
+
+            if "data_diff" in self._delta_write_info:
+                metadata["data_diff"] = self._delta_write_info["data_diff"]
 
         if df is not None:
             metadata["rows"] = self._count_rows(df)

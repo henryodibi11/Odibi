@@ -2,7 +2,7 @@ import logging
 import os
 
 from odibi.transformations import transformation
-from odibi.context import SparkContext, PandasContext
+from odibi.context import SparkContext, PandasContext, EngineContext
 
 try:
     from delta.tables import DeltaTable
@@ -24,6 +24,11 @@ def merge(context, current, **params):
         strategy (str): 'upsert' (default), 'append_only', 'delete_match'.
         audit_cols (Dict): {'created_col': '...', 'updated_col': '...'}
     """
+    # Unwrap EngineContext if present
+    real_context = context
+    if isinstance(context, EngineContext):
+        real_context = context.context
+
     target = params.get("target")
     keys = params.get("keys")
     strategy = params.get("strategy", "upsert")
@@ -43,9 +48,9 @@ def merge(context, current, **params):
     if isinstance(keys, str):
         keys = [keys]
 
-    if isinstance(context, SparkContext):
+    if isinstance(real_context, SparkContext):
         return _merge_spark(
-            context,
+            real_context,
             current,
             target,
             keys,
@@ -56,10 +61,10 @@ def merge(context, current, **params):
             cluster_by,
             params,
         )
-    elif isinstance(context, PandasContext):
-        return _merge_pandas(context, current, target, keys, strategy, audit_cols, params)
+    elif isinstance(real_context, PandasContext):
+        return _merge_pandas(real_context, current, target, keys, strategy, audit_cols, params)
     else:
-        raise ValueError(f"Unsupported context type: {type(context)}")
+        raise ValueError(f"Unsupported context type: {type(real_context)}")
 
 
 def _merge_spark(

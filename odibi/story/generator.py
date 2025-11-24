@@ -301,6 +301,53 @@ class StoryGenerator:
             for step in result.metadata["steps"]:
                 lines.append(f"- {step}")
 
+        # Executed SQL
+        if result.metadata and "executed_sql" in result.metadata:
+            sqls = result.metadata["executed_sql"]
+            if sqls:
+                lines.append("")
+                lines.append("**Executed SQL:**")
+                for sql in sqls:
+                    lines.append("```sql")
+                    lines.append(sql)
+                    lines.append("```")
+
+        # Delta Info
+        if result.metadata and "delta_info" in result.metadata:
+            delta = result.metadata["delta_info"]
+            lines.append("")
+            lines.append("**Delta Lake Metadata:**")
+            lines.append(f"- **Version:** {delta.version}")
+            lines.append(f"- **Timestamp:** {delta.timestamp}")
+            lines.append(f"- **Operation:** {delta.operation}")
+            if delta.operation_metrics:
+                lines.append("- **Metrics:**")
+                for k, v in delta.operation_metrics.items():
+                    lines.append(f"  - {k}: {v}")
+
+        # Data Diff
+        if result.metadata and "data_diff" in result.metadata and result.metadata["data_diff"]:
+            diff = result.metadata["data_diff"]
+            lines.append("")
+            lines.append("**Data Changes:**")
+
+            change_icon = "➕" if diff.get("rows_change", 0) > 0 else "➖"
+            lines.append(f"- **Net Change:** {change_icon} {diff.get('rows_change', 0)} rows")
+
+            added = diff.get("sample_added")
+            if added:
+                lines.append("")
+                lines.append(f"**Sample Added Rows ({len(added)}):**")
+                lines.append("")
+                lines.append(self._sample_to_markdown(added, None))
+
+            removed = diff.get("sample_removed")
+            if removed:
+                lines.append("")
+                lines.append(f"**Sample Removed Rows ({len(removed)}):**")
+                lines.append("")
+                lines.append(self._sample_to_markdown(removed, None))
+
         # Schema info
         if result.metadata and "schema_in" in result.metadata:
             schema_in = result.metadata["schema_in"]
