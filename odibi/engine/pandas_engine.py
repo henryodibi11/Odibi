@@ -200,7 +200,8 @@ class PandasEngine(Engine):
                     return df
 
                 df = pd.read_csv(full_path, **read_kwargs)
-                df.attrs["odibi_source_files"] = [str(full_path)]
+                if hasattr(df, "attrs"):
+                    df.attrs["odibi_source_files"] = [str(full_path)]
                 return df
             except UnicodeDecodeError:
                 # Retry with common fallbacks
@@ -214,7 +215,8 @@ class PandasEngine(Engine):
                     return df
 
                 df = pd.read_csv(full_path, **read_kwargs)
-                df.attrs["odibi_source_files"] = [str(full_path)]
+                if hasattr(df, "attrs"):
+                    df.attrs["odibi_source_files"] = [str(full_path)]
                 return df
             except pd.errors.ParserError:
                 # Retry with bad lines skipped
@@ -225,7 +227,8 @@ class PandasEngine(Engine):
                     return df
 
                 df = pd.read_csv(full_path, **read_kwargs)
-                df.attrs["odibi_source_files"] = [str(full_path)]
+                if hasattr(df, "attrs"):
+                    df.attrs["odibi_source_files"] = [str(full_path)]
                 return df
         elif format == "parquet":
             # read_parquet handles list of files
@@ -242,7 +245,8 @@ class PandasEngine(Engine):
                 return df
 
             df = pd.read_json(full_path, **read_kwargs)
-            df.attrs["odibi_source_files"] = [str(full_path)]
+            if hasattr(df, "attrs"):
+                df.attrs["odibi_source_files"] = [str(full_path)]
             return df
         elif format == "excel":
             # Excel doesn't support dtype_backend arg directly in older versions or engine dependent

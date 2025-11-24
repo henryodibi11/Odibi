@@ -30,7 +30,7 @@ def test_csv_chunking(tmp_path):
 
     # 3. Verify it is an iterator
     # TextFileReader is an iterator
-    assert isinstance(result, Iterator)
+    assert hasattr(result, "__next__")
 
     # 4. Iterate and verify
     chunks = list(result)
@@ -79,7 +79,7 @@ def test_json_chunking(tmp_path):
     )
 
     # 3. Verify it is an iterator
-    assert isinstance(result, Iterator)
+    assert hasattr(result, "__next__")
 
     # 4. Write iterator
     result_iter = engine.read(
