@@ -195,8 +195,13 @@ class PandasEngine(Engine):
         if format == "csv":
             try:
                 if is_glob and isinstance(full_path, list):
-                    return self._read_parallel(pd.read_csv, full_path, **read_kwargs)
-                return pd.read_csv(full_path, **read_kwargs)
+                    df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
+                    df.attrs["odibi_source_files"] = full_path
+                    return df
+
+                df = pd.read_csv(full_path, **read_kwargs)
+                df.attrs["odibi_source_files"] = [str(full_path)]
+                return df
             except UnicodeDecodeError:
                 # Retry with common fallbacks
                 # Note: Arrow engine might be stricter, so we might need to drop it for retry?
@@ -204,22 +209,41 @@ class PandasEngine(Engine):
                 # Simplify: Just update encoding in kwargs
                 read_kwargs["encoding"] = "latin1"
                 if is_glob and isinstance(full_path, list):
-                    return self._read_parallel(pd.read_csv, full_path, **read_kwargs)
-                return pd.read_csv(full_path, **read_kwargs)
+                    df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
+                    df.attrs["odibi_source_files"] = full_path
+                    return df
+
+                df = pd.read_csv(full_path, **read_kwargs)
+                df.attrs["odibi_source_files"] = [str(full_path)]
+                return df
             except pd.errors.ParserError:
                 # Retry with bad lines skipped
                 read_kwargs["on_bad_lines"] = "skip"
                 if is_glob and isinstance(full_path, list):
-                    return self._read_parallel(pd.read_csv, full_path, **read_kwargs)
-                return pd.read_csv(full_path, **read_kwargs)
+                    df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
+                    df.attrs["odibi_source_files"] = full_path
+                    return df
+
+                df = pd.read_csv(full_path, **read_kwargs)
+                df.attrs["odibi_source_files"] = [str(full_path)]
+                return df
         elif format == "parquet":
             # read_parquet handles list of files
-            return pd.read_parquet(full_path, **read_kwargs)
+            df = pd.read_parquet(full_path, **read_kwargs)
+            if isinstance(full_path, list):
+                df.attrs["odibi_source_files"] = full_path
+            else:
+                df.attrs["odibi_source_files"] = [str(full_path)]
+            return df
         elif format == "json":
             if is_glob and isinstance(full_path, list):
-                return self._read_parallel(pd.read_json, full_path, **read_kwargs)
+                df = self._read_parallel(pd.read_json, full_path, **read_kwargs)
+                df.attrs["odibi_source_files"] = full_path
+                return df
 
-            return pd.read_json(full_path, **read_kwargs)
+            df = pd.read_json(full_path, **read_kwargs)
+            df.attrs["odibi_source_files"] = [str(full_path)]
+            return df
         elif format == "excel":
             # Excel doesn't support dtype_backend arg directly in older versions or engine dependent
             # But Pandas 2.0 might. Let's check safely.
@@ -937,16 +961,16 @@ class PandasEngine(Engine):
 
         return result
 
-    def get_schema(self, df: pd.DataFrame) -> List[str]:
-        """Get DataFrame column names.
+    def get_schema(self, df: pd.DataFrame) -> Dict[str, str]:
+        """Get DataFrame schema with types.
 
         Args:
             df: DataFrame
 
         Returns:
-            List of column names
+            Dict[str, str]: Column name -> Type string
         """
-        return df.columns.tolist()
+        return {col: str(df[col].dtype) for col in df.columns}
 
     def get_shape(self, df: pd.DataFrame) -> tuple:
         """Get DataFrame shape.
@@ -1238,3 +1262,28 @@ class PandasEngine(Engine):
 
         dt = DeltaTable(full_path, storage_options=storage_opts)
         dt.restore(version)
+
+    def get_source_files(self, df: pd.DataFrame) -> List[str]:
+        """Get list of source files that generated this DataFrame.
+
+        Args:
+            df: DataFrame
+
+        Returns:
+            List of file paths
+        """
+        if hasattr(df, "attrs"):
+            return df.attrs.get("odibi_source_files", [])
+        return []
+
+    def profile_nulls(self, df: pd.DataFrame) -> Dict[str, float]:
+        """Calculate null percentage for each column.
+
+        Args:
+            df: DataFrame
+
+        Returns:
+            Dictionary of {column_name: null_percentage}
+        """
+        # mean() of boolean DataFrame gives the percentage of True values
+        return df.isna().mean().to_dict()

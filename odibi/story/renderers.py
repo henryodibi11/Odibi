@@ -67,10 +67,23 @@ class HTMLStoryRenderer:
 
         template = Template(template_content)
 
+        # Register custom filter
+        # Note: Template creates its own environment, so we attach to that
+        template.environment.filters["to_yaml"] = self._to_yaml
+
         # Render with metadata and theme
+
         html = template.render(metadata=metadata, theme=self.theme)
 
         return html
+
+    def _to_yaml(self, value) -> str:
+        """Convert value to YAML string."""
+        import yaml
+
+        if not value:
+            return ""
+        return yaml.dump(value, sort_keys=False, default_flow_style=False).strip()
 
     def render_to_file(self, metadata: PipelineStoryMetadata, output_path: str) -> str:
         """

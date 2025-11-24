@@ -55,7 +55,19 @@ class SparkEngine(Engine):
             # 2. Enable Adaptive Query Execution (usually default in 3.x, but ensuring it)
             builder = builder.config("spark.sql.adaptive.enabled", "true")
 
+            # 3. Reduce Verbosity (Silence Py4J and Spark logs)
+            builder = builder.config(
+                "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR, console"
+            )
+            builder = builder.config(
+                "spark.executor.extraJavaOptions", "-Dlog4j.rootCategory=ERROR, console"
+            )
+
             self.spark = spark_session or configure_spark_with_delta_pip(builder).getOrCreate()
+
+            # Programmatically set log level after creation
+            self.spark.sparkContext.setLogLevel("ERROR")
+
         except ImportError:
             # Delta not available - use regular Spark
             builder = SparkSession.builder.appName("odibi").config(
@@ -66,7 +78,13 @@ class SparkEngine(Engine):
             builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
             builder = builder.config("spark.sql.adaptive.enabled", "true")
 
+            # Reduce Verbosity
+            builder = builder.config(
+                "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR, console"
+            )
+
             self.spark = spark_session or builder.getOrCreate()
+            self.spark.sparkContext.setLogLevel("ERROR")
 
         self.config = config or {}
         self.connections = connections or {}
@@ -159,16 +177,16 @@ class SparkEngine(Engine):
             logger.warning(f"Failed to fetch Delta commit info for {target}: {e}")
             return None
 
-    def get_schema(self, df) -> List[str]:
-        """Get DataFrame schema as list of column names.
+    def get_schema(self, df) -> Dict[str, str]:
+        """Get DataFrame schema with types.
 
         Args:
             df: Spark DataFrame
 
         Returns:
-            List of column names
+            Dict[str, str]: Column name -> Type string
         """
-        return df.columns
+        return {f.name: f.dataType.simpleString() for f in df.schema}
 
     def get_shape(self, df) -> Tuple[int, int]:
         """Get DataFrame shape as (rows, columns)."""
@@ -913,3 +931,44 @@ class SparkEngine(Engine):
         full_path = connection.get_path(path)
         delta_table = DeltaTable.forPath(self.spark, full_path)
         delta_table.restoreToVersion(version)
+
+    def get_source_files(self, df) -> List[str]:
+        """Get list of source files that generated this DataFrame.
+
+        Args:
+            df: Spark DataFrame
+
+        Returns:
+            List of file paths
+        """
+        try:
+            return df.inputFiles()
+        except Exception:
+            # inputFiles() might fail for non-file sources or complex transformations
+            return []
+
+    def profile_nulls(self, df) -> Dict[str, float]:
+        """Calculate null percentage for each column.
+
+        Args:
+            df: Spark DataFrame
+
+        Returns:
+            Dictionary of {column_name: null_percentage} (0.0 to 1.0)
+        """
+        from pyspark.sql.functions import col, when, mean
+
+        # Build aggregation expression for all columns in one pass
+        # mean(when(col.isNull, 1).otherwise(0))
+        aggs = []
+        for c in df.columns:
+            aggs.append(mean(when(col(c).isNull(), 1).otherwise(0)).alias(c))
+
+        if not aggs:
+            return {}
+
+        try:
+            result = df.select(*aggs).collect()[0].asDict()
+            return result
+        except Exception:
+            return {}

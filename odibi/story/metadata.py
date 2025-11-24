@@ -43,6 +43,7 @@ class NodeExecutionMetadata:
     rows_out: Optional[int] = None
     rows_change: Optional[int] = None
     rows_change_pct: Optional[float] = None
+    sample_in: Optional[List[Dict[str, Any]]] = None
     sample_data: Optional[List[Dict[str, Any]]] = None
 
     # Schema tracking
@@ -54,8 +55,18 @@ class NodeExecutionMetadata:
 
     # Execution Logic & Lineage
     executed_sql: List[str] = field(default_factory=list)
+    sql_hash: Optional[str] = None
+    transformation_stack: List[str] = field(default_factory=list)
+    config_snapshot: Optional[Dict[str, Any]] = None
+
+    # Delta & Data Info
     delta_info: Optional[DeltaWriteInfo] = None
     data_diff: Optional[Dict[str, Any]] = None  # Stores diff summary (added/removed samples)
+    environment: Optional[Dict[str, Any]] = None  # Captured execution environment
+
+    # Source & Quality
+    source_files: List[str] = field(default_factory=list)
+    null_profile: Optional[Dict[str, float]] = None
 
     # Error info
     error_message: Optional[str] = None
@@ -94,6 +105,7 @@ class NodeExecutionMetadata:
             "rows_out": self.rows_out,
             "rows_change": self.rows_change,
             "rows_change_pct": self.rows_change_pct,
+            "sample_in": self.sample_in,
             "sample_data": self.sample_data,
             "schema_in": self.schema_in,
             "schema_out": self.schema_out,
@@ -104,7 +116,13 @@ class NodeExecutionMetadata:
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "executed_sql": self.executed_sql,
+            "sql_hash": self.sql_hash,
+            "transformation_stack": self.transformation_stack,
+            "config_snapshot": self.config_snapshot,
             "data_diff": self.data_diff,
+            "environment": self.environment,
+            "source_files": self.source_files,
+            "null_profile": self.null_profile,
         }
 
         if self.delta_info:
@@ -134,6 +152,7 @@ class PipelineStoryMetadata:
     pipeline_layer: Optional[str] = None
 
     # Execution info
+    run_id: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
     started_at: str = field(default_factory=lambda: datetime.now().isoformat())
     completed_at: Optional[str] = None
     duration: float = 0.0
@@ -194,6 +213,7 @@ class PipelineStoryMetadata:
         return {
             "pipeline_name": self.pipeline_name,
             "pipeline_layer": self.pipeline_layer,
+            "run_id": self.run_id,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "duration": self.duration,

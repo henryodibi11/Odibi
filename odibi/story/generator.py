@@ -3,12 +3,12 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
-import pandas as pd
 import yaml
 import subprocess
-from odibi import __version__
 
 from odibi.node import NodeResult
+from odibi.story.metadata import PipelineStoryMetadata, NodeExecutionMetadata, DeltaWriteInfo
+from odibi.story.renderers import HTMLStoryRenderer, JSONStoryRenderer
 
 
 # Custom class to force block style for multiline strings
@@ -75,7 +75,7 @@ class StoryGenerator:
         context: Any = None,
         config: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Generate story markdown.
+        """Generate story HTML and JSON.
 
         Args:
             node_results: Dictionary of node name -> NodeResult
@@ -89,91 +89,148 @@ class StoryGenerator:
             config: Optional pipeline configuration snapshot
 
         Returns:
-            Path to generated story file
+            Path to generated HTML story file
         """
-        lines = []
-        git_info = self._get_git_info()
+        # 1. Build metadata object
+        metadata = PipelineStoryMetadata(
+            pipeline_name=self.pipeline_name,
+            pipeline_layer=config.get("layer") if config else None,
+            started_at=start_time,
+            completed_at=end_time,
+            duration=duration,
+            total_nodes=len(completed) + len(failed) + len(skipped),
+            completed_nodes=len(completed),
+            failed_nodes=len(failed),
+            skipped_nodes=len(skipped),
+            project=config.get("project") if config else None,
+            plant=config.get("plant") if config else None,
+            asset=config.get("asset") if config else None,
+            business_unit=config.get("business_unit") if config else None,
+        )
 
-        # Header
-        lines.append(f"# Pipeline Run Story: {self.pipeline_name}")
-        lines.append("")
-        lines.append("### Execution Metadata")
-        lines.append(f"- **Started:** {start_time}")
-        lines.append(f"- **Completed:** {end_time}")
-        lines.append(f"- **Duration:** {duration:.2f}s")
-        lines.append(f"- **Odibi Version:** v{__version__}")
-        lines.append(f"- **Git Commit:** `{git_info['commit']}` (Branch: `{git_info['branch']}`)")
+        # Add Git Info
+        # git_info = self._get_git_info()
+        # We can't easily add arbitrary fields to dataclass without changing it,
+        # but we can rely on the fact that it's just metadata.
+        # For now, let's skip adding git info to the core model or extend it later.
 
-        # Status
-        if failed:
-            lines.append(f"**Status:** ❌ Failed ({len(failed)} nodes failed)")
-        elif completed:
-            lines.append("**Status:** ✅ Success")
-        else:
-            lines.append("**Status:** ⚠️ No nodes executed")
-
-        lines.append("")
-        lines.append("---")
-        lines.append("")
-
-        # Summary
-        lines.append("## Summary")
-        lines.append("")
-        lines.append(f"- ✅ **Completed:** {len(completed)} nodes")
-        lines.append(f"- ❌ **Failed:** {len(failed)} nodes")
-        lines.append(f"- ⏭️ **Skipped:** {len(skipped)} nodes")
-        lines.append(f"- ⏱️ **Duration:** {duration:.2f}s")
-
-        if completed:
-            lines.append(f"\n**Completed nodes:** {', '.join(completed)}")
-        if failed:
-            lines.append(f"\n**Failed nodes:** {', '.join(failed)}")
-        if skipped:
-            lines.append(f"\n**Skipped nodes:** {', '.join(skipped)}")
-
-        lines.append("")
-        lines.append("---")
-        lines.append("")
-
-        # Pipeline Config
-        if config:
-            lines.append("## Pipeline Configuration")
-            lines.append("")
-            lines.append("```yaml")
-            clean_config = self._clean_config_for_dump(config)
-            lines.append(yaml.dump(clean_config, sort_keys=False, default_flow_style=False))
-            lines.append("```")
-            lines.append("")
-            lines.append("---")
-            lines.append("")
-
-        # Node details
+        # Process all nodes in order
         all_nodes = completed + failed + skipped
+
+        # If we have config, try to follow config order instead of list order
+        if config and "nodes" in config:
+            config_order = [n["name"] for n in config["nodes"]]
+            # Sort all_nodes based on index in config_order
+            all_nodes.sort(key=lambda x: config_order.index(x) if x in config_order else 999)
+
         for node_name in all_nodes:
             if node_name in node_results:
-                node_result = node_results[node_name]
-                node_section = self._generate_node_section(node_name, node_result, context)
-                lines.extend(node_section)
+                result = node_results[node_name]
+                node_meta = self._convert_result_to_metadata(result, node_name)
 
-        # Write to file
+                # Status overrides (result object has success bool, but we have lists)
+                if node_name in failed:
+                    node_meta.status = "failed"
+                elif node_name in skipped:
+                    node_meta.status = "skipped"
+                else:
+                    node_meta.status = "success"
+
+                metadata.nodes.append(node_meta)
+            else:
+                # Skipped node without result
+                metadata.nodes.append(
+                    NodeExecutionMetadata(
+                        node_name=node_name, operation="skipped", status="skipped", duration=0.0
+                    )
+                )
+
+        # 2. Render outputs
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{self.pipeline_name}_{timestamp}.md"
+        base_filename = f"{self.pipeline_name}_{timestamp}"
 
+        # Prepare renderers
+        html_renderer = HTMLStoryRenderer()
+        json_renderer = JSONStoryRenderer()
+
+        # Paths
         if self.is_remote:
-            # Remote path handling
-            full_path = f"{self.output_path_str.rstrip('/')}/{filename}"
-            self._write_remote(full_path, "\n".join(lines))
-            story_path = full_path
+            html_path = f"{self.output_path_str.rstrip('/')}/{base_filename}.html"
+            json_path = f"{self.output_path_str.rstrip('/')}/{base_filename}.json"
         else:
-            # Local path handling
-            story_path = self.output_path / filename
-            with open(story_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines))
+            html_path = str(self.output_path / f"{base_filename}.html")
+            json_path = str(self.output_path / f"{base_filename}.json")
 
-        # Auto-cleanup old stories
+        # Render HTML
+        html_content = html_renderer.render(metadata)
+
+        # Render JSON
+        json_content = json_renderer.render(metadata)
+
+        # Write files
+        if self.is_remote:
+            self._write_remote(html_path, html_content)
+            self._write_remote(json_path, json_content)
+        else:
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            with open(json_path, "w", encoding="utf-8") as f:
+                f.write(json_content)
+
+        # Cleanup
         self.cleanup()
 
-        return str(story_path)
+        return html_path
+
+    def _convert_result_to_metadata(
+        self, result: NodeResult, node_name: str
+    ) -> NodeExecutionMetadata:
+        """Convert NodeResult to NodeExecutionMetadata."""
+        meta = result.metadata or {}
+
+        # Extract Delta Info
+        delta_info = None
+        if "delta_info" in meta:
+            d = meta["delta_info"]
+            # Check if it's already an object or dict
+            if isinstance(d, DeltaWriteInfo):
+                delta_info = d
+            else:
+                # It might be a dict if coming from loose dict
+                pass
+
+        node_meta = NodeExecutionMetadata(
+            node_name=node_name,
+            operation="transform",  # Generic default
+            status="success" if result.success else "failed",
+            duration=result.duration,
+            rows_out=result.rows_processed,
+            schema_out=result.result_schema,
+            # From metadata dict
+            rows_in=None,  # Calculated if we had input info
+            sample_in=meta.get("sample_data_in"),
+            executed_sql=meta.get("executed_sql", []),
+            sql_hash=meta.get("sql_hash"),
+            transformation_stack=meta.get("transformation_stack", []),
+            config_snapshot=meta.get("config_snapshot"),
+            delta_info=delta_info,
+            data_diff=meta.get("data_diff"),
+            environment=meta.get("environment"),
+            source_files=meta.get("source_files", []),
+            null_profile=meta.get("null_profile"),
+            schema_in=meta.get("schema_in"),
+            sample_data=meta.get("sample_data"),
+            columns_added=meta.get("columns_added", []),
+            columns_removed=meta.get("columns_removed", []),
+            error_message=str(result.error) if result.error else None,
+            error_type=type(result.error).__name__ if result.error else None,
+        )
+
+        # Calculate derived metrics
+        node_meta.calculate_row_change()  # Needs rows_in
+        # schema changes are already in metadata from Node logic
+
+        return node_meta
 
     def _write_remote(self, path: str, content: str) -> None:
         """Write content to remote path using fsspec."""
@@ -242,9 +299,16 @@ class StoryGenerator:
         try:
             from datetime import timedelta
 
-            # Find all stories for this pipeline
+            # Find all HTML stories for this pipeline
             stories = sorted(
-                self.output_path.glob(f"{self.pipeline_name}_*.md"),
+                self.output_path.glob(f"{self.pipeline_name}_*.html"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+
+            # Find all JSON stories for this pipeline
+            json_stories = sorted(
+                self.output_path.glob(f"{self.pipeline_name}_*.json"),
                 key=lambda p: p.stat().st_mtime,
                 reverse=True,
             )
@@ -255,238 +319,36 @@ class StoryGenerator:
                 for path in to_delete:
                     path.unlink(missing_ok=True)
 
-                # Update list for next check
-                stories = stories[: self.retention_count]
+            if len(json_stories) > self.retention_count:
+                to_delete = json_stories[self.retention_count :]
+                for path in to_delete:
+                    path.unlink(missing_ok=True)
 
             # 2. Time retention
             now = datetime.now()
             cutoff = now - timedelta(days=self.retention_days)
 
-            for path in stories:
-                mtime = datetime.fromtimestamp(path.stat().st_mtime)
-                if mtime < cutoff:
-                    path.unlink(missing_ok=True)
+            # Clean remaining HTML
+            for path in self.output_path.glob(f"{self.pipeline_name}_*.html"):
+                if path.exists():
+                    mtime = datetime.fromtimestamp(path.stat().st_mtime)
+                    if mtime < cutoff:
+                        path.unlink(missing_ok=True)
+
+            # Clean remaining JSON
+            for path in self.output_path.glob(f"{self.pipeline_name}_*.json"):
+                if path.exists():
+                    mtime = datetime.fromtimestamp(path.stat().st_mtime)
+                    if mtime < cutoff:
+                        path.unlink(missing_ok=True)
+
+            # Clean legacy markdown if exists
+            for path in self.output_path.glob(f"{self.pipeline_name}_*.md"):
+                path.unlink(missing_ok=True)
 
         except Exception as e:
             # Don't fail generation if cleanup fails
             print(f"Warning: Story cleanup failed: {e}")
 
-    def _generate_node_section(self, node_name: str, result: NodeResult, context: Any) -> List[str]:
-        """Generate markdown section for a single node.
-
-        Args:
-            node_name: Node name
-            result: Node execution result
-            context: Execution context
-
-        Returns:
-            List of markdown lines
-        """
-        lines = []
-
-        # Node header
-        lines.append(f"## Node: {node_name}")
-        lines.append("")
-
-        # Status and duration
-        status_icon = "✅" if result.success else "❌"
-        status_text = "Success" if result.success else "Failed"
-        lines.append(f"**Status:** {status_icon} {status_text}")
-        lines.append(f"**Duration:** {result.duration:.4f}s")
-
-        # Metadata
-        if result.metadata and "steps" in result.metadata:
-            lines.append("")
-            lines.append("**Execution steps:**")
-            for step in result.metadata["steps"]:
-                lines.append(f"- {step}")
-
-        # Executed SQL
-        if result.metadata and "executed_sql" in result.metadata:
-            sqls = result.metadata["executed_sql"]
-            if sqls:
-                lines.append("")
-                lines.append("**Executed SQL:**")
-                for sql in sqls:
-                    lines.append("```sql")
-                    lines.append(sql)
-                    lines.append("```")
-
-        # Delta Info
-        if result.metadata and "delta_info" in result.metadata:
-            delta = result.metadata["delta_info"]
-            lines.append("")
-            lines.append("**Delta Lake Metadata:**")
-            lines.append(f"- **Version:** {delta.version}")
-            lines.append(f"- **Timestamp:** {delta.timestamp}")
-            lines.append(f"- **Operation:** {delta.operation}")
-            if delta.operation_metrics:
-                lines.append("- **Metrics:**")
-                for k, v in delta.operation_metrics.items():
-                    lines.append(f"  - {k}: {v}")
-
-        # Data Diff
-        if result.metadata and "data_diff" in result.metadata and result.metadata["data_diff"]:
-            diff = result.metadata["data_diff"]
-            lines.append("")
-            lines.append("**Data Changes:**")
-
-            change_icon = "➕" if diff.get("rows_change", 0) > 0 else "➖"
-            lines.append(f"- **Net Change:** {change_icon} {diff.get('rows_change', 0)} rows")
-
-            added = diff.get("sample_added")
-            if added:
-                lines.append("")
-                lines.append(f"**Sample Added Rows ({len(added)}):**")
-                lines.append("")
-                lines.append(self._sample_to_markdown(added, None))
-
-            removed = diff.get("sample_removed")
-            if removed:
-                lines.append("")
-                lines.append(f"**Sample Removed Rows ({len(removed)}):**")
-                lines.append("")
-                lines.append(self._sample_to_markdown(removed, None))
-
-        # Schema info
-        if result.metadata and "schema_in" in result.metadata:
-            schema_in = result.metadata["schema_in"]
-            lines.append("")
-            lines.append("**Input schema:**")
-            lines.append(f"- Columns ({len(schema_in)}): {', '.join(schema_in)}")
-
-            # Add input sample
-            if "sample_data_in" in result.metadata:
-                sample_in = result.metadata["sample_data_in"]
-                if sample_in:
-                    lines.append("")
-                    lines.append(f"**Sample input** (first {len(sample_in)} rows):")
-                    lines.append("")
-                    lines.append(self._sample_to_markdown(sample_in, schema_in))
-
-        if result.result_schema:
-            lines.append("")
-            lines.append("**Output schema:**")
-            lines.append(
-                f"- Columns ({len(result.result_schema)}): {', '.join(result.result_schema)}"
-            )
-
-            # Schema changes
-            if result.metadata:
-                added = result.metadata.get("columns_added")
-                removed = result.metadata.get("columns_removed")
-
-                if added or removed:
-                    lines.append("")
-                    lines.append("**Schema Changes:**")
-                    if added:
-                        lines.append(f"- 🟢 **Added:** {', '.join(added)}")
-                    if removed:
-                        lines.append(f"- 🔴 **Removed:** {', '.join(removed)}")
-
-        if result.rows_processed is not None:
-            lines.append(f"- Rows: {result.rows_processed:,}")
-
-        # Sample data
-        if result.metadata and "sample_data" in result.metadata:
-            sample_data = result.metadata["sample_data"]
-            if sample_data:
-                lines.append("")
-                lines.append(f"**Sample output** (first {len(sample_data)} rows):")
-                lines.append("")
-                lines.append(self._sample_to_markdown(sample_data, result.result_schema))
-
-        # Error details
-        if result.error:
-            lines.append("")
-            lines.append("**Error:**")
-            lines.append("```")
-            lines.append(str(result.error))
-            lines.append("```")
-
-        lines.append("")
-        lines.append("---")
-        lines.append("")
-
-        return lines
-
-    def _sample_to_markdown(self, sample: List[Dict[str, Any]], schema: Optional[List[str]]) -> str:
-        """Convert sample data to markdown table.
-
-        Args:
-            sample: List of row dictionaries
-            schema: Optional list of column names (for ordering)
-
-        Returns:
-            Markdown table string
-        """
-        if not sample:
-            return "*No data*"
-
-        # Check for special redaction message (sensitive: true)
-        if len(sample) == 1 and "message" in sample[0] and len(sample[0]) == 1:
-            msg = sample[0]["message"]
-            if "[REDACTED" in str(msg):
-                return f"**{msg}**"
-
-        # Determine columns
-        if schema:
-            columns = schema
-        else:
-            columns = list(sample[0].keys())
-
-        # Build markdown table
-        lines = []
-
-        # Header
-        header = "| " + " | ".join(str(col) for col in columns) + " |"
-        lines.append(header)
-
-        # Separator
-        separator = "| " + " | ".join("---" for _ in columns) + " |"
-        lines.append(separator)
-
-        # Rows
-        for row in sample:
-            values = [str(row.get(col, "")) for col in columns]
-            row_str = "| " + " | ".join(values) + " |"
-            lines.append(row_str)
-
-        return "\n".join(lines)
-
-    def _dataframe_to_markdown(self, df: pd.DataFrame, max_rows: int) -> str:
-        """Convert DataFrame to markdown table.
-
-        Args:
-            df: DataFrame to convert
-            max_rows: Maximum rows to include
-
-        Returns:
-            Markdown table string
-        """
-        if len(df) == 0:
-            return "*No data*"
-
-        # Get sample
-        sample = df.head(max_rows)
-
-        # Build markdown table
-        lines = []
-
-        # Header
-        header = "| " + " | ".join(str(col) for col in sample.columns) + " |"
-        lines.append(header)
-
-        # Separator
-        separator = "| " + " | ".join("---" for _ in sample.columns) + " |"
-        lines.append(separator)
-
-        # Rows
-        for _, row in sample.iterrows():
-            row_str = "| " + " | ".join(str(val) for val in row.values) + " |"
-            lines.append(row_str)
-
-        if len(df) > max_rows:
-            lines.append(f"\n*... and {len(df) - max_rows} more rows*")
-
-        return "\n".join(lines)
+    # Legacy methods removed as they are now handled by renderers
+    # _generate_node_section, _sample_to_markdown, _dataframe_to_markdown

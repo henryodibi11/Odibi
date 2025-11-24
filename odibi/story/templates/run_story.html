@@ -3,493 +3,693 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ metadata.pipeline_name }} - Pipeline Run Story</title>
+    <title>Pipeline Story: {{ metadata.pipeline_name }}</title>
     <style>
         :root {
             --primary-color: #0066cc;
+            --bg-color: #f4f7f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #e1e4e8;
             --success-color: #28a745;
             --error-color: #dc3545;
             --warning-color: #ffc107;
-            --bg-color: #ffffff;
-            --text-color: #333333;
-            --border-color: #dddddd;
-            --code-bg: #f5f5f5;
+            --skipped-color: #6c757d;
             --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            --code-font: Consolas, Monaco, "Courier New", monospace;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
         }
 
         body {
             font-family: var(--font-family);
-            line-height: 1.6;
+            background-color: var(--bg-color);
             color: var(--text-color);
-            background: #f8f9fa;
+            margin: 0;
             padding: 20px;
+            line-height: 1.5;
         }
 
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background: var(--bg-color);
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            overflow: hidden;
         }
 
         /* Header */
-        header {
-            background: var(--primary-color);
-            color: white;
-            padding: 30px;
-        }
-
-        header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-
-        .header-meta {
-            opacity: 0.9;
-            font-size: 14px;
-        }
-
-        .header-meta span {
-            margin-right: 20px;
-        }
-
-        /* Status Badge */
-        .status-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
-        .status-success {
-            background: var(--success-color);
-            color: white;
-        }
-
-        .status-failed {
-            background: var(--error-color);
-            color: white;
-        }
-
-        .status-partial {
-            background: var(--warning-color);
-            color: #333;
-        }
-
-        /* Summary Section */
-        .summary {
-            padding: 30px;
-            background: #f8f9fa;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .summary h2 {
-            margin-bottom: 20px;
-            color: var(--primary-color);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .stat-card {
-            background: white;
+        .header {
+            background: var(--card-bg);
             padding: 20px;
-            border-radius: 6px;
-            border-left: 4px solid var(--primary-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            border-left: 5px solid var(--primary-color);
         }
 
-        .stat-card.success { border-left-color: var(--success-color); }
-        .stat-card.error { border-left-color: var(--error-color); }
-        .stat-card.warning { border-left-color: var(--warning-color); }
+        .header h1 { margin: 0 0 10px 0; color: var(--primary-color); }
+        .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 0.9em; }
+        .meta-item label { display: block; color: #666; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        .stat-value {
-            font-size: 32px;
-            font-weight: bold;
-            color: var(--primary-color);
+        /* Summary Stats */
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
         }
-
-        .stat-label {
-            font-size: 14px;
-            color: #666;
-            margin-top: 5px;
+        .stat-card {
+            flex: 1;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
+        .stat-value { font-size: 24px; font-weight: bold; }
+        .stat-label { font-size: 12px; color: #666; text-transform: uppercase; }
+        .stat-success { color: var(--success-color); }
+        .stat-error { color: var(--error-color); }
 
-        /* Node Details */
-        .nodes {
-            padding: 30px;
-        }
-
+        /* Node Card */
         .node-card {
-            background: white;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             margin-bottom: 20px;
             overflow: hidden;
+            border: 1px solid var(--border-color);
         }
 
         .node-header {
             padding: 15px 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
+            background: #fff;
+            transition: background 0.2s;
         }
+        .node-header:hover { background: #f8f9fa; }
 
-        .node-header:hover {
-            background: #e9ecef;
-        }
+        .node-title { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 1.1em; }
+        .node-metrics { display: flex; gap: 20px; color: #666; font-size: 0.9em; }
+        
+        .status-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: white; font-size: 14px; }
+        .status-success { background-color: var(--success-color); }
+        .status-failed { background-color: var(--error-color); }
+        .status-skipped { background-color: var(--skipped-color); }
 
-        .node-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .node-status-icon {
-            font-size: 20px;
-        }
-
-        .node-content {
-            padding: 20px;
-        }
-
-        .node-content.collapsed {
+        /* Node Body (Collapsible) */
+        .node-body {
             display: none;
-        }
-
-        .node-meta {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .meta-item {
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 4px;
-        }
-
-        .meta-label {
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-
-        .meta-value {
-            font-size: 16px;
-            color: var(--text-color);
-            margin-top: 5px;
-        }
-
-        .meta-value.positive {
-            color: var(--success-color);
-        }
-
-        .meta-value.negative {
-            color: var(--error-color);
-        }
-
-        /* Schema Changes */
-        .schema-changes {
-            margin-top: 15px;
-        }
-
-        .schema-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            margin: 2px;
-        }
-
-        .schema-added {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .schema-removed {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        /* Sample Data Table */
-        .sample-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-            font-size: 14px;
-        }
-
-        .sample-table th {
-            background: var(--primary-color);
-            color: white;
-            padding: 10px;
-            text-align: left;
-            font-weight: 600;
-        }
-
-        .sample-table td {
-            padding: 8px 10px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .sample-table tr:nth-child(even) {
-            background: #f8f9fa;
-        }
-
-        /* Error Display */
-        .error-box {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            border-radius: 4px;
-            padding: 15px;
-            margin-top: 15px;
-        }
-
-        .error-title {
-            color: var(--error-color);
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-
-        .error-message {
-            font-family: var(--code-font);
-            font-size: 13px;
-            white-space: pre-wrap;
-            color: #721c24;
-        }
-
-        /* Code Blocks */
-        code {
-            font-family: var(--code-font);
-            background: var(--code-bg);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 13px;
-        }
-
-        pre {
-            background: var(--code-bg);
-            padding: 15px;
-            border-radius: 4px;
-            overflow-x: auto;
-            font-size: 13px;
-        }
-
-        /* Footer */
-        footer {
-            padding: 20px 30px;
-            background: #f8f9fa;
             border-top: 1px solid var(--border-color);
-            text-align: center;
+        }
+        .node-body.open { display: block; }
+
+        /* Tabs */
+        .tabs { display: flex; background: #f8f9fa; border-bottom: 1px solid var(--border-color); }
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: 500;
             color: #666;
-            font-size: 14px;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-btn:hover { color: var(--primary-color); }
+        .tab-btn.active { color: var(--primary-color); border-bottom-color: var(--primary-color); background: #fff; }
+
+        .tab-content { padding: 20px; display: none; }
+        .tab-content.active { display: block; }
+
+        /* Data Tables */
+        table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-bottom: 15px; }
+        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background: #f8f9fa; font-weight: 600; }
+        .diff-added { color: var(--success-color); background: #e6fffa; }
+        .diff-removed { color: var(--error-color); background: #fff5f5; }
+        
+        /* Code Blocks */
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: var(--mono-font);
+            font-size: 0.9em;
+            margin: 0;
         }
 
-        /* Utilities */
-        .text-muted {
-            color: #6c757d;
-        }
-
+        /* Badges */
         .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
             font-weight: 600;
+            text-transform: uppercase;
         }
+        .badge-blue { background: #e7f5ff; color: #1971c2; }
+        .badge-green { background: #e6fffa; color: #0ca678; }
+        .badge-red { background: #fff5f5; color: #e03131; }
+        .badge-orange { background: #fff9db; color: #f08c00; }
+        .badge-gray { background: #f1f3f5; color: #868e96; }
 
-        .badge-success { background: var(--success-color); color: white; }
-        .badge-error { background: var(--error-color); color: white; }
-        .badge-warning { background: var(--warning-color); color: #333; }
+        /* Schema Diff */
+        .schema-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .schema-box { background: #f8f9fa; padding: 15px; border-radius: 6px; }
+        .schema-list { list-style: none; padding: 0; margin: 0; }
+        .schema-list li { padding: 4px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .col-added { color: var(--success-color); font-weight: bold; }
+        .col-removed { color: var(--error-color); text-decoration: line-through; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header>
-            <h1>📊 {{ metadata.pipeline_name }}</h1>
-            <div class="header-meta">
-                <span>⏱️ Started: {{ metadata.started_at }}</span>
-                <span>✅ Completed: {{ metadata.completed_at or 'Running...' }}</span>
-                <span>⏲️ Duration: {{ "%.2f"|format(metadata.duration) }}s</span>
+
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <h1>{{ metadata.pipeline_name }}</h1>
+        <div class="meta-grid">
+            <div class="meta-item">
+                <label>Run ID</label>
+                <span>{{ metadata.run_id }}</span>
             </div>
-
-            {% if metadata.failed_nodes > 0 %}
-            <div class="status-badge status-failed">
-                ❌ Failed ({{ metadata.failed_nodes }} node{{ 's' if metadata.failed_nodes != 1 else '' }})
+            <div class="meta-item">
+                <label>Started</label>
+                <span>{{ metadata.started_at }}</span>
             </div>
-            {% elif metadata.completed_nodes == metadata.total_nodes %}
-            <div class="status-badge status-success">
-                ✅ Success ({{ metadata.completed_nodes }}/{{ metadata.total_nodes }} nodes)
+            <div class="meta-item">
+                <label>Duration</label>
+                <span>{{ "%.2f"|format(metadata.duration) }}s</span>
             </div>
-            {% else %}
-            <div class="status-badge status-partial">
-                ⚠️ Partial ({{ metadata.completed_nodes }}/{{ metadata.total_nodes }} completed)
+            <div class="meta-item">
+                <label>Context</label>
+                <span>
+                    {% if metadata.project %}{{ metadata.project }}{% endif %}
+                    {% if metadata.plant %} / {{ metadata.plant }}{% endif %}
+                </span>
             </div>
-            {% endif %}
-        </header>
-
-        <!-- Summary -->
-        <section class="summary">
-            <h2>Pipeline Summary</h2>
-
-            {% if metadata.pipeline_layer %}
-            <p><strong>Layer:</strong> {{ metadata.pipeline_layer }}</p>
-            {% endif %}
-
-            {% if metadata.project %}
-            <p>
-                <strong>Project:</strong> {{ metadata.project }}
-                {% if metadata.plant %} | <strong>Plant:</strong> {{ metadata.plant }}{% endif %}
-                {% if metadata.asset %} | <strong>Asset:</strong> {{ metadata.asset }}{% endif %}
-            </p>
-            {% endif %}
-
-            <div class="stats-grid">
-                <div class="stat-card success">
-                    <div class="stat-value">{{ metadata.completed_nodes }}</div>
-                    <div class="stat-label">✅ Completed Nodes</div>
-                </div>
-
-                {% if metadata.failed_nodes > 0 %}
-                <div class="stat-card error">
-                    <div class="stat-value">{{ metadata.failed_nodes }}</div>
-                    <div class="stat-label">❌ Failed Nodes</div>
-                </div>
-                {% endif %}
-
-                {% if metadata.skipped_nodes > 0 %}
-                <div class="stat-card warning">
-                    <div class="stat-value">{{ metadata.skipped_nodes }}</div>
-                    <div class="stat-label">⏭️ Skipped Nodes</div>
-                </div>
-                {% endif %}
-
-                <div class="stat-card">
-                    <div class="stat-value">{{ "%.1f"|format(metadata.get_success_rate()) }}%</div>
-                    <div class="stat-label">Success Rate</div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-value">{{ "{:,}".format(metadata.get_total_rows_processed()) }}</div>
-                    <div class="stat-label">Total Rows Processed</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Node Details -->
-        <section class="nodes">
-            <h2 style="margin-bottom: 20px; color: var(--primary-color);">Node Execution Details</h2>
-
-            {% for node in metadata.nodes %}
-            <div class="node-card">
-                <div class="node-header" onclick="toggleNode('node-{{ loop.index }}')">
-                    <div class="node-title">
-                        <span class="node-status-icon">
-                            {% if node.status == 'success' %}✅{% elif node.status == 'failed' %}❌{% else %}⏭️{% endif %}
-                        </span>
-                        {{ node.node_name }}
-                        <span class="badge">{{ node.operation }}</span>
-                    </div>
-                    <span class="text-muted">{{ "%.3f"|format(node.duration) }}s</span>
-                </div>
-
-                <div class="node-content" id="node-{{ loop.index }}">
-                    <!-- Metadata -->
-                    <div class="node-meta">
-                        <div class="meta-item">
-                            <div class="meta-label">Duration</div>
-                            <div class="meta-value">{{ "%.4f"|format(node.duration) }}s</div>
-                        </div>
-
-                        {% if node.rows_in is not none %}
-                        <div class="meta-item">
-                            <div class="meta-label">Rows In</div>
-                            <div class="meta-value">{{ "{:,}".format(node.rows_in) }}</div>
-                        </div>
-                        {% endif %}
-
-                        {% if node.rows_out is not none %}
-                        <div class="meta-item">
-                            <div class="meta-label">Rows Out</div>
-                            <div class="meta-value">{{ "{:,}".format(node.rows_out) }}</div>
-                        </div>
-                        {% endif %}
-
-                        {% if node.rows_change is not none %}
-                        <div class="meta-item">
-                            <div class="meta-label">Row Change</div>
-                            <div class="meta-value {% if node.rows_change > 0 %}positive{% elif node.rows_change < 0 %}negative{% endif %}">
-                                {% if node.rows_change > 0 %}+{% endif %}{{ "{:,}".format(node.rows_change) }}
-                                ({{ "%.1f"|format(node.rows_change_pct) }}%)
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <!-- Schema Changes -->
-                    {% if node.columns_added or node.columns_removed %}
-                    <div class="schema-changes">
-                        <strong>Schema Changes:</strong><br>
-                        {% for col in node.columns_added %}
-                        <span class="schema-badge schema-added">+ {{ col }}</span>
-                        {% endfor %}
-                        {% for col in node.columns_removed %}
-                        <span class="schema-badge schema-removed">- {{ col }}</span>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <!-- Error -->
-                    {% if node.error_message %}
-                    <div class="error-box">
-                        <div class="error-title">Error: {{ node.error_type or 'Exception' }}</div>
-                        <div class="error-message">{{ node.error_message }}</div>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </section>
-
-        <!-- Footer -->
-        <footer>
-            <p>Generated by Odibi v1.3.0-alpha.5 | {{ metadata.started_at }}</p>
-        </footer>
+        </div>
     </div>
 
-    <script>
-        function toggleNode(nodeId) {
-            const content = document.getElementById(nodeId);
-            content.classList.toggle('collapsed');
+    <!-- Stats -->
+    <div class="stats-bar">
+        <div class="stat-card">
+            <div class="stat-value">{{ metadata.total_nodes }}</div>
+            <div class="stat-label">Nodes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-success">{{ metadata.completed_nodes }}</div>
+            <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-error">{{ metadata.failed_nodes }}</div>
+            <div class="stat-label">Failed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ "{:,}".format(metadata.get_total_rows_processed()) }}</div>
+            <div class="stat-label">Total Rows</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ "%.1f"|format(metadata.get_success_rate()) }}%</div>
+            <div class="stat-label">Success Rate</div>
+        </div>
+    </div>
+
+    <!-- Node List -->
+    <div class="node-list">
+        
+        <!-- Pipeline Graph -->
+        <div class="node-card" style="padding: 20px;">
+            <h3 style="margin-top: 0; margin-bottom: 15px; color: var(--primary-color);">Pipeline Flow</h3>
+            <div class="mermaid" style="background: #f8f9fa; padding: 20px; border-radius: 8px; display: flex; justify-content: center;">
+            graph LR
+                %% Styles
+                classDef success fill:#e6fffa,stroke:#0ca678,stroke-width:2px;
+                classDef failed fill:#fff5f5,stroke:#e03131,stroke-width:2px;
+                classDef skipped fill:#f8f9fa,stroke:#adb5bd,stroke-width:2px,stroke-dasharray: 5 5;
+
+                %% Nodes
+                {% for node in metadata.nodes %}
+                {{ node.node_name }}[{{ node.node_name }}]:::{{ node.status }}
+                {% endfor %}
+
+                %% Dependencies
+                {% for node in metadata.nodes %}
+                    {% if node.config_snapshot.depends_on %}
+                        {% for parent in node.config_snapshot.depends_on %}
+                        {{ parent }} --> {{ node.node_name }}
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        {% for node in metadata.nodes %}
+        <div class="node-card" id="node-{{ node.node_name }}">
+            <div class="node-header" onclick="toggleNode(this)">
+                <div class="node-title">
+                    <div class="status-icon status-{{ node.status }}">
+                        {% if node.status == 'success' %}✓{% elif node.status == 'failed' %}!{% else %}-{% endif %}
+                    </div>
+                    {{ node.node_name }}
+                    <span class="badge badge-blue">{{ node.operation }}</span>
+                </div>
+                <div class="node-metrics">
+                    {% if node.rows_out is not none %}
+                    <span>{{ "{:,}".format(node.rows_out) }} rows</span>
+                    {% endif %}
+                    
+                    {% if node.rows_change is not none and node.rows_change != 0 %}
+                    <span class="badge {% if node.rows_change > 0 %}badge-green{% else %}badge-red{% endif %}">
+                        {% if node.rows_change > 0 %}+{% endif %}{{ "{:,}".format(node.rows_change) }}
+                    </span>
+                    {% endif %}
+                    
+                    <span>{{ "%.4f"|format(node.duration) }}s</span>
+                </div>
+            </div>
+
+            <div class="node-body">
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="openTab(event, 'info-{{ loop.index }}')">Info & Schema</button>
+                    {% if node.executed_sql %}
+                    <button class="tab-btn" onclick="openTab(event, 'sql-{{ loop.index }}')">SQL Logic</button>
+                    {% endif %}
+                    {% if node.sample_data or node.sample_in or node.data_diff %}
+                    <button class="tab-btn" onclick="openTab(event, 'data-{{ loop.index }}')">Data Preview</button>
+                    {% endif %}
+                    {% if node.config_snapshot %}
+                    <button class="tab-btn" onclick="openTab(event, 'config-{{ loop.index }}')">Config</button>
+                    {% endif %}
+                </div>
+
+                <!-- Tab: Info -->
+                <div id="info-{{ loop.index }}" class="tab-content active">
+                    {% if node.error_message %}
+                    <div style="background: #fff5f5; color: #c92a2a; padding: 15px; border-radius: 4px; border: 1px solid #ffa8a8; margin-bottom: 20px;">
+                        <strong>Error: {{ node.error_type }}</strong>
+                        <pre style="background: none; color: #c92a2a; padding: 0; margin-top: 10px;">{{ node.error_message }}</pre>
+                    </div>
+                    {% endif %}
+
+                    {% if node.source_files %}
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="margin: 0 0 10px 0; font-size: 0.95em; color: #666;">Source Files ({{ node.source_files|length }})</h4>
+                        <div style="max-height: 100px; overflow-y: auto; background: #f8f9fa; padding: 10px; border: 1px solid #e1e4e8; border-radius: 4px; font-family: var(--mono-font); font-size: 0.8em; color: #555;">
+                            {% for file in node.source_files %}
+                            <div style="white-space: nowrap;">{{ file }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="schema-grid">
+                        <div class="schema-box">
+                            <h4>Input Schema ({% if node.schema_in %}{{ node.schema_in|length }}{% else %}0{% endif %})</h4>
+                            <ul class="schema-list">
+                                {% if node.schema_in %}
+                                    {% if node.schema_in is mapping %}
+                                        {% for col, dtype in node.schema_in.items() %}
+                                        <li class="{% if col in node.columns_removed %}col-removed{% endif %}">
+                                            <span style="font-weight: 500;">{{ col }}</span>
+                                            <span style="color: #666; font-family: var(--mono-font); font-size: 0.85em;">{{ dtype }}</span>
+                                        </li>
+                                        {% endfor %}
+                                    {% else %}
+                                        {% for col in node.schema_in %}
+                                        <li class="{% if col in node.columns_removed %}col-removed{% endif %}">{{ col }}</li>
+                                        {% endfor %}
+                                    {% endif %}
+                                {% else %}
+                                    <li style="color: #999; font-style: italic;">No input schema</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="schema-box">
+                            <h4>Output Schema ({% if node.schema_out %}{{ node.schema_out|length }}{% else %}0{% endif %})</h4>
+                            <ul class="schema-list">
+                                {% if node.schema_out %}
+                                    {% if node.schema_out is mapping %}
+                                        {% for col, dtype in node.schema_out.items() %}
+                                        <li class="{% if col in node.columns_added %}col-added{% endif %}">
+                                            <div>
+                                                <span style="font-weight: 500;">{{ col }}</span>
+                                                {% if col in node.columns_added %}<span style="font-size: 0.8em;">(NEW)</span>{% endif %}
+                                                
+                                                {% if node.null_profile %}
+                                                    {% set null_pct = node.null_profile.get(col, 0.0) %}
+                                                    {% if null_pct > 0 %}
+                                                        <span class="badge {% if null_pct > 0.9 %}badge-red{% elif null_pct > 0.1 %}badge-orange{% else %}badge-gray{% endif %}" style="font-size: 0.75em; margin-left: 6px;">
+                                                            {{ "%.0f"|format(null_pct * 100) }}% Null
+                                                        </span>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </div>
+                                            <span style="color: #666; font-family: var(--mono-font); font-size: 0.85em;">{{ dtype }}</span>
+                                        </li>
+                                        {% endfor %}
+                                    {% else %}
+                                        {% for col in node.schema_out %}
+                                        <li class="{% if col in node.columns_added %}col-added{% endif %}">
+                                            {{ col }}
+                                            {% if col in node.columns_added %}<span style="font-size: 0.8em;">(NEW)</span>{% endif %}
+                                            
+                                            {% if node.null_profile %}
+                                                {% set null_pct = node.null_profile.get(col, 0.0) %}
+                                                {% if null_pct > 0 %}
+                                                    <span class="badge {% if null_pct > 0.9 %}badge-red{% elif null_pct > 0.1 %}badge-orange{% else %}badge-gray{% endif %}" style="font-size: 0.75em; margin-left: 6px;">
+                                                        {{ "%.0f"|format(null_pct * 100) }}% Null
+                                                    </span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </li>
+                                        {% endfor %}
+                                    {% endif %}
+                                {% else %}
+                                    <li style="color: #999; font-style: italic;">No output schema</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    {% if node.delta_info %}
+                    <div style="margin-top: 20px; border: 1px solid #b8daff; background: #f1f8ff; border-radius: 6px; overflow: hidden;">
+                        <div style="background: #e7f5ff; padding: 10px 15px; border-bottom: 1px solid #b8daff; display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0; font-size: 0.95em; color: #004085; display: flex; align-items: center; gap: 8px;">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0L1 4l7 4 7-4-7-4zM1 12l7 4 7-4V8l-7 4-7-4v4z"/></svg>
+                                Delta Lake Write
+                            </h4>
+                            <span class="badge badge-blue" style="font-size: 0.8em;">v{{ node.delta_info.version }}</span>
+                        </div>
+                        <div style="padding: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; font-size: 0.9em;">
+                            <div>
+                                <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase;">Operation</div>
+                                <div style="font-weight: 600; color: #333;">{{ node.delta_info.operation }}</div>
+                            </div>
+                            <div>
+                                <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase;">Timestamp</div>
+                                <div style="font-weight: 600; color: #333;">{{ node.delta_info.timestamp }}</div>
+                            </div>
+                            
+                            <!-- Metrics Highlights -->
+                            {% if node.delta_info.operation_metrics %}
+                                {% set metrics = node.delta_info.operation_metrics %}
+                                {% set inserted = metrics.numTargetRowsInserted or metrics.numOutputRows or metrics.num_added_rows %}
+                                {% set updated = metrics.numTargetRowsUpdated or metrics.num_updated_rows %}
+                                {% set deleted = metrics.numTargetRowsDeleted or metrics.num_deleted_rows %}
+                                {% set files = metrics.numAddedFiles or metrics.numFilesAdded or metrics.num_added_files %}
+
+                                {% if inserted %}
+                                <div>
+                                    <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase;">Rows Inserted</div>
+                                    <div style="font-weight: 600; color: var(--success-color);">+{{ inserted }}</div>
+                                </div>
+                                {% endif %}
+                                {% if updated %}
+                                <div>
+                                    <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase;">Rows Updated</div>
+                                    <div style="font-weight: 600; color: #f59f00;">~{{ updated }}</div>
+                                </div>
+                                {% endif %}
+                                {% if deleted %}
+                                <div>
+                                    <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase;">Rows Deleted</div>
+                                    <div style="font-weight: 600; color: var(--error-color);">-{{ deleted }}</div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Generic fallback if specific metrics missing -->
+                                {% if not inserted and not updated and not deleted %}
+                                <div>
+                                    <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase;">Files Added</div>
+                                    <div style="font-weight: 600;">{{ files }}</div>
+                                </div>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Tab: SQL -->
+                {% if node.executed_sql %}
+                <div id="sql-{{ loop.index }}" class="tab-content">
+                    {% for sql in node.executed_sql %}
+                    <div style="margin-bottom: 20px;">
+                        <pre>{{ sql }}</pre>
+                    </div>
+                    {% endfor %}
+                    {% if node.sql_hash %}
+                    <div style="margin-top: 10px; color: #999; font-size: 0.8em;">Hash: {{ node.sql_hash }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Tab: Data -->
+                {% if node.sample_data or node.sample_in or node.data_diff %}
+                <div id="data-{{ loop.index }}" class="tab-content">
+                    {% if node.data_diff %}
+                    <div style="margin-bottom: 20px; border: 1px solid #e1e4e8; border-radius: 6px; overflow: hidden;">
+                        <div style="background: #f8f9fa; padding: 10px 15px; border-bottom: 1px solid #e1e4e8;">
+                            <h4 style="margin: 0; font-size: 1em; color: #666;">
+                                📉 Changes vs Previous Version
+                                {% if node.delta_info and node.delta_info.read_version is not none %}
+                                <span style="font-weight: normal; font-size: 0.9em;">(v{{ node.delta_info.version }} vs v{{ node.delta_info.version - 1 }})</span>
+                                {% endif %}
+                            </h4>
+                        </div>
+                        
+                        <div style="padding: 15px;">
+                            <div style="display: flex; gap: 20px; margin-bottom: 15px; font-size: 0.95em;">
+                            <div><strong>Net Change:</strong> {{ node.data_diff.rows_change }}</div>
+                            {% if node.data_diff.rows_added is not none %}
+                            <div style="color: var(--success-color);"><strong>Added:</strong> {{ node.data_diff.rows_added }}</div>
+                            {% endif %}
+                            {% if node.data_diff.rows_updated is not none %}
+                            <div style="color: #f59f00;"><strong>Updated:</strong> {{ node.data_diff.rows_updated }}</div>
+                            {% endif %}
+                            {% if node.data_diff.rows_removed is not none %}
+                            <div style="color: var(--error-color);"><strong>Removed:</strong> {{ node.data_diff.rows_removed }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if node.data_diff.schema_previous is not none %}
+                        <div style="margin-bottom: 20px; padding: 15px; background: #fff; border: 1px solid #e1e4e8; border-radius: 4px;">
+                            <h5 style="margin-top: 0; margin-bottom: 10px; color: #333; display: flex; align-items: center; gap: 8px;">
+                                <span>📋</span> Schema Evolution
+                            </h5>
+                            
+                            {% if not node.data_diff.schema_added and not node.data_diff.schema_removed %}
+                                <div style="color: #666; font-style: italic;">No schema changes detected vs previous run.</div>
+                            {% else %}
+                                <div style="display: grid; gap: 10px;">
+                                    {% if node.data_diff.schema_added %}
+                                    <div>
+                                        <span class="badge badge-green" style="margin-right: 8px;">+ ADDED</span>
+                                        <span style="color: var(--success-color); font-family: var(--mono-font);">{{ node.data_diff.schema_added|join(', ') }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if node.data_diff.schema_removed %}
+                                    <div>
+                                        <span class="badge badge-red" style="margin-right: 8px;">- REMOVED</span>
+                                        <span style="color: var(--error-color); font-family: var(--mono-font);">{{ node.data_diff.schema_removed|join(', ') }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if node.data_diff.sample_updated %}
+                        <h5 style="margin-top: 0; margin-bottom: 10px; font-size: 0.9em; color: #666;">UPDATED ROWS (Values changed from previous run)</h5>
+                        <div style="overflow-x: auto; margin-bottom: 20px; border: 1px solid #eee;">
+                            <table style="margin: 0;">
+                                <thead>
+                                    <tr>
+                                        <th>Key(s)</th>
+                                        <th>Changes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in node.data_diff.sample_updated %}
+                                    <tr>
+                                        <td style="white-space: nowrap;">
+                                            {% for k, v in row.items() if k != '_changes' %}
+                                            <div><small>{{ k }}:</small> <strong>{{ v }}</strong></div>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for col, change in row._changes.items() %}
+                                            <div style="margin-bottom: 4px;">
+                                                <strong>{{ col }}</strong>: 
+                                                <span style="color: var(--error-color); text-decoration: line-through;">{{ change.old }}</span> 
+                                                &rarr; 
+                                                <span style="color: var(--success-color);">{{ change.new }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                        
+                        {% if node.data_diff.sample_added %}
+                        <h5 style="margin-top: 0; margin-bottom: 10px; font-size: 0.9em; color: #666;">ADDED ROWS (New in this run)</h5>
+                        <div style="overflow-x: auto; margin-bottom: 20px; border: 1px solid #eee;">
+                            <table style="margin: 0;">
+                                <thead>
+                                    <tr>
+                                    {% for key in node.data_diff.sample_added[0].keys() %}<th>{{ key }}</th>{% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in node.data_diff.sample_added %}
+                                    <tr class="diff-added">
+                                    {% for val in row.values() %}<td>{{ val }}</td>{% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                        
+                        {% if node.data_diff.sample_removed %}
+                        <h5 style="margin-top: 0; margin-bottom: 10px; font-size: 0.9em; color: #666;">REMOVED ROWS (Existed in previous run, gone now)</h5>
+                        <div style="overflow-x: auto; border: 1px solid #eee;">
+                            <table style="margin: 0;">
+                                <thead>
+                                    <tr>
+                                    {% for key in node.data_diff.sample_removed[0].keys() %}<th>{{ key }}</th>{% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in node.data_diff.sample_removed %}
+                                    <tr class="diff-removed">
+                                    {% for val in row.values() %}<td>{{ val }}</td>{% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                        </div> <!-- End padding container -->
+                    </div>
+                    {% endif %}
+
+                    {% if node.sample_in %}
+                    <h4>Input Sample</h4>
+                    <div style="overflow-x: auto; margin-bottom: 20px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                {% if node.sample_in|length > 0 %}
+                                    {% for key in node.sample_in[0].keys() %}<th>{{ key }}</th>{% endfor %}
+                                {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in node.sample_in %}
+                                <tr>
+                                {% for val in row.values() %}<td>{{ val }}</td>{% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    {% if node.sample_data %}
+                    <h4>Output Sample</h4>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                {% if node.sample_data|length > 0 %}
+                                    {% for key in node.sample_data[0].keys() %}<th>{{ key }}</th>{% endfor %}
+                                {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in node.sample_data %}
+                                <tr>
+                                {% for val in row.values() %}<td>{{ val }}</td>{% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p>No sample data available.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <!-- Tab: Config -->
+                {% if node.config_snapshot %}
+                <div id="config-{{ loop.index }}" class="tab-content">
+                    {% if node.environment %}
+                    <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e1e4e8;">
+                        <h5 style="margin-top: 0; margin-bottom: 10px; color: #666;">Execution Environment</h5>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 0.9em;">
+                            <div><span style="color: #999;">Host:</span> <strong>{{ node.environment.host }}</strong></div>
+                            <div><span style="color: #999;">User:</span> <strong>{{ node.environment.user }}</strong></div>
+                            <div><span style="color: #999;">Python:</span> <strong>{{ node.environment.python }}</strong></div>
+                            <div><span style="color: #999;">Platform:</span> <strong>{{ node.environment.platform }}</strong></div>
+                            {% if node.environment.pandas %}<div><span style="color: #999;">Pandas:</span> <strong>{{ node.environment.pandas }}</strong></div>{% endif %}
+                            {% if node.environment.pyspark %}<div><span style="color: #999;">PySpark:</span> <strong>{{ node.environment.pyspark }}</strong></div>{% endif %}
+                            {% if node.environment.odibi %}<div><span style="color: #999;">Odibi:</span> <strong>{{ node.environment.odibi }}</strong></div>{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <pre>{{ node.config_snapshot | to_yaml }}</pre>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; color: #999; font-size: 0.8em;">
+        Generated by Odibi v1.3.0
+    </div>
+</div>
+
+<script>
+    function toggleNode(header) {
+        const body = header.nextElementSibling;
+        body.classList.toggle('open');
+    }
+
+    function openTab(evt, tabId) {
+        // Find the parent .node-body
+        var nodeBody = evt.currentTarget.closest('.node-body');
+        
+        // Hide all tab contents in this node
+        var tabContents = nodeBody.getElementsByClassName("tab-content");
+        for (var i = 0; i < tabContents.length; i++) {
+            tabContents[i].classList.remove("active");
         }
 
-        // Collapse all nodes except failed ones by default
-        document.addEventListener('DOMContentLoaded', function() {
-            {% for node in metadata.nodes %}
-            {% if node.status != 'failed' %}
-            document.getElementById('node-{{ loop.index }}').classList.add('collapsed');
-            {% endif %}
-            {% endfor %}
-        });
-    </script>
+        // Deactivate all buttons in this node
+        var tabBtns = nodeBody.getElementsByClassName("tab-btn");
+        for (var i = 0; i < tabBtns.length; i++) {
+            tabBtns[i].classList.remove("active");
+        }
+
+        // Activate selected tab and button
+        document.getElementById(tabId).classList.add("active");
+        evt.currentTarget.classList.add("active");
+        
+        // Stop propagation to prevent closing the node card
+        evt.stopPropagation();
+    }
+</script>
+<script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true });
+</script>
+
 </body>
 </html>

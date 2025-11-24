@@ -22,9 +22,7 @@ class NodeResult(BaseModel):
     success: bool
     duration: float
     rows_processed: Optional[int] = None
-    result_schema: Optional[List[str]] = Field(
-        default=None, alias="schema"
-    )  # Renamed to avoid shadowing
+    result_schema: Optional[Any] = Field(default=None, alias="schema")  # Renamed to avoid shadowing
     error: Optional[Exception] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
@@ -512,7 +510,11 @@ class Node:
 
             except Exception as e:
                 # Add step context to error
-                schema = self._get_schema(current_df) if current_df is not None else []
+                # Handle schema being a dict now
+                schema_dict = self._get_schema(current_df) if current_df is not None else {}
+                # If schema is dict, use keys for error reporting context
+                schema = list(schema_dict.keys()) if isinstance(schema_dict, dict) else schema_dict
+
                 shape = self._get_shape(current_df) if current_df is not None else None
 
                 exec_context.input_schema = schema
@@ -635,6 +637,15 @@ class Node:
                 f"Available: {', '.join(self.connections.keys())}"
             )
 
+        # Check if deep diagnostics are requested
+        write_options = write_config.options.copy() if write_config.options else {}
+        deep_diag = write_options.pop("deep_diagnostics", False)
+
+        # Check for update keys
+        diff_keys = write_options.pop("diff_keys", None)
+
+        # print(f"DEBUG: Node {self.config.name} deep_diag={deep_diag} keys={diff_keys} options={write_config.options}")
+
         # Delegate to engine-specific writer
         delta_info = self.engine.write(
             df=df,
@@ -643,7 +654,7 @@ class Node:
             table=write_config.table,
             path=write_config.path,
             mode=write_config.mode,
-            options=write_config.options,
+            options=write_options,
         )
 
         if delta_info:
@@ -672,19 +683,52 @@ class Node:
                         curr_ver = delta_info["version"]
                         prev_ver = curr_ver - 1
 
-                        diff = get_delta_diff(
-                            table_path=full_path,
-                            version_a=prev_ver,
-                            version_b=curr_ver,
-                            spark=spark_session,
-                        )
+                        # ONLY perform deep diff (row samples) if requested or small data
+                        # For now, we trust 'deep_diagnostics' flag or rely on lightweight metrics
 
-                        # Store lightweight summary
-                        self._delta_write_info["data_diff"] = {
-                            "rows_change": diff.rows_change,
-                            "sample_added": diff.sample_added,
-                            "sample_removed": diff.sample_removed,
-                        }
+                        if deep_diag:
+                            diff = get_delta_diff(
+                                table_path=full_path,
+                                version_a=prev_ver,
+                                version_b=curr_ver,
+                                spark=spark_session,
+                                deep=True,
+                                keys=diff_keys,
+                            )
+
+                            # Store lightweight summary
+                            self._delta_write_info["data_diff"] = {
+                                "rows_change": diff.rows_change,
+                                "rows_added": diff.rows_added,
+                                "rows_removed": diff.rows_removed,
+                                "rows_updated": diff.rows_updated,
+                                "schema_added": diff.schema_added,
+                                "schema_removed": diff.schema_removed,
+                                "schema_previous": diff.schema_previous,
+                                "sample_added": diff.sample_added,
+                                "sample_removed": diff.sample_removed,
+                                "sample_updated": diff.sample_updated,
+                            }
+                        else:
+                            # Lightweight Mode: Rely on Delta operation metrics (already in delta_info)
+                            # We can calculate net row change from metrics if available
+                            metrics = delta_info.get("operation_metrics", {})
+                            rows_inserted = int(
+                                metrics.get("numTargetRowsInserted", 0)
+                                or metrics.get("numOutputRows", 0)
+                            )
+                            rows_deleted = int(metrics.get("numTargetRowsDeleted", 0))
+                            # rows_updated = int(metrics.get("numTargetRowsUpdated", 0))
+
+                            net_change = rows_inserted - rows_deleted
+
+                            # Just store net change, no samples
+                            self._delta_write_info["data_diff"] = {
+                                "rows_change": net_change,
+                                "sample_added": None,
+                                "sample_removed": None,
+                            }
+
                 except Exception as e:
                     # Don't fail the pipeline if diagnostics fail
                     # Just log it
@@ -702,10 +746,61 @@ class Node:
         Returns:
             Metadata dictionary
         """
+        import hashlib
+        import platform
+        import getpass
+        import socket
+        import sys
+
+        try:
+            import pandas as pd
+
+            pandas_version = pd.__version__
+        except ImportError:
+            pandas_version = None
+
+        try:
+            import pyspark
+
+            pyspark_version = pyspark.__version__
+        except ImportError:
+            pyspark_version = None
+
+        # Compute SQL Hash
+        sql_hash = None
+        if self._executed_sql:
+            # Normalize SQL: Join, lowercase, remove extra whitespace
+            normalized_sql = " ".join(self._executed_sql).lower().strip()
+            sql_hash = hashlib.md5(normalized_sql.encode("utf-8")).hexdigest()
+
+        # Capture Config Snapshot
+        # We dump to dict to ensure it's serializable
+        # mode='json' ensures Enums are converted to strings
+        config_snapshot = (
+            self.config.model_dump(mode="json")
+            if hasattr(self.config, "model_dump")
+            else self.config.dict()
+        )
+
         metadata = {
             "timestamp": datetime.now().isoformat(),
+            "environment": {
+                "user": getpass.getuser(),
+                "host": socket.gethostname(),
+                "platform": platform.platform(),
+                "python": sys.version.split()[0],
+                "pandas": pandas_version,
+                "pyspark": pyspark_version,
+                "odibi": __import__("odibi").__version__,
+            },
             "steps": self._execution_steps.copy(),
             "executed_sql": self._executed_sql.copy(),
+            "sql_hash": sql_hash,
+            "transformation_stack": [
+                step.function if hasattr(step, "function") else str(step)
+                for step in (self.config.transform.steps if self.config.transform else [])
+            ],
+            "config_snapshot": config_snapshot,
         }
 
         if self._delta_write_info:
@@ -733,17 +828,24 @@ class Node:
         if df is not None:
             metadata["rows"] = self._count_rows(df)
             metadata["schema"] = self._get_schema(df)
+            metadata["source_files"] = self.engine.get_source_files(df)
+
+            try:
+                metadata["null_profile"] = self.engine.profile_nulls(df)
+            except Exception:
+                # Don't fail pipeline for stats
+                metadata["null_profile"] = {}
 
         return metadata
 
-    def _get_schema(self, df: Any) -> List[str]:
-        """Get DataFrame schema (column names).
+    def _get_schema(self, df: Any) -> Any:
+        """Get DataFrame schema (column names and types).
 
         Args:
             df: DataFrame
 
         Returns:
-            List of column names
+            Dict[str, str] or List[str]
         """
         return self.engine.get_schema(df)
 

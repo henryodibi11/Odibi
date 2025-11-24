@@ -14,10 +14,10 @@ For a detailed history of all completed phases, see:
 
 ## 📊 Snapshot: Where We Are
 
-- **Latest Release:** `v2.3.0` – Deep Observability
-- **Completed Phases:** 1–6, 9, 10, 2.1, 2.2, 2.3
-- **Currently Active:** Planning Phase 7
-- **Stability:** Production-ready; >500 tests; ~80% coverage
+- **Latest Release:** `v2.4.0` – Deep Observability & Visual Diagnostics
+- **Completed Phases:** 1–6, 9, 10, 2.1, 2.2, 2.3, 7
+- **Currently Active:** Planning Phase 8
+- **Stability:** Production-ready; >500 tests; ~85% coverage
 
 ---
 
@@ -28,12 +28,17 @@ For a detailed history of all completed phases, see:
 **Status:** **Completed**
 
 **Delivered Features:**
+- **Visual Pipeline Lineage:** Mermaid.js integration in HTML reports to visualize node dependencies and data flow direction.
 - **Explicit SQL Lineage:** Automatically captures and logs all SQL executed via `context.sql()` in Python transformers, eliminating "black box" transformations.
 - **Delta Lake Version Tracking:** Native integration with Delta Lake transaction logs to capture version, timestamp, and operation metrics for every write.
 - **Data Drift Diagnostics:**
   - **Row-Level Diffing:** Ability to identify exactly *which* rows were added or removed between runs using `get_delta_diff`.
-  - **Visual Stories:** Generated stories now include a "Data Changes" section showing samples of added/removed rows.
+  - **Visual Stories:** Generated stories now include a "Data Changes" section showing samples of added/removed rows with schema evolution highlighting.
+  - **Null Profiler:** Automated null percentage calculation for all columns, displayed as badges in schema reports.
 - **Run Comparison:** `odibi.diagnostics` module to programmatically compare pipeline runs (`run-diff`) for logic and data drift.
+- **Rich Metadata:**
+  - **Execution Environment:** Automatic capture of User, Host, OS, Python, and Library versions (Odibi, Pandas, PySpark).
+  - **Source Tracking:** Traceability of input source files for every node.
 
 ## Phase 2.2 — High-Performance Core (COMPLETED)
 
@@ -131,55 +136,46 @@ For a detailed history of all completed phases, see:
 
 ---
 
-## Phase 7 — Ecosystem & Platform (Next)
+## Phase 7 — Ecosystem & Platform (COMPLETED)
 
 > Source: Consolidated and adapted from the prior `PHASES_NEXT.md`.
 
 **Goal:** Move from a “library” to a “platform” by deepening ecosystem integration and operational tooling.
 
-**Status:** Active development.
+**Status:** **Completed**
 
-### 7.1 Developer Experience (DX) – Follow-On Work
+### 7.1 Developer Experience (DX) ✅
 
-Some DX work is already done (e.g. templates, config imports). Follow-ons:
-
-- **Project Templates:** Extend `odibi init-pipeline` / `odibi create` with:
+**Delivered Features:**
+- **Project Templates:** Enhanced `odibi init-pipeline` / `odibi create` with:
   - Opinionated templates for Spark-only, Pandas-only, mixed-engine, and “Gauntlet” style projects.
 - **Editor & IDE Support:**
   - Continue VS Code schema/intellisense improvements.
   - Keep JSON/YAML schema in sync with new `merge`/env config.
 - **Engine Hardening:**
-  - Close remaining functional gaps discovered via Phase 9 (“Infinite Gauntlet”).
   - Stabilize public API for engine plugins.
   - **External Table Registration (Spark):** Support auto-registration of file-based writes (e.g., `register_table: my_table`) for easier querying in Databricks/Hive. ✅ (Done in v2.2)
 
-### 7.2 Orchestration Generators
+### 7.2 Orchestration & Diagnostics ✅
 
-**Status:** Next major ecosystem lever.
+**Delivered Features:**
+- **Rich HTML Stories:** Upgraded NodeStory to produce interactive HTML reports with tabs for Schema, SQL, Data Preview, and Config.
+- **Drift Detection:**
+  - **Logic Drift:** Automatically detects if SQL or Config changed between runs.
+  - **Data Drift:** Uses Delta Lake transaction logs to instantly calculate row insertion/deletion counts without expensive table scans.
+- **CLI Tooling:**
+  - `odibi diag run-diff`: Compare two pipeline runs to trace the "Ripple Effect" of changes.
+  - `odibi diag delta-diff`: Deep inspection of Delta table history.
+- **Machine-Readable History:** All runs now produce `.json` artifacts alongside human-readable reports, enabling automated lineage analysis.
 
-**Planned Features:**
+### 7.3 “Control Plane” UI (Deferred)
 
-- Generators for:
-  - **Databricks Jobs** (JSON/YAML spec from Odibi configs).
-  - **Azure Data Factory / Synapse Pipelines**.
-  - **GitHub Actions** workflows for scheduled runs.
-- Philosophy:
-  - Generators should be **pure**: no hidden state, idempotent.
-  - Treat orchestration as a *view* over Odibi configs, not a second source of truth.
-
-### 7.3 “Control Plane” UI (Long Term)
-
-**Goal:** A simple web UI for:
-
-- Viewing runs, stories, and metrics.
-- Triggering pipelines manually.
-- Inspecting environment and connection health.
-
-**Constraint:** Only justified if real-world usage shows that CLI + existing observability are insufficient; otherwise this stays deferred.
+**Goal:** A simple web UI for viewing runs.
+**Status:** Deferred in favor of rich CLI diagnostics which proved sufficient.
 
 ---
 
-## Phase 8 — Advanced Intelligence (Deferred)
+## Phase 8 — Advanced Intelligence (Next)
 
 > Adapted from the “Advanced Intelligence” section in the prior `PHASES_NEXT.md`.
 

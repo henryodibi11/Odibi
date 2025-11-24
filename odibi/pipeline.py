@@ -389,6 +389,18 @@ class Pipeline:
             else:
                 config_dump = self.config.dict()
 
+            # Merge project-level config if available
+            if self.project_config:
+                project_dump = (
+                    self.project_config.model_dump(mode="json")
+                    if hasattr(self.project_config, "model_dump")
+                    else self.project_config.dict()
+                )
+                # Merge relevant fields
+                for field in ["project", "plant", "asset", "business_unit", "layer"]:
+                    if field in project_dump and project_dump[field]:
+                        config_dump[field] = project_dump[field]
+
             story_path = self.story_generator.generate(
                 node_results=results.node_results,
                 completed=results.completed,

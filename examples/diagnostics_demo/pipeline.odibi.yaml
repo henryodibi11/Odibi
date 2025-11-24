@@ -5,28 +5,66 @@ connections:
 engine: pandas
 pipelines:
 - nodes:
-  - name: raw_customers
+  - name: load_customers
     read:
       connection: local
       format: csv
-      path: d:\odibi\examples\diagnostics_demo\data\customers.csv
+      path: c:\Users\hodibi\OneDrive - Ingredion\Desktop\Repos\Odibi\examples\diagnostics_demo\data\customers.csv
     write:
       connection: local
       format: delta
-      mode: append
-      path: d:\odibi\examples\diagnostics_demo\output\customers_delta
+      mode: overwrite
+      options:
+        deep_diagnostics: true
+        diff_keys:
+        - id
+        schema_mode: overwrite
+      path: c:\Users\hodibi\OneDrive - Ingredion\Desktop\Repos\Odibi\examples\diagnostics_demo\output\raw_customers
+  - name: load_transactions
+    read:
+      connection: local
+      format: csv
+      path: c:\Users\hodibi\OneDrive - Ingredion\Desktop\Repos\Odibi\examples\diagnostics_demo\data\transactions.csv
+    write:
+      connection: local
+      format: delta
+      mode: overwrite
+      path: c:\Users\hodibi\OneDrive - Ingredion\Desktop\Repos\Odibi\examples\diagnostics_demo\output\raw_transactions
   - depends_on:
-    - raw_customers
-    name: enriched_customers
-    transformer: examples.diagnostics_demo.logic.enrich_customers
+    - load_customers
+    name: enrich_data
+    params:
+      segment_prefix: GLOBAL-
+    transformer: enrich_customers
     write:
       connection: local
       format: delta
-      mode: append
-      path: d:\odibi\examples\diagnostics_demo\output\enriched_delta
-  pipeline: diagnostics_demo
+      mode: overwrite
+      options:
+        deep_diagnostics: true
+        diff_keys:
+        - id
+        schema_mode: overwrite
+      path: c:\Users\hodibi\OneDrive - Ingredion\Desktop\Repos\Odibi\examples\diagnostics_demo\output\enriched_customers
+  - depends_on:
+    - enrich_data
+    - load_transactions
+    name: join_data
+    params: {}
+    transformer: join_transactions
+  - depends_on:
+    - join_data
+    name: summarize_stats
+    params: {}
+    transformer: summarize_customer
+    write:
+      connection: local
+      format: delta
+      mode: overwrite
+      path: c:\Users\hodibi\OneDrive - Ingredion\Desktop\Repos\Odibi\examples\diagnostics_demo\output\customer_stats
+  pipeline: customer_360
 project: diagnostics_demo
 story:
   connection: local
-  path: examples/diagnostics_demo/stories
-version: 0.1.0
+  path: c:\Users\hodibi\OneDrive - Ingredion\Desktop\Repos\Odibi\examples\diagnostics_demo\stories
+version: 1.0.0

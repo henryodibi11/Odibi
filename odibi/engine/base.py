@@ -102,14 +102,14 @@ class Engine(ABC):
         pass
 
     @abstractmethod
-    def get_schema(self, df: Any) -> List[str]:
-        """Get DataFrame column names.
+    def get_schema(self, df: Any) -> Any:
+        """Get DataFrame schema.
 
         Args:
             df: DataFrame
 
         Returns:
-            List of column names
+            Dict[str, str] mapping column names to types, or List[str] of names (deprecated)
         """
         pass
 
@@ -188,3 +188,25 @@ class Engine(ABC):
             List of row dictionaries
         """
         pass
+
+    def get_source_files(self, df: Any) -> List[str]:
+        """Get list of source files that generated this DataFrame.
+
+        Args:
+            df: DataFrame
+
+        Returns:
+            List of file paths (or empty list if not applicable/supported)
+        """
+        return []
+
+    def profile_nulls(self, df: Any) -> Dict[str, float]:
+        """Calculate null percentage for each column.
+
+        Args:
+            df: DataFrame
+
+        Returns:
+            Dictionary of {column_name: null_percentage} (0.0 to 1.0)
+        """
+        return {}

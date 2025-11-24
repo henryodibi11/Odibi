@@ -563,6 +563,31 @@
           "timestamp": "2025-11-24T08:21:17.764818"
         }
       }
+    },
+    "customer_360": {
+      "last_run": "2025-11-24T12:29:44.503260",
+      "nodes": {
+        "load_customers": {
+          "success": true,
+          "timestamp": "2025-11-24T12:29:43.919861"
+        },
+        "load_transactions": {
+          "success": true,
+          "timestamp": "2025-11-24T12:29:44.009153"
+        },
+        "enrich_data": {
+          "success": true,
+          "timestamp": "2025-11-24T12:29:44.418183"
+        },
+        "join_data": {
+          "success": true,
+          "timestamp": "2025-11-24T12:29:44.418183"
+        },
+        "summarize_stats": {
+          "success": true,
+          "timestamp": "2025-11-24T12:29:44.503260"
+        }
+      }
     }
   }
 }
