@@ -165,7 +165,7 @@ class TestHTMLStoryRenderer:
         assert "Pipeline Flow" in html  # Replaces explicit checks for mermaid if node list is empty
         # But wait, the test fixture has nodes.
         # If the template changed structure, "load_data" should still be there.
-        
+
         # Check for presence of key elements
         assert "load_data" in html
         assert "transform" in html
@@ -219,7 +219,7 @@ class TestHTMLStoryRenderer:
         renderer = HTMLStoryRenderer()
         html = renderer.render(sample_metadata)
 
-        # The class might not be explicitly "error-box" anymore, 
+        # The class might not be explicitly "error-box" anymore,
         # but inline styles or specific error message container
         assert "Error:" in html
         assert "ZeroDivisionError" in html

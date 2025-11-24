@@ -22,8 +22,12 @@ class TestCheckpointing:
         engine = MagicMock()
         # Mock read to return a DataFrame
         engine.read.return_value = pd.DataFrame({"a": [1]})
-        engine.get_schema.return_value = ["a"]
+        engine.get_schema.return_value = {"a": "int64"}
         engine.count_rows.return_value = 1
+        # Mock other methods used in reporting to avoid MagicMock comparisons
+        engine.validate_data.return_value = []
+        engine.profile_nulls.return_value = {"a": 0.0}
+        engine.get_source_files.return_value = []
         return engine
 
     @pytest.fixture

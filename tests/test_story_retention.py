@@ -20,13 +20,14 @@ class TestStoryRetention:
         for i in range(10):
             p_html = tmp_path / f"test_pipeline_run{i}.html"
             p_html.touch()
-            
+
             p_json = tmp_path / f"test_pipeline_run{i}.json"
             p_json.touch()
-            
+
             # Ensure different mtimes (newest last)
             t = time.time() + i * 10
             import os
+
             os.utime(p_html, (t, t))
             os.utime(p_json, (t, t))
 
@@ -35,7 +36,7 @@ class TestStoryRetention:
 
         files_html = list(tmp_path.glob("test_pipeline_*.html"))
         files_json = list(tmp_path.glob("test_pipeline_*.json"))
-        
+
         assert len(files_html) == 5
         assert len(files_json) == 5
 

@@ -607,7 +607,10 @@ class TestPandasEngineSchemaOperations:
     def test_get_schema(self, engine):
         """Get schema returns column list."""
         df = pd.DataFrame({"a": [1, 2], "b": [None, 2.0], "c": ["x", "y"]})
-        assert engine.get_schema(df) == ["a", "b", "c"]
+        schema = engine.get_schema(df)
+        assert schema["a"] == "int64"
+        assert schema["b"] == "float64"
+        assert schema["c"] == "object"
 
     def test_get_shape(self, engine):
         """Get shape returns (rows, cols)."""

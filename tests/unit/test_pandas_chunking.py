@@ -1,5 +1,4 @@
 import pandas as pd
-from typing import Iterator
 from odibi.engine.pandas_engine import PandasEngine
 
 

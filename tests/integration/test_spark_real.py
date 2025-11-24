@@ -27,8 +27,11 @@ def test_spark_real_session():
 
         spark.stop()
     except RuntimeError as e:
-        if "Only remote Spark sessions using Databricks Connect are supported" in str(e):
+        error_msg = str(e)
+        if "Only remote Spark sessions using Databricks Connect are supported" in error_msg:
             pytest.skip("Databricks Connect installed but not configured")
+        elif "Java gateway process exited" in error_msg or "JAVA_HOME" in error_msg:
+            pytest.skip(f"Spark failed to start (likely missing Java): {e}")
         else:
             pytest.fail(f"Failed to start or use real Spark session: {e}")
     except Exception as e:
@@ -36,6 +39,9 @@ def test_spark_real_session():
         import sys
 
         err_msg = str(e)
+        if "Java gateway process exited" in err_msg:
+            pytest.skip(f"Spark failed to start (likely missing Java): {e}")
+
         if sys.platform == "win32":
             # Windows failures are almost always due to winutils/hadoop missing
             # Check for common symptoms or just skip if it looks like environment issue
