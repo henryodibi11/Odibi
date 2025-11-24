@@ -158,32 +158,67 @@ def _get_delta_diff_spark(
 
             if keys and set(keys).issubset(common_cols):
                 # --- Spark Key-Based Diff ---
-                # TODO: Implement full Spark update detection using joins
-                # For now, fallback to basic diff but warn or implement simple version
+                # Join on keys to find Added, Removed, and Updated
 
-                # Join on keys
-                # b (current) Left Anti a (old) = Added
-                # df_added = df_b_common.join(df_a_common, keys, "left_anti")
+                # 1. Added: In B but not in A (based on keys)
+                # df_b_common left_anti df_a_common on keys
+                diff_added = df_b_common.join(df_a_common, keys, "left_anti")
+                rows_added_count = diff_added.count()
+                added_rows = [row.asDict() for row in diff_added.limit(10).collect()]
 
-                # a (old) Left Anti b (current) = Removed
-                # df_removed = df_a_common.join(df_b_common, keys, "left_anti")
+                # 2. Removed: In A but not in B (based on keys)
+                # df_a_common left_anti df_b_common on keys
+                diff_removed = df_a_common.join(df_b_common, keys, "left_anti")
+                rows_removed_count = diff_removed.count()
+                removed_rows = [row.asDict() for row in diff_removed.limit(10).collect()]
 
-                # Updates: Inner join where values differ
-                # This is complex in Spark SQL expression generation dynamically
-                # For this PR, we might skip Spark advanced update details or leave placeholders
-                pass
+                # 3. Updates: In both (inner join), but value columns differ
+                value_cols = [c for c in common_cols if c not in keys]
 
-            # Fallback to Set Diff if keys not supported/implemented fully for Spark yet
-            # or if keys not provided
-            diff_added = df_b_common.exceptAll(df_a_common)
-            diff_removed = df_a_common.exceptAll(df_b_common)
+                # Rename columns in A to avoid ambiguity
+                # We can alias DataFrames
+                df_a_aliased = df_a_common.alias("a")
+                df_b_aliased = df_b_common.alias("b")
 
-            # Get counts
-            rows_added_count = diff_added.count()
-            rows_removed_count = diff_removed.count()
+                # Build filter condition
+                from pyspark.sql import functions as F
 
-            added_rows = [row.asDict() for row in diff_added.limit(10).collect()]
-            removed_rows = [row.asDict() for row in diff_removed.limit(10).collect()]
+                # Start with False
+                change_condition = F.lit(False)
+
+                for col in value_cols:
+                    # logical_or of existing condition AND (col_a != col_b)
+                    # utilizing equalNullSafe inverted: not(a <=> b)
+                    col_changed = ~F.col(f"a.{col}").eqNullSafe(F.col(f"b.{col}"))
+                    change_condition = change_condition | col_changed
+
+                # Inner Join + Filter
+                # Join condition is equality on keys
+                join_cond = [F.col(f"a.{k}") == F.col(f"b.{k}") for k in keys]
+
+                diff_updated = (
+                    df_b_aliased.join(df_a_aliased, join_cond, "inner")
+                    .filter(change_condition)
+                    .select("b.*")  # We return the 'new' state
+                )
+
+                rows_updated_count = diff_updated.count()
+
+                # Let's grab the top 10 updated rows (new state)
+                updated_rows = [row.asDict() for row in diff_updated.limit(10).collect()]
+
+            else:
+                # Fallback to Set Diff if keys not supported/implemented fully for Spark yet
+                # or if keys not provided
+                diff_added = df_b_common.exceptAll(df_a_common)
+                diff_removed = df_a_common.exceptAll(df_b_common)
+
+                # Get counts
+                rows_added_count = diff_added.count()
+                rows_removed_count = diff_removed.count()
+
+                added_rows = [row.asDict() for row in diff_added.limit(10).collect()]
+                removed_rows = [row.asDict() for row in diff_removed.limit(10).collect()]
 
     return DeltaDiffResult(
         table_path=table_path,

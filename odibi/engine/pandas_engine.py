@@ -796,7 +796,7 @@ class PandasEngine(Engine):
 
                 if isinstance(df, Iterator):
                     # Warning: Materializing iterator for SQL execution
-                    # TODO: Investigate DuckDB streaming support for iterators
+                    # Note: DuckDB doesn't support streaming from iterator yet
                     df = pd.concat(df, ignore_index=True)
 
                 conn.register(name, df)
