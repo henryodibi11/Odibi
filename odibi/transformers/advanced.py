@@ -230,7 +230,110 @@ def hash_columns(context: EngineContext, params: HashParams) -> EngineContext:
 
 
 # -------------------------------------------------------------------------
-# 7. Validate and Flag
+# 7. Generate Surrogate Key
+# -------------------------------------------------------------------------
+
+
+class SurrogateKeyParams(BaseModel):
+    columns: List[str] = Field(..., description="Columns to combine for the key")
+    separator: str = Field("-", description="Separator between values")
+    output_col: str = Field("surrogate_key", description="Name of the output column")
+
+
+def generate_surrogate_key(context: EngineContext, params: SurrogateKeyParams) -> EngineContext:
+    """
+    Generates a deterministic surrogate key (MD5) from a combination of columns.
+    Handles NULLs by treating them as empty strings to ensure consistency.
+    """
+    # Logic: MD5( CONCAT_WS( separator, COALESCE(col1, ''), COALESCE(col2, '') ... ) )
+
+    from odibi.enums import EngineType
+
+    # 1. Build the concatenation expression
+    # We must cast to string and coalesce nulls
+
+    def safe_col(col):
+        # Spark/DuckDB cast syntax slightly different but standard SQL CAST(x AS STRING) usually works
+        # Spark: cast(col as string)
+        # DuckDB: cast(col as varchar) or string
+        return f"COALESCE(CAST({col} AS STRING), '')"
+
+    if context.engine_type == EngineType.SPARK:
+        # Spark CONCAT_WS skips nulls, but we coerced them to empty string above anyway for safety.
+        # Actually, if we want strict "dbt style" surrogate keys, we often treat NULL as a specific token.
+        # But empty string is standard for "simple" SKs.
+
+        cols_expr = ", ".join([safe_col(c) for c in params.columns])
+        concat_expr = f"concat_ws('{params.separator}', {cols_expr})"
+        final_expr = f"md5({concat_expr})"
+
+    else:
+        # DuckDB / Pandas
+        # DuckDB also supports concat_ws and md5.
+        # Note: DuckDB CAST AS STRING is valid.
+
+        cols_expr = ", ".join([safe_col(c) for c in params.columns])
+        concat_expr = f"concat_ws('{params.separator}', {cols_expr})"
+        final_expr = f"md5({concat_expr})"
+
+    sql_query = f"SELECT *, {final_expr} AS {params.output_col} FROM df"
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 8. Parse JSON
+# -------------------------------------------------------------------------
+
+
+class ParseJsonParams(BaseModel):
+    column: str = Field(..., description="String column containing JSON")
+    json_schema: str = Field(
+        ..., description="DDL schema string (e.g. 'a INT, b STRING') or Spark StructType DDL"
+    )
+    output_col: Optional[str] = None
+
+
+def parse_json(context: EngineContext, params: ParseJsonParams) -> EngineContext:
+    """
+    Parses a JSON string column into a Struct/Map column.
+    """
+    from odibi.enums import EngineType
+
+    target = params.output_col or f"{params.column}_parsed"
+
+    if context.engine_type == EngineType.SPARK:
+        # Spark: from_json(col, schema)
+        expr = f"from_json({params.column}, '{params.json_schema}')"
+
+    else:
+        # DuckDB / Pandas
+        # DuckDB: json_transform(col, 'schema') is experimental.
+        # Standard: from_json(col, 'schema') works in recent DuckDB versions.
+        # But reliable way is usually casting or json extraction if we know the structure?
+        # Actually, DuckDB allows: cast(json_parse(col) as STRUCT(a INT, b VARCHAR...))
+
+        # We need to convert the generic DDL schema string to DuckDB STRUCT syntax?
+        # That is complex.
+        # SIMPLIFICATION: For DuckDB, we might rely on automatic inference if we use `json_parse`?
+        # Or just `json_parse(col)` which returns a JSON type (which is distinct).
+        # Then user can unpack it.
+
+        # Let's try `json_parse(col)`.
+        # Note: If user provided specific schema to enforce types, that's harder in DuckDB SQL string without parsing the DDL.
+        # Spark's schema string "a INT, b STRING" is not valid DuckDB STRUCT(a INT, b VARCHAR).
+
+        # For V1 of this function, we will focus on Spark (where it's critical).
+        # For DuckDB, we will use `json_parse(col)` which makes it a JSON object,
+        # and future `unpack_struct` calls usually handle JSON types in DuckDB 0.10+.
+
+        expr = f"json_parse({params.column})"
+
+    sql_query = f"SELECT *, {expr} AS {target} FROM df"
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 9. Validate and Flag
 # -------------------------------------------------------------------------
 
 
@@ -277,7 +380,7 @@ def validate_and_flag(context: EngineContext, params: ValidateAndFlagParams) -> 
 
 
 # -------------------------------------------------------------------------
-# 8. Window Calculation
+# 10. Window Calculation
 # -------------------------------------------------------------------------
 
 

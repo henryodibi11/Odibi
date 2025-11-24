@@ -555,3 +555,33 @@ def convert_timezone(context: EngineContext, params: ConvertTimezoneParams) -> E
 
     sql_query = f"SELECT *, {expr} AS {target} FROM df"
     return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 17. Concat Columns
+# -------------------------------------------------------------------------
+
+
+class ConcatColumnsParams(BaseModel):
+    columns: List[str] = Field(..., description="Columns to concatenate")
+    separator: str = Field("", description="Separator string")
+    output_col: str = Field(..., description="Resulting column name")
+
+
+def concat_columns(context: EngineContext, params: ConcatColumnsParams) -> EngineContext:
+    """
+    Concatenates multiple columns into one string.
+    NULLs are skipped (treated as empty string) using CONCAT_WS behavior.
+    """
+    # Logic: CONCAT_WS(separator, col1, col2...)
+    # Both Spark and DuckDB support CONCAT_WS with skip-null behavior.
+
+    cols_str = ", ".join(params.columns)
+
+    # Note: Spark CONCAT_WS requires separator as first arg.
+    # DuckDB CONCAT_WS requires separator as first arg.
+
+    expr = f"concat_ws('{params.separator}', {cols_str})"
+
+    sql_query = f"SELECT *, {expr} AS {params.output_col} FROM df"
+    return context.sql(sql_query)

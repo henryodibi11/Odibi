@@ -38,6 +38,7 @@ def register_standard_library():
     registry.register(sql_core.date_diff, "date_diff", sql_core.DateDiffParams)
     registry.register(sql_core.case_when, "case_when", sql_core.CaseWhenParams)
     registry.register(sql_core.convert_timezone, "convert_timezone", sql_core.ConvertTimezoneParams)
+    registry.register(sql_core.concat_columns, "concat_columns", sql_core.ConcatColumnsParams)
 
     # Relational
     registry.register(relational.join, "join", relational.JoinParams)
@@ -53,6 +54,10 @@ def register_standard_library():
     registry.register(advanced.regex_replace, "regex_replace", advanced.RegexReplaceParams)
     registry.register(advanced.unpack_struct, "unpack_struct", advanced.UnpackStructParams)
     registry.register(advanced.hash_columns, "hash_columns", advanced.HashParams)
+    registry.register(advanced.parse_json, "parse_json", advanced.ParseJsonParams)
+    registry.register(
+        advanced.generate_surrogate_key, "generate_surrogate_key", advanced.SurrogateKeyParams
+    )
     registry.register(
         advanced.validate_and_flag, "validate_and_flag", advanced.ValidateAndFlagParams
     )
