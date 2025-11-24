@@ -296,8 +296,93 @@ class StoryGenerator:
 
     def cleanup(self) -> None:
         """Remove old stories based on retention policy."""
-        if self.is_remote or self.output_path is None:
-            # Cleanup not supported for remote storage yet
+        if self.is_remote:
+            try:
+                import fsspec
+                from datetime import timedelta
+
+                # Initialize filesystem
+                protocol = self.output_path_str.split("://")[0]
+                fs = fsspec.filesystem(protocol, **self.storage_options)
+
+                # List all files in the directory
+                try:
+                    # Strip protocol for listing
+                    path_to_list = self.output_path_str.split("://")[1]
+                    files = fs.ls(path_to_list)
+                except Exception:
+                    # Might fail if directory doesn't exist or auth issues, just return
+                    return
+
+                # Filter for this pipeline's stories
+                html_files = []
+                json_files = []
+
+                for f in files:
+                    # fsspec returns full paths usually
+                    filename = f.split("/")[-1]
+                    if filename.startswith(f"{self.pipeline_name}_"):
+                        if filename.endswith(".html"):
+                            html_files.append(f)
+                        elif filename.endswith(".json"):
+                            json_files.append(f)
+
+                # Sort by filename (descending) - filenames have timestamps so this works
+                # Format: pipeline_YYYYMMDD_HHMMSS.html
+                html_files.sort(reverse=True)
+                json_files.sort(reverse=True)
+
+                # 1. Count retention
+                if len(html_files) > self.retention_count:
+                    to_delete = html_files[self.retention_count :]
+                    fs.rm(to_delete)
+
+                if len(json_files) > self.retention_count:
+                    to_delete = json_files[self.retention_count :]
+                    fs.rm(to_delete)
+
+                # 2. Time retention
+                # Parse timestamps from filenames since mtime might be unreliable/slow on object store
+                now = datetime.now()
+                cutoff = now - timedelta(days=self.retention_days)
+
+                remaining_html = html_files[: self.retention_count]
+                remaining_json = json_files[: self.retention_count]
+
+                files_to_delete = []
+
+                for f_list in [remaining_html, remaining_json]:
+                    for f in f_list:
+                        try:
+                            filename = f.split("/")[-1]
+                            # Extract timestamp: pipeline_YYYYMMDD_HHMMSS.ext
+                            # Find the last underscore before extension?
+                            # Our format: base_filename = {pipeline_name}_{timestamp}
+                            # timestamp = "%Y%m%d_%H%M%S" (15 chars)
+
+                            # Removing extension
+                            name_no_ext = filename.rsplit(".", 1)[0]
+                            # Timestamp is last 15 chars
+                            ts_str = name_no_ext[-15:]
+                            file_date = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+
+                            if file_date < cutoff:
+                                files_to_delete.append(f)
+                        except (ValueError, IndexError):
+                            # Skip files that don't match expected format
+                            continue
+
+                if files_to_delete:
+                    fs.rm(files_to_delete)
+
+            except ImportError:
+                print("Warning: Remote story cleanup requires 'fsspec'. Skipping.")
+            except Exception as e:
+                print(f"Warning: Remote story cleanup failed: {e}")
+
+            return
+
+        if self.output_path is None:
             return
 
         try:

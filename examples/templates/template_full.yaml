@@ -47,7 +47,7 @@ logging:
 # alerts:
 #   - type: slack  # or 'teams', 'webhook'
 #     url: ${SLACK_WEBHOOK_URL}
-#     on_events: [on_failure]  # Options: on_start, on_success, on_failure
+#     on_events: [on_failure, on_success]  # Triggers: on_start, on_success, on_failure
 #     metadata: {channel: "#data-alerts"}
 
 # ==========================================
@@ -283,12 +283,116 @@ story:
   retention_days: 30      # Delete stories older than 30 days
   retention_count: 100    # Keep only the last 100 stories (deletes oldest first)
 
-# ==========================================
-# 4. Environments (Experimental/Roadmap)
-# ==========================================
-# Environments allow overriding settings for specific contexts (prod vs dev).
-# Currently in active development (Phase 3).
+# -----------------------------------------------------------------------------
+# 6. ENVIRONMENTS (Overrides)
+# -----------------------------------------------------------------------------
 # environments:
 #   production:
 #     logging: {level: WARNING}
 #     retry: {max_attempts: 5}
+
+# =============================================================================
+# STANDARD LIBRARY REFERENCE (v2.4.0)
+# =============================================================================
+# Below is the complete list of available transformers.
+# Copy-paste these into your 'transform: steps:' section as needed.
+# =============================================================================
+
+# --- SQL CORE (odibi.transformers.sql_core) ---
+
+# - operation: sql_core.filter_rows
+#   params: { condition: "age > 18 AND status = 'active'" }
+
+# - operation: sql_core.derive_columns
+#   params: { derivations: { full_name: "first_name || ' ' || last_name" } }
+
+# - operation: sql_core.cast_columns
+#   params: { casts: { id: "int", price: "float", active: "bool" } }
+
+# - operation: sql_core.clean_text
+#   params: { columns: ["city"], case: "upper", trim: true }
+
+# - operation: sql_core.extract_date_parts
+#   params: { source_col: "timestamp", parts: ["year", "month", "day"] }
+
+# - operation: sql_core.normalize_schema
+#   params: { rename: {old: new}, drop: [bad_col], select_order: [col1, col2] }
+
+# - operation: sql_core.sort
+#   params: { by: ["date"], ascending: false }
+
+# - operation: sql_core.limit
+#   params: { n: 100 }
+
+# - operation: sql_core.distinct
+#   params: { columns: ["category"] } # Optional: specific columns
+
+# - operation: sql_core.fill_nulls
+#   params: { values: { amount: 0.0, category: "Unknown" } }
+
+# - operation: sql_core.split_part
+#   params: { col: "email", delimiter: "@", index: 1 }
+
+# - operation: sql_core.date_add
+#   params: { col: "start_date", value: 1, unit: "day" }
+
+# - operation: sql_core.date_diff
+#   params: { start_col: "start", end_col: "end", unit: "day" }
+
+# - operation: sql_core.case_when
+#   params:
+#     output_col: "segment"
+#     cases: [{condition: "age < 18", value: "'Minor'"}, {condition: "age >= 18", value: "'Adult'"}]
+#     default: "'Unknown'"
+
+# - operation: sql_core.convert_timezone
+#   params: { col: "ts", source_tz: "UTC", target_tz: "America/New_York" }
+
+# - operation: sql_core.concat_columns
+#   params: { columns: ["addr", "city"], separator: ", ", output_col: "full_address" }
+
+
+# --- ADVANCED (odibi.transformers.advanced) ---
+
+# - operation: advanced.deduplicate
+#   params: { keys: ["id"], order_by: "updated_at DESC" }
+
+# - operation: advanced.validate_and_flag
+#   params: { rules: {is_positive: "amt > 0"}, flag_col: "issues" }
+
+# - operation: advanced.explode_list_column
+#   params: { column: "items", outer: true }
+
+# - operation: advanced.regex_replace
+#   params: { column: "text", pattern: "[0-9]+", replacement: "#" }
+
+# - operation: advanced.hash_columns
+#   params: { columns: ["email"], algorithm: "sha256" } # Anonymization
+
+# - operation: advanced.generate_surrogate_key
+#   params: { columns: ["customer_id", "region_id"], output_col: "row_key" }
+
+# - operation: advanced.parse_json
+#   params: { column: "json_str", json_schema: "id INT, name STRING" }
+
+# - operation: advanced.window_calculation
+#   params: { target_col: "running_total", function: "sum(amt)", partition_by: ["user"], order_by: "date" }
+
+
+# --- RELATIONAL (odibi.transformers.relational) ---
+
+# - operation: relational.join
+#   params: { right_dataset: "other_node", on: "id", how: "left", prefix: "other" }
+
+# - operation: relational.union
+#   params: { datasets: ["node_a", "node_b"], by_name: true }
+
+# - operation: relational.pivot
+#   params: { group_by: ["region"], pivot_col: "category", agg_col: "sales", agg_func: "sum" }
+
+# - operation: relational.unpivot
+#   params: { id_cols: ["id"], value_vars: ["q1", "q2"], var_name: "quarter", value_name: "sales" }
+
+# - operation: relational.aggregate
+#   params: { group_by: ["region"], aggregations: { sales: "sum", id: "count" } }
+

@@ -52,6 +52,13 @@ logging:
   structured: false     # Set 'true' for JSON logs (Splunk/Datadog)
   metadata: {env: "dev"}
 
+# Alerting (Webhooks)
+# alerts:
+#   - type: slack  # or 'teams', 'webhook'
+#     url: ${SLACK_WEBHOOK_URL}
+#     on_events: [on_failure, on_success]  # Triggers: on_start, on_success, on_failure
+#     metadata: {channel: "#data-alerts"}
+
 # -----------------------------------------------------------------------------
 # 3. CONNECTIONS (The Address Book)
 # -----------------------------------------------------------------------------
@@ -215,6 +222,14 @@ story:
   max_sample_rows: 20
   retention_days: 30
   # Tracks schema changes, row counts, and data lineage visually.
+
+# -----------------------------------------------------------------------------
+# 6. ENVIRONMENTS (Overrides)
+# -----------------------------------------------------------------------------
+# environments:
+#   production:
+#     logging: {level: WARNING}
+#     retry: {max_attempts: 5}
 
 # =============================================================================
 # STANDARD LIBRARY REFERENCE (v2.4.0)
