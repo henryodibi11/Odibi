@@ -1,0 +1,190 @@
+# Reference implementation of all Standard Transformations
+# Use this as a copy-paste source for your pipelines.
+
+pipeline:
+  # ---------------------------------------------------------------------------
+  # 1. SQL Core (Cleaning & Prep)
+  # ---------------------------------------------------------------------------
+
+  - name: clean_raw_data
+    transformer: sql_core.clean_text
+    params:
+      columns: ["email", "first_name"]
+      trim: true
+      case: "lower"
+
+  - name: split_email_domain
+    transformer: sql_core.split_part
+    params:
+      col: "email"
+      delimiter: "@"
+      index: 2  # 1-based index (2 = domain.com)
+
+  - name: handle_nulls
+    transformer: sql_core.fill_nulls
+    params:
+      values:
+        amount: 0.0
+        status: "unknown"
+        is_active: false
+
+  - name: filter_active_users
+    transformer: sql_core.filter_rows
+    params:
+      condition: "status = 'active' AND amount >= 0"
+
+  - name: derive_business_logic
+    transformer: sql_core.derive_columns
+    params:
+      derivations:
+        tax_amount: "amount * 0.2"
+        full_name: "first_name || ' ' || last_name"
+
+  - name: concat_fields
+    transformer: sql_core.concat_columns
+    params:
+      columns: ["region", "country"]
+      separator: " - "
+      output_col: "location_code"
+
+  - name: categorize_users
+    transformer: sql_core.case_when
+    params:
+      cases:
+        - condition: "amount > 1000"
+          value: "'VIP'"
+        - condition: "amount > 500"
+          value: "'Regular'"
+      default: "'Standard'"
+      output_col: "customer_tier"
+
+  # ---------------------------------------------------------------------------
+  # 2. Date & Time
+  # ---------------------------------------------------------------------------
+
+  - name: parse_date_parts
+    transformer: sql_core.extract_date_parts
+    params:
+      source_col: "created_at"
+      parts: ["year", "month", "day"]  # Creates created_at_year, etc.
+
+  - name: standardize_timezone
+    transformer: sql_core.convert_timezone
+    params:
+      col: "event_timestamp"
+      source_tz: "UTC"
+      target_tz: "America/New_York"
+      output_col: "event_time_ny"
+
+  - name: calculate_tenure
+    transformer: sql_core.date_diff
+    params:
+      start_col: "first_purchase_date"
+      end_col: "current_date"
+      unit: "day"
+
+  - name: truncate_dates
+    transformer: sql_core.date_trunc
+    params:
+      col: "event_timestamp"
+      unit: "month" # Truncates to start of month
+
+  # ---------------------------------------------------------------------------
+  # 3. Advanced Parsing & Validation
+  # ---------------------------------------------------------------------------
+
+  - name: parse_json_logs
+    transformer: advanced.parse_json
+    params:
+      column: "log_payload"
+      json_schema: "device_id STRING, app_version STRING, session_id INT"
+      output_col: "log_data"
+
+  - name: flatten_struct
+    transformer: advanced.unpack_struct
+    params:
+      column: "log_data"  # Unpacks device_id, app_version to top level
+
+  - name: explode_tags
+    transformer: advanced.explode_list_column
+    params:
+      column: "tags_list"
+      outer: true  # Keep rows with empty lists
+
+  - name: deduplicate_records
+    transformer: advanced.deduplicate
+    params:
+      keys: ["user_id"]
+      order_by: "updated_at DESC" # Keep latest
+
+  - name: validate_data_quality
+    transformer: advanced.validate_and_flag
+    params:
+      rules:
+        valid_email: "email LIKE '%@%'"
+        positive_amt: "amount >= 0"
+      flag_col: "dq_issues" # Contains list of failed rule names
+
+  - name: mask_pii
+    transformer: advanced.hash_columns
+    params:
+      columns: ["email", "ssn"]
+      algorithm: "sha256"
+
+  # ---------------------------------------------------------------------------
+  # 4. Relational Modeling
+  # ---------------------------------------------------------------------------
+
+  - name: join_transactions
+    transformer: relational.join
+    params:
+      right_dataset: "transactions"
+      on: "user_id"
+      how: "left"
+      prefix: "txn" # Columns from right side get txn_ prefix
+
+  - name: union_history
+    transformer: relational.union
+    params:
+      datasets: ["archive_2023", "archive_2022"]
+      by_name: true
+
+  - name: pivot_sales
+    transformer: relational.pivot
+    params:
+      group_by: ["region"]
+      pivot_col: "product_category"
+      agg_col: "amount"
+      agg_func: "sum"
+
+  - name: calculate_rankings
+    transformer: advanced.window_calculation
+    params:
+      target_col: "sales_rank"
+      function: "rank()"
+      partition_by: ["region"]
+      order_by: "amount DESC"
+
+  - name: generate_dimension_key
+    transformer: advanced.generate_surrogate_key
+    params:
+      columns: ["email", "region"]
+      separator: "|"
+      output_col: "customer_sk"
+
+  # ---------------------------------------------------------------------------
+  # 5. Output Formatting
+  # ---------------------------------------------------------------------------
+
+  - name: final_schema
+    transformer: sql_core.normalize_schema
+    params:
+      rename:
+        amount: "total_sales"
+      drop: ["temp_col", "dq_issues"]
+      select_order: ["customer_sk", "full_name", "total_sales", "region"]
+
+  - name: top_100_customers
+    transformer: sql_core.limit
+    params:
+      n: 100
