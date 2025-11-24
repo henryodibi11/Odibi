@@ -369,75 +369,11 @@ class PandasEngine(Engine):
         from collections.abc import Iterator
 
         if isinstance(df, Iterator):
-            first_chunk = True
-            for chunk in df:
-                # Determine mode for this chunk
-                # First chunk uses user-provided mode, subsequent chunks append
-                current_mode = mode if first_chunk else "append"
-
-                # Determine options for this chunk
-                current_options = options.copy()
-
-                # For CSV, if appending (subsequent chunks), we generally don't want to repeat header
-                # unless user explicitly handled it.
-                # If user passed header=False globally, we respect it.
-                # If user passed header=True (default), we only want it for first chunk.
-                if not first_chunk and format == "csv":
-                    # Only override if not explicitly set to False (though usually it defaults to True)
-                    if current_options.get("header") is not False:
-                        current_options["header"] = False
-
-                # Write the chunk
-                self.write(
-                    chunk,
-                    connection,
-                    format,
-                    table,
-                    path,
-                    mode=current_mode,
-                    options=current_options,
-                )
-                first_chunk = False
-
-            # For iterator, we can't easily return metadata for "the" write since it's many writes.
-            # For Delta, subsequent appends create new versions.
-            # We could return the *last* commit info?
-            # Or just None for now to be safe.
-            return None
+            return self._write_iterator(df, connection, format, table, path, mode, options)
 
         # SQL Server / Azure SQL Support
         if format in ["sql_server", "azure_sql"]:
-            if not hasattr(connection, "write_table"):
-                raise ValueError(
-                    f"Connection type '{type(connection).__name__}' does not support SQL operations"
-                )
-
-            if not table:
-                raise ValueError("SQL format requires 'table' config")
-
-            # Extract schema from table name if present
-            if "." in table:
-                schema, table_name = table.split(".", 1)
-            else:
-                schema, table_name = "dbo", table
-
-            # Map mode to if_exists
-            if_exists = "replace"  # overwrite
-            if mode == "append":
-                if_exists = "append"
-            elif mode == "fail":
-                if_exists = "fail"
-
-            chunksize = options.get("chunksize", 1000)
-
-            connection.write_table(
-                df=df,
-                table_name=table_name,
-                schema=schema,
-                if_exists=if_exists,
-                chunksize=chunksize,
-            )
-            return None
+            return self._write_sql(df, connection, table, mode, options)
 
         # Get full path from connection
         if path:
@@ -450,33 +386,109 @@ class PandasEngine(Engine):
         # Merge storage options for cloud connections
         merged_options = self._merge_storage_options(connection, options)
 
-        # Clean up custom options that are not supported by pandas writers
-        # 'keys' is used for upsert/append_once logic but not by to_csv/to_parquet
-        writer_options = merged_options.copy()
-        writer_options.pop("keys", None)
-
-        # Warn about partitioning anti-patterns (if partitioning is used)
-        # Check both 'partition_by' (snake_case) and 'partitionBy' (camelCase)
-        partition_by = writer_options.get("partition_by") or writer_options.get("partitionBy")
-
-        if partition_by:
-            import warnings
-
-            warnings.warn(
-                "⚠️  Partitioning can cause performance issues if misused. "
-                "Only partition on low-cardinality columns (< 1000 unique values) "
-                "and ensure each partition has > 1000 rows.",
-                UserWarning,
-            )
-
         # Custom Writers
         if format in self._custom_writers:
+            # Clean up custom options
+            writer_options = merged_options.copy()
+            writer_options.pop("keys", None)
             self._custom_writers[format](df, full_path, mode=mode, **writer_options)
             return None
 
-        # Only create local directories (skip for remote URIs like abfss://, s3://)
-        parsed = urlparse(full_path)
-        # On Windows, drive letters can be parsed as schemes (e.g. "c")
+        # Ensure directory exists (local only)
+        self._ensure_directory(full_path)
+
+        # Warn about partitioning
+        self._check_partitioning(merged_options)
+
+        # Delta Lake Write
+        if format == "delta":
+            return self._write_delta(df, full_path, mode, merged_options)
+        
+        # Handle Generic Upsert/Append-Once for non-Delta
+        if mode in ["upsert", "append_once"]:
+            df, mode = self._handle_generic_upsert(df, full_path, format, mode, merged_options)
+
+        # Standard File Write
+        return self._write_file(df, full_path, format, mode, merged_options)
+
+    def _write_iterator(
+        self,
+        df_iter: Iterator[pd.DataFrame],
+        connection: Any,
+        format: str,
+        table: Optional[str],
+        path: Optional[str],
+        mode: str,
+        options: Dict[str, Any],
+    ) -> None:
+        """Handle writing of iterator/generator."""
+        first_chunk = True
+        for chunk in df_iter:
+            # Determine mode for this chunk
+            current_mode = mode if first_chunk else "append"
+            current_options = options.copy()
+
+            # Handle CSV header for chunks
+            if not first_chunk and format == "csv":
+                if current_options.get("header") is not False:
+                    current_options["header"] = False
+
+            self.write(
+                chunk,
+                connection,
+                format,
+                table,
+                path,
+                mode=current_mode,
+                options=current_options,
+            )
+            first_chunk = False
+        return None
+
+    def _write_sql(
+        self,
+        df: pd.DataFrame,
+        connection: Any,
+        table: Optional[str],
+        mode: str,
+        options: Dict[str, Any],
+    ) -> None:
+        """Handle SQL writing."""
+        if not hasattr(connection, "write_table"):
+            raise ValueError(
+                f"Connection type '{type(connection).__name__}' does not support SQL operations"
+            )
+
+        if not table:
+            raise ValueError("SQL format requires 'table' config")
+
+        # Extract schema from table name if present
+        if "." in table:
+            schema, table_name = table.split(".", 1)
+        else:
+            schema, table_name = "dbo", table
+
+        # Map mode to if_exists
+        if_exists = "replace"  # overwrite
+        if mode == "append":
+            if_exists = "append"
+        elif mode == "fail":
+            if_exists = "fail"
+
+        chunksize = options.get("chunksize", 1000)
+
+        connection.write_table(
+            df=df,
+            table_name=table_name,
+            schema=schema,
+            if_exists=if_exists,
+            chunksize=chunksize,
+        )
+        return None
+
+    def _ensure_directory(self, full_path: str) -> None:
+        """Ensure parent directory exists for local files."""
+        parsed = urlparse(str(full_path))
         is_windows_drive = (
             len(parsed.scheme) == 1 and parsed.scheme.isalpha() if parsed.scheme else False
         )
@@ -484,289 +496,252 @@ class PandasEngine(Engine):
         if not parsed.scheme or parsed.scheme == "file" or is_windows_drive:
             Path(full_path).parent.mkdir(parents=True, exist_ok=True)
 
-        # --- Delta Lake Write Support ---
-        if format == "delta":
-            try:
-                from deltalake import write_deltalake, DeltaTable
-            except ImportError:
-                raise ImportError(
-                    "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
-                    "See README.md for installation instructions."
-                )
+    def _check_partitioning(self, options: Dict[str, Any]) -> None:
+        """Warn about potential partitioning issues."""
+        partition_by = options.get("partition_by") or options.get("partitionBy")
+        if partition_by:
+            import warnings
+            warnings.warn(
+                "⚠️  Partitioning can cause performance issues if misused. "
+                "Only partition on low-cardinality columns (< 1000 unique values) "
+                "and ensure each partition has > 1000 rows.",
+                UserWarning,
+            )
 
-            storage_opts = merged_options.get("storage_options", {})
+    def _write_delta(
+        self,
+        df: pd.DataFrame,
+        full_path: str,
+        mode: str,
+        merged_options: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Handle Delta Lake writing."""
+        try:
+            from deltalake import write_deltalake, DeltaTable
+        except ImportError:
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
+                "See README.md for installation instructions."
+            )
 
-            # write_deltalake supports: mode='error' | 'append' | 'overwrite' | 'ignore'
-            # We map our modes to these.
-            delta_mode = mode
-
-            # Clean writer_options (remove storage_options as it is passed explicitly)
-            if "storage_options" in writer_options:
-                del writer_options["storage_options"]
-
-            if mode == "upsert":
-                # deltalake >= 0.10.0 supports merge, but write_deltalake doesn't handle it directly in same API usually?
-                # It does via `engine="rust"` usually?
-                # Actually, write_deltalake does NOT support upsert directly as a mode string in basic usage.
-                # We need to use DeltaTable.merge() for upserts.
-
-                if "keys" not in options:
-                    raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
-
-                dt = DeltaTable(full_path, storage_options=storage_opts)
-                keys = options["keys"]
-                if isinstance(keys, str):
-                    keys = [keys]
-
-                # Build merge condition
-                # source is new data, target is existing table
-                # condition: target.key = source.key
-                predicate = " AND ".join([f"target.{k} = source.{k}" for k in keys])
-
-                dt.merge(
-                    source=df, predicate=predicate, source_alias="source", target_alias="target"
-                ).when_matched_update_all().when_not_matched_insert_all().execute()
-
-            elif mode == "append_once":
-                # Merge with insert-only
-                if "keys" not in options:
-                    raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
-
-                dt = DeltaTable(full_path, storage_options=storage_opts)
-                keys = options["keys"]
-                if isinstance(keys, str):
-                    keys = [keys]
-
-                predicate = " AND ".join([f"target.{k} = source.{k}" for k in keys])
-
-                dt.merge(
-                    source=df, predicate=predicate, source_alias="source", target_alias="target"
-                ).when_not_matched_insert_all().execute()
-
-            else:
-                # Standard write (overwrite, append)
-                write_deltalake(
-                    full_path,
-                    df,
-                    mode=mode if mode != "fail" else "error",
-                    storage_options=storage_opts,
-                    **writer_options,
-                )
-
-            # Fetch Metadata
-            dt = DeltaTable(full_path, storage_options=storage_opts)
-            last_commit = dt.history(1)[0]
-
-            return {
-                "version": last_commit["version"],
-                "timestamp": datetime.fromtimestamp(
-                    last_commit["timestamp"] / 1000
-                ),  # ms to datetime
-                "operation": last_commit["operation"],
-                "operation_metrics": last_commit.get("operationMetrics", {}),
-            }
-
-        # --- Generic Upsert/Append-Once Logic for File Formats (CSV, Parquet, JSON) ---
-        # Delta Lake has its own native implementation above.
-        if mode in ["upsert", "append_once"]:
-            if "keys" not in options:
-                raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
-
-            keys = options["keys"]
+        storage_opts = merged_options.get("storage_options", {})
+        
+        # Map modes
+        delta_mode = "overwrite"
+        if mode == "append":
+            delta_mode = "append"
+        elif mode == "error" or mode == "fail":
+            delta_mode = "error"
+        elif mode == "ignore":
+            delta_mode = "ignore"
+        
+        # Handle upsert/append_once logic
+        if mode == "upsert":
+            keys = merged_options.get("keys")
+            if not keys:
+                raise ValueError("Upsert requires 'keys' in options")
+            
             if isinstance(keys, str):
                 keys = [keys]
+                
+            dt = DeltaTable(full_path, storage_options=storage_opts)
+            (
+                dt.merge(
+                    source=df,
+                    predicate=" AND ".join([f"s.{k} = t.{k}" for k in keys]),
+                    source_alias="s",
+                    target_alias="t",
+                )
+                .when_matched_update_all()
+                .when_not_matched_insert_all()
+                .execute()
+            )
+        elif mode == "append_once":
+            keys = merged_options.get("keys")
+            if not keys:
+                raise ValueError("Append_once requires 'keys' in options")
+                
+            if isinstance(keys, str):
+                keys = [keys]
+                
+            dt = DeltaTable(full_path, storage_options=storage_opts)
+            (
+                dt.merge(
+                    source=df,
+                    predicate=" AND ".join([f"s.{k} = t.{k}" for k in keys]),
+                    source_alias="s",
+                    target_alias="t",
+                )
+                .when_not_matched_insert_all()
+                .execute()
+            )
+        else:
+            # Filter options supported by write_deltalake
+            write_kwargs = {
+                k: v for k, v in merged_options.items() 
+                if k in ["partition_by", "mode", "overwrite_schema", "name", "description", "configuration"]
+            }
+            
+            write_deltalake(
+                full_path,
+                df,
+                mode=delta_mode,
+                storage_options=storage_opts,
+                **write_kwargs
+            )
 
-            # Try to read existing file
-            # Note: This approach rewrites the entire file and is not suitable for massive datasets.
-            # For massive datasets, use Delta Lake.
-            existing_df = None
-            try:
-                # Use cleaned writer_options for reading to avoid passing 'keys' to readers
-                if format == "csv":
-                    existing_df = pd.read_csv(full_path, **writer_options)
-                elif format == "parquet":
-                    existing_df = pd.read_parquet(full_path, **writer_options)
-                elif format == "json":
-                    existing_df = pd.read_json(full_path, **writer_options)
-                elif format == "excel":
-                    existing_df = pd.read_excel(full_path, **writer_options)
-            except (FileNotFoundError, Exception):
-                # File likely doesn't exist (or other read error), treat as new write
-                pass
+        # Return commit info
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        history = dt.history(limit=1)
+        latest = history[0]
+        
+        return {
+            "version": dt.version(),
+            "timestamp": datetime.fromtimestamp(latest.get("timestamp", 0) / 1000),
+            "operation": latest.get("operation"),
+            "operation_metrics": latest.get("operationMetrics", {}),
+            "read_version": latest.get("readVersion"),
+        }
 
-            if existing_df is not None:
-                # Handle Iterator input for merge (must materialize)
-                if isinstance(df, Iterator):
-                    df = pd.concat(df, ignore_index=True)
+    def _handle_generic_upsert(
+        self,
+        df: pd.DataFrame,
+        full_path: str,
+        format: str,
+        mode: str,
+        options: Dict[str, Any],
+    ) -> tuple[pd.DataFrame, str]:
+        """Handle upsert/append_once for standard files by merging with existing data."""
+        if "keys" not in options:
+            raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
 
-                if mode == "append_once":
-                    # Filter out rows from 'df' that are already in 'existing_df'
-                    # Left anti join logic
+        keys = options["keys"]
+        if isinstance(keys, str):
+            keys = [keys]
 
-                    # Check if keys exist
-                    missing_keys = set(keys) - set(df.columns)
-                    if missing_keys:
-                        raise KeyError(f"Keys {missing_keys} not found in input data")
+        # Try to read existing file
+        existing_df = None
+        try:
+            read_opts = options.copy()
+            read_opts.pop("keys", None)
+            
+            if format == "csv":
+                existing_df = pd.read_csv(full_path, **read_opts)
+            elif format == "parquet":
+                existing_df = pd.read_parquet(full_path, **read_opts)
+            elif format == "json":
+                existing_df = pd.read_json(full_path, **read_opts)
+            elif format == "excel":
+                existing_df = pd.read_excel(full_path, **read_opts)
+        except Exception:
+            # File doesn't exist or can't be read
+            return df, "overwrite" # Treat as new write
 
-                    missing_existing = set(keys) - set(existing_df.columns)
-                    if missing_existing:
-                        # Existing file schema mismatch - append anyway or fail?
-                        # Safest is to fail or assume distinct. Let's append to avoid data loss,
-                        # but append_once implies we want to avoid dups.
-                        # If keys missing in existing, we can't check.
-                        pass
-                    else:
-                        # Identify new rows
-                        # Use merge with indicator
-                        # Only check on keys
-                        merged = df.merge(existing_df[keys], on=keys, how="left", indicator=True)
-                        new_rows = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
+        if existing_df is None:
+             return df, "overwrite"
 
-                        # Update df to only be the new rows
-                        # For CSV/JSON which support append, we can just append the new rows.
-                        # For Parquet/Excel, we must rewrite the whole file with (Existing + New).
-                        if format in ["csv", "json"]:
-                            df = new_rows
-                            mode = "append"
-                        else:
-                            # Parquet/Excel - rewrite everything
-                            df = pd.concat([existing_df, new_rows], ignore_index=True)
-                            mode = "overwrite"
+        if mode == "append_once":
+            # Check if keys exist
+            missing_keys = set(keys) - set(df.columns)
+            if missing_keys:
+                raise KeyError(f"Keys {missing_keys} not found in input data")
 
-                elif mode == "upsert":
-                    # Update existing rows, insert new rows
-                    # Strategy:
-                    # 1. Set index to keys
-                    # 2. Combine/Update
-                    # 3. Reset index
+            # Identify new rows
+            merged = df.merge(existing_df[keys], on=keys, how="left", indicator=True)
+            new_rows = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
 
-                    # Check if keys exist
-                    missing_keys = set(keys) - set(df.columns)
-                    if missing_keys:
-                        raise KeyError(f"Keys {missing_keys} not found in input data")
+            if format in ["csv", "json"]:
+                return new_rows, "append"
+            else:
+                # Rewrite everything
+                return pd.concat([existing_df, new_rows], ignore_index=True), "overwrite"
 
-                    # Update existing with new values
-                    # combine_first: updates nulls. We want overwrite.
-                    # We can concat and drop duplicates keeping last, BUT that assumes full row match?
-                    # No, we update based on key.
+        elif mode == "upsert":
+            # Check if keys exist
+            missing_keys = set(keys) - set(df.columns)
+            if missing_keys:
+                raise KeyError(f"Keys {missing_keys} not found in input data")
 
-                    # 1. Remove rows from existing that are in input (based on keys)
-                    # indicator merge to find rows to keep
-                    merged_indicator = existing_df.merge(
-                        df[keys], on=keys, how="left", indicator=True
-                    )
-                    rows_to_keep = existing_df[merged_indicator["_merge"] == "left_only"]
+            # 1. Remove rows from existing that are in input
+            merged_indicator = existing_df.merge(
+                df[keys], on=keys, how="left", indicator=True
+            )
+            rows_to_keep = existing_df[merged_indicator["_merge"] == "left_only"]
 
-                    # 2. Concat rows_to_keep + input df
-                    df = pd.concat([rows_to_keep, df], ignore_index=True)
+            # 2. Concat rows_to_keep + input df
+            # 3. Write mode becomes overwrite
+            return pd.concat([rows_to_keep, df], ignore_index=True), "overwrite"
+            
+        return df, mode
 
-                    # 3. Write mode becomes overwrite (replacing file with merged result)
-                    mode = "overwrite"
-
-        # Write based on format
+    def _write_file(
+        self,
+        df: pd.DataFrame,
+        full_path: str,
+        format: str,
+        mode: str,
+        merged_options: Dict[str, Any],
+    ) -> None:
+        """Handle standard file writing (CSV, Parquet, etc.)."""
+        writer_options = merged_options.copy()
+        writer_options.pop("keys", None)
+        
+        # Remove storage_options for local pandas writers usually?
+        # Some pandas writers accept storage_options (parquet, csv with fsspec)
+        
         if format == "csv":
-            mode_param = "w" if mode == "overwrite" else "a"
-            df.to_csv(full_path, mode=mode_param, index=False, **writer_options)
+            mode_param = "w"
+            if mode == "append":
+                mode_param = "a"
+                if not os.path.exists(full_path):
+                    # If file doesn't exist, include header
+                    writer_options["header"] = True
+                else:
+                    # If appending, don't write header unless explicit
+                    if "header" not in writer_options:
+                        writer_options["header"] = False
+            
+            df.to_csv(full_path, index=False, mode=mode_param, **writer_options)
+            
         elif format == "parquet":
-            # Parquet doesn't support append easily
+            if mode == "append":
+                # Pandas read_parquet doesn't support append directly usually.
+                # We implement simple read-concat-write for local files
+                if os.path.exists(full_path):
+                    existing = pd.read_parquet(full_path, **merged_options)
+                    df = pd.concat([existing, df], ignore_index=True)
+            
             df.to_parquet(full_path, index=False, **writer_options)
+            
         elif format == "json":
-            mode_param = "w" if mode == "overwrite" else "a"
-            df.to_json(full_path, orient="records", mode=mode_param, **writer_options)
+            if mode == "append":
+                writer_options["mode"] = "a"
+            
+            # Default to records if not specified
+            if "orient" not in writer_options:
+                writer_options["orient"] = "records"
+                
+            df.to_json(full_path, **writer_options)
+            
         elif format == "excel":
-            df.to_excel(full_path, index=False, **writer_options)
-        elif format == "delta":
-            try:
-                from deltalake import write_deltalake, DeltaTable
-            except ImportError:
-                raise ImportError(
-                    "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
-                    "See README.md for installation instructions."
-                )
-
-            import warnings
-
-            # Merge storage options for cloud connections
-            storage_opts = merged_options.get("storage_options", {})
-
-            # Get partition columns if specified
-            partition_by = merged_options.get("partition_by")
-
-            # Warn about partitioning anti-patterns
-            if partition_by:
-                warnings.warn(
-                    "⚠️  Partitioning can cause performance issues if misused. "
-                    "Only partition on low-cardinality columns (< 1000 unique values) "
-                    "and ensure each partition has > 1000 rows.",
-                    UserWarning,
-                )
-
-            # Convert mode to Delta mode
-            if mode == "upsert" or mode == "append_once":
-                # Use merge for upsert/append_once
-                if "keys" not in options:
-                    raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
-
-                # Load existing table to check if it exists
-                try:
-                    dt = DeltaTable(full_path, storage_options=storage_opts)
-                except Exception:
-                    # If table doesn't exist, 'upsert' and 'append_once' act like 'write' (create new)
-                    # We fall back to standard write_deltalake with mode='overwrite' (or 'error'?)
-                    # Standard behavior is usually to create if not exists.
-                    # Let's use write_deltalake directly for creation.
-                    # print(f"DEBUG: DeltaTable init failed: {e}")
-                    write_deltalake(
-                        full_path,
-                        df,
-                        mode="overwrite",  # Initial write is always overwrite/create
-                        partition_by=partition_by,
-                        storage_options=storage_opts,
-                    )
+            if mode == "append":
+                # Simple append for excel
+                if os.path.exists(full_path):
+                    with pd.ExcelWriter(full_path, mode="a", if_sheet_exists="overlay") as writer:
+                        df.to_excel(writer, index=False, **writer_options)
                     return
 
-                # Construct merge predicate
-                keys = options["keys"]
-                if isinstance(keys, str):
-                    keys = [keys]
-
-                predicate = " AND ".join([f"target.{k} = source.{k}" for k in keys])
-
-                merger = dt.merge(
-                    source=df, predicate=predicate, source_alias="source", target_alias="target"
-                )
-
-                if mode == "upsert":
-                    # Update existing, Insert new
-                    merger.when_matched_update_all().when_not_matched_insert_all().execute()
-                else:  # append_once
-                    # Only Insert new (deduplicate)
-                    merger.when_not_matched_insert_all().execute()
-
-            else:
-                # Standard write modes (overwrite/append)
-                delta_mode = "overwrite" if mode == "overwrite" else "append"
-
-                # Write Delta table
-                write_deltalake(
-                    full_path,
-                    df,
-                    mode=delta_mode,
-                    partition_by=partition_by,
-                    storage_options=storage_opts,
-                )
+            df.to_excel(full_path, index=False, **writer_options)
+            
         elif format == "avro":
             try:
                 import fastavro
             except ImportError:
-                raise ImportError(
-                    "Avro support requires 'pip install odibi[pandas]' or 'pip install fastavro'. "
-                    "See README.md for installation instructions."
-                )
-
+                raise ImportError("Avro support requires 'pip install fastavro'")
+                
             records = df.to_dict("records")
             schema = self._infer_avro_schema(df)
-
+            
             # Use fsspec for remote URIs (abfss://, s3://, etc.)
             parsed = urlparse(full_path)
             if parsed.scheme and parsed.scheme not in ["file", ""]:
@@ -779,40 +754,12 @@ class PandasEngine(Engine):
                     fastavro.writer(f, schema, records)
             else:
                 # Local file - use standard open
-                write_mode = "wb" if mode == "overwrite" else "ab"
-                with open(full_path, write_mode) as f:
+                open_mode = "wb"
+                if mode == "append" and os.path.exists(full_path):
+                    open_mode = "a+b"
+                    
+                with open(full_path, open_mode) as f:
                     fastavro.writer(f, schema, records)
-        elif format in ["sql_server", "azure_sql"]:
-            if not hasattr(connection, "write_table"):
-                raise ValueError(
-                    f"Connection type '{type(connection).__name__}' does not support SQL operations"
-                )
-
-            if not table:
-                raise ValueError("SQL format requires 'table' config")
-
-            # Extract schema from table name if present
-            if "." in table:
-                schema, table_name = table.split(".", 1)
-            else:
-                schema, table_name = "dbo", table
-
-            # Map mode to if_exists
-            if_exists = "replace"  # overwrite
-            if mode == "append":
-                if_exists = "append"
-            elif mode == "fail":
-                if_exists = "fail"
-
-            chunksize = options.get("chunksize", 1000)
-
-            connection.write_table(
-                df=df,
-                table_name=table_name,
-                schema=schema,
-                if_exists=if_exists,
-                chunksize=chunksize,
-            )
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 

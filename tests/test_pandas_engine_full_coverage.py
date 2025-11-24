@@ -368,7 +368,10 @@ class TestPandasEngineWrite:
                 pass
 
             def history(self, limit=None):
-                return [{"version": 1, "timestamp": 1000, "operation": "WRITE"}]
+                return [{"version": 1, "timestamp": 1000, "operation": "WRITE", "readVersion": 0}]
+
+            def version(self):
+                return 1
 
         fake_mod = types.SimpleNamespace(
             write_deltalake=write_deltalake,

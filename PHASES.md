@@ -168,7 +168,19 @@ For a detailed history of all completed phases, see:
   - `odibi diag delta-diff`: Deep inspection of Delta table history.
 - **Machine-Readable History:** All runs now produce `.json` artifacts alongside human-readable reports, enabling automated lineage analysis.
 
-### 7.3 “Control Plane” UI (Deferred)
+### 7.3 Engine Extensibility & Hardening ✅
+
+**Status:** **Completed**
+
+**Goal:** Simplify core engine logic and enable dynamic engine registration to support future backends (e.g., DuckDB, Snowpark) without modifying core orchestration code.
+
+**Delivered Features:**
+- **Engine Registry:** Decoupled `Pipeline` from hard-coded engine classes using a dynamic `odibi.engine.registry`.
+- **Refactored Write Logic:** Decomposed monolithic `PandasEngine.write` into specialized helpers (`_write_sql`, `_write_delta`, `_write_file`) for better maintainability.
+- **Clean Orchestration:** Simplified `Node` execution flow into distinct phases (`_execute_read_phase`, `_execute_transform_phase`, etc.) to improve readability and error context.
+- **Remote Cleanup Fix:** Hardened `StoryGenerator` to gracefully handle remote storage paths (S3/ADLS) during cleanup.
+
+### 7.4 “Control Plane” UI (Deferred)
 
 **Goal:** A simple web UI for viewing runs.
 **Status:** Deferred in favor of rich CLI diagnostics which proved sufficient.

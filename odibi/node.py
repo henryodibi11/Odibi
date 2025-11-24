@@ -232,155 +232,52 @@ class Node:
         start_time = time.time()
 
         if self.dry_run:
-            # Dry run execution
-            self._execution_steps.append("Dry run: Skipping actual execution")
-
-            # Simulate steps
-            if self.config.read:
-                self._execution_steps.append(
-                    f"Dry run: Would read from {self.config.read.connection}"
-                )
-
-            if self.config.transform:
-                self._execution_steps.append(
-                    f"Dry run: Would apply {len(self.config.transform.steps)} transform steps"
-                )
-
-            if self.config.write:
-                self._execution_steps.append(
-                    f"Dry run: Would write to {self.config.write.connection}"
-                )
-
-            return NodeResult(
-                node_name=self.config.name,
-                success=True,
-                duration=0.0,
-                rows_processed=0,
-                metadata={"dry_run": True, "steps": self._execution_steps},
-            )
+            return self._execute_dry_run()
 
         input_df = None
         input_schema = None
         input_sample = None
 
-        # try-except removed here, letting exceptions bubble up to execute() loop
-        result_df = None
-
-        # Read phase
-        if self.config.read:
-            result_df = self._execute_read()
-            input_df = result_df
-            self._execution_steps.append(f"Read from {self.config.read.connection}")
-        elif self.config.depends_on:
+        # 1. Read Phase
+        result_df = self._execute_read_phase()
+        
+        # If no direct read, check dependencies
+        if result_df is None and self.config.depends_on:
             # If this is a transform/write node, get data from dependency
             # We use the first dependency as the "primary" input for schema comparison
-            input_df = self.context.get(self.config.depends_on[0])
+            result_df = self.context.get(self.config.depends_on[0])
+            input_df = result_df  # Snapshot for metadata
+
+        if self.config.read:
+            input_df = result_df
 
         # Capture input schema before transformation
         if input_df is not None:
             input_schema = self._get_schema(input_df)
-
             if self.max_sample_rows > 0:
                 try:
                     input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
                 except Exception:
-                    # Don't fail execution if sampling fails
                     pass
 
-        # Transformer Phase (New Phase 2.1)
-        if self.config.transformer:
-            if result_df is None and input_df is not None:
-                result_df = input_df
+        # 2. Transform Phase
+        result_df = self._execute_transform_phase(result_df, input_df)
 
-            result_df = self._execute_transformer_node(result_df)
-            self._execution_steps.append(f"Applied transformer '{self.config.transformer}'")
+        # 3. Validation Phase
+        self._execute_validation_phase(result_df)
 
-        # Transform phase
-        if self.config.transform:
-            if result_df is None and input_df is not None:
-                # Use input_df if available (from dependency)
-                result_df = input_df
+        # 4. Write Phase
+        self._execute_write_phase(result_df)
 
-            result_df = self._execute_transform(result_df)
-            self._execution_steps.append(
-                f"Applied {len(self.config.transform.steps)} transform steps"
-            )
-
-        # Validation phase
-        if self.config.validation and result_df is not None:
-            self._execute_validation(result_df)
-            self._execution_steps.append("Validation passed")
-
-        # Write phase
-        if self.config.write:
-            # If write-only node, get data from context based on dependencies
-            if result_df is None and self.config.depends_on:
-                # Use data from first dependency
-                result_df = self.context.get(self.config.depends_on[0])
-
-            if result_df is not None:
-                self._execute_write(result_df)
-                self._execution_steps.append(f"Written to {self.config.write.connection}")
-
-        # Register in context for downstream nodes
+        # 5. Register & Cache
         if result_df is not None:
             self.context.register(self.config.name, result_df)
-
-            # Cache if requested
             if self.config.cache:
                 self._cached_result = result_df
 
-        # Collect metadata
+        # 6. Metadata Collection
         duration = time.time() - start_time
-        metadata = self._collect_metadata(result_df)
-
-        # Calculate schema changes if we have both input and output schemas
-        if input_schema and metadata.get("schema"):
-            output_schema = metadata["schema"]
-            set_in = set(input_schema)
-            set_out = set(output_schema)
-
-            metadata["schema_in"] = input_schema
-            metadata["columns_added"] = list(set_out - set_in)
-            metadata["columns_removed"] = list(set_in - set_out)
-
-            if input_sample:
-                metadata["sample_data_in"] = input_sample
-
-        # Add sample data to metadata if requested
-        if result_df is not None and self.max_sample_rows > 0:
-            if isinstance(self.config.sensitive, list):
-                # Redact specific columns
-                try:
-                    sample = self.engine.get_sample(result_df, n=self.max_sample_rows)
-                    for row in sample:
-                        for col in self.config.sensitive:
-                            if col in row:
-                                row[col] = "[REDACTED]"
-                    metadata["sample_data"] = sample
-                except Exception:
-                    metadata["sample_data"] = []
-            elif self.config.sensitive:
-                # Redact all data
-                metadata["sample_data"] = [{"message": "[REDACTED: Sensitive Data]"}]
-            else:
-                # No redaction
-                try:
-                    sample = self.engine.get_sample(result_df, n=self.max_sample_rows)
-                    metadata["sample_data"] = sample
-                except Exception:
-                    # Don't fail execution if sampling fails (e.g. serialization issues)
-                    metadata["sample_data"] = []
-
-        # Redact input sample if sensitive
-        if "sample_data_in" in metadata:
-            if isinstance(self.config.sensitive, list):
-                for row in metadata["sample_data_in"]:
-                    for col in self.config.sensitive:
-                        if col in row:
-                            row[col] = "[REDACTED]"
-            elif self.config.sensitive:
-                metadata["sample_data_in"] = [{"message": "[REDACTED: Sensitive Data]"}]
+        metadata = self._collect_metadata(result_df, input_schema, input_sample)
 
         return NodeResult(
             node_name=self.config.name,
@@ -390,6 +287,86 @@ class Node:
             schema=metadata.get("schema"),
             metadata=metadata,
         )
+
+    def _execute_dry_run(self) -> NodeResult:
+        """Simulate execution."""
+        self._execution_steps.append("Dry run: Skipping actual execution")
+
+        if self.config.read:
+            self._execution_steps.append(
+                f"Dry run: Would read from {self.config.read.connection}"
+            )
+
+        if self.config.transform:
+            self._execution_steps.append(
+                f"Dry run: Would apply {len(self.config.transform.steps)} transform steps"
+            )
+
+        if self.config.write:
+            self._execution_steps.append(
+                f"Dry run: Would write to {self.config.write.connection}"
+            )
+
+        return NodeResult(
+            node_name=self.config.name,
+            success=True,
+            duration=0.0,
+            rows_processed=0,
+            metadata={"dry_run": True, "steps": self._execution_steps},
+        )
+
+    def _execute_read_phase(self) -> Optional[Any]:
+        """Execute read operation."""
+        if not self.config.read:
+            return None
+            
+        result_df = self._execute_read()
+        self._execution_steps.append(f"Read from {self.config.read.connection}")
+        return result_df
+
+    def _execute_transform_phase(self, result_df: Optional[Any], input_df: Optional[Any]) -> Optional[Any]:
+        """Execute transformer and transform steps."""
+        
+        # Transformer Node (Phase 2.1)
+        if self.config.transformer:
+            # If transform-only node, ensure we have input
+            if result_df is None and input_df is not None:
+                result_df = input_df
+
+            result_df = self._execute_transformer_node(result_df)
+            self._execution_steps.append(f"Applied transformer '{self.config.transformer}'")
+
+        # Transform Steps
+        if self.config.transform:
+            if result_df is None and input_df is not None:
+                result_df = input_df
+
+            result_df = self._execute_transform(result_df)
+            self._execution_steps.append(
+                f"Applied {len(self.config.transform.steps)} transform steps"
+            )
+            
+        return result_df
+
+    def _execute_validation_phase(self, result_df: Any) -> None:
+        """Execute validation if configured."""
+        if self.config.validation and result_df is not None:
+            self._execute_validation(result_df)
+            self._execution_steps.append("Validation passed")
+
+    def _execute_write_phase(self, result_df: Any) -> None:
+        """Execute write if configured."""
+        if not self.config.write:
+            return
+
+        # If write-only node, get data from context based on dependencies
+        df_to_write = result_df
+        if df_to_write is None and self.config.depends_on:
+            df_to_write = self.context.get(self.config.depends_on[0])
+
+        if df_to_write is not None:
+            self._execute_write(df_to_write)
+            self._execution_steps.append(f"Written to {self.config.write.connection}")
 
     def _execute_read(self) -> Any:
         """Execute read operation.
@@ -407,7 +384,6 @@ class Node:
             )
 
         # Delegate to engine-specific reader
-        # This will be implemented by engine adapters
         df = self.engine.read(
             connection=connection,
             format=read_config.format,
@@ -447,7 +423,6 @@ class Node:
         )
 
         # Execute
-        # We call func(context=engine_ctx, current=input_df, **params)
         try:
             result = func(engine_ctx, current=input_df, **params)
 
@@ -484,8 +459,6 @@ class Node:
                 )
 
                 # Temporarily register current_df for SQL steps
-                # This allows SQL steps to refer to the intermediate result of previous step
-                # e.g. "SELECT * FROM current_df"
                 if current_df is not None:
                     self.context.register("current_df", current_df)
 
@@ -510,11 +483,8 @@ class Node:
 
             except Exception as e:
                 # Add step context to error
-                # Handle schema being a dict now
                 schema_dict = self._get_schema(current_df) if current_df is not None else {}
-                # If schema is dict, use keys for error reporting context
                 schema = list(schema_dict.keys()) if isinstance(schema_dict, dict) else schema_dict
-
                 shape = self._get_shape(current_df) if current_df is not None else None
 
                 exec_context.input_schema = schema
@@ -530,30 +500,14 @@ class Node:
         return current_df
 
     def _execute_sql_step(self, sql: str) -> Any:
-        """Execute SQL transformation.
-
-        Args:
-            sql: SQL query
-
-        Returns:
-            Result DataFrame
-        """
+        """Execute SQL transformation."""
         self._executed_sql.append(sql)
         return self.engine.execute_sql(sql, self.context)
 
     def _execute_function_step(
         self, function_name: str, params: Dict[str, Any], current_df: Optional[Any]
     ) -> Any:
-        """Execute Python function transformation.
-
-        Args:
-            function_name: Name of registered function
-            params: Function parameters
-            current_df: Current DataFrame in pipeline
-
-        Returns:
-            Result DataFrame
-        """
+        """Execute Python function transformation."""
         import inspect
 
         # Validate parameters
@@ -574,9 +528,6 @@ class Node:
             sql_executor=self.engine.execute_sql,
         )
 
-        # Capture SQL history before execution (technically 0 for new context)
-        # initial_sql_count = len(self.context._sql_history)
-
         if "current" in sig.parameters:
             # Inject current DataFrame
             result = func(engine_ctx, current=current_df, **params)
@@ -593,27 +544,11 @@ class Node:
     def _execute_operation_step(
         self, operation: str, params: Dict[str, Any], current_df: Any
     ) -> Any:
-        """Execute built-in operation (pivot, etc.).
-
-        Args:
-            operation: Operation name
-            params: Operation parameters
-            current_df: Current DataFrame
-
-        Returns:
-            Result DataFrame
-        """
+        """Execute built-in operation (pivot, etc.)."""
         return self.engine.execute_operation(operation, params, current_df)
 
     def _execute_validation(self, df: Any) -> None:
-        """Execute validation rules.
-
-        Args:
-            df: DataFrame to validate
-
-        Raises:
-            ValidationError: If validation fails
-        """
+        """Execute validation rules."""
         validation_config = self.config.validation
 
         # Delegate to engine
@@ -623,11 +558,7 @@ class Node:
             raise ValidationError(self.config.name, failures)
 
     def _execute_write(self, df: Any) -> None:
-        """Execute write operation.
-
-        Args:
-            df: DataFrame to write
-        """
+        """Execute write operation."""
         write_config = self.config.write
         connection = self.connections.get(write_config.connection)
 
@@ -644,8 +575,6 @@ class Node:
         # Check for update keys
         diff_keys = write_options.pop("diff_keys", None)
 
-        # print(f"DEBUG: Node {self.config.name} deep_diag={deep_diag} keys={diff_keys} options={write_config.options}")
-
         # Delegate to engine-specific writer
         delta_info = self.engine.write(
             df=df,
@@ -659,89 +588,95 @@ class Node:
 
         if delta_info:
             self._delta_write_info = delta_info
+            self._calculate_delta_diagnostics(delta_info, connection, write_config, deep_diag, diff_keys)
 
-            # Calculate Data Diff if version > 0
-            # Use isinstance to protect against Mocks in tests
-            ver = delta_info.get("version", 0)
-            if isinstance(ver, int) and ver > 0:
-                try:
-                    # Import here to avoid circular dependency if any
-                    from odibi.diagnostics import get_delta_diff
+    def _calculate_delta_diagnostics(
+        self, 
+        delta_info: Dict[str, Any], 
+        connection: Any, 
+        write_config: Any, 
+        deep_diag: bool, 
+        diff_keys: Optional[List[str]]
+    ) -> None:
+        """Calculate Delta Lake diagnostics/diff."""
+        # Calculate Data Diff if version > 0
+        ver = delta_info.get("version", 0)
+        if isinstance(ver, int) and ver > 0:
+            try:
+                # Import here to avoid circular dependency if any
+                from odibi.diagnostics import get_delta_diff
 
-                    # Determine table path
-                    full_path = (
-                        connection.get_path(write_config.path) if write_config.path else None
-                    )
-                    # If table based, we need to resolve it or pass spark.
-                    # get_delta_diff handles path.
+                # Determine table path
+                full_path = (
+                    connection.get_path(write_config.path) if write_config.path else None
+                )
 
-                    if full_path:
-                        # For Spark engine, we need to pass the spark session
-                        spark_session = getattr(self.engine, "spark", None)
+                if full_path:
+                    # For Spark engine, we need to pass the spark session
+                    spark_session = getattr(self.engine, "spark", None)
 
-                        # Current version
-                        curr_ver = delta_info["version"]
-                        prev_ver = curr_ver - 1
+                    # Current version
+                    curr_ver = delta_info["version"]
+                    prev_ver = curr_ver - 1
 
-                        # ONLY perform deep diff (row samples) if requested or small data
-                        # For now, we trust 'deep_diagnostics' flag or rely on lightweight metrics
+                    if deep_diag:
+                        diff = get_delta_diff(
+                            table_path=full_path,
+                            version_a=prev_ver,
+                            version_b=curr_ver,
+                            spark=spark_session,
+                            deep=True,
+                            keys=diff_keys,
+                        )
 
-                        if deep_diag:
-                            diff = get_delta_diff(
-                                table_path=full_path,
-                                version_a=prev_ver,
-                                version_b=curr_ver,
-                                spark=spark_session,
-                                deep=True,
-                                keys=diff_keys,
-                            )
+                        # Store summary
+                        self._delta_write_info["data_diff"] = {
+                            "rows_change": diff.rows_change,
+                            "rows_added": diff.rows_added,
+                            "rows_removed": diff.rows_removed,
+                            "rows_updated": diff.rows_updated,
+                            "schema_added": diff.schema_added,
+                            "schema_removed": diff.schema_removed,
+                            "schema_previous": diff.schema_previous,
+                            "sample_added": diff.sample_added,
+                            "sample_removed": diff.sample_removed,
+                            "sample_updated": diff.sample_updated,
+                        }
+                    else:
+                        # Lightweight Mode: Rely on Delta operation metrics
+                        metrics = delta_info.get("operation_metrics", {})
+                        rows_inserted = int(
+                            metrics.get("numTargetRowsInserted", 0)
+                            or metrics.get("numOutputRows", 0)
+                        )
+                        rows_deleted = int(metrics.get("numTargetRowsDeleted", 0))
 
-                            # Store lightweight summary
-                            self._delta_write_info["data_diff"] = {
-                                "rows_change": diff.rows_change,
-                                "rows_added": diff.rows_added,
-                                "rows_removed": diff.rows_removed,
-                                "rows_updated": diff.rows_updated,
-                                "schema_added": diff.schema_added,
-                                "schema_removed": diff.schema_removed,
-                                "schema_previous": diff.schema_previous,
-                                "sample_added": diff.sample_added,
-                                "sample_removed": diff.sample_removed,
-                                "sample_updated": diff.sample_updated,
-                            }
-                        else:
-                            # Lightweight Mode: Rely on Delta operation metrics (already in delta_info)
-                            # We can calculate net row change from metrics if available
-                            metrics = delta_info.get("operation_metrics", {})
-                            rows_inserted = int(
-                                metrics.get("numTargetRowsInserted", 0)
-                                or metrics.get("numOutputRows", 0)
-                            )
-                            rows_deleted = int(metrics.get("numTargetRowsDeleted", 0))
-                            # rows_updated = int(metrics.get("numTargetRowsUpdated", 0))
+                        net_change = rows_inserted - rows_deleted
 
-                            net_change = rows_inserted - rows_deleted
+                        # Just store net change, no samples
+                        self._delta_write_info["data_diff"] = {
+                            "rows_change": net_change,
+                            "sample_added": None,
+                            "sample_removed": None,
+                        }
 
-                            # Just store net change, no samples
-                            self._delta_write_info["data_diff"] = {
-                                "rows_change": net_change,
-                                "sample_added": None,
-                                "sample_removed": None,
-                            }
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to calculate data diff: {e}")
 
-                except Exception as e:
-                    # Don't fail the pipeline if diagnostics fail
-                    # Just log it
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    logger.warning(f"Failed to calculate data diff: {e}")
-
-    def _collect_metadata(self, df: Optional[Any]) -> Dict[str, Any]:
+    def _collect_metadata(
+        self, 
+        df: Optional[Any], 
+        input_schema: Optional[Any] = None, 
+        input_sample: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
         """Collect metadata about execution.
 
         Args:
             df: Result DataFrame
+            input_schema: Schema of input dataframe
+            input_sample: Sample rows from input dataframe
 
         Returns:
             Metadata dictionary
@@ -754,14 +689,12 @@ class Node:
 
         try:
             import pandas as pd
-
             pandas_version = pd.__version__
         except ImportError:
             pandas_version = None
 
         try:
             import pyspark
-
             pyspark_version = pyspark.__version__
         except ImportError:
             pyspark_version = None
@@ -769,13 +702,9 @@ class Node:
         # Compute SQL Hash
         sql_hash = None
         if self._executed_sql:
-            # Normalize SQL: Join, lowercase, remove extra whitespace
             normalized_sql = " ".join(self._executed_sql).lower().strip()
             sql_hash = hashlib.md5(normalized_sql.encode("utf-8")).hexdigest()
 
-        # Capture Config Snapshot
-        # We dump to dict to ensure it's serializable
-        # mode='json' ensures Enums are converted to strings
         config_snapshot = (
             self.config.model_dump(mode="json")
             if hasattr(self.config, "model_dump")
@@ -805,15 +734,10 @@ class Node:
 
         if self._delta_write_info:
             from odibi.story.metadata import DeltaWriteInfo
-
-            # Convert timestamp string/object to datetime if needed
-            # Spark returns datetime object usually, but let's be safe
+            
             ts = self._delta_write_info.get("timestamp")
-            if isinstance(ts, str):
-                # Parse if string (unlikely from Spark result, but possible if serialized)
-                # Assuming it's a datetime object from Spark Row
-                pass
-
+            # Spark returns datetime object usually, but let's be safe
+            
             metadata["delta_info"] = DeltaWriteInfo(
                 version=self._delta_write_info["version"],
                 timestamp=ts,
@@ -833,88 +757,86 @@ class Node:
             try:
                 metadata["null_profile"] = self.engine.profile_nulls(df)
             except Exception:
-                # Don't fail pipeline for stats
                 metadata["null_profile"] = {}
+
+        # Calculate schema changes
+        if input_schema and metadata.get("schema"):
+            output_schema = metadata["schema"]
+            set_in = set(input_schema)
+            set_out = set(output_schema)
+
+            metadata["schema_in"] = input_schema
+            metadata["columns_added"] = list(set_out - set_in)
+            metadata["columns_removed"] = list(set_in - set_out)
+
+            if input_sample:
+                metadata["sample_data_in"] = input_sample
+
+        # Add sample data
+        if df is not None and self.max_sample_rows > 0:
+            metadata["sample_data"] = self._get_redacted_sample(df, self.config.sensitive)
+
+        # Redact input sample if present
+        if "sample_data_in" in metadata:
+            metadata["sample_data_in"] = self._redact_sample_list(metadata["sample_data_in"], self.config.sensitive)
 
         return metadata
 
+    def _get_redacted_sample(self, df: Any, sensitive_config: Any) -> List[Dict[str, Any]]:
+        """Get sample data with redaction."""
+        if sensitive_config is True:
+             # Redact all
+             return [{"message": "[REDACTED: Sensitive Data]"}]
+        
+        try:
+            sample = self.engine.get_sample(df, n=self.max_sample_rows)
+            return self._redact_sample_list(sample, sensitive_config)
+        except Exception:
+            return []
+
+    def _redact_sample_list(self, sample: List[Dict[str, Any]], sensitive_config: Any) -> List[Dict[str, Any]]:
+        """Redact list of rows based on config."""
+        if not sample:
+            return []
+            
+        if sensitive_config is True:
+            return [{"message": "[REDACTED: Sensitive Data]"}]
+            
+        if isinstance(sensitive_config, list):
+            # Redact specific columns
+            for row in sample:
+                for col in sensitive_config:
+                    if col in row:
+                        row[col] = "[REDACTED]"
+        
+        return sample
+
     def _get_schema(self, df: Any) -> Any:
-        """Get DataFrame schema (column names and types).
-
-        Args:
-            df: DataFrame
-
-        Returns:
-            Dict[str, str] or List[str]
-        """
+        """Get DataFrame schema (column names and types)."""
         return self.engine.get_schema(df)
 
     def _get_shape(self, df: Any) -> tuple:
-        """Get DataFrame shape.
-
-        Args:
-            df: DataFrame
-
-        Returns:
-            (rows, columns)
-        """
+        """Get DataFrame shape."""
         return self.engine.get_shape(df)
 
     def _count_rows(self, df: Any) -> int:
-        """Count rows in DataFrame.
-
-        Args:
-            df: DataFrame
-
-        Returns:
-            Row count
-        """
+        """Count rows in DataFrame."""
         return self.engine.count_rows(df)
 
     def _is_empty(self, df: Any) -> bool:
-        """Check if DataFrame is empty.
-
-        Args:
-            df: DataFrame
-
-        Returns:
-            True if empty
-        """
+        """Check if DataFrame is empty."""
         return self._count_rows(df) == 0
 
     def _count_nulls(self, df: Any, columns: List[str]) -> Dict[str, int]:
-        """Count nulls in specified columns.
-
-        Args:
-            df: DataFrame
-            columns: Columns to check
-
-        Returns:
-            Dictionary of column -> null count
-        """
+        """Count nulls in specified columns."""
         return self.engine.count_nulls(df, columns)
 
     def _validate_schema(self, df: Any, schema_rules: Dict[str, Any]) -> List[str]:
-        """Validate DataFrame schema.
-
-        Args:
-            df: DataFrame
-            schema_rules: Validation rules
-
-        Returns:
-            List of validation failures
-        """
+        """Validate DataFrame schema."""
         return self.engine.validate_schema(df, schema_rules)
 
     def _generate_suggestions(self, error: Exception) -> List[str]:
-        """Generate helpful suggestions based on error type.
-
-        Args:
-            error: The exception that occurred
-
-        Returns:
-            List of suggestion strings
-        """
+        """Generate helpful suggestions based on error type."""
         suggestions = []
         error_str = str(error).lower()
 

@@ -293,9 +293,20 @@ class TestSparkEngineLogic:
         connections["local"].get_path.side_effect = lambda p: p  # identity
 
         # Initialize Pipeline with mocked engine injection
-        # Since Pipeline creates Engine internally, we need to patch the class
-        with patch("odibi.pipeline.SparkEngine") as MockSparkEngineClass:
-            # Configure the mock engine instance that Pipeline will get
+        # Since Pipeline creates Engine internally using registry, we patch registry.get_engine_class
+        # Note: Pipeline.py imports get_engine_class from odibi.engine.registry
+        # We should patch where it is used, which is odibi.pipeline.get_engine_class
+        # OR patch the registry module itself.
+        # Since we imported Pipeline from odibi.pipeline, patching 'odibi.pipeline.get_engine_class' is safest.
+        
+        # However, Pipeline imports `from odibi.engine.registry import get_engine_class`
+        # So we patch `odibi.pipeline.get_engine_class`
+        
+        with patch("odibi.pipeline.get_engine_class") as MockGetEngineClass:
+            # Configure the mock engine class and instance
+            MockSparkEngineClass = MagicMock()
+            MockGetEngineClass.return_value = MockSparkEngineClass
+            
             mock_engine_instance = MockSparkEngineClass.return_value
             mock_engine_instance.spark = mock_spark_session
             mock_engine_instance.name = "spark"

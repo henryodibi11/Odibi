@@ -296,6 +296,10 @@ class StoryGenerator:
 
     def cleanup(self) -> None:
         """Remove old stories based on retention policy."""
+        if self.is_remote or self.output_path is None:
+            # Cleanup not supported for remote storage yet
+            return
+
         try:
             from datetime import timedelta
 

@@ -10,12 +10,7 @@ from odibi.config import PipelineConfig, ProjectConfig, RetryConfig, AlertConfig
 from odibi.context import create_context
 from odibi.graph import DependencyGraph
 from odibi.node import Node, NodeResult
-from odibi.engine import PandasEngine
-
-try:
-    from odibi.engine.spark_engine import SparkEngine
-except ImportError:
-    SparkEngine = None  # Handle optional dependency
+from odibi.engine.registry import get_engine_class
 from odibi.exceptions import DependencyError
 from odibi.story import StoryGenerator
 from odibi.connections import LocalConnection
@@ -124,20 +119,23 @@ class Pipeline:
                 else performance_config
             )
 
-        if engine == "pandas":
-            self.engine = PandasEngine(config=engine_config)
-        elif engine == "spark":
-            if SparkEngine is None:
+        try:
+            EngineClass = get_engine_class(engine)
+        except ValueError as e:
+            # Handle Spark special case message
+            if engine == "spark":
                 raise ImportError(
                     "Spark engine not available. "
                     "Install with 'pip install odibi[spark]' or ensure pyspark is installed."
                 )
+            raise e
 
+        if engine == "spark":
             # SparkEngine can take existing session if needed, but here we let it create/get one
             # We might need to pass connections to it for ADLS auth config
-            self.engine = SparkEngine(connections=connections, config=engine_config)
+            self.engine = EngineClass(connections=connections, config=engine_config)
         else:
-            raise ValueError(f"Unsupported engine: {engine}")
+            self.engine = EngineClass(config=engine_config)
 
         # Initialize context
         spark_session = getattr(self.engine, "spark", None)
