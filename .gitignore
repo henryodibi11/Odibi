@@ -113,3 +113,9 @@ test_exploration*.ipynb
 # stress_test_runs*/
 
 .databricks
+
+# Diagnostics Demo Output
+examples/diagnostics_demo/output/
+examples/diagnostics_demo/output_*/
+examples/diagnostics_demo/stories_*/
+
