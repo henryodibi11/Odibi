@@ -5,7 +5,6 @@ Diagnostics CLI Commands
 Commands for analyzing pipeline drift and data changes.
 """
 
-
 from odibi.diagnostics.manager import HistoryManager
 from odibi.diagnostics.diff import diff_runs
 from odibi.diagnostics.delta import get_delta_diff
