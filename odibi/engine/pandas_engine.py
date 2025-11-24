@@ -586,6 +586,7 @@ class PandasEngine(Engine):
                     "partition_by",
                     "mode",
                     "overwrite_schema",
+                    "schema_mode",
                     "name",
                     "description",
                     "configuration",

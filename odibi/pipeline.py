@@ -615,6 +615,34 @@ class PipelineManager:
         """
         # Load YAML with environment variable substitution
         yaml_path_obj = Path(yaml_path)
+        config_dir = yaml_path_obj.parent.absolute()
+
+        # --- Auto-Discovery of Custom Transforms ---
+        # Check for 'transforms.py' in config directory and CWD
+        import sys
+        import importlib.util
+        import os
+
+        def load_transforms_module(path):
+            if os.path.exists(path):
+                try:
+                    spec = importlib.util.spec_from_file_location("transforms_autodiscovered", path)
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        sys.modules["transforms_autodiscovered"] = module
+                        spec.loader.exec_module(module)
+                        logger.info(f"Auto-loaded transforms from: {path}")
+                except Exception as e:
+                    logger.warning(f"Failed to auto-load transforms from {path}: {e}")
+
+        # 1. Config Directory
+        load_transforms_module(os.path.join(config_dir, "transforms.py"))
+
+        # 2. Current Working Directory (if different)
+        cwd = os.getcwd()
+        if os.path.abspath(cwd) != str(config_dir):
+            load_transforms_module(os.path.join(cwd, "transforms.py"))
+
         # Path check is now handled inside load_yaml_with_env but we can keep/remove it.
         # load_yaml_with_env takes a str, so passing str(yaml_path_obj) is safer.
 
