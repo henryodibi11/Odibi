@@ -1,45 +1,85 @@
-# Reference implementation of all Standard Transformations
-# Use this as a copy-paste source for your pipelines.
+# ==================================================================================
+# ODIBI STANDARD TRANSFORMATION LIBRARY - REFERENCE GUIDE
+# ==================================================================================
+# This file is a comprehensive cheat sheet for all built-in transformations in Odibi.
+# Copy and paste relevant blocks into your pipeline YAML files.
+#
+# STRUCTURE:
+# 1. SQL Core (Cleaning & Prep)
+# 2. Date & Time
+# 3. Advanced Parsing & Validation
+# 4. Relational Modeling (Joins, Unions)
+# 5. Output Formatting
+# ==================================================================================
 
 pipeline:
-  # ---------------------------------------------------------------------------
-  # 1. SQL Core (Cleaning & Prep)
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # GROUP 1: CLEANING & PREPARATION (SQL CORE)
+  # Essential first steps to sanitize raw data.
+  # ===========================================================================
 
+  # ---------------------------------------------------------------------------
+  # Clean Text
+  # Use this to normalize string columns (trim whitespace, fix casing).
+  # Example: "  User@Email.com " -> "user@email.com"
+  # ---------------------------------------------------------------------------
   - name: clean_raw_data
     transformer: sql_core.clean_text
     params:
-      columns: ["email", "first_name"]
-      trim: true
-      case: "lower"
+      columns: ["email", "first_name"]  # List of columns to process
+      trim: true        # Removes leading/trailing whitespace
+      case: "lower"     # Options: "lower", "upper", "preserve"
 
+  # ---------------------------------------------------------------------------
+  # Split Part
+  # Extracts a specific token from a delimited string.
+  # Example: "user@domain.com" -> "domain.com" (index 2)
+  # ---------------------------------------------------------------------------
   - name: split_email_domain
     transformer: sql_core.split_part
     params:
       col: "email"
       delimiter: "@"
-      index: 2  # 1-based index (2 = domain.com)
+      index: 2  # 1-based index (like SQL split_part). 1=user, 2=domain.
 
+  # ---------------------------------------------------------------------------
+  # Fill Nulls
+  # Replaces NULL/None values with safe defaults to prevent errors later.
+  # ---------------------------------------------------------------------------
   - name: handle_nulls
     transformer: sql_core.fill_nulls
     params:
       values:
-        amount: 0.0
-        status: "unknown"
-        is_active: false
+        amount: 0.0          # Floats/Ints
+        status: "unknown"    # Strings
+        is_active: false     # Booleans
 
+  # ---------------------------------------------------------------------------
+  # Filter Rows
+  # Removes bad or irrelevant rows early in the pipeline using SQL logic.
+  # ---------------------------------------------------------------------------
   - name: filter_active_users
     transformer: sql_core.filter_rows
     params:
-      condition: "status = 'active' AND amount >= 0"
+      condition: "status = 'active' AND amount >= 0"  # Standard SQL WHERE clause
 
+  # ---------------------------------------------------------------------------
+  # Derive Columns
+  # Creates new columns using mathematical formulas or logic.
+  # ---------------------------------------------------------------------------
   - name: derive_business_logic
     transformer: sql_core.derive_columns
     params:
       derivations:
+        # New Column : SQL Expression
         tax_amount: "amount * 0.2"
-        full_name: "first_name || ' ' || last_name"
+        full_name: "first_name || ' ' || last_name"  # '||' is standard concat
 
+  # ---------------------------------------------------------------------------
+  # Concat Columns
+  # A safer way to join strings than 'derive', handling NULLs automatically.
+  # Example: [Region, Country] -> "Region - Country"
+  # ---------------------------------------------------------------------------
   - name: concat_fields
     transformer: sql_core.concat_columns
     params:
@@ -47,6 +87,10 @@ pipeline:
       separator: " - "
       output_col: "location_code"
 
+  # ---------------------------------------------------------------------------
+  # Case When (Conditional Logic)
+  # Implements complex IF/ELSE logic to categorize rows.
+  # ---------------------------------------------------------------------------
   - name: categorize_users
     transformer: sql_core.case_when
     params:
@@ -55,19 +99,28 @@ pipeline:
           value: "'VIP'"
         - condition: "amount > 500"
           value: "'Regular'"
-      default: "'Standard'"
+      default: "'Standard'"  # Fallback value
       output_col: "customer_tier"
 
-  # ---------------------------------------------------------------------------
-  # 2. Date & Time
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # GROUP 2: DATE & TIME HANDLING
+  # Standardizing timestamps across timezones and formats.
+  # ===========================================================================
 
+  # ---------------------------------------------------------------------------
+  # Extract Date Parts
+  # Breaks a timestamp into separate year/month/day columns for partitioning.
+  # ---------------------------------------------------------------------------
   - name: parse_date_parts
     transformer: sql_core.extract_date_parts
     params:
       source_col: "created_at"
-      parts: ["year", "month", "day"]  # Creates created_at_year, etc.
+      parts: ["year", "month", "day"]  # Creates: created_at_year, created_at_month...
 
+  # ---------------------------------------------------------------------------
+  # Convert Timezone
+  # Converts UTC timestamps to a local timezone (handling Daylight Savings).
+  # ---------------------------------------------------------------------------
   - name: standardize_timezone
     transformer: sql_core.convert_timezone
     params:
@@ -76,106 +129,176 @@ pipeline:
       target_tz: "America/New_York"
       output_col: "event_time_ny"
 
+  # ---------------------------------------------------------------------------
+  # Date Diff
+  # Calculates the time elapsed between two dates.
+  # ---------------------------------------------------------------------------
   - name: calculate_tenure
     transformer: sql_core.date_diff
     params:
       start_col: "first_purchase_date"
       end_col: "current_date"
-      unit: "day"
+      unit: "day"  # Options: day, hour, minute, second
 
+  # ---------------------------------------------------------------------------
+  # Date Trunc
+  # Rounds a timestamp down to the start of the period (useful for aggregation).
+  # Example: 2023-05-15 14:30 -> 2023-05-01 00:00
+  # ---------------------------------------------------------------------------
   - name: truncate_dates
     transformer: sql_core.date_trunc
     params:
       col: "event_timestamp"
-      unit: "month" # Truncates to start of month
+      unit: "month"  # Options: year, month, day, hour, minute
+
+  # ===========================================================================
+  # GROUP 3: ADVANCED PARSING & STRUCTURE
+  # Handling messy formats like JSON, Arrays, and Structs.
+  # ===========================================================================
 
   # ---------------------------------------------------------------------------
-  # 3. Advanced Parsing & Validation
+  # Parse JSON
+  # Converts a text column containing JSON strings into a structured object.
+  # Essential for processing API logs or NoSQL dumps.
   # ---------------------------------------------------------------------------
-
   - name: parse_json_logs
     transformer: advanced.parse_json
     params:
       column: "log_payload"
+      # Define expected schema (Spark SQL syntax) to enforce types
       json_schema: "device_id STRING, app_version STRING, session_id INT"
       output_col: "log_data"
 
+  # ---------------------------------------------------------------------------
+  # Unpack Struct
+  # Flattens a structured column (from JSON/Parquet) into top-level columns.
+  # ---------------------------------------------------------------------------
   - name: flatten_struct
     transformer: advanced.unpack_struct
     params:
-      column: "log_data"  # Unpacks device_id, app_version to top level
+      column: "log_data"  # Will create cols: log_data.device_id, log_data.session_id...
 
+  # ---------------------------------------------------------------------------
+  # Explode List
+  # Converts a list column into multiple rows (one row per item).
+  # Example: [Tag A, Tag B] -> Row 1 (Tag A), Row 2 (Tag B)
+  # ---------------------------------------------------------------------------
   - name: explode_tags
     transformer: advanced.explode_list_column
     params:
       column: "tags_list"
-      outer: true  # Keep rows with empty lists
+      outer: true  # true = keep empty lists as a NULL row (LEFT JOIN behavior)
 
+  # ===========================================================================
+  # GROUP 4: QUALITY & PRIVACY
+  # Ensuring data is unique, valid, and secure.
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # Deduplicate
+  # Removes duplicate rows based on a unique key, keeping the "latest" one.
+  # ---------------------------------------------------------------------------
   - name: deduplicate_records
     transformer: advanced.deduplicate
     params:
-      keys: ["user_id"]
-      order_by: "updated_at DESC" # Keep latest
+      keys: ["user_id"]           # Columns that define uniqueness
+      order_by: "updated_at DESC" # Sort logic to determine which row to keep
 
+  # ---------------------------------------------------------------------------
+  # Validate & Flag
+  # Runs logic checks. Bad rows get a tag in a new column instead of dropping.
+  # Good for: Data Observability dashboards.
+  # ---------------------------------------------------------------------------
   - name: validate_data_quality
     transformer: advanced.validate_and_flag
     params:
       rules:
         valid_email: "email LIKE '%@%'"
         positive_amt: "amount >= 0"
-      flag_col: "dq_issues" # Contains list of failed rule names
+      flag_col: "dq_issues" # Column will contain comma-separated failed rule names
 
+  # ---------------------------------------------------------------------------
+  # Hash Columns (PII)
+  # Anonymizes sensitive data using a one-way hash.
+  # ---------------------------------------------------------------------------
   - name: mask_pii
     transformer: advanced.hash_columns
     params:
       columns: ["email", "ssn"]
-      algorithm: "sha256"
+      algorithm: "sha256" # Options: sha256, md5
+
+  # ===========================================================================
+  # GROUP 5: RELATIONAL MODELING
+  # Combining and reshaping datasets (Joins, Unions, Pivots).
+  # ===========================================================================
 
   # ---------------------------------------------------------------------------
-  # 4. Relational Modeling
+  # Join
+  # Merges the current dataset with another dataset.
   # ---------------------------------------------------------------------------
-
   - name: join_transactions
     transformer: relational.join
     params:
-      right_dataset: "transactions"
+      right_dataset: "transactions" # Must be defined in 'depends_on' or previously loaded
       on: "user_id"
-      how: "left"
-      prefix: "txn" # Columns from right side get txn_ prefix
+      how: "left"   # Options: inner, left, right, full, cross
+      prefix: "txn" # Optional: Prefix for columns from the right dataset to avoid collision
 
+  # ---------------------------------------------------------------------------
+  # Union
+  # Stacks multiple datasets on top of each other (e.g., combining history).
+  # ---------------------------------------------------------------------------
   - name: union_history
     transformer: relational.union
     params:
       datasets: ["archive_2023", "archive_2022"]
-      by_name: true
+      by_name: true # Recommended: aligns columns by name, not position
 
+  # ---------------------------------------------------------------------------
+  # Pivot
+  # Rotates rows into columns (Cross-Tab report).
+  # ---------------------------------------------------------------------------
   - name: pivot_sales
     transformer: relational.pivot
     params:
       group_by: ["region"]
-      pivot_col: "product_category"
+      pivot_col: "product_category" # Unique values become new columns
       agg_col: "amount"
       agg_func: "sum"
 
+  # ---------------------------------------------------------------------------
+  # Window Calculation
+  # Performs advanced analytics like Ranking or Running Totals.
+  # ---------------------------------------------------------------------------
   - name: calculate_rankings
     transformer: advanced.window_calculation
     params:
       target_col: "sales_rank"
-      function: "rank()"
-      partition_by: ["region"]
-      order_by: "amount DESC"
+      function: "rank()"          # Any SQL window function (row_number, sum, lead, etc.)
+      partition_by: ["region"]    # Reset counter for each region
+      order_by: "amount DESC"     # Sort order for the ranking
 
+  # ---------------------------------------------------------------------------
+  # Generate Surrogate Key
+  # Creates a deterministic unique ID (MD5) from business keys.
+  # Essential for Dimensional Modeling (Star Schema).
+  # ---------------------------------------------------------------------------
   - name: generate_dimension_key
     transformer: advanced.generate_surrogate_key
     params:
-      columns: ["email", "region"]
-      separator: "|"
+      columns: ["email", "region"] # Columns that define uniqueness
+      separator: "|"               # Separator used internally before hashing
       output_col: "customer_sk"
 
-  # ---------------------------------------------------------------------------
-  # 5. Output Formatting
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # GROUP 6: OUTPUT FORMATTING
+  # Final touches before writing the data.
+  # ===========================================================================
 
+  # ---------------------------------------------------------------------------
+  # Normalize Schema
+  # Renames, drops, and reorders columns to match a strict contract.
+  # ---------------------------------------------------------------------------
   - name: final_schema
     transformer: sql_core.normalize_schema
     params:
@@ -184,6 +307,10 @@ pipeline:
       drop: ["temp_col", "dq_issues"]
       select_order: ["customer_sk", "full_name", "total_sales", "region"]
 
+  # ---------------------------------------------------------------------------
+  # Limit
+  # Restricts the number of rows (useful for dev/test pipelines).
+  # ---------------------------------------------------------------------------
   - name: top_100_customers
     transformer: sql_core.limit
     params:
