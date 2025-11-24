@@ -1,254 +1,209 @@
 # =============================================================================
-# ODIBI CONFIGURATION TEMPLATE
+# ODIBI MASTER REFERENCE (v2.4.0)
 # =============================================================================
-# This file contains a comprehensive reference of all Odibi features.
-# Uncomment the sections you need.
+# This is your "Super Cheatsheet" for the Odibi Framework.
+# It covers configuration, connection examples, and transformation patterns.
 #
-# Tips:
-# - Use ${ENV_VAR} to reference environment variables (e.g., secrets).
-# - Hover over keys in VS Code for documentation (if extension is configured).
+# SECTIONS:
+# 1. Project & Engine Settings
+# 2. Connections (Data Sources & Auth Options)
+# 3. Pipelines (Nodes, Transforms, SQL, Python)
+# 4. Observability (Lineage, Data Quality, Stories)
 # =============================================================================
 
-project: my_new_project
-version: "0.1.0"
-description: "A data pipeline project"
+project: my_odibi_project
+version: "2.4.0"
+description: "A reference data pipeline project"
 owner: "Data Team"
 
-# Execution Engine
-# 'pandas': Good for local dev and small data (<10GB)
-# 'spark':  Good for big data (Databricks, Synapse)
+# -----------------------------------------------------------------------------
+# 1. ENGINE & PERFORMANCE
+# -----------------------------------------------------------------------------
+# 'pandas': Best for <10GB data, local dev, and complex Python logic.
+# 'spark':  Best for >10GB data, Databricks/Synapse, and distributed processing.
 engine: pandas
 
-# ==========================================
-# Global Settings (Optional)
-# ==========================================
+performance:
+  use_arrow: true  # (v2.2+) Uses Arrow memory layout for 50% less RAM & faster I/O
 
-# Retry Policy (for network/connection flakiness)
 retry:
   enabled: true
   max_attempts: 3
   backoff: exponential  # Options: exponential, linear, constant
 
-# Logging Configuration
 logging:
   level: INFO           # Options: DEBUG, INFO, WARNING, ERROR
   structured: false     # Set true for JSON logs (Splunk/Datadog)
-  # metadata: {env: "prod", region: "us-east"}  # Extra fields for JSON logs
 
-# Alerting (Webhooks)
-# alerts:
-#   - type: slack  # or 'teams', 'webhook'
-#     url: ${SLACK_WEBHOOK_URL}
-#     on_events: [on_failure]  # Options: on_start, on_success, on_failure
-#     metadata: {channel: "#data-alerts"}
-
-# ==========================================
-# 1. Connections (Data Sources)
-# ==========================================
+# -----------------------------------------------------------------------------
+# 2. CONNECTIONS (DATA SOURCES)
+# -----------------------------------------------------------------------------
 connections:
   # --- Type: Local Filesystem ---
   local_data:
     type: local
     base_path: ./data
 
-  # --- Type: Azure Data Lake Gen2 ---
-  # my_datalake:
+  # --- Type: Delta Lake (The Standard) ---
+  # For Pandas: Points to a local directory of Delta tables
+  # For Spark: Points to Hive Metastore / Unity Catalog
+  delta_lake:
+    type: delta
+    path: ./data/delta_tables     # Pandas/Local
+    # catalog: spark_catalog      # Spark
+    # schema: default             # Spark
+
+  # --- Type: Azure Data Lake Gen2 (Reference) ---
+  # adls_raw:
   #   type: azure_blob
   #   account_name: ${AZURE_STORAGE_ACCOUNT}
   #   container: raw-data
-  #   validation_mode: eager
+  #   validation_mode: lazy  # lazy (check on use) vs eager (check on startup)
   #
-  #   # Auth Option 1: Default (Recommended)
-  #   # Uses Environment Variables (AZURE_CLIENT_ID...) or Managed Identity
-  #   # No extra config needed here.
+  #   # Auth Option 1: Default (Env Vars / Managed Identity) - RECOMMENDED
+  #   # Uses AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, etc. automatically.
   #
   #   # Auth Option 2: Explicit Access Key
-  #   # auth:
-  #   #   account_key: ${AZURE_STORAGE_KEY}
+  #   # auth: { account_key: ${AZURE_STORAGE_KEY} }
   #
   #   # Auth Option 3: SAS Token
-  #   # auth:
-  #   #   sas_token: ${AZURE_SAS_TOKEN}
+  #   # auth: { sas_token: ${AZURE_SAS_TOKEN} }
   #
-  #   # Auth Option 4: Secure Key Vault (Account Key)
+  #   # Auth Option 4: Key Vault (Secure)
   #   # auth:
   #   #   key_vault_name: my-keyvault
-  #   #   secret_name: adls-account-key
-  #
-  #   # Auth Option 5: Secure Key Vault (SAS Token)
-  #   # auth:
-  #   #   auth_mode: sas_token
-  #   #   key_vault_name: my-keyvault
-  #   #   secret_name: adls-sas-token
+  #   #   secret_name: adls-access-key
 
-  # --- Type: Delta Lake (Spark/Databricks) ---
-  # spark_catalog:
-  #   type: delta
-  #   catalog: hive_metastore  # Spark Only
-  #   schema: default          # Spark Only
-
-  # --- Type: Delta Lake (Pandas/Local) ---
-  # local_delta:
-  #   type: delta
-  #   path: ./data/delta_tables  # Path-based for Pandas
-
-
-  # --- Type: SQL Server / Azure SQL ---
-  # my_db:
+  # --- Type: SQL Database (Reference) ---
+  # warehouse_db:
   #   type: sql_server
-  #   host: myserver.database.windows.net
-  #   database: production_db
-  #   port: 1433
+  #   host: ${DB_HOST}
+  #   database: analytics
   #   auth:
   #     username: ${DB_USER}
   #     password: ${DB_PASS}
-  #
-  #   # Auth Option 2: Key Vault (Secure Password)
-  #   # auth:
-  #   #   username: ${DB_USER}
-  #   #   key_vault_name: my-keyvault
-  #   #   secret_name: db-password
+  #     # Or use Key Vault:
+  #     # key_vault_name: my-kv
+  #     # secret_name: db-password
 
-  # --- Type: HTTP (API) ---
-  # public_api:
-  #   type: http
-  #   base_url: https://api.example.com/v1
-  #   headers: {Authorization: "Bearer ${API_KEY}"}
-
-# ==========================================
-# 2. Pipelines (Logic)
-# ==========================================
+# -----------------------------------------------------------------------------
+# 3. PIPELINES
+# -----------------------------------------------------------------------------
 pipelines:
   - pipeline: main_etl
-    description: "Example ETL pipeline"
-    layer: silver  # Optional tag: bronze, silver, gold
+    description: "End-to-End ETL Example"
+    layer: silver
+    
     nodes:
-      # ---------------------------------------------------------
-      # Node 1: Read Data
-      # ---------------------------------------------------------
+      # =======================================================================
+      # NODE 1: READ (Ingestion)
+      # =======================================================================
       - name: read_input
         description: "Ingest raw data"
         
-        # --- Scenario A: File-Based Read (CSV, Parquet, JSON) ---
+        # --- Scenario A: File-Based Read ---
         read:
           connection: local_data
           format: csv
-          path: input.csv
+          path: source/customers.csv
           options: {header: true, sep: ","}
 
-        # --- Scenario B: Table-Based Read (SQL, Delta Catalog) ---
+        # --- Scenario B: Table-Based Read ---
         # read:
-        #   connection: my_db  # or spark_catalog
-        #   format: sql_server # or delta
-        #   table: sales.transactions
-        #   options: {fetch_size: 1000}
+        #   connection: warehouse_db
+        #   format: sql_server
+        #   table: sales.customers
         
-        # Performance: Cache result in memory if multiple nodes depend on it
+        # Cache result in memory if referenced by multiple downstream nodes
         cache: false
-        
-        # Debugging: Override log level for this specific node
-        # log_level: DEBUG
 
-      # ---------------------------------------------------------
-      # Node 2: Transform & Validate
-      # ---------------------------------------------------------
+      # =======================================================================
+      # NODE 2: TRANSFORM (Cleaning & Logic)
+      # =======================================================================
       - name: clean_data
         depends_on: [read_input]
         
         transform:
           steps:
-            # --- Option A: SQL (Most Common) ---
-            - sql: "SELECT * FROM read_input WHERE amount > 0"
+            # A. SQL Transformation (Standard)
+            - sql: |
+                SELECT 
+                  id,
+                  trim(lower(email)) as email,
+                  first_name, 
+                  last_name,
+                  region
+                FROM read_input
+                WHERE id IS NOT NULL
 
-            # --- Option B: Built-in Operations (Engine Agnostic) ---
-            # 1. Drop Duplicates
-            # - operation: drop_duplicates
-            #   params: {subset: ["id"], keep: "first"}
-            
-            # 2. Fill Nulls
-            # - operation: fillna
-            #   params: {value: 0, subset: ["amount"]}
-            
-            # 3. Drop Columns
-            # - operation: drop
-            #   params: {columns: ["temp_col"]}
-            
-            # 4. Rename Columns
-            # - operation: rename
-            #   params: {columns: {"old_name": "new_name"}}
+            # B. Standard Library (v2.2+) - No code needed
+            - transformer: sql_core.clean_text
+              params: 
+                columns: ["first_name", "last_name"]
+                case: "title"
 
-            # --- Option C: Custom Python (Advanced) ---
-            # 1. Create a file named 'transforms.py' in this folder.
-            # 2. Add:
-            #    from odibi import transform
-            #    @transform
-            #    def clean_currency(context, current, currency_code):
-            #        return current
-            # 3. Reference it here:
-            # - function: clean_currency
-            #   params: {currency_code: "USD"}
-        
-        # Data Quality Checks (Runs AFTER transform)
-        validation:
-          not_empty: true
-          no_nulls: [id, transaction_date]
-          
-          # Schema Enforcement (Check column types)
-          # schema:
-          #   id: int
-          #   amount: float
-          #   name: string
-          
-          ranges:
-            amount: {min: 0, max: 1000000}
-          allowed_values:
-            status: [completed, pending, failed]
-        
-        # Error Handling Strategy
-        on_error: fail_fast  # Options: fail_fast (stop), fail_later (skip dependents), ignore
+            # C. Data Quality Flagging (v2.4+)
+            - transformer: advanced.validate_and_flag
+              params:
+                rules:
+                  valid_email: "email LIKE '%@%'"
+                flag_col: "dq_issues"
 
-      # ---------------------------------------------------------
-      # Node 3: Write & Protect
-      # ---------------------------------------------------------
-      - name: write_silver
+        # PII Protection: Automatically mask these in logs/stories
+        sensitive: [email, last_name]
+
+      # =======================================================================
+      # NODE 3: MERGE / UPSERT (Loading)
+      # =======================================================================
+      - name: upsert_to_silver
+        description: "Upsert to Delta Lake (SCD Type 1)"
         depends_on: [clean_data]
         
-        # Privacy: Mask these columns in logs/stories (PII Protection)
-        sensitive: [email, phone_number, ssn]
-        # sensitive: true  # Masks ALL data samples
+        # The 'merge' transformer handles Insert/Update/Delete logic automatically
+        transformer: merge
+        params:
+          target_connection: delta_lake
+          target_path: silver/customers
+          
+          merge_keys: ["id"]
+          strategy: upsert  # Options: upsert, append_only, delete_match, overwrite
+          
+          audit_cols:
+            created_col: "created_at"
+            updated_col: "updated_at"
+
+      # =======================================================================
+      # NODE 4: AGGREGATION & WRITE (Gold)
+      # =======================================================================
+      - name: gold_stats
+        depends_on: [upsert_to_silver]
         
-        # --- Scenario A: File-Based Write ---
+        transform:
+          steps:
+            - sql: "SELECT region, count(*) as count FROM upsert_to_silver GROUP BY 1"
+            
         write:
           connection: local_data
           format: parquet
-          path: silver/transactions.parquet
+          path: gold/region_stats.parquet
           mode: overwrite
 
-        # --- Scenario B: Table-Based Write ---
-        # write:
-        #   connection: spark_catalog
-        #   format: delta
-        #   table: silver.transactions
-        #   mode: append
-        #   options:
-        #     mergeSchema: true
-        #     partitionBy: ["date"]
+        # Validation: Fail the pipeline if these checks fail
+        validation:
+          not_empty: true
+          no_nulls: [region]
 
-# ==========================================
-# 3. Data Story (Documentation/Audit)
-# ==========================================
+# -----------------------------------------------------------------------------
+# 4. OBSERVABILITY & STORIES (v2.4)
+# -----------------------------------------------------------------------------
 story:
-  connection: local_data  # Where to save the report
+  connection: local_data
   path: odibi_stories/
-  max_sample_rows: 10     # Number of sample rows to capture
+  max_sample_rows: 20
   auto_generate: true
-  retention_days: 30      # Clean up old stories automatically
-  retention_count: 100    # Keep only the last N stories
-
-# ==========================================
-# 4. Environments (Experimental/Roadmap)
-# ==========================================
-# environments:
-#   production:
-#     logging: {level: WARNING}
-#     retry: {max_attempts: 5}
+  
+  # The HTML report will automatically include:
+  # - Interactive Lineage Graph (Mermaid.js)
+  # - Data Drift (Row additions/removals since last run)
+  # - Schema Changes
+  # - SQL & Config Snapshots

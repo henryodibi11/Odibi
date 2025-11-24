@@ -138,6 +138,38 @@ class NodeExecutionMetadata:
 
         return base_dict
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "NodeExecutionMetadata":
+        """Create instance from dictionary."""
+        delta_info = None
+        if "delta_info" in data and data["delta_info"]:
+            d_info = data["delta_info"]
+            # Parse timestamp if present
+            ts = None
+            if d_info.get("timestamp"):
+                try:
+                    ts = datetime.fromisoformat(d_info["timestamp"])
+                except ValueError:
+                    pass
+
+            delta_info = DeltaWriteInfo(
+                version=d_info.get("version"),
+                timestamp=ts,
+                operation=d_info.get("operation"),
+                operation_metrics=d_info.get("operation_metrics", {}),
+                read_version=d_info.get("read_version"),
+            )
+
+        # Filter out unknown keys to be safe
+        valid_keys = cls.__annotations__.keys()
+        clean_data = {k: v for k, v in data.items() if k in valid_keys}
+
+        # Remove nested objects handled separately
+        if "delta_info" in clean_data:
+            del clean_data["delta_info"]
+
+        return cls(delta_info=delta_info, **clean_data)
+
 
 @dataclass
 class PipelineStoryMetadata:
@@ -230,3 +262,28 @@ class PipelineStoryMetadata:
             "business_unit": self.business_unit,
             "theme": self.theme,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PipelineStoryMetadata":
+        """Create instance from dictionary."""
+        nodes_data = data.get("nodes", [])
+        nodes = [NodeExecutionMetadata.from_dict(n) for n in nodes_data]
+
+        # Filter valid keys
+        valid_keys = cls.__annotations__.keys()
+        clean_data = {k: v for k, v in data.items() if k in valid_keys}
+
+        # Handle nested
+        if "nodes" in clean_data:
+            del clean_data["nodes"]
+
+        return cls(nodes=nodes, **clean_data)
+
+    @classmethod
+    def from_json(cls, path: str) -> "PipelineStoryMetadata":
+        """Load from a JSON file."""
+        import json
+
+        with open(path, "r") as f:
+            data = json.load(f)
+        return cls.from_dict(data)
