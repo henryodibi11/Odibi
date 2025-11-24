@@ -427,6 +427,20 @@ class PandasEngine(Engine):
         writer_options = merged_options.copy()
         writer_options.pop("keys", None)
 
+        # Warn about partitioning anti-patterns (if partitioning is used)
+        # Check both 'partition_by' (snake_case) and 'partitionBy' (camelCase)
+        partition_by = writer_options.get("partition_by") or writer_options.get("partitionBy")
+
+        if partition_by:
+            import warnings
+
+            warnings.warn(
+                "⚠️  Partitioning can cause performance issues if misused. "
+                "Only partition on low-cardinality columns (< 1000 unique values) "
+                "and ensure each partition has > 1000 rows.",
+                UserWarning,
+            )
+
         # Custom Writers
         if format in self._custom_writers:
             self._custom_writers[format](df, full_path, mode=mode, **writer_options)

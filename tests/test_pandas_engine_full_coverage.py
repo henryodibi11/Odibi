@@ -363,9 +363,16 @@ class TestPandasEngineWrite:
                 )
             )
 
+        class FakeDeltaTable:
+            def __init__(self, path, storage_options=None):
+                pass
+
+            def history(self, limit=None):
+                return [{"version": 1, "timestamp": 1000, "operation": "WRITE"}]
+
         fake_mod = types.SimpleNamespace(
             write_deltalake=write_deltalake,
-            DeltaTable=types.SimpleNamespace(isDeltaTable=lambda *a: False),
+            DeltaTable=FakeDeltaTable,
         )
         monkeypatch.setitem(sys.modules, "deltalake", fake_mod)
 
