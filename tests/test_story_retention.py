@@ -17,51 +17,64 @@ class TestStoryRetention:
     def test_cleanup_by_count(self, generator, tmp_path):
         """Test retention by count (keep latest N)."""
         # Create 10 dummy stories (mix of html and json)
+        # We update the test to use the new directory structure:
+        # {pipeline}/{date}/run_{time}.html
+        
+        import datetime
+        today = datetime.date.today().isoformat()
+        
+        pipeline_dir = tmp_path / "test_pipeline" / today
+        pipeline_dir.mkdir(parents=True, exist_ok=True)
+        
         for i in range(10):
-            p_html = tmp_path / f"test_pipeline_run{i}.html"
+            # Format: run_HH-MM-SS.html
+            # We fake the time to ensure sorting
+            time_str = f"10-00-{i:02d}"
+            
+            p_html = pipeline_dir / f"run_{time_str}.html"
             p_html.touch()
 
-            p_json = tmp_path / f"test_pipeline_run{i}.json"
+            p_json = pipeline_dir / f"run_{time_str}.json"
             p_json.touch()
-
-            # Ensure different mtimes (newest last)
-            t = time.time() + i * 10
-            import os
-
-            os.utime(p_html, (t, t))
-            os.utime(p_json, (t, t))
 
         # Run cleanup (limit is 5)
         generator.cleanup()
 
-        files_html = list(tmp_path.glob("test_pipeline_*.html"))
-        files_json = list(tmp_path.glob("test_pipeline_*.json"))
+        files_html = list(pipeline_dir.glob("*.html"))
+        files_json = list(pipeline_dir.glob("*.json"))
 
         assert len(files_html) == 5
         assert len(files_json) == 5
 
-        # Ensure we kept the newest ones (run5 to run9)
+        # Ensure we kept the newest ones (run 5 to 9)
         names = [p.name for p in files_html]
-        assert "test_pipeline_run9.html" in names
-        assert "test_pipeline_run0.html" not in names
+        assert "run_10-00-09.html" in names
+        assert "run_10-00-00.html" not in names
 
     def test_cleanup_by_time(self, generator, tmp_path):
         """Test retention by time (keep newer than N days)."""
         # Config says 7 days
-
+        
+        import datetime
+        today = datetime.date.today().isoformat()
+        
         # 1. Create recent file (should keep)
-        recent_html = tmp_path / "test_pipeline_recent.html"
+        recent_dir = tmp_path / "test_pipeline" / today
+        recent_dir.mkdir(parents=True, exist_ok=True)
+        
+        recent_html = recent_dir / "run_recent.html"
         recent_html.touch()
 
         # 2. Create old file (should delete)
-        old_html = tmp_path / "test_pipeline_old.html"
+        # We rely on directory name for date parsing primarily now
+        # So we create an old directory
+        
+        eight_days_ago = (datetime.date.today() - datetime.timedelta(days=8)).isoformat()
+        old_dir = tmp_path / "test_pipeline" / eight_days_ago
+        old_dir.mkdir(parents=True, exist_ok=True)
+        
+        old_html = old_dir / "run_old.html"
         old_html.touch()
-
-        # Modify mtime to be 8 days ago
-        import os
-
-        past = time.time() - (8 * 24 * 3600)
-        os.utime(old_html, (past, past))
 
         generator.cleanup()
 
@@ -70,14 +83,25 @@ class TestStoryRetention:
 
     def test_cleanup_integration(self, generator, tmp_path):
         """Test cleanup runs after generation."""
-        # Pre-populate with many files
+        # Pre-populate with many files in new structure
+        import datetime
+        today = datetime.date.today().isoformat()
+        pipeline_dir = tmp_path / "test_pipeline" / today
+        pipeline_dir.mkdir(parents=True, exist_ok=True)
+        
         for i in range(10):
-            (tmp_path / f"test_pipeline_{i}.html").touch()
+             (pipeline_dir / f"run_10-00-{i:02d}.html").touch()
+             (pipeline_dir / f"run_10-00-{i:02d}.json").touch()
 
         # Run generation
         generator.generate({}, [], [], [], 0.0, "", "")
 
-        # Should have cleaned up to retention_count (5) + 1 new one?
-        # The logic counts all files including new one.
-        files = list(tmp_path.glob("test_pipeline_*.html"))
-        assert len(files) <= 5 + 1  # +1 for the newly generated file
+        # Check files
+        # Since generate creates a new file, cleanup runs AFTER generation
+        # Total HTML files should be retention_count (5)
+        
+        # Note: generator.generate() creates the file AND then runs cleanup()
+        # So we expect exactly retention_count files
+        
+        all_files = list(tmp_path.glob("**/*.html"))
+        assert len(all_files) == 5
