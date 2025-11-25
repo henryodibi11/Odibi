@@ -584,6 +584,13 @@ read:
     column: "updated_at"
     lookback: 3
     unit: "day"
+
+# Required for state tracking:
+write:
+  connection: "bronze_lake"
+  format: "delta"
+  table: "orders_raw"
+  mode: "append"
 ```
 
 | Field | Type | Required | Default | Description |
