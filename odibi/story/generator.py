@@ -149,10 +149,10 @@ class StoryGenerator:
         timestamp_obj = datetime.now()
         date_str = timestamp_obj.strftime("%Y-%m-%d")
         time_str = timestamp_obj.strftime("%H-%M-%S")
-        
+
         # Create structured path: {pipeline_name}/{date}/
         relative_folder = f"{self.pipeline_name}/{date_str}"
-        
+
         if self.is_remote:
             base_path = f"{self.output_path_str.rstrip('/')}/{relative_folder}"
         else:
@@ -334,7 +334,7 @@ class StoryGenerator:
                 )
 
                 self._apply_retention(stories, json_stories)
-                
+
                 # Clean empty date directories
                 for date_dir in pipeline_dir.iterdir():
                     if date_dir.is_dir() and not any(date_dir.iterdir()):
@@ -362,7 +362,7 @@ class StoryGenerator:
     def _apply_retention(self, stories: List[Path], json_stories: List[Path]) -> None:
         """Apply count and time retention policies."""
         from datetime import timedelta
-        
+
         # 1. Count retention
         if len(stories) > self.retention_count:
             to_delete = stories[self.retention_count :]
@@ -380,8 +380,8 @@ class StoryGenerator:
 
         # Check remaining files
         # For nested files, we could parse date from folder name, but mtime is safer fallback
-        remaining = stories[:self.retention_count] + json_stories[:self.retention_count]
-        
+        remaining = stories[: self.retention_count] + json_stories[: self.retention_count]
+
         for path in remaining:
             if path.exists():
                 # Try to infer date from path first (faster/more accurate than mtime)
@@ -394,7 +394,7 @@ class StoryGenerator:
                         continue
                 except ValueError:
                     pass
-                
+
                 # Fallback to mtime
                 mtime = datetime.fromtimestamp(path.stat().st_mtime)
                 if mtime < cutoff:
