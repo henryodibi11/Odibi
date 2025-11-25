@@ -146,8 +146,20 @@ class StoryGenerator:
                 )
 
         # 2. Render outputs
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        base_filename = f"{self.pipeline_name}_{timestamp}"
+        timestamp_obj = datetime.now()
+        date_str = timestamp_obj.strftime("%Y-%m-%d")
+        time_str = timestamp_obj.strftime("%H-%M-%S")
+        
+        # Create structured path: {pipeline_name}/{date}/
+        relative_folder = f"{self.pipeline_name}/{date_str}"
+        
+        if self.is_remote:
+            base_path = f"{self.output_path_str.rstrip('/')}/{relative_folder}"
+        else:
+            base_path = self.output_path / relative_folder
+            base_path.mkdir(parents=True, exist_ok=True)
+
+        base_filename = f"run_{time_str}"
 
         # Prepare renderers
         html_renderer = HTMLStoryRenderer()
@@ -155,11 +167,11 @@ class StoryGenerator:
 
         # Paths
         if self.is_remote:
-            html_path = f"{self.output_path_str.rstrip('/')}/{base_filename}.html"
-            json_path = f"{self.output_path_str.rstrip('/')}/{base_filename}.json"
+            html_path = f"{base_path}/{base_filename}.html"
+            json_path = f"{base_path}/{base_filename}.json"
         else:
-            html_path = str(self.output_path / f"{base_filename}.html")
-            json_path = str(self.output_path / f"{base_filename}.json")
+            html_path = str(base_path / f"{base_filename}.html")
+            json_path = str(base_path / f"{base_filename}.json")
 
         # Render HTML
         html_content = html_renderer.render(metadata)
@@ -296,90 +308,8 @@ class StoryGenerator:
 
     def cleanup(self) -> None:
         """Remove old stories based on retention policy."""
+        # TODO: Implement robust remote cleanup for nested structure
         if self.is_remote:
-            try:
-                import fsspec
-                from datetime import timedelta
-
-                # Initialize filesystem
-                protocol = self.output_path_str.split("://")[0]
-                fs = fsspec.filesystem(protocol, **self.storage_options)
-
-                # List all files in the directory
-                try:
-                    # Strip protocol for listing
-                    path_to_list = self.output_path_str.split("://")[1]
-                    files = fs.ls(path_to_list)
-                except Exception:
-                    # Might fail if directory doesn't exist or auth issues, just return
-                    return
-
-                # Filter for this pipeline's stories
-                html_files = []
-                json_files = []
-
-                for f in files:
-                    # fsspec returns full paths usually
-                    filename = f.split("/")[-1]
-                    if filename.startswith(f"{self.pipeline_name}_"):
-                        if filename.endswith(".html"):
-                            html_files.append(f)
-                        elif filename.endswith(".json"):
-                            json_files.append(f)
-
-                # Sort by filename (descending) - filenames have timestamps so this works
-                # Format: pipeline_YYYYMMDD_HHMMSS.html
-                html_files.sort(reverse=True)
-                json_files.sort(reverse=True)
-
-                # 1. Count retention
-                if len(html_files) > self.retention_count:
-                    to_delete = html_files[self.retention_count :]
-                    fs.rm(to_delete)
-
-                if len(json_files) > self.retention_count:
-                    to_delete = json_files[self.retention_count :]
-                    fs.rm(to_delete)
-
-                # 2. Time retention
-                # Parse timestamps from filenames since mtime might be unreliable/slow on object store
-                now = datetime.now()
-                cutoff = now - timedelta(days=self.retention_days)
-
-                remaining_html = html_files[: self.retention_count]
-                remaining_json = json_files[: self.retention_count]
-
-                files_to_delete = []
-
-                for f_list in [remaining_html, remaining_json]:
-                    for f in f_list:
-                        try:
-                            filename = f.split("/")[-1]
-                            # Extract timestamp: pipeline_YYYYMMDD_HHMMSS.ext
-                            # Find the last underscore before extension?
-                            # Our format: base_filename = {pipeline_name}_{timestamp}
-                            # timestamp = "%Y%m%d_%H%M%S" (15 chars)
-
-                            # Removing extension
-                            name_no_ext = filename.rsplit(".", 1)[0]
-                            # Timestamp is last 15 chars
-                            ts_str = name_no_ext[-15:]
-                            file_date = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
-
-                            if file_date < cutoff:
-                                files_to_delete.append(f)
-                        except (ValueError, IndexError):
-                            # Skip files that don't match expected format
-                            continue
-
-                if files_to_delete:
-                    fs.rm(files_to_delete)
-
-            except ImportError:
-                print("Warning: Remote story cleanup requires 'fsspec'. Skipping.")
-            except Exception as e:
-                print(f"Warning: Remote story cleanup failed: {e}")
-
             return
 
         if self.output_path is None:
@@ -388,56 +318,87 @@ class StoryGenerator:
         try:
             from datetime import timedelta
 
-            # Find all HTML stories for this pipeline
-            stories = sorted(
+            # 1. Clean new nested structure: {pipeline}/{date}/run_*.html
+            pipeline_dir = self.output_path / self.pipeline_name
+            if pipeline_dir.exists():
+                # Find all files recursively
+                stories = sorted(
+                    pipeline_dir.glob("**/*.html"),
+                    key=lambda p: str(p),  # Sort by path (date/time)
+                    reverse=True,
+                )
+                json_stories = sorted(
+                    pipeline_dir.glob("**/*.json"),
+                    key=lambda p: str(p),
+                    reverse=True,
+                )
+
+                self._apply_retention(stories, json_stories)
+                
+                # Clean empty date directories
+                for date_dir in pipeline_dir.iterdir():
+                    if date_dir.is_dir() and not any(date_dir.iterdir()):
+                        try:
+                            date_dir.rmdir()
+                        except Exception:
+                            pass
+
+            # 2. Clean legacy flat structure: {pipeline}_*.html in root
+            legacy_stories = sorted(
                 self.output_path.glob(f"{self.pipeline_name}_*.html"),
                 key=lambda p: p.stat().st_mtime,
                 reverse=True,
             )
-
-            # Find all JSON stories for this pipeline
-            json_stories = sorted(
-                self.output_path.glob(f"{self.pipeline_name}_*.json"),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )
-
-            # 1. Count retention
-            if len(stories) > self.retention_count:
-                to_delete = stories[self.retention_count :]
-                for path in to_delete:
-                    path.unlink(missing_ok=True)
-
-            if len(json_stories) > self.retention_count:
-                to_delete = json_stories[self.retention_count :]
-                for path in to_delete:
-                    path.unlink(missing_ok=True)
-
-            # 2. Time retention
-            now = datetime.now()
-            cutoff = now - timedelta(days=self.retention_days)
-
-            # Clean remaining HTML
-            for path in self.output_path.glob(f"{self.pipeline_name}_*.html"):
-                if path.exists():
-                    mtime = datetime.fromtimestamp(path.stat().st_mtime)
-                    if mtime < cutoff:
-                        path.unlink(missing_ok=True)
-
-            # Clean remaining JSON
-            for path in self.output_path.glob(f"{self.pipeline_name}_*.json"):
-                if path.exists():
-                    mtime = datetime.fromtimestamp(path.stat().st_mtime)
-                    if mtime < cutoff:
-                        path.unlink(missing_ok=True)
-
-            # Clean legacy markdown if exists
-            for path in self.output_path.glob(f"{self.pipeline_name}_*.md"):
-                path.unlink(missing_ok=True)
+            # Only clean legacy if we have them
+            if legacy_stories:
+                # We don't want to count legacy + new against the same limit technically,
+                # but for simplicity let's just clean legacy based on their own existence
+                self._apply_retention(legacy_stories, [])
 
         except Exception as e:
             # Don't fail generation if cleanup fails
             print(f"Warning: Story cleanup failed: {e}")
+
+    def _apply_retention(self, stories: List[Path], json_stories: List[Path]) -> None:
+        """Apply count and time retention policies."""
+        from datetime import timedelta
+        
+        # 1. Count retention
+        if len(stories) > self.retention_count:
+            to_delete = stories[self.retention_count :]
+            for path in to_delete:
+                path.unlink(missing_ok=True)
+
+        if len(json_stories) > self.retention_count:
+            to_delete = json_stories[self.retention_count :]
+            for path in to_delete:
+                path.unlink(missing_ok=True)
+
+        # 2. Time retention
+        now = datetime.now()
+        cutoff = now - timedelta(days=self.retention_days)
+
+        # Check remaining files
+        # For nested files, we could parse date from folder name, but mtime is safer fallback
+        remaining = stories[:self.retention_count] + json_stories[:self.retention_count]
+        
+        for path in remaining:
+            if path.exists():
+                # Try to infer date from path first (faster/more accurate than mtime)
+                # Path format: .../{date}/run_{time}.html
+                try:
+                    # Try to parse parent folder as date
+                    file_date = datetime.strptime(path.parent.name, "%Y-%m-%d")
+                    if file_date < cutoff.replace(hour=0, minute=0, second=0, microsecond=0):
+                        path.unlink(missing_ok=True)
+                        continue
+                except ValueError:
+                    pass
+                
+                # Fallback to mtime
+                mtime = datetime.fromtimestamp(path.stat().st_mtime)
+                if mtime < cutoff:
+                    path.unlink(missing_ok=True)
 
     # Legacy methods removed as they are now handled by renderers
     # _generate_node_section, _sample_to_markdown, _dataframe_to_markdown
