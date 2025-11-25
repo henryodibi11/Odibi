@@ -473,6 +473,10 @@ class IncrementalConfig(BaseModel):
 
     Generates SQL: `WHERE column >= NOW() - lookback`
 
+    **Important:** This feature requires a `write` configuration in the same node.
+    Odibi checks if the *Write Target* exists to decide between a Full Load (First Run)
+    and an Incremental Load (Subsequent Runs).
+
     Supports:
     * `column`: Primary filter column
     * `fallback_column`: Optional backup (e.g. created_at)

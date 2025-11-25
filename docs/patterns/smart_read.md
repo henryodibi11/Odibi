@@ -4,6 +4,14 @@ The "Smart Read" feature simplifies incremental data loading by automatically ge
 
 It eliminates the need to write complex SQL with `first_run_query` and dialect-specific date math.
 
+!!! warning "Requirement: Write Configuration"
+    Smart Read **requires** a `write` block in the same node.
+
+    It determines whether to run a **Full Load** or **Incremental Load** by checking if the destination defined in `write` already exists.
+
+    *   If you only want to read data (without writing), use the standard `query` option with explicit date filters instead.
+    *   Ensure your `write` mode is set correctly (e.g., `append` or `upsert`) to handle the incoming data.
+
 ## How It Works
 
 Odibi checks if your **Write** target exists:
