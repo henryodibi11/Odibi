@@ -684,6 +684,12 @@ class PipelineManager:
 
         # Build initial connection objects (without prefetching secrets)
         for conn_name, conn_config in conn_configs.items():
+            # Convert Pydantic model to dict if needed
+            if hasattr(conn_config, "model_dump"):
+                conn_config = conn_config.model_dump()
+            elif hasattr(conn_config, "dict"):
+                conn_config = conn_config.dict()
+
             conn_type = conn_config.get("type", "local")
 
             # Check plugins

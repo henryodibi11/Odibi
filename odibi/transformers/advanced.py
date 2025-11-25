@@ -1,6 +1,7 @@
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List, Optional, Union
+from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from odibi.context import EngineContext
 from odibi.enums import EngineType
@@ -14,7 +15,7 @@ class DeduplicateParams(BaseModel):
     """
     Configuration for deduplication.
 
-    Example:
+    Scenario: Keep latest record
     ```yaml
     deduplicate:
       keys: ["id"]
@@ -60,11 +61,11 @@ class ExplodeParams(BaseModel):
     """
     Configuration for exploding lists.
 
-    Example:
+    Scenario: Flatten list of items per order
     ```yaml
     explode_list_column:
       column: "items"
-      outer: true
+      outer: true  # Keep orders with empty items list
     ```
     """
 
@@ -95,26 +96,28 @@ def explode_list_column(context: EngineContext, params: ExplodeParams) -> Engine
 # 3. Dict Mapping
 # -------------------------------------------------------------------------
 
+JsonScalar = Union[str, int, float, bool, None]
+
 
 class DictMappingParams(BaseModel):
     """
     Configuration for dictionary mapping.
 
-    Example:
+    Scenario: Map status codes to labels
     ```yaml
     dict_based_mapping:
       column: "status_code"
       mapping:
-        1: "Active"
-        0: "Inactive"
+        "1": "Active"
+        "0": "Inactive"
       default: "Unknown"
       output_column: "status_desc"
     ```
     """
 
     column: str
-    mapping: Dict[Any, Any]
-    default: Optional[Any] = None
+    mapping: Dict[str, JsonScalar]
+    default: Optional[JsonScalar] = None
     output_column: Optional[str] = None
 
 
@@ -236,6 +239,11 @@ def unpack_struct(context: EngineContext, params: UnpackStructParams) -> EngineC
 # -------------------------------------------------------------------------
 
 
+class HashAlgorithm(str, Enum):
+    SHA256 = "sha256"
+    MD5 = "md5"
+
+
 class HashParams(BaseModel):
     """
     Configuration for column hashing.
@@ -249,7 +257,7 @@ class HashParams(BaseModel):
     """
 
     columns: List[str]
-    algorithm: Literal["sha256", "md5"] = "sha256"
+    algorithm: HashAlgorithm = HashAlgorithm.SHA256
 
 
 def hash_columns(context: EngineContext, params: HashParams) -> EngineContext:
@@ -264,9 +272,9 @@ def hash_columns(context: EngineContext, params: HashParams) -> EngineContext:
 
         df = context.df
         for col in params.columns:
-            if params.algorithm == "sha256":
+            if params.algorithm == HashAlgorithm.SHA256:
                 df = df.withColumn(col, F.sha2(F.col(col), 256))
-            elif params.algorithm == "md5":
+            elif params.algorithm == HashAlgorithm.MD5:
                 df = df.withColumn(col, F.md5(F.col(col)))
         return context.with_df(df)
 
@@ -285,7 +293,7 @@ def hash_columns(context: EngineContext, params: HashParams) -> EngineContext:
             if val is None:
                 return None
             encoded = str(val).encode("utf-8")
-            if alg == "sha256":
+            if alg == HashAlgorithm.SHA256:
                 return hashlib.sha256(encoded).hexdigest()
             return hashlib.md5(encoded).hexdigest()
 
@@ -453,6 +461,13 @@ class ValidateAndFlagParams(BaseModel):
         ..., description="Map of rule name to SQL condition (must be TRUE)"
     )
     flag_col: str = Field("_issues", description="Name of the column to store failed rules")
+
+    @field_validator("rules")
+    @classmethod
+    def require_non_empty_rules(cls, v):
+        if not v:
+            raise ValueError("ValidateAndFlag: 'rules' must not be empty")
+        return v
 
 
 def validate_and_flag(context: EngineContext, params: ValidateAndFlagParams) -> EngineContext:

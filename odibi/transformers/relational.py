@@ -1,6 +1,7 @@
 from typing import Dict, List, Literal, Optional, Union
+from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from odibi.context import EngineContext
 from odibi.enums import EngineType
@@ -14,13 +15,21 @@ class JoinParams(BaseModel):
     """
     Configuration for joining datasets.
 
-    Example:
+    Scenario 1: Simple Left Join
     ```yaml
     join:
       right_dataset: "customers"
       on: "customer_id"
       how: "left"
-      prefix: "cust"
+    ```
+
+    Scenario 2: Join with Prefix (avoid collisions)
+    ```yaml
+    join:
+      right_dataset: "orders"
+      on: ["user_id"]
+      how: "inner"
+      prefix: "ord"  # Result cols: ord_date, ord_amount...
     ```
     """
 
@@ -30,6 +39,15 @@ class JoinParams(BaseModel):
     prefix: Optional[str] = Field(
         None, description="Prefix for columns from right dataset to avoid collisions"
     )
+
+    @field_validator("on")
+    @classmethod
+    def coerce_on_to_list(cls, v):
+        if isinstance(v, str):
+            return [v]
+        if not v:
+            raise ValueError("'on' must contain at least one join key")
+        return v
 
 
 def join(context: EngineContext, params: JoinParams) -> EngineContext:
@@ -48,10 +66,8 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
     context.register_temp_view(right_view_name, right_df)
 
     # Construct Join Condition
-    if isinstance(params.on, str):
-        join_cols = [params.on]
-    else:
-        join_cols = params.on
+    # params.on is guaranteed to be List[str] by validator
+    join_cols = params.on
 
     join_condition = " AND ".join([f"df.{col} = {right_view_name}.{col}" for col in join_cols])
 
@@ -112,11 +128,18 @@ class UnionParams(BaseModel):
     """
     Configuration for unioning datasets.
 
-    Example:
+    Example (By Name - Default):
     ```yaml
     union:
       datasets: ["sales_2023", "sales_2024"]
       by_name: true
+    ```
+
+    Example (By Position):
+    ```yaml
+    union:
+      datasets: ["legacy_data"]
+      by_name: false
     ```
     """
 
@@ -170,6 +193,15 @@ class PivotParams(BaseModel):
       pivot_col: "month"
       agg_col: "sales"
       agg_func: "sum"
+    ```
+
+    Example (Optimized for Spark):
+    ```yaml
+    pivot:
+      group_by: ["id"]
+      pivot_col: "category"
+      values: ["A", "B", "C"]  # Explicit values avoid extra pass
+      agg_col: "amount"
     ```
     """
 
@@ -283,6 +315,15 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
 # -------------------------------------------------------------------------
 
 
+class AggFunc(str, Enum):
+    SUM = "sum"
+    AVG = "avg"
+    MIN = "min"
+    MAX = "max"
+    COUNT = "count"
+    FIRST = "first"
+
+
 class AggregateParams(BaseModel):
     """
     Configuration for aggregation.
@@ -299,7 +340,7 @@ class AggregateParams(BaseModel):
     """
 
     group_by: List[str] = Field(..., description="Columns to group by")
-    aggregations: Dict[str, str] = Field(
+    aggregations: Dict[str, AggFunc] = Field(
         ..., description="Map of column to aggregation function (sum, avg, min, max, count)"
     )
 
@@ -313,7 +354,7 @@ def aggregate(context: EngineContext, params: AggregateParams) -> EngineContext:
 
     for col, func in params.aggregations.items():
         # Construct agg: SUM(col) AS col
-        agg_exprs.append(f"{func.upper()}({col}) AS {col}")
+        agg_exprs.append(f"{func.value.upper()}({col}) AS {col}")
 
     # Select grouped cols + aggregated cols
     # Note: params.group_by are already columns, so we list them

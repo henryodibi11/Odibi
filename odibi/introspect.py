@@ -3,11 +3,16 @@
 import inspect
 import importlib
 import sys
+import re
 from pathlib import Path
-from typing import List, Optional, Any, Dict, Type
+from typing import List, Optional, Any, Dict, Type, Set, Union
+
+try:
+    from typing import Annotated, get_args, get_origin
+except ImportError:
+    from typing_extensions import Annotated, get_args, get_origin
 
 from pydantic import BaseModel
-
 
 # --- Data Models ---
 
@@ -27,36 +32,254 @@ class ModelDoc(BaseModel):
     docstring: Optional[str]
     fields: List[FieldDoc]
     group: str  # "Core", "Connection", "Transformation", "Setting"
+    used_in: List[str] = []
 
 
-# --- Extraction Logic ---
+# --- Configuration ---
+
+GROUP_MAPPING = {
+    "ProjectConfig": "Core",
+    "PipelineConfig": "Core",
+    "NodeConfig": "Core",
+    "ReadConfig": "Operation",
+    "WriteConfig": "Operation",
+    "TransformConfig": "Operation",
+    "ValidationConfig": "Operation",
+    "ColumnMetadata": "Core",
+    "TimeTravelConfig": "Operation",
+    "LocalConnectionConfig": "Connection",
+    "AzureBlobConnectionConfig": "Connection",
+    "DeltaConnectionConfig": "Connection",
+    "SQLServerConnectionConfig": "Connection",
+    "HttpConnectionConfig": "Connection",
+    "StoryConfig": "Setting",
+    "RetryConfig": "Setting",
+    "LoggingConfig": "Setting",
+    "PerformanceConfig": "Setting",
+    "AlertConfig": "Setting",
+    "SCD2Params": "Transformation",
+}
+
+CUSTOM_ORDER = [
+    # Core
+    "ProjectConfig",
+    "PipelineConfig",
+    "NodeConfig",
+    "ColumnMetadata",
+    # Operations (ETL flow)
+    "ReadConfig",
+    "TimeTravelConfig",
+    "TransformConfig",
+    "ValidationConfig",
+    "WriteConfig",
+    # Connections (Common first)
+    "LocalConnectionConfig",
+    "DeltaConnectionConfig",
+    "AzureBlobConnectionConfig",
+    "SQLServerConnectionConfig",
+    "HttpConnectionConfig",
+]
+
+# Known Type Aliases to simplify display
+TYPE_ALIASES = {
+    "ConnectionConfig": [
+        "LocalConnectionConfig",
+        "AzureBlobConnectionConfig",
+        "DeltaConnectionConfig",
+        "SQLServerConnectionConfig",
+        "HttpConnectionConfig",
+    ],
+    "AzureBlobAuthConfig": [
+        "AzureBlobKeyVaultAuth",
+        "AzureBlobAccountKeyAuth",
+        "AzureBlobSasAuth",
+        "AzureBlobConnectionStringAuth",
+        "AzureBlobMsiAuth",
+    ],
+    "SQLServerAuthConfig": [
+        "SQLLoginAuth",
+        "SQLAadPasswordAuth",
+        "SQLMsiAuth",
+        "SQLConnectionStringAuth",
+    ],
+    "HttpAuthConfig": ["HttpNoAuth", "HttpBasicAuth", "HttpBearerAuth", "HttpApiKeyAuth"],
+}
+
+SECTION_INTROS = {
+    "Transformation": """
+### How to Use Transformers
+
+You can use any transformer in two ways:
+
+**1. As a Top-Level Transformer ("The App")**
+Use this for major operations that define the node's purpose (e.g. Merge, SCD2).
+```yaml
+- name: "my_node"
+  transformer: "<transformer_name>"
+  params:
+    <param_name>: <value>
+```
+
+**2. As a Step in a Chain ("The Script")**
+Use this for smaller operations within a `transform` block (e.g. clean_text, filter).
+```yaml
+- name: "my_node"
+  transform:
+    steps:
+      - function: "<transformer_name>"
+        params:
+          <param_name>: <value>
+```
+
+**Available Transformers:**
+The models below describe the `params` required for each transformer.
+"""
+}
+
+# --- Logic ---
+
+
+def discover_modules(root_dir: str = "odibi") -> List[str]:
+    """Recursively discover all Python modules in the package."""
+    modules = []
+    path = Path(root_dir)
+
+    # Handle running from inside odibi/ vs root
+    if not path.exists():
+        # Try finding it in current directory
+        if Path("odibi").exists():
+            path = Path("odibi")
+        else:
+            # If we are inside the package already?
+            # Assumption: Script is run from project root d:/odibi
+            # so odibi/ should exist.
+            print(f"Warning: Could not find root directory '{root_dir}'", file=sys.stderr)
+            return []
+
+    for file_path in path.rglob("*.py"):
+        if "introspect.py" in str(file_path):  # Avoid self
+            continue
+
+        # Convert path to module notation
+        # e.g. odibi\transformers\scd.py -> odibi.transformers.scd
+        try:
+            # If path is absolute or relative to cwd, we need to find the 'odibi' package root
+            # simpler: assume we are at project root, so 'odibi/...' maps to 'odibi.'
+            parts = list(file_path.parts)
+
+            # Find where 'odibi' starts in the path parts
+            if "odibi" in parts:
+                start_idx = parts.index("odibi")
+                rel_parts = parts[start_idx:]
+                module_name = ".".join(rel_parts).replace(".py", "")
+
+                # Fix __init__ (odibi.transformers.__init__ -> odibi.transformers)
+                if module_name.endswith(".__init__"):
+                    module_name = module_name[:-9]
+
+                modules.append(module_name)
+        except Exception as e:
+            print(f"Skipping {file_path}: {e}")
+
+    return sorted(list(set(modules)))
 
 
 def get_docstring(obj: Any) -> Optional[str]:
-    """Extract the full docstring."""
-    return inspect.getdoc(obj)
+    doc = inspect.getdoc(obj)
+    if doc is None:
+        return None
+    # Prevent inheriting Pydantic's internal docstring
+    if doc == inspect.getdoc(BaseModel):
+        return None
+    return doc
 
 
 def get_summary(obj: Any) -> Optional[str]:
-    """Extract the first line of the docstring."""
     doc = get_docstring(obj)
     if not doc:
         return None
     return doc.split("\n")[0].strip()
 
 
-def format_type_hint(annotation: Any) -> str:
-    """Format a type hint as a string."""
-    if annotation is inspect.Parameter.empty:
-        return "Any"
-    if isinstance(annotation, str):
-        return annotation
-
-    # Handle Optional[T] -> T | None
-    s = str(annotation).replace("typing.", "")
+def clean_type_str(s: str) -> str:
+    """Clean up raw type string."""
+    s = s.replace("typing.", "")
     s = s.replace("odibi.config.", "")
     s = s.replace("odibi.enums.", "")
+    s = s.replace("pydantic.types.", "")
+    s = s.replace("NoneType", "None")
+    s = s.replace("False", "bool")  # Literal[False] often shows as False
+    s = s.replace("True", "bool")
     return s
+
+
+def format_type_hint(annotation: Any) -> str:
+    """Robust type hint formatting."""
+    if annotation is inspect.Parameter.empty:
+        return "Any"
+
+    # Handle Annotated (strip metadata)
+    if get_origin(annotation) is Annotated:
+        args = get_args(annotation)
+        if args:
+            return format_type_hint(args[0])
+
+    # Handle Union / Optional
+    origin = get_origin(annotation)
+    if origin is Union:
+        args = get_args(annotation)
+        # Check if it's Optional (Union[T, None])
+        # Filter out NoneType
+        non_none = [a for a in args if a is not type(None)]
+
+        # Check if this Union matches a known Alias
+        arg_names = set()
+        for a in non_none:
+            if hasattr(a, "__name__"):
+                arg_names.add(a.__name__)
+            else:
+                arg_names.add(str(a))
+
+        for alias, components in TYPE_ALIASES.items():
+            if arg_names == set(components):
+                return alias
+
+        formatted_args = [format_type_hint(a) for a in non_none]
+        if len(formatted_args) == 1:
+            return f"Optional[{formatted_args[0]}]"
+        return " | ".join(formatted_args)
+
+    # Handle Literal
+    s_annot = str(annotation)
+    if "Literal" in s_annot and (
+        "typing.Literal" in s_annot or "typing_extensions.Literal" in s_annot
+    ):
+        args = get_args(annotation)
+        clean_args = []
+        for a in args:
+            if hasattr(a, "value"):  # Enum member
+                clean_args.append(repr(a.value))
+            else:
+                clean_args.append(repr(a))
+        return f"Literal[{', '.join(clean_args)}]"
+
+    # Handle List/Dict
+    if origin is list or origin is List:
+        args = get_args(annotation)
+        inner = format_type_hint(args[0]) if args else "Any"
+        return f"List[{inner}]"
+
+    if origin is dict or origin is Dict:
+        args = get_args(annotation)
+        k = format_type_hint(args[0]) if args else "Any"
+        v = format_type_hint(args[1]) if args else "Any"
+        return f"Dict[{k}, {v}]"
+
+    # Handle Classes / Strings
+    if isinstance(annotation, type):
+        return clean_type_str(annotation.__name__)
+
+    return clean_type_str(str(annotation))
 
 
 def get_pydantic_fields(cls: Type[BaseModel]) -> List[FieldDoc]:
@@ -75,7 +298,6 @@ def get_pydantic_fields(cls: Type[BaseModel]) -> List[FieldDoc]:
             required = field.is_required()
             default = None
             if not required:
-                # Try to get default value representation
                 if field.default is not None:
                     default = str(field.default)
 
@@ -108,7 +330,7 @@ def get_pydantic_fields(cls: Type[BaseModel]) -> List[FieldDoc]:
 
 
 def scan_module_for_models(module_name: str, group_map: Dict[str, str]) -> List[ModelDoc]:
-    """Scan a module for Pydantic models and assign groups."""
+    """Scan a module for Pydantic models."""
     try:
         module = importlib.import_module(module_name)
     except ImportError as e:
@@ -117,77 +339,79 @@ def scan_module_for_models(module_name: str, group_map: Dict[str, str]) -> List[
 
     models = []
     for name, obj in inspect.getmembers(module):
-        # Only classes defined in this module (or re-exported explicitly if we wanted, but here we stick to source)
         if not inspect.isclass(obj):
             continue
 
-        if hasattr(obj, "__module__") and obj.__module__ != module_name:
+        # Allow including models from sub-modules if they are part of the target package
+        # But generally prefer defining module
+        if not hasattr(obj, "__module__"):
             continue
 
-        # Check if Pydantic Model
-        if issubclass(obj, BaseModel) and obj is not BaseModel:
-            # Determine Group
-            group = "Other"
-            if name in group_map:
-                group = group_map[name]
-            elif module_name.startswith("odibi.transformers"):
-                group = "Transformation"
+        # Filter out imported pydantic base
+        if obj is BaseModel:
+            continue
 
-            fields = get_pydantic_fields(obj)
+        if issubclass(obj, BaseModel):
+            # Only document models that are either in the module or are explicitly desired
+            # For odibi.config, we want everything defined there
+            if obj.__module__ == module_name:
+                # Determine Group
+                group = "Other"
+                if name in group_map:
+                    group = group_map[name]
+                elif module_name.startswith("odibi.transformers"):
+                    group = "Transformation"
 
-            models.append(
-                ModelDoc(
-                    name=name,
-                    module=module_name,
-                    summary=get_summary(obj),
-                    docstring=get_docstring(obj),
-                    fields=fields,
-                    group=group,
+                fields = get_pydantic_fields(obj)
+
+                models.append(
+                    ModelDoc(
+                        name=name,
+                        module=module_name,
+                        summary=get_summary(obj),
+                        docstring=get_docstring(obj),
+                        fields=fields,
+                        group=group,
+                    )
                 )
-            )
-
     return models
 
 
-# --- Configuration ---
+def build_usage_map(models: List[ModelDoc]) -> Dict[str, Set[str]]:
+    """Build a reverse index of where models are used."""
+    usage = {m.name: set() for m in models}
+    model_names = set(m.name for m in models)
 
-CONFIG_MODULES = [
-    "odibi.config",
-    "odibi.transformers.sql_core",
-    "odibi.transformers.relational",
-    "odibi.transformers.advanced",
-    "odibi.transformers.merge_transformer",
-]
+    for m in models:
+        for f in m.fields:
+            # Naive check: if model name appears in type hint
+            # This handles List[NodeConfig], Optional[ReadConfig], etc.
+            for target in model_names:
+                if target == m.name:
+                    continue
+                # Check for whole word match to avoid partials
+                if re.search(r"\b" + re.escape(target) + r"\b", f.type_hint):
+                    usage[target].add(m.name)
 
-# Explicit grouping for odibi.config classes
-GROUP_MAPPING = {
-    "ProjectConfig": "Core",
-    "PipelineConfig": "Core",
-    "NodeConfig": "Core",
-    "ReadConfig": "Operation",
-    "WriteConfig": "Operation",
-    "TransformConfig": "Operation",
-    "ValidationConfig": "Operation",
-    "LocalConnectionConfig": "Connection",
-    "AzureBlobConnectionConfig": "Connection",
-    "DeltaConnectionConfig": "Connection",
-    "SQLServerConnectionConfig": "Connection",
-    "HttpConnectionConfig": "Connection",
-    "StoryConfig": "Setting",
-    "RetryConfig": "Setting",
-    "LoggingConfig": "Setting",
-    "PerformanceConfig": "Setting",
-    "AlertConfig": "Setting",
-}
+    return usage
 
 
-def generate_docs(output_path: str = "docs/api.md"):
+def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
     """Run introspection and save to file."""
     print("Scanning configuration models...")
 
+    modules = discover_modules()
+    print(f"Discovered {len(modules)} modules: {modules}")
+
     all_models = []
-    for mod in CONFIG_MODULES:
+    for mod in modules:
         all_models.extend(scan_module_for_models(mod, GROUP_MAPPING))
+
+    # Build Reverse Index
+    usage_map = build_usage_map(all_models)
+    for m in all_models:
+        if m.name in usage_map:
+            m.used_in = sorted(list(usage_map[m.name]))
 
     # Organize by group
     grouped = {
@@ -223,6 +447,8 @@ def generate_docs(output_path: str = "docs/api.md"):
         ("Transformation", "Transformation Reference"),
     ]
 
+    model_names = {m.name for m in all_models}
+
     for group_key, title in sections:
         models = grouped[group_key]
         if not models:
@@ -231,14 +457,35 @@ def generate_docs(output_path: str = "docs/api.md"):
         lines.append(f"## {title}")
         lines.append("")
 
-        # Sort models by name
-        models.sort(key=lambda x: x.name)
+        if group_key in SECTION_INTROS:
+            lines.append(SECTION_INTROS[group_key].strip())
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+        # Sort models
+        def sort_key(m):
+            try:
+                return (0, CUSTOM_ORDER.index(m.name))
+            except ValueError:
+                return (1, m.name)
+
+        models.sort(key=sort_key)
 
         for model in models:
             lines.append(f"### `{model.name}`")
 
+            # Reverse Index
+            if model.used_in:
+                links = [f"[{u}](#{u.lower()})" for u in model.used_in]
+                lines.append(f"> *Used in: {', '.join(links)}*")
+                lines.append("")
+
             if model.docstring:
                 lines.append(f"{model.docstring}\n")
+                if model.group == "Transformation":
+                    lines.append("[Back to Catalog](#nodeconfig)")
+                    lines.append("")
 
             if model.fields:
                 lines.append("| Field | Type | Required | Default | Description |")
@@ -249,10 +496,36 @@ def generate_docs(output_path: str = "docs/api.md"):
                     desc = field.description or "-"
                     desc = desc.replace("|", "\\|").replace("\n", " ")
 
-                    # Clean type hint for display
-                    th = field.type_hint.replace("typing.", "").replace("odibi.config.", "")
+                    # Cross Linking
+                    th_display = field.type_hint
+                    # Find all model names in the type hint and link them
+                    # Sort by length desc to replace longest first (avoid replacing substring)
+                    for target in sorted(list(model_names), key=len, reverse=True):
+                        pattern = r"\b" + re.escape(target) + r"\b"
+                        if re.search(pattern, th_display):
+                            th_display = re.sub(
+                                pattern, f"[{target}](#{target.lower()})", th_display
+                            )
 
-                    lines.append(f"| **{field.name}** | `{th}` | {req} | {default} | {desc} |")
+                    # Auto-expand aliases in description (to provide navigation)
+                    for alias, components in TYPE_ALIASES.items():
+                        if alias in field.type_hint:
+                            links = []
+                            for c in components:
+                                if c in model_names:
+                                    links.append(f"[{c}](#{c.lower()})")
+                                else:
+                                    links.append(c)
+
+                            if links:
+                                prefix = "<br>**Options:** " if desc != "-" else "**Options:** "
+                                if desc == "-":
+                                    desc = ""
+                                desc += f"{prefix}{', '.join(links)}"
+
+                    lines.append(
+                        f"| **{field.name}** | {th_display} | {req} | {default} | {desc} |"
+                    )
                 lines.append("")
 
             lines.append("---\n")
@@ -261,3 +534,11 @@ def generate_docs(output_path: str = "docs/api.md"):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Configuration Manual saved to {output_path}")
+
+
+if __name__ == "__main__":
+    # Ensure current directory is in path for imports
+    if str(Path.cwd()) not in sys.path:
+        sys.path.insert(0, str(Path.cwd()))
+
+    generate_docs()

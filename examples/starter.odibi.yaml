@@ -1,0 +1,44 @@
+project: odibi_starter_project
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./data/raw
+  delta_lake:
+    type: local
+    base_path: ./data/lake
+
+story:
+  connection: delta_lake
+  path: stories
+
+pipelines:
+  - pipeline: kitchen_sink_example
+    nodes:
+      - name: process_customers
+        read:
+          connection: raw_data
+          format: csv
+          path: customers.csv
+
+        transformer: deduplicate
+        params:
+          keys: ["customer_id"]
+          order_by: "customer_id"
+
+        transform:
+          steps:
+            - function: clean_text
+              params:
+                columns: ["email"]
+                case: "lower"
+            - sql: |
+                SELECT *,
+                first_name || ' ' || last_name as full_name
+                FROM df
+
+        write:
+          connection: delta_lake
+          format: delta
+          path: gold/customers
+          mode: overwrite

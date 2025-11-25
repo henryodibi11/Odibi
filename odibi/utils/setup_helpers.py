@@ -141,7 +141,7 @@ def fetch_keyvault_secrets_parallel(
 
     if not kv_connections:
         if verbose:
-            print("✓ No Key Vault connections to fetch")
+            print("- No Key Vault connections to fetch")
         return results
 
     if verbose:
@@ -168,16 +168,16 @@ def fetch_keyvault_secrets_parallel(
 
             if verbose:
                 if result.success:
-                    print(f"  ✓ {name}: {result.duration_ms:.0f}ms")
+                    print(f"  - {name}: {result.duration_ms:.0f}ms")
                 else:
-                    print(f"  ✗ {name}: {type(result.error).__name__}")
+                    print(f"  [X] {name}: {type(result.error).__name__}")
 
     total_duration = (time.time() - start_time) * 1000
 
     if verbose:
         success_count = sum(1 for r in results.values() if r.success)
         print(
-            f"✓ Completed in {total_duration:.0f}ms ({success_count}/{len(kv_connections)} successful)"
+            f"- Completed in {total_duration:.0f}ms ({success_count}/{len(kv_connections)} successful)"
         )
 
     return results
@@ -288,12 +288,11 @@ def validate_databricks_environment(verbose: bool = True) -> Dict[str, Any]:
         results["errors"].append(f"dbutils check failed: {e}")
 
     if verbose:
-        print("=== Databricks Environment Validation ===")
-        print(f"  Databricks Runtime: {'✓' if results['is_databricks'] else '✗'}")
+        print(f"  Databricks Runtime: {'[X]' if results['is_databricks'] else '[ ]'}")
         if results["runtime_version"]:
             print(f"  Runtime Version: {results['runtime_version']}")
-        print(f"  Spark Available: {'✓' if results['spark_available'] else '✗'}")
-        print(f"  dbutils Available: {'✓' if results['dbutils_available'] else '✗'}")
+        print(f"  Spark Available: {'[X]' if results['spark_available'] else '[ ]'}")
+        print(f"  dbutils Available: {'[X]' if results['dbutils_available'] else '[ ]'}")
 
         if results["errors"]:
             print("\n  Errors:")

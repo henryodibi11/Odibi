@@ -47,7 +47,7 @@ class TestReadConfig:
         """Valid config with query in options should parse correctly without table/path."""
         config = ReadConfig(
             connection="sql",
-            format="sql_server",
+            format="sql",
             options={"query": "SELECT * FROM users"},
         )
         assert config.table is None
@@ -285,7 +285,8 @@ class TestProjectConfig:
             story=StoryConfig(connection="local", path="stories/"),
         )
         assert "local" in config.connections
-        assert config.connections["local"]["type"] == "local"
+        # connections are models, so access with dot notation, not dict subscription
+        assert config.connections["local"].type.value == "local"
 
     def test_project_default_engine_is_pandas(self):
         """Default engine should be Pandas."""

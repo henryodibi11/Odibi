@@ -54,11 +54,21 @@ def run_command(args):
             for result in results.values():
                 if result.failed:
                     failed = True
+                    logger.error(f"Pipeline '{result.pipeline_name}' failed")
+                    for node_name in result.failed:
+                        node_res = result.node_results.get(node_name)
+                        if node_res and node_res.error:
+                            logger.error(f"Node '{node_name}' error: {node_res.error}")
                     break
         else:
             # Single pipeline
             if results.failed:
                 failed = True
+                logger.error(f"Pipeline '{results.pipeline_name}' failed")
+                for node_name in results.failed:
+                    node_res = results.node_results.get(node_name)
+                    if node_res and node_res.error:
+                        logger.error(f"Node '{node_name}' error: {node_res.error}")
 
         if failed:
             logger.error("Pipeline execution failed")

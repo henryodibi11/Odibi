@@ -41,7 +41,7 @@ class ConnectionError(OdibiException):
     def _format_error(self) -> str:
         """Format connection error with suggestions."""
         parts = [
-            f"✗ Connection validation failed: {self.connection_name}",
+            f"[X] Connection validation failed: {self.connection_name}",
             f"\n  Reason: {self.reason}",
         ]
 
@@ -63,10 +63,10 @@ class DependencyError(OdibiException):
 
     def _format_error(self) -> str:
         """Format dependency error."""
-        parts = [f"✗ Dependency error: {self.message}"]
+        parts = [f"[X] Dependency error: {self.message}"]
 
         if self.cycle:
-            parts.append("\n  Cycle detected: " + " → ".join(self.cycle))
+            parts.append("\n  Cycle detected: " + " -> ".join(self.cycle))
 
         return "".join(parts)
 
@@ -189,7 +189,7 @@ class NodeExecutionError(OdibiException):
 
     def _format_error(self) -> str:
         """Generate rich error message with context."""
-        parts = [f"✗ Node execution failed: {self.context.node_name}"]
+        parts = [f"[X] Node execution failed: {self.context.node_name}"]
 
         # Location info
         if self.context.config_file:
@@ -225,7 +225,7 @@ class NodeExecutionError(OdibiException):
         if self.context.previous_steps:
             parts.append("\n\n  Previous steps:")
             for step in self.context.previous_steps:
-                parts.append(f"\n    ✓ {step}")
+                parts.append(f"\n    - {step}")
 
         # Suggestions
         if self.suggestions:
@@ -256,8 +256,8 @@ class ValidationError(OdibiException):
 
     def _format_error(self) -> str:
         """Format validation error."""
-        parts = [f"✗ Validation failed for node: {self.node_name}"]
+        parts = [f"[X] Validation failed for node: {self.node_name}"]
         parts.append("\n\n  Failures:")
         for failure in self.failures:
-            parts.append(f"\n    • {failure}")
+            parts.append(f"\n    * {failure}")
         return "".join(parts)

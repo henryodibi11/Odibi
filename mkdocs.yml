@@ -38,21 +38,32 @@ nav:
   - Home: README.md
   - Tutorials:
       - Getting Started: docs/tutorials/getting_started.md
-      - Databricks Setup: docs/tutorials/databricks_setup.ipynb
   - Guides:
       - Writing Transformations: docs/guides/writing_transformations.md
       - Master CLI: docs/guides/cli_master_guide.md
+      - Python API Guide: docs/guides/python_api_guide.md
       - Production Deployment: docs/guides/production_deployment.md
+      - Environments: docs/guides/environments.md
+      - Secrets Management: docs/guides/secrets.md
+      - Azure Setup: docs/guides/setup_azure.md
+      - Performance Tuning: docs/guides/performance_tuning.md
       - WSL Setup: docs/guides/wsl_setup.md
   - Reference:
       - Cheatsheet: docs/reference/cheatsheet.md
-      - Configuration: docs/reference/configuration.md
+      - Configuration Guide: docs/reference/configuration.md
+      - YAML Schema: docs/reference/yaml_schema.md
       - Supported Formats: docs/reference/supported_formats.md
       - API:
         - Pipeline: docs/reference/api/pipeline.md
         - Engine: docs/reference/api/engine.md
         - Connections: docs/reference/api/connections.md
         - CLI: docs/reference/api/cli.md
+  - Patterns:
+      - Overview: docs/patterns/README.md
+      - Append-Only Raw: docs/patterns/append_only_raw.md
+      - High Water Mark: docs/patterns/hwm_pattern_guide.md
+      - Merge/Upsert: docs/patterns/merge_upsert.md
+      - Windowed Reprocess: docs/patterns/windowed_reprocess.md
   - Explanation:
       - Architecture: docs/explanation/architecture.md
       - Case Studies: docs/explanation/case_studies.md

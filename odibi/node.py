@@ -1,6 +1,7 @@
 """Node execution engine."""
 
 import time
+import inspect
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -464,7 +465,25 @@ class Node:
 
         # Execute
         try:
-            result = func(engine_ctx, current=input_df, **params)
+            param_model = FunctionRegistry.get_param_model(transformer_name)
+            if param_model:
+                # Pydantic-based Transformer
+                try:
+                    params_obj = param_model(**params)
+                except Exception as e:
+                    raise ValueError(f"Invalid parameters for '{transformer_name}': {e}")
+
+                # Check signature for 'current' injection (legacy support or mixed mode)
+                sig = inspect.signature(func)
+                call_kwargs = {}
+                if "current" in sig.parameters:
+                    call_kwargs["current"] = input_df
+
+                # Call with (context, params_obj)
+                result = func(engine_ctx, params_obj, **call_kwargs)
+            else:
+                # Legacy/Kwargs Transformer
+                result = func(engine_ctx, current=input_df, **params)
 
             # Capture SQL history
             if engine_ctx._sql_history:
@@ -473,6 +492,10 @@ class Node:
         except Exception as e:
             # Wrap error
             raise TransformError(f"Transformer '{transformer_name}' failed: {e}") from e
+
+        # Unwrap EngineContext if returned
+        if isinstance(result, EngineContext):
+            return result.df
 
         return result
 
@@ -568,16 +591,30 @@ class Node:
             sql_executor=self.engine.execute_sql,
         )
 
+        # Determine invocation strategy (Model vs kwargs)
+        param_model = FunctionRegistry.get_param_model(function_name)
+        call_kwargs = {}
+
         if "current" in sig.parameters:
-            # Inject current DataFrame
-            result = func(engine_ctx, current=current_df, **params)
+            call_kwargs["current"] = current_df
+
+        if param_model:
+            try:
+                params_obj = param_model(**params)
+            except Exception as e:
+                raise ValueError(f"Invalid parameters for '{function_name}': {e}")
+
+            result = func(engine_ctx, params_obj, **call_kwargs)
         else:
-            # Original behavior - context only
-            result = func(engine_ctx, **params)
+            result = func(engine_ctx, **params, **call_kwargs)
 
         # Capture new SQL queries executed during function call
         if engine_ctx._sql_history:
             self._executed_sql.extend(engine_ctx._sql_history)
+
+        # Unwrap EngineContext if returned
+        if isinstance(result, EngineContext):
+            return result.df
 
         return result
 

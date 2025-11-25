@@ -1,4 +1,5 @@
 from typing import Dict, List, Literal, Optional, Union
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +18,12 @@ class FilterRowsParams(BaseModel):
     ```yaml
     filter_rows:
       condition: "age > 18 AND status = 'active'"
+    ```
+
+    Example (Null Check):
+    ```yaml
+    filter_rows:
+      condition: "email IS NOT NULL AND email != ''"
     ```
     """
 
@@ -53,6 +60,8 @@ class DeriveColumnsParams(BaseModel):
         total_price: "quantity * unit_price"
         full_name: "concat(first_name, ' ', last_name)"
     ```
+
+    Note: Engine will fail if expressions reference non-existent columns.
     """
 
     # key: new_column_name, value: sql_expression
@@ -79,6 +88,19 @@ def derive_columns(context: EngineContext, params: DeriveColumnsParams) -> Engin
 # -------------------------------------------------------------------------
 
 
+class SimpleType(str, Enum):
+    INT = "int"
+    INTEGER = "integer"
+    STR = "str"
+    STRING = "string"
+    FLOAT = "float"
+    DOUBLE = "double"
+    BOOL = "bool"
+    BOOLEAN = "boolean"
+    DATE = "date"
+    TIMESTAMP = "timestamp"
+
+
 class CastColumnsParams(BaseModel):
     """
     Configuration for column type casting.
@@ -88,14 +110,16 @@ class CastColumnsParams(BaseModel):
     cast_columns:
       casts:
         age: "int"
-        salary: "double"
-        created_at: "timestamp"
+        salary: "DOUBLE"
+        created_at: "TIMESTAMP"
+        tags: "ARRAY<STRING>"  # Raw SQL types allowed
     ```
     """
 
     # key: column_name, value: target_type
-    # Supports simplified types (int, str, float, bool) or raw SQL types.
-    casts: Dict[str, str] = Field(..., description="Map of column to target SQL type")
+    casts: Dict[str, Union[SimpleType, str]] = Field(
+        ..., description="Map of column to target SQL type"
+    )
 
 
 def cast_columns(context: EngineContext, params: CastColumnsParams) -> EngineContext:
@@ -121,8 +145,14 @@ def cast_columns(context: EngineContext, params: CastColumnsParams) -> EngineCon
 
     for col in current_cols:
         if col in params.casts:
-            raw_type = params.casts[col].lower()
-            target_type = type_map.get(raw_type, params.casts[col])  # Fallback to raw if not in map
+            raw_type = params.casts[col]
+            # Handle Enum or str
+            if isinstance(raw_type, Enum):
+                raw_type_str = raw_type.value
+            else:
+                raw_type_str = str(raw_type)
+
+            target_type = type_map.get(raw_type_str.lower(), raw_type_str)
             projection.append(f"CAST({col} AS {target_type}) AS {col}")
         else:
             projection.append(col)
@@ -244,9 +274,15 @@ class NormalizeSchemaParams(BaseModel):
     ```
     """
 
-    rename: Optional[Dict[str, str]] = Field(default_factory=dict)
-    drop: Optional[List[str]] = Field(default_factory=list)
-    select_order: Optional[List[str]] = None
+    rename: Optional[Dict[str, str]] = Field(
+        default_factory=dict, description="old_name -> new_name"
+    )
+    drop: Optional[List[str]] = Field(
+        default_factory=list, description="Columns to remove; ignored if not present"
+    )
+    select_order: Optional[List[str]] = Field(
+        None, description="Final column order; any missing columns appended after"
+    )
 
 
 def normalize_schema(context: EngineContext, params: NormalizeSchemaParams) -> EngineContext:
@@ -663,6 +699,11 @@ def date_diff(context: EngineContext, params: DateDiffParams) -> EngineContext:
 # -------------------------------------------------------------------------
 
 
+class CaseWhenCase(BaseModel):
+    condition: str
+    value: str
+
+
 class CaseWhenParams(BaseModel):
     """
     Configuration for conditional logic.
@@ -681,7 +722,7 @@ class CaseWhenParams(BaseModel):
     """
 
     # List of (condition, value) tuples
-    cases: List[Dict[str, str]] = Field(..., description="List of {condition: ..., value: ...}")
+    cases: List[CaseWhenCase] = Field(..., description="List of conditional branches")
     default: str = Field("NULL", description="Default value if no condition met")
     output_col: str = Field(..., description="Name of the resulting column")
 
@@ -692,8 +733,8 @@ def case_when(context: EngineContext, params: CaseWhenParams) -> EngineContext:
     """
     when_clauses = []
     for case in params.cases:
-        condition = case.get("condition")
-        value = case.get("value")
+        condition = case.condition
+        value = case.value
         if condition and value:
             when_clauses.append(f"WHEN {condition} THEN {value}")
 

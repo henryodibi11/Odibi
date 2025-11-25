@@ -2,7 +2,7 @@
 
 import inspect
 from functools import wraps
-from typing import Any, Callable, Dict, Union
+from typing import Any, Callable, Dict, Union, Optional
 
 
 class FunctionRegistry:
@@ -53,6 +53,11 @@ class FunctionRegistry:
                 f"Transform function '{name}' not registered. Available functions: {available}"
             )
         return cls._functions[name]
+
+    @classmethod
+    def get_param_model(cls, name: str) -> Optional[Any]:
+        """Get the Pydantic model for a function's parameters."""
+        return cls._param_models.get(name)
 
     @classmethod
     def validate_params(cls, name: str, params: Dict[str, Any]) -> None:

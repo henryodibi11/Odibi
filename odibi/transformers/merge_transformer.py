@@ -1,10 +1,12 @@
 import logging
 import os
+from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 from odibi.context import EngineContext, PandasContext, SparkContext
 from odibi.registry import transform
-from pydantic import BaseModel, Field
-from typing import List, Dict, Optional
 
 try:
     from delta.tables import DeltaTable
@@ -14,27 +16,62 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class MergeStrategy(str, Enum):
+    UPSERT = "upsert"
+    APPEND_ONLY = "append_only"
+    DELETE_MATCH = "delete_match"
+
+
+class AuditColumnsConfig(BaseModel):
+    created_col: Optional[str] = Field(
+        default=None, description="Column to set only on first insert"
+    )
+    updated_col: Optional[str] = Field(default=None, description="Column to update on every merge")
+
+    @model_validator(mode="after")
+    def at_least_one(self):
+        if not self.created_col and not self.updated_col:
+            raise ValueError(
+                "Merge.audit_cols: specify at least one of 'created_col' or 'updated_col'."
+            )
+        return self
+
+
 class MergeParams(BaseModel):
     """
     Configuration for Merge transformer (Upsert/Append).
 
-    Example:
+    ### ⚖️ "GDPR & Compliance" Guide
+
+    **Business Problem:**
+    "A user exercised their 'Right to be Forgotten'. We need to remove them from our Silver tables immediately."
+
+    **The Solution:**
+    Use the `delete_match` strategy. The source dataframe contains the IDs to be deleted, and the transformer removes them from the target.
+
+    **Recipe: Right to be Forgotten**
     ```yaml
     transformer: "merge"
     params:
-      target: "silver/customers"
+      target: "silver.customers"
       keys: ["customer_id"]
-      strategy: "upsert"
-      audit_cols:
-        created_col: "created_at"
-        updated_col: "updated_at"
+
+      # The "Eraser" Mode
+      strategy: "delete_match"
     ```
+
+    **Other Strategies:**
+    *   **upsert** (Default): Update existing records, insert new ones.
+    *   **append_only**: Ignore duplicates, only insert new keys.
     """
 
     target: str = Field(..., description="Target table name or path")
     keys: List[str] = Field(..., description="List of join keys")
-    strategy: str = Field("upsert", description="'upsert', 'append_only', 'delete_match'")
-    audit_cols: Optional[Dict[str, str]] = Field(
+    strategy: MergeStrategy = Field(
+        default=MergeStrategy.UPSERT,
+        description="Merge behavior: 'upsert', 'append_only', 'delete_match'",
+    )
+    audit_cols: Optional[AuditColumnsConfig] = Field(
         None, description="{'created_col': '...', 'updated_col': '...'}"
     )
     optimize_write: bool = Field(False, description="Run OPTIMIZE after write (Spark)")
@@ -43,54 +80,44 @@ class MergeParams(BaseModel):
         None, description="Columns to Liquid Cluster by (Delta)"
     )
 
+    @field_validator("keys")
+    @classmethod
+    def check_keys(cls, v):
+        if not v:
+            raise ValueError("Merge: 'keys' must not be empty.")
+        return v
+
+    @model_validator(mode="after")
+    def check_strategy_and_audit(self):
+        if self.strategy == MergeStrategy.DELETE_MATCH and self.audit_cols:
+            raise ValueError("Merge: 'audit_cols' is not used with strategy='delete_match'.")
+        return self
+
 
 @transform("merge", category="transformer")
 def merge(context, current, **params):
     """
     Merge transformer implementation.
     Handles Upsert, Append-Only, and Delete-Match strategies.
-
-    Example:
-    ```yaml
-    transformer: "merge"
-    params:
-      target: "silver/customers"
-      keys: ["customer_id"]
-      strategy: "upsert"
-      audit_cols:
-        created_col: "created_at"
-        updated_col: "updated_at"
-    ```
-
-    Params:
-        target (str): Target table name or path.
-        keys (List[str]): List of join keys.
-        strategy (str): 'upsert' (default), 'append_only', 'delete_match'.
-        audit_cols (Dict): {'created_col': '...', 'updated_col': '...'}
     """
+    # Validate params using Pydantic model
+    # This ensures runtime behavior matches the "Cookbook" docs
+    merge_params = MergeParams(**params)
+
     # Unwrap EngineContext if present
     real_context = context
     if isinstance(context, EngineContext):
         real_context = context.context
 
-    target = params.get("target")
-    keys = params.get("keys")
-    strategy = params.get("strategy", "upsert")
-    audit_cols = params.get("audit_cols")
+    target = merge_params.target
+    keys = merge_params.keys
+    strategy = merge_params.strategy
+    audit_cols = merge_params.audit_cols
 
     # Optimization params
-    optimize_write = params.get("optimize_write", False)
-    zorder_by = params.get("zorder_by")
-
-    cluster_by = params.get("cluster_by")
-
-    if not target:
-        raise ValueError("Merge transformer requires 'target' parameter")
-    if not keys:
-        raise ValueError("Merge transformer requires 'keys' parameter")
-
-    if isinstance(keys, str):
-        keys = [keys]
+    optimize_write = merge_params.optimize_write
+    zorder_by = merge_params.zorder_by
+    cluster_by = merge_params.cluster_by
 
     if isinstance(real_context, SparkContext):
         return _merge_spark(
@@ -103,7 +130,7 @@ def merge(context, current, **params):
             optimize_write,
             zorder_by,
             cluster_by,
-            params,
+            params,  # pass raw params if needed by internal logic or refactor internal logic
         )
     elif isinstance(real_context, PandasContext):
         return _merge_pandas(real_context, current, target, keys, strategy, audit_cols, params)
@@ -133,8 +160,8 @@ def _merge_spark(
 
     # Add Audit Columns to Source
     if audit_cols:
-        created_col = audit_cols.get("created_col")
-        updated_col = audit_cols.get("updated_col")
+        created_col = audit_cols.created_col
+        updated_col = audit_cols.updated_col
 
         if updated_col:
             source_df = source_df.withColumn(updated_col, current_timestamp())
@@ -172,38 +199,17 @@ def _merge_spark(
             merger = delta_table.alias("target").merge(batch_df.alias("source"), condition)
 
             orig_auto_merge = None
-            if strategy == "upsert":
+            if strategy == MergeStrategy.UPSERT:
                 # Construct update map
                 update_expr = {}
                 for col_name in batch_df.columns:
                     # Skip created_col in update
-                    if audit_cols and audit_cols.get("created_col") == col_name:
+                    if audit_cols and audit_cols.created_col == col_name:
                         continue
 
                     # Note: When Delta Merge UPDATE SET uses column names from source that
                     # do NOT exist in target, it throws UNRESOLVED_EXPRESSION if schema evolution
                     # is not enabled or handled automatically by the merge operation for updates.
-                    # The merge operation usually handles schema evolution for INSERTs automatically
-                    # if configured, but for UPDATEs, the columns must exist or be handled.
-                    #
-                    # However, `delta-spark` merge should support schema evolution if enabled.
-                    # By default it might not.
-                    #
-                    # WORKAROUND:
-                    # We are trying to update `record_updated_at` (which is in source) into target
-                    # (where it doesn't exist yet).
-                    # Delta Merge Insert (whenNotMatchedInsertAll) will create the column in target
-                    # if schema evolution is ON.
-                    # But Update (whenMatchedUpdate) happens first or concurrently logic-wise.
-                    # If the column doesn't exist in target, we can't update it.
-                    #
-                    # To fix this for the "first run" where target lacks audit cols:
-                    # We should rely on Delta's schema evolution.
-                    #
-                    # But `whenMatchedUpdate(set=...)` requires keys to resolve in target.
-
-                    # If we use `whenMatchedUpdateAll()`, it might handle it if we enable evolution?
-                    # Let's try enabling schema evolution on the Spark session or the write.
 
                     update_expr[col_name] = f"source.{col_name}"
 
@@ -219,10 +225,10 @@ def _merge_spark(
                 merger = merger.whenMatchedUpdate(set=update_expr)
                 merger = merger.whenNotMatchedInsertAll()
 
-            elif strategy == "append_only":
+            elif strategy == MergeStrategy.APPEND_ONLY:
                 merger = merger.whenNotMatchedInsertAll()
 
-            elif strategy == "delete_match":
+            elif strategy == MergeStrategy.DELETE_MATCH:
                 merger = merger.whenMatchedDelete()
 
             try:
@@ -236,7 +242,7 @@ def _merge_spark(
 
         else:
             # Table does not exist
-            if strategy == "delete_match":
+            if strategy == MergeStrategy.DELETE_MATCH:
                 logger.warning(f"Target {target} does not exist. Delete match skipped.")
                 return
 
@@ -319,8 +325,8 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
     # Audit columns
     now = pd.Timestamp.now()
     if audit_cols:
-        created_col = audit_cols.get("created_col")
-        updated_col = audit_cols.get("updated_col")
+        created_col = audit_cols.created_col
+        updated_col = audit_cols.updated_col
 
         if updated_col:
             source_df[updated_col] = now
@@ -338,7 +344,7 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
             pass
 
     if target_df.empty:
-        if strategy == "delete_match":
+        if strategy == MergeStrategy.DELETE_MATCH:
             return source_df
 
         # Write source as initial
@@ -347,7 +353,7 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
         return source_df
 
     # Align schemas if needed (simple intersection?)
-    # For now assuming schema matches or pandas handles it (NaNs)
+    # For now, assuming schema matches or pandas handles it (NaNs)
 
     # Set index for update/difference
     # Ensure keys exist
@@ -358,14 +364,12 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
     target_df_indexed = target_df.set_index(keys)
     source_df_indexed = source_df.set_index(keys)
 
-    if strategy == "upsert":
+    if strategy == MergeStrategy.UPSERT:
         # Update existing
         # NOTE: We must ensure created_col is NOT updated if it already exists
-        if audit_cols and "created_col" in audit_cols:
-            created_col = audit_cols["created_col"]
+        if audit_cols and audit_cols.created_col:
+            created_col = audit_cols.created_col
             # Remove created_col from source update payload if present
-            # Pandas update() uses all columns in 'other' that match 'self'.
-            # So we need to pass a source_df_indexed WITHOUT created_col
             cols_to_update = [c for c in source_df_indexed.columns if c != created_col]
             target_df_indexed.update(source_df_indexed[cols_to_update])
         else:
@@ -376,13 +380,13 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
         if not new_indices.empty:
             target_df_indexed = pd.concat([target_df_indexed, source_df_indexed.loc[new_indices]])
 
-    elif strategy == "append_only":
+    elif strategy == MergeStrategy.APPEND_ONLY:
         # Only append new
         new_indices = source_df_indexed.index.difference(target_df_indexed.index)
         if not new_indices.empty:
             target_df_indexed = pd.concat([target_df_indexed, source_df_indexed.loc[new_indices]])
 
-    elif strategy == "delete_match":
+    elif strategy == MergeStrategy.DELETE_MATCH:
         # Drop indices present in source
         target_df_indexed = target_df_indexed.drop(source_df_indexed.index, errors="ignore")
 
