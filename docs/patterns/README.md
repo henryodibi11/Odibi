@@ -13,14 +13,14 @@ This directory contains documentation for common data pipeline patterns used in 
 
 ---
 
-### [2. High Water Mark (Incremental Load)](./hwm_pattern_guide.md)
+### [2. High Water Mark (Smart Read)](./smart_read.md)
 **Problem:** My source table has millions of rows. How do I efficiently read only new/changed data?
 
-**Pattern:** Track the maximum timestamp processed, then filter the source query to only rows newer than that mark. On first run, load full history; on subsequent runs, load only new/changed data.
+**Pattern:** Use the `incremental` configuration (Smart Read) to automatically filter the source query. Odibi manages the state for you: First Run = Full Load, Subsequent Runs = Incremental Load.
 
-**When to use:** When your source has timestamps (created_at, updated_at) and you want incremental reads. Essential for daily incremental loads, CDC pipelines, and cost-efficient large-table processing.
+**When to use:** When your source has timestamps (created_at, updated_at) and you want incremental reads. Essential for daily incremental loads.
 
-**See also:** [Complete HWM Pattern Guide](./hwm_pattern_guide.md) - comprehensive guide with setup, examples, troubleshooting, and migration path.
+**See also:** [Manual HWM Guide](./hwm_pattern_guide.md) - understanding the underlying SQL pattern.
 
 ---
 
@@ -33,7 +33,16 @@ This directory contains documentation for common data pipeline patterns used in 
 
 ---
 
-### [4. Windowed Reprocess (Gold Layer Aggregates)](./windowed_reprocess.md)
+### [4. SCD Type 2 (History Tracking)](./scd2.md)
+**Problem:** "I need to know what the address was *last month*, not just now."
+
+**Pattern:** Track full history. Old records are closed (valid_to set), new records are opened (valid_to NULL). Preserves point-in-time accuracy.
+
+**When to use:** Slowly Changing Dimensions (Customer address, Product category).
+
+---
+
+### [5. Windowed Reprocess (Gold Layer Aggregates)](./windowed_reprocess.md)
 **Problem:** Late-arriving data can break my aggregates. How do I fix them without double-counting?
 
 **Pattern:** Instead of patching aggregates with updates, recalculate the entire time window and overwrite that partition.
@@ -60,7 +69,9 @@ These patterns are built on the **Odibi Architecture Manifesto**:
 |---------|-------|--------|------------|-----------|
 | Append-Only Raw | Source | Raw | `append` | Yes (duplicates OK) |
 | High Water Mark | Source + Timestamp | Raw | `append` | Yes (filtered by timestamp) |
+| Smart Read | Source + Timestamp | Raw | `append` | Yes (auto-managed) |
 | Merge/Upsert | Raw (micro-batch) | Silver | `merge` | Yes (by key) |
+| SCD Type 2 | Raw (micro-batch) | Silver/Gold | `overwrite` | Yes (full history) |
 | Windowed Reprocess | Silver (window) | Gold | `overwrite` (partition) | Yes (recalculated) |
 
 ---

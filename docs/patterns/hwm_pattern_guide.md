@@ -1,5 +1,10 @@
 # High Water Mark (HWM) Pattern Guide
 
+> **🚀 Modern Pattern Available: Smart Read**
+>
+> While this guide explains the *concept* of HWM, Odibi now automates this pattern via the **Smart Read** feature.
+> We strongly recommend using [Smart Read](./smart_read.md) instead of manually writing the SQL queries described below.
+
 ## What Is HWM?
 
 A pattern for **incremental data loading**: load all data once on the first run, then load only new/changed data on each subsequent run.
@@ -20,7 +25,7 @@ nodes:
       connection: my_sql_server
       format: sql_server
       query: |
-        SELECT 
+        SELECT
           order_id,
           customer_id,
           amount,
@@ -28,14 +33,14 @@ nodes:
           updated_at
         FROM dbo.orders
         WHERE COALESCE(updated_at, created_at) >= DATEADD(DAY, -1, CAST(GETDATE() AS DATE))
-    
+
     write:
       connection: adls
       format: delta
       path: bronze/orders
       mode: append
       first_run_query: |
-        SELECT 
+        SELECT
           order_id,
           customer_id,
           amount,
@@ -156,7 +161,7 @@ nodes:
         SELECT order_id, customer_id, amount, created_at, updated_at
         FROM dbo.orders
         WHERE COALESCE(updated_at, created_at) >= DATEADD(DAY, -1, CAST(GETDATE() AS DATE))
-    
+
     write:
       connection: adls
       format: delta
