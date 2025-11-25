@@ -132,7 +132,7 @@ class TestSparkEngineTableExists:
         """Spark should detect catalog tables using spark.catalog.tableExists()."""
         mock_spark = Mock()
         mock_spark.catalog.tableExists.return_value = True
-        
+
         # Pass mock spark session directly
         engine = SparkEngine(connections={}, spark_session=mock_spark)
         result = engine.table_exists(Mock(), "schema.table_name")
@@ -144,7 +144,7 @@ class TestSparkEngineTableExists:
         """Spark should return False when catalog table doesn't exist."""
         mock_spark = Mock()
         mock_spark.catalog.tableExists.return_value = False
-        
+
         engine = SparkEngine(connections={}, spark_session=mock_spark)
         result = engine.table_exists(Mock(), "schema.table_name")
 
@@ -157,11 +157,11 @@ class TestSparkEngineTableExists:
         mock_delta_module = sys.modules["delta.tables"]
         mock_delta_table_cls = Mock()
         mock_delta_module.DeltaTable = mock_delta_table_cls
-        
+
         mock_spark = Mock()
         mock_spark.catalog.tableExists.return_value = False
         mock_delta_table_cls.isDeltaTable.return_value = True
-        
+
         mock_conn = Mock()
         mock_conn.get_path.return_value = "s3://bucket/path/to/delta"
 
@@ -177,13 +177,15 @@ class TestSparkEngineTableExists:
         mock_delta_module = sys.modules["delta.tables"]
         mock_delta_table_cls = Mock()
         mock_delta_module.DeltaTable = mock_delta_table_cls
-        
+
         mock_spark = Mock()
         mock_spark.catalog.tableExists.return_value = False
         mock_delta_table_cls.isDeltaTable.return_value = False
-        
+
         # Also fail the fallback FileSystem check
-        mock_spark.sparkContext._gateway.jvm.org.apache.hadoop.fs.FileSystem.get.side_effect = Exception("Fail")
+        mock_spark.sparkContext._gateway.jvm.org.apache.hadoop.fs.FileSystem.get.side_effect = (
+            Exception("Fail")
+        )
 
         mock_conn = Mock()
         mock_conn.get_path.return_value = "s3://bucket/path/to/nonexistent"
@@ -202,7 +204,7 @@ class TestPandasEngineTableExists:
         # Create a test file
         test_file = os.path.join(temp_dir, "test_file.csv")
         Path(test_file).touch()
-        
+
         mock_conn = Mock()
         mock_conn.get_path.return_value = test_file
 
@@ -214,7 +216,7 @@ class TestPandasEngineTableExists:
     def test_pandas_file_not_exists(self, temp_dir):
         """Pandas should return False for non-existent files."""
         test_file = os.path.join(temp_dir, "nonexistent_file.csv")
-        
+
         mock_conn = Mock()
         mock_conn.get_path.return_value = test_file
 
@@ -227,7 +229,7 @@ class TestPandasEngineTableExists:
         """Pandas should detect directories as existing."""
         subdir = os.path.join(temp_dir, "subdir")
         os.makedirs(subdir)
-        
+
         mock_conn = Mock()
         mock_conn.get_path.return_value = subdir
 
@@ -249,69 +251,48 @@ class TestNodeDetermineWriteMode:
         """Node should have _determine_write_mode method."""
         assert hasattr(Node, "_determine_write_mode")
 
-    def test_first_run_uses_overwrite_mode(
-        self, write_config_with_hwm, read_config
-    ):
+    def test_first_run_uses_overwrite_mode(self, write_config_with_hwm, read_config):
         """First run (table doesn't exist) should use OVERWRITE mode."""
         mock_engine = Mock()
         mock_engine.table_exists.return_value = False
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="test_node", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         mode = node._determine_write_mode()
 
         assert mode == WriteMode.OVERWRITE
         mock_engine.table_exists.assert_called_once()
 
-    def test_subsequent_run_uses_configured_mode(
-        self, write_config_with_hwm, read_config
-    ):
+    def test_subsequent_run_uses_configured_mode(self, write_config_with_hwm, read_config):
         """Subsequent run (table exists) should use configured mode (APPEND)."""
         mock_engine = Mock()
         mock_engine.table_exists.return_value = True
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="test_node", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         mode = node._determine_write_mode()
 
-        assert mode == None # Returns None to indicate "use configured mode"
+        assert mode == None  # Returns None to indicate "use configured mode"
 
-    def test_no_hwm_uses_configured_mode(
-        self, write_config_without_hwm, read_config
-    ):
+    def test_no_hwm_uses_configured_mode(self, write_config_without_hwm, read_config):
         """Without first_run_query, should always use configured mode."""
         mock_engine = Mock()
         mock_engine.table_exists.return_value = False
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="test_node", read=read_config, write=write_config_without_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         mode = node._determine_write_mode()
 
-        assert mode is None 
+        assert mode is None
 
 
 # ============================================================================
@@ -330,57 +311,45 @@ class TestNodeHWMFirstRunScenario:
         mock_engine = Mock()
         mock_engine.table_exists.return_value = False
         mock_engine.read.return_value = Mock()
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="test_node", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         # Simulate execution logic to verify override
         # In _execute_read(), Node calls _determine_write_mode logic logic
         # Actually _execute_read re-implements the check to override query.
-        
+
         node._execute_read()
-        
+
         # Verify engine.read called with first_run_query option
         call_args = mock_engine.read.call_args
         assert call_args is not None
-        options = call_args[1]['options']
-        assert options['query'] == "SELECT * FROM dbo.source_table"
+        options = call_args[1]["options"]
+        assert options["query"] == "SELECT * FROM dbo.source_table"
 
 
 class TestNodeHWMSubsequentRuns:
     """Tests for HWM behavior on subsequent runs."""
 
-    def test_subsequent_run_uses_normal_query(
-        self, write_config_with_hwm, read_config
-    ):
+    def test_subsequent_run_uses_normal_query(self, write_config_with_hwm, read_config):
         """Subsequent run should use normal query from ReadConfig."""
         mock_engine = Mock()
         mock_engine.table_exists.return_value = True
         mock_engine.read.return_value = Mock()
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="test_node", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         node._execute_read()
-        
+
         # Verify engine.read called with normal query
         call_args = mock_engine.read.call_args
-        options = call_args[1]['options']
-        assert options['query'] == read_config.options['query']
+        options = call_args[1]["options"]
+        assert options["query"] == read_config.options["query"]
 
 
 # ============================================================================
@@ -447,21 +416,16 @@ class TestHWMEdgeCases:
         mock_engine = Mock()
         # Table exists but is empty
         mock_engine.table_exists.return_value = True
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="test_node", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         # With table existing but empty, should still use normal query (APPEND mode)
         # Unless we implement logic to check for empty. Current logic assumes if exists -> append.
         mode = node._determine_write_mode()
-        assert mode == None # None means use configured mode (APPEND)
+        assert mode == None  # None means use configured mode (APPEND)
 
     def test_hwm_first_run_query_empty_string(self):
         """WriteConfig should handle empty string first_run_query."""
@@ -495,22 +459,15 @@ class TestHWMEdgeCases:
 class TestHWMModeOverride:
     """Tests for mode override behavior in HWM."""
 
-    def test_mode_override_on_first_run(
-        self, write_config_with_hwm, read_config
-    ):
+    def test_mode_override_on_first_run(self, write_config_with_hwm, read_config):
         """Mode should be overridden to OVERWRITE on first run."""
         mock_engine = Mock()
         mock_engine.table_exists.return_value = False
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="test_node", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         mode = node._determine_write_mode()
 
@@ -518,27 +475,20 @@ class TestHWMModeOverride:
         assert mode == WriteMode.OVERWRITE
         assert write_config_with_hwm.mode == WriteMode.APPEND  # Original config unchanged
 
-    def test_mode_not_overridden_on_subsequent_run(
-        self, write_config_with_hwm, read_config
-    ):
+    def test_mode_not_overridden_on_subsequent_run(self, write_config_with_hwm, read_config):
         """Mode should not be overridden on subsequent runs."""
         mock_engine = Mock()
         mock_engine.table_exists.return_value = True
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="test_node", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         mode = node._determine_write_mode()
 
         # Subsequent runs should use configured mode
-        assert mode is None # use configured
+        assert mode is None  # use configured
 
 
 # ============================================================================
@@ -553,16 +503,11 @@ class TestHWMIntegration:
         """Test complete HWM first-run scenario."""
         mock_engine = Mock()
         mock_engine.table_exists.return_value = False
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="orders_pipeline", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         # Verify HWM setup
         assert node.config.write.first_run_query is not None
@@ -572,17 +517,12 @@ class TestHWMIntegration:
         """Test complete HWM subsequent-run scenario."""
         mock_engine = Mock()
         mock_engine.table_exists.return_value = True
-        
+
         connections = {"test_conn": Mock()}
         config = NodeConfig(name="orders_pipeline", read=read_config, write=write_config_with_hwm)
 
-        node = Node(
-            config=config,
-            context=Mock(),
-            engine=mock_engine,
-            connections=connections
-        )
+        node = Node(config=config, context=Mock(), engine=mock_engine, connections=connections)
 
         # Verify HWM subsequent run behavior
         assert node.config.write.first_run_query is not None
-        assert node._determine_write_mode() == None # Configured mode
+        assert node._determine_write_mode() == None  # Configured mode

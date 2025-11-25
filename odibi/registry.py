@@ -174,6 +174,7 @@ def transform(name_or_func: Union[str, Callable] = None, **kwargs) -> Callable:
     Returns:
         The decorated function
     """
+
     def _register(func, name=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -194,6 +195,7 @@ def transform(name_or_func: Union[str, Callable] = None, **kwargs) -> Callable:
         # Called as @transform("name") or @transform(name="name")
         def decorator(func):
             return _register(func, name=name_or_func)
+
         return decorator
 
 

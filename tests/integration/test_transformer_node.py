@@ -5,7 +5,7 @@ from odibi.node import Node
 from odibi.config import NodeConfig
 from odibi.context import PandasContext
 from odibi.registry import FunctionRegistry
-import odibi.transformers.merge_transformer # Auto-register merge transformer
+import odibi.transformers.merge_transformer  # Auto-register merge transformer
 
 
 class TestTransformerNodeIntegration:
@@ -26,7 +26,7 @@ class TestTransformerNodeIntegration:
         mock_transformer = MagicMock(return_value=pd.DataFrame({"res": [1]}))
         # Mock name for registry
         mock_transformer.__name__ = "mock_test_transformer"
-        
+
         registry = FunctionRegistry
         registry.register(mock_transformer, name="mock_test_transformer")
 
@@ -75,11 +75,11 @@ class TestTransformerNodeIntegration:
         # Explicitly register merge for this test to ensure availability
         import odibi.transformers.merge_transformer as mt
         from odibi.registry import FunctionRegistry
-        
+
         # Force re-registration if needed, or just ensure it is registered
         # The import above should trigger decorator, but let's be explicit if previous tests messed it up
         if "merge" not in FunctionRegistry._functions:
-             FunctionRegistry.register(mt.merge, name="merge")
+            FunctionRegistry.register(mt.merge, name="merge")
 
         # This tests that 'merge' is registered and callable via Node
         # We don't need to mock it, but we will mock the internal pandas merge logic
