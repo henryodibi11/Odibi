@@ -108,6 +108,9 @@ Documentation = "https://github.com/henryodibi11/Odibi/tree/main/docs"
 Repository = "https://github.com/henryodibi11/Odibi"
 Issues = "https://github.com/henryodibi11/Odibi/issues"
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["odibi*"]

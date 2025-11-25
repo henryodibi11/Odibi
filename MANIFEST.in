@@ -1,0 +1,2 @@
+include odibi/story/templates/*.html
+recursive-include odibi/story/templates *.html
