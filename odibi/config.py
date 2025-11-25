@@ -478,6 +478,18 @@ class IncrementalConfig(BaseModel):
     * `fallback_column`: Optional backup (e.g. created_at)
     * `lookback`: Number of units
     * `unit`: Time unit (hour, day, etc.)
+
+    Example:
+    ```yaml
+    read:
+      connection: "postgres_db"
+      format: "sql"
+      table: "orders"
+      incremental:
+        column: "updated_at"
+        lookback: 3
+        unit: "day"
+    ```
     """
 
     column: str = Field(description="Primary column to filter on (e.g., updated_at)")

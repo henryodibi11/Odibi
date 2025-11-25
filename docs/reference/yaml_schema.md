@@ -570,6 +570,18 @@ Supports:
 * `lookback`: Number of units
 * `unit`: Time unit (hour, day, etc.)
 
+Example:
+```yaml
+read:
+  connection: "postgres_db"
+  format: "sql"
+  table: "orders"
+  incremental:
+    column: "updated_at"
+    lookback: 3
+    unit: "day"
+```
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **column** | str | Yes | - | Primary column to filter on (e.g., updated_at) |
