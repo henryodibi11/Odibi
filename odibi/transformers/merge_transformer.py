@@ -3,6 +3,8 @@ import os
 
 from odibi.context import EngineContext, PandasContext, SparkContext
 from odibi.registry import transform
+from pydantic import BaseModel, Field
+from typing import List, Dict, Optional
 
 try:
     from delta.tables import DeltaTable
@@ -10,6 +12,36 @@ except ImportError:
     DeltaTable = None
 
 logger = logging.getLogger(__name__)
+
+
+class MergeParams(BaseModel):
+    """
+    Configuration for Merge transformer (Upsert/Append).
+
+    Example:
+    ```yaml
+    transformer: "merge"
+    params:
+      target: "silver/customers"
+      keys: ["customer_id"]
+      strategy: "upsert"
+      audit_cols:
+        created_col: "created_at"
+        updated_col: "updated_at"
+    ```
+    """
+
+    target: str = Field(..., description="Target table name or path")
+    keys: List[str] = Field(..., description="List of join keys")
+    strategy: str = Field("upsert", description="'upsert', 'append_only', 'delete_match'")
+    audit_cols: Optional[Dict[str, str]] = Field(
+        None, description="{'created_col': '...', 'updated_col': '...'}"
+    )
+    optimize_write: bool = Field(False, description="Run OPTIMIZE after write (Spark)")
+    zorder_by: Optional[List[str]] = Field(None, description="Columns to Z-Order by")
+    cluster_by: Optional[List[str]] = Field(
+        None, description="Columns to Liquid Cluster by (Delta)"
+    )
 
 
 @transform("merge", category="transformer")
