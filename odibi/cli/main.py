@@ -9,6 +9,7 @@ from odibi.cli.run import run_command
 from odibi.cli.secrets import add_secrets_parser, secrets_command
 from odibi.cli.story import add_story_parser, story_command
 from odibi.cli.validate import validate_command
+from odibi.introspect import generate_docs
 from odibi.utils.telemetry import setup_telemetry
 
 
@@ -58,6 +59,9 @@ Examples:
     validate_parser = subparsers.add_parser("validate", help="Validate config")
     validate_parser.add_argument("config", help="Path to YAML config file")
 
+    # odibi docs
+    subparsers.add_parser("docs", help="Generate API documentation")
+
     # odibi graph
     graph_parser = subparsers.add_parser("graph", help="Visualize dependency graph")
     graph_parser.add_argument("config", help="Path to YAML config file")
@@ -92,6 +96,9 @@ Examples:
 
     if args.command == "run":
         return run_command(args)
+    elif args.command == "docs":
+        generate_docs()
+        return 0
     elif args.command == "validate":
         return validate_command(args)
     elif args.command == "graph":
