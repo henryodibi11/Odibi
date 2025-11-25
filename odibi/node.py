@@ -494,11 +494,18 @@ class Node:
                         # Note: PandasEngine now supports 'filter' as an alias for 'query' to unify this
                         options["filter"] = where_clause
 
+        # Determine table argument for engine.read
+        # If we generated a query for SQL/JDBC (e.g. incremental or HWM), we MUST NOT pass the table name
+        # because Spark JDBC reader throws error if both 'dbtable' and 'query' are present.
+        table_arg = read_config.table
+        if read_config.format in ["sql", "sql_server", "azure_sql"] and "query" in options:
+            table_arg = None
+
         # Delegate to engine-specific reader
         df = self.engine.read(
             connection=connection,
             format=read_config.format,
-            table=read_config.table,
+            table=table_arg,
             path=read_config.path,
             streaming=read_config.streaming,
             options=options,

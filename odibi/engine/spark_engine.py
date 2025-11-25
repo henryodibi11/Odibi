@@ -237,10 +237,13 @@ class SparkEngine(Engine):
             # Merge with user options (user options take precedence)
             merged_options = {**jdbc_options, **options}
 
-            if table:
+            # Prioritize 'query' option if present (e.g. from Incremental read)
+            if "query" in merged_options:
+                # If query is present, ensure dbtable is NOT present to avoid Spark error:
+                # "Both 'dbtable' and 'query' can not be specified at the same time."
+                merged_options.pop("dbtable", None)
+            elif table:
                 merged_options["dbtable"] = table
-            elif "query" in options:
-                merged_options["query"] = options["query"]
             elif "dbtable" not in merged_options:
                 raise ValueError("SQL format requires 'table' config or 'query' option")
 
