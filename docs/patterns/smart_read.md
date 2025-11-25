@@ -125,6 +125,30 @@ Perfect for pipelines that run every hour but want a 4-hour safety window for la
       mode: "append"
 ```
 
+### Advanced: Merging directly to Silver (Upsert)
+
+If you are bypassing Bronze and merging directly into a Silver table, you can use `upsert`.
+**Note:** This requires defining the primary `keys` to match on.
+
+```yaml
+    read:
+      connection: "crm_db"
+      format: "sql"
+      table: "customers"
+      incremental:
+        column: "last_modified"
+        lookback: 1
+        unit: "day"
+
+    write:
+      connection: "silver"
+      format: "delta"
+      table: "dim_customers"
+      mode: "upsert"
+      options:
+        keys: ["customer_id"]
+```
+
 ## Supported Units
 
 | Unit | Description |
