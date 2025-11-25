@@ -10,7 +10,15 @@ It eliminates the need to write complex SQL with `first_run_query` and dialect-s
     It determines whether to run a **Full Load** or **Incremental Load** by checking if the destination defined in `write` already exists.
 
     *   If you only want to read data (without writing), use the standard `query` option with explicit date filters instead.
-    *   Ensure your `write` mode is set correctly (e.g., `append` or `upsert`) to handle the incoming data.
+    *   Ensure your `write` mode is set correctly (usually `append`) to preserve history.
+
+## Write Modes for Incremental
+
+| Mode | Suitability | Why? |
+|---|---|---|
+| **`append`** | ✅ **Recommended** | Safely adds new records to the lake. Preserves history. |
+| **`upsert`** | ⚠️ **Advanced** | Use only if you are merging directly into a Silver layer table and have defined keys. |
+| **`overwrite`** | ❌ **Dangerous** | **Do NOT use.** This would replace your entire historical dataset with just the latest batch (e.g., the last 3 days). |
 
 ## How It Works
 
