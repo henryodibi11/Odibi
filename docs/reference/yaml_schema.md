@@ -1471,7 +1471,7 @@ SCD Type 2 tracks the full history of changes. Each record has an "effective win
 ```yaml
 transformer: "scd2"
 params:
-  # The "Time Machine" Configuration
+  target: "gold/customers"         # Path to existing history
   keys: ["customer_id"]            # How we identify the entity
   track_cols: ["address", "tier"]  # What changes we care about
   effective_time_col: "txn_date"   # When the change actually happened
@@ -1485,53 +1485,15 @@ params:
 3. **Close**: If changed, updates the old record's `end_time_col` to the new `effective_time_col`.
 4. **Insert**: Adds a new record with `effective_time_col` as start and open-ended end date.
 
-### 🔎 Visual Example
-
-**Input (Source Update):**
-*Customer 101 moved to NY on Feb 1st.*
-
-| customer_id | address | tier | txn_date   |
-|-------------|---------|------|------------|
-| 101         | NY      | Gold | 2024-02-01 |
-
-**Target Table (Before):**
-*Customer 101 lived in CA since Jan 1st.*
-
-| customer_id | address | tier | txn_date   | valid_to | is_active |
-|-------------|---------|------|------------|----------|-----------|
-| 101         | CA      | Gold | 2024-01-01 | NULL     | true      |
-
-**Target Table (After SCD2):**
-*Old record CLOSED (valid_to set). New record OPEN (is_active=true).*
-
-| customer_id | address | tier | txn_date   | valid_to   | is_active |
-|-------------|---------|------|------------|------------|-----------|
-| 101         | CA      | Gold | 2024-01-01 | 2024-02-01 | false     |
-| 101         | NY      | Gold | 2024-02-01 | NULL       | true      |
-
-**Matching YAML Configuration:**
-```yaml
-transformer: "scd2"
-params:
-  keys: ["customer_id"]
-  track_cols: ["address", "tier"]
-  effective_time_col: "txn_date"
-  end_time_col: "valid_to"
-  current_flag_col: "is_active"
-```
-
-**⚡ Automation Note:**
-You do **NOT** need to calculate `valid_to` or `is_active` in your input.
-The transformer automatically manages these columns based on changes in your `track_cols`.
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
+| **target** | str | Yes | - | Target table name or path containing history |
 | **keys** | List[str] | Yes | - | Natural keys to identify unique entities |
 | **track_cols** | List[str] | Yes | - | Columns to monitor for changes |
-| **effective_time_col** | Optional[str] | No | - | Source column indicating when the change occurred. If omitted, defaults to Current Timestamp (Processing Time). |
-| **end_time_col** | str | No | `end_date` | Name of the end timestamp column |
+| **effective_time_col** | str | Yes | - | Source column indicating when the change occurred. |
+| **end_time_col** | str | No | `valid_to` | Name of the end timestamp column |
 | **current_flag_col** | str | No | `is_current` | Name of the current record flag column |
 | **delete_col** | Optional[str] | No | - | Column indicating soft deletion (boolean) |
 

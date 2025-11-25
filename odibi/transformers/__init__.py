@@ -63,27 +63,8 @@ def register_standard_library():
         advanced.window_calculation, "window_calculation", advanced.WindowCalculationParams
     )
 
-    # SCD (Registered as params only for now as we don't have implementation)
-    # The user plan just says "New Transformer: SCD Type 2" with "SCD2Params".
-    # It seems like this is primarily for the schema.
-    # Since I don't have an actual function implementation for SCD2, I won't register a function.
-    # BUT, the plan says "New Transformer: SCD Type 2", implying I should probably expose it somehow.
-    # The prompt says "Implement the new fields... (e.g. SCD2Params transformer)".
-    # Usually transformers are high-level like 'merge'.
-    # If it's a transformer like 'merge', it's not in standard library but in `odibi.transformers`.
-    # I should check if I need to add it to introspect.py.
-    # The user just asked to "Implement the new fields... SCD2Params transformer".
-    # It doesn't explicitly ask for the implementation logic, just the schema/params.
-
-    # Wait, looking at the code:
-    # registry.register(func, name, params_model)
-    # If I don't have a function, I can't register it here.
-    # However, 'merge' is mentioned in NodeConfig comments as a 'transformer'.
-    # The user plan lists "SCD2Params" under "New Transformer".
-    # The goal is likely to have it show up in docs.
-
-    # Let's stick to just creating the file and adding it to __init__.py imports so introspect can find it.
-    # I will modify __init__.py to import scd so introspect.py sees it.
+    # SCD
+    registry.register(scd.scd2, "scd2", scd.SCD2Params)
 
 
 # Auto-register on import
