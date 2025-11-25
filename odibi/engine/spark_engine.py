@@ -223,7 +223,7 @@ class SparkEngine(Engine):
         options = options or {}
 
         # SQL Server / Azure SQL Support
-        if format in ["sql_server", "azure_sql"]:
+        if format in ["sql", "sql_server", "azure_sql"]:
             if streaming:
                 raise ValueError("Streaming not supported for SQL Server / Azure SQL yet.")
 
@@ -346,7 +346,7 @@ class SparkEngine(Engine):
         options = options or {}
 
         # SQL Server / Azure SQL Support
-        if format in ["sql_server", "azure_sql"]:
+        if format in ["sql", "sql_server", "azure_sql"]:
             # ... existing SQL logic ...
             if not hasattr(connection, "get_spark_options"):
                 raise ValueError(
