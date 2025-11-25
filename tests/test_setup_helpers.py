@@ -1,15 +1,17 @@
 """Tests for odibi.utils.setup_helpers (Phase 2C)."""
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
+
+from odibi.connections import AzureADLS
 from odibi.utils.setup_helpers import (
+    KeyVaultFetchResult,
+    configure_connections_parallel,
     fetch_keyvault_secret,
     fetch_keyvault_secrets_parallel,
-    configure_connections_parallel,
     validate_databricks_environment,
-    KeyVaultFetchResult,
 )
-from odibi.connections import AzureADLS
 
 
 class TestKeyVaultFetchResult:

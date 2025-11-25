@@ -1,9 +1,7 @@
 from odibi.registry import FunctionRegistry
 
 # Import all transform modules
-from odibi.transformers import sql_core
-from odibi.transformers import relational
-from odibi.transformers import advanced
+from odibi.transformers import advanced, relational, sql_core
 
 # List of all standard library modules
 _MODULES = [sql_core, relational, advanced]

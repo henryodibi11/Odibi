@@ -1,6 +1,7 @@
-import requests
-from pathlib import Path
 import time
+from pathlib import Path
+
+import requests
 
 DATA_DIR = Path(__file__).parent.parent / "data" / "raw"
 DATA_DIR.mkdir(parents=True, exist_ok=True)

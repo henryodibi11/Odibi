@@ -1,7 +1,8 @@
 import os
 import re
+from typing import Any, Dict
+
 import yaml
-from typing import Dict, Any
 
 # Pattern to match ${VAR} or ${env:VAR}
 # Captures the variable name in group 1

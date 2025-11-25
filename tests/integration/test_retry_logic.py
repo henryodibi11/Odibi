@@ -1,9 +1,11 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from odibi.config import NodeConfig, ReadConfig, RetryConfig
 from odibi.context import PandasContext
-from odibi.node import Node
 from odibi.exceptions import NodeExecutionError
+from odibi.node import Node
 
 
 class TestNodeRetry:

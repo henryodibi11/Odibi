@@ -5,9 +5,9 @@ Explanation Quality Linter
 Validates that explanations meet Odibi quality standards.
 """
 
-from typing import List
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
+from typing import List
 
 
 @dataclass

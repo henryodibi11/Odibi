@@ -5,8 +5,8 @@ Graph CLI Command
 Visualizes the pipeline dependency graph.
 """
 
-from odibi.pipeline import PipelineManager
 from odibi.graph import DependencyGraph
+from odibi.pipeline import PipelineManager
 
 
 def graph_command(args):

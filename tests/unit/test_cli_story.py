@@ -11,8 +11,9 @@ class TestGenerateCommand:
 
     def test_generate_command_help(self):
         """Should have generate command available."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -26,8 +27,9 @@ class TestGenerateCommand:
 
     def test_generate_command_with_output(self):
         """Should accept output parameter."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -41,8 +43,9 @@ class TestGenerateCommand:
 
     def test_generate_command_with_format(self):
         """Should accept format parameter."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -54,8 +57,9 @@ class TestGenerateCommand:
 
     def test_generate_command_no_validate_flag(self):
         """Should support --no-validate flag."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -67,8 +71,9 @@ class TestGenerateCommand:
 
     def test_generate_command_with_theme(self):
         """Should accept theme parameter."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -84,8 +89,9 @@ class TestDiffCommand:
 
     def test_diff_command_help(self):
         """Should have diff command available."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -100,8 +106,9 @@ class TestDiffCommand:
 
     def test_diff_command_detailed_flag(self):
         """Should support --detailed flag."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -163,8 +170,9 @@ class TestListCommand:
 
     def test_list_command_help(self):
         """Should have list command available."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -177,8 +185,9 @@ class TestListCommand:
 
     def test_list_command_with_directory(self):
         """Should accept directory parameter."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")
@@ -232,8 +241,9 @@ class TestStoryParserIntegration:
 
     def test_all_story_commands_registered(self):
         """Should register all story subcommands."""
-        from odibi.cli.story import add_story_parser
         import argparse
+
+        from odibi.cli.story import add_story_parser
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="command")

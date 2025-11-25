@@ -1,8 +1,8 @@
 """Function registry for transform functions."""
 
-from typing import Callable, Dict, Any, Union
 import inspect
 from functools import wraps
+from typing import Any, Callable, Dict, Union
 
 
 class FunctionRegistry:

@@ -1,7 +1,8 @@
-import pandas as pd
 import os
 import subprocess
 import sys
+
+import pandas as pd
 
 # Setup paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

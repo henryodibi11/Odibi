@@ -1,8 +1,8 @@
-import sys
 import os
+import sys
+
 import pytest
 import yaml
-from pathlib import Path
 
 sys.path.append(os.getcwd())
 

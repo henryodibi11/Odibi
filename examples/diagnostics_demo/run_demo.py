@@ -8,24 +8,26 @@ This script demonstrates how to use ODIBI's diagnostics API programmatically
 It simulates a "Day 1 vs Day 2" scenario where data and logic change.
 """
 
+import json
 import os
-import sys
 import shutil
+import sys
+
 import pandas as pd
 import yaml
-import json
 
 # Ensure we can import odibi
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from odibi.pipeline import PipelineManager
-from odibi.diagnostics.manager import HistoryManager
-from odibi.diagnostics.diff import diff_runs
-from odibi.diagnostics.delta import get_delta_diff
-from odibi.transformations.registry import get_registry
-
 # --- 1. Setup Environment ---
 import time
+
+from odibi.transformations.registry import get_registry
+
+from odibi.diagnostics.delta import get_delta_diff
+from odibi.diagnostics.diff import diff_runs
+from odibi.diagnostics.manager import HistoryManager
+from odibi.pipeline import PipelineManager
 
 timestamp = int(time.time())
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -326,8 +328,8 @@ delta_path = os.path.join(OUTPUT_DIR, "enriched_customers")
 # Try to initialize Spark for advanced diff
 spark = None
 try:
-    from pyspark.sql import SparkSession
     from delta import configure_spark_with_delta_pip
+    from pyspark.sql import SparkSession
 
     print("   [INFO] Initializing Spark for Deep Diagnostics...")
     builder = (

@@ -6,6 +6,7 @@ Commands for generating and managing pipeline documentation stories.
 """
 
 from pathlib import Path
+
 import yaml
 
 from odibi.config import ProjectConfig

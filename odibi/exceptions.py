@@ -1,6 +1,6 @@
 """Custom exceptions for ODIBI framework."""
 
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 
 class OdibiException(Exception):

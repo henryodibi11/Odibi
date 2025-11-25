@@ -3,8 +3,8 @@
 import pytest
 
 from odibi.config import NodeConfig, ReadConfig, TransformConfig
-from odibi.graph import DependencyGraph
 from odibi.exceptions import DependencyError
+from odibi.graph import DependencyGraph
 
 
 class TestDependencyGraph:

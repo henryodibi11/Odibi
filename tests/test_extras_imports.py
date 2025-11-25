@@ -23,6 +23,7 @@ def test_spark_engine_import_without_pyspark(monkeypatch):
 def test_spark_engine_import_with_pyspark():
     """SparkEngine should initialize when pyspark is available."""
     from unittest.mock import MagicMock
+
     from odibi.engine.spark_engine import SparkEngine
 
     # Mock SparkSession to avoid Java dependency
@@ -38,6 +39,7 @@ def test_spark_engine_methods_not_implemented():
     """SparkEngine methods should work for Phase 2A."""
     pytest.importorskip("pyspark")
     from unittest.mock import MagicMock
+
     from odibi.engine.spark_engine import SparkEngine
 
     # Mock SparkSession to avoid Java dependency

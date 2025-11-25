@@ -1,7 +1,8 @@
-import pytest
-from unittest.mock import MagicMock, patch
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Import PipelineManager - this is safe as it doesn't import AzureADLS at module level
 from odibi.pipeline import PipelineManager

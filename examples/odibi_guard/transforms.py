@@ -1,5 +1,7 @@
-import pandas as pd
 import re
+
+import pandas as pd
+
 from odibi.registry import transform
 
 # 192.168.1.1 - - [20/Nov/2025:19:27:50 +0000] "GET /index.html HTTP/1.1" 200 123 "-" "Mozilla/5.0"

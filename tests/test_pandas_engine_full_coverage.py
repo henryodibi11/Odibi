@@ -5,8 +5,8 @@ Uses monkeypatch to avoid heavy dependencies while testing all code paths.
 
 import builtins
 import io
-import types
 import sys
+import types
 from pathlib import Path
 from urllib.parse import urlparse
 

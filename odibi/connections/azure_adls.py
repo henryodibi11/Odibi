@@ -3,7 +3,8 @@
 import os
 import posixpath
 import warnings
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from .base import BaseConnection
 
 
@@ -140,9 +141,10 @@ class AzureADLS(BaseConnection):
 
         if self.auth_mode == "key_vault":
             try:
+                import concurrent.futures
+
                 from azure.identity import DefaultAzureCredential
                 from azure.keyvault.secrets import SecretClient
-                import concurrent.futures
             except ImportError as e:
                 raise ImportError(
                     "Key Vault authentication requires 'azure-identity' and 'azure-keyvault-secrets'. "

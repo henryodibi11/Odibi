@@ -6,10 +6,10 @@ Generates stakeholder-ready documentation from pipeline configurations.
 Automatically extracts explanations from registered operations.
 """
 
-from typing import Dict, Any, List, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from odibi.config import PipelineConfig, ProjectConfig, NodeConfig
+from odibi.config import NodeConfig, PipelineConfig, ProjectConfig
 from odibi.validation import ExplanationLinter
 
 

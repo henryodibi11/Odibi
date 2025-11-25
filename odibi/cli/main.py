@@ -1,13 +1,14 @@
 """Main CLI entry point."""
 
-import sys
 import argparse
-from odibi.cli.run import run_command
-from odibi.cli.validate import validate_command
-from odibi.cli.story import add_story_parser, story_command
+import sys
+
 from odibi.cli.graph import graph_command
-from odibi.cli.secrets import add_secrets_parser, secrets_command
 from odibi.cli.init_pipeline import add_init_parser, init_pipeline_command
+from odibi.cli.run import run_command
+from odibi.cli.secrets import add_secrets_parser, secrets_command
+from odibi.cli.story import add_story_parser, story_command
+from odibi.cli.validate import validate_command
 from odibi.utils.telemetry import setup_telemetry
 
 

@@ -1,7 +1,8 @@
 import json
-from odibi.utils.logging import StructuredLogger
-from io import StringIO
 import sys
+from io import StringIO
+
+from odibi.utils.logging import StructuredLogger
 
 
 class TestStructuredLogger:

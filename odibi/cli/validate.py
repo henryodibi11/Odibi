@@ -1,6 +1,7 @@
 """Validate command implementation."""
 
 import yaml
+
 from odibi.config import ProjectConfig
 
 

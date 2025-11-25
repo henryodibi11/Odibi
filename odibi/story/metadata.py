@@ -5,9 +5,9 @@ Story Metadata Tracking
 Tracks detailed metadata for pipeline execution stories.
 """
 
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 @dataclass

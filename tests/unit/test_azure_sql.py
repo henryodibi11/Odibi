@@ -1,8 +1,9 @@
 """Tests for Azure SQL connection."""
 
-import pytest
+from unittest.mock import MagicMock, Mock, patch
+
 import pandas as pd
-from unittest.mock import Mock, MagicMock, patch
+import pytest
 
 from odibi.connections.azure_sql import AzureSQL
 

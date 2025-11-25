@@ -5,10 +5,11 @@ Theme System
 Customizable themes for story rendering with branding support.
 """
 
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
-import yaml
 from pathlib import Path
+from typing import Any, Dict, Optional
+
+import yaml
 
 
 @dataclass

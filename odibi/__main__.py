@@ -1,7 +1,8 @@
 """Entry point for python -m odibi."""
 
-from odibi.cli.main import main
 import sys
+
+from odibi.cli.main import main
 
 if __name__ == "__main__":
     sys.exit(main())

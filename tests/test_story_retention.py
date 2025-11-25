@@ -1,4 +1,5 @@
 import pytest
+
 from odibi.story.generator import StoryGenerator
 
 

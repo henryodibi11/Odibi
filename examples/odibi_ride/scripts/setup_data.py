@@ -1,6 +1,7 @@
-import requests
 import argparse
 from pathlib import Path
+
+import requests
 
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"

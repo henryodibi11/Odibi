@@ -1,13 +1,14 @@
 """Story generator for pipeline execution documentation."""
 
-from typing import List, Dict, Any, Optional
+import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import yaml
-import subprocess
 
 from odibi.node import NodeResult
-from odibi.story.metadata import PipelineStoryMetadata, NodeExecutionMetadata, DeltaWriteInfo
+from odibi.story.metadata import DeltaWriteInfo, NodeExecutionMetadata, PipelineStoryMetadata
 from odibi.story.renderers import HTMLStoryRenderer, JSONStoryRenderer
 
 

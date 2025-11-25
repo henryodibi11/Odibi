@@ -1,6 +1,6 @@
 import json
-import sys
 import logging
+import sys
 from datetime import datetime
 
 

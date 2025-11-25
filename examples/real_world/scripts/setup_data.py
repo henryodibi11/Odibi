@@ -1,8 +1,9 @@
-import sys
-import requests
-import pandas as pd
-from pathlib import Path
 import argparse
+import sys
+from pathlib import Path
+
+import pandas as pd
+import requests
 import urllib3
 
 # Disable SSL warnings

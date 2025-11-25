@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from odibi.engine.spark_engine import SparkEngine
 from odibi.exceptions import TransformError
 

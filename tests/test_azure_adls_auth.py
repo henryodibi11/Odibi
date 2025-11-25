@@ -1,8 +1,9 @@
 """Tests for Azure ADLS authentication (Phase 2A - Mocked)."""
 
 import os
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from odibi.connections.azure_adls import AzureADLS
 

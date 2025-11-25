@@ -5,9 +5,9 @@ Story Renderers
 Renders pipeline stories in different output formats (HTML, Markdown, JSON).
 """
 
-from typing import Optional
-from pathlib import Path
 import json
+from pathlib import Path
+from typing import Optional
 
 from odibi.story.metadata import PipelineStoryMetadata
 

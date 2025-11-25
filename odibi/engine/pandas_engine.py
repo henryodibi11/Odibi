@@ -1,17 +1,17 @@
 """Pandas engine implementation."""
 
-from typing import Any, Dict, List, Optional, Union, Iterator
-import pandas as pd
-from pathlib import Path
-from urllib.parse import urlparse
 import glob
 import os
-from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional, Union
+from urllib.parse import urlparse
 
+import pandas as pd
 
-from odibi.engine.base import Engine
 from odibi.context import Context, PandasContext
+from odibi.engine.base import Engine
 from odibi.exceptions import TransformError
 
 
@@ -557,7 +557,7 @@ class PandasEngine(Engine):
     ) -> Dict[str, Any]:
         """Handle Delta Lake writing."""
         try:
-            from deltalake import write_deltalake, DeltaTable
+            from deltalake import DeltaTable, write_deltalake
         except ImportError:
             raise ImportError(
                 "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "

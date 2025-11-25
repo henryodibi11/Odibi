@@ -1,10 +1,11 @@
 """Tests for Delta Lake support in PandasEngine."""
 
-import pytest
-import pandas as pd
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
+
+import pandas as pd
+import pytest
 
 # Try to import delta dependencies
 try:
@@ -14,9 +15,8 @@ try:
 except ImportError:
     DELTA_AVAILABLE = False
 
-from odibi.engine.pandas_engine import PandasEngine
 from odibi.connections.local import LocalConnection
-
+from odibi.engine.pandas_engine import PandasEngine
 
 pytestmark = pytest.mark.skipif(
     not DELTA_AVAILABLE,

@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from odibi.engine.spark_engine import SparkEngine
 
 
@@ -259,15 +261,15 @@ class TestSparkEngineLogic:
 
     def test_pipeline_integration_logic(self, mock_spark_session, mock_spark_df):
         """Verify Pipeline orchestrator uses SparkEngine correctly."""
-        from odibi.pipeline import Pipeline
         from odibi.config import (
-            PipelineConfig,
             NodeConfig,
+            PipelineConfig,
             ReadConfig,
-            WriteConfig,
             TransformConfig,
             TransformStep,
+            WriteConfig,
         )
+        from odibi.pipeline import Pipeline
 
         # Ensure spark.table() returns a DataFrame-like object (for Context.get calls)
         mock_spark_session.table.return_value = mock_spark_df

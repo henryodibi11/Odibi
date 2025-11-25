@@ -5,7 +5,7 @@ ODIBI Diagnostics Module
 Tools for troubleshooting, lineage, and drift detection.
 """
 
-from .delta import get_delta_diff, detect_drift
+from .delta import detect_drift, get_delta_diff
 from .diff import diff_nodes, diff_runs
 from .manager import HistoryManager
 

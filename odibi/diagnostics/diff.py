@@ -5,8 +5,8 @@ ODIBI Diff Tools
 Compare nodes and runs to identify changes in logic, data, or performance.
 """
 
-from typing import Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 
 from odibi.story.metadata import NodeExecutionMetadata, PipelineStoryMetadata
 

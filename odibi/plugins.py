@@ -1,8 +1,8 @@
 """Plugin system for Odibi."""
 
-import sys
 import logging
-from typing import Dict, Any, Optional
+import sys
+from typing import Any, Dict, Optional
 
 if sys.version_info < (3, 10):
     from importlib_metadata import entry_points

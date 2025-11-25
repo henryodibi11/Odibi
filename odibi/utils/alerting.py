@@ -3,6 +3,7 @@
 import json
 import urllib.request
 from typing import Any, Dict
+
 from odibi.config import AlertConfig, AlertType
 from odibi.utils.logging import logger
 

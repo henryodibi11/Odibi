@@ -1,8 +1,9 @@
 """Run command implementation."""
 
-import sys
 import importlib.util
+import sys
 from pathlib import Path
+
 from odibi.pipeline import PipelineManager
 from odibi.utils.logging import logger
 

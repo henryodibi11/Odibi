@@ -3,9 +3,9 @@
 __version__ = "2.4.0"
 
 # Core components (available now)
-from odibi.registry import transform
-from odibi.context import Context
 import odibi.transformers  # noqa: F401 # Register built-in transformers
+from odibi.context import Context
+from odibi.registry import transform
 
 # Pipeline and other components will be imported when available
 __all__ = [

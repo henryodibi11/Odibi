@@ -5,8 +5,10 @@ Azure SQL Database Connection
 Provides connectivity to Azure SQL databases with authentication support.
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
+
 from odibi.connections.base import BaseConnection
 from odibi.exceptions import ConnectionError
 
@@ -165,8 +167,9 @@ class AzureSQL(BaseConnection):
             return self._engine
 
         try:
-            from sqlalchemy import create_engine
             from urllib.parse import quote_plus
+
+            from sqlalchemy import create_engine
         except ImportError:
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",

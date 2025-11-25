@@ -1,8 +1,10 @@
-import pandas as pd
 import os
-from odibi.pipeline import Pipeline
-from odibi.config import PipelineConfig, NodeConfig, ReadConfig, WriteConfig
+
+import pandas as pd
+
+from odibi.config import NodeConfig, PipelineConfig, ReadConfig, WriteConfig
 from odibi.connections import LocalConnection
+from odibi.pipeline import Pipeline
 
 # 1. Define a simple pipeline programmatically
 pipeline_config = PipelineConfig(

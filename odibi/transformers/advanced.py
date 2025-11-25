@@ -1,5 +1,7 @@
-from typing import List, Dict, Any, Optional, Literal
+from typing import Any, Dict, List, Literal, Optional
+
 from pydantic import BaseModel, Field
+
 from odibi.context import EngineContext
 from odibi.enums import EngineType
 
@@ -83,8 +85,9 @@ def dict_based_mapping(context: EngineContext, params: DictMappingParams) -> Eng
     target_col = params.output_column or params.column
 
     if context.engine_type == EngineType.SPARK:
-        import pyspark.sql.functions as F
         from itertools import chain
+
+        import pyspark.sql.functions as F
 
         # Create map expression
         mapping_expr = F.create_map([F.lit(x) for x in chain(*params.mapping.items())])

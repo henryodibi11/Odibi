@@ -1,8 +1,10 @@
 """Tests for CLI module (Phase 2.5)."""
 
-import pytest
 import sys
 from unittest.mock import Mock, patch
+
+import pytest
+
 from odibi.cli import main
 from odibi.cli.run import run_command
 from odibi.cli.validate import validate_command

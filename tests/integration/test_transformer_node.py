@@ -1,11 +1,13 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
 import pandas as pd
-from odibi.node import Node
+import pytest
+
+import odibi.transformers.merge_transformer  # noqa: F401 # Auto-register merge transformer
 from odibi.config import NodeConfig
 from odibi.context import PandasContext
+from odibi.node import Node
 from odibi.registry import FunctionRegistry
-import odibi.transformers.merge_transformer  # Auto-register merge transformer
 
 
 class TestTransformerNodeIntegration:

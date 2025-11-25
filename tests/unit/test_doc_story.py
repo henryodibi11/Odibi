@@ -1,9 +1,10 @@
 """Tests for documentation story generator."""
 
-import pytest
 from pathlib import Path
 
-from odibi.config import PipelineConfig, ProjectConfig, NodeConfig
+import pytest
+
+from odibi.config import NodeConfig, PipelineConfig, ProjectConfig
 from odibi.story.doc_story import DocStoryGenerator
 
 
@@ -44,7 +45,7 @@ def sample_pipeline_config():
 @pytest.fixture
 def sample_project_config():
     """Create sample project configuration."""
-    from odibi.config import StoryConfig, LocalConnectionConfig
+    from odibi.config import LocalConnectionConfig, StoryConfig
 
     return ProjectConfig(
         project="Test Project",

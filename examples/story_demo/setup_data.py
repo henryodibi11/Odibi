@@ -1,6 +1,7 @@
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 # Create data directory
 os.makedirs("examples/story_demo/data", exist_ok=True)

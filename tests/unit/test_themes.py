@@ -3,13 +3,13 @@
 import pytest
 
 from odibi.story.themes import (
+    CORPORATE_THEME,
+    DARK_THEME,
+    DEFAULT_THEME,
+    MINIMAL_THEME,
     StoryTheme,
     get_theme,
     list_themes,
-    DEFAULT_THEME,
-    CORPORATE_THEME,
-    DARK_THEME,
-    MINIMAL_THEME,
 )
 
 

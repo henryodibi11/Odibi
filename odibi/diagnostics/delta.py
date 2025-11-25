@@ -5,8 +5,8 @@ Delta Lake Diagnostics
 Tools for analyzing Delta Lake tables, history, and drift.
 """
 
-from typing import Any, Dict, Optional, List
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -250,8 +250,8 @@ def _get_delta_diff_pandas(
 ) -> DeltaDiffResult:
     """Pandas (deltalake) implementation of delta diff."""
     try:
-        from deltalake import DeltaTable
         import pandas as pd
+        from deltalake import DeltaTable
     except ImportError:
         raise ImportError("Delta Lake support requires 'deltalake' and 'pandas'")
 
@@ -289,7 +289,6 @@ def _get_delta_diff_pandas(
 
     # Optimization: Use pyarrow dataset scanner count if available
     try:
-
         rows_a = len(dt.to_pandas())  # Fallback for now
     except Exception:
         rows_a = 0

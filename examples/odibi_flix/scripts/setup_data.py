@@ -1,6 +1,7 @@
-import requests
 import gzip
 from pathlib import Path
+
+import requests
 
 BASE_URL = "https://datasets.imdbws.com"
 DATA_DIR = Path(__file__).parent.parent / "data" / "raw"

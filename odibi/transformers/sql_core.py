@@ -1,5 +1,7 @@
-from typing import List, Dict, Optional, Literal, Union
+from typing import Dict, List, Literal, Optional, Union
+
 from pydantic import BaseModel, Field
+
 from odibi.context import EngineContext
 
 # -------------------------------------------------------------------------
@@ -365,8 +367,9 @@ def split_part(context: EngineContext, params: SplitPartParams) -> EngineContext
     """
     Extracts the Nth part of a string after splitting by a delimiter.
     """
-    from odibi.enums import EngineType
     import re
+
+    from odibi.enums import EngineType
 
     if context.engine_type == EngineType.SPARK:
         # Spark: element_at(split(col, delimiter), index)

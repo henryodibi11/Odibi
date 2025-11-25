@@ -8,9 +8,10 @@ Reusable fixtures for testing pipelines and transformations.
 import shutil
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, Any, Dict, Optional
-import pandas as pd
+from typing import Any, Dict, Generator, Optional
+
 import numpy as np
+import pandas as pd
 
 
 @contextmanager

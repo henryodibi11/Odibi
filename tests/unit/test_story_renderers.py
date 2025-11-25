@@ -1,14 +1,15 @@
 """Tests for story renderers."""
 
-import pytest
 import json
 from pathlib import Path
+
+import pytest
 
 from odibi.story.metadata import NodeExecutionMetadata, PipelineStoryMetadata
 from odibi.story.renderers import (
     HTMLStoryRenderer,
-    MarkdownStoryRenderer,
     JSONStoryRenderer,
+    MarkdownStoryRenderer,
     get_renderer,
 )
 

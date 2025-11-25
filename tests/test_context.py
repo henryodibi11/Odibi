@@ -1,7 +1,7 @@
 """Tests for unified Context API."""
 
-import pytest
 import pandas as pd
+import pytest
 
 from odibi.context import PandasContext, create_context
 

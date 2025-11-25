@@ -4,7 +4,7 @@ import os
 import sys
 
 try:
-    from opentelemetry import trace, metrics
+    from opentelemetry import metrics, trace
     from opentelemetry.trace import Status, StatusCode
 
     AVAILABLE = True
@@ -99,10 +99,10 @@ def setup_telemetry(service_name: str = "odibi"):
         return
 
     try:
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
         from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         # Initialize Provider
         resource = Resource.create(attributes={"service.name": service_name})

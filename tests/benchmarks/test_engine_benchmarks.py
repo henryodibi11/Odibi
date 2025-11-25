@@ -1,15 +1,17 @@
-import pytest
 import time
 from pathlib import Path
+
+import pytest
+
 from odibi.engine.pandas_engine import PandasEngine
 
 # Try importing SparkEngine, but don't fail if missing
 try:
-    from odibi.engine.spark_engine import SparkEngine
-
     # Also check if pyspark is actually importable (SparkEngine might import it inside __init__ or methods,
     # but checking here just in case)
     import pyspark  # noqa: F401
+
+    from odibi.engine.spark_engine import SparkEngine
 
     SPARK_AVAILABLE = True
 except ImportError:

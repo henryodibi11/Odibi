@@ -1,8 +1,9 @@
-import pytest
-import pandas as pd
 import numpy as np
-from odibi.engine.pandas_engine import PandasEngine
+import pandas as pd
+import pytest
+
 from odibi.context import PandasContext
+from odibi.engine.pandas_engine import PandasEngine
 
 
 class TestPandasChunking:

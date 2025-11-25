@@ -3,9 +3,11 @@
 Status: Phase 2B implemented - Delta Lake read/write, VACUUM, history, restore
 """
 
-from typing import Any, Dict, List, Tuple, Optional
-from .base import Engine
+from typing import Any, Dict, List, Optional, Tuple
+
 from odibi.exceptions import TransformError
+
+from .base import Engine
 
 
 class SparkEngine(Engine):
@@ -270,10 +272,10 @@ class SparkEngine(Engine):
 
                 if "encoding" not in options:
                     try:
-                        from odibi.utils.encoding import detect_encoding
-
                         # Local import to avoid circular dependency if any
                         import logging
+
+                        from odibi.utils.encoding import detect_encoding
 
                         logger = logging.getLogger(__name__)
 
@@ -994,7 +996,7 @@ class SparkEngine(Engine):
         Returns:
             Dictionary of {column_name: null_percentage} (0.0 to 1.0)
         """
-        from pyspark.sql.functions import col, when, mean
+        from pyspark.sql.functions import col, mean, when
 
         # Build aggregation expression for all columns in one pass
         # mean(when(col.isNull, 1).otherwise(0))

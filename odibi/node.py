@@ -1,17 +1,18 @@
 """Node execution engine."""
 
-from typing import Any, Optional, Dict, List
-from datetime import datetime
 import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from odibi.config import NodeConfig, RetryConfig, WriteMode
 from odibi.context import Context, EngineContext
 from odibi.enums import EngineType
-from odibi.registry import FunctionRegistry
 
 # from odibi.transformations.registry import get_registry as get_transformation_registry  # Removed in cleanup
-from odibi.exceptions import NodeExecutionError, TransformError, ValidationError, ExecutionContext
+from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
+from odibi.registry import FunctionRegistry
 
 
 class NodeResult(BaseModel):
@@ -117,12 +118,12 @@ class Node:
             NodeResult with execution details
         """
         from odibi.utils.telemetry import (
-            tracer,
-            nodes_executed,
-            rows_processed,
-            node_duration,
             Status,
             StatusCode,
+            node_duration,
+            nodes_executed,
+            rows_processed,
+            tracer,
         )
 
         with tracer.start_as_current_span("node_execution") as span:
@@ -730,9 +731,9 @@ class Node:
         Returns:
             Metadata dictionary
         """
+        import getpass
         import hashlib
         import platform
-        import getpass
         import socket
         import sys
 

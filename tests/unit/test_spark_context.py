@@ -1,6 +1,8 @@
-import pytest
-from unittest.mock import MagicMock
 import threading
+from unittest.mock import MagicMock
+
+import pytest
+
 from odibi.context import SparkContext
 
 

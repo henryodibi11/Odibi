@@ -1,9 +1,10 @@
+import pandas as pd
 import pytest
+
 from odibi.config import NodeConfig, ReadConfig
 from odibi.context import PandasContext
-from odibi.node import Node
 from odibi.engine.pandas_engine import PandasEngine
-import pandas as pd
+from odibi.node import Node
 
 
 class TestPIIRedaction:

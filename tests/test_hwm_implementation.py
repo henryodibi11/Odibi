@@ -1,18 +1,18 @@
 """Comprehensive tests for HWM (High Water Mark) pattern implementation."""
 
-import pytest
-from unittest.mock import Mock, patch
-from pathlib import Path
-import tempfile
 import os
 import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import Mock, patch
 
-from odibi.config import NodeConfig, WriteConfig, WriteMode, ReadConfig
-from odibi.node import Node
+import pytest
+
+from odibi.config import NodeConfig, ReadConfig, WriteConfig, WriteMode
 from odibi.engine.base import Engine
-from odibi.engine.spark_engine import SparkEngine
 from odibi.engine.pandas_engine import PandasEngine
-
+from odibi.engine.spark_engine import SparkEngine
+from odibi.node import Node
 
 # ============================================================================
 # FIXTURES
@@ -278,7 +278,7 @@ class TestNodeDetermineWriteMode:
 
         mode = node._determine_write_mode()
 
-        assert mode == None  # Returns None to indicate "use configured mode"
+        assert mode is None  # Returns None to indicate "use configured mode"
 
     def test_no_hwm_uses_configured_mode(self, write_config_without_hwm, read_config):
         """Without first_run_query, should always use configured mode."""
@@ -425,7 +425,7 @@ class TestHWMEdgeCases:
         # With table existing but empty, should still use normal query (APPEND mode)
         # Unless we implement logic to check for empty. Current logic assumes if exists -> append.
         mode = node._determine_write_mode()
-        assert mode == None  # None means use configured mode (APPEND)
+        assert mode is None  # None means use configured mode (APPEND)
 
     def test_hwm_first_run_query_empty_string(self):
         """WriteConfig should handle empty string first_run_query."""
@@ -525,4 +525,4 @@ class TestHWMIntegration:
 
         # Verify HWM subsequent run behavior
         assert node.config.write.first_run_query is not None
-        assert node._determine_write_mode() == None  # Configured mode
+        assert node._determine_write_mode() is None  # Configured mode

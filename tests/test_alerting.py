@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+
 from odibi.config import AlertConfig, AlertType
 from odibi.pipeline import Pipeline
 from odibi.utils.alerting import send_alert

@@ -1,7 +1,7 @@
 """Dependency graph builder and analyzer."""
 
-from typing import List, Set, Dict, Optional
 from collections import defaultdict, deque
+from typing import Dict, List, Optional, Set
 
 from odibi.config import NodeConfig
 from odibi.exceptions import DependencyError
