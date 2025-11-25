@@ -38,6 +38,13 @@ class EngineContext:
             return self.df.columns
         return []
 
+    @property
+    def spark(self) -> Any:
+        """Helper to access SparkSession if available in context."""
+        if hasattr(self.context, "spark"):
+            return self.context.spark
+        return None
+
     def with_df(self, df: Any) -> "EngineContext":
         """Returns a new context with updated DataFrame."""
         new_ctx = EngineContext(self.context, df, self.engine_type, self.sql_executor)
