@@ -376,7 +376,7 @@ class AzureSQL(BaseConnection):
 
         options = {
             "url": jdbc_url,
-            # "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver", # Usually auto-detected or configured in Spark
+            "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
         }
 
         if self.auth_mode == "sql" or self.auth_mode == "key_vault":
