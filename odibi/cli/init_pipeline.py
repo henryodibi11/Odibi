@@ -1,571 +1,96 @@
 import os
-
-TEMPLATES = {
-    "kitchen-sink": {
-        "description": "Comprehensive reference with all features enabled (Pandas/Arrow)",
-        "structure": {
-            "data/source": {},
-            "data/delta_tables": {},
-            "data/gold": {},
-            "odibi_stories": {},
-        },
-        "config": """# =============================================================================
-# ODIBI "ULTIMATE CHEATSHEET" & MASTER REFERENCE (v2.4.0)
-# =============================================================================
-# Welcome! This file controls your data pipeline.
-# It is designed to be BOTH a "Zero to Hero" guide for beginners AND
-# a comprehensive reference for advanced users.
-#
-# KEY CONCEPTS:
-# 1. PIPELINE: A series of steps (like an assembly line).
-# 2. NODE: A single step in that line (e.g., "Read", "Transform", "Save").
-# 3. CONNECTION: A saved "address book" for where data lives.
-# 4. OPERATION: A pre-built tool to modify data (like a "function").
-#
-# HOW TO USE THIS FILE:
-# - Lines starting with '#' are comments.
-# - Copy sections you need, delete the rest.
-# - See the "STANDARD LIBRARY REFERENCE" at the bottom for all available operations.
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# 1. PROJECT SETTINGS
-# -----------------------------------------------------------------------------
-project: {project_name}
-version: "2.4.0"
-description: "The ultimate reference pipeline"
-owner: "Data Engineering Team"
-
-# -----------------------------------------------------------------------------
-# 2. THE ENGINE
-# -----------------------------------------------------------------------------
-# 'pandas': Fast, runs on laptop, good for <10GB files ("Sports Car").
-# 'spark':  Powerful, runs on clusters, good for TBs ("Freight Train").
-engine: pandas
-
-# Performance Tuning
-performance:
-  # 'Arrow' makes reading files 2x faster and uses 50% less RAM.
-  use_arrow: true
-
-# Retry Policy (Resilience)
-retry:
-  enabled: true
-  max_attempts: 3
-  backoff: exponential  # 1s, 2s, 4s...
-
-# Logging
-logging:
-  level: INFO
-  structured: false     # Set 'true' for JSON logs (Splunk/Datadog)
-  metadata: {env: "dev"}
-
-# -----------------------------------------------------------------------------
-# 3. CONNECTIONS (The Address Book)
-# -----------------------------------------------------------------------------
-connections:
-
-  # A. Local Filesystem
-  local_fs:
-    type: local
-    base_path: ./data
-
-  # B. Delta Lake (Time Travel enabled storage)
-  delta_lake:
-    type: delta
-    path: ./data/delta_tables
-
-  # C. Azure Data Lake Storage Gen2 (ADLS)
-  # azure_data:
-  #   type: azure_blob
-  #   account_name: ${AZURE_STORAGE_ACCOUNT}
-  #   container: analytics
-  #   # Auth: Managed Identity is automatic. Explicit keys below:
-  #   # auth:
-  #   #   account_key: ${AZURE_STORAGE_KEY}
-  #   #   sas_token: ${AZURE_SAS_TOKEN}
-
-  # D. SQL Server / Azure SQL
-  # sql_db:
-  #   type: sql_server
-  #   host: ${DB_HOST}
-  #   port: 1433
-  #   database: warehouse
-  #   auth:
-  #     username: ${DB_USER}
-  #     password: ${DB_PASS}
-
-  # E. HTTP / API (Web Data)
-  # web_api:
-  #   type: http
-  #   base_url: "https://api.example.com"
-  #   headers: {Authorization: "Bearer ${API_TOKEN}"}
-
-# -----------------------------------------------------------------------------
-# 4. THE PIPELINE (Complex Example)
-# -----------------------------------------------------------------------------
-pipelines:
-  - pipeline: master_demo
-    description: "Demonstrates reading, transforming, merging, and validating"
-    layer: silver
-
-    nodes:
-      # -----------------------------------------------------------------------
-      # NODE 1: Ingest Raw Data
-      # -----------------------------------------------------------------------
-      - name: read_customers
-        description: "Read CSV with specific options"
-        read:
-          connection: local_fs
-          path: source/customers.csv
-          format: csv
-          options: {header: true, sep: ","}
-        on_error: fail_fast
-
-      # -----------------------------------------------------------------------
-      # NODE 2: Transform & Clean
-      # -----------------------------------------------------------------------
-      - name: clean_customers
-        depends_on: [read_customers]
-
-        transform:
-          steps:
-            # 1. SQL Transformation (Flexible)
-            - sql: |
-                SELECT
-                  id,
-                  email,
-                  first_name,
-                  last_name,
-                  country,
-                  signup_date,
-                  amount
-                FROM read_customers
-                WHERE id IS NOT NULL
-
-            # 2. Standard Library: Clean Text
-            - operation: sql_core.clean_text
-              params:
-                columns: ["first_name", "last_name", "country"]
-                case: "upper"   # JOHN -> JOHN
-                trim: true      # " John " -> "John"
-
-            # 3. Standard Library: Validate & Flag (Data Quality)
-            - operation: advanced.validate_and_flag
-              params:
-                flag_col: "dq_issues"
-                rules:
-                  valid_email: "email LIKE '%@%'"
-                  positive_amt: "amount >= 0"
-
-            # 4. Standard Library: Deduplicate
-            - operation: advanced.deduplicate
-              params:
-                keys: ["email"]
-                order_by: "signup_date DESC" # Keep most recent
-
-        # Privacy: Hide PII in logs
-        sensitive: [email, first_name, last_name]
-
-      # -----------------------------------------------------------------------
-      # NODE 3: Merge (Upsert) to Delta
-      # -----------------------------------------------------------------------
-      - name: upsert_customers
-        depends_on: [clean_customers]
-
-        # "MERGE" strategy: Update existing IDs, Insert new ones.
-        # This uses a top-level transformer logic.
-        transformer: merge
-        params:
-          target: data/delta_tables/silver/customers
-          keys: ["id"]
-          strategy: upsert
-
-          # Audit Columns (History tracking)
-          audit_cols:
-            created_col: "row_created_at"
-            updated_col: "row_updated_at"
-
-      # -----------------------------------------------------------------------
-      # NODE 4: Aggregate & Validate
-      # -----------------------------------------------------------------------
-      - name: country_stats
-        depends_on: [upsert_customers]
-
-        transform:
-          steps:
-            - operation: relational.aggregate
-              params:
-                group_by: ["country"]
-                aggregations:
-                  amount: sum
-                  id: count
-
-        write:
-          connection: local_fs
-          path: gold/country_stats.parquet
-          format: parquet
-          mode: overwrite
-
-        # Pipeline Validation Gates
-        validation:
-          not_empty: true
-          no_nulls: [country]
-          ranges: {amount: {min: 0}}
-
-# -----------------------------------------------------------------------------
-# 5. OBSERVABILITY
-# -----------------------------------------------------------------------------
-story:
-  connection: local_fs
-  path: odibi_stories/
-  auto_generate: true
-  max_sample_rows: 20
-  retention_days: 30
-  # Tracks schema changes, row counts, and data lineage visually.
-
-# =============================================================================
-# STANDARD LIBRARY REFERENCE (v2.4.0)
-# =============================================================================
-# Below is the complete list of available transformers.
-# Copy-paste these into your 'transform: steps:' section as needed.
-# =============================================================================
-
-# --- SQL CORE (odibi.transformers.sql_core) ---
-
-# - operation: sql_core.filter_rows
-#   params: { condition: "age > 18 AND status = 'active'" }
-
-# - operation: sql_core.derive_columns
-#   params: { derivations: { full_name: "first_name || ' ' || last_name" } }
-
-# - operation: sql_core.cast_columns
-#   params: { casts: { id: "int", price: "float", active: "bool" } }
-
-# - operation: sql_core.clean_text
-#   params: { columns: ["city"], case: "upper", trim: true }
-
-# - operation: sql_core.extract_date_parts
-#   params: { source_col: "timestamp", parts: ["year", "month", "day"] }
-
-# - operation: sql_core.normalize_schema
-#   params: { rename: {old: new}, drop: [bad_col], select_order: [col1, col2] }
-
-# - operation: sql_core.sort
-#   params: { by: ["date"], ascending: false }
-
-# - operation: sql_core.limit
-#   params: { n: 100 }
-
-# - operation: sql_core.distinct
-#   params: { columns: ["category"] } # Optional: specific columns
-
-# - operation: sql_core.fill_nulls
-#   params: { values: { amount: 0.0, category: "Unknown" } }
-
-# - operation: sql_core.split_part
-#   params: { col: "email", delimiter: "@", index: 1 }
-
-# - operation: sql_core.date_add
-#   params: { col: "start_date", value: 1, unit: "day" }
-
-# - operation: sql_core.date_diff
-#   params: { start_col: "start", end_col: "end", unit: "day" }
-
-# - operation: sql_core.case_when
-#   params:
-#     output_col: "segment"
-#     cases: [{condition: "age < 18", value: "'Minor'"}, {condition: "age >= 18", value: "'Adult'"}]
-#     default: "'Unknown'"
-
-# - operation: sql_core.convert_timezone
-#   params: { col: "ts", source_tz: "UTC", target_tz: "America/New_York" }
-
-# - operation: sql_core.concat_columns
-#   params: { columns: ["addr", "city"], separator: ", ", output_col: "full_address" }
-
-
-# --- ADVANCED (odibi.transformers.advanced) ---
-
-# - operation: advanced.deduplicate
-#   params: { keys: ["id"], order_by: "updated_at DESC" }
-
-# - operation: advanced.validate_and_flag
-#   params: { rules: {is_positive: "amt > 0"}, flag_col: "issues" }
-
-# - operation: advanced.explode_list_column
-#   params: { column: "items", outer: true }
-
-# - operation: advanced.regex_replace
-#   params: { column: "text", pattern: "[0-9]+", replacement: "#" }
-
-# - operation: advanced.hash_columns
-#   params: { columns: ["email"], algorithm: "sha256" } # Anonymization
-
-# - operation: advanced.generate_surrogate_key
-#   params: { columns: ["customer_id", "region_id"], output_col: "row_key" }
-
-# - operation: advanced.parse_json
-#   params: { column: "json_str", json_schema: "id INT, name STRING" }
-
-# - operation: advanced.window_calculation
-#   params: { target_col: "running_total", function: "sum(amt)", partition_by: ["user"], order_by: "date" }
-
-
-# --- RELATIONAL (odibi.transformers.relational) ---
-
-# - operation: relational.join
-#   params: { right_dataset: "other_node", on: "id", how: "left", prefix: "other" }
-
-# - operation: relational.union
-#   params: { datasets: ["node_a", "node_b"], by_name: true }
-
-# - operation: relational.pivot
-#   params: { group_by: ["region"], pivot_col: "category", agg_col: "sales", agg_func: "sum" }
-
-# - operation: relational.unpivot
-#   params: { id_cols: ["id"], value_vars: ["q1", "q2"], var_name: "quarter", value_name: "sales" }
-
-# - operation: relational.aggregate
-#   params: { group_by: ["region"], aggregations: { sales: "sum", id: "count" } }
-""",
-    },
-    "local-medallion": {
-        "description": "Pandas + Local Parquet/Delta Medallion Architecture",
-        "structure": {
-            "data/landing": {},
-            "data/raw": {},
-            "data/silver": {},
-            "data/gold": {},
-            "stories": {},
-        },
-        "config": """
-project: {project_name}
-engine: pandas
-
-# Performance Tuning (Added in v2.2)
-performance:
-  use_arrow: true
-
-connections:
-  local_lake:
-    type: local
-    base_path: ./data
-
-story:
-  connection: local_lake
-  path: ../stories/
-
-pipelines:
-  - pipeline: ingestion
-    description: Ingest data from landing to raw
-    layer: bronze
-    nodes:
-      - name: ingest_customers
-        description: Ingest customers CSV to Parquet
-        read:
-          connection: local_lake
-          path: landing/customers.csv
-          format: csv
-        write:
-          connection: local_lake
-          path: raw/customers.parquet
-          format: parquet
-          mode: overwrite
-
-  - pipeline: refinement
-    description: Clean and upsert to Silver
-    layer: silver
-    nodes:
-      - name: clean_customers
-        description: Deduplicate and merge customers
-        read:
-          connection: local_lake
-          path: raw/customers.parquet
-          format: parquet
-        transformer: merge
-        params:
-          target: data/silver/customers.delta
-          keys: ["id"]
-          strategy: upsert
-          # Performance Optimization (Added in v2.2)
-          # optimize_write: true
-          # zorder_by: ["region"] # Only for Spark engine
-""",
-    },
-    "azure-delta": {
-        "description": "Spark + Azure Data Lake Storage + Delta Lake",
-        "structure": {
-            "stories": {},
-        },
-        "config": """
-project: {project_name}
-engine: spark
-
-# Performance Tuning (Added in v2.2)
-performance:
-  use_arrow: true
-
-connections:
-  # Example ADLS connection (requires env vars)
-  adls_primary:
-    type: azure_blob
-    account_name: ${AZURE_STORAGE_ACCOUNT}
-    container: data
-    auth:
-      sas_token: ${AZURE_SAS_TOKEN}
-
-  # Spark Delta Catalog
-  delta_catalog:
-    type: delta
-    catalog: spark_catalog
-    schema: default
-
-story:
-  connection: delta_catalog
-  path: /stories/
-
-pipelines:
-  - pipeline: raw_ingestion
-    description: Ingest raw data
-    layer: bronze
-    nodes:
-      - name: json_to_delta
-        read:
-          connection: adls_primary
-          path: landing/events/
-          format: json
-        write:
-          connection: delta_catalog
-          table: raw_events
-          format: delta
-          mode: append
-          options:
-            optimize_write: true  # Compaction
-            # cluster_by: [event_type] # Liquid Clustering (if creating new table)
-
-  - pipeline: aggregation
-    description: Aggregate events
-    layer: gold
-    nodes:
-      - name: daily_summary
-        read:
-          connection: delta_catalog
-          table: raw_events
-          format: delta
-        transform:
-          steps:
-            - sql: |
-                SELECT 
-                  date(timestamp) as event_date, 
-                  count(*) as event_count
-                FROM table
-                GROUP BY 1
-        write:
-          connection: delta_catalog
-          table: daily_stats
-          format: delta
-          mode: overwrite
-""",
-    },
-    "reference-lite": {
-        "description": "Minimal example for quick testing",
-        "structure": {
-            "output": {},
-            "stories": {},
-        },
-        "config": """
-project: {project_name}
-engine: pandas
-
-connections:
-  local:
-    type: local
-    base_path: .
-
-story:
-  connection: local
-  path: stories/
-
-pipelines:
-  - pipeline: minimal
-    nodes:
-      - name: hello_world
-        transform:
-          steps:
-            - sql: "SELECT 'Hello' as message, 1 as id"
-        write:
-          connection: local
-          path: output/hello.csv
-          format: csv
-          mode: overwrite
-""",
-    },
+import shutil
+import logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Map template names to their relative paths in the repo
+TEMPLATE_MAP = {
+    "kitchen": "examples/templates/kitchen_sink.odibi.yaml",
+    "full": "examples/templates/template_full.yaml",
+    "local": "examples/templates/simple_local.yaml",
+    "local-medallion": "examples/templates/simple_local.yaml",
+    "azure": "examples/templates/azure_spark.yaml",
 }
 
 
-def add_init_pipeline_parser(subparsers):
-    """Add parser for init-pipeline command."""
+def add_init_parser(subparsers):
+    """Add arguments for init-pipeline command."""
     parser = subparsers.add_parser(
-        "init-pipeline", help="Initialize a new pipeline project from a template"
+        "init-pipeline",
+        aliases=["create", "init"],
+        help="Initialize a new Odibi project from a template",
     )
-    parser.add_argument("name", help="Name of the project/directory")
+    parser.add_argument("name", help="Name of the project directory to create")
     parser.add_argument(
         "--template",
-        choices=TEMPLATES.keys(),
-        default="local-medallion",
-        help="Project template to use",
+        choices=list(TEMPLATE_MAP.keys()),
+        default="local",
+        help="Template to use (default: local)",
     )
+    # Add --force to overwrite existing directory
     parser.add_argument(
         "--force", action="store_true", help="Overwrite existing directory if it exists"
     )
 
 
 def init_pipeline_command(args):
-    """Execute init-pipeline command."""
+    """Execute the init-pipeline command."""
     project_name = args.name
     template_name = args.template
-    template = TEMPLATES[template_name]
+    force = args.force
 
-    print(f"Initializing project '{project_name}' using template '{template_name}'...")
+    # 1. Determine Target Path
+    target_dir = Path(os.getcwd()) / project_name
 
-    if os.path.exists(project_name) and not args.force:
-        print(f"Error: Directory '{project_name}' already exists. Use --force to overwrite.")
+    if target_dir.exists():
+        if not force:
+            logger.error(f"Directory '{project_name}' already exists. Use --force to overwrite.")
+            return 1
+        else:
+            logger.warning(f"Overwriting existing directory '{project_name}'...")
+            shutil.rmtree(target_dir)
+
+    # 2. Find Template File
+    # Assuming we are running from within the installed package or repo
+    # Try to find the repo root relative to this file
+    # This file is in odibi/cli/init_pipeline.py
+    # Repo root is ../../../
+
+    current_file = Path(__file__).resolve()
+    repo_root = current_file.parent.parent.parent
+
+    template_rel_path = TEMPLATE_MAP[template_name]
+    source_path = repo_root / template_rel_path
+
+    if not source_path.exists():
+        # Fallback: check if we are installed and templates are packaged (not likely in this env but good practice)
+        # For now, just fail if not found in repo structure
+        logger.error(f"Template file not found at: {source_path}")
+        logger.error(
+            "Ensure you are running Odibi from the repository root or templates are correctly installed."
+        )
         return 1
 
-    if not os.path.exists(project_name):
-        os.makedirs(project_name)
+    # 3. Create Project Structure
+    try:
+        os.makedirs(target_dir)
 
-    # Create directory structure
-    for path in template["structure"]:
-        full_path = os.path.join(project_name, path)
-        os.makedirs(full_path, exist_ok=True)
+        # Copy the template to odibi.yaml
+        target_file = target_dir / "odibi.yaml"
+        shutil.copy2(source_path, target_file)
 
-    # Create odibi.yaml
-    config_content = template["config"].strip().format(project_name=project_name)
-    with open(os.path.join(project_name, "odibi.yaml"), "w") as f:
-        f.write(config_content)
+        # Create standard directories
+        os.makedirs(target_dir / "data", exist_ok=True)
+        os.makedirs(target_dir / "logs", exist_ok=True)
 
-    # Create README
-    with open(os.path.join(project_name, "README.md"), "w") as f:
-        f.write(f"# {project_name}\n\n")
-        f.write(f"Generated with Odibi template: {template_name}\n")
-        f.write(f"{template['description']}\n\n")
-        f.write("## Usage\n\n")
-        f.write("Run the pipeline:\n")
-        f.write("```bash\n")
-        f.write("odibi run odibi.yaml\n")
-        f.write("```\n")
+        logger.info(f"Created new project '{project_name}' using '{template_name}' template.")
+        logger.info(f"Location: {target_dir}")
+        logger.info(f"Next step: cd {project_name} && odibi run odibi.yaml")
 
-    # Create .gitignore
-    with open(os.path.join(project_name, ".gitignore"), "w") as f:
-        f.write("__pycache__/\n")
-        f.write("*.pyc\n")
-        f.write(".env\n")
-        f.write("data/\n")
-        f.write("stories/\n")
-        f.write("output/\n")
+        return 0
 
-    print(f"Project '{project_name}' created successfully!")
-    print(f"\nNext steps:\n  cd {project_name}\n  odibi run odibi.yaml")
-    return 0
+    except Exception as e:
+        logger.error(f"Failed to create project: {str(e)}")
+        return 1

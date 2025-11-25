@@ -4,7 +4,8 @@ import pandas as pd
 from odibi.node import Node
 from odibi.config import NodeConfig
 from odibi.context import PandasContext
-from odibi.transformations.registry import get_registry
+from odibi.registry import FunctionRegistry
+import odibi.transformers.merge_transformer # Auto-register merge transformer
 
 
 class TestTransformerNodeIntegration:
@@ -23,8 +24,11 @@ class TestTransformerNodeIntegration:
     def test_node_calls_transformer(self, context, engine, connections):
         # Register a mock transformer
         mock_transformer = MagicMock(return_value=pd.DataFrame({"res": [1]}))
-        registry = get_registry()
-        registry.register("mock_test_transformer", mock_transformer, version="1.0.0")
+        # Mock name for registry
+        mock_transformer.__name__ = "mock_test_transformer"
+        
+        registry = FunctionRegistry
+        registry.register(mock_transformer, name="mock_test_transformer")
 
         # Create Node Config
         config = NodeConfig(
@@ -64,9 +68,19 @@ class TestTransformerNodeIntegration:
         assert call_args[1]["foo"] == "bar"
 
         # Cleanup
-        registry.unregister("mock_test_transformer")
+        if "mock_test_transformer" in registry._functions:
+            del registry._functions["mock_test_transformer"]
 
     def test_node_calls_merge_transformer(self, context, engine, connections):
+        # Explicitly register merge for this test to ensure availability
+        import odibi.transformers.merge_transformer as mt
+        from odibi.registry import FunctionRegistry
+        
+        # Force re-registration if needed, or just ensure it is registered
+        # The import above should trigger decorator, but let's be explicit if previous tests messed it up
+        if "merge" not in FunctionRegistry._functions:
+             FunctionRegistry.register(mt.merge, name="merge")
+
         # This tests that 'merge' is registered and callable via Node
         # We don't need to mock it, but we will mock the internal pandas merge logic
         # by mocking _merge_pandas via patch if we wanted strict isolation,

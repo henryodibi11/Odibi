@@ -406,19 +406,19 @@
       }
     },
     "alert_test": {
-      "last_run": "2025-11-24T14:05:10.213640",
+      "last_run": "2025-11-25T00:24:35.666471",
       "nodes": {}
     },
     "parallel_test": {
-      "last_run": "2025-11-24T14:05:12.893188",
+      "last_run": "2025-11-25T00:24:37.850216",
       "nodes": {
-        "node_b": {
-          "success": true,
-          "timestamp": "2025-11-24T14:05:12.889566"
-        },
         "node_a": {
           "success": false,
           "timestamp": null
+        },
+        "node_b": {
+          "success": true,
+          "timestamp": "2025-11-25T00:24:37.850216"
         },
         "node_c": {
           "success": false,
@@ -427,46 +427,46 @@
       }
     },
     "test_read": {
-      "last_run": "2025-11-24T14:05:12.914368",
+      "last_run": "2025-11-25T00:24:37.879616",
       "nodes": {
         "load_data": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:12.913372"
+          "timestamp": "2025-11-25T00:24:37.878592"
         }
       }
     },
     "test_deps": {
-      "last_run": "2025-11-24T14:05:13.036454",
+      "last_run": "2025-11-25T00:24:37.961073",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:13.032450"
+          "timestamp": "2025-11-25T00:24:37.945446"
         },
         "transform": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:13.035454"
+          "timestamp": "2025-11-25T00:24:37.961073"
         }
       }
     },
     "test_write": {
-      "last_run": "2025-11-24T14:05:13.165347",
+      "last_run": "2025-11-25T00:24:38.056229",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:13.157832"
+          "timestamp": "2025-11-25T00:24:38.040361"
         },
         "save": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:13.164347"
+          "timestamp": "2025-11-25T00:24:38.056229"
         }
       }
     },
     "test_failure": {
-      "last_run": "2025-11-24T14:05:13.275414",
+      "last_run": "2025-11-25T00:24:38.127874",
       "nodes": {
         "load": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:13.274415"
+          "timestamp": "2025-11-25T00:24:38.127874"
         },
         "fail": {
           "success": false,
@@ -479,11 +479,11 @@
       }
     },
     "test_independent": {
-      "last_run": "2025-11-24T14:05:13.383926",
+      "last_run": "2025-11-25T00:24:38.215383",
       "nodes": {
         "success1": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:13.376313"
+          "timestamp": "2025-11-25T00:24:38.215383"
         },
         "fail": {
           "success": false,
@@ -491,20 +491,20 @@
         },
         "success2": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:13.381953"
+          "timestamp": "2025-11-25T00:24:38.215383"
         }
       }
     },
     "test_spark": {
-      "last_run": "2025-11-24T14:05:43.043187",
+      "last_run": "2025-11-25T00:25:08.314773",
       "nodes": {
         "node1": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:43.037709"
+          "timestamp": "2025-11-25T00:25:08.314773"
         },
         "node2": {
           "success": true,
-          "timestamp": "2025-11-24T14:05:43.042183"
+          "timestamp": "2025-11-25T00:25:08.314773"
         }
       }
     },
@@ -565,27 +565,36 @@
       }
     },
     "customer_360": {
-      "last_run": "2025-11-24T12:29:44.503260",
+      "last_run": "2025-11-24T16:23:35.746973",
       "nodes": {
         "load_customers": {
           "success": true,
-          "timestamp": "2025-11-24T12:29:43.919861"
+          "timestamp": "2025-11-24T16:23:35.618524"
         },
         "load_transactions": {
           "success": true,
-          "timestamp": "2025-11-24T12:29:44.009153"
+          "timestamp": "2025-11-24T16:23:35.652522"
         },
         "enrich_data": {
           "success": true,
-          "timestamp": "2025-11-24T12:29:44.418183"
+          "timestamp": "2025-11-24T16:23:35.708887"
         },
         "join_data": {
           "success": true,
-          "timestamp": "2025-11-24T12:29:44.418183"
+          "timestamp": "2025-11-24T16:23:35.711885"
         },
         "summarize_stats": {
           "success": true,
-          "timestamp": "2025-11-24T12:29:44.503260"
+          "timestamp": "2025-11-24T16:23:35.745973"
+        }
+      }
+    },
+    "ingest_orders": {
+      "last_run": "2025-11-24T23:58:32.933319",
+      "nodes": {
+        "load_orders": {
+          "success": false,
+          "timestamp": null
         }
       }
     }

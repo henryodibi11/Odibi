@@ -119,3 +119,7 @@ examples/diagnostics_demo/output/
 examples/diagnostics_demo/output_*/
 examples/diagnostics_demo/stories_*/
 
+# Odibi Internal
+.odibi/
+spark_catalog.*.stories/
+

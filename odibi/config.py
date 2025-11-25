@@ -145,7 +145,17 @@ class ReadConfig(BaseModel):
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based sources")
     streaming: bool = Field(default=False, description="Enable streaming read (Spark only)")
+    query: Optional[str] = Field(default=None, description="SQL query (shortcut for options.query)")
     options: Dict[str, Any] = Field(default_factory=dict, description="Format-specific options")
+
+    @model_validator(mode="after")
+    def move_query_to_options(self):
+        """Move top-level query to options."""
+        if self.query:
+            if "query" in self.options and self.options["query"] != self.query:
+                raise ValueError("Cannot specify 'query' in both top-level and options")
+            self.options["query"] = self.query
+        return self
 
     @model_validator(mode="after")
     def check_table_or_path(self):
@@ -213,6 +223,14 @@ class WriteConfig(BaseModel):
         default=None, description="Register file output as external table (Spark/Delta only)"
     )
     mode: WriteMode = Field(default=WriteMode.OVERWRITE, description="Write mode")
+    first_run_query: Optional[str] = Field(
+        default=None,
+        description=(
+            "SQL query for full-load on first run (High Water Mark pattern). "
+            "If set, uses this query when target table doesn't exist, then switches to incremental. "
+            "Only applies to SQL reads."
+        ),
+    )
     options: Dict[str, Any] = Field(default_factory=dict, description="Format-specific options")
 
     @model_validator(mode="after")

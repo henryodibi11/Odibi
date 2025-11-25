@@ -210,3 +210,19 @@ class Engine(ABC):
             Dictionary of {column_name: null_percentage} (0.0 to 1.0)
         """
         return {}
+
+    @abstractmethod
+    def table_exists(
+        self, connection: Any, table: Optional[str] = None, path: Optional[str] = None
+    ) -> bool:
+        """Check if table or location exists.
+
+        Args:
+            connection: Connection object
+            table: Table name (for catalog tables)
+            path: File path (for path-based tables)
+
+        Returns:
+            True if table/location exists, False otherwise
+        """
+        pass

@@ -4,17 +4,10 @@ import sys
 import argparse
 from odibi.cli.run import run_command
 from odibi.cli.validate import validate_command
-from odibi.cli.doctor import doctor_command
 from odibi.cli.story import add_story_parser, story_command
 from odibi.cli.graph import graph_command
 from odibi.cli.secrets import add_secrets_parser, secrets_command
-from odibi.cli.generate_project import add_generate_project_parser, generate_project_command
-from odibi.cli.stress import add_stress_parser, run_stress_test
-from odibi.cli.schema import schema_command
-from odibi.cli.ide import add_ide_parser, init_vscode_command
-from odibi.cli.create import add_create_parser, create_command
-from odibi.cli.init_pipeline import add_init_pipeline_parser, init_pipeline_command
-from odibi.cli.diagnostics import add_diagnostics_parser, diagnostics_command
+from odibi.cli.init_pipeline import add_init_parser, init_pipeline_command
 from odibi.utils.telemetry import setup_telemetry
 
 
@@ -30,7 +23,6 @@ def main():
 Examples:
   odibi run config.yaml                    Run a pipeline
   odibi validate config.yaml               Validate configuration
-  odibi doctor config.yaml                 Diagnose configuration issues
   odibi graph config.yaml                  Visualize dependencies
   odibi story generate config.yaml        Generate documentation
   odibi story diff run1.json run2.json    Compare two runs
@@ -65,10 +57,6 @@ Examples:
     validate_parser = subparsers.add_parser("validate", help="Validate config")
     validate_parser.add_argument("config", help="Path to YAML config file")
 
-    # odibi doctor
-    doctor_parser = subparsers.add_parser("doctor", help="Diagnose config issues")
-    doctor_parser.add_argument("config", help="Path to YAML config file")
-
     # odibi graph
     graph_parser = subparsers.add_parser("graph", help="Visualize dependency graph")
     graph_parser.add_argument("config", help="Path to YAML config file")
@@ -87,26 +75,8 @@ Examples:
     # odibi secrets
     add_secrets_parser(subparsers)
 
-    # odibi generate-project
-    add_generate_project_parser(subparsers)
-
-    # odibi stress
-    add_stress_parser(subparsers)
-
-    # odibi schema
-    subparsers.add_parser("schema", help="Generate JSON schema for VS Code")
-
-    # odibi init-vscode
-    add_ide_parser(subparsers)
-
-    # odibi create
-    add_create_parser(subparsers)
-
-    # odibi init-pipeline
-    add_init_pipeline_parser(subparsers)
-
-    # odibi diagnostics
-    add_diagnostics_parser(subparsers)
+    # odibi init-pipeline (create/init)
+    add_init_parser(subparsers)
 
     args = parser.parse_args()
 
@@ -123,28 +93,14 @@ Examples:
         return run_command(args)
     elif args.command == "validate":
         return validate_command(args)
-    elif args.command == "doctor":
-        return doctor_command(args)
     elif args.command == "graph":
         return graph_command(args)
     elif args.command == "story":
         return story_command(args)
     elif args.command == "secrets":
         return secrets_command(args)
-    elif args.command == "generate-project":
-        return generate_project_command(args)
-    elif args.command == "stress":
-        return run_stress_test(args)
-    elif args.command == "schema":
-        return schema_command(args)
-    elif args.command == "init-vscode":
-        return init_vscode_command(args)
-    elif args.command == "create":
-        return create_command(args)
-    elif args.command == "init-pipeline":
+    elif args.command in ["init-pipeline", "create", "init"]:
         return init_pipeline_command(args)
-    elif args.command == "diagnostics":
-        return diagnostics_command(args)
     else:
         parser.print_help()
         return 1

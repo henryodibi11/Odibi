@@ -1,7 +1,7 @@
 import logging
 import os
 
-from odibi.transformations import transformation
+from odibi.registry import transform
 from odibi.context import SparkContext, PandasContext, EngineContext
 
 try:
@@ -12,7 +12,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-@transformation("merge", category="transformer")
+@transform("merge", category="transformer")
 def merge(context, current, **params):
     """
     Merge transformer implementation.

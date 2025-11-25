@@ -10,7 +10,6 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 from odibi.config import PipelineConfig, ProjectConfig, NodeConfig
-from odibi.transformations import get_registry
 from odibi.validation import ExplanationLinter
 
 
@@ -39,7 +38,7 @@ class DocStoryGenerator:
         """
         self.pipeline_config = pipeline_config
         self.project_config = project_config
-        self.registry = get_registry()
+        self.registry = None  # Registry logic removed/deprecated in cleanup
         self.linter = ExplanationLinter()
 
     def generate(

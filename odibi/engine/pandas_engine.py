@@ -20,12 +20,18 @@ class PandasEngine(Engine):
 
     name = "pandas"
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        connections: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None,
+    ):
         """Initialize Pandas engine.
 
         Args:
+            connections: Dictionary of connection objects
             config: Engine configuration (optional)
         """
+        self.connections = connections or {}
         self.config = config or {}
         # Check for performance flags
         performance = self.config.get("performance", {})
@@ -55,6 +61,28 @@ class PandasEngine(Engine):
                 self.use_arrow = False
         else:
             self.use_arrow = False
+
+    def _process_df(
+        self, df: Union[pd.DataFrame, Iterator[pd.DataFrame]], query: Optional[str]
+    ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
+        """Apply post-read processing (filtering)."""
+        if query and df is not None:
+            # Handle Iterator
+            from collections.abc import Iterator
+
+            if isinstance(df, Iterator):
+                # Filter each chunk
+                return (chunk.query(query) for chunk in df)
+
+            if not df.empty:
+                try:
+                    return df.query(query)
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to apply query '{query}': {e}")
+        return df
 
     def _merge_storage_options(
         self, connection: Any, options: Optional[Dict[str, Any]] = None
@@ -186,6 +214,10 @@ class PandasEngine(Engine):
 
         # Prepare read options
         read_kwargs = merged_options.copy()
+
+        # Extract 'query' option for post-read filtering (Pandas engine support for HWM pattern)
+        post_read_query = read_kwargs.pop("query", None)
+
         if self.use_arrow:
             # Use PyArrow backend for memory efficiency and speed
             # Available in Pandas 2.0+
@@ -197,12 +229,12 @@ class PandasEngine(Engine):
                 if is_glob and isinstance(full_path, list):
                     df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
                     df.attrs["odibi_source_files"] = full_path
-                    return df
+                    return self._process_df(df, post_read_query)
 
                 df = pd.read_csv(full_path, **read_kwargs)
                 if hasattr(df, "attrs"):
                     df.attrs["odibi_source_files"] = [str(full_path)]
-                return df
+                return self._process_df(df, post_read_query)
             except UnicodeDecodeError:
                 # Retry with common fallbacks
                 # Note: Arrow engine might be stricter, so we might need to drop it for retry?
@@ -212,24 +244,24 @@ class PandasEngine(Engine):
                 if is_glob and isinstance(full_path, list):
                     df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
                     df.attrs["odibi_source_files"] = full_path
-                    return df
+                    return self._process_df(df, post_read_query)
 
                 df = pd.read_csv(full_path, **read_kwargs)
                 if hasattr(df, "attrs"):
                     df.attrs["odibi_source_files"] = [str(full_path)]
-                return df
+                return self._process_df(df, post_read_query)
             except pd.errors.ParserError:
                 # Retry with bad lines skipped
                 read_kwargs["on_bad_lines"] = "skip"
                 if is_glob and isinstance(full_path, list):
                     df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
                     df.attrs["odibi_source_files"] = full_path
-                    return df
+                    return self._process_df(df, post_read_query)
 
                 df = pd.read_csv(full_path, **read_kwargs)
                 if hasattr(df, "attrs"):
                     df.attrs["odibi_source_files"] = [str(full_path)]
-                return df
+                return self._process_df(df, post_read_query)
         elif format == "parquet":
             # read_parquet handles list of files
             df = pd.read_parquet(full_path, **read_kwargs)
@@ -237,24 +269,24 @@ class PandasEngine(Engine):
                 df.attrs["odibi_source_files"] = full_path
             else:
                 df.attrs["odibi_source_files"] = [str(full_path)]
-            return df
+            return self._process_df(df, post_read_query)
         elif format == "json":
             if is_glob and isinstance(full_path, list):
                 df = self._read_parallel(pd.read_json, full_path, **read_kwargs)
                 df.attrs["odibi_source_files"] = full_path
-                return df
+                return self._process_df(df, post_read_query)
 
             df = pd.read_json(full_path, **read_kwargs)
             if hasattr(df, "attrs"):
                 df.attrs["odibi_source_files"] = [str(full_path)]
-            return df
+            return self._process_df(df, post_read_query)
         elif format == "excel":
             # Excel doesn't support dtype_backend arg directly in older versions or engine dependent
             # But Pandas 2.0 might. Let's check safely.
             # read_excel does NOT support dtype_backend as of 2.0.3 typically.
             # We skip arrow backend for Excel for now to be safe.
             excel_kwargs = merged_options.copy()
-            return pd.read_excel(full_path, **excel_kwargs)
+            return self._process_df(pd.read_excel(full_path, **excel_kwargs), post_read_query)
         elif format == "delta":
             try:
                 from deltalake import DeltaTable
@@ -281,15 +313,20 @@ class PandasEngine(Engine):
                 sig = inspect.signature(dt.to_pandas)
 
                 if "arrow_options" in sig.parameters:
-                    return dt.to_pandas(
-                        partitions=None, arrow_options={"types_mapper": pd.ArrowDtype}
+                    return self._process_df(
+                        dt.to_pandas(
+                            partitions=None, arrow_options={"types_mapper": pd.ArrowDtype}
+                        ),
+                        post_read_query,
                     )
                 else:
                     # Fallback for older deltalake versions
                     # Convert via Arrow manually to ensure pyarrow backed
-                    return dt.to_pyarrow_table().to_pandas(types_mapper=pd.ArrowDtype)
+                    return self._process_df(
+                        dt.to_pyarrow_table().to_pandas(types_mapper=pd.ArrowDtype), post_read_query
+                    )
             else:
-                return dt.to_pandas()
+                return self._process_df(dt.to_pandas(), post_read_query)
         elif format == "avro":
             try:
                 import fastavro
@@ -315,7 +352,7 @@ class PandasEngine(Engine):
                 with open(full_path, "rb") as f:
                     reader = fastavro.reader(f)
                     records = [record for record in reader]
-                return pd.DataFrame(records)
+                return self._process_df(pd.DataFrame(records), post_read_query)
         elif format in ["sql_server", "azure_sql"]:
             if not hasattr(connection, "read_table"):
                 raise ValueError(
@@ -346,6 +383,7 @@ class PandasEngine(Engine):
         format: str,
         table: Optional[str] = None,
         path: Optional[str] = None,
+        register_table: Optional[str] = None,
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
@@ -357,6 +395,7 @@ class PandasEngine(Engine):
             format: Output format
             table: Table name
             path: File path
+            register_table: Name to register as external table (not used in Pandas)
             mode: Write mode
             options: Format-specific options
 
@@ -1115,6 +1154,24 @@ class PandasEngine(Engine):
             List of row dictionaries
         """
         return df.head(n).to_dict("records")
+
+    def table_exists(
+        self, connection: Any, table: Optional[str] = None, path: Optional[str] = None
+    ) -> bool:
+        """Check if table or location exists.
+
+        Args:
+            connection: Connection object
+            table: Table name (not used in Pandas—no catalog)
+            path: File path
+
+        Returns:
+            True if file/directory exists, False otherwise
+        """
+        if path:
+            full_path = connection.get_path(path)
+            return os.path.exists(full_path)
+        return False
 
     def vacuum_delta(
         self,

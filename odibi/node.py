@@ -5,11 +5,12 @@ from datetime import datetime
 import time
 from pydantic import BaseModel, Field
 
-from odibi.config import NodeConfig, RetryConfig
+from odibi.config import NodeConfig, RetryConfig, WriteMode
 from odibi.context import Context, EngineContext
 from odibi.enums import EngineType
 from odibi.registry import FunctionRegistry
-from odibi.transformations.registry import get_registry as get_transformation_registry
+
+# from odibi.transformations.registry import get_registry as get_transformation_registry  # Removed in cleanup
 from odibi.exceptions import NodeExecutionError, TransformError, ValidationError, ExecutionContext
 
 
@@ -311,6 +312,31 @@ class Node:
             metadata={"dry_run": True, "steps": self._execution_steps},
         )
 
+    def _determine_write_mode(self) -> Optional[WriteMode]:
+        """Determine write mode considering HWM first-run pattern.
+
+        Returns:
+            WriteMode.OVERWRITE if first run detected, None to use configured mode
+        """
+        if not self.config.write or self.config.write.first_run_query is None:
+            return None  # Use configured mode
+
+        write_config = self.config.write
+        target_connection = self.connections.get(write_config.connection)
+
+        if target_connection is None:
+            return None
+
+        # Check if target table exists
+        table_exists = self.engine.table_exists(
+            target_connection, table=write_config.table, path=write_config.path
+        )
+
+        if not table_exists:
+            return WriteMode.OVERWRITE  # Always overwrite on first run
+
+        return None  # Use configured mode for subsequent runs
+
     def _execute_read_phase(self) -> Optional[Any]:
         """Execute read operation."""
         if not self.config.read:
@@ -357,22 +383,26 @@ class Node:
         if not self.config.write:
             return
 
+        # Determine actual write mode (handles HWM first-run)
+        actual_mode = self._determine_write_mode()
+
         # If write-only node, get data from context based on dependencies
         df_to_write = result_df
         if df_to_write is None and self.config.depends_on:
             df_to_write = self.context.get(self.config.depends_on[0])
 
         if df_to_write is not None:
-            self._execute_write(df_to_write)
+            self._execute_write(df_to_write, actual_mode)
             self._execution_steps.append(f"Written to {self.config.write.connection}")
 
     def _execute_read(self) -> Any:
-        """Execute read operation.
+        """Execute read operation with HWM first-run support.
 
         Returns:
             DataFrame from source
         """
         read_config = self.config.read
+        write_config = self.config.write
         connection = self.connections.get(read_config.connection)
 
         if connection is None:
@@ -381,6 +411,18 @@ class Node:
                 f"Available: {', '.join(self.connections.keys())}"
             )
 
+        # HWM Pattern: Use full-load query if first run
+        options = read_config.options.copy()
+        if write_config and write_config.first_run_query is not None:
+            target_connection = self.connections.get(write_config.connection)
+            if target_connection:
+                table_exists = self.engine.table_exists(
+                    target_connection, table=write_config.table, path=write_config.path
+                )
+                if not table_exists:
+                    # First run: Override with full-load query
+                    options["query"] = write_config.first_run_query
+
         # Delegate to engine-specific reader
         df = self.engine.read(
             connection=connection,
@@ -388,7 +430,7 @@ class Node:
             table=read_config.table,
             path=read_config.path,
             streaming=read_config.streaming,
-            options=read_config.options,
+            options=options,
         )
 
         return df
@@ -405,8 +447,7 @@ class Node:
         transformer_name = self.config.transformer
         params = self.config.params
 
-        registry = get_transformation_registry()
-        func = registry.get(transformer_name)
+        func = FunctionRegistry.get(transformer_name)
 
         if not func:
             raise ValueError(f"Transformer '{transformer_name}' not found.")
@@ -555,8 +596,13 @@ class Node:
         if failures:
             raise ValidationError(self.config.name, failures)
 
-    def _execute_write(self, df: Any) -> None:
-        """Execute write operation."""
+    def _execute_write(self, df: Any, override_mode: Optional[WriteMode] = None) -> None:
+        """Execute write operation.
+
+        Args:
+            df: DataFrame to write
+            override_mode: Override write mode (used by HWM first-run logic)
+        """
         write_config = self.config.write
         connection = self.connections.get(write_config.connection)
 
@@ -573,6 +619,9 @@ class Node:
         # Check for update keys
         diff_keys = write_options.pop("diff_keys", None)
 
+        # Use override mode if provided (HWM first-run), otherwise use configured
+        mode = override_mode if override_mode is not None else write_config.mode
+
         # Delegate to engine-specific writer
         delta_info = self.engine.write(
             df=df,
@@ -580,7 +629,8 @@ class Node:
             format=write_config.format,
             table=write_config.table,
             path=write_config.path,
-            mode=write_config.mode,
+            register_table=write_config.register_table,
+            mode=mode,
             options=write_options,
         )
 

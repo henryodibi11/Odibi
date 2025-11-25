@@ -1,6 +1,6 @@
 """Function registry for transform functions."""
 
-from typing import Callable, Dict, Any
+from typing import Callable, Dict, Any, Union
 import inspect
 from functools import wraps
 
@@ -154,32 +154,47 @@ class FunctionRegistry:
         }
 
 
-def transform(func: Callable) -> Callable:
+def transform(name_or_func: Union[str, Callable] = None, **kwargs) -> Callable:
     """Decorator to register a transform function.
 
     Usage:
         @transform
-        def my_transform(context, param1: str, param2: int = 10):
-            '''Transform description.'''
-            data = context.get("input_table")
-            # ... transformation logic
-            return result
+        def my_transform(...): ...
+
+        @transform("my_name")
+        def my_transform(...): ...
+
+        @transform(name="my_name", category="foo")
+        def my_transform(...): ...
 
     Args:
-        func: Function to register
+        name_or_func: Function (if used without args) or Name (if used with args)
+        **kwargs: Additional metadata (ignored for now)
 
     Returns:
         The decorated function
     """
+    def _register(func, name=None):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
+        # Register the function
+        # If name passed to decorator is None, use func.__name__
+        # But FunctionRegistry.register handles None name by using func.__name__
+        # However, we want to use the explicit name if provided.
+        reg_name = name or func.__name__
+        FunctionRegistry.register(wrapper, name=reg_name)
+        return wrapper
 
-    # Register the function
-    FunctionRegistry.register(wrapper)
-
-    return wrapper
+    if callable(name_or_func):
+        # Called as @transform
+        return _register(name_or_func)
+    else:
+        # Called as @transform("name") or @transform(name="name")
+        def decorator(func):
+            return _register(func, name=name_or_func)
+        return decorator
 
 
 def get_registered_function(name: str) -> Callable:

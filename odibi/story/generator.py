@@ -308,8 +308,16 @@ class StoryGenerator:
 
     def cleanup(self) -> None:
         """Remove old stories based on retention policy."""
-        # TODO: Implement robust remote cleanup for nested structure
+
         if self.is_remote:
+            # Remote cleanup not yet implemented
+            # We log a warning to ensure visibility
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "Remote cleanup for stories is not yet supported. Storage usage may grow."
+            )
             return
 
         if self.output_path is None:

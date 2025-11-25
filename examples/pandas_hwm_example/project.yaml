@@ -1,0 +1,35 @@
+project: pandas_hwm_example
+engine: pandas
+
+connections:
+  local:
+    type: local
+    base_path: ./data
+  story_conn:
+    type: local
+    base_path: ./stories
+
+story:
+  connection: story_conn
+  path: run_logs
+
+pipelines:
+  - pipeline: ingest_orders
+    description: "Loads orders with HWM pattern"
+    layer: bronze
+    nodes:
+      - name: load_orders
+        read:
+          connection: local
+          format: csv
+          path: source_orders.csv
+          # Incremental query: Get data from '2025-01-02' onwards
+          # Note: This query is ignored on the first run because first_run_query overrides it.
+          query: "updated_at >= '2025-01-02'"
+        write:
+          connection: local
+          format: parquet
+          path: bronze_orders.parquet
+          mode: append
+          # First run: Load everything (empty string means no filter)
+          first_run_query: ""

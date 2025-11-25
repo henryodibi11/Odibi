@@ -856,6 +856,44 @@ class SparkEngine(Engine):
         """
         return [row.asDict() for row in df.limit(n).collect()]
 
+    def table_exists(
+        self, connection: Any, table: Optional[str] = None, path: Optional[str] = None
+    ) -> bool:
+        """Check if table or location exists.
+
+        Args:
+            connection: Connection object
+            table: Table name (for catalog tables)
+            path: File path (for path-based Delta tables)
+
+        Returns:
+            True if table/location exists, False otherwise
+        """
+        if table:
+            # Check catalog table
+            return self.spark.catalog.tableExists(table)
+        elif path:
+            # Check path-based Delta table
+            try:
+                from delta.tables import DeltaTable
+
+                full_path = connection.get_path(path)
+                return DeltaTable.isDeltaTable(self.spark, full_path)
+            except ImportError:
+                # Delta not available, try simple file existence
+                try:
+                    full_path = connection.get_path(path)
+                    return self.spark.sparkContext._gateway.jvm.org.apache.hadoop.fs.FileSystem.get(
+                        self.spark.sparkContext._jsc.hadoopConfiguration()
+                    ).exists(
+                        self.spark.sparkContext._gateway.jvm.org.apache.hadoop.fs.Path(full_path)
+                    )
+                except Exception:
+                    return False
+            except Exception:
+                return False
+        return False
+
     def vacuum_delta(
         self,
         connection: Any,

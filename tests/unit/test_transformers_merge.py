@@ -131,6 +131,8 @@ class TestMergeTransformerPandas:
         # Second Write (Update)
         # Sleep a bit to ensure timestamp diff?
         # Pandas timestamp precision is high, should differ slightly.
+        import time
+        time.sleep(0.1)
 
         source_df_2 = pd.DataFrame({"id": [1], "val": ["b"]})
 
