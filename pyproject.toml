@@ -101,6 +101,7 @@ dev = [
 
 [project.scripts]
 odibi = "odibi.cli:main"
+odb = "odibi.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/henryodibi11/Odibi"
