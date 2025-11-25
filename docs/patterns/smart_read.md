@@ -26,11 +26,46 @@ Odibi checks if your **Write** target exists:
     *   Generates: `SELECT * FROM source_table WHERE column >= [Calculated Date]`
     *   Result: Loads only new/changed data.
 
+## The Standard Pattern: "Ingest to Bronze"
+
+The most common use case for Smart Read is the **Ingestion Node**. This node acts as a bridge between your external source (SQL, API) and your Data Lake (Bronze Layer).
+
+### Why use this pattern?
+
+1.  **State Management**: The node uses the **Write Target** (e.g., `bronze_orders`) as its state.
+    *   *Target Empty?* $\rightarrow$ Run `SELECT *` (Full History)
+    *   *Target Exists?* $\rightarrow$ Run `SELECT * ... WHERE date > X` (Incremental)
+2.  **Efficiency**: Downstream nodes (e.g., "clean_orders") can simply depend on this node. They will receive the dataframe containing *only* the data that was just ingested (the incremental batch), allowing your entire pipeline to process only new data efficiently.
+
+### Example Node
+
+```yaml
+- name: "ingest_orders"
+  description: "Incrementally load orders from SQL to Delta"
+
+  # 1. READ (Source)
+  read:
+    connection: "sql_db"
+    format: "sql"
+    table: "orders"
+    incremental:
+      column: "updated_at"
+      lookback: 3
+      unit: "day"
+
+  # 2. WRITE (Target - Required for state tracking)
+  write:
+    connection: "data_lake"
+    format: "delta"
+    table: "bronze_orders"
+    mode: "append"  # Append new rows from the incremental batch
+```
+
 ## Configuration
 
 Use the `incremental` block in your `read` configuration.
 
-### Example: Standard Incremental (Recommended)
+### Example: Handling Updates & Inserts
 
 This pattern handles both new records (`created_at`) and updates (`updated_at`).
 
@@ -39,6 +74,7 @@ nodes:
   - name: "load_orders"
     read:
       connection: "sql_server_prod"
+      format: "sql"
       table: "dbo.orders"
 
       incremental:
@@ -46,6 +82,12 @@ nodes:
         fallback_column: "created_at" # If updated_at is NULL
         lookback: 1
         unit: "day"
+
+    write:
+      connection: "bronze"
+      format: "delta"
+      table: "orders_raw"
+      mode: "append"
 ```
 
 This generates:
@@ -61,11 +103,18 @@ Perfect for pipelines that run every hour but want a 4-hour safety window for la
 ```yaml
     read:
       connection: "postgres_db"
+      format: "sql"
       table: "public.events"
       incremental:
         column: "event_time"
         lookback: 4
         unit: "hour"
+
+    write:
+      connection: "bronze"
+      format: "delta"
+      table: "events_raw"
+      mode: "append"
 ```
 
 ## Supported Units
