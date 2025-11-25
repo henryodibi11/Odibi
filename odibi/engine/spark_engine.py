@@ -480,9 +480,16 @@ class SparkEngine(Engine):
 
                 # Register if requested (even after merge)
                 if register_table:
-                    self.spark.sql(
-                        f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
-                    )
+                    try:
+                        self.spark.sql(
+                            f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
+                        )
+                    except Exception as e:
+                        import logging
+
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"Failed to register external table '{register_table}': {e}")
+                        # Don't raise, as data write was successful
 
                 self._optimize_delta_write(full_path, options, is_table=False)
                 return self._get_last_delta_commit_info(full_path, is_table=False)
@@ -593,7 +600,7 @@ class SparkEngine(Engine):
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Failed to register external table '{register_table}': {e}")
+                logger.error(f"Failed to register external table '{register_table}': {e}")
 
         if format == "delta":
             return self._get_last_delta_commit_info(full_path, is_table=False)
