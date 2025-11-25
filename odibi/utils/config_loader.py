@@ -78,7 +78,9 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
         if isinstance(imports, str):
             imports = [imports]
 
-        merged_data = {}
+        # Start with current data as the base
+        merged_data = data.copy()
+
         for import_path in imports:
             # Resolve relative to current file
             if not os.path.isabs(import_path):
@@ -89,10 +91,12 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
             # Recursive load
             # Note: We pass env down to imported files too
             imported_data = load_yaml_with_env(full_import_path, env=env)
+
+            # Merge imported data INTO the current data
+            # This way, the main file acts as the "master" that accumulates imports
             merged_data = _deep_merge(merged_data, imported_data)
 
-        # Merge current data on top of imported data
-        data = _deep_merge(merged_data, data)
+        data = merged_data
 
     # Apply Environment Overrides from "environments" block in main file
     if env:
