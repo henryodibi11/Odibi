@@ -165,12 +165,23 @@ class SparkEngine(Engine):
             # Get last commit
             last_commit = dt.history(1).collect()[0]
 
+            # Safely access Row fields (handles PySpark Row which supports dictionary-like access OR attribute access)
+            def safe_get(row, field):
+                if hasattr(row, field):
+                    return getattr(row, field)
+                if hasattr(row, "__getitem__"):
+                    try:
+                        return row[field]
+                    except (KeyError, ValueError):
+                        return None
+                return None
+
             return {
-                "version": last_commit["version"],
-                "timestamp": last_commit["timestamp"],
-                "operation": last_commit["operation"],
-                "operation_metrics": last_commit["operationMetrics"],
-                "read_version": last_commit.get("readVersion"),
+                "version": safe_get(last_commit, "version"),
+                "timestamp": safe_get(last_commit, "timestamp"),
+                "operation": safe_get(last_commit, "operation"),
+                "operation_metrics": safe_get(last_commit, "operationMetrics"),
+                "read_version": safe_get(last_commit, "readVersion"),
             }
         except Exception as e:
             import logging
