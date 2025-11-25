@@ -49,7 +49,17 @@ class AlertType(str, Enum):
 
 
 class AlertConfig(BaseModel):
-    """Configuration for alerts."""
+    """
+    Configuration for alerts.
+
+    Example:
+    ```yaml
+    alerts:
+      - type: "slack"
+        url: "https://hooks.slack.com/..."
+        on_events: ["on_failure"]
+    ```
+    """
 
     type: AlertType
     url: str = Field(description="Webhook URL")
@@ -81,14 +91,37 @@ class BaseConnectionConfig(BaseModel):
 
 
 class LocalConnectionConfig(BaseConnectionConfig):
-    """Local filesystem connection."""
+    """
+    Local filesystem connection.
+
+    Example:
+    ```yaml
+    local_data:
+      type: "local"
+      base_path: "./data"
+    ```
+    """
 
     type: ConnectionType = ConnectionType.LOCAL
     base_path: str = Field(default="./data", description="Base directory path")
 
 
 class AzureBlobConnectionConfig(BaseConnectionConfig):
-    """Azure Blob Storage connection."""
+    """
+    Azure Blob Storage connection.
+
+    Example:
+    ```yaml
+    adls_bronze:
+      type: "azure_blob"
+      account_name: "myaccount"
+      container: "bronze"
+      auth:
+        mode: "key_vault"
+        key_vault: "kv-name"
+        secret: "adls-key"
+    ```
+    """
 
     type: ConnectionType = ConnectionType.AZURE_BLOB
     account_name: str
@@ -97,7 +130,17 @@ class AzureBlobConnectionConfig(BaseConnectionConfig):
 
 
 class DeltaConnectionConfig(BaseConnectionConfig):
-    """Delta Lake connection."""
+    """
+    Delta Lake connection.
+
+    Example:
+    ```yaml
+    delta_silver:
+      type: "delta"
+      catalog: "spark_catalog"
+      schema: "silver_db"
+    ```
+    """
 
     type: ConnectionType = ConnectionType.DELTA
     catalog: str
@@ -105,7 +148,19 @@ class DeltaConnectionConfig(BaseConnectionConfig):
 
 
 class SQLServerConnectionConfig(BaseConnectionConfig):
-    """SQL Server connection."""
+    """
+    SQL Server connection.
+
+    Example:
+    ```yaml
+    sql_dw:
+      type: "sql_server"
+      host: "server.database.windows.net"
+      database: "dw"
+      auth:
+        mode: "aad_msi"
+    ```
+    """
 
     type: ConnectionType = ConnectionType.SQL_SERVER
     host: str
@@ -115,7 +170,18 @@ class SQLServerConnectionConfig(BaseConnectionConfig):
 
 
 class HttpConnectionConfig(BaseConnectionConfig):
-    """HTTP connection."""
+    """
+    HTTP connection.
+
+    Example:
+    ```yaml
+    api_source:
+      type: "http"
+      base_url: "https://api.example.com"
+      headers:
+        Authorization: "Bearer ${API_TOKEN}"
+    ```
+    """
 
     type: str = "http"
     base_url: str
@@ -139,7 +205,27 @@ ConnectionConfig = Union[
 
 
 class ReadConfig(BaseModel):
-    """Configuration for reading data."""
+    """
+    Configuration for reading data.
+
+    Example (File):
+    ```yaml
+    read:
+      connection: "local_data"
+      format: "csv"
+      path: "input/users.csv"
+      options:
+        header: true
+    ```
+
+    Example (SQL):
+    ```yaml
+    read:
+      connection: "sql_dw"
+      format: "sql"
+      table: "users"  # OR query: "SELECT * FROM users"
+    ```
+    """
 
     connection: str = Field(description="Connection name from project.yaml")
     format: str = Field(description="Data format (csv, parquet, delta, etc.)")
@@ -188,7 +274,27 @@ class TransformStep(BaseModel):
 
 
 class TransformConfig(BaseModel):
-    """Configuration for transforming data."""
+    """
+    Configuration for transforming data.
+
+    Example (SQL Mix):
+    ```yaml
+    transform:
+      steps:
+        - sql: "SELECT * FROM df WHERE active = true"
+        - function: "my_custom_func"
+          params: { multiplier: 2 }
+        - operation: "pivot"
+          params: { index: "id", columns: "year", values: "sales" }
+    ```
+
+    Example (Shortcuts):
+    ```yaml
+    transform:
+      steps:
+        - "SELECT * FROM df"  # String is implied SQL
+    ```
+    """
 
     steps: List[Union[str, TransformStep]] = Field(
         description="List of transformation steps (SQL strings or TransformStep configs)"
@@ -196,7 +302,23 @@ class TransformConfig(BaseModel):
 
 
 class ValidationConfig(BaseModel):
-    """Configuration for data validation."""
+    """
+    Configuration for data validation.
+
+    Example:
+    ```yaml
+    validation:
+      not_empty: true
+      no_nulls: ["id", "email"]
+      schema:
+        id: "int"
+        email: "string"
+      allowed_values:
+        status: ["active", "inactive"]
+      ranges:
+        age: { min: 0, max: 120 }
+    ```
+    """
 
     schema_validation: Optional[Dict[str, Any]] = Field(
         default=None, alias="schema", description="Schema validation rules"
@@ -214,7 +336,19 @@ class ValidationConfig(BaseModel):
 
 
 class WriteConfig(BaseModel):
-    """Configuration for writing data."""
+    """
+    Configuration for writing data.
+
+    Example:
+    ```yaml
+    write:
+      connection: "adls_silver"
+      format: "delta"
+      path: "silver/users"
+      mode: "overwrite"
+      register_table: "silver_users"
+    ```
+    """
 
     connection: str = Field(description="Connection name from project.yaml")
     format: str = Field(description="Output format (csv, parquet, delta, etc.)")
@@ -243,7 +377,19 @@ class WriteConfig(BaseModel):
 
 
 class NodeConfig(BaseModel):
-    """Configuration for a single node."""
+    """
+    Configuration for a single node.
+
+    Example:
+    ```yaml
+    - name: "process_users"
+      description: "Clean and enrich user data"
+      depends_on: ["raw_users"]
+      read: ...
+      transform: ...
+      write: ...
+    ```
+    """
 
     name: str = Field(description="Unique node name")
     description: Optional[str] = Field(default=None, description="Human-readable description")
@@ -286,7 +432,20 @@ class NodeConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
-    """Configuration for a pipeline."""
+    """
+    Configuration for a pipeline.
+
+    Example:
+    ```yaml
+    pipelines:
+      - pipeline: "user_onboarding"
+        description: "Ingest and process new users"
+        layer: "silver"
+        nodes:
+          - name: "node1"
+            ...
+    ```
+    """
 
     pipeline: str = Field(description="Pipeline name")
     description: Optional[str] = Field(default=None, description="Pipeline description")
@@ -310,7 +469,17 @@ class PipelineConfig(BaseModel):
 
 
 class RetryConfig(BaseModel):
-    """Retry configuration."""
+    """
+    Retry configuration.
+
+    Example:
+    ```yaml
+    retry:
+      enabled: true
+      max_attempts: 3
+      backoff: "exponential"
+    ```
+    """
 
     enabled: bool = True
     max_attempts: int = Field(default=3, ge=1, le=10)
@@ -318,7 +487,16 @@ class RetryConfig(BaseModel):
 
 
 class LoggingConfig(BaseModel):
-    """Logging configuration."""
+    """
+    Logging configuration.
+
+    Example:
+    ```yaml
+    logging:
+      level: "INFO"
+      structured: true
+    ```
+    """
 
     level: LogLevel = LogLevel.INFO
     structured: bool = Field(default=False, description="Output JSON logs")
@@ -335,10 +513,19 @@ class PerformanceConfig(BaseModel):
 
 
 class StoryConfig(BaseModel):
-    """Story generation configuration.
+    """
+    Story generation configuration.
 
     Stories are ODIBI's core value - execution reports with lineage.
     They must use a connection for consistent, traceable output.
+
+    Example:
+    ```yaml
+    story:
+      connection: "local_data"
+      path: "stories/"
+      retention_days: 30
+    ```
     """
 
     connection: str = Field(
@@ -358,10 +545,20 @@ class StoryConfig(BaseModel):
 
 
 class ProjectConfig(BaseModel):
-    """Complete project configuration from YAML.
+    """
+    Complete project configuration from YAML.
 
     Represents the entire YAML structure with validation.
     All settings are top-level (no nested defaults).
+
+    Example:
+    ```yaml
+    project: "MyDataProject"
+    engine: "pandas"
+    connections: ...
+    story: ...
+    pipelines: ...
+    ```
     """
 
     # === MANDATORY ===

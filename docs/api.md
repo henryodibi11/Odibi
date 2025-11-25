@@ -202,6 +202,21 @@ Types of alerting channels.
 #### `class AlertConfig`
 Configuration for alerts.
 
+Example:
+```yaml
+alerts:
+  - type: "slack"
+    url: "https://hooks.slack.com/..."
+    on_events: ["on_failure"]
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | `AlertType` | Yes | - | - |
+| **url** | `str` | Yes | - | Webhook URL |
+| **on_events** | `List` | No | `['on_failure']` | Events to trigger alert: on_start, on_success, on_failure |
+| **metadata** | `Dict` | No | `PydanticUndefined` | Extra metadata for alert |
+
 
 #### `class ErrorStrategy`
 Strategy for handling node failures.
@@ -210,29 +225,146 @@ Strategy for handling node failures.
 #### `class BaseConnectionConfig`
 Base configuration for all connections.
 
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | `ConnectionType` | Yes | - | - |
+| **validation_mode** | `str` | No | `lazy` | - |
+
 
 #### `class LocalConnectionConfig`
 Local filesystem connection.
+
+Example:
+```yaml
+local_data:
+  type: "local"
+  base_path: "./data"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | `ConnectionType` | No | `ConnectionType.LOCAL` | - |
+| **validation_mode** | `str` | No | `lazy` | - |
+| **base_path** | `str` | No | `./data` | Base directory path |
 
 
 #### `class AzureBlobConnectionConfig`
 Azure Blob Storage connection.
 
+Example:
+```yaml
+adls_bronze:
+  type: "azure_blob"
+  account_name: "myaccount"
+  container: "bronze"
+  auth:
+    mode: "key_vault"
+    key_vault: "kv-name"
+    secret: "adls-key"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | `ConnectionType` | No | `ConnectionType.AZURE_BLOB` | - |
+| **validation_mode** | `str` | No | `lazy` | - |
+| **account_name** | `str` | Yes | - | - |
+| **container** | `str` | Yes | - | - |
+| **auth** | `Dict` | No | `PydanticUndefined` | - |
+
 
 #### `class DeltaConnectionConfig`
 Delta Lake connection.
+
+Example:
+```yaml
+delta_silver:
+  type: "delta"
+  catalog: "spark_catalog"
+  schema: "silver_db"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | `ConnectionType` | No | `ConnectionType.DELTA` | - |
+| **validation_mode** | `str` | No | `lazy` | - |
+| **catalog** | `str` | Yes | - | - |
+| **schema_name** | `str` | Yes | - | - |
 
 
 #### `class SQLServerConnectionConfig`
 SQL Server connection.
 
+Example:
+```yaml
+sql_dw:
+  type: "sql_server"
+  host: "server.database.windows.net"
+  database: "dw"
+  auth:
+    mode: "aad_msi"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | `ConnectionType` | No | `ConnectionType.SQL_SERVER` | - |
+| **validation_mode** | `str` | No | `lazy` | - |
+| **host** | `str` | Yes | - | - |
+| **database** | `str` | Yes | - | - |
+| **port** | `int` | No | `1433` | - |
+| **auth** | `Dict` | No | `PydanticUndefined` | - |
+
 
 #### `class HttpConnectionConfig`
 HTTP connection.
 
+Example:
+```yaml
+api_source:
+  type: "http"
+  base_url: "https://api.example.com"
+  headers:
+    Authorization: "Bearer ${API_TOKEN}"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | `str` | No | `http` | - |
+| **validation_mode** | `str` | No | `lazy` | - |
+| **base_url** | `str` | Yes | - | - |
+| **headers** | `Dict` | No | `PydanticUndefined` | - |
+| **auth** | `Dict` | No | `PydanticUndefined` | - |
+
 
 #### `class ReadConfig`
 Configuration for reading data.
+
+Example (File):
+```yaml
+read:
+  connection: "local_data"
+  format: "csv"
+  path: "input/users.csv"
+  options:
+    header: true
+```
+
+Example (SQL):
+```yaml
+read:
+  connection: "sql_dw"
+  format: "sql"
+  table: "users"  # OR query: "SELECT * FROM users"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **connection** | `str` | Yes | - | Connection name from project.yaml |
+| **format** | `str` | Yes | - | Data format (csv, parquet, delta, etc.) |
+| **table** | `Optional` | No | - | Table name for SQL/Delta |
+| **path** | `Optional` | No | - | Path for file-based sources |
+| **streaming** | `bool` | No | `False` | Enable streaming read (Spark only) |
+| **query** | `Optional` | No | - | SQL query (shortcut for options.query) |
+| **options** | `Dict` | No | `PydanticUndefined` | Format-specific options |
 
 - **move_query_to_options**`(self)`
   - Move top-level query to options.
@@ -242,19 +374,91 @@ Configuration for reading data.
 #### `class TransformStep`
 Single transformation step.
 
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **sql** | `Optional` | No | - | - |
+| **function** | `Optional` | No | - | - |
+| **operation** | `Optional` | No | - | - |
+| **params** | `Dict` | No | `PydanticUndefined` | - |
+
 - **check_step_type**`(self)`
   - Ensure exactly one step type is provided.
 
 #### `class TransformConfig`
 Configuration for transforming data.
 
+Example (SQL Mix):
+```yaml
+transform:
+  steps:
+    - sql: "SELECT * FROM df WHERE active = true"
+    - function: "my_custom_func"
+      params: { multiplier: 2 }
+    - operation: "pivot"
+      params: { index: "id", columns: "year", values: "sales" }
+```
+
+Example (Shortcuts):
+```yaml
+transform:
+  steps:
+    - "SELECT * FROM df"  # String is implied SQL
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **steps** | `List` | Yes | - | List of transformation steps (SQL strings or TransformStep configs) |
+
 
 #### `class ValidationConfig`
 Configuration for data validation.
 
+Example:
+```yaml
+validation:
+  not_empty: true
+  no_nulls: ["id", "email"]
+  schema:
+    id: "int"
+    email: "string"
+  allowed_values:
+    status: ["active", "inactive"]
+  ranges:
+    age: { min: 0, max: 120 }
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **schema_validation** | `Optional` | No | - | Schema validation rules |
+| **not_empty** | `bool` | No | `False` | Ensure result is not empty |
+| **no_nulls** | `List` | No | `PydanticUndefined` | Columns that must not have nulls |
+| **ranges** | `Dict` | No | `PydanticUndefined` | Value ranges {col: {min: 0, max: 100}} |
+| **allowed_values** | `Dict` | No | `PydanticUndefined` | Allowed values {col: [val1, val2]} |
+
 
 #### `class WriteConfig`
 Configuration for writing data.
+
+Example:
+```yaml
+write:
+  connection: "adls_silver"
+  format: "delta"
+  path: "silver/users"
+  mode: "overwrite"
+  register_table: "silver_users"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **connection** | `str` | Yes | - | Connection name from project.yaml |
+| **format** | `str` | Yes | - | Output format (csv, parquet, delta, etc.) |
+| **table** | `Optional` | No | - | Table name for SQL/Delta |
+| **path** | `Optional` | No | - | Path for file-based outputs |
+| **register_table** | `Optional` | No | - | Register file output as external table (Spark/Delta only) |
+| **mode** | `WriteMode` | No | `WriteMode.OVERWRITE` | Write mode |
+| **first_run_query** | `Optional` | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
+| **options** | `Dict` | No | `PydanticUndefined` | Format-specific options |
 
 - **check_table_or_path**`(self)`
   - Ensure either table or path is provided.
@@ -262,11 +466,56 @@ Configuration for writing data.
 #### `class NodeConfig`
 Configuration for a single node.
 
+Example:
+```yaml
+- name: "process_users"
+  description: "Clean and enrich user data"
+  depends_on: ["raw_users"]
+  read: ...
+  transform: ...
+  write: ...
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | `str` | Yes | - | Unique node name |
+| **description** | `Optional` | No | - | Human-readable description |
+| **depends_on** | `List` | No | `PydanticUndefined` | List of node dependencies |
+| **read** | `Optional` | No | - | - |
+| **transform** | `Optional` | No | - | - |
+| **write** | `Optional` | No | - | - |
+| **streaming** | `bool` | No | `False` | Enable streaming execution for this node |
+| **transformer** | `Optional` | No | - | Name of transformer to apply |
+| **params** | `Dict` | No | `PydanticUndefined` | Parameters for transformer |
+| **cache** | `bool` | No | `False` | Cache result for reuse |
+| **log_level** | `Optional` | No | - | Override log level for this node |
+| **on_error** | `ErrorStrategy` | No | `ErrorStrategy.FAIL_LATER` | Failure handling strategy |
+| **validation** | `Optional` | No | - | - |
+| **sensitive** | `Union` | No | `False` | If true or list of columns, masks sample data in stories |
+
 - **check_at_least_one_operation**`(self)`
   - Ensure at least one operation is defined.
 
 #### `class PipelineConfig`
 Configuration for a pipeline.
+
+Example:
+```yaml
+pipelines:
+  - pipeline: "user_onboarding"
+    description: "Ingest and process new users"
+    layer: "silver"
+    nodes:
+      - name: "node1"
+        ...
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **pipeline** | `str` | Yes | - | Pipeline name |
+| **description** | `Optional` | No | - | Pipeline description |
+| **layer** | `Optional` | No | - | Logical layer (bronze/silver/gold) |
+| **nodes** | `List` | Yes | - | List of nodes in this pipeline |
 
 - **check_unique_node_names**`(nodes: List[odibi.config.NodeConfig]) -> List[odibi.config.NodeConfig]`
   - Ensure all node names are unique within the pipeline.
@@ -274,21 +523,100 @@ Configuration for a pipeline.
 #### `class RetryConfig`
 Retry configuration.
 
+Example:
+```yaml
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff: "exponential"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **enabled** | `bool` | No | `True` | - |
+| **max_attempts** | `int` | No | `3` | - |
+| **backoff** | `str` | No | `exponential` | - |
+
 
 #### `class LoggingConfig`
 Logging configuration.
+
+Example:
+```yaml
+logging:
+  level: "INFO"
+  structured: true
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **level** | `LogLevel` | No | `LogLevel.INFO` | - |
+| **structured** | `bool` | No | `False` | Output JSON logs |
+| **metadata** | `Dict` | No | `PydanticUndefined` | Extra metadata in logs |
 
 
 #### `class PerformanceConfig`
 Performance tuning configuration.
 
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **use_arrow** | `bool` | No | `True` | Use Apache Arrow-backed DataFrames (Pandas only). Reduces memory and speeds up I/O. |
+
 
 #### `class StoryConfig`
 Story generation configuration.
 
+Stories are ODIBI's core value - execution reports with lineage.
+They must use a connection for consistent, traceable output.
+
+Example:
+```yaml
+story:
+  connection: "local_data"
+  path: "stories/"
+  retention_days: 30
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **connection** | `str` | Yes | - | Connection name for story output (uses connection's path resolution) |
+| **path** | `str` | Yes | - | Path for stories (relative to connection base_path) |
+| **max_sample_rows** | `int` | No | `10` | - |
+| **auto_generate** | `bool` | No | `True` | - |
+| **retention_days** | `Optional` | No | `30` | Days to keep stories |
+| **retention_count** | `Optional` | No | `100` | Max number of stories to keep |
+
 
 #### `class ProjectConfig`
 Complete project configuration from YAML.
+
+Represents the entire YAML structure with validation.
+All settings are top-level (no nested defaults).
+
+Example:
+```yaml
+project: "MyDataProject"
+engine: "pandas"
+connections: ...
+story: ...
+pipelines: ...
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **project** | `str` | Yes | - | Project name |
+| **engine** | `EngineType` | No | `EngineType.PANDAS` | Execution engine |
+| **connections** | `Dict` | Yes | - | Named connections (at least one required) |
+| **pipelines** | `List` | Yes | - | Pipeline definitions (at least one required) |
+| **story** | `StoryConfig` | Yes | - | Story generation configuration (mandatory) |
+| **description** | `Optional` | No | - | Project description |
+| **version** | `str` | No | `1.0.0` | Project version |
+| **owner** | `Optional` | No | - | Project owner/contact |
+| **retry** | `RetryConfig` | No | `PydanticUndefined` | - |
+| **logging** | `LoggingConfig` | No | `PydanticUndefined` | - |
+| **alerts** | `List` | No | `PydanticUndefined` | Alert configurations |
+| **performance** | `PerformanceConfig` | No | `PydanticUndefined` | Performance tuning |
+| **environments** | `Optional` | No | - | Environment-specific overrides |
 
 - **validate_story_connection_exists**`(self)`
   - Ensure story.connection is defined in connections.
@@ -303,6 +631,9 @@ Azure Data Lake Storage Gen2 connection (Phase 2A: Multi-mode authentication).
 ### Classes
 #### `class AzureADLS`
 Azure Data Lake Storage Gen2 connection.
+
+Phase 2A: Multi-mode authentication + multi-account support
+Supports key_vault (recommended), direct_key, service_principal, and managed_identity.
 
 - **__init__**`(self, account: str, container: str, path_prefix: str = '', auth_mode: str = 'key_vault', key_vault_name: Optional[str] = None, secret_name: Optional[str] = None, account_key: Optional[str] = None, sas_token: Optional[str] = None, tenant_id: Optional[str] = None, client_id: Optional[str] = None, client_secret: Optional[str] = None, validate: bool = True, **kwargs)`
   - Initialize ADLS connection.
@@ -329,6 +660,12 @@ Azure SQL Database Connection
 ### Classes
 #### `class AzureSQL`
 Azure SQL Database connection.
+
+Supports:
+- SQL authentication (username/password)
+- Azure Active Directory Managed Identity
+- Connection pooling
+- Read/write operations via SQLAlchemy
 
 - **__init__**`(self, server: str, database: str, driver: str = 'ODBC Driver 18 for SQL Server', username: Optional[str] = None, password: Optional[str] = None, auth_mode: str = 'aad_msi', key_vault_name: Optional[str] = None, secret_name: Optional[str] = None, port: int = 1433, timeout: int = 30, **kwargs)`
   - Initialize Azure SQL connection.
@@ -412,6 +749,9 @@ Local DBFS mock for testing Databricks pipelines locally.
 #### `class LocalDBFS`
 Mock DBFS connection for local development.
 
+Maps dbfs:/ paths to local filesystem for testing.
+Useful for developing Databricks pipelines locally.
+
 - **__init__**`(self, root: Union[str, pathlib.Path] = '.dbfs')`
   - Initialize local DBFS mock.
 - **resolve**`(self, path: str) -> str`
@@ -437,6 +777,8 @@ def create_context(engine: str, spark_session: Optional[Any] = None) -> odibi.co
 ### Classes
 #### `class EngineContext`
 The context passed to transformations.
+Wraps the global context (other datasets) and the local state (current dataframe).
+Provides uniform API for SQL and Data operations.
 
 - **__init__**`(self, context: 'Context', df: Any, engine_type: odibi.enums.EngineType, sql_executor: Optional[Any] = None)`
   - Initialize self.  See help(type(self)) for accurate signature.
@@ -703,6 +1045,9 @@ Spark execution engine (Phase 2B: Delta Lake support).
 #### `class SparkEngine`
 Spark execution engine with PySpark backend.
 
+Phase 2A: Basic read/write + ADLS multi-account support
+Phase 2B: Delta Lake support
+
 - **__init__**`(self, connections: Optional[Dict[str, Any]] = None, spark_session=None, config: Optional[Dict[str, Any]] = None)`
   - Initialize Spark engine with import guard.
 - **get_schema**`(self, df) -> Dict[str, str]`
@@ -747,6 +1092,15 @@ Spark execution engine with PySpark backend.
 ### Classes
 #### `class EngineType`
 str(object='') -> str
+str(bytes_or_buffer[, encoding[, errors]]) -> str
+
+Create a new string object from the given object. If encoding or
+errors is specified, then the object must expose a data buffer
+that will be decoded using the given encoding and error handler.
+Otherwise, returns the result of object.__str__() (if defined)
+or repr(object).
+encoding defaults to sys.getdefaultencoding().
+errors defaults to 'strict'.
 
 
 ---
@@ -829,6 +1183,13 @@ Builds and analyzes dependency graph from node configurations.
 Introspection tool for generating API documentation.
 
 ### Functions
+#### `get_docstring`
+```python
+def get_docstring(obj: Any) -> Optional[str]
+```
+> Extract the full docstring.
+
+
 #### `get_summary`
 ```python
 def get_summary(obj: Any) -> Optional[str]
@@ -848,6 +1209,13 @@ def format_type_hint(annotation: Any) -> str
 def get_parameters(func: Any) -> List[odibi.introspect.ParameterDoc]
 ```
 > Extract parameters from a function.
+
+
+#### `get_pydantic_fields`
+```python
+def get_pydantic_fields(cls: Any) -> List[odibi.introspect.FieldDoc]
+```
+> Extract fields from a Pydantic model.
 
 
 #### `scan_module`
@@ -881,18 +1249,207 @@ def generate_docs(output_path: str = 'docs/api.md')
 ### Classes
 #### `class ParameterDoc`
 !!! abstract "Usage Documentation"
+    [Models](../concepts/models.md)
+
+A base class for creating Pydantic models.
+
+Attributes:
+    __class_vars__: The names of the class variables defined on the model.
+    __private_attributes__: Metadata about the private attributes of the model.
+    __signature__: The synthesized `__init__` [`Signature`][inspect.Signature] of the model.
+
+    __pydantic_complete__: Whether model building is completed, or if there are still undefined fields.
+    __pydantic_core_schema__: The core schema of the model.
+    __pydantic_custom_init__: Whether the model has a custom `__init__` function.
+    __pydantic_decorators__: Metadata containing the decorators defined on the model.
+        This replaces `Model.__validators__` and `Model.__root_validators__` from Pydantic V1.
+    __pydantic_generic_metadata__: Metadata for generic models; contains data used for a similar purpose to
+        __args__, __origin__, __parameters__ in typing-module generics. May eventually be replaced by these.
+    __pydantic_parent_namespace__: Parent namespace of the model, used for automatic rebuilding of models.
+    __pydantic_post_init__: The name of the post-init method for the model, if defined.
+    __pydantic_root_model__: Whether the model is a [`RootModel`][pydantic.root_model.RootModel].
+    __pydantic_serializer__: The `pydantic-core` `SchemaSerializer` used to dump instances of the model.
+    __pydantic_validator__: The `pydantic-core` `SchemaValidator` used to validate instances of the model.
+
+    __pydantic_fields__: A dictionary of field names and their corresponding [`FieldInfo`][pydantic.fields.FieldInfo] objects.
+    __pydantic_computed_fields__: A dictionary of computed field names and their corresponding [`ComputedFieldInfo`][pydantic.fields.ComputedFieldInfo] objects.
+
+    __pydantic_extra__: A dictionary containing extra values, if [`extra`][pydantic.config.ConfigDict.extra]
+        is set to `'allow'`.
+    __pydantic_fields_set__: The names of fields explicitly set during instantiation.
+    __pydantic_private__: Values of private attributes set on the model instance.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | `str` | Yes | - | - |
+| **type_hint** | `str` | Yes | - | - |
+| **default** | `Optional` | No | - | - |
+
+
+#### `class FieldDoc`
+!!! abstract "Usage Documentation"
+    [Models](../concepts/models.md)
+
+A base class for creating Pydantic models.
+
+Attributes:
+    __class_vars__: The names of the class variables defined on the model.
+    __private_attributes__: Metadata about the private attributes of the model.
+    __signature__: The synthesized `__init__` [`Signature`][inspect.Signature] of the model.
+
+    __pydantic_complete__: Whether model building is completed, or if there are still undefined fields.
+    __pydantic_core_schema__: The core schema of the model.
+    __pydantic_custom_init__: Whether the model has a custom `__init__` function.
+    __pydantic_decorators__: Metadata containing the decorators defined on the model.
+        This replaces `Model.__validators__` and `Model.__root_validators__` from Pydantic V1.
+    __pydantic_generic_metadata__: Metadata for generic models; contains data used for a similar purpose to
+        __args__, __origin__, __parameters__ in typing-module generics. May eventually be replaced by these.
+    __pydantic_parent_namespace__: Parent namespace of the model, used for automatic rebuilding of models.
+    __pydantic_post_init__: The name of the post-init method for the model, if defined.
+    __pydantic_root_model__: Whether the model is a [`RootModel`][pydantic.root_model.RootModel].
+    __pydantic_serializer__: The `pydantic-core` `SchemaSerializer` used to dump instances of the model.
+    __pydantic_validator__: The `pydantic-core` `SchemaValidator` used to validate instances of the model.
+
+    __pydantic_fields__: A dictionary of field names and their corresponding [`FieldInfo`][pydantic.fields.FieldInfo] objects.
+    __pydantic_computed_fields__: A dictionary of computed field names and their corresponding [`ComputedFieldInfo`][pydantic.fields.ComputedFieldInfo] objects.
+
+    __pydantic_extra__: A dictionary containing extra values, if [`extra`][pydantic.config.ConfigDict.extra]
+        is set to `'allow'`.
+    __pydantic_fields_set__: The names of fields explicitly set during instantiation.
+    __pydantic_private__: Values of private attributes set on the model instance.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | `str` | Yes | - | - |
+| **type_hint** | `str` | Yes | - | - |
+| **required** | `bool` | Yes | - | - |
+| **default** | `Optional` | No | - | - |
+| **description** | `Optional` | No | - | - |
 
 
 #### `class FunctionDoc`
 !!! abstract "Usage Documentation"
+    [Models](../concepts/models.md)
+
+A base class for creating Pydantic models.
+
+Attributes:
+    __class_vars__: The names of the class variables defined on the model.
+    __private_attributes__: Metadata about the private attributes of the model.
+    __signature__: The synthesized `__init__` [`Signature`][inspect.Signature] of the model.
+
+    __pydantic_complete__: Whether model building is completed, or if there are still undefined fields.
+    __pydantic_core_schema__: The core schema of the model.
+    __pydantic_custom_init__: Whether the model has a custom `__init__` function.
+    __pydantic_decorators__: Metadata containing the decorators defined on the model.
+        This replaces `Model.__validators__` and `Model.__root_validators__` from Pydantic V1.
+    __pydantic_generic_metadata__: Metadata for generic models; contains data used for a similar purpose to
+        __args__, __origin__, __parameters__ in typing-module generics. May eventually be replaced by these.
+    __pydantic_parent_namespace__: Parent namespace of the model, used for automatic rebuilding of models.
+    __pydantic_post_init__: The name of the post-init method for the model, if defined.
+    __pydantic_root_model__: Whether the model is a [`RootModel`][pydantic.root_model.RootModel].
+    __pydantic_serializer__: The `pydantic-core` `SchemaSerializer` used to dump instances of the model.
+    __pydantic_validator__: The `pydantic-core` `SchemaValidator` used to validate instances of the model.
+
+    __pydantic_fields__: A dictionary of field names and their corresponding [`FieldInfo`][pydantic.fields.FieldInfo] objects.
+    __pydantic_computed_fields__: A dictionary of computed field names and their corresponding [`ComputedFieldInfo`][pydantic.fields.ComputedFieldInfo] objects.
+
+    __pydantic_extra__: A dictionary containing extra values, if [`extra`][pydantic.config.ConfigDict.extra]
+        is set to `'allow'`.
+    __pydantic_fields_set__: The names of fields explicitly set during instantiation.
+    __pydantic_private__: Values of private attributes set on the model instance.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | `str` | Yes | - | - |
+| **signature** | `str` | Yes | - | - |
+| **summary** | `Optional` | Yes | - | - |
+| **parameters** | `List` | Yes | - | - |
+| **source_line** | `int` | Yes | - | - |
 
 
 #### `class ClassDoc`
 !!! abstract "Usage Documentation"
+    [Models](../concepts/models.md)
+
+A base class for creating Pydantic models.
+
+Attributes:
+    __class_vars__: The names of the class variables defined on the model.
+    __private_attributes__: Metadata about the private attributes of the model.
+    __signature__: The synthesized `__init__` [`Signature`][inspect.Signature] of the model.
+
+    __pydantic_complete__: Whether model building is completed, or if there are still undefined fields.
+    __pydantic_core_schema__: The core schema of the model.
+    __pydantic_custom_init__: Whether the model has a custom `__init__` function.
+    __pydantic_decorators__: Metadata containing the decorators defined on the model.
+        This replaces `Model.__validators__` and `Model.__root_validators__` from Pydantic V1.
+    __pydantic_generic_metadata__: Metadata for generic models; contains data used for a similar purpose to
+        __args__, __origin__, __parameters__ in typing-module generics. May eventually be replaced by these.
+    __pydantic_parent_namespace__: Parent namespace of the model, used for automatic rebuilding of models.
+    __pydantic_post_init__: The name of the post-init method for the model, if defined.
+    __pydantic_root_model__: Whether the model is a [`RootModel`][pydantic.root_model.RootModel].
+    __pydantic_serializer__: The `pydantic-core` `SchemaSerializer` used to dump instances of the model.
+    __pydantic_validator__: The `pydantic-core` `SchemaValidator` used to validate instances of the model.
+
+    __pydantic_fields__: A dictionary of field names and their corresponding [`FieldInfo`][pydantic.fields.FieldInfo] objects.
+    __pydantic_computed_fields__: A dictionary of computed field names and their corresponding [`ComputedFieldInfo`][pydantic.fields.ComputedFieldInfo] objects.
+
+    __pydantic_extra__: A dictionary containing extra values, if [`extra`][pydantic.config.ConfigDict.extra]
+        is set to `'allow'`.
+    __pydantic_fields_set__: The names of fields explicitly set during instantiation.
+    __pydantic_private__: Values of private attributes set on the model instance.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | `str` | Yes | - | - |
+| **summary** | `Optional` | Yes | - | - |
+| **docstring** | `Optional` | Yes | - | - |
+| **methods** | `List` | Yes | - | - |
+| **fields** | `List` | No | `PydanticUndefined` | - |
+| **source_line** | `int` | Yes | - | - |
 
 
 #### `class ModuleDoc`
 !!! abstract "Usage Documentation"
+    [Models](../concepts/models.md)
+
+A base class for creating Pydantic models.
+
+Attributes:
+    __class_vars__: The names of the class variables defined on the model.
+    __private_attributes__: Metadata about the private attributes of the model.
+    __signature__: The synthesized `__init__` [`Signature`][inspect.Signature] of the model.
+
+    __pydantic_complete__: Whether model building is completed, or if there are still undefined fields.
+    __pydantic_core_schema__: The core schema of the model.
+    __pydantic_custom_init__: Whether the model has a custom `__init__` function.
+    __pydantic_decorators__: Metadata containing the decorators defined on the model.
+        This replaces `Model.__validators__` and `Model.__root_validators__` from Pydantic V1.
+    __pydantic_generic_metadata__: Metadata for generic models; contains data used for a similar purpose to
+        __args__, __origin__, __parameters__ in typing-module generics. May eventually be replaced by these.
+    __pydantic_parent_namespace__: Parent namespace of the model, used for automatic rebuilding of models.
+    __pydantic_post_init__: The name of the post-init method for the model, if defined.
+    __pydantic_root_model__: Whether the model is a [`RootModel`][pydantic.root_model.RootModel].
+    __pydantic_serializer__: The `pydantic-core` `SchemaSerializer` used to dump instances of the model.
+    __pydantic_validator__: The `pydantic-core` `SchemaValidator` used to validate instances of the model.
+
+    __pydantic_fields__: A dictionary of field names and their corresponding [`FieldInfo`][pydantic.fields.FieldInfo] objects.
+    __pydantic_computed_fields__: A dictionary of computed field names and their corresponding [`ComputedFieldInfo`][pydantic.fields.ComputedFieldInfo] objects.
+
+    __pydantic_extra__: A dictionary containing extra values, if [`extra`][pydantic.config.ConfigDict.extra]
+        is set to `'allow'`.
+    __pydantic_fields_set__: The names of fields explicitly set during instantiation.
+    __pydantic_private__: Values of private attributes set on the model instance.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | `str` | Yes | - | - |
+| **path** | `str` | Yes | - | - |
+| **summary** | `Optional` | Yes | - | - |
+| **classes** | `List` | Yes | - | - |
+| **functions** | `List` | Yes | - | - |
+| **submodules** | `List` | No | `PydanticUndefined` | - |
 
 
 ---
@@ -903,6 +1460,16 @@ Node execution engine.
 ### Classes
 #### `class NodeResult`
 Result of node execution.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **node_name** | `str` | Yes | - | - |
+| **success** | `bool` | Yes | - | - |
+| **duration** | `float` | Yes | - | - |
+| **rows_processed** | `Optional` | No | - | - |
+| **result_schema** | `Optional` | No | - | - |
+| **error** | `Optional` | No | - | - |
+| **metadata** | `Dict` | No | `PydanticUndefined` | - |
 
 
 #### `class Node`
@@ -1055,6 +1622,12 @@ Documentation Story Generator
 #### `class DocStoryGenerator`
 Generates documentation stories for pipelines.
 
+Creates stakeholder-ready documentation by:
+- Extracting operation explanations from the registry
+- Building context from pipeline/project config
+- Validating explanation quality
+- Rendering to HTML or Markdown
+
 - **__init__**`(self, pipeline_config: odibi.config.PipelineConfig, project_config: Optional[odibi.config.ProjectConfig] = None)`
   - Initialize doc story generator.
 - **generate**`(self, output_path: str, format: str = 'html', validate: bool = True, include_flow_diagram: bool = True, theme=None) -> str`
@@ -1103,6 +1676,9 @@ Metadata specific to Delta Lake writes.
 #### `class NodeExecutionMetadata`
 Metadata for a single node execution.
 
+Captures all relevant information about a node's execution including
+performance metrics, data transformations, and error details.
+
 - **__init__**`(self, node_name: str, operation: str, status: str, duration: float, rows_in: Optional[int] = None, rows_out: Optional[int] = None, rows_change: Optional[int] = None, rows_change_pct: Optional[float] = None, sample_in: Optional[List[Dict[str, Any]]] = None, sample_data: Optional[List[Dict[str, Any]]] = None, schema_in: Optional[List[str]] = None, schema_out: Optional[List[str]] = None, columns_added: List[str] = <factory>, columns_removed: List[str] = <factory>, columns_renamed: List[str] = <factory>, executed_sql: List[str] = <factory>, sql_hash: Optional[str] = None, transformation_stack: List[str] = <factory>, config_snapshot: Optional[Dict[str, Any]] = None, delta_info: Optional[odibi.story.metadata.DeltaWriteInfo] = None, data_diff: Optional[Dict[str, Any]] = None, environment: Optional[Dict[str, Any]] = None, source_files: List[str] = <factory>, null_profile: Optional[Dict[str, float]] = None, error_message: Optional[str] = None, error_type: Optional[str] = None, started_at: Optional[str] = None, completed_at: Optional[str] = None) -> None`
   - Initialize self.  See help(type(self)) for accurate signature.
 - **calculate_row_change**`(self)`
@@ -1116,6 +1692,9 @@ Metadata for a single node execution.
 
 #### `class PipelineStoryMetadata`
 Complete metadata for a pipeline run story.
+
+Aggregates information about the entire pipeline execution including
+all node executions, overall status, and project context.
 
 - **__init__**`(self, pipeline_name: str, pipeline_layer: Optional[str] = None, run_id: str = <factory>, started_at: str = <factory>, completed_at: Optional[str] = None, duration: float = 0.0, total_nodes: int = 0, completed_nodes: int = 0, failed_nodes: int = 0, skipped_nodes: int = 0, nodes: List[odibi.story.metadata.NodeExecutionMetadata] = <factory>, project: Optional[str] = None, plant: Optional[str] = None, asset: Optional[str] = None, business_unit: Optional[str] = None, theme: str = 'default', include_samples: bool = True, max_sample_rows: int = 10) -> None`
   - Initialize self.  See help(type(self)) for accurate signature.
@@ -1149,6 +1728,12 @@ def get_renderer(format: str)
 #### `class HTMLStoryRenderer`
 Renders pipeline stories as HTML.
 
+Creates professional, interactive HTML reports with:
+- Responsive design
+- Collapsible sections
+- Status indicators
+- Summary statistics
+
 - **__init__**`(self, template_path: Optional[str] = None, theme=None)`
   - Initialize HTML renderer.
 - **render**`(self, metadata: odibi.story.metadata.PipelineStoryMetadata) -> str`
@@ -1159,6 +1744,12 @@ Renders pipeline stories as HTML.
 #### `class MarkdownStoryRenderer`
 Renders pipeline stories as Markdown.
 
+Creates clean, readable Markdown documentation with:
+- GitHub-flavored markdown
+- Tables for data
+- Code blocks for errors
+- Emoji indicators
+
 - **render**`(self, metadata: odibi.story.metadata.PipelineStoryMetadata) -> str`
   - Render story as Markdown.
 - **render_to_file**`(self, metadata: odibi.story.metadata.PipelineStoryMetadata, output_path: str) -> str`
@@ -1166,6 +1757,11 @@ Renders pipeline stories as Markdown.
 
 #### `class JSONStoryRenderer`
 Renders pipeline stories as JSON.
+
+Creates machine-readable JSON output for:
+- API integration
+- Programmatic analysis
+- Data storage/archival
 
 - **render**`(self, metadata: odibi.story.metadata.PipelineStoryMetadata) -> str`
   - Render story as JSON.
@@ -1195,6 +1791,9 @@ def list_themes() -> Dict[str, odibi.story.themes.StoryTheme]
 ### Classes
 #### `class StoryTheme`
 Story theme configuration.
+
+Defines colors, typography, branding, and layout options for
+rendered stories (HTML).
 
 - **__init__**`(self, name: str, primary_color: str = '#0066cc', success_color: str = '#28a745', error_color: str = '#dc3545', warning_color: str = '#ffc107', bg_color: str = '#ffffff', text_color: str = '#333333', border_color: str = '#dddddd', code_bg: str = '#f5f5f5', font_family: str = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", heading_font: str = 'inherit', code_font: str = "Consolas, Monaco, 'Courier New', monospace", font_size: str = '16px', logo_url: Optional[str] = None, company_name: Optional[str] = None, footer_text: Optional[str] = None, max_width: str = '1200px', sidebar: bool = False, custom_css: Optional[str] = None) -> None`
   - Initialize self.  See help(type(self)) for accurate signature.
@@ -1330,43 +1929,179 @@ def window_calculation(context: odibi.context.EngineContext, params: odibi.trans
 
 ### Classes
 #### `class DeduplicateParams`
-!!! abstract "Usage Documentation"
+Configuration for deduplication.
+
+Example:
+```yaml
+deduplicate:
+  keys: ["id"]
+  order_by: "updated_at DESC"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **keys** | `List` | Yes | - | - |
+| **order_by** | `Optional` | No | - | SQL Order by clause (e.g. 'updated_at DESC') |
 
 
 #### `class ExplodeParams`
-!!! abstract "Usage Documentation"
+Configuration for exploding lists.
+
+Example:
+```yaml
+explode_list_column:
+  column: "items"
+  outer: true
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | `str` | Yes | - | - |
+| **outer** | `bool` | No | `False` | If True, keep rows with empty lists (explode_outer) |
 
 
 #### `class DictMappingParams`
-!!! abstract "Usage Documentation"
+Configuration for dictionary mapping.
+
+Example:
+```yaml
+dict_based_mapping:
+  column: "status_code"
+  mapping:
+    1: "Active"
+    0: "Inactive"
+  default: "Unknown"
+  output_column: "status_desc"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | `str` | Yes | - | - |
+| **mapping** | `Dict` | Yes | - | - |
+| **default** | `Optional` | No | - | - |
+| **output_column** | `Optional` | No | - | - |
 
 
 #### `class RegexReplaceParams`
-!!! abstract "Usage Documentation"
+Configuration for regex replacement.
+
+Example:
+```yaml
+regex_replace:
+  column: "phone"
+  pattern: "[^0-9]"
+  replacement: ""
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | `str` | Yes | - | - |
+| **pattern** | `str` | Yes | - | - |
+| **replacement** | `str` | Yes | - | - |
 
 
 #### `class UnpackStructParams`
-!!! abstract "Usage Documentation"
+Configuration for unpacking structs.
+
+Example:
+```yaml
+unpack_struct:
+  column: "user_info"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | `str` | Yes | - | - |
 
 
 #### `class HashParams`
-!!! abstract "Usage Documentation"
+Configuration for column hashing.
+
+Example:
+```yaml
+hash_columns:
+  columns: ["email", "ssn"]
+  algorithm: "sha256"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | `List` | Yes | - | - |
+| **algorithm** | `Literal` | No | `sha256` | - |
 
 
 #### `class SurrogateKeyParams`
-!!! abstract "Usage Documentation"
+Configuration for surrogate key generation.
+
+Example:
+```yaml
+generate_surrogate_key:
+  columns: ["region", "product_id"]
+  separator: "-"
+  output_col: "unique_id"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | `List` | Yes | - | Columns to combine for the key |
+| **separator** | `str` | No | `-` | Separator between values |
+| **output_col** | `str` | No | `surrogate_key` | Name of the output column |
 
 
 #### `class ParseJsonParams`
-!!! abstract "Usage Documentation"
+Configuration for JSON parsing.
+
+Example:
+```yaml
+parse_json:
+  column: "raw_json"
+  json_schema: "id INT, name STRING"
+  output_col: "parsed_struct"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | `str` | Yes | - | String column containing JSON |
+| **json_schema** | `str` | Yes | - | DDL schema string (e.g. 'a INT, b STRING') or Spark StructType DDL |
+| **output_col** | `Optional` | No | - | - |
 
 
 #### `class ValidateAndFlagParams`
-!!! abstract "Usage Documentation"
+Configuration for validation flagging.
+
+Example:
+```yaml
+validate_and_flag:
+  flag_col: "data_issues"
+  rules:
+    age_check: "age >= 0"
+    email_format: "email LIKE '%@%'"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **rules** | `Dict` | Yes | - | Map of rule name to SQL condition (must be TRUE) |
+| **flag_col** | `str` | No | `_issues` | Name of the column to store failed rules |
 
 
 #### `class WindowCalculationParams`
-!!! abstract "Usage Documentation"
+Configuration for window functions.
+
+Example:
+```yaml
+window_calculation:
+  target_col: "cumulative_sales"
+  function: "sum(sales)"
+  partition_by: ["region"]
+  order_by: "date ASC"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **target_col** | `str` | Yes | - | - |
+| **function** | `str` | Yes | - | Window function e.g. 'sum(amount)', 'rank()' |
+| **partition_by** | `List` | No | `PydanticUndefined` | - |
+| **order_by** | `Optional` | No | - | - |
 
 
 ---
@@ -1421,23 +2156,99 @@ def aggregate(context: odibi.context.EngineContext, params: odibi.transformers.r
 
 ### Classes
 #### `class JoinParams`
-!!! abstract "Usage Documentation"
+Configuration for joining datasets.
+
+Example:
+```yaml
+join:
+  right_dataset: "customers"
+  on: "customer_id"
+  how: "left"
+  prefix: "cust"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **right_dataset** | `str` | Yes | - | Name of the node/dataset to join with |
+| **on** | `Union` | Yes | - | Column(s) to join on |
+| **how** | `Literal` | No | `left` | Join type |
+| **prefix** | `Optional` | No | - | Prefix for columns from right dataset to avoid collisions |
 
 
 #### `class UnionParams`
-!!! abstract "Usage Documentation"
+Configuration for unioning datasets.
+
+Example:
+```yaml
+union:
+  datasets: ["sales_2023", "sales_2024"]
+  by_name: true
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **datasets** | `List` | Yes | - | List of node names to union with current |
+| **by_name** | `bool` | No | `True` | Match columns by name (UNION ALL BY NAME) |
 
 
 #### `class PivotParams`
-!!! abstract "Usage Documentation"
+Configuration for pivoting data.
+
+Example:
+```yaml
+pivot:
+  group_by: ["product_id", "region"]
+  pivot_col: "month"
+  agg_col: "sales"
+  agg_func: "sum"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **group_by** | `List` | Yes | - | - |
+| **pivot_col** | `str` | Yes | - | - |
+| **agg_col** | `str` | Yes | - | - |
+| **agg_func** | `Literal` | No | `sum` | - |
+| **values** | `Optional` | No | - | Specific values to pivot (for Spark optimization) |
 
 
 #### `class UnpivotParams`
-!!! abstract "Usage Documentation"
+Configuration for unpivoting (melting) data.
+
+Example:
+```yaml
+unpivot:
+  id_cols: ["product_id"]
+  value_vars: ["jan_sales", "feb_sales", "mar_sales"]
+  var_name: "month"
+  value_name: "sales"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **id_cols** | `List` | Yes | - | - |
+| **value_vars** | `List` | Yes | - | - |
+| **var_name** | `str` | No | `variable` | - |
+| **value_name** | `str` | No | `value` | - |
 
 
 #### `class AggregateParams`
-!!! abstract "Usage Documentation"
+Configuration for aggregation.
+
+Example:
+```yaml
+aggregate:
+  group_by: ["department", "region"]
+  aggregations:
+    salary: "sum"
+    employee_id: "count"
+    age: "avg"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **group_by** | `List` | Yes | - | Columns to group by |
+| **aggregations** | `Dict` | Yes | - | Map of column to aggregation function (sum, avg, min, max, count) |
 
 
 ---
@@ -1572,75 +2383,312 @@ def concat_columns(context: odibi.context.EngineContext, params: odibi.transform
 
 ### Classes
 #### `class FilterRowsParams`
-!!! abstract "Usage Documentation"
+Configuration for filtering rows.
+
+Example:
+```yaml
+filter_rows:
+  condition: "age > 18 AND status = 'active'"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **condition** | `str` | Yes | - | SQL WHERE clause (e.g., 'age > 18 AND status = "active"') |
 
 
 #### `class DeriveColumnsParams`
-!!! abstract "Usage Documentation"
+Configuration for derived columns.
+
+Example:
+```yaml
+derive_columns:
+  derivations:
+    total_price: "quantity * unit_price"
+    full_name: "concat(first_name, ' ', last_name)"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **derivations** | `Dict` | Yes | - | Map of column name to SQL expression |
 
 
 #### `class CastColumnsParams`
-!!! abstract "Usage Documentation"
+Configuration for column type casting.
+
+Example:
+```yaml
+cast_columns:
+  casts:
+    age: "int"
+    salary: "double"
+    created_at: "timestamp"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **casts** | `Dict` | Yes | - | Map of column to target SQL type |
 
 
 #### `class CleanTextParams`
-!!! abstract "Usage Documentation"
+Configuration for text cleaning.
+
+Example:
+```yaml
+clean_text:
+  columns: ["email", "username"]
+  trim: true
+  case: "lower"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | `List` | Yes | - | List of columns to clean |
+| **trim** | `bool` | No | `True` | Apply TRIM() |
+| **case** | `Literal` | No | `preserve` | Case conversion |
 
 
 #### `class ExtractDateParams`
-!!! abstract "Usage Documentation"
+Configuration for extracting date parts.
+
+Example:
+```yaml
+extract_date_parts:
+  source_col: "created_at"
+  prefix: "created"
+  parts: ["year", "month"]
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **source_col** | `str` | Yes | - | - |
+| **prefix** | `Optional` | No | - | - |
+| **parts** | `List` | No | `['year', 'month', 'day']` | - |
 
 
 #### `class NormalizeSchemaParams`
-!!! abstract "Usage Documentation"
+Configuration for schema normalization.
+
+Example:
+```yaml
+normalize_schema:
+  rename:
+    old_col: "new_col"
+  drop: ["unused_col"]
+  select_order: ["id", "new_col", "created_at"]
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **rename** | `Optional` | No | `PydanticUndefined` | - |
+| **drop** | `Optional` | No | `PydanticUndefined` | - |
+| **select_order** | `Optional` | No | - | - |
 
 
 #### `class SortParams`
-!!! abstract "Usage Documentation"
+Configuration for sorting.
+
+Example:
+```yaml
+sort:
+  by: ["created_at", "id"]
+  ascending: false
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **by** | `Union` | Yes | - | Column(s) to sort by |
+| **ascending** | `bool` | No | `True` | Sort order |
 
 
 #### `class LimitParams`
-!!! abstract "Usage Documentation"
+Configuration for result limiting.
+
+Example:
+```yaml
+limit:
+  n: 100
+  offset: 0
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **n** | `int` | Yes | - | Number of rows to return |
+| **offset** | `int` | No | `0` | Number of rows to skip |
 
 
 #### `class SampleParams`
-!!! abstract "Usage Documentation"
+Configuration for random sampling.
+
+Example:
+```yaml
+sample:
+  fraction: 0.1
+  seed: 42
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **fraction** | `float` | Yes | - | Fraction of rows to return (0.0 to 1.0) |
+| **seed** | `Optional` | No | - | - |
 
 
 #### `class DistinctParams`
-!!! abstract "Usage Documentation"
+Configuration for distinct rows.
+
+Example:
+```yaml
+distinct:
+  columns: ["category", "status"]
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | `Optional` | No | - | Columns to project (if None, keeps all columns unique) |
 
 
 #### `class FillNullsParams`
-!!! abstract "Usage Documentation"
+Configuration for filling null values.
+
+Example:
+```yaml
+fill_nulls:
+  values:
+    count: 0
+    description: "N/A"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **values** | `Dict` | Yes | - | Map of column to fill value |
 
 
 #### `class SplitPartParams`
-!!! abstract "Usage Documentation"
+Configuration for splitting strings.
+
+Example:
+```yaml
+split_part:
+  col: "email"
+  delimiter: "@"
+  index: 2  # Extracts domain
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **col** | `str` | Yes | - | Column to split |
+| **delimiter** | `str` | Yes | - | Delimiter to split by |
+| **index** | `int` | Yes | - | 1-based index of the token to extract |
 
 
 #### `class DateAddParams`
-!!! abstract "Usage Documentation"
+Configuration for date addition.
+
+Example:
+```yaml
+date_add:
+  col: "created_at"
+  value: 1
+  unit: "day"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **col** | `str` | Yes | - | - |
+| **value** | `int` | Yes | - | - |
+| **unit** | `Literal` | Yes | - | - |
 
 
 #### `class DateTruncParams`
-!!! abstract "Usage Documentation"
+Configuration for date truncation.
+
+Example:
+```yaml
+date_trunc:
+  col: "created_at"
+  unit: "month"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **col** | `str` | Yes | - | - |
+| **unit** | `Literal` | Yes | - | - |
 
 
 #### `class DateDiffParams`
-!!! abstract "Usage Documentation"
+Configuration for date difference.
+
+Example:
+```yaml
+date_diff:
+  start_col: "created_at"
+  end_col: "updated_at"
+  unit: "day"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **start_col** | `str` | Yes | - | - |
+| **end_col** | `str` | Yes | - | - |
+| **unit** | `Literal` | No | `day` | - |
 
 
 #### `class CaseWhenParams`
-!!! abstract "Usage Documentation"
+Configuration for conditional logic.
+
+Example:
+```yaml
+case_when:
+  output_col: "age_group"
+  default: "'Adult'"
+  cases:
+    - condition: "age < 18"
+      value: "'Minor'"
+    - condition: "age > 65"
+      value: "'Senior'"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **cases** | `List` | Yes | - | List of {condition: ..., value: ...} |
+| **default** | `str` | No | `NULL` | Default value if no condition met |
+| **output_col** | `str` | Yes | - | Name of the resulting column |
 
 
 #### `class ConvertTimezoneParams`
-!!! abstract "Usage Documentation"
+Configuration for timezone conversion.
+
+Example:
+```yaml
+convert_timezone:
+  col: "utc_time"
+  source_tz: "UTC"
+  target_tz: "America/New_York"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **col** | `str` | Yes | - | Timestamp column to convert |
+| **source_tz** | `str` | No | `UTC` | Source timezone (e.g., 'UTC', 'America/New_York') |
+| **target_tz** | `str` | Yes | - | Target timezone (e.g., 'America/Los_Angeles') |
+| **output_col** | `Optional` | No | - | Name of the result column (default: {col}_{target_tz}) |
 
 
 #### `class ConcatColumnsParams`
-!!! abstract "Usage Documentation"
+Configuration for string concatenation.
+
+Example:
+```yaml
+concat_columns:
+  columns: ["first_name", "last_name"]
+  separator: " "
+  output_col: "full_name"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | `List` | Yes | - | Columns to concatenate |
+| **separator** | `str` | No | - | Separator string |
+| **output_col** | `str` | Yes | - | Resulting column name |
 
 
 ---
@@ -1812,6 +2860,13 @@ A linting issue found in an explanation.
 
 #### `class ExplanationLinter`
 Lints explanation text for quality issues.
+
+Checks:
+- Minimum length
+- Required sections (Purpose, Details, Result)
+- Generic/lazy phrases
+- TODO placeholders
+- Formula formatting
 
 - **__init__**`(self)`
   - Initialize self.  See help(type(self)) for accurate signature.

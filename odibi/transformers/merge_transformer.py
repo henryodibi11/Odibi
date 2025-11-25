@@ -18,6 +18,18 @@ def merge(context, current, **params):
     Merge transformer implementation.
     Handles Upsert, Append-Only, and Delete-Match strategies.
 
+    Example:
+    ```yaml
+    transformer: "merge"
+    params:
+      target: "silver/customers"
+      keys: ["customer_id"]
+      strategy: "upsert"
+      audit_cols:
+        created_col: "created_at"
+        updated_col: "updated_at"
+    ```
+
     Params:
         target (str): Target table name or path.
         keys (List[str]): List of join keys.

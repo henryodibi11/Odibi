@@ -19,6 +19,14 @@ class ParameterDoc(BaseModel):
     default: Optional[str] = None
 
 
+class FieldDoc(BaseModel):
+    name: str
+    type_hint: str
+    required: bool
+    default: Optional[str] = None
+    description: Optional[str] = None
+
+
 class FunctionDoc(BaseModel):
     name: str
     signature: str
@@ -30,7 +38,9 @@ class FunctionDoc(BaseModel):
 class ClassDoc(BaseModel):
     name: str
     summary: Optional[str]
+    docstring: Optional[str]
     methods: List[FunctionDoc]
+    fields: List[FieldDoc] = Field(default_factory=list)
     source_line: int
 
 
@@ -46,9 +56,14 @@ class ModuleDoc(BaseModel):
 # --- Extraction Logic ---
 
 
+def get_docstring(obj: Any) -> Optional[str]:
+    """Extract the full docstring."""
+    return inspect.getdoc(obj)
+
+
 def get_summary(obj: Any) -> Optional[str]:
     """Extract the first line of the docstring."""
-    doc = inspect.getdoc(obj)
+    doc = get_docstring(obj)
     if not doc:
         return None
     return doc.split("\n")[0].strip()
@@ -89,6 +104,54 @@ def get_parameters(func: Any) -> List[ParameterDoc]:
             )
         )
     return params
+
+
+def get_pydantic_fields(cls: Any) -> List[FieldDoc]:
+    """Extract fields from a Pydantic model."""
+    fields = []
+
+    # Pydantic V2
+    if hasattr(cls, "model_fields"):
+        for name, field in cls.model_fields.items():
+            # Get type annotation
+            type_hint = "Any"
+            if field.annotation is not None:
+                type_hint = format_type_hint(field.annotation)
+
+            # Check required/default
+            required = field.is_required()
+            default = None
+            if not required:
+                # Try to get default value representation
+                if field.default is not None:  # Pydantic V2 specific checks might be needed
+                    default = str(field.default)
+
+            fields.append(
+                FieldDoc(
+                    name=name,
+                    type_hint=type_hint,
+                    required=required,
+                    default=default,
+                    description=field.description,
+                )
+            )
+    # Pydantic V1 fallback (just in case)
+    elif hasattr(cls, "__fields__"):
+        for name, field in cls.__fields__.items():
+            type_hint = format_type_hint(field.outer_type_)
+            required = field.required
+            default = str(field.default) if not required else None
+            fields.append(
+                FieldDoc(
+                    name=name,
+                    type_hint=type_hint,
+                    required=required,
+                    default=default,
+                    description=field.field_info.description,
+                )
+            )
+
+    return fields
 
 
 def scan_module(module_name: str) -> Optional[ModuleDoc]:
@@ -147,6 +210,11 @@ def scan_module(module_name: str) -> Optional[ModuleDoc]:
             # Sort methods by source line
             methods.sort(key=lambda x: x.source_line)
 
+            # Extract Pydantic fields if applicable
+            fields = []
+            if hasattr(obj, "model_fields") or hasattr(obj, "__fields__"):
+                fields = get_pydantic_fields(obj)
+
             try:
                 source_line = inspect.getsourcelines(obj)[1]
             except (OSError, TypeError):
@@ -156,7 +224,9 @@ def scan_module(module_name: str) -> Optional[ModuleDoc]:
                 ClassDoc(
                     name=name,
                     summary=get_summary(obj),
+                    docstring=get_docstring(obj),
                     methods=methods,
+                    fields=fields,
                     source_line=source_line,
                 )
             )
@@ -249,8 +319,27 @@ def render_markdown(modules: List[ModuleDoc]) -> str:
             lines.append("### Classes")
             for cls in module.classes:
                 lines.append(f"#### `class {cls.name}`")
-                if cls.summary:
+
+                # Render full docstring if available (includes examples)
+                if cls.docstring:
+                    lines.append(f"{cls.docstring}\n")
+                elif cls.summary:
                     lines.append(f"{cls.summary}\n")
+
+                # Render Fields Table for Pydantic Models
+                if cls.fields:
+                    lines.append("| Field | Type | Required | Default | Description |")
+                    lines.append("| --- | --- | --- | --- | --- |")
+                    for field in cls.fields:
+                        req = "Yes" if field.required else "No"
+                        default = f"`{field.default}`" if field.default else "-"
+                        desc = field.description or "-"
+                        # Escape pipes in description
+                        desc = desc.replace("|", "\\|").replace("\n", " ")
+                        lines.append(
+                            f"| **{field.name}** | `{field.type_hint}` | {req} | {default} | {desc} |"
+                        )
+                    lines.append("")
 
                 for method in cls.methods:
                     lines.append(f"- **{method.name}**`{method.signature}`")

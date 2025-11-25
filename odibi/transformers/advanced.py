@@ -11,6 +11,17 @@ from odibi.enums import EngineType
 
 
 class DeduplicateParams(BaseModel):
+    """
+    Configuration for deduplication.
+
+    Example:
+    ```yaml
+    deduplicate:
+      keys: ["id"]
+      order_by: "updated_at DESC"
+    ```
+    """
+
     keys: List[str]
     order_by: Optional[str] = Field(
         None, description="SQL Order by clause (e.g. 'updated_at DESC')"
@@ -46,6 +57,17 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
 
 
 class ExplodeParams(BaseModel):
+    """
+    Configuration for exploding lists.
+
+    Example:
+    ```yaml
+    explode_list_column:
+      column: "items"
+      outer: true
+    ```
+    """
+
     column: str
     outer: bool = Field(False, description="If True, keep rows with empty lists (explode_outer)")
 
@@ -75,6 +97,21 @@ def explode_list_column(context: EngineContext, params: ExplodeParams) -> Engine
 
 
 class DictMappingParams(BaseModel):
+    """
+    Configuration for dictionary mapping.
+
+    Example:
+    ```yaml
+    dict_based_mapping:
+      column: "status_code"
+      mapping:
+        1: "Active"
+        0: "Inactive"
+      default: "Unknown"
+      output_column: "status_desc"
+    ```
+    """
+
     column: str
     mapping: Dict[Any, Any]
     default: Optional[Any] = None
@@ -115,6 +152,18 @@ def dict_based_mapping(context: EngineContext, params: DictMappingParams) -> Eng
 
 
 class RegexReplaceParams(BaseModel):
+    """
+    Configuration for regex replacement.
+
+    Example:
+    ```yaml
+    regex_replace:
+      column: "phone"
+      pattern: "[^0-9]"
+      replacement: ""
+    ```
+    """
+
     column: str
     pattern: str
     replacement: str
@@ -135,6 +184,16 @@ def regex_replace(context: EngineContext, params: RegexReplaceParams) -> EngineC
 
 
 class UnpackStructParams(BaseModel):
+    """
+    Configuration for unpacking structs.
+
+    Example:
+    ```yaml
+    unpack_struct:
+      column: "user_info"
+    ```
+    """
+
     column: str
 
 
@@ -178,6 +237,17 @@ def unpack_struct(context: EngineContext, params: UnpackStructParams) -> EngineC
 
 
 class HashParams(BaseModel):
+    """
+    Configuration for column hashing.
+
+    Example:
+    ```yaml
+    hash_columns:
+      columns: ["email", "ssn"]
+      algorithm: "sha256"
+    ```
+    """
+
     columns: List[str]
     algorithm: Literal["sha256", "md5"] = "sha256"
 
@@ -238,6 +308,18 @@ def hash_columns(context: EngineContext, params: HashParams) -> EngineContext:
 
 
 class SurrogateKeyParams(BaseModel):
+    """
+    Configuration for surrogate key generation.
+
+    Example:
+    ```yaml
+    generate_surrogate_key:
+      columns: ["region", "product_id"]
+      separator: "-"
+      output_col: "unique_id"
+    ```
+    """
+
     columns: List[str] = Field(..., description="Columns to combine for the key")
     separator: str = Field("-", description="Separator between values")
     output_col: str = Field("surrogate_key", description="Name of the output column")
@@ -289,6 +371,18 @@ def generate_surrogate_key(context: EngineContext, params: SurrogateKeyParams) -
 
 
 class ParseJsonParams(BaseModel):
+    """
+    Configuration for JSON parsing.
+
+    Example:
+    ```yaml
+    parse_json:
+      column: "raw_json"
+      json_schema: "id INT, name STRING"
+      output_col: "parsed_struct"
+    ```
+    """
+
     column: str = Field(..., description="String column containing JSON")
     json_schema: str = Field(
         ..., description="DDL schema string (e.g. 'a INT, b STRING') or Spark StructType DDL"
@@ -341,6 +435,19 @@ def parse_json(context: EngineContext, params: ParseJsonParams) -> EngineContext
 
 
 class ValidateAndFlagParams(BaseModel):
+    """
+    Configuration for validation flagging.
+
+    Example:
+    ```yaml
+    validate_and_flag:
+      flag_col: "data_issues"
+      rules:
+        age_check: "age >= 0"
+        email_format: "email LIKE '%@%'"
+    ```
+    """
+
     # key: rule name, value: sql condition (must be true for valid)
     rules: Dict[str, str] = Field(
         ..., description="Map of rule name to SQL condition (must be TRUE)"
@@ -388,6 +495,19 @@ def validate_and_flag(context: EngineContext, params: ValidateAndFlagParams) -> 
 
 
 class WindowCalculationParams(BaseModel):
+    """
+    Configuration for window functions.
+
+    Example:
+    ```yaml
+    window_calculation:
+      target_col: "cumulative_sales"
+      function: "sum(sales)"
+      partition_by: ["region"]
+      order_by: "date ASC"
+    ```
+    """
+
     target_col: str
     function: str = Field(..., description="Window function e.g. 'sum(amount)', 'rank()'")
     partition_by: List[str] = Field(default_factory=list)

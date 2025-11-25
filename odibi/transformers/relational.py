@@ -11,6 +11,19 @@ from odibi.enums import EngineType
 
 
 class JoinParams(BaseModel):
+    """
+    Configuration for joining datasets.
+
+    Example:
+    ```yaml
+    join:
+      right_dataset: "customers"
+      on: "customer_id"
+      how: "left"
+      prefix: "cust"
+    ```
+    """
+
     right_dataset: str = Field(..., description="Name of the node/dataset to join with")
     on: Union[str, List[str]] = Field(..., description="Column(s) to join on")
     how: Literal["inner", "left", "right", "full", "cross"] = Field("left", description="Join type")
@@ -96,6 +109,17 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
 
 
 class UnionParams(BaseModel):
+    """
+    Configuration for unioning datasets.
+
+    Example:
+    ```yaml
+    union:
+      datasets: ["sales_2023", "sales_2024"]
+      by_name: true
+    ```
+    """
+
     datasets: List[str] = Field(..., description="List of node names to union with current")
     by_name: bool = Field(True, description="Match columns by name (UNION ALL BY NAME)")
 
@@ -136,6 +160,19 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
 
 
 class PivotParams(BaseModel):
+    """
+    Configuration for pivoting data.
+
+    Example:
+    ```yaml
+    pivot:
+      group_by: ["product_id", "region"]
+      pivot_col: "month"
+      agg_col: "sales"
+      agg_func: "sum"
+    ```
+    """
+
     group_by: List[str]
     pivot_col: str
     agg_col: str
@@ -188,6 +225,19 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
 
 
 class UnpivotParams(BaseModel):
+    """
+    Configuration for unpivoting (melting) data.
+
+    Example:
+    ```yaml
+    unpivot:
+      id_cols: ["product_id"]
+      value_vars: ["jan_sales", "feb_sales", "mar_sales"]
+      var_name: "month"
+      value_name: "sales"
+    ```
+    """
+
     id_cols: List[str]
     value_vars: List[str]
     var_name: str = "variable"
@@ -234,6 +284,20 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
 
 
 class AggregateParams(BaseModel):
+    """
+    Configuration for aggregation.
+
+    Example:
+    ```yaml
+    aggregate:
+      group_by: ["department", "region"]
+      aggregations:
+        salary: "sum"
+        employee_id: "count"
+        age: "avg"
+    ```
+    """
+
     group_by: List[str] = Field(..., description="Columns to group by")
     aggregations: Dict[str, str] = Field(
         ..., description="Map of column to aggregation function (sum, avg, min, max, count)"

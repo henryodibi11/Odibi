@@ -10,6 +10,16 @@ from odibi.context import EngineContext
 
 
 class FilterRowsParams(BaseModel):
+    """
+    Configuration for filtering rows.
+
+    Example:
+    ```yaml
+    filter_rows:
+      condition: "age > 18 AND status = 'active'"
+    ```
+    """
+
     condition: str = Field(
         ..., description="SQL WHERE clause (e.g., 'age > 18 AND status = \"active\"')"
     )
@@ -33,6 +43,18 @@ def filter_rows(context: EngineContext, params: FilterRowsParams) -> EngineConte
 
 
 class DeriveColumnsParams(BaseModel):
+    """
+    Configuration for derived columns.
+
+    Example:
+    ```yaml
+    derive_columns:
+      derivations:
+        total_price: "quantity * unit_price"
+        full_name: "concat(first_name, ' ', last_name)"
+    ```
+    """
+
     # key: new_column_name, value: sql_expression
     derivations: Dict[str, str] = Field(..., description="Map of column name to SQL expression")
 
@@ -58,6 +80,19 @@ def derive_columns(context: EngineContext, params: DeriveColumnsParams) -> Engin
 
 
 class CastColumnsParams(BaseModel):
+    """
+    Configuration for column type casting.
+
+    Example:
+    ```yaml
+    cast_columns:
+      casts:
+        age: "int"
+        salary: "double"
+        created_at: "timestamp"
+    ```
+    """
+
     # key: column_name, value: target_type
     # Supports simplified types (int, str, float, bool) or raw SQL types.
     casts: Dict[str, str] = Field(..., description="Map of column to target SQL type")
@@ -102,6 +137,18 @@ def cast_columns(context: EngineContext, params: CastColumnsParams) -> EngineCon
 
 
 class CleanTextParams(BaseModel):
+    """
+    Configuration for text cleaning.
+
+    Example:
+    ```yaml
+    clean_text:
+      columns: ["email", "username"]
+      trim: true
+      case: "lower"
+    ```
+    """
+
     columns: List[str] = Field(..., description="List of columns to clean")
     trim: bool = Field(True, description="Apply TRIM()")
     case: Literal["lower", "upper", "preserve"] = Field("preserve", description="Case conversion")
@@ -137,6 +184,18 @@ def clean_text(context: EngineContext, params: CleanTextParams) -> EngineContext
 
 
 class ExtractDateParams(BaseModel):
+    """
+    Configuration for extracting date parts.
+
+    Example:
+    ```yaml
+    extract_date_parts:
+      source_col: "created_at"
+      prefix: "created"
+      parts: ["year", "month"]
+    ```
+    """
+
     source_col: str
     prefix: Optional[str] = None
     parts: List[Literal["year", "month", "day", "hour"]] = ["year", "month", "day"]
@@ -172,6 +231,19 @@ def extract_date_parts(context: EngineContext, params: ExtractDateParams) -> Eng
 
 
 class NormalizeSchemaParams(BaseModel):
+    """
+    Configuration for schema normalization.
+
+    Example:
+    ```yaml
+    normalize_schema:
+      rename:
+        old_col: "new_col"
+      drop: ["unused_col"]
+      select_order: ["id", "new_col", "created_at"]
+    ```
+    """
+
     rename: Optional[Dict[str, str]] = Field(default_factory=dict)
     drop: Optional[List[str]] = Field(default_factory=list)
     select_order: Optional[List[str]] = None
@@ -238,6 +310,17 @@ def normalize_schema(context: EngineContext, params: NormalizeSchemaParams) -> E
 
 
 class SortParams(BaseModel):
+    """
+    Configuration for sorting.
+
+    Example:
+    ```yaml
+    sort:
+      by: ["created_at", "id"]
+      ascending: false
+    ```
+    """
+
     by: Union[str, List[str]] = Field(..., description="Column(s) to sort by")
     ascending: bool = Field(True, description="Sort order")
 
@@ -260,6 +343,17 @@ def sort(context: EngineContext, params: SortParams) -> EngineContext:
 
 
 class LimitParams(BaseModel):
+    """
+    Configuration for result limiting.
+
+    Example:
+    ```yaml
+    limit:
+      n: 100
+      offset: 0
+    ```
+    """
+
     n: int = Field(..., description="Number of rows to return")
     offset: int = Field(0, description="Number of rows to skip")
 
@@ -272,6 +366,17 @@ def limit(context: EngineContext, params: LimitParams) -> EngineContext:
 
 
 class SampleParams(BaseModel):
+    """
+    Configuration for random sampling.
+
+    Example:
+    ```yaml
+    sample:
+      fraction: 0.1
+      seed: 42
+    ```
+    """
+
     fraction: float = Field(..., description="Fraction of rows to return (0.0 to 1.0)")
     seed: Optional[int] = None
 
@@ -299,6 +404,16 @@ def sample(context: EngineContext, params: SampleParams) -> EngineContext:
 
 
 class DistinctParams(BaseModel):
+    """
+    Configuration for distinct rows.
+
+    Example:
+    ```yaml
+    distinct:
+      columns: ["category", "status"]
+    ```
+    """
+
     columns: Optional[List[str]] = Field(
         None, description="Columns to project (if None, keeps all columns unique)"
     )
@@ -321,6 +436,18 @@ def distinct(context: EngineContext, params: DistinctParams) -> EngineContext:
 
 
 class FillNullsParams(BaseModel):
+    """
+    Configuration for filling null values.
+
+    Example:
+    ```yaml
+    fill_nulls:
+      values:
+        count: 0
+        description: "N/A"
+    ```
+    """
+
     # key: column, value: fill value (str, int, float, bool)
     values: Dict[str, Union[str, int, float, bool]] = Field(
         ..., description="Map of column to fill value"
@@ -358,6 +485,18 @@ def fill_nulls(context: EngineContext, params: FillNullsParams) -> EngineContext
 
 
 class SplitPartParams(BaseModel):
+    """
+    Configuration for splitting strings.
+
+    Example:
+    ```yaml
+    split_part:
+      col: "email"
+      delimiter: "@"
+      index: 2  # Extracts domain
+    ```
+    """
+
     col: str = Field(..., description="Column to split")
     delimiter: str = Field(..., description="Delimiter to split by")
     index: int = Field(..., description="1-based index of the token to extract")
@@ -390,6 +529,18 @@ def split_part(context: EngineContext, params: SplitPartParams) -> EngineContext
 
 
 class DateAddParams(BaseModel):
+    """
+    Configuration for date addition.
+
+    Example:
+    ```yaml
+    date_add:
+      col: "created_at"
+      value: 1
+      unit: "day"
+    ```
+    """
+
     col: str
     value: int
     unit: Literal["day", "month", "year", "hour", "minute", "second"]
@@ -415,6 +566,17 @@ def date_add(context: EngineContext, params: DateAddParams) -> EngineContext:
 
 
 class DateTruncParams(BaseModel):
+    """
+    Configuration for date truncation.
+
+    Example:
+    ```yaml
+    date_trunc:
+      col: "created_at"
+      unit: "month"
+    ```
+    """
+
     col: str
     unit: Literal["year", "month", "day", "hour", "minute", "second"]
 
@@ -440,6 +602,18 @@ def date_trunc(context: EngineContext, params: DateTruncParams) -> EngineContext
 
 
 class DateDiffParams(BaseModel):
+    """
+    Configuration for date difference.
+
+    Example:
+    ```yaml
+    date_diff:
+      start_col: "created_at"
+      end_col: "updated_at"
+      unit: "day"
+    ```
+    """
+
     start_col: str
     end_col: str
     unit: Literal["day", "hour", "minute", "second"] = "day"
@@ -490,6 +664,22 @@ def date_diff(context: EngineContext, params: DateDiffParams) -> EngineContext:
 
 
 class CaseWhenParams(BaseModel):
+    """
+    Configuration for conditional logic.
+
+    Example:
+    ```yaml
+    case_when:
+      output_col: "age_group"
+      default: "'Adult'"
+      cases:
+        - condition: "age < 18"
+          value: "'Minor'"
+        - condition: "age > 65"
+          value: "'Senior'"
+    ```
+    """
+
     # List of (condition, value) tuples
     cases: List[Dict[str, str]] = Field(..., description="List of {condition: ..., value: ...}")
     default: str = Field("NULL", description="Default value if no condition met")
@@ -519,6 +709,18 @@ def case_when(context: EngineContext, params: CaseWhenParams) -> EngineContext:
 
 
 class ConvertTimezoneParams(BaseModel):
+    """
+    Configuration for timezone conversion.
+
+    Example:
+    ```yaml
+    convert_timezone:
+      col: "utc_time"
+      source_tz: "UTC"
+      target_tz: "America/New_York"
+    ```
+    """
+
     col: str = Field(..., description="Timestamp column to convert")
     source_tz: str = Field("UTC", description="Source timezone (e.g., 'UTC', 'America/New_York')")
     target_tz: str = Field(..., description="Target timezone (e.g., 'America/Los_Angeles')")
@@ -566,6 +768,18 @@ def convert_timezone(context: EngineContext, params: ConvertTimezoneParams) -> E
 
 
 class ConcatColumnsParams(BaseModel):
+    """
+    Configuration for string concatenation.
+
+    Example:
+    ```yaml
+    concat_columns:
+      columns: ["first_name", "last_name"]
+      separator: " "
+      output_col: "full_name"
+    ```
+    """
+
     columns: List[str] = Field(..., description="Columns to concatenate")
     separator: str = Field("", description="Separator string")
     output_col: str = Field(..., description="Resulting column name")

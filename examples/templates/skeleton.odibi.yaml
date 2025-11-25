@@ -1,0 +1,91 @@
+# Odibi Skeleton Template
+# Use this as a starting point for new projects.
+# Refer to docs/api.md for detailed configuration options.
+
+# ============================================
+# 1. Project Metadata
+# ============================================
+project: "MyDataProject"
+version: "1.0.0"
+engine: "pandas" # or "spark"
+
+# ============================================
+# 2. Connections
+# ============================================
+# Define data sources and destinations.
+# See `odibi.config` in API docs for types (AzureBlob, Delta, SQL, etc.)
+connections:
+  local_data:
+    type: "local"
+    base_path: "./data"
+
+# ============================================
+# 3. Story Configuration
+# ============================================
+# Defines where execution logs and lineage are stored.
+story:
+  connection: "local_data"
+  path: "stories/"
+  retention_days: 30
+
+# ============================================
+# 4. Pipelines
+# ============================================
+pipelines:
+  - pipeline: "my_first_pipeline"
+    description: "Ingest and transform data"
+    layer: "bronze"
+    nodes:
+
+      # Node 1: Ingest (Read -> Write)
+      - name: "ingest_raw"
+        description: "Load raw CSV"
+        read:
+          connection: "local_data"
+          format: "csv"
+          path: "input/source.csv"
+          options: { header: true }
+        write:
+          connection: "local_data"
+          format: "parquet"
+          path: "bronze/raw_data"
+          mode: "overwrite"
+
+      # Node 2: Transform (Read -> Transform -> Write)
+      - name: "clean_data"
+        depends_on: ["ingest_raw"]
+        read:
+          connection: "local_data"
+          format: "parquet"
+          path: "bronze/raw_data"
+
+        # Transformations
+        # See `odibi.transformers` in API docs for available operations.
+        transform:
+          steps:
+            # SQL Step
+            - "SELECT * FROM df WHERE id IS NOT NULL"
+
+            # Operation Step (Python/Native)
+            - operation: "clean_text"
+              params:
+                columns: ["name"]
+                case: "lower"
+                trim: true
+
+        write:
+          connection: "local_data"
+          format: "delta"
+          path: "silver/clean_data"
+          mode: "overwrite"
+
+# ============================================
+# 5. Global Settings (Optional)
+# ============================================
+logging:
+  level: "INFO"
+  structured: false
+
+retry:
+  enabled: true
+  max_attempts: 3
