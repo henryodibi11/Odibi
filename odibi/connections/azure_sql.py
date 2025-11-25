@@ -109,7 +109,7 @@ class AzureSQL(BaseConnection):
             f"Server=tcp:{self.server},1433;"
             f"Database={self.database};"
             f"Encrypt=yes;"
-            f"TrustServerCertificate=no;"
+            f"TrustServerCertificate=yes;"
             f"Connection Timeout=30;"
         )
 
@@ -369,7 +369,7 @@ class AzureSQL(BaseConnection):
 
         if self.auth_mode == "aad_msi":
             # For MSI, append authentication property to URL
-            jdbc_url += "encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;authentication=ActiveDirectoryMsi;"
+            jdbc_url += "encrypt=true;trustServerCertificate=true;hostNameInCertificate=*.database.windows.net;loginTimeout=30;authentication=ActiveDirectoryMsi;"
         elif self.auth_mode == "aad_service_principal":
             # Not fully implemented in init yet, but placeholder
             pass
