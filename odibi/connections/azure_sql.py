@@ -365,11 +365,11 @@ class AzureSQL(BaseConnection):
         # Note: Spark uses its own JDBC driver (usually com.microsoft.sqlserver.jdbc.SQLServerDriver)
         # We rely on the driver being present in the Spark environment.
 
-        jdbc_url = f"jdbc:sqlserver://{self.server}:{self.port};databaseName={self.database};"
+        jdbc_url = f"jdbc:sqlserver://{self.server}:{self.port};databaseName={self.database};encrypt=true;trustServerCertificate=true;"
 
         if self.auth_mode == "aad_msi":
             # For MSI, append authentication property to URL
-            jdbc_url += "encrypt=true;trustServerCertificate=true;hostNameInCertificate=*.database.windows.net;loginTimeout=30;authentication=ActiveDirectoryMsi;"
+            jdbc_url += "hostNameInCertificate=*.database.windows.net;loginTimeout=30;authentication=ActiveDirectoryMsi;"
         elif self.auth_mode == "aad_service_principal":
             # Not fully implemented in init yet, but placeholder
             pass
