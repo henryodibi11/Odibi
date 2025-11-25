@@ -316,8 +316,6 @@ class StoryGenerator:
             return
 
         try:
-            from datetime import timedelta
-
             # 1. Clean new nested structure: {pipeline}/{date}/run_*.html
             pipeline_dir = self.output_path / self.pipeline_name
             if pipeline_dir.exists():
