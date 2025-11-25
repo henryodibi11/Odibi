@@ -2,7 +2,7 @@
 
 import time
 import inspect
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -415,15 +415,76 @@ class Node:
 
         # HWM Pattern: Use full-load query if first run
         options = read_config.options.copy()
-        if write_config and write_config.first_run_query is not None:
+
+        # Determine if target exists (shared logic)
+        target_exists = False
+        if write_config:
             target_connection = self.connections.get(write_config.connection)
             if target_connection:
-                table_exists = self.engine.table_exists(
-                    target_connection, table=write_config.table, path=write_config.path
+                try:
+                    target_exists = self.engine.table_exists(
+                        target_connection, table=write_config.table, path=write_config.path
+                    )
+                except Exception:
+                    # If check fails, assume it doesn't exist or we can't read it
+                    target_exists = False
+
+        # 1. Manual HWM (Legacy/Explicit)
+        if write_config and write_config.first_run_query is not None:
+            if not target_exists:
+                # First run: Override with full-load query
+                options["query"] = write_config.first_run_query
+
+        # 2. Automatic Incremental (Smart Read)
+        elif read_config.incremental:
+            # Only apply if no manual query is already set in options (precedence)
+            if "query" not in options and not read_config.query:
+                table_name = read_config.table or (
+                    f"delta.`{read_config.path}`" if read_config.path else None
                 )
-                if not table_exists:
-                    # First run: Override with full-load query
-                    options["query"] = write_config.first_run_query
+
+                if not table_name:
+                    raise ValueError("Incremental read requires 'table' or 'path' to be set.")
+
+                if not target_exists:
+                    # First Run: Load everything
+                    # For SQL/JDBC, passing "query" usually overrides "table", so we explicit select *
+                    # Or we can just NOT set a query and let it read the whole table naturally.
+                    # BUT, if the user wants 'incremental' behavior, they expect us to manage the query.
+                    # Let's be explicit.
+                    options["query"] = f"SELECT * FROM {table_name}"
+                else:
+                    # Subsequent Run: Rolling Window
+                    inc = read_config.incremental
+
+                    # Calculate cutoff
+                    now = datetime.now()
+                    if inc.unit == "hour":
+                        delta = timedelta(hours=inc.lookback)
+                    elif inc.unit == "day":
+                        delta = timedelta(days=inc.lookback)
+                    elif inc.unit == "month":
+                        # Approximate
+                        delta = timedelta(days=inc.lookback * 30)
+                    elif inc.unit == "year":
+                        delta = timedelta(days=inc.lookback * 365)
+                    else:
+                        delta = timedelta(days=inc.lookback)
+
+                    cutoff = now - delta
+
+                    # Format date - ISO 8601 is generally safe for Spark/SQL
+                    # 'YYYY-MM-DD HH:MM:SS'
+                    date_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+                    if inc.fallback_column:
+                        where_clause = (
+                            f"COALESCE({inc.column}, {inc.fallback_column}) >= '{date_str}'"
+                        )
+                    else:
+                        where_clause = f"{inc.column} >= '{date_str}'"
+
+                    options["query"] = f"SELECT * FROM {table_name} WHERE {where_clause}"
 
         # Delegate to engine-specific reader
         df = self.engine.read(

@@ -450,6 +450,45 @@ class TimeTravelConfig(BaseModel):
         return self
 
 
+class IncrementalUnit(str, Enum):
+    """
+    Time units for incremental lookback.
+
+    Values:
+    * `hour`
+    * `day`
+    * `month`
+    * `year`
+    """
+
+    HOUR = "hour"
+    DAY = "day"
+    MONTH = "month"
+    YEAR = "year"
+
+
+class IncrementalConfig(BaseModel):
+    """
+    Configuration for automatic incremental loading (Rolling Window).
+
+    Generates SQL: `WHERE column >= NOW() - lookback`
+
+    Supports:
+    * `column`: Primary filter column
+    * `fallback_column`: Optional backup (e.g. created_at)
+    * `lookback`: Number of units
+    * `unit`: Time unit (hour, day, etc.)
+    """
+
+    column: str = Field(description="Primary column to filter on (e.g., updated_at)")
+    fallback_column: Optional[str] = Field(
+        default=None,
+        description="Backup column if primary is NULL (e.g., created_at). Generates COALESCE(col, fallback) >= ...",
+    )
+    lookback: int = Field(default=1, ge=1, description="Number of units to look back")
+    unit: IncrementalUnit = Field(default=IncrementalUnit.DAY, description="Time unit")
+
+
 class ReadConfig(BaseModel):
     """
     Configuration for reading data.
@@ -496,6 +535,10 @@ class ReadConfig(BaseModel):
     path: Optional[str] = Field(default=None, description="Path for file-based sources")
     streaming: bool = Field(default=False, description="Enable streaming read (Spark only)")
     query: Optional[str] = Field(default=None, description="SQL query (shortcut for options.query)")
+    incremental: Optional[IncrementalConfig] = Field(
+        default=None,
+        description="Automatic incremental loading strategy. If set, generates query based on target state.",
+    )
     time_travel: Optional[TimeTravelConfig] = Field(
         default=None, description="Time travel options (Delta only)"
     )

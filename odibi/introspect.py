@@ -42,6 +42,7 @@ GROUP_MAPPING = {
     "PipelineConfig": "Core",
     "NodeConfig": "Core",
     "ReadConfig": "Operation",
+    "IncrementalConfig": "Operation",
     "WriteConfig": "Operation",
     "TransformConfig": "Operation",
     "ValidationConfig": "Operation",
@@ -68,6 +69,7 @@ CUSTOM_ORDER = [
     "ColumnMetadata",
     # Operations (ETL flow)
     "ReadConfig",
+    "IncrementalConfig",
     "TimeTravelConfig",
     "TransformConfig",
     "ValidationConfig",

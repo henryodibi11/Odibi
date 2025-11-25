@@ -550,9 +550,32 @@ read:
 | **path** | Optional[str] | No | - | Path for file-based sources |
 | **streaming** | bool | No | `False` | Enable streaming read (Spark only) |
 | **query** | Optional[str] | No | - | SQL query (shortcut for options.query) |
+| **incremental** | Optional[[IncrementalConfig](#incrementalconfig)] | No | - | Automatic incremental loading strategy. If set, generates query based on target state. |
 | **time_travel** | Optional[[TimeTravelConfig](#timetravelconfig)] | No | - | Time travel options (Delta only) |
 | **archive_options** | Dict[str, Any] | No | `PydanticUndefined` | Options for archiving bad records (e.g. badRecordsPath for Spark) |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
+
+---
+
+### `IncrementalConfig`
+> *Used in: [ReadConfig](#readconfig)*
+
+Configuration for automatic incremental loading (Rolling Window).
+
+Generates SQL: `WHERE column >= NOW() - lookback`
+
+Supports:
+* `column`: Primary filter column
+* `fallback_column`: Optional backup (e.g. created_at)
+* `lookback`: Number of units
+* `unit`: Time unit (hour, day, etc.)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | str | Yes | - | Primary column to filter on (e.g., updated_at) |
+| **fallback_column** | Optional[str] | No | - | Backup column if primary is NULL (e.g., created_at). Generates COALESCE(col, fallback) >= ... |
+| **lookback** | int | No | `1` | Number of units to look back |
+| **unit** | IncrementalUnit | No | `IncrementalUnit.DAY` | Time unit |
 
 ---
 
