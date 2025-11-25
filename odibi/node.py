@@ -484,7 +484,15 @@ class Node:
                     else:
                         where_clause = f"{inc.column} >= '{date_str}'"
 
-                    options["query"] = f"SELECT * FROM {table_name} WHERE {where_clause}"
+                    # Dispatch based on format:
+                    # SQL formats require full query
+                    # File/Table formats (Parquet, Delta) require predicate filter
+                    if read_config.format in ["sql", "sql_server", "azure_sql"]:
+                        options["query"] = f"SELECT * FROM {table_name} WHERE {where_clause}"
+                    else:
+                        # For Pandas (query) and Spark (filter)
+                        # Note: PandasEngine now supports 'filter' as an alias for 'query' to unify this
+                        options["filter"] = where_clause
 
         # Delegate to engine-specific reader
         df = self.engine.read(

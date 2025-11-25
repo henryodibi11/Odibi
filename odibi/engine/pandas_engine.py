@@ -215,8 +215,9 @@ class PandasEngine(Engine):
         # Prepare read options
         read_kwargs = merged_options.copy()
 
-        # Extract 'query' option for post-read filtering (Pandas engine support for HWM pattern)
-        post_read_query = read_kwargs.pop("query", None)
+        # Extract 'query' or 'filter' option for post-read filtering (Pandas engine support for HWM pattern)
+        # 'query' is legacy/pandas-native, 'filter' is Odibi standard for non-SQL formats
+        post_read_query = read_kwargs.pop("query", None) or read_kwargs.pop("filter", None)
 
         if self.use_arrow:
             # Use PyArrow backend for memory efficiency and speed

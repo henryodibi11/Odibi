@@ -258,7 +258,13 @@ class SparkEngine(Engine):
             for key, value in options.items():
                 reader = reader.option(key, value)
 
-            return reader.table(table)
+            df = reader.table(table)
+
+            # Apply filter if present (Smart Read support)
+            if "filter" in options:
+                df = df.filter(options["filter"])
+
+            return df
 
         elif path:
             # File Path
@@ -313,7 +319,13 @@ class SparkEngine(Engine):
 
                 reader = reader.option(key, value)
 
-            return reader.load(full_path)
+            df = reader.load(full_path)
+
+            # Apply filter if present (Smart Read support)
+            if "filter" in options:
+                df = df.filter(options["filter"])
+
+            return df
         else:
             raise ValueError("Either path or table must be provided")
 
