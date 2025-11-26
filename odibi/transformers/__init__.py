@@ -1,7 +1,7 @@
 from odibi.registry import FunctionRegistry
 
 # Import all transform modules
-from odibi.transformers import advanced, relational, sql_core, scd
+from odibi.transformers import advanced, relational, scd, sql_core
 
 # List of all standard library modules
 _MODULES = [sql_core, relational, advanced, scd]
@@ -62,6 +62,9 @@ def register_standard_library():
     registry.register(
         advanced.window_calculation, "window_calculation", advanced.WindowCalculationParams
     )
+    registry.register(advanced.normalize_json, "normalize_json", advanced.NormalizeJsonParams)
+    registry.register(advanced.sessionize, "sessionize", advanced.SessionizeParams)
+    registry.register(advanced.geocode, "geocode", advanced.GeocodeParams)
 
     # SCD
     registry.register(scd.scd2, "scd2", scd.SCD2Params)

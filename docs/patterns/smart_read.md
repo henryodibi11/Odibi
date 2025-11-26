@@ -1,6 +1,8 @@
-# Smart Read (Automatic Incremental Loading)
+# Smart Read (Rolling Window)
 
-The "Smart Read" feature simplifies incremental data loading by automatically generating the correct SQL query based on the state of your target table.
+The "Smart Read" feature simplifies incremental data loading by automatically generating the correct SQL query based on time windows.
+
+> **Note:** This page describes the **Rolling Window** mode (Stateless). For exact state tracking (HWM), see [Stateful Incremental Loading](./incremental_stateful.md).
 
 It eliminates the need to write complex SQL with `first_run_query` and dialect-specific date math.
 

@@ -1,9 +1,9 @@
-# High Water Mark (HWM) Pattern Guide
+# [Legacy] Manual High Water Mark (HWM)
 
-> **🚀 Modern Pattern Available: Smart Read**
+> **⚠️ Deprecated Pattern**
 >
-> While this guide explains the *concept* of HWM, Odibi now automates this pattern via the **Smart Read** feature.
-> We strongly recommend using [Smart Read](./smart_read.md) instead of manually writing the SQL queries described below.
+> This manual pattern is no longer recommended.
+> Please use the new [Stateful Incremental Loading](./incremental_stateful.md) feature which handles this automatically.
 
 ## What Is HWM?
 

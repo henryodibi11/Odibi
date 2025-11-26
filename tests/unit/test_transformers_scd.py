@@ -1,11 +1,12 @@
-import pytest
-import pandas as pd
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
+import pytest
+
 from odibi.context import EngineContext, PandasContext, SparkContext
 from odibi.enums import EngineType
-from odibi.transformers.scd import scd2, SCD2Params
+from odibi.transformers.scd import SCD2Params, scd2
 
 
 class TestSCD2Pandas:

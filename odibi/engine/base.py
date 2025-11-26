@@ -226,3 +226,73 @@ class Engine(ABC):
             True if table/location exists, False otherwise
         """
         pass
+
+    @abstractmethod
+    def harmonize_schema(self, df: Any, target_schema: Dict[str, str], policy: Any) -> Any:
+        """Harmonize DataFrame schema with target schema according to policy.
+
+        Args:
+            df: Input DataFrame
+            target_schema: Target schema (column name -> type)
+            policy: SchemaPolicyConfig object
+
+        Returns:
+            Harmonized DataFrame
+        """
+        pass
+
+    @abstractmethod
+    def anonymize(
+        self, df: Any, columns: List[str], method: str, salt: Optional[str] = None
+    ) -> Any:
+        """Anonymize specified columns.
+
+        Args:
+            df: DataFrame to anonymize
+            columns: List of columns to anonymize
+            method: Method ('hash', 'mask', 'redact')
+            salt: Optional salt for hashing
+
+        Returns:
+            Anonymized DataFrame
+        """
+        pass
+
+    def get_table_schema(
+        self,
+        connection: Any,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        format: Optional[str] = None,
+    ) -> Optional[Dict[str, str]]:
+        """Get schema of an existing table/file.
+
+        Args:
+            connection: Connection object
+            table: Table name
+            path: File path
+            format: Data format (optional, helps with file-based sources)
+
+        Returns:
+            Schema dict or None if table doesn't exist or schema fetch fails.
+        """
+        return None
+
+    def maintain_table(
+        self,
+        connection: Any,
+        format: str,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        config: Optional[Any] = None,
+    ) -> None:
+        """Run table maintenance operations (optimize, vacuum).
+
+        Args:
+            connection: Connection object
+            format: Table format
+            table: Table name
+            path: Table path
+            config: AutoOptimizeConfig object
+        """
+        pass

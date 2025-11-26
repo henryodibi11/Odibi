@@ -1,7 +1,7 @@
 """Configuration models for ODIBI framework."""
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Literal, Optional, Union
 
 try:
     from typing import Annotated
@@ -467,49 +467,75 @@ class IncrementalUnit(str, Enum):
     YEAR = "year"
 
 
+class IncrementalMode(str, Enum):
+    """Mode for incremental loading."""
+
+    ROLLING_WINDOW = "rolling_window"  # Current default: WHERE col >= NOW() - lookback
+    STATEFUL = "stateful"  # New: WHERE col > last_hwm
+
+
 class IncrementalConfig(BaseModel):
     """
-    Configuration for automatic incremental loading (Rolling Window).
+    Configuration for automatic incremental loading.
 
-    Generates SQL: `WHERE column >= NOW() - lookback`
+    Modes:
+    1. **Rolling Window** (Default): Uses a time-based lookback from NOW().
+       Good for: Stateless loading where you just want "recent" data.
+       Args: `lookback`, `unit`
 
-    **Important:** This feature requires a `write` configuration in the same node.
-    Odibi checks if the *Write Target* exists to decide between a Full Load (First Run)
-    and an Incremental Load (Subsequent Runs).
+    2. **Stateful**: Tracks the High-Water Mark (HWM) of the key column.
+       Good for: Exact incremental ingestion (e.g. CDC-like).
+       Args: `state_key` (optional), `watermark_lag` (optional)
 
-    Supports:
-    * `column`: Primary filter column
-    * `fallback_column`: Optional backup (e.g. created_at)
-    * `lookback`: Number of units
-    * `unit`: Time unit (hour, day, etc.)
-
-    Example:
-    ```yaml
-    read:
-      connection: "postgres_db"
-      format: "sql"
-      table: "orders"
-      incremental:
-        column: "updated_at"
-        lookback: 3
-        unit: "day"
-
-    # Required for state tracking:
-    write:
-      connection: "bronze_lake"
-      format: "delta"
-      table: "orders_raw"
-      mode: "append"
-    ```
+    Generates SQL:
+    - Rolling: `WHERE column >= NOW() - lookback`
+    - Stateful: `WHERE column > last_hwm - lag`
     """
 
-    column: str = Field(description="Primary column to filter on (e.g., updated_at)")
+    model_config = {"populate_by_name": True}
+
+    mode: IncrementalMode = Field(
+        default=IncrementalMode.ROLLING_WINDOW,
+        description="Incremental strategy: 'rolling_window' or 'stateful'",
+    )
+
+    # Columns
+    column: str = Field(
+        alias="key_column", description="Primary column to filter on (e.g., updated_at)"
+    )
     fallback_column: Optional[str] = Field(
         default=None,
         description="Backup column if primary is NULL (e.g., created_at). Generates COALESCE(col, fallback) >= ...",
     )
-    lookback: int = Field(default=1, ge=1, description="Number of units to look back")
-    unit: IncrementalUnit = Field(default=IncrementalUnit.DAY, description="Time unit")
+
+    # Rolling Window Args
+    lookback: Optional[int] = Field(
+        default=None, description="Time units to look back (Rolling Window only)"
+    )
+    unit: Optional[IncrementalUnit] = Field(
+        default=None,
+        description="Time unit for lookback (Rolling Window only). Options: 'hour', 'day', 'month', 'year'",
+    )
+
+    # Stateful Args
+    state_key: Optional[str] = Field(
+        default=None,
+        description="Unique ID for state tracking. Defaults to node name if not provided.",
+    )
+    watermark_lag: Optional[str] = Field(
+        default=None,
+        description="Safety buffer to handle late-arriving data. Subtracts this duration (e.g., '2h', '30m') from the stored High Water Mark when generating the query. Useful if your source system has eventual consistency or replication lag.",
+    )
+
+    @model_validator(mode="after")
+    def check_mode_args(self):
+        if self.mode == IncrementalMode.ROLLING_WINDOW:
+            # Apply defaults if missing (Backward Compatibility)
+            if self.lookback is None:
+                self.lookback = 1
+            if self.unit is None:
+                self.unit = IncrementalUnit.DAY
+        return self
 
 
 class ReadConfig(BaseModel):
@@ -557,10 +583,13 @@ class ReadConfig(BaseModel):
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based sources")
     streaming: bool = Field(default=False, description="Enable streaming read (Spark only)")
-    query: Optional[str] = Field(default=None, description="SQL query (shortcut for options.query)")
+    query: Optional[str] = Field(
+        default=None,
+        description="SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector.",
+    )
     incremental: Optional[IncrementalConfig] = Field(
         default=None,
-        description="Automatic incremental loading strategy. If set, generates query based on target state.",
+        description="Automatic incremental loading strategy (CDC-like). If set, generates query based on target state (HWM).",
     )
     time_travel: Optional[TimeTravelConfig] = Field(
         default=None, description="Time travel options (Delta only)"
@@ -663,9 +692,91 @@ class TransformConfig(BaseModel):
     )
 
 
+class ValidationAction(str, Enum):
+    FAIL = "fail"
+    WARN = "warn"
+
+
+class OnFailAction(str, Enum):
+    ALERT = "alert"
+    IGNORE = "ignore"
+
+
+class TestType(str, Enum):
+    NOT_NULL = "not_null"
+    UNIQUE = "unique"
+    ACCEPTED_VALUES = "accepted_values"
+    ROW_COUNT = "row_count"
+    CUSTOM_SQL = "custom_sql"
+    RANGE = "range"
+    REGEX_MATCH = "regex_match"
+
+
+class BaseTestConfig(BaseModel):
+    type: TestType
+    name: Optional[str] = Field(default=None, description="Optional name for the check")
+
+
+class NotNullTest(BaseTestConfig):
+    type: Literal[TestType.NOT_NULL] = TestType.NOT_NULL
+    columns: List[str]
+
+
+class UniqueTest(BaseTestConfig):
+    type: Literal[TestType.UNIQUE] = TestType.UNIQUE
+    columns: List[str]
+
+
+class AcceptedValuesTest(BaseTestConfig):
+    type: Literal[TestType.ACCEPTED_VALUES] = TestType.ACCEPTED_VALUES
+    column: str
+    values: List[Any]
+
+
+class RowCountTest(BaseTestConfig):
+    type: Literal[TestType.ROW_COUNT] = TestType.ROW_COUNT
+    min: Optional[int] = None
+    max: Optional[int] = None
+
+
+class CustomSQLTest(BaseTestConfig):
+    type: Literal[TestType.CUSTOM_SQL] = TestType.CUSTOM_SQL
+    condition: str
+    threshold: float = Field(
+        default=0.0, description="Failure rate threshold (0.0 = strictly no failures allowed)"
+    )
+
+
+class RangeTest(BaseTestConfig):
+    type: Literal[TestType.RANGE] = TestType.RANGE
+    column: str
+    min: Optional[Union[int, float, str]] = None
+    max: Optional[Union[int, float, str]] = None
+
+
+class RegexMatchTest(BaseTestConfig):
+    type: Literal[TestType.REGEX_MATCH] = TestType.REGEX_MATCH
+    column: str
+    pattern: str
+
+
+TestConfig = Annotated[
+    Union[
+        NotNullTest,
+        UniqueTest,
+        AcceptedValuesTest,
+        RowCountTest,
+        CustomSQLTest,
+        RangeTest,
+        RegexMatchTest,
+    ],
+    Field(discriminator="type"),
+]
+
+
 class ValidationConfig(BaseModel):
     """
-    Configuration for data validation.
+    Configuration for data validation (Quality Gate).
 
     ### 🛡️ "The Indestructible Pipeline" Pattern
 
@@ -678,46 +789,67 @@ class ValidationConfig(BaseModel):
     **Recipe: The Quality Gate**
     ```yaml
     validation:
-      # BLOCKING: Stop the pipeline if data is bad.
-      severity: "error"
+      mode: "fail"          # fail (stop pipeline) or warn (log only)
+      on_fail: "alert"      # alert or ignore
 
-      # 1. Completeness
-      not_empty: true
-      no_nulls: ["transaction_id", "customer_id"]
+      tests:
+        # 1. Completeness
+        - type: "not_null"
+          columns: ["transaction_id", "customer_id"]
 
-      # 2. Integrity
-      allowed_values:
-        status: ["PENDING", "COMPLETED", "FAILED"]
-        currency: ["USD", "EUR", "GBP"]
+        # 2. Integrity
+        - type: "unique"
+          columns: ["transaction_id"]
 
-      # 3. Business Logic (SQL Expressions)
-      custom_sql:
-        positive_amount: "amount > 0"
-        valid_tax_rate: "tax_rate BETWEEN 0 AND 0.5"
-        dates_ordered: "created_at <= completed_at"
+        - type: "accepted_values"
+          column: "status"
+          values: ["PENDING", "COMPLETED", "FAILED"]
+
+        # 3. Ranges & Patterns
+        - type: "range"
+          column: "age"
+          min: 18
+          max: 120
+
+        - type: "regex_match"
+          column: "email"
+          pattern: "^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$"
+
+        # 4. Business Logic (SQL)
+        - type: "custom_sql"
+          name: "dates_ordered"
+          condition: "created_at <= completed_at"
+          threshold: 0.01   # Allow 1% failure
     ```
     """
 
-    severity: Literal["error", "warning"] = Field(
-        default="error",
-        description="If 'error', fails pipeline. If 'warning', logs alert but continues.",
+    mode: ValidationAction = Field(
+        default=ValidationAction.FAIL,
+        description="Execution mode: 'fail' (stop pipeline) or 'warn' (log only)",
     )
-    schema_validation: Optional[Dict[str, Any]] = Field(
-        default=None, alias="schema", description="Schema validation rules"
+    on_fail: OnFailAction = Field(
+        default=OnFailAction.ALERT,
+        description="Action on failure: 'alert' (send notification) or 'ignore'",
     )
-    custom_sql: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Custom SQL checks. Key is check name, value is SQL expression returning boolean.",
-    )
-    not_empty: bool = Field(default=False, description="Ensure result is not empty")
-    no_nulls: List[str] = Field(
-        default_factory=list, description="Columns that must not have nulls"
-    )
-    ranges: Dict[str, Dict[str, float]] = Field(
-        default_factory=dict, description="Value ranges {col: {min: 0, max: 100}}"
-    )
-    allowed_values: Dict[str, List[Any]] = Field(
-        default_factory=dict, description="Allowed values {col: [val1, val2]}"
+    tests: List[TestConfig] = Field(default_factory=list, description="List of validation tests")
+
+
+class AutoOptimizeConfig(BaseModel):
+    """
+    Configuration for Delta Lake automatic optimization.
+
+    Example:
+    ```yaml
+    auto_optimize:
+      enabled: true
+      vacuum_retention_hours: 168
+    ```
+    """
+
+    enabled: bool = Field(default=True, description="Enable auto optimization")
+    vacuum_retention_hours: int = Field(
+        default=168,
+        description="Hours to retain history for VACUUM (default 7 days). Set to 0 to disable VACUUM.",
     )
 
 
@@ -764,12 +896,17 @@ class WriteConfig(BaseModel):
     register_table: Optional[str] = Field(
         default=None, description="Register file output as external table (Spark/Delta only)"
     )
-    mode: WriteMode = Field(default=WriteMode.OVERWRITE, description="Write mode")
+    mode: WriteMode = Field(
+        default=WriteMode.OVERWRITE,
+        description="Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once'",
+    )
     partition_by: List[str] = Field(
-        default_factory=list, description="Columns to partition output by"
+        default_factory=list,
+        description="List of columns to physically partition the output by (folder structure). Use for low-cardinality columns (e.g. date, country).",
     )
     zorder_by: List[str] = Field(
-        default_factory=list, description="Columns to Z-Order by (Delta only)"
+        default_factory=list,
+        description="List of columns to Z-Order by. Improves read performance for high-cardinality columns used in filters/joins (Delta only).",
     )
     table_properties: Dict[str, str] = Field(
         default_factory=dict, description="Table properties (e.g. comments, retention)"
@@ -786,6 +923,10 @@ class WriteConfig(BaseModel):
         ),
     )
     options: Dict[str, Any] = Field(default_factory=dict, description="Format-specific options")
+    auto_optimize: Optional[Union[bool, AutoOptimizeConfig]] = Field(
+        default=None,
+        description="Auto-run OPTIMIZE and VACUUM after write (Delta only)",
+    )
 
     @model_validator(mode="after")
     def check_table_or_path(self):
@@ -805,6 +946,81 @@ class ColumnMetadata(BaseModel):
     tags: List[str] = Field(
         default_factory=list, description="Tags (e.g. 'business_key', 'measure')"
     )
+
+
+class SchemaMode(str, Enum):
+    ENFORCE = "enforce"
+    EVOLVE = "evolve"
+
+
+class OnNewColumns(str, Enum):
+    IGNORE = "ignore"
+    FAIL = "fail"
+    ADD_NULLABLE = "add_nullable"
+
+
+class OnMissingColumns(str, Enum):
+    FAIL = "fail"
+    FILL_NULL = "fill_null"
+
+
+class PrivacyMethod(str, Enum):
+    """Supported privacy anonymization methods."""
+
+    HASH = "hash"  # SHA256 hash
+    MASK = "mask"  # Mask all but last 4 chars
+    REDACT = "redact"  # Replace with [REDACTED]
+
+
+class PrivacyConfig(BaseModel):
+    """
+    Configuration for PII anonymization.
+
+    Example:
+    ```yaml
+    privacy:
+      method: "hash"
+      salt: "my_secret_salt"
+    ```
+    """
+
+    method: PrivacyMethod = Field(
+        ..., description="Anonymization method. Options: 'hash', 'mask', 'redact'"
+    )
+    salt: Optional[str] = Field(
+        default=None,
+        description="Salt for hashing (optional but recommended). Combined with value before hashing.",
+    )
+
+
+class SchemaPolicyConfig(BaseModel):
+    """
+    Configuration for Schema Management (Drift Handling).
+
+    Controls how the node handles differences between input data and target table schema.
+    """
+
+    mode: SchemaMode = Field(
+        default=SchemaMode.ENFORCE, description="Schema evolution mode: 'enforce' or 'evolve'"
+    )
+    on_new_columns: Optional[OnNewColumns] = Field(
+        default=None,
+        description="Action for new columns in input: 'ignore', 'fail', 'add_nullable'",
+    )
+    on_missing_columns: OnMissingColumns = Field(
+        default=OnMissingColumns.FILL_NULL,
+        description="Action for missing columns in input: 'fail', 'fill_null'",
+    )
+
+    @model_validator(mode="after")
+    def set_defaults(self):
+        if self.mode == SchemaMode.EVOLVE:
+            if self.on_new_columns is None:
+                self.on_new_columns = OnNewColumns.ADD_NULLABLE
+        else:  # ENFORCE
+            if self.on_new_columns is None:
+                self.on_new_columns = OnNewColumns.IGNORE
+        return self
 
 
 class NodeConfig(BaseModel):
@@ -1028,29 +1244,37 @@ class NodeConfig(BaseModel):
     description: Optional[str] = Field(default=None, description="Human-readable description")
     enabled: bool = Field(default=True, description="If False, node is skipped during execution")
     tags: List[str] = Field(
-        default_factory=list, description="Operational tags for selective execution"
+        default_factory=list,
+        description="Operational tags for selective execution (e.g., 'daily', 'critical'). Use with `odibi run --tag`.",
     )
-    depends_on: List[str] = Field(default_factory=list, description="List of node dependencies")
+    depends_on: List[str] = Field(
+        default_factory=list,
+        description="List of parent nodes that must complete before this node runs. The output of these nodes is available for reading.",
+    )
 
     columns: Dict[str, ColumnMetadata] = Field(
-        default_factory=dict, description="Data Dictionary: Metadata for output columns"
+        default_factory=dict,
+        description="Data Dictionary defining the output schema. Used for documentation, PII tagging, and validation.",
     )
 
     # Operations (at least one required)
     read: Optional[ReadConfig] = Field(
         default=None,
-        description="Input operation. If missing, data is taken from the first dependency.",
+        description="Input operation (Load). If missing, data is taken from the first dependency.",
     )
     transform: Optional[TransformConfig] = Field(
-        default=None, description="Chain of fine-grained transformation steps (SQL, functions)."
+        default=None,
+        description="Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present.",
     )
     write: Optional[WriteConfig] = Field(
-        default=None, description="Output operation (save to file/table)."
+        default=None, description="Output operation (Save to file/table)."
     )
-    streaming: bool = Field(default=False, description="Enable streaming execution for this node")
+    streaming: bool = Field(
+        default=False, description="Enable streaming execution for this node (Spark only)"
+    )
     transformer: Optional[str] = Field(
         default=None,
-        description="High-level pattern (App) to apply. Valid value from Transformer Catalog.",
+        description="Name of the 'App' logic to run (e.g., 'deduplicate', 'scd2'). See Transformer Catalog for options.",
     )
     params: Dict[str, Any] = Field(default_factory=dict, description="Parameters for transformer")
 
@@ -1069,6 +1293,12 @@ class NodeConfig(BaseModel):
         default=ErrorStrategy.FAIL_LATER, description="Failure handling strategy"
     )
     validation: Optional[ValidationConfig] = None
+    schema_policy: Optional[SchemaPolicyConfig] = Field(
+        default=None, description="Schema drift handling policy"
+    )
+    privacy: Optional[PrivacyConfig] = Field(
+        default=None, description="Privacy Suite: PII anonymization settings"
+    )
     sensitive: Union[bool, List[str]] = Field(
         default=False, description="If true or list of columns, masks sample data in stories"
     )

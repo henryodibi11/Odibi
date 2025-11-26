@@ -2,7 +2,7 @@
 
 import inspect
 from functools import wraps
-from typing import Any, Callable, Dict, Union, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 
 class FunctionRegistry:

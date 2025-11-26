@@ -71,6 +71,7 @@ class NodeExecutionMetadata:
     # Error info
     error_message: Optional[str] = None
     error_type: Optional[str] = None
+    validation_warnings: List[str] = field(default_factory=list)
 
     # Timestamps
     started_at: Optional[str] = None
@@ -113,6 +114,7 @@ class NodeExecutionMetadata:
             "columns_removed": self.columns_removed,
             "error_message": self.error_message,
             "error_type": self.error_type,
+            "validation_warnings": self.validation_warnings,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "executed_sql": self.executed_sql,

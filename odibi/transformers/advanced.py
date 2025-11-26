@@ -1,5 +1,5 @@
-from typing import Dict, List, Optional, Union
 from enum import Enum
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -23,9 +23,12 @@ class DeduplicateParams(BaseModel):
     ```
     """
 
-    keys: List[str]
+    keys: List[str] = Field(
+        ..., description="List of columns to partition by (columns that define uniqueness)"
+    )
     order_by: Optional[str] = Field(
-        None, description="SQL Order by clause (e.g. 'updated_at DESC')"
+        None,
+        description="SQL Order by clause (e.g. 'updated_at DESC') to determine which record to keep (first one is kept)",
     )
 
 
@@ -69,8 +72,11 @@ class ExplodeParams(BaseModel):
     ```
     """
 
-    column: str
-    outer: bool = Field(False, description="If True, keep rows with empty lists (explode_outer)")
+    column: str = Field(..., description="Column containing the list/array to explode")
+    outer: bool = Field(
+        False,
+        description="If True, keep rows with empty lists (explode_outer behavior). If False, drops them.",
+    )
 
 
 def explode_list_column(context: EngineContext, params: ExplodeParams) -> EngineContext:
@@ -115,10 +121,16 @@ class DictMappingParams(BaseModel):
     ```
     """
 
-    column: str
-    mapping: Dict[str, JsonScalar]
-    default: Optional[JsonScalar] = None
-    output_column: Optional[str] = None
+    column: str = Field(..., description="Column to map values from")
+    mapping: Dict[str, JsonScalar] = Field(
+        ..., description="Dictionary of source value -> target value"
+    )
+    default: Optional[JsonScalar] = Field(
+        None, description="Default value if source value is not found in mapping"
+    )
+    output_column: Optional[str] = Field(
+        None, description="Name of output column. If not provided, overwrites source column."
+    )
 
 
 def dict_based_mapping(context: EngineContext, params: DictMappingParams) -> EngineContext:
@@ -167,9 +179,9 @@ class RegexReplaceParams(BaseModel):
     ```
     """
 
-    column: str
-    pattern: str
-    replacement: str
+    column: str = Field(..., description="Column to apply regex replacement on")
+    pattern: str = Field(..., description="Regex pattern to match")
+    replacement: str = Field(..., description="String to replace matches with")
 
 
 def regex_replace(context: EngineContext, params: RegexReplaceParams) -> EngineContext:
@@ -197,7 +209,9 @@ class UnpackStructParams(BaseModel):
     ```
     """
 
-    column: str
+    column: str = Field(
+        ..., description="Struct/Dictionary column to unpack/flatten into individual columns"
+    )
 
 
 def unpack_struct(context: EngineContext, params: UnpackStructParams) -> EngineContext:
@@ -256,8 +270,10 @@ class HashParams(BaseModel):
     ```
     """
 
-    columns: List[str]
-    algorithm: HashAlgorithm = HashAlgorithm.SHA256
+    columns: List[str] = Field(..., description="List of columns to hash")
+    algorithm: HashAlgorithm = Field(
+        HashAlgorithm.SHA256, description="Hashing algorithm. Options: 'sha256', 'md5'"
+    )
 
 
 def hash_columns(context: EngineContext, params: HashParams) -> EngineContext:
@@ -547,3 +563,207 @@ def window_calculation(context: EngineContext, params: WindowCalculationParams) 
 
     sql_query = f"SELECT *, {expr} AS {params.target_col} FROM df"
     return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 11. Normalize JSON
+# -------------------------------------------------------------------------
+
+
+class NormalizeJsonParams(BaseModel):
+    """
+    Configuration for JSON normalization.
+
+    Example:
+    ```yaml
+    normalize_json:
+      column: "json_data"
+      sep: "_"
+    ```
+    """
+
+    column: str = Field(..., description="Column containing nested JSON/Struct")
+    sep: str = Field("_", description="Separator for nested fields (e.g., 'parent_child')")
+
+
+def normalize_json(context: EngineContext, params: NormalizeJsonParams) -> EngineContext:
+    """
+    Flattens a nested JSON/Struct column.
+    """
+    if context.engine_type == EngineType.SPARK:
+        # Spark: Top-level flatten using "col.*"
+        sql_query = f"SELECT *, {params.column}.* FROM df"
+        return context.sql(sql_query)
+
+    elif context.engine_type == EngineType.PANDAS:
+        import json
+
+        import pandas as pd
+
+        df = context.df.copy()
+
+        # Ensure we have dicts
+        s = df[params.column]
+        if len(s) > 0:
+            first_val = s.iloc[0]
+            if isinstance(first_val, str):
+                # Try to parse if string
+                try:
+                    s = s.apply(json.loads)
+                except Exception:
+                    pass
+
+        # json_normalize
+        # Handle empty case
+        if s.empty:
+            return context.with_df(df)
+
+        normalized = pd.json_normalize(s, sep=params.sep)
+        # Align index
+        normalized.index = df.index
+
+        # Join back (avoid collision if possible, or use suffixes)
+        # We use rsuffix just in case
+        df = df.join(normalized, rsuffix="_json")
+        return context.with_df(df)
+
+    else:
+        raise ValueError(f"Unsupported engine: {context.engine_type}")
+
+
+# -------------------------------------------------------------------------
+# 12. Sessionize
+# -------------------------------------------------------------------------
+
+
+class SessionizeParams(BaseModel):
+    """
+    Configuration for sessionization.
+
+    Example:
+    ```yaml
+    sessionize:
+      timestamp_col: "event_time"
+      user_col: "user_id"
+      threshold_seconds: 1800
+    ```
+    """
+
+    timestamp_col: str = Field(
+        ..., description="Timestamp column to calculate session duration from"
+    )
+    user_col: str = Field(..., description="User identifier to partition sessions by")
+    threshold_seconds: int = Field(
+        1800,
+        description="Inactivity threshold in seconds (default: 30 minutes). If gap > threshold, new session starts.",
+    )
+    session_col: str = Field(
+        "session_id", description="Output column name for the generated session ID"
+    )
+
+
+def sessionize(context: EngineContext, params: SessionizeParams) -> EngineContext:
+    """
+    Assigns session IDs based on inactivity threshold.
+    """
+    if context.engine_type == EngineType.SPARK:
+        # Spark SQL
+        # 1. Lag timestamp to get prev_timestamp
+        # 2. Calculate diff: ts - prev_ts
+        # 3. Flag new session: if diff > threshold OR prev_ts is null -> 1 else 0
+        # 4. Sum(flags) over (partition by user order by ts) -> session_id
+
+        threshold = params.threshold_seconds
+
+        # We use nested queries for clarity and safety against multiple aggregations
+        sql = f"""
+        WITH lagged AS (
+            SELECT *,
+                   LAG({params.timestamp_col}) OVER (PARTITION BY {params.user_col} ORDER BY {params.timestamp_col}) as _prev_ts
+            FROM df
+        ),
+        flagged AS (
+            SELECT *,
+                   CASE
+                     WHEN _prev_ts IS NULL THEN 1
+                     WHEN (unix_timestamp({params.timestamp_col}) - unix_timestamp(_prev_ts)) > {threshold} THEN 1
+                     ELSE 0
+                   END as _is_new_session
+            FROM lagged
+        )
+        SELECT *,
+               concat({params.user_col}, '-', sum(_is_new_session) OVER (PARTITION BY {params.user_col} ORDER BY {params.timestamp_col})) as {params.session_col}
+        FROM flagged
+        """
+        # Note: This returns intermediate columns (_prev_ts, _is_new_session) as well.
+        # Ideally we select * EXCEPT ... but Spark < 3.1 doesn't support EXCEPT in SELECT list easily without listing all cols.
+        # We leave them for now, or user can drop them.
+        return context.sql(sql)
+
+    elif context.engine_type == EngineType.PANDAS:
+        import pandas as pd
+
+        df = context.df.copy()
+
+        # Ensure datetime
+        if not pd.api.types.is_datetime64_any_dtype(df[params.timestamp_col]):
+            df[params.timestamp_col] = pd.to_datetime(df[params.timestamp_col])
+
+        # Sort
+        df = df.sort_values([params.user_col, params.timestamp_col])
+
+        user = df[params.user_col]
+
+        # Calculate time diff (in seconds)
+        # We groupby user to ensure shift doesn't cross user boundaries for diff
+        # But diff() doesn't support groupby well directly on Series without apply?
+        # Actually `groupby().diff()` works.
+        time_diff = df.groupby(params.user_col)[params.timestamp_col].diff().dt.total_seconds()
+
+        # Flag new session
+        # New if: time_diff > threshold OR time_diff is NaT (start of group)
+        is_new = (time_diff > params.threshold_seconds) | (time_diff.isna())
+
+        # Cumulative sum per user
+        session_ids = is_new.groupby(user).cumsum()
+
+        df[params.session_col] = user.astype(str) + "-" + session_ids.astype(int).astype(str)
+
+        return context.with_df(df)
+
+    else:
+        raise ValueError(f"Unsupported engine: {context.engine_type}")
+
+
+# -------------------------------------------------------------------------
+# 13. Geocode (Stub)
+# -------------------------------------------------------------------------
+
+
+class GeocodeParams(BaseModel):
+    """
+    Configuration for geocoding.
+
+    Example:
+    ```yaml
+    geocode:
+      address_col: "full_address"
+      output_col: "lat_long"
+    ```
+    """
+
+    address_col: str = Field(..., description="Column containing the address to geocode")
+    output_col: str = Field("lat_long", description="Name of the output column for coordinates")
+
+
+def geocode(context: EngineContext, params: GeocodeParams) -> EngineContext:
+    """
+    Geocoding Stub.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.warning("Geocode transformer is a stub. No actual geocoding performed.")
+
+    # Pass-through
+    return context.with_df(context.df)

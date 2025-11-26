@@ -1,11 +1,11 @@
 """Introspection tool for generating Configuration Manual."""
 
-import inspect
 import importlib
-import sys
+import inspect
 import re
+import sys
 from pathlib import Path
-from typing import List, Optional, Any, Dict, Type, Set, Union
+from typing import Any, Dict, List, Optional, Set, Type, Union
 
 try:
     from typing import Annotated, get_args, get_origin
@@ -58,7 +58,9 @@ GROUP_MAPPING = {
     "LoggingConfig": "Setting",
     "PerformanceConfig": "Setting",
     "AlertConfig": "Setting",
-    "SCD2Params": "Transformation",
+    "CaseWhenParams": "Transformation",
+    "ConvertTimezoneParams": "Transformation",
+    "ConcatColumnsParams": "Transformation",
 }
 
 CUSTOM_ORDER = [

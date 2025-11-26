@@ -203,6 +203,13 @@ class MarkdownStoryRenderer:
                     f"({node.rows_change_pct:+.1f}%)"
                 )
 
+            # Validation Warnings
+            if node.validation_warnings:
+                lines.append("")
+                lines.append("**Validation Warnings:**")
+                for warning in node.validation_warnings:
+                    lines.append(f"- ⚠️ {warning}")
+
             # Schema changes
             if node.columns_added or node.columns_removed:
                 lines.append("")

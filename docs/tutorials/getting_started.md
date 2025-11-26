@@ -144,5 +144,6 @@ Open the HTML file in your browser to view the report:
 
 You have successfully built a data pipeline!
 
+*   **[Incremental Loading](../patterns/incremental_stateful.md):** Learn how to efficiently process only new data using State Tracking ("Auto-Pilot").
 *   **[Write Custom Transformations](../guides/writing_transformations.md):** Learn how to add Python logic (like advanced validation) to your pipeline.
 *   **[Master the CLI](../guides/cli_master_guide.md):** Learn about `odibi stress` and `odibi doctor`.

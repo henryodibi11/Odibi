@@ -190,6 +190,73 @@ class SparkEngine(Engine):
             logger.warning(f"Failed to fetch Delta commit info for {target}: {e}")
             return None
 
+    def harmonize_schema(self, df, target_schema: Dict[str, str], policy: Any):
+        """Harmonize DataFrame schema with target schema according to policy."""
+        from pyspark.sql.functions import col, lit
+
+        from odibi.config import OnMissingColumns, OnNewColumns, SchemaMode
+
+        target_cols = list(target_schema.keys())
+        current_cols = df.columns
+
+        missing = set(target_cols) - set(current_cols)
+        new_cols = set(current_cols) - set(target_cols)
+
+        # 1. Check Validations
+        if missing and policy.on_missing_columns == OnMissingColumns.FAIL:
+            raise ValueError(f"Schema Policy Violation: Missing columns {missing}")
+
+        if new_cols and policy.on_new_columns == OnNewColumns.FAIL:
+            raise ValueError(f"Schema Policy Violation: New columns {new_cols}")
+
+        # 2. Apply Transformations
+        if policy.mode == SchemaMode.EVOLVE and policy.on_new_columns == OnNewColumns.ADD_NULLABLE:
+            # Evolve: Add missing cols, Keep new cols
+            res = df
+            for c in missing:
+                res = res.withColumn(c, lit(None))
+            return res
+        else:
+            # Enforce / Ignore New: Project to target schema
+            select_exprs = []
+            for c in target_cols:
+                if c in current_cols:
+                    select_exprs.append(col(c))
+                else:
+                    # Missing column, add as null
+                    select_exprs.append(lit(None).alias(c))
+
+            return df.select(*select_exprs)
+
+    def anonymize(self, df, columns: List[str], method: str, salt: Optional[str] = None):
+        """Anonymize columns using Spark functions."""
+        from pyspark.sql.functions import col, concat, lit, regexp_replace, sha2
+
+        res = df
+        for c in columns:
+            if c not in df.columns:
+                continue
+
+            if method == "hash":
+                if salt:
+                    # sha2(concat(col, salt), 256)
+                    res = res.withColumn(c, sha2(concat(col(c), lit(salt)), 256))
+                else:
+                    res = res.withColumn(c, sha2(col(c), 256))
+
+            elif method == "mask":
+                # Mask all but last 4 characters
+                # Logic: Replace any character that is followed by at least 4 characters with '*'
+                # Regex: '.(?=.{4})'
+                # Note: If string is shorter than 4, it won't match and won't be masked (which is usually desired behavior or we mask all)
+                # Spec says "regex masking". Let's use standard pattern.
+                res = res.withColumn(c, regexp_replace(col(c), ".(?=.{4})", "*"))
+
+            elif method == "redact":
+                res = res.withColumn(c, lit("[REDACTED]"))
+
+        return res
+
     def get_schema(self, df) -> Dict[str, str]:
         """Get DataFrame schema with types.
 
@@ -929,6 +996,34 @@ class SparkEngine(Engine):
                 return False
         return False
 
+    def get_table_schema(
+        self,
+        connection: Any,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        format: Optional[str] = None,
+    ) -> Optional[Dict[str, str]]:
+        """Get schema of an existing table/file."""
+        try:
+            if table:
+                if self.spark.catalog.tableExists(table):
+                    return self.get_schema(self.spark.table(table))
+            elif path:
+                full_path = connection.get_path(path)
+                if format == "delta":
+                    from delta.tables import DeltaTable
+
+                    if DeltaTable.isDeltaTable(self.spark, full_path):
+                        return self.get_schema(DeltaTable.forPath(self.spark, full_path).toDF())
+                elif format == "parquet":
+                    return self.get_schema(self.spark.read.parquet(full_path))
+                elif format:
+                    # Generic try
+                    return self.get_schema(self.spark.read.format(format).load(full_path))
+        except Exception:
+            pass
+        return None
+
     def vacuum_delta(
         self,
         connection: Any,
@@ -1004,6 +1099,50 @@ class SparkEngine(Engine):
         full_path = connection.get_path(path)
         delta_table = DeltaTable.forPath(self.spark, full_path)
         delta_table.restoreToVersion(version)
+
+    def maintain_table(
+        self,
+        connection: Any,
+        format: str,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        config: Optional[Any] = None,
+    ) -> None:
+        """Run table maintenance operations (optimize, vacuum)."""
+        if format != "delta" or not config or not config.enabled:
+            return
+
+        # Determine target identifier
+        if table:
+            target = table
+        elif path:
+            full_path = connection.get_path(path)
+            target = f"delta.`{full_path}`"
+        else:
+            return
+
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            # 1. OPTIMIZE (Compaction)
+            # We always run basic optimization. If Z-Order was needed, it should have been
+            # configured in write options (zorder_by) which runs during write.
+            # This acts as a catch-all compaction.
+            logger.info(f"Running Auto-Optimize (Compaction) on {target}...")
+            self.spark.sql(f"OPTIMIZE {target}")
+
+            # 2. VACUUM (Cleanup)
+            retention = config.vacuum_retention_hours
+            if retention > 0:
+                logger.info(
+                    f"Running Auto-Optimize (VACUUM) on {target} (Retention: {retention}h)..."
+                )
+                self.spark.sql(f"VACUUM {target} RETAIN {retention} HOURS")
+
+        except Exception as e:
+            logger.warning(f"Auto-optimize failed for {target}: {e}")
 
     def get_source_files(self, df) -> List[str]:
         """Get list of source files that generated this DataFrame.

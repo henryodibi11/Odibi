@@ -957,6 +957,80 @@ class PandasEngine(Engine):
 
         return result
 
+    def harmonize_schema(
+        self, df: pd.DataFrame, target_schema: Dict[str, str], policy: Any
+    ) -> pd.DataFrame:
+        """Harmonize DataFrame schema with target schema according to policy."""
+        from odibi.config import OnMissingColumns, OnNewColumns, SchemaMode
+
+        target_cols = list(target_schema.keys())
+        current_cols = df.columns.tolist()
+
+        missing = set(target_cols) - set(current_cols)
+        new_cols = set(current_cols) - set(target_cols)
+
+        # 1. Check Validations
+        if missing and policy.on_missing_columns == OnMissingColumns.FAIL:
+            raise ValueError(f"Schema Policy Violation: Missing columns {missing}")
+
+        if new_cols and policy.on_new_columns == OnNewColumns.FAIL:
+            raise ValueError(f"Schema Policy Violation: New columns {new_cols}")
+
+        # 2. Apply Transformations
+        if policy.mode == SchemaMode.EVOLVE and policy.on_new_columns == OnNewColumns.ADD_NULLABLE:
+            # Evolve: Add missing columns, Keep new columns
+            for col in missing:
+                df[col] = None
+        else:
+            # Enforce / Ignore New: Project to target schema (Drops new, Adds missing)
+            # Note: reindex adds NaN for missing columns
+            df = df.reindex(columns=target_cols)
+
+        return df
+
+    def anonymize(
+        self, df: pd.DataFrame, columns: List[str], method: str, salt: Optional[str] = None
+    ) -> pd.DataFrame:
+        """Anonymize specified columns."""
+        import hashlib
+        import re
+
+        res = df.copy()
+
+        for col in columns:
+            if col not in res.columns:
+                continue
+
+            if method == "hash":
+                # Ensure column is string
+                s_col = res[col].astype(str)
+
+                def _hash(val):
+                    if val is None or val == "nan" or val == "None":  # Handle stringified nulls
+                        return None
+                    to_hash = str(val)
+                    if salt:
+                        to_hash += salt
+                    return hashlib.sha256(to_hash.encode("utf-8")).hexdigest()
+
+                res[col] = s_col.apply(_hash)
+
+            elif method == "mask":
+                # Mask all but last 4
+                # Regex sub: replace char if followed by 4 chars
+                def _mask(val):
+                    if pd.isna(val):
+                        return val
+                    s_val = str(val)
+                    return re.sub(r".(?=.{4})", "*", s_val)
+
+                res[col] = res[col].apply(_mask)
+
+            elif method == "redact":
+                res[col] = "[REDACTED]"
+
+        return res
+
     def get_schema(self, df: pd.DataFrame) -> Dict[str, str]:
         """Get DataFrame schema with types.
 
@@ -1174,6 +1248,58 @@ class PandasEngine(Engine):
             return os.path.exists(full_path)
         return False
 
+    def get_table_schema(
+        self,
+        connection: Any,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        format: Optional[str] = None,
+    ) -> Optional[Dict[str, str]]:
+        """Get schema of an existing table/file."""
+        try:
+            if table and format in ["sql_server", "azure_sql"]:
+                # SQL Server: Read empty result
+                query = f"SELECT TOP 0 * FROM {table}"
+                df = connection.read_sql(query)
+                return self.get_schema(df)
+
+            if path:
+                full_path = connection.get_path(path)
+                if not os.path.exists(full_path):
+                    return None
+
+                if format == "delta":
+                    from deltalake import DeltaTable
+
+                    dt = DeltaTable(full_path)
+                    # Use pyarrow schema to pandas schema to avoid reading data
+                    arrow_schema = dt.schema().to_pyarrow()
+                    empty_df = arrow_schema.empty_table().to_pandas()
+                    return self.get_schema(empty_df)
+
+                elif format == "parquet":
+                    import pyarrow.parquet as pq
+
+                    target_path = full_path
+                    if os.path.isdir(full_path):
+                        # Find first parquet file
+                        files = glob.glob(os.path.join(full_path, "*.parquet"))
+                        if not files:
+                            return None
+                        target_path = files[0]
+
+                    schema = pq.read_schema(target_path)
+                    empty_df = schema.empty_table().to_pandas()
+                    return self.get_schema(empty_df)
+
+                elif format == "csv":
+                    df = pd.read_csv(full_path, nrows=0)
+                    return self.get_schema(df)
+
+        except Exception:
+            pass
+        return None
+
     def vacuum_delta(
         self,
         connection: Any,
@@ -1276,6 +1402,61 @@ class PandasEngine(Engine):
 
         dt = DeltaTable(full_path, storage_options=storage_opts)
         dt.restore(version)
+
+    def maintain_table(
+        self,
+        connection: Any,
+        format: str,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        config: Optional[Any] = None,
+    ) -> None:
+        """Run table maintenance operations (optimize, vacuum)."""
+        if format != "delta" or not config or not config.enabled:
+            return
+
+        # Pandas engine only supports path-based Delta (resolved from table or path)
+        if not path and not table:
+            return
+
+        full_path = connection.get_path(path if path else table)
+
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Auto-optimize skipped: 'deltalake' library not installed."
+            )
+            return
+
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Storage options
+            storage_opts = {}
+            if hasattr(connection, "pandas_storage_options"):
+                storage_opts = connection.pandas_storage_options()
+
+            dt = DeltaTable(full_path, storage_options=storage_opts)
+
+            # 1. OPTIMIZE (Compaction)
+            logger.info(f"Running Auto-Optimize (Compaction) on {full_path}...")
+            dt.optimize.compact()
+
+            # 2. VACUUM
+            retention = config.vacuum_retention_hours
+            if retention > 0:
+                logger.info(
+                    f"Running Auto-Optimize (VACUUM) on {full_path} (Retention: {retention}h)..."
+                )
+                dt.vacuum(retention_hours=retention, enforce_retention_duration=True, dry_run=False)
+
+        except Exception as e:
+            logger.warning(f"Auto-optimize failed for {full_path}: {e}")
 
     def get_source_files(self, df: pd.DataFrame) -> List[str]:
         """Get list of source files that generated this DataFrame.

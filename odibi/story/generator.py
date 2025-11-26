@@ -237,6 +237,7 @@ class StoryGenerator:
             columns_removed=meta.get("columns_removed", []),
             error_message=str(result.error) if result.error else None,
             error_type=type(result.error).__name__ if result.error else None,
+            validation_warnings=meta.get("validation_warnings", []),
         )
 
         # Calculate derived metrics

@@ -304,14 +304,14 @@ These are the built-in functions you can use in two ways:
 | **name** | str | Yes | - | Unique node name |
 | **description** | Optional[str] | No | - | Human-readable description |
 | **enabled** | bool | No | `True` | If False, node is skipped during execution |
-| **tags** | List[str] | No | `PydanticUndefined` | Operational tags for selective execution |
-| **depends_on** | List[str] | No | `PydanticUndefined` | List of node dependencies |
-| **columns** | Dict[str, [ColumnMetadata](#columnmetadata)] | No | `PydanticUndefined` | Data Dictionary: Metadata for output columns |
-| **read** | Optional[[ReadConfig](#readconfig)] | No | - | Input operation. If missing, data is taken from the first dependency. |
-| **transform** | Optional[[TransformConfig](#transformconfig)] | No | - | Chain of fine-grained transformation steps (SQL, functions). |
-| **write** | Optional[[WriteConfig](#writeconfig)] | No | - | Output operation (save to file/table). |
-| **streaming** | bool | No | `False` | Enable streaming execution for this node |
-| **transformer** | Optional[str] | No | - | High-level pattern (App) to apply. Valid value from Transformer Catalog. |
+| **tags** | List[str] | No | `PydanticUndefined` | Operational tags for selective execution (e.g., 'daily', 'critical'). Use with `odibi run --tag`. |
+| **depends_on** | List[str] | No | `PydanticUndefined` | List of parent nodes that must complete before this node runs. The output of these nodes is available for reading. |
+| **columns** | Dict[str, [ColumnMetadata](#columnmetadata)] | No | `PydanticUndefined` | Data Dictionary defining the output schema. Used for documentation, PII tagging, and validation. |
+| **read** | Optional[[ReadConfig](#readconfig)] | No | - | Input operation (Load). If missing, data is taken from the first dependency. |
+| **transform** | Optional[[TransformConfig](#transformconfig)] | No | - | Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present. |
+| **write** | Optional[[WriteConfig](#writeconfig)] | No | - | Output operation (Save to file/table). |
+| **streaming** | bool | No | `False` | Enable streaming execution for this node (Spark only) |
+| **transformer** | Optional[str] | No | - | Name of the 'App' logic to run (e.g., 'deduplicate', 'scd2'). See Transformer Catalog for options. |
 | **params** | Dict[str, Any] | No | `PydanticUndefined` | Parameters for transformer |
 | **pre_sql** | List[str] | No | `PydanticUndefined` | SQL to run before node execution |
 | **post_sql** | List[str] | No | `PydanticUndefined` | SQL to run after node execution |
@@ -320,6 +320,8 @@ These are the built-in functions you can use in two ways:
 | **log_level** | Optional[LogLevel] | No | - | Override log level for this node |
 | **on_error** | ErrorStrategy | No | `ErrorStrategy.FAIL_LATER` | Failure handling strategy |
 | **validation** | Optional[[ValidationConfig](#validationconfig)] | No | - | - |
+| **schema_policy** | Optional[[SchemaPolicyConfig](#schemapolicyconfig)] | No | - | Schema drift handling policy |
+| **privacy** | Optional[[PrivacyConfig](#privacyconfig)] | No | - | Privacy Suite: PII anonymization settings |
 | **sensitive** | bool | List[str] | No | `False` | If true or list of columns, masks sample data in stories |
 
 ---
@@ -549,8 +551,8 @@ read:
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based sources |
 | **streaming** | bool | No | `False` | Enable streaming read (Spark only) |
-| **query** | Optional[str] | No | - | SQL query (shortcut for options.query) |
-| **incremental** | Optional[[IncrementalConfig](#incrementalconfig)] | No | - | Automatic incremental loading strategy. If set, generates query based on target state. |
+| **query** | Optional[str] | No | - | SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector. |
+| **incremental** | Optional[[IncrementalConfig](#incrementalconfig)] | No | - | Automatic incremental loading strategy (CDC-like). If set, generates query based on target state (HWM). |
 | **time_travel** | Optional[[TimeTravelConfig](#timetravelconfig)] | No | - | Time travel options (Delta only) |
 | **archive_options** | Dict[str, Any] | No | `PydanticUndefined` | Options for archiving bad records (e.g. badRecordsPath for Spark) |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
@@ -560,45 +562,30 @@ read:
 ### `IncrementalConfig`
 > *Used in: [ReadConfig](#readconfig)*
 
-Configuration for automatic incremental loading (Rolling Window).
+Configuration for automatic incremental loading.
 
-Generates SQL: `WHERE column >= NOW() - lookback`
+Modes:
+1. **Rolling Window** (Default): Uses a time-based lookback from NOW().
+   Good for: Stateless loading where you just want "recent" data.
+   Args: `lookback`, `unit`
 
-**Important:** This feature requires a `write` configuration in the same node.
-Odibi checks if the *Write Target* exists to decide between a Full Load (First Run)
-and an Incremental Load (Subsequent Runs).
+2. **Stateful**: Tracks the High-Water Mark (HWM) of the key column.
+   Good for: Exact incremental ingestion (e.g. CDC-like).
+   Args: `state_key` (optional), `watermark_lag` (optional)
 
-Supports:
-* `column`: Primary filter column
-* `fallback_column`: Optional backup (e.g. created_at)
-* `lookback`: Number of units
-* `unit`: Time unit (hour, day, etc.)
-
-Example:
-```yaml
-read:
-  connection: "postgres_db"
-  format: "sql"
-  table: "orders"
-  incremental:
-    column: "updated_at"
-    lookback: 3
-    unit: "day"
-
-# Required for state tracking:
-write:
-  connection: "bronze_lake"
-  format: "delta"
-  table: "orders_raw"
-  mode: "append"
-```
+Generates SQL:
+- Rolling: `WHERE column >= NOW() - lookback`
+- Stateful: `WHERE column > last_hwm - lag`
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
+| **mode** | IncrementalMode | No | `IncrementalMode.ROLLING_WINDOW` | Incremental strategy: 'rolling_window' or 'stateful' |
 | **column** | str | Yes | - | Primary column to filter on (e.g., updated_at) |
 | **fallback_column** | Optional[str] | No | - | Backup column if primary is NULL (e.g., created_at). Generates COALESCE(col, fallback) >= ... |
-| **lookback** | int | No | `1` | Number of units to look back |
-| **unit** | IncrementalUnit | No | `IncrementalUnit.DAY` | Time unit |
+| **lookback** | Optional[int] | No | - | Time units to look back (Rolling Window only) |
+| **unit** | Optional[IncrementalUnit] | No | - | Time unit for lookback (Rolling Window only). Options: 'hour', 'day', 'month', 'year' |
+| **state_key** | Optional[str] | No | - | Unique ID for state tracking. Defaults to node name if not provided. |
+| **watermark_lag** | Optional[str] | No | - | Safety buffer to handle late-arriving data. Subtracts this duration (e.g., '2h', '30m') from the stored High Water Mark when generating the query. Useful if your source system has eventual consistency or replication lag. |
 
 ---
 
@@ -665,7 +652,7 @@ transform:
 ### `ValidationConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
-Configuration for data validation.
+Configuration for data validation (Quality Gate).
 
 ### 🛡️ "The Indestructible Pipeline" Pattern
 
@@ -678,34 +665,44 @@ A Quality Gate that runs *after* transformation but *before* writing.
 **Recipe: The Quality Gate**
 ```yaml
 validation:
-  # BLOCKING: Stop the pipeline if data is bad.
-  severity: "error"
+  mode: "fail"          # fail (stop pipeline) or warn (log only)
+  on_fail: "alert"      # alert or ignore
 
-  # 1. Completeness
-  not_empty: true
-  no_nulls: ["transaction_id", "customer_id"]
+  tests:
+    # 1. Completeness
+    - type: "not_null"
+      columns: ["transaction_id", "customer_id"]
 
-  # 2. Integrity
-  allowed_values:
-    status: ["PENDING", "COMPLETED", "FAILED"]
-    currency: ["USD", "EUR", "GBP"]
+    # 2. Integrity
+    - type: "unique"
+      columns: ["transaction_id"]
 
-  # 3. Business Logic (SQL Expressions)
-  custom_sql:
-    positive_amount: "amount > 0"
-    valid_tax_rate: "tax_rate BETWEEN 0 AND 0.5"
-    dates_ordered: "created_at <= completed_at"
+    - type: "accepted_values"
+      column: "status"
+      values: ["PENDING", "COMPLETED", "FAILED"]
+
+    # 3. Ranges & Patterns
+    - type: "range"
+      column: "age"
+      min: 18
+      max: 120
+
+    - type: "regex_match"
+      column: "email"
+      pattern: "^[\w\.-]+@[\w\.-]+\.\w+$"
+
+    # 4. Business Logic (SQL)
+    - type: "custom_sql"
+      name: "dates_ordered"
+      condition: "created_at <= completed_at"
+      threshold: 0.01   # Allow 1% failure
 ```
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **severity** | Literal['error', 'warning'] | No | `error` | If 'error', fails pipeline. If 'warning', logs alert but continues. |
-| **schema_validation** | Optional[Dict[str, Any]] | No | - | Schema validation rules |
-| **custom_sql** | Dict[str, str] | No | `PydanticUndefined` | Custom SQL checks. Key is check name, value is SQL expression returning boolean. |
-| **not_empty** | bool | No | `False` | Ensure result is not empty |
-| **no_nulls** | List[str] | No | `PydanticUndefined` | Columns that must not have nulls |
-| **ranges** | Dict[str, Dict[str, float]] | No | `PydanticUndefined` | Value ranges {col: {min: 0, max: 100}} |
-| **allowed_values** | Dict[str, List[Any]] | No | `PydanticUndefined` | Allowed values {col: [val1, val2]} |
+| **mode** | ValidationAction | No | `ValidationAction.FAIL` | Execution mode: 'fail' (stop pipeline) or 'warn' (log only) |
+| **on_fail** | OnFailAction | No | `OnFailAction.ALERT` | Action on failure: 'alert' (send notification) or 'ignore' |
+| **tests** | List[[NotNullTest](#notnulltest) | [UniqueTest](#uniquetest) | [AcceptedValuesTest](#acceptedvaluestest) | [RowCountTest](#rowcounttest) | [CustomSQLTest](#customsqltest) | [RangeTest](#rangetest) | [RegexMatchTest](#regexmatchtest)] | No | `PydanticUndefined` | List of validation tests |
 
 ---
 
@@ -752,13 +749,14 @@ write:
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based outputs |
 | **register_table** | Optional[str] | No | - | Register file output as external table (Spark/Delta only) |
-| **mode** | WriteMode | No | `WriteMode.OVERWRITE` | Write mode |
-| **partition_by** | List[str] | No | `PydanticUndefined` | Columns to partition output by |
-| **zorder_by** | List[str] | No | `PydanticUndefined` | Columns to Z-Order by (Delta only) |
+| **mode** | WriteMode | No | `WriteMode.OVERWRITE` | Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once' |
+| **partition_by** | List[str] | No | `PydanticUndefined` | List of columns to physically partition the output by (folder structure). Use for low-cardinality columns (e.g. date, country). |
+| **zorder_by** | List[str] | No | `PydanticUndefined` | List of columns to Z-Order by. Improves read performance for high-cardinality columns used in filters/joins (Delta only). |
 | **table_properties** | Dict[str, str] | No | `PydanticUndefined` | Table properties (e.g. comments, retention) |
 | **merge_schema** | bool | No | `False` | Allow schema evolution (mergeSchema option in Delta) |
 | **first_run_query** | Optional[str] | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
+| **auto_optimize** | bool | [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
 
 ---
 
@@ -1123,8 +1121,8 @@ deduplicate:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **keys** | List[str] | Yes | - | - |
-| **order_by** | Optional[str] | No | - | SQL Order by clause (e.g. 'updated_at DESC') |
+| **keys** | List[str] | Yes | - | List of columns to partition by (columns that define uniqueness) |
+| **order_by** | Optional[str] | No | - | SQL Order by clause (e.g. 'updated_at DESC') to determine which record to keep (first one is kept) |
 
 ---
 
@@ -1167,10 +1165,10 @@ dict_based_mapping:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **column** | str | Yes | - | - |
-| **mapping** | Dict[str, str | int | float | bool] | Yes | - | - |
-| **default** | str | int | float | bool | No | - | - |
-| **output_column** | Optional[str] | No | - | - |
+| **column** | str | Yes | - | Column to map values from |
+| **mapping** | Dict[str, str | int | float | bool] | Yes | - | Dictionary of source value -> target value |
+| **default** | str | int | float | bool | No | - | Default value if source value is not found in mapping |
+| **output_column** | Optional[str] | No | - | Name of output column. If not provided, overwrites source column. |
 
 ---
 
@@ -1205,8 +1203,8 @@ explode_list_column:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **column** | str | Yes | - | - |
-| **outer** | bool | No | `False` | If True, keep rows with empty lists (explode_outer) |
+| **column** | str | Yes | - | Column containing the list/array to explode |
+| **outer** | bool | No | `False` | If True, keep rows with empty lists (explode_outer behavior). If False, drops them. |
 
 ---
 
@@ -1273,6 +1271,25 @@ filter_rows:
 
 ---
 
+### `GeocodeParams`
+Configuration for geocoding.
+
+Example:
+```yaml
+geocode:
+  address_col: "full_address"
+  output_col: "lat_long"
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **address_col** | str | Yes | - | Column containing the address to geocode |
+| **output_col** | str | No | `lat_long` | Name of the output column for coordinates |
+
+---
+
 ### `HashParams`
 Configuration for column hashing.
 
@@ -1287,8 +1304,8 @@ hash_columns:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **columns** | List[str] | Yes | - | - |
-| **algorithm** | HashAlgorithm | No | `HashAlgorithm.SHA256` | - |
+| **columns** | List[str] | Yes | - | List of columns to hash |
+| **algorithm** | HashAlgorithm | No | `HashAlgorithm.SHA256` | Hashing algorithm. Options: 'sha256', 'md5' |
 
 ---
 
@@ -1379,6 +1396,25 @@ params:
 | **optimize_write** | bool | No | `False` | Run OPTIMIZE after write (Spark) |
 | **zorder_by** | Optional[List[str]] | No | - | Columns to Z-Order by |
 | **cluster_by** | Optional[List[str]] | No | - | Columns to Liquid Cluster by (Delta) |
+
+---
+
+### `NormalizeJsonParams`
+Configuration for JSON normalization.
+
+Example:
+```yaml
+normalize_json:
+  column: "json_data"
+  sep: "_"
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | str | Yes | - | Column containing nested JSON/Struct |
+| **sep** | str | No | `_` | Separator for nested fields (e.g., 'parent_child') |
 
 ---
 
@@ -1473,9 +1509,9 @@ regex_replace:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **column** | str | Yes | - | - |
-| **pattern** | str | Yes | - | - |
-| **replacement** | str | Yes | - | - |
+| **column** | str | Yes | - | Column to apply regex replacement on |
+| **pattern** | str | Yes | - | Regex pattern to match |
+| **replacement** | str | Yes | - | String to replace matches with |
 
 ---
 
@@ -1538,6 +1574,28 @@ sample:
 | --- | --- | --- | --- | --- |
 | **fraction** | float | Yes | - | Fraction of rows to return (0.0 to 1.0) |
 | **seed** | Optional[int] | No | - | - |
+
+---
+
+### `SessionizeParams`
+Configuration for sessionization.
+
+Example:
+```yaml
+sessionize:
+  timestamp_col: "event_time"
+  user_col: "user_id"
+  threshold_seconds: 1800
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **timestamp_col** | str | Yes | - | Timestamp column to calculate session duration from |
+| **user_col** | str | Yes | - | User identifier to partition sessions by |
+| **threshold_seconds** | int | No | `1800` | Inactivity threshold in seconds (default: 30 minutes). If gap > threshold, new session starts. |
+| **session_col** | str | No | `session_id` | Output column name for the generated session ID |
 
 ---
 
@@ -1641,7 +1699,7 @@ unpack_struct:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **column** | str | Yes | - | - |
+| **column** | str | Yes | - | Struct/Dictionary column to unpack/flatten into individual columns |
 
 ---
 

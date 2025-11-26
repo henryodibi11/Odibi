@@ -1,19 +1,20 @@
 """Node execution engine."""
 
-import time
 import inspect
+import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from odibi.config import NodeConfig, RetryConfig, WriteMode
+from odibi.config import IncrementalMode, NodeConfig, RetryConfig, WriteMode
 from odibi.context import Context, EngineContext
 from odibi.enums import EngineType
 
 # from odibi.transformations.registry import get_registry as get_transformation_registry  # Removed in cleanup
 from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
 from odibi.registry import FunctionRegistry
+from odibi.state import DeltaStateBackend, LocalFileStateBackend, StateManager
 
 
 class NodeResult(BaseModel):
@@ -69,6 +70,17 @@ class Node:
         self._execution_steps: List[str] = []
         self._executed_sql: List[str] = []
         self._delta_write_info: Optional[Dict[str, Any]] = None
+        self._pending_hwm: Optional[tuple] = None
+        self._validation_warnings: List[str] = []
+
+        # Initialize State Manager
+        backend = None
+        if hasattr(self.engine, "spark"):
+            backend = DeltaStateBackend(self.engine.spark)
+        else:
+            backend = LocalFileStateBackend()
+
+        self.state_manager = StateManager(backend=backend)
 
     def restore(self) -> bool:
         """Restore node state from previous execution (if persisted).
@@ -282,6 +294,19 @@ class Node:
         duration = time.time() - start_time
         metadata = self._collect_metadata(result_df, input_schema, input_sample)
 
+        # Commit HWM if pending
+        if self._pending_hwm:
+            key, value = self._pending_hwm
+            try:
+                self.state_manager.set_hwm(key, value)
+                metadata["hwm_updated"] = {"key": key, "value": value}
+            except Exception as e:
+                # Warn but don't fail execution? Or fail?
+                # If we fail to save state, next run will re-process data.
+                # It is safer to fail, or at least log.
+                # For now, let's add warning to metadata.
+                metadata["hwm_error"] = str(e)
+
         return NodeResult(
             node_name=self.config.name,
             success=True,
@@ -372,6 +397,18 @@ class Node:
                 f"Applied {len(self.config.transform.steps)} transform steps"
             )
 
+        # Privacy Suite (Phase 3)
+        if self.config.privacy:
+            pii_cols = [name for name, meta in self.config.columns.items() if meta.pii]
+            if pii_cols:
+                result_df = self.engine.anonymize(
+                    result_df,
+                    pii_cols,
+                    self.config.privacy.method,
+                    self.config.privacy.salt,
+                )
+                self._execution_steps.append(f"Anonymized {len(pii_cols)} PII columns")
+
         return result_df
 
     def _execute_validation_phase(self, result_df: Any) -> None:
@@ -394,8 +431,80 @@ class Node:
             df_to_write = self.context.get(self.config.depends_on[0])
 
         if df_to_write is not None:
-            self._execute_write(df_to_write, actual_mode)
+            extra_options = {}
+
+            # --- Schema Management ---
+            if self.config.schema_policy:
+                write_config = self.config.write
+                target_conn = self.connections.get(write_config.connection)
+
+                # 1. Fetch Target Schema
+                target_schema = None
+                try:
+                    target_schema = self.engine.get_table_schema(
+                        connection=target_conn,
+                        table=write_config.table,
+                        path=write_config.path,
+                        format=write_config.format,
+                    )
+                except Exception:
+                    # Ignore if we can't fetch schema (e.g. table doesn't exist yet)
+                    pass
+
+                # 2. Harmonize Schema
+                if target_schema:
+                    df_to_write = self.engine.harmonize_schema(
+                        df_to_write, target_schema, self.config.schema_policy
+                    )
+
+                # 3. Configure Evolution Options (Phase 2.3)
+                if self.config.schema_policy.mode == "evolve":
+                    if write_config.format == "delta":
+                        if hasattr(self.engine, "spark"):
+                            extra_options["mergeSchema"] = "true"
+                        else:
+                            # Pandas / DeltaLake
+                            extra_options["schema_mode"] = "merge"
+
+            self._execute_write(df_to_write, actual_mode, extra_options=extra_options)
             self._execution_steps.append(f"Written to {self.config.write.connection}")
+
+            # Auto-Optimize
+            self._execute_auto_optimize()
+
+    def _execute_auto_optimize(self) -> None:
+        """Execute auto-optimization if configured."""
+        write_config = self.config.write
+        if not write_config or not write_config.auto_optimize:
+            return
+
+        # Resolve config
+        from odibi.config import AutoOptimizeConfig
+
+        opt_config = None
+        if isinstance(write_config.auto_optimize, bool):
+            if write_config.auto_optimize:
+                opt_config = AutoOptimizeConfig(enabled=True)
+            else:
+                return
+        else:
+            opt_config = write_config.auto_optimize
+
+        if not opt_config or not opt_config.enabled:
+            return
+
+        connection = self.connections.get(write_config.connection)
+        if not connection:
+            return
+
+        self.engine.maintain_table(
+            connection=connection,
+            format=write_config.format,
+            table=write_config.table,
+            path=write_config.path,
+            config=opt_config,
+        )
+        self._execution_steps.append("Auto-optimized table (Compaction + Vacuum)")
 
     def _execute_read(self) -> Any:
         """Execute read operation with HWM first-run support.
@@ -446,52 +555,100 @@ class Node:
                 if not table_name:
                     raise ValueError("Incremental read requires 'table' or 'path' to be set.")
 
-                if not target_exists:
-                    # First Run: Load everything
-                    # For SQL/JDBC, passing "query" usually overrides "table", so we explicit select *
-                    # Or we can just NOT set a query and let it read the whole table naturally.
-                    # BUT, if the user wants 'incremental' behavior, they expect us to manage the query.
-                    # Let's be explicit.
-                    options["query"] = f"SELECT * FROM {table_name}"
-                else:
-                    # Subsequent Run: Rolling Window
-                    inc = read_config.incremental
+                inc = read_config.incremental
+                where_clause = None
 
-                    # Calculate cutoff
-                    now = datetime.now()
-                    if inc.unit == "hour":
-                        delta = timedelta(hours=inc.lookback)
-                    elif inc.unit == "day":
-                        delta = timedelta(days=inc.lookback)
-                    elif inc.unit == "month":
-                        # Approximate
-                        delta = timedelta(days=inc.lookback * 30)
-                    elif inc.unit == "year":
-                        delta = timedelta(days=inc.lookback * 365)
+                if inc.mode == IncrementalMode.STATEFUL:
+                    # STATEFUL MODE
+                    state_key = inc.state_key or self.config.name
+                    last_hwm = self.state_manager.get_hwm(state_key)
+
+                    if last_hwm is None:
+                        # First run: Load everything
+                        if read_config.format in ["sql", "sql_server", "azure_sql"]:
+                            options["query"] = f"SELECT * FROM {table_name}"
                     else:
-                        delta = timedelta(days=inc.lookback)
+                        # Subsequent run: Filter > HWM
+                        val_to_compare = last_hwm
 
-                    cutoff = now - delta
+                        # Apply watermark lag (only if string/time)
+                        if inc.watermark_lag and isinstance(last_hwm, str):
+                            try:
+                                from dateutil.parser import parse
 
-                    # Format date - ISO 8601 is generally safe for Spark/SQL
-                    # 'YYYY-MM-DD HH:MM:SS'
-                    date_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+                                hwm_dt = parse(last_hwm)
+                                lag_str = inc.watermark_lag.lower()
+                                unit_char = lag_str[-1]
+                                val = int(lag_str[:-1])
 
-                    if inc.fallback_column:
-                        where_clause = (
-                            f"COALESCE({inc.column}, {inc.fallback_column}) >= '{date_str}'"
+                                delta = timedelta()
+                                if unit_char == "h":
+                                    delta = timedelta(hours=val)
+                                elif unit_char == "d":
+                                    delta = timedelta(days=val)
+                                elif unit_char == "m":
+                                    delta = timedelta(minutes=val)
+                                elif unit_char == "s":
+                                    delta = timedelta(seconds=val)
+
+                                val_to_compare = (hwm_dt - delta).strftime("%Y-%m-%d %H:%M:%S.%f")
+                            except Exception:
+                                pass  # Fallback to raw HWM if parsing fails
+
+                        val_str = (
+                            f"'{val_to_compare}'"
+                            if isinstance(val_to_compare, str)
+                            else str(val_to_compare)
                         )
-                    else:
-                        where_clause = f"{inc.column} >= '{date_str}'"
 
-                    # Dispatch based on format:
-                    # SQL formats require full query
-                    # File/Table formats (Parquet, Delta) require predicate filter
+                        if inc.fallback_column:
+                            where_clause = (
+                                f"COALESCE({inc.column}, {inc.fallback_column}) > {val_str}"
+                            )
+                        else:
+                            where_clause = f"{inc.column} > {val_str}"
+
+                    # Register pending HWM update (will be processed after read)
+                    self._pending_hwm = (state_key, inc.column)
+
+                else:
+                    # ROLLING WINDOW MODE (Legacy)
+                    if not target_exists:
+                        # First Run: Load everything
+                        if read_config.format in ["sql", "sql_server", "azure_sql"]:
+                            options["query"] = f"SELECT * FROM {table_name}"
+                    else:
+                        # Subsequent Run
+                        now = datetime.now()
+                        lookback = inc.lookback or 1
+                        unit_str = str(inc.unit).lower() if inc.unit else "day"
+
+                        if unit_str == "hour":
+                            delta = timedelta(hours=lookback)
+                        elif unit_str == "day":
+                            delta = timedelta(days=lookback)
+                        elif unit_str == "month":
+                            delta = timedelta(days=lookback * 30)
+                        elif unit_str == "year":
+                            delta = timedelta(days=lookback * 365)
+                        else:
+                            delta = timedelta(days=lookback)
+
+                        cutoff = now - delta
+                        date_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+                        if inc.fallback_column:
+                            where_clause = (
+                                f"COALESCE({inc.column}, {inc.fallback_column}) >= '{date_str}'"
+                            )
+                        else:
+                            where_clause = f"{inc.column} >= '{date_str}'"
+
+                # Apply generated WHERE clause
+                if where_clause:
                     if read_config.format in ["sql", "sql_server", "azure_sql"]:
                         options["query"] = f"SELECT * FROM {table_name} WHERE {where_clause}"
                     else:
-                        # For Pandas (query) and Spark (filter)
-                        # Note: PandasEngine now supports 'filter' as an alias for 'query' to unify this
                         options["filter"] = where_clause
 
         # Determine table argument for engine.read
@@ -510,6 +667,18 @@ class Node:
             streaming=read_config.streaming,
             options=options,
         )
+
+        # Capture HWM if needed
+        if self._pending_hwm and df is not None:
+            key, column = self._pending_hwm
+            # If streaming, we can't easily get max. Incremental usually implies batch.
+            if not read_config.streaming:
+                new_max = self._get_column_max(df, column)
+                if new_max is not None:
+                    self._pending_hwm = (key, new_max)
+                else:
+                    # No new data or empty DF -> No HWM update
+                    self._pending_hwm = None
 
         return df
 
@@ -702,20 +871,40 @@ class Node:
 
     def _execute_validation(self, df: Any) -> None:
         """Execute validation rules."""
+        from odibi.config import ValidationAction
+        from odibi.validation.engine import Validator
+
         validation_config = self.config.validation
 
-        # Delegate to engine
-        failures = self.engine.validate_data(df, validation_config)
+        # Use new Validator
+        validator = Validator()
+        failures = validator.validate(df, validation_config)
 
         if failures:
-            raise ValidationError(self.config.name, failures)
+            if validation_config.mode == ValidationAction.FAIL:
+                raise ValidationError(self.config.name, failures)
+            elif validation_config.mode == ValidationAction.WARN:
+                import logging
 
-    def _execute_write(self, df: Any, override_mode: Optional[WriteMode] = None) -> None:
+                logger = logging.getLogger(__name__)
+                for fail in failures:
+                    logger.warning(f"Validation Warning (Node {self.config.name}): {fail}")
+                    # Also add to execution steps for visibility
+                    self._execution_steps.append(f"Warning: {fail}")
+                    self._validation_warnings.append(fail)
+
+    def _execute_write(
+        self,
+        df: Any,
+        override_mode: Optional[WriteMode] = None,
+        extra_options: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Execute write operation.
 
         Args:
             df: DataFrame to write
             override_mode: Override write mode (used by HWM first-run logic)
+            extra_options: Additional options to pass to writer (e.g. schema evolution)
         """
         write_config = self.config.write
         connection = self.connections.get(write_config.connection)
@@ -728,6 +917,11 @@ class Node:
 
         # Check if deep diagnostics are requested
         write_options = write_config.options.copy() if write_config.options else {}
+
+        # Merge extra options
+        if extra_options:
+            write_options.update(extra_options)
+
         deep_diag = write_options.pop("deep_diagnostics", False)
 
         # Check for update keys
@@ -853,14 +1047,14 @@ class Node:
         try:
             import pandas as pd
 
-            pandas_version = pd.__version__
+            pandas_version = getattr(pd, "__version__", None)
         except ImportError:
             pandas_version = None
 
         try:
             import pyspark
 
-            pyspark_version = pyspark.__version__
+            pyspark_version = getattr(pyspark, "__version__", None)
         except ImportError:
             pyspark_version = None
 
@@ -894,6 +1088,7 @@ class Node:
                 step.function if hasattr(step, "function") else str(step)
                 for step in (self.config.transform.steps if self.config.transform else [])
             ],
+            "validation_warnings": self._validation_warnings.copy(),
             "config_snapshot": config_snapshot,
         }
 
@@ -1030,3 +1225,35 @@ class Node:
             suggestions.append("Check network connectivity and credentials")
 
         return suggestions
+
+    def _get_column_max(self, df: Any, column: str) -> Any:
+        """Get maximum value of a column from DataFrame (Spark or Pandas)."""
+        if hasattr(self.engine, "spark"):
+            # Spark
+            from pyspark.sql import functions as F
+
+            try:
+                row = df.select(F.max(column)).first()
+                return row[0] if row else None
+            except Exception:
+                return None
+        else:
+            # Pandas
+            try:
+                if column in df.columns:
+                    val = df[column].max()
+                    # Handle pandas/numpy NaT/NaN
+                    import numpy as np
+                    import pandas as pd
+
+                    if pd.isna(val):
+                        return None
+                    # Convert numpy types to native python types for JSON serialization
+                    if isinstance(val, (np.integer, np.floating)):
+                        return val.item()
+                    if isinstance(val, np.datetime64):
+                        return str(val)  # or val.isoformat()
+                    return val
+                return None
+            except Exception:
+                return None
