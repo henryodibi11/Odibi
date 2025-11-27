@@ -4,8 +4,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from odibi.connections import AzureADLS
-from odibi.utils.setup_helpers import (
+# Skip entire module if azure-identity is not installed
+pytest.importorskip("azure.identity")
+
+from odibi.connections import AzureADLS  # noqa: E402
+from odibi.utils.setup_helpers import (  # noqa: E402
     KeyVaultFetchResult,
     configure_connections_parallel,
     fetch_keyvault_secret,

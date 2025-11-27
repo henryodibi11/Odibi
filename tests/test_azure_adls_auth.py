@@ -5,7 +5,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from odibi.connections.azure_adls import AzureADLS
+# Skip entire module if azure-identity is not installed
+pytest.importorskip("azure.identity")
+
+from odibi.connections.azure_adls import AzureADLS  # noqa: E402
 
 
 class TestAzureADLSValidation:

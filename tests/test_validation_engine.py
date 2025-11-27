@@ -128,7 +128,10 @@ try:
     def spark():
         os.environ["PYSPARK_PYTHON"] = sys.executable
         os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
-        return SparkSession.builder.master("local[1]").appName("test").getOrCreate()
+        try:
+            return SparkSession.builder.master("local[1]").appName("test").getOrCreate()
+        except Exception as e:
+            pytest.skip(f"Could not create SparkSession: {e}")
 
     def test_spark_validation(spark):
         data = [
