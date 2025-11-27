@@ -324,7 +324,7 @@ class Pipeline:
                         else:
                             resume_reason = "Upstream dependency executed"
                     else:
-                        resume_reason = f"Configuration changed (Hash mismatch: {last_hash[:7]}... != {current_hash[:7]}...)"
+                        resume_reason = f"Configuration changed (Hash mismatch: {str(last_hash)[:7]}... != {str(current_hash)[:7]}...)"
                 else:
                     resume_reason = "No successful previous run found"
 
@@ -338,9 +338,12 @@ class Pipeline:
                                 engine=self.engine,
                                 connections=self.connections,
                             )
+                            # If using dry run or mock engine in tests, restore might always succeed or fail based on implementation
+                            # In the failing test case, the mock engine's read is mocked but restore() calls engine.read
+                            # Let's ensure we pass the result properly.
                             if temp_node.restore():
                                 logger.info(f"Skipping '{node_name}': {resume_reason}")
-                                return NodeResult(
+                                result = NodeResult(
                                     node_name=node_name,
                                     success=True,
                                     duration=0.0,
@@ -350,6 +353,9 @@ class Pipeline:
                                         "version_hash": current_hash,
                                     },
                                 )
+                                # IMPORTANT: Set rows_processed/schema from restored if possible?
+                                # For now just returning metadata is key.
+                                return result
                             else:
                                 logger.info(f"Re-running '{node_name}': Restore failed")
                         except Exception as e:
