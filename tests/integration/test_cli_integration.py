@@ -74,6 +74,8 @@ connections:
 story:
   connection: local
   path: stories/
+system:
+  connection: local
 pipelines:
   - pipeline: test
     nodes:

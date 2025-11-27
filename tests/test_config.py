@@ -241,8 +241,8 @@ class TestProjectConfig:
     """Test ProjectConfig validation."""
 
     def test_minimal_project_config(self):
-        """Minimal valid project config requires connections, pipelines, story."""
-        from odibi.config import StoryConfig
+        """Minimal valid project config requires connections, pipelines, story, and system."""
+        from odibi.config import StoryConfig, SystemConfig
 
         config = ProjectConfig(
             project="My Project",
@@ -259,6 +259,7 @@ class TestProjectConfig:
                 )
             ],
             story=StoryConfig(connection="data", path="stories/"),
+            system=SystemConfig(connection="data"),
         )
         assert config.project == "My Project"
         assert config.engine == EngineType.PANDAS  # Default
@@ -266,7 +267,7 @@ class TestProjectConfig:
 
     def test_project_with_connections(self):
         """Project can define connections."""
-        from odibi.config import StoryConfig
+        from odibi.config import StoryConfig, SystemConfig
 
         config = ProjectConfig(
             project="Test",
@@ -283,6 +284,7 @@ class TestProjectConfig:
                 )
             ],
             story=StoryConfig(connection="local", path="stories/"),
+            system=SystemConfig(connection="local"),
         )
         assert "local" in config.connections
         # connections are models, so access with dot notation, not dict subscription
@@ -290,7 +292,7 @@ class TestProjectConfig:
 
     def test_project_default_engine_is_pandas(self):
         """Default engine should be Pandas."""
-        from odibi.config import StoryConfig
+        from odibi.config import StoryConfig, SystemConfig
 
         config = ProjectConfig(
             project="Test",
@@ -307,12 +309,13 @@ class TestProjectConfig:
                 )
             ],
             story=StoryConfig(connection="data", path="stories/"),
+            system=SystemConfig(connection="data"),
         )
         assert config.engine == EngineType.PANDAS
 
     def test_project_can_set_spark_engine(self):
         """Can set engine to Spark."""
-        from odibi.config import StoryConfig
+        from odibi.config import StoryConfig, SystemConfig
 
         config = ProjectConfig(
             project="Test",
@@ -330,12 +333,13 @@ class TestProjectConfig:
                 )
             ],
             story=StoryConfig(connection="data", path="stories/"),
+            system=SystemConfig(connection="data"),
         )
         assert config.engine == EngineType.SPARK
 
     def test_project_with_global_settings(self):
         """Project has settings for retry, logging at top level."""
-        from odibi.config import StoryConfig
+        from odibi.config import StoryConfig, SystemConfig
 
         config = ProjectConfig(
             project="Test",
@@ -352,6 +356,7 @@ class TestProjectConfig:
                 )
             ],
             story=StoryConfig(connection="data", path="stories/"),
+            system=SystemConfig(connection="data"),
         )
 
         # Check top-level settings exist (no more nested defaults)

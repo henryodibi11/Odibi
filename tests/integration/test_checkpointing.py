@@ -71,40 +71,64 @@ class TestCheckpointing:
 
     def test_pipeline_resume_skips_successful_node(self, context, engine, connections):
         """Test Pipeline.run logic for skipping nodes."""
+        import hashlib
+        import json
 
         # Mock StateManager
         with patch("odibi.pipeline.StateManager") as MockStateManager:
             state_instance = MockStateManager.return_value
 
-            # Setup: Node A succeeded last time
-            def get_status(pipeline, node):
-                if node == "node_a":
-                    return True
-                return False
-
-            state_instance.get_last_run_status.side_effect = get_status
-
             # Pipeline config
+            node_a_config = NodeConfig(
+                name="node_a",
+                read=ReadConfig(connection="local", format="csv", path="in.csv"),
+                write=WriteConfig(connection="local", format="csv", path="out_a.csv"),
+            )
+            node_b_config = NodeConfig(
+                name="node_b",
+                depends_on=["node_a"],
+                write=WriteConfig(connection="local", format="csv", path="out_b.csv"),
+            )
+
             pipeline_config = PipelineConfig(
                 pipeline="test_pipe",
-                nodes=[
-                    NodeConfig(
-                        name="node_a",
-                        read=ReadConfig(connection="local", format="csv", path="in.csv"),
-                        write=WriteConfig(connection="local", format="csv", path="out_a.csv"),
-                    ),
-                    NodeConfig(
-                        name="node_b",
-                        depends_on=["node_a"],
-                        write=WriteConfig(connection="local", format="csv", path="out_b.csv"),
-                    ),
-                ],
+                nodes=[node_a_config, node_b_config],
             )
+
+            # Calculate expected hash for node_a to mock successful previous run
+            dump = node_a_config.model_dump(
+                mode="json", exclude={"description", "tags", "log_level"}
+            )
+            dump_str = json.dumps(dump, sort_keys=True)
+            node_a_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
+
+            # Setup: Node A succeeded last time with matching hash
+            def get_info(pipeline, node):
+                if node == "node_a":
+                    return {
+                        "success": True,
+                        "metadata": {"version_hash": node_a_hash},
+                    }
+                return None
+
+            state_instance.get_last_run_info.side_effect = get_info
 
             # Use real Pipeline class but mock engine/connections
             pipeline = Pipeline(pipeline_config, engine="pandas", connections=connections)
             pipeline.engine = engine
             pipeline.context = context
+
+            # Inject mock ProjectConfig for state management
+            from odibi.config import ProjectConfig, SystemConfig, StoryConfig
+
+            pipeline.project_config = ProjectConfig(
+                project="test_project",
+                engine="pandas",
+                connections={"local": {"type": "local", "base_path": "./data"}},
+                pipelines=[pipeline_config],
+                story=StoryConfig(connection="local", path="stories"),
+                system=SystemConfig(connection="local"),
+            )
 
             # Execute with resume
             results = pipeline.run(resume_from_failure=True)
