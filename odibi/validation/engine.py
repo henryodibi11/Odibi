@@ -147,10 +147,13 @@ class Validator:
         self, df: Any, config: ValidationConfig, context: Dict[str, Any] = None
     ) -> List[str]:
         """Execute checks using Spark SQL."""
+        from pyspark.sql import functions as F
+
         failures = []
+        # Cache for multiple checks if needed, but let's rely on Spark's optimization for now
+        # df.cache()
         row_count = df.count()
 
-        # 1. Row Count Checks
         for test in config.tests:
             msg = None
             if test.type == TestType.ROW_COUNT:
@@ -159,20 +162,113 @@ class Validator:
                 elif test.max is not None and row_count > test.max:
                     msg = f"Row count {row_count} > max {test.max}"
 
+            elif test.type == TestType.SCHEMA:
+                if context and "columns" in context:
+                    expected = set(context["columns"].keys())
+                    actual = set(df.columns)
+                    if getattr(test, "strict", True):
+                        if actual != expected:
+                            msg = f"Schema mismatch. Expected {expected}, got {actual}"
+                    else:
+                        missing = expected - actual
+                        if missing:
+                            msg = f"Schema mismatch. Missing columns: {missing}"
+
+            elif test.type == TestType.FRESHNESS:
+                col = getattr(test, "column", "updated_at")
+                if col in df.columns:
+                    max_ts = df.agg(F.max(col)).collect()[0][0]
+                    if max_ts:
+                        from datetime import datetime, timedelta
+
+                        duration_str = test.max_age
+                        delta = None
+                        if duration_str.endswith("h"):
+                            delta = timedelta(hours=int(duration_str[:-1]))
+                        elif duration_str.endswith("d"):
+                            delta = timedelta(days=int(duration_str[:-1]))
+
+                        if delta and (datetime.utcnow() - max_ts > delta):
+                            msg = (
+                                f"Data too old. Max timestamp {max_ts} is older than {test.max_age}"
+                            )
+                else:
+                    msg = f"Freshness check failed: Column '{col}' not found"
+
+            elif test.type == TestType.NOT_NULL:
+                for col in test.columns:
+                    if col in df.columns:
+                        null_count = df.filter(F.col(col).isNull()).count()
+                        if null_count > 0:
+                            col_msg = f"Column '{col}' contains {null_count} NULLs"
+                            res = self._handle_failure(col_msg, test)
+                            if res:
+                                failures.append(res)
+                continue
+
+            elif test.type == TestType.UNIQUE:
+                cols = [c for c in test.columns if c in df.columns]
+                if len(cols) != len(test.columns):
+                    msg = f"Unique check failed: Columns {set(test.columns) - set(cols)} not found"
+                else:
+                    dup_count = df.groupBy(*cols).count().filter("count > 1").count()
+                    if dup_count > 0:
+                        msg = f"Column '{', '.join(cols)}' is not unique"
+
+            elif test.type == TestType.ACCEPTED_VALUES:
+                col = test.column
+                if col in df.columns:
+                    invalid_df = df.filter(~F.col(col).isin(test.values))
+                    invalid_count = invalid_df.count()
+                    if invalid_count > 0:
+                        examples_rows = invalid_df.select(col).limit(3).collect()
+                        examples = [r[0] for r in examples_rows]
+                        msg = f"Column '{col}' contains invalid values. Found: {examples}"
+                else:
+                    msg = f"Accepted values check failed: Column '{col}' not found"
+
+            elif test.type == TestType.RANGE:
+                col = test.column
+                if col in df.columns:
+                    cond = F.lit(False)
+                    if test.min is not None:
+                        cond = cond | (F.col(col) < test.min)
+                    if test.max is not None:
+                        cond = cond | (F.col(col) > test.max)
+
+                    invalid_count = df.filter(cond).count()
+                    if invalid_count > 0:
+                        msg = f"Column '{col}' contains {invalid_count} values out of range"
+                else:
+                    msg = f"Range check failed: Column '{col}' not found"
+
+            elif test.type == TestType.REGEX_MATCH:
+                col = test.column
+                if col in df.columns:
+                    # Spark uses Java regex. Python regex might need adaptation if complex.
+                    # For simple anchors ^ and $ and classes \w, it works.
+                    invalid_count = df.filter(
+                        F.col(col).isNotNull() & ~F.col(col).rlike(test.pattern)
+                    ).count()
+                    if invalid_count > 0:
+                        msg = f"Column '{col}' contains {invalid_count} values that does not match pattern '{test.pattern}'"
+                else:
+                    msg = f"Regex check failed: Column '{col}' not found"
+
+            elif test.type == TestType.CUSTOM_SQL:
+                try:
+                    invalid_count = df.filter(f"NOT ({test.condition})").count()
+                    if invalid_count > 0:
+                        msg = f"Custom check '{getattr(test, 'name', 'custom_sql')}' failed. Found {invalid_count} invalid rows."
+                except Exception as e:
+                    msg = f"Failed to execute custom SQL '{test.condition}': {e}"
+
             if msg:
                 res = self._handle_failure(msg, test)
                 if res:
                     failures.append(res)
 
-        # ... (rest of Spark logic, updated to use _handle_failure) ...
-        # For now, returning existing logic but wrapped
-
-        # Simplified for brevity: I'm injecting the new contracts handling
-        # Existing logic accumulates strings directly. I should filter them.
-
-        # Since refactoring the whole method is large, I will just add the new checks.
-
-        return failures  # TODO: Update Spark logic fully
+        return failures
 
     def _validate_pandas(
         self, df: Any, config: ValidationConfig, context: Dict[str, Any] = None

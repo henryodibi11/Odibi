@@ -16,6 +16,7 @@ def config_file(tmp_path):
         "project": "env_test",
         "engine": "pandas",
         "story": {"path": "stories", "connection": "test_conn"},
+        "system": {"connection": "test_conn"},
         "connections": {"test_conn": {"type": "local", "base_path": "./data"}},
         "pipelines": [],
         "environments": {

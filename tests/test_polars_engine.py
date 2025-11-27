@@ -1,8 +1,9 @@
-import polars as pl
 import pytest
 
-from odibi.context import PolarsContext
-from odibi.engine.polars_engine import PolarsEngine
+pl = pytest.importorskip("polars")
+
+from odibi.context import PolarsContext  # noqa: E402
+from odibi.engine.polars_engine import PolarsEngine  # noqa: E402
 
 
 class MockConnection:
