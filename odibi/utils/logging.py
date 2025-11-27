@@ -1,7 +1,16 @@
+import codecs
 import json
 import logging
 import sys
 from datetime import datetime
+
+try:
+    from rich.console import Console
+    from rich.logging import RichHandler
+
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
 
 
 class StructuredLogger:
@@ -12,8 +21,39 @@ class StructuredLogger:
         self.level = getattr(logging, level.upper(), logging.INFO)
         self._secrets = set()
 
-        # Set up standard logging for when not structured
-        logging.basicConfig(level=self.level, format="%(message)s", stream=sys.stdout)
+        # Fix Windows Unicode handling
+        if sys.platform == "win32" and sys.stdout.encoding.lower() != "utf-8":
+            try:
+                sys.stdout.reconfigure(encoding="utf-8")
+            except AttributeError:
+                # Python < 3.7 doesn't have reconfigure, use codecs wrapper
+                sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+
+        # Set up logging
+        if not self.structured and RICH_AVAILABLE:
+            # Rich logging (safe for Windows emoji)
+            # Force console to use UTF-8 or fallback safely
+            logging.basicConfig(
+                level=self.level,
+                format="%(message)s",
+                datefmt="[%X]",
+                handlers=[
+                    RichHandler(
+                        rich_tracebacks=True,
+                        markup=True,
+                        show_path=False,
+                        console=(
+                            Console(force_terminal=True, legacy_windows=False)
+                            if sys.platform == "win32"
+                            else None
+                        ),
+                    )
+                ],
+            )
+        else:
+            # Standard logging (JSON or fallback)
+            logging.basicConfig(level=self.level, format="%(message)s", stream=sys.stdout)
+
         self.logger = logging.getLogger("odibi")
 
         # Suppress noisy Py4J logging

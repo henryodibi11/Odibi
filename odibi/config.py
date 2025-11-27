@@ -397,16 +397,26 @@ class HttpConnectionConfig(BaseConnectionConfig):
     auth: HttpAuthConfig = Field(default_factory=lambda: HttpNoAuth(mode=HttpAuthMode.NONE))
 
 
+class CustomConnectionConfig(BaseModel):
+    """
+    Configuration for custom/plugin connections.
+    Allows any fields.
+    """
+
+    type: str
+    validation_mode: ValidationMode = ValidationMode.LAZY
+    # Allow extra fields
+    model_config = {"extra": "allow"}
+
+
 # Connection config discriminated union
-ConnectionConfig = Annotated[
-    Union[
-        LocalConnectionConfig,
-        AzureBlobConnectionConfig,
-        DeltaConnectionConfig,
-        SQLServerConnectionConfig,
-        HttpConnectionConfig,
-    ],
-    Field(discriminator="type"),
+ConnectionConfig = Union[
+    LocalConnectionConfig,
+    AzureBlobConnectionConfig,
+    DeltaConnectionConfig,
+    SQLServerConnectionConfig,
+    HttpConnectionConfig,
+    CustomConnectionConfig,
 ]
 
 
@@ -489,7 +499,25 @@ class IncrementalConfig(BaseModel):
 
     Generates SQL:
     - Rolling: `WHERE column >= NOW() - lookback`
-    - Stateful: `WHERE column > last_hwm - lag`
+    - Stateful: `WHERE column > :last_hwm`
+
+    Example (Rolling Window):
+    ```yaml
+    incremental:
+      mode: "rolling_window"
+      column: "updated_at"
+      lookback: 3
+      unit: "day"
+    ```
+
+    Example (Stateful HWM):
+    ```yaml
+    incremental:
+      mode: "stateful"
+      column: "id"
+      # Optional: track separate column for HWM state
+      state_key: "last_processed_id"
+    ```
     """
 
     model_config = {"populate_by_name": True}
@@ -579,7 +607,7 @@ class ReadConfig(BaseModel):
     """
 
     connection: str = Field(description="Connection name from project.yaml")
-    format: ReadFormat = Field(description="Data format (csv, parquet, delta, etc.)")
+    format: Union[ReadFormat, str] = Field(description="Data format (csv, parquet, delta, etc.)")
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based sources")
     streaming: bool = Field(default=False, description="Enable streaming read (Spark only)")
@@ -710,11 +738,35 @@ class TestType(str, Enum):
     CUSTOM_SQL = "custom_sql"
     RANGE = "range"
     REGEX_MATCH = "regex_match"
+    VOLUME_DROP = "volume_drop"  # Phase 4.1: History-Aware
+    SCHEMA = "schema"
+    DISTRIBUTION = "distribution"
+    FRESHNESS = "freshness"
+
+
+class ContractSeverity(str, Enum):
+    WARN = "warn"
+    FAIL = "fail"
+    QUARANTINE = "quarantine"
 
 
 class BaseTestConfig(BaseModel):
     type: TestType
     name: Optional[str] = Field(default=None, description="Optional name for the check")
+    on_fail: ContractSeverity = Field(
+        default=ContractSeverity.FAIL, description="Action on failure"
+    )
+
+
+class VolumeDropTest(BaseTestConfig):
+    """
+    Checks if row count dropped significantly compared to history.
+    Formula: (current - avg) / avg < -threshold
+    """
+
+    type: Literal[TestType.VOLUME_DROP] = TestType.VOLUME_DROP
+    threshold: float = Field(default=0.5, description="Max allowed drop (0.5 = 50% drop)")
+    lookback_days: int = Field(default=7, description="Days of history to average")
 
 
 class NotNullTest(BaseTestConfig):
@@ -760,6 +812,27 @@ class RegexMatchTest(BaseTestConfig):
     pattern: str
 
 
+class SchemaContract(BaseTestConfig):
+    type: Literal[TestType.SCHEMA] = TestType.SCHEMA
+    strict: bool = True
+    on_fail: ContractSeverity = ContractSeverity.FAIL
+
+
+class DistributionContract(BaseTestConfig):
+    type: Literal[TestType.DISTRIBUTION] = TestType.DISTRIBUTION
+    column: str
+    metric: Literal["mean", "min", "max", "null_percentage"]
+    threshold: str
+    on_fail: ContractSeverity = ContractSeverity.WARN
+
+
+class FreshnessContract(BaseTestConfig):
+    type: Literal[TestType.FRESHNESS] = TestType.FRESHNESS
+    column: str = Field(default="updated_at", description="Timestamp column to check")
+    max_age: str
+    on_fail: ContractSeverity = ContractSeverity.FAIL
+
+
 TestConfig = Annotated[
     Union[
         NotNullTest,
@@ -769,6 +842,10 @@ TestConfig = Annotated[
         CustomSQLTest,
         RangeTest,
         RegexMatchTest,
+        VolumeDropTest,
+        SchemaContract,
+        DistributionContract,
+        FreshnessContract,
     ],
     Field(discriminator="type"),
 ]
@@ -890,7 +967,7 @@ class WriteConfig(BaseModel):
     """
 
     connection: str = Field(description="Connection name from project.yaml")
-    format: ReadFormat = Field(description="Output format (csv, parquet, delta, etc.)")
+    format: Union[ReadFormat, str] = Field(description="Output format (csv, parquet, delta, etc.)")
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based outputs")
     register_table: Optional[str] = Field(
@@ -991,6 +1068,10 @@ class PrivacyConfig(BaseModel):
         default=None,
         description="Salt for hashing (optional but recommended). Combined with value before hashing.",
     )
+    declassify: List[str] = Field(
+        default_factory=list,
+        description="List of columns to declassify (remove from PII inheritance).",
+    )
 
 
 class SchemaPolicyConfig(BaseModel):
@@ -1041,6 +1122,24 @@ class NodeConfig(BaseModel):
 
     *   **`depends_on`**: Critical! If Node B reads from Node A (in memory), you MUST list `["Node A"]`.
         *   *Implicit Data Flow*: If a node has no `read` block, it automatically picks up the DataFrame from its first dependency.
+
+    ### 🧠 Smart Read & Incremental Loading
+
+    **Automated History Management.**
+
+    Odibi intelligently determines whether to perform a **Full Load** or an **Incremental Load** based on the state of the target.
+
+    **The "Smart Read" Logic:**
+    1.  **First Run (Full Load):** If the target table (defined in `write`) does **not exist**:
+        *   Incremental filtering rules are **ignored**.
+        *   The entire source dataset is read.
+        *   Use `write.first_run_query` (optional) to override the read query for this initial bootstrap (e.g., to backfill only 1 year of history instead of all time).
+
+    2.  **Subsequent Runs (Incremental Load):** If the target table **exists**:
+        *   **Rolling Window:** Filters source data where `column >= NOW() - lookback`.
+        *   **Stateful:** Filters source data where `column > last_high_water_mark`.
+
+    This ensures you don't need separate "init" and "update" pipelines. One config handles both lifecycle states.
 
     ### 🏷️ Orchestration Tags
     **Run What You Need.**
@@ -1293,6 +1392,10 @@ class NodeConfig(BaseModel):
         default=ErrorStrategy.FAIL_LATER, description="Failure handling strategy"
     )
     validation: Optional[ValidationConfig] = None
+    contracts: List[TestConfig] = Field(
+        default_factory=list,
+        description="Pre-condition contracts (Circuit Breakers). Runs on input data before transformation.",
+    )
     schema_policy: Optional[SchemaPolicyConfig] = Field(
         default=None, description="Schema drift handling policy"
     )
@@ -1450,6 +1553,34 @@ class StoryConfig(BaseModel):
         return self
 
 
+class SystemConfig(BaseModel):
+    """
+    Configuration for the Odibi System Catalog (The Brain).
+
+    Stores metadata, state, and pattern configurations.
+    """
+
+    connection: str = Field(description="Connection to store system tables (e.g., 'adls_bronze')")
+    path: str = Field(default="_odibi_system", description="Path relative to connection root")
+
+
+class LineageConfig(BaseModel):
+    """
+    Configuration for OpenLineage integration.
+
+    Example:
+    ```yaml
+    lineage:
+      url: "http://localhost:5000"
+      namespace: "my_project"
+    ```
+    """
+
+    url: Optional[str] = Field(default=None, description="OpenLineage API URL")
+    namespace: str = Field(default="odibi", description="Namespace for jobs")
+    api_key: Optional[str] = Field(default=None, description="API Key")
+
+
 class ProjectConfig(BaseModel):
     """
     Complete project configuration from YAML.
@@ -1466,18 +1597,18 @@ class ProjectConfig(BaseModel):
 
     # 1. Resilience
     retry:
-      enabled: true
-      max_attempts: 3
-      backoff: "exponential"
+        enabled: true
+        max_attempts: 3
+        backoff: "exponential"
 
     # 2. Observability
     logging:
-      level: "INFO"
-      structured: true  # JSON logs for Splunk/Datadog
+        level: "INFO"
+        structured: true  # JSON logs for Splunk/Datadog
 
     # 3. Alerting
     alerts:
-      - type: "slack"
+        - type: "slack"
         url: "${SLACK_WEBHOOK_URL}"
         on_events: ["on_failure"]
 
@@ -1495,8 +1626,12 @@ class ProjectConfig(BaseModel):
         description="Pipeline definitions (at least one required)"
     )
     story: StoryConfig = Field(description="Story generation configuration (mandatory)")
+    system: SystemConfig = Field(description="System Catalog configuration (mandatory)")
 
     # === OPTIONAL (with sensible defaults) ===
+    lineage: Optional["LineageConfig"] = Field(
+        default=None, description="OpenLineage configuration"
+    )
     description: Optional[str] = Field(default=None, description="Project description")
     version: str = Field(default="1.0.0", description="Project version")
     owner: Optional[str] = Field(default=None, description="Project owner/contact")
@@ -1530,7 +1665,41 @@ class ProjectConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def ensure_system_config(self):
+        """
+        Validate system config connection exists.
+        """
+        if self.system is None:
+            raise ValueError("System config is mandatory")
+
+        # Ensure the system connection exists
+        if self.system.connection not in self.connections:
+            available = ", ".join(self.connections.keys())
+            raise ValueError(
+                f"System connection '{self.system.connection}' not found. "
+                f"Available connections: {available}"
+            )
+
+        return self
+
+    @model_validator(mode="after")
     def check_environments_not_implemented(self):
         """Check environments implementation."""
         # Implemented in Phase 3
         return self
+
+
+def load_config_from_file(path: str) -> ProjectConfig:
+    """
+    Load and validate configuration from file.
+
+    Args:
+        path: Path to YAML file
+
+    Returns:
+        ProjectConfig
+    """
+    from odibi.utils import load_yaml_with_env
+
+    config_dict = load_yaml_with_env(path)
+    return ProjectConfig(**config_dict)

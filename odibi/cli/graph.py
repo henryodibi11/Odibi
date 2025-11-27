@@ -44,9 +44,9 @@ def graph_command(args):
         if args.format == "ascii":
             print(pipeline.visualize())
         elif args.format == "dot":
-            print(_generate_dot(pipeline.graph, pipeline_name))
+            print(_generate_dot(pipeline.graph, pipeline_name, manager.catalog_manager))
         elif args.format == "mermaid":
-            print(_generate_mermaid(pipeline.graph, pipeline_name))
+            print(_generate_mermaid(pipeline.graph, pipeline_name, manager.catalog_manager))
 
         return 0
 
@@ -59,7 +59,7 @@ def graph_command(args):
         return 1
 
 
-def _generate_dot(graph: DependencyGraph, pipeline_name: str) -> str:
+def _generate_dot(graph: DependencyGraph, pipeline_name: str, catalog_manager=None) -> str:
     """Generate DOT (Graphviz) representation."""
     lines = []
     lines.append(f'digraph "{pipeline_name}" {{')
@@ -82,7 +82,17 @@ def _generate_dot(graph: DependencyGraph, pipeline_name: str) -> str:
             op_type = "transform"
             color = "lightyellow"
 
-        label = f"{node_name}\\n({op_type})"
+        # Enrich with Catalog Stats
+        stats_text = ""
+        if catalog_manager:
+            try:
+                avg_rows = catalog_manager.get_average_volume(node_name)
+                if avg_rows is not None:
+                    stats_text = f"\\n~{int(avg_rows)} rows"
+            except Exception:
+                pass
+
+        label = f"{node_name}\\n({op_type}){stats_text}"
         lines.append(f'    "{node_name}" [label="{label}", style="filled", fillcolor="{color}"];')
 
         # Add edges
@@ -93,26 +103,44 @@ def _generate_dot(graph: DependencyGraph, pipeline_name: str) -> str:
     return "\n".join(lines)
 
 
-def _generate_mermaid(graph: DependencyGraph, pipeline_name: str) -> str:
+def _generate_mermaid(graph: DependencyGraph, pipeline_name: str, catalog_manager=None) -> str:
     """Generate Mermaid diagram."""
     lines = []
     lines.append("graph LR")
 
+    # Define styles
+    lines.append("    classDef read fill:lightblue,stroke:#333,stroke-width:1px;")
+    lines.append("    classDef write fill:lightgreen,stroke:#333,stroke-width:1px;")
+    lines.append("    classDef transform fill:lightyellow,stroke:#333,stroke-width:1px;")
+
     for node_name in graph.nodes:
         node = graph.nodes[node_name]
+        style_class = "transform"
 
         # Node styling based on type
         if node.read:
             shape = "(("  # Circle
             end_shape = "))"
+            style_class = "read"
         elif node.write:
             shape = "[/"  # Parallelogram
             end_shape = "/]"
+            style_class = "write"
         else:
             shape = "["  # Box
             end_shape = "]"
 
-        lines.append(f"    {node_name}{shape}{node_name}{end_shape}")
+        # Enrich with Catalog Stats
+        label = node_name
+        if catalog_manager:
+            try:
+                avg_rows = catalog_manager.get_average_volume(node_name)
+                if avg_rows is not None:
+                    label = f"{node_name}<br/>~{int(avg_rows)} rows"
+            except Exception:
+                pass
+
+        lines.append(f'    {node_name}{shape}"{label}"{end_shape}:::{style_class}')
 
         # Edges
         for dep in node.depends_on:

@@ -25,9 +25,18 @@ class TestTransformerNodeIntegration:
 
     def test_node_calls_transformer(self, context, engine, connections):
         # Register a mock transformer
-        mock_transformer = MagicMock(return_value=pd.DataFrame({"res": [1]}))
-        # Mock name for registry
+        # Use a real function to ensure signature inspection works correctly
+        def _dummy_func(context, foo, current=None):
+            return pd.DataFrame({"res": [1]})
+
+        mock_transformer = MagicMock(side_effect=_dummy_func)
         mock_transformer.__name__ = "mock_test_transformer"
+        # Important: MagicMock signature inspection can be tricky, explicit signature helps
+        # inspect.signature(mock) follows wrapped if side_effect is function?
+        # Usually yes, but let's be safe.
+        import inspect
+
+        mock_transformer.__signature__ = inspect.signature(_dummy_func)
 
         registry = FunctionRegistry
         registry.register(mock_transformer, name="mock_test_transformer")

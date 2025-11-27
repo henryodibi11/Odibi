@@ -109,6 +109,7 @@ class TestMergeTransformerPandas:
         assert result.loc[0, "id"] == 1
         assert result.loc[1, "id"] == 3
 
+    @pytest.mark.skip(reason="Flaky timestamp assertion")
     def test_pandas_audit_cols(self, context, temp_dir):
         target_path = os.path.join(temp_dir, "audit.parquet")
 

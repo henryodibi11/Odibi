@@ -1,7 +1,7 @@
 """Tests for CLI module (Phase 2.5)."""
 
 import sys
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 
@@ -83,6 +83,8 @@ class TestRunCommand:
         args.dry_run = False
         args.env = "dev"
         args.resume = False
+        args.parallel = False
+        args.workers = 4
 
         mock_result = Mock()
         mock_result.failed = []
@@ -96,7 +98,13 @@ class TestRunCommand:
 
             assert result == 0  # Success
             MockManager.from_yaml.assert_called_once_with("test.yaml", env="dev")
-            mock_manager.run.assert_called_once_with(dry_run=False, resume_from_failure=False)
+            mock_manager.run.assert_called_once_with(
+                dry_run=False,
+                resume_from_failure=False,
+                parallel=False,
+                max_workers=4,
+                on_error=ANY,
+            )
 
 
 class TestValidateCommand:

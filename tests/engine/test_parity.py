@@ -315,6 +315,8 @@ class TestSparkEngineLogic:
 
             # Setup read return
             mock_engine_instance.read.return_value = mock_spark_df
+            # Setup materialize to be identity (pass-through)
+            mock_engine_instance.materialize.side_effect = lambda df: df
             # Setup operation return (chaining)
             mock_engine_instance.execute_operation.return_value = mock_spark_df
 

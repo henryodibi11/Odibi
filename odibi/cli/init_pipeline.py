@@ -19,15 +19,15 @@ def add_init_parser(subparsers):
     """Add arguments for init-pipeline command."""
     parser = subparsers.add_parser(
         "init-pipeline",
-        aliases=["create", "init"],
+        aliases=["create", "init", "generate-project"],
         help="Initialize a new Odibi project from a template",
     )
     parser.add_argument("name", help="Name of the project directory to create")
     parser.add_argument(
         "--template",
         choices=list(TEMPLATE_MAP.keys()),
-        default="local",
-        help="Template to use (default: local)",
+        default=None,
+        help="Template to use (default: prompt user)",
     )
     # Add --force to overwrite existing directory
     parser.add_argument(
@@ -40,6 +40,29 @@ def init_pipeline_command(args):
     project_name = args.name
     template_name = args.template
     force = args.force
+
+    # Interactive Prompt
+    if template_name is None:
+        print("\nSelect a project template:")
+        templates = list(TEMPLATE_MAP.keys())
+        for i, t in enumerate(templates):
+            print(f"  {i + 1}. {t}")
+
+        try:
+            choice = input(f"\nEnter number (default: 1 [{templates[0]}]): ").strip()
+            if not choice:
+                template_name = templates[0]
+            else:
+                idx = int(choice) - 1
+                if 0 <= idx < len(templates):
+                    template_name = templates[idx]
+                else:
+                    logger.error("Invalid selection.")
+                    return 1
+        except (ValueError, EOFError, KeyboardInterrupt):
+            # Fallback for non-interactive
+            template_name = "local"
+            logger.info(f"Using default template: {template_name}")
 
     # 1. Determine Target Path
     target_dir = Path(os.getcwd()) / project_name
@@ -83,7 +106,130 @@ def init_pipeline_command(args):
 
         # Create standard directories
         os.makedirs(target_dir / "data", exist_ok=True)
+        os.makedirs(target_dir / "data/raw", exist_ok=True)
         os.makedirs(target_dir / "logs", exist_ok=True)
+        os.makedirs(target_dir / ".github/workflows", exist_ok=True)
+
+        # Create sample data for local template
+        if template_name in ["local", "local-medallion"]:
+            with open(target_dir / "data/raw/sample_data.csv", "w") as f:
+                f.write("id,name,value,updated_at\n")
+                f.write("1,Item A,100,2023-01-01 10:00:00\n")
+                f.write("2,Item B,200,2023-01-01 11:00:00\n")
+                f.write("1,Item A (Old),90,2023-01-01 09:00:00\n")
+
+        # Create Dockerfile
+        dockerfile_content = """FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies if needed (e.g., for pyodbc)
+# RUN apt-get update && apt-get install -y unixodbc-dev
+
+# Install Odibi
+RUN pip install odibi[all]
+
+# Copy project files
+COPY . /app
+
+# Default command
+CMD ["odibi", "run", "odibi.yaml"]
+"""
+        with open(target_dir / "Dockerfile", "w") as f:
+            f.write(dockerfile_content)
+
+        # Create GitHub CI Workflow
+        ci_yaml_content = """name: Odibi CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install odibi[all] pytest
+
+    - name: Check Health (Doctor)
+      run: odibi doctor
+
+    - name: Validate Configuration
+      run: odibi validate odibi.yaml
+
+    - name: Run Unit Tests
+      run: odibi test
+
+    # Optional: Dry Run
+    # - name: Dry Run Pipeline
+    #   run: odibi run odibi.yaml --dry-run
+"""
+        with open(target_dir / ".github/workflows/ci.yaml", "w") as f:
+            f.write(ci_yaml_content)
+
+        # Create .dockerignore
+        with open(target_dir / ".dockerignore", "w") as f:
+            f.write("data/\nlogs/\n.git/\n__pycache__/\n*.pyc\n")
+
+        # Create .gitignore
+        with open(target_dir / ".gitignore", "w") as f:
+            f.write("data/\nlogs/\n__pycache__/\n*.pyc\n.odibi/\nstories/\n")
+
+        # Generate README.md
+        readme_content = f"""# {project_name}
+
+A data engineering project built with [Odibi](https://github.com/henryodibi11/Odibi).
+
+## Getting Started
+
+### Prerequisites
+- Python 3.9+
+- Odibi (`pip install odibi`)
+
+### Project Structure
+- `odibi.yaml`: Main pipeline configuration
+- `data/`: Local data storage
+- `stories/`: Execution reports (HTML)
+
+### Commands
+
+**1. Validate Configuration**
+```bash
+odibi validate odibi.yaml
+```
+
+**2. Check Health**
+```bash
+odibi doctor
+```
+
+**3. Run Pipeline**
+```bash
+odibi run odibi.yaml
+```
+
+**4. View Results**
+```bash
+odibi ui
+```
+
+## CI/CD
+A GitHub Actions workflow is included in `.github/workflows/ci.yaml` that validates the project on every push.
+"""
+        with open(target_dir / "README.md", "w") as f:
+            f.write(readme_content)
 
         logger.info(f"Created new project '{project_name}' using '{template_name}' template.")
         logger.info(f"Location: {target_dir}")

@@ -12,6 +12,10 @@ story:
   connection: delta_lake
   path: stories
 
+system:
+  connection: delta_lake
+  path: _system_catalog
+
 pipelines:
   - pipeline: kitchen_sink_example
     nodes:

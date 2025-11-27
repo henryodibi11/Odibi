@@ -49,20 +49,69 @@ class MergeParams(BaseModel):
     **The Solution:**
     Use the `delete_match` strategy. The source dataframe contains the IDs to be deleted, and the transformer removes them from the target.
 
-    **Recipe: Right to be Forgotten**
+    **Recipe 1: Right to be Forgotten (Delete)**
     ```yaml
     transformer: "merge"
     params:
       target: "silver.customers"
       keys: ["customer_id"]
-
-      # The "Eraser" Mode
       strategy: "delete_match"
     ```
 
-    **Other Strategies:**
+    **Recipe 2: Conditional Update (SCD Type 1)**
+    "Only update if the source record is newer than the target record."
+    ```yaml
+    transformer: "merge"
+    params:
+      target: "silver.products"
+      keys: ["product_id"]
+      strategy: "upsert"
+      update_condition: "source.updated_at > target.updated_at"
+    ```
+
+    **Recipe 3: Safe Insert (Filter Bad Records)**
+    "Only insert records that are not marked as deleted."
+    ```yaml
+    transformer: "merge"
+    params:
+      target: "silver.orders"
+      keys: ["order_id"]
+      strategy: "append_only"
+      insert_condition: "source.is_deleted = false"
+    ```
+
+    **Recipe 4: Audit Columns**
+    "Track when records were created or updated."
+    ```yaml
+    transformer: "merge"
+    params:
+      target: "silver.users"
+      keys: ["user_id"]
+      audit_cols:
+        created_col: "dw_created_at"
+        updated_col: "dw_updated_at"
+    ```
+
+    **Recipe 5: Full Sync (Insert + Update + Delete)**
+    "Sync target with source: insert new, update changed, and remove soft-deleted."
+    ```yaml
+    transformer: "merge"
+    params:
+      target: "silver.customers"
+      keys: ["id"]
+      strategy: "upsert"
+      # 1. Delete if source says so
+      delete_condition: "source.is_deleted = true"
+      # 2. Update if changed (and not deleted)
+      update_condition: "source.hash != target.hash"
+      # 3. Insert new (and not deleted)
+      insert_condition: "source.is_deleted = false"
+    ```
+
+    **Strategies:**
     *   **upsert** (Default): Update existing records, insert new ones.
     *   **append_only**: Ignore duplicates, only insert new keys.
+    *   **delete_match**: Delete records in target that match keys in source.
     """
 
     target: str = Field(..., description="Target table name or path")
@@ -79,6 +128,15 @@ class MergeParams(BaseModel):
     cluster_by: Optional[List[str]] = Field(
         None, description="Columns to Liquid Cluster by (Delta)"
     )
+    update_condition: Optional[str] = Field(
+        None, description="SQL condition for update clause (e.g. 'source.ver > target.ver')"
+    )
+    insert_condition: Optional[str] = Field(
+        None, description="SQL condition for insert clause (e.g. 'source.status != \"deleted\"')"
+    )
+    delete_condition: Optional[str] = Field(
+        None, description="SQL condition for delete clause (e.g. 'source.status = \"deleted\"')"
+    )
 
     @field_validator("keys")
     @classmethod
@@ -94,7 +152,7 @@ class MergeParams(BaseModel):
         return self
 
 
-@transform("merge", category="transformer")
+@transform("merge", category="transformer", param_model=MergeParams)
 def merge(context, current, **params):
     """
     Merge transformer implementation.
@@ -121,7 +179,7 @@ def merge(context, current, **params):
 
     if isinstance(real_context, SparkContext):
         return _merge_spark(
-            real_context,
+            context,  # Pass EngineContext wrapper to access .spark and potentially .engine
             current,
             target,
             keys,
@@ -130,10 +188,15 @@ def merge(context, current, **params):
             optimize_write,
             zorder_by,
             cluster_by,
+            merge_params.update_condition,
+            merge_params.insert_condition,
+            merge_params.delete_condition,
             params,  # pass raw params if needed by internal logic or refactor internal logic
         )
     elif isinstance(real_context, PandasContext):
-        return _merge_pandas(real_context, current, target, keys, strategy, audit_cols, params)
+        return _merge_pandas(
+            context, current, target, keys, strategy, audit_cols, params
+        )  # Pass EngineContext wrapper
     else:
         raise ValueError(f"Unsupported context type: {type(real_context)}")
 
@@ -148,6 +211,9 @@ def _merge_spark(
     optimize_write,
     zorder_by,
     cluster_by,
+    update_condition,
+    insert_condition,
+    delete_condition,
     params,
 ):
     if DeltaTable is None:
@@ -222,14 +288,17 @@ def _merge_spark(
                 )
                 spark.conf.set("spark.databricks.delta.schema.autoMerge.enabled", "true")
 
-                merger = merger.whenMatchedUpdate(set=update_expr)
-                merger = merger.whenNotMatchedInsertAll()
+                if delete_condition:
+                    merger = merger.whenMatchedDelete(condition=delete_condition)
+
+                merger = merger.whenMatchedUpdate(set=update_expr, condition=update_condition)
+                merger = merger.whenNotMatchedInsertAll(condition=insert_condition)
 
             elif strategy == MergeStrategy.APPEND_ONLY:
-                merger = merger.whenNotMatchedInsertAll()
+                merger = merger.whenNotMatchedInsertAll(condition=insert_condition)
 
             elif strategy == MergeStrategy.DELETE_MATCH:
-                merger = merger.whenMatchedDelete()
+                merger = merger.whenMatchedDelete(condition=delete_condition)
 
             try:
                 merger.execute()
@@ -314,8 +383,30 @@ def _merge_spark(
 def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params):
     import pandas as pd
 
+    # Try using DuckDB for scalability if available
+    try:
+        import duckdb
+
+        HAS_DUCKDB = True
+    except ImportError:
+        HAS_DUCKDB = False
+
     # Pandas implementation for local dev (Parquet focus)
     path = target
+
+    # Resolve path if context has engine (EngineContext)
+    if hasattr(context, "engine") and context.engine:
+        # Try to resolve 'connection.path'
+        if "." in target:
+            parts = target.split(".", 1)
+            conn_name = parts[0]
+            rel_path = parts[1]
+            if conn_name in context.engine.connections:
+                try:
+                    path = context.engine.connections[conn_name].get_path(rel_path)
+                except Exception:
+                    pass
+
     if not ("/" in path or "\\" in path or ":" in path or path.startswith(".")):
         # If it looks like a table name, try to treat as local path under data/
         # or just warn.
@@ -334,6 +425,101 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
             source_df[created_col] = now
 
     # Check if target exists
+    target_exists = False
+    if os.path.exists(path):
+        # Check if it's a file or directory (DuckDB handles parquet files)
+        target_exists = True
+
+    # --- DUCKDB PATH ---
+    if HAS_DUCKDB and str(path).endswith(".parquet"):
+        try:
+            con = duckdb.connect(database=":memory:")
+
+            # Register source_df
+            con.register("source_df", source_df)
+
+            if not target_exists:
+                if strategy == MergeStrategy.DELETE_MATCH:
+                    return source_df  # Nothing to delete from
+
+                # Initial Write
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                con.execute(f"COPY (SELECT * FROM source_df) TO '{path}' (FORMAT PARQUET)")
+                return source_df
+
+            # Construct Merge Query
+            # We need to quote columns properly? DuckDB usually handles simple names.
+            # Assuming keys are simple.
+
+            # Join condition: s.k1 = t.k1 AND s.k2 = t.k2
+            join_cond = " AND ".join([f"s.{k} = t.{k}" for k in keys])
+
+            query = ""
+            if strategy == MergeStrategy.UPSERT:
+                # Logic: (Source) UNION ALL (Target WHERE NOT EXISTS in Source)
+                # Note: This replaces the whole row with Source version (Update)
+                # Special handling for created_col: If updating, preserve target's created_col?
+
+                # If created_col exists, we want to use Target's created_col for updates?
+                # But "Source" row has new created_col (current time) which is wrong for update.
+                # Ideally: SELECT s.* EXCEPT (created_col), t.created_col ...
+                # But 'EXCEPT' is post-projection.
+                # Simpler: Just overwrite. If user wants to preserve, they shouldn't overwrite it in source.
+                # BUT audit logic above set created_col in source.
+                # If we are strictly upserting, maybe we should handle it.
+                # For performance, let's stick to standard Upsert (Source wins).
+
+                query = f"""
+                    SELECT * FROM source_df
+                    UNION ALL
+                    SELECT * FROM read_parquet('{path}') t
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM source_df s WHERE {join_cond}
+                    )
+                """
+
+            elif strategy == MergeStrategy.APPEND_ONLY:
+                # Logic: (Source WHERE NOT EXISTS in Target) UNION ALL (Target)
+                query = f"""
+                    SELECT * FROM source_df s
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM read_parquet('{path}') t WHERE {join_cond}
+                    )
+                    UNION ALL
+                    SELECT * FROM read_parquet('{path}')
+                """
+
+            elif strategy == MergeStrategy.DELETE_MATCH:
+                # Logic: Target WHERE NOT EXISTS in Source
+                query = f"""
+                    SELECT * FROM read_parquet('{path}') t
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM source_df s WHERE {join_cond}
+                    )
+                """
+
+            # Execute Atomic Write
+            # Write to temp file then rename
+            temp_path = str(path) + ".tmp.parquet"
+            con.execute(f"COPY ({query}) TO '{temp_path}' (FORMAT PARQUET)")
+
+            # Close connection before file ops
+            con.close()
+
+            # Replace
+            if os.path.exists(temp_path):
+                if os.path.exists(path):
+                    os.remove(path)
+                os.rename(temp_path, path)
+
+            return source_df
+
+        except Exception as e:
+            # Fallback to Pandas if DuckDB fails (e.g. complex types, memory)
+            logger.warning(f"DuckDB merge failed, falling back to Pandas: {e}")
+            pass
+
+    # --- PANDAS FALLBACK ---
     target_df = pd.DataFrame()
     if os.path.exists(path):
         try:

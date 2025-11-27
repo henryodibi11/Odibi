@@ -16,6 +16,8 @@ import pytest
 from odibi.engine.pandas_engine import PandasEngine
 from odibi.exceptions import TransformError
 
+# pytestmark = pytest.mark.skip(reason="Environment issues with LazyDataset persistence in CI")
+
 
 class FakeConnection:
     """Fake connection with pandas_storage_options method."""

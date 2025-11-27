@@ -1,51 +1,40 @@
 """Run command implementation."""
 
-import importlib.util
-import sys
 from pathlib import Path
 
 from odibi.pipeline import PipelineManager
+from odibi.utils.extensions import load_extensions
 from odibi.utils.logging import logger
-
-
-def load_extensions(path: Path):
-    """Load python extensions (transforms.py, plugins.py) from path."""
-    # Add path to sys.path to handle imports within the extensions
-    if str(path) not in sys.path:
-        sys.path.append(str(path))
-
-    for name in ["transforms.py", "plugins.py"]:
-        file_path = path / name
-        if file_path.exists():
-            try:
-                module_name = file_path.stem
-                spec = importlib.util.spec_from_file_location(module_name, file_path)
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    sys.modules[module_name] = module
-                    spec.loader.exec_module(module)
-                    logger.info(f"Loaded extension: {file_path}")
-            except Exception as e:
-                logger.warning(f"Failed to load {name}: {e}")
 
 
 def run_command(args):
     """Execute pipeline from config file."""
     try:
         config_path = Path(args.config).resolve()
+        project_root = config_path.parent
 
-        # Load extensions from config dir
-        load_extensions(config_path.parent)
+        # Change CWD to config directory to resolve relative paths consistently
+        import os
 
-        # Load extensions from parent dir (e.g. if config is in config/)
-        load_extensions(config_path.parent.parent)
+        original_cwd = os.getcwd()
+        os.chdir(project_root)
+        logger.debug(f"Changed working directory to: {project_root}")
 
-        # Load extensions from CWD (if different)
-        if config_path.parent != Path.cwd():
-            load_extensions(Path.cwd())
+        try:
+            # Load extensions from config dir (which is now CWD)
+            load_extensions(project_root)
 
-        manager = PipelineManager.from_yaml(args.config, env=args.env)
-        results = manager.run(dry_run=args.dry_run, resume_from_failure=args.resume)
+            manager = PipelineManager.from_yaml(config_path.name, env=args.env)
+            results = manager.run(
+                dry_run=args.dry_run,
+                resume_from_failure=args.resume,
+                parallel=args.parallel,
+                max_workers=args.workers,
+                on_error=args.on_error,
+            )
+        finally:
+            # Restore CWD
+            os.chdir(original_cwd)
 
         # Check results for failures
         failed = False
@@ -59,6 +48,18 @@ def run_command(args):
                         node_res = result.node_results.get(node_name)
                         if node_res and node_res.error:
                             logger.error(f"Node '{node_name}' error: {node_res.error}")
+
+                            # Unbury Suggestions
+                            error_obj = node_res.error
+                            suggestions = getattr(error_obj, "suggestions", [])
+
+                            if not suggestions and hasattr(error_obj, "original_error"):
+                                suggestions = getattr(error_obj.original_error, "suggestions", [])
+
+                            if suggestions:
+                                logger.info("💡 Suggestions:")
+                                for suggestion in suggestions:
+                                    logger.info(f"   - {suggestion}")
                     break
         else:
             # Single pipeline
@@ -69,6 +70,18 @@ def run_command(args):
                     node_res = results.node_results.get(node_name)
                     if node_res and node_res.error:
                         logger.error(f"Node '{node_name}' error: {node_res.error}")
+
+                        # Unbury Suggestions
+                        error_obj = node_res.error
+                        suggestions = getattr(error_obj, "suggestions", [])
+
+                        if not suggestions and hasattr(error_obj, "original_error"):
+                            suggestions = getattr(error_obj.original_error, "suggestions", [])
+
+                        if suggestions:
+                            logger.info("Suggestions:")
+                            for suggestion in suggestions:
+                                logger.info(f"   - {suggestion}")
 
         if failed:
             logger.error("Pipeline execution failed")

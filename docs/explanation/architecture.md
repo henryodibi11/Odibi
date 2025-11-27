@@ -39,7 +39,17 @@
 │  Node → Read/Transform/Write → Engine                        │
 │           ↓                      ↓                            │
 │    Transformation           PandasEngine                      │
-│      Registry               or SparkEngine                    │
+│      Registry               PolarsEngine                      │
+│                             SparkEngine                       │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   STATE & METADATA LAYER                     │
+│                                                               │
+│  System Catalog (Delta Tables) ←→ OpenLineage Emitter        │
+│           ↓                           ↓                       │
+│    _odibi_system/state          DataHub / Marquez             │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
@@ -146,16 +156,20 @@ cli/ (user interface)
 
 ```
 transformations/
-    ├─→ Used by: operations/, node.py, story/doc_story.py
-    └─→ Uses: Nothing (core module)
+    ├─→ Used by: node.py, story/doc_story.py
+    └─→ Uses: registry.py (core)
 
-operations/
-    ├─→ Used by: Pipelines (via registry lookup)
-    └─→ Uses: transformations/
+registry.py
+    ├─→ Used by: transformations/, engine/
+    └─→ Uses: Nothing (singleton)
 
-story/
-    ├─→ Used by: pipeline.py, cli/story.py
-    └─→ Uses: config.py, validation/, transformations/
+state/
+    ├─→ Used by: node.py, pipeline.py
+    └─→ Uses: deltalake (local), spark (distributed)
+
+lineage/
+    ├─→ Used by: node.py, pipeline.py
+    └─→ Uses: openlineage-python (optional)
 
 connections/
     ├─→ Used by: engine/
@@ -163,14 +177,14 @@ connections/
 
 engine/
     ├─→ Used by: node.py
-    └─→ Uses: connections/
+    └─→ Uses: connections/, transformations/
 
 cli/
     ├─→ Used by: Users!
     └─→ Uses: Everything
 ```
 
-**Key insight:** `transformations/` is at the core. Everything builds on it.
+**Key insight:** `transformations/` provides the logic, `engine/` provides the horsepower, and `state/` provides the memory.
 
 ---
 
@@ -539,43 +553,63 @@ def test_something(mock_pivot):
 
 ### 1. Registry Pattern
 
-**Where:** `transformations/registry.py`
+**Where:** `odibi/registry.py`
 
 **Purpose:** Centralized operation lookup
 
 **Example:** All operations register themselves globally
 
+```python
+# In odibi/transformers/math.py
+@transform("calculate_sum")
+def calculate_sum(df, ...): ...
+```
+
 ### 2. Factory Pattern
 
-**Where:** `story/renderers.py` (`get_renderer()`)
+**Where:** `odibi/connections/factory.py`
 
-**Purpose:** Create renderers by format name
-
-```python
-renderer = get_renderer("html")  # Returns HTMLStoryRenderer
-renderer = get_renderer("md")    # Returns MarkdownStoryRenderer
-```
-
-### 3. Decorator Pattern
-
-**Where:** `transformations/decorators.py`, `explanation.py`
-
-**Purpose:** Enhance functions with metadata
+**Purpose:** Create connections by type name
 
 ```python
-@transformation("op")  # Adds registration
-@op.explain           # Adds explanation
+conn = create_connection(config)  # Returns AzureBlobConnection, LocalConnection, etc.
 ```
 
-### 4. Strategy Pattern
+### 3. Adapter Pattern (State)
 
-**Where:** `engine/` (PandasEngine vs SparkEngine)
+**Where:** `odibi/state/__init__.py`
+
+**Purpose:** Uniform interface for state management
+
+```python
+# Unified CatalogStateBackend handles both local and distributed modes:
+backend = CatalogStateBackend(...)
+# Local: uses delta-rs (writes to local delta tables)
+# Spark: uses Spark SQL (writes to delta tables on ADLS/S3)
+```
+
+### 4. Observer Pattern (Lineage)
+
+**Where:** `odibi/lineage/`
+
+**Purpose:** Emit events without coupling execution logic
+
+```python
+# Node execution emits events:
+lineage.emit_start(node)
+# ... execution ...
+lineage.emit_complete(node)
+```
+
+### 5. Strategy Pattern
+
+**Where:** `engine/` (PandasEngine vs SparkEngine vs PolarsEngine)
 
 **Purpose:** Swap execution strategies
 
 ```python
 # Same interface, different implementation:
-engine = PandasEngine()  # or SparkEngine()
+engine = PandasEngine()  # or PolarsEngine()
 df = engine.read(...)    # Works with either!
 ```
 

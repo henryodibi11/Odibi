@@ -284,6 +284,8 @@ class SparkEngine(Engine):
         path: Optional[str] = None,
         streaming: bool = False,
         options: Optional[Dict[str, Any]] = None,
+        as_of_version: Optional[int] = None,
+        as_of_timestamp: Optional[str] = None,
     ):
         """Read data using Spark.
 
@@ -294,11 +296,19 @@ class SparkEngine(Engine):
             path: File path
             streaming: Whether to read as a stream (readStream)
             options: Format-specific options (including versionAsOf for Delta time travel)
+            as_of_version: Time travel version
+            as_of_timestamp: Time travel timestamp
 
         Returns:
             Spark DataFrame (or Streaming DataFrame)
         """
         options = options or {}
+
+        # Handle Time Travel options (Inject into options for Delta)
+        if as_of_version is not None:
+            options["versionAsOf"] = as_of_version
+        if as_of_timestamp is not None:
+            options["timestampAsOf"] = as_of_timestamp
 
         # SQL Server / Azure SQL Support
         if format in ["sql", "sql_server", "azure_sql"]:
@@ -430,7 +440,7 @@ class SparkEngine(Engine):
             table: Table name
             path: File path
             register_table: Name to register as external table (if path is used)
-            mode: Write mode (overwrite, append, error, ignore)
+            mode: Write mode (overwrite, append, error, ignore, upsert, append_once)
             options: Format-specific options (including partition_by for partitioning)
 
         Returns:
@@ -463,6 +473,58 @@ class SparkEngine(Engine):
 
             df.write.format("jdbc").options(**merged_options).mode(mode).save()
             return
+
+        # Handle Upsert/AppendOnce (Delta Only)
+        if mode in ["upsert", "append_once"]:
+            if format != "delta":
+                raise NotImplementedError(
+                    f"Mode '{mode}' only supported for Delta format in Spark engine."
+                )
+
+            keys = options.get("keys")
+            if not keys:
+                raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
+
+            if isinstance(keys, str):
+                keys = [keys]
+
+            # Check if target exists
+            exists = self.table_exists(connection, table, path)
+
+            if not exists:
+                # Fallback to overwrite (creation)
+                mode = "overwrite"
+            else:
+                # Perform Merge
+                from delta.tables import DeltaTable
+
+                target_dt = None
+                target_name = ""
+                is_table_target = False
+
+                if table:
+                    target_dt = DeltaTable.forName(self.spark, table)
+                    target_name = table
+                    is_table_target = True
+                elif path:
+                    full_path = connection.get_path(path)
+                    target_dt = DeltaTable.forPath(self.spark, full_path)
+                    target_name = full_path
+                    is_table_target = False
+
+                # Build condition: target.key = source.key
+                condition = " AND ".join([f"target.`{k}` = source.`{k}`" for k in keys])
+
+                merge_builder = target_dt.alias("target").merge(df.alias("source"), condition)
+
+                if mode == "upsert":
+                    merge_builder.whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+                elif mode == "append_once":
+                    merge_builder.whenNotMatchedInsertAll().execute()
+
+                # Optimization & Metadata
+                self._optimize_delta_write(target_name, options, is_table=is_table_target)
+                return self._get_last_delta_commit_info(target_name, is_table=is_table_target)
 
         # Get output location
         if table:
@@ -1184,3 +1246,13 @@ class SparkEngine(Engine):
             return result
         except Exception:
             return {}
+
+    def filter_greater_than(self, df, column: str, value: Any) -> Any:
+        """Filter DataFrame where column > value."""
+        # Use SQL expression string for consistency with tests and simpler debugging
+        return df.filter(f"{column} > '{value}'")
+
+    def filter_coalesce(self, df, col1: str, col2: str, op: str, value: Any) -> Any:
+        """Filter using COALESCE(col1, col2) op value."""
+        # Use SQL expression string
+        return df.filter(f"COALESCE({col1}, {col2}) {op} '{value}'")

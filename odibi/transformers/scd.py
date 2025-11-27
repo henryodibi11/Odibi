@@ -209,10 +209,123 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
 
 
 def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
+    import logging
+
     import pandas as pd
+
+    logger = logging.getLogger(__name__)
+
+    # Try using DuckDB
+    try:
+        import duckdb
+
+        HAS_DUCKDB = True
+    except ImportError:
+        HAS_DUCKDB = False
 
     # 1. Load Target
     path = params.target
+
+    # Resolve path if context has engine (EngineContext)
+    if hasattr(context, "engine") and context.engine:
+        # Try to resolve 'connection.path'
+        if "." in path:
+            parts = path.split(".", 1)
+            conn_name = parts[0]
+            rel_path = parts[1]
+            if conn_name in context.engine.connections:
+                try:
+                    path = context.engine.connections[conn_name].get_path(rel_path)
+                except Exception:
+                    pass
+
+    # Define Cols
+    keys = params.keys
+    eff_col = params.effective_time_col
+    end_col = params.end_time_col
+    flag_col = params.current_flag_col
+    track = params.track_cols
+
+    # --- DUCKDB IMPLEMENTATION ---
+    if HAS_DUCKDB and str(path).endswith(".parquet") and os.path.exists(path):
+        try:
+            con = duckdb.connect(database=":memory:")
+            con.register("source_df", source_df)
+
+            # Helper to build condition string
+            # DuckDB supports IS DISTINCT FROM
+            change_cond_parts = []
+            for col in track:
+                change_cond_parts.append(f"s.{col} IS DISTINCT FROM t.{col}")
+            change_cond = " OR ".join(change_cond_parts)
+
+            join_cond = " AND ".join([f"s.{k} = t.{k}" for k in keys])
+
+            src_cols = [c for c in source_df.columns if c not in [end_col, flag_col]]
+            cols_select = ", ".join([f"s.{c}" for c in src_cols])
+
+            sql_new_inserts = f"""
+                SELECT {cols_select}, NULL::TIMESTAMP as {end_col}, True as {flag_col}
+                FROM source_df s
+                LEFT JOIN (SELECT * FROM read_parquet('{path}') WHERE {flag_col} = True) t
+                ON {join_cond}
+                WHERE t.{keys[0]} IS NULL
+            """
+
+            sql_changed_inserts = f"""
+                SELECT {cols_select}, NULL::TIMESTAMP as {end_col}, True as {flag_col}
+                FROM source_df s
+                JOIN (SELECT * FROM read_parquet('{path}') WHERE {flag_col} = True) t
+                ON {join_cond}
+                WHERE ({change_cond})
+            """
+
+            sql_closed_records = f"""
+                SELECT
+                    t.* EXCLUDE ({end_col}, {flag_col}),
+                    s.{eff_col}::TIMESTAMP as {end_col},
+                    False as {flag_col}
+                FROM read_parquet('{path}') t
+                JOIN source_df s ON {join_cond}
+                WHERE t.{flag_col} = True AND ({change_cond})
+            """
+
+            sql_unchanged = f"""
+                SELECT * FROM read_parquet('{path}') t
+                WHERE NOT (
+                    t.{flag_col} = True AND EXISTS (
+                        SELECT 1 FROM source_df s
+                        WHERE {join_cond} AND ({change_cond})
+                    )
+                )
+            """
+
+            final_query = f"""
+                {sql_new_inserts}
+                UNION ALL
+                {sql_changed_inserts}
+                UNION ALL
+                {sql_closed_records}
+                UNION ALL
+                {sql_unchanged}
+            """
+
+            temp_path = str(path) + ".tmp.parquet"
+            con.execute(f"COPY ({final_query}) TO '{temp_path}' (FORMAT PARQUET)")
+            con.close()
+
+            if os.path.exists(temp_path):
+                if os.path.exists(path):
+                    os.remove(path)
+                os.rename(temp_path, path)
+
+            return context.with_df(source_df)
+
+        except Exception as e:
+            logger.warning(f"DuckDB SCD2 failed, falling back to Pandas: {e}")
+            pass
+
+    # --- PANDAS FALLBACK ---
     target_df = pd.DataFrame()
 
     # Try loading if exists
@@ -225,13 +338,6 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
                 target_df = pd.read_csv(path)
         except Exception:
             pass
-
-    # Define Cols
-    keys = params.keys
-    eff_col = params.effective_time_col
-    end_col = params.end_time_col
-    flag_col = params.current_flag_col
-    track = params.track_cols
 
     # Prepare Source
     source_df = source_df.copy()

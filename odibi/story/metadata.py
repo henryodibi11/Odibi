@@ -73,6 +73,10 @@ class NodeExecutionMetadata:
     error_type: Optional[str] = None
     validation_warnings: List[str] = field(default_factory=list)
 
+    # Historical Context (Catalog)
+    historical_avg_rows: Optional[float] = None
+    historical_avg_duration: Optional[float] = None
+
     # Timestamps
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
@@ -115,6 +119,8 @@ class NodeExecutionMetadata:
             "error_message": self.error_message,
             "error_type": self.error_type,
             "validation_warnings": self.validation_warnings,
+            "historical_avg_rows": self.historical_avg_rows,
+            "historical_avg_duration": self.historical_avg_duration,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "executed_sql": self.executed_sql,

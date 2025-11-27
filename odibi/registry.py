@@ -180,6 +180,10 @@ def transform(name_or_func: Union[str, Callable] = None, **kwargs) -> Callable:
         The decorated function
     """
 
+    # If called with keyword args only (e.g. @transform(name="foo")), name_or_func might be None
+    if name_or_func is None and "name" in kwargs:
+        name_or_func = kwargs["name"]
+
     def _register(func, name=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -190,7 +194,13 @@ def transform(name_or_func: Union[str, Callable] = None, **kwargs) -> Callable:
         # But FunctionRegistry.register handles None name by using func.__name__
         # However, we want to use the explicit name if provided.
         reg_name = name or func.__name__
-        FunctionRegistry.register(wrapper, name=reg_name)
+
+        # Extract param_model from kwargs (captured from decorator args)
+        # Note: kwargs here are from the outer scope (transform arguments), NOT wrapper args
+        # Wait, _register closes over kwargs from transform(..., **kwargs)
+        param_model = kwargs.get("param_model")
+
+        FunctionRegistry.register(wrapper, name=reg_name, param_model=param_model)
         return wrapper
 
     if callable(name_or_func):

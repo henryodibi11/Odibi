@@ -1,0 +1,59 @@
+project: "pandas_validation"
+engine: "pandas"
+
+connections:
+  local_data:
+    type: "local"
+    base_path: "./tests/pandas_validation/data"
+
+story:
+  connection: "local_data"
+  path: "stories/"
+  retention_count: 5
+
+pipelines:
+  - pipeline: "validation_flow"
+    nodes:
+      # 1. Ingest
+      - name: "load_csv"
+        read:
+          connection: "local_data"
+          format: "csv"
+          path: "input.csv"
+        write:
+          connection: "local_data"
+          format: "parquet"
+          path: "intermediate.parquet"
+        columns:
+          col1: { description: "ID column" }
+          col2: { description: "Value column", pii: true }
+
+      # 2. Transform & Privacy
+      - name: "process_data"
+        depends_on: ["load_csv"]
+        # Anonymize col2
+        privacy:
+          method: "redact"
+
+        transform:
+          steps:
+            # Filter rows where col1 > 1
+            - sql: "SELECT * FROM df WHERE col1 > 1"
+
+        write:
+          connection: "local_data"
+          format: "csv"
+          path: "output.csv"
+
+        columns:
+          col1: { description: "ID" }
+          col2: { description: "PII", pii: true }
+
+        validation:
+          mode: "fail"
+          on_fail: "ignore" # Don't alert, just fail (or ignore to let it pass)
+          tests:
+             - type: "not_null"
+               columns: ["col1"]
+             - type: "row_count"
+               min: 1

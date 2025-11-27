@@ -6,17 +6,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-import odibi.transformers  # noqa: F401 # Register built-in transformers
 from odibi.config import AlertConfig, ErrorStrategy, PipelineConfig, ProjectConfig, RetryConfig
-from odibi.connections import LocalConnection
 from odibi.context import create_context
 from odibi.engine.registry import get_engine_class
 from odibi.exceptions import DependencyError
 from odibi.graph import DependencyGraph
+from odibi.lineage import OpenLineageAdapter
 from odibi.node import Node, NodeResult
 from odibi.plugins import get_connection_factory, load_plugins
-from odibi.state import StateManager
+from odibi.registry import FunctionRegistry
+from odibi.state import StateManager, create_state_backend
 from odibi.story import StoryGenerator
+from odibi.transformers import register_standard_library
 from odibi.utils import load_yaml_with_env
 from odibi.utils.alerting import send_alert
 from odibi.utils.logging import configure_logging, logger
@@ -78,6 +79,8 @@ class Pipeline:
         retry_config: Optional[RetryConfig] = None,
         alerts: Optional[List[AlertConfig]] = None,
         performance_config: Optional[Any] = None,
+        catalog_manager: Optional[Any] = None,
+        lineage_adapter: Optional[Any] = None,
     ):
         """Initialize pipeline.
 
@@ -90,6 +93,8 @@ class Pipeline:
             retry_config: Retry configuration
             alerts: Alert configurations
             performance_config: Performance tuning configuration
+            catalog_manager: System Catalog Manager (Phase 1)
+            lineage_adapter: OpenLineage Adapter
         """
         self.config = pipeline_config
         self.project_config = None  # Set by PipelineManager if available
@@ -99,6 +104,8 @@ class Pipeline:
         self.retry_config = retry_config
         self.alerts = alerts or []
         self.performance_config = performance_config
+        self.catalog_manager = catalog_manager
+        self.lineage = lineage_adapter
 
         # Initialize story generator
         story_config = story_config or {}
@@ -108,6 +115,7 @@ class Pipeline:
             max_sample_rows=story_config.get("max_sample_rows", 10),
             output_path=story_config.get("output_path", "stories/"),
             storage_options=story_config.get("storage_options", {}),
+            catalog_manager=catalog_manager,
         )
 
         # Initialize engine
@@ -176,6 +184,7 @@ class Pipeline:
         dry_run: bool = False,
         resume_from_failure: bool = False,
         max_workers: int = 4,
+        on_error: Optional[str] = None,
     ) -> PipelineResults:
         """Execute the pipeline.
 
@@ -196,7 +205,54 @@ class Pipeline:
         # Alert: on_start
         self._send_alerts("on_start", results)
 
-        state_manager = StateManager() if resume_from_failure else None
+        # Lineage: Start
+        parent_run_id = None
+        if self.lineage:
+            parent_run_id = self.lineage.emit_pipeline_start(self.config)
+
+        # Drift Detection (Governance)
+        if self.catalog_manager:
+            try:
+                import hashlib
+                import json
+
+                # Calculate Local Hash
+                if hasattr(self.config, "model_dump"):
+                    dump = self.config.model_dump(mode="json")
+                else:
+                    dump = self.config.dict()
+                dump_str = json.dumps(dump, sort_keys=True)
+                local_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
+
+                # Get Remote Hash
+                remote_hash = self.catalog_manager.get_pipeline_hash(self.config.pipeline)
+
+                if remote_hash and remote_hash != local_hash:
+                    logger.warning(
+                        f"⚠️ DRIFT DETECTED: Local pipeline definition differs from Catalog.\n"
+                        f"   Local Hash: {local_hash[:8]}\n"
+                        f"   Catalog Hash: {remote_hash[:8]}\n"
+                        f"   Advice: Deploy changes using 'odibi deploy' before running in production."
+                    )
+                elif not remote_hash:
+                    logger.info("ℹ️ Pipeline not found in Catalog (Running un-deployed code)")
+            except Exception as e:
+                logger.debug(f"Drift detection check failed: {e}")
+
+        state_manager = None
+        if resume_from_failure:
+            if self.project_config:
+                try:
+                    backend = create_state_backend(
+                        config=self.project_config,
+                        project_root=".",
+                        spark_session=getattr(self.engine, "spark", None),
+                    )
+                    state_manager = StateManager(backend=backend)
+                except Exception as e:
+                    logger.warning(f"Could not initialize StateManager: {e}")
+            else:
+                logger.warning("Resume capability unavailable: Project configuration missing.")
 
         # Define node processing function (inner function to capture self/context)
         def process_node(node_name: str) -> NodeResult:
@@ -217,8 +273,62 @@ class Pipeline:
 
             # Check for resume capability
             if resume_from_failure and state_manager:
-                last_status = state_manager.get_last_run_status(self.config.pipeline, node_name)
-                if last_status is True:
+                last_info = state_manager.get_last_run_info(self.config.pipeline, node_name)
+
+                # logger.info(f"DEBUG: last_info for {node_name}: {last_info}")
+
+                can_resume = False
+                resume_reason = ""
+
+                if last_info and last_info.get("success"):
+                    # Check 1: Version Hash (Code/Config Change)
+                    last_hash = last_info.get("metadata", {}).get("version_hash")
+                    # current_hash = self.graph.nodes[node_name].get_version_hash()
+
+                    # Note: We need to access Node object to get hash, but we only have NodeConfig here.
+                    # Wait, graph.nodes[node_name] IS NodeConfig.
+                    # NodeConfig doesn't have get_version_hash method (it's on Node class).
+                    # We can instantiate a temporary Node or move the hash logic to a utility/config method.
+                    # Node.get_version_hash uses self.config.
+                    # Let's use a static helper or re-instantiate.
+                    # Since get_version_hash is simple, we can just compute it here.
+
+                    # Calculate hash from config
+                    import hashlib
+                    import json
+
+                    node_cfg = self.graph.nodes[node_name]
+                    dump = (
+                        node_cfg.model_dump(
+                            mode="json", exclude={"description", "tags", "log_level"}
+                        )
+                        if hasattr(node_cfg, "model_dump")
+                        else node_cfg.dict(exclude={"description", "tags", "log_level"})
+                    )
+                    dump_str = json.dumps(dump, sort_keys=True)
+                    current_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
+
+                    if last_hash == current_hash:
+                        # Check 2: Cascading Invalidation
+                        # If any dependency was NOT skipped (meaning it ran), we must run.
+                        deps_ran = False
+                        for dep in node_config.depends_on:
+                            # If dep is in completed but NOT in skipped list -> It executed this run
+                            if dep in results.completed and dep not in results.skipped:
+                                deps_ran = True
+                                break
+
+                        if not deps_ran:
+                            can_resume = True
+                            resume_reason = "Previously succeeded and restored from storage"
+                        else:
+                            resume_reason = "Upstream dependency executed"
+                    else:
+                        resume_reason = f"Configuration changed (Hash mismatch: {last_hash[:7]}... != {current_hash[:7]}...)"
+                else:
+                    resume_reason = "No successful previous run found"
+
+                if can_resume:
                     # Try to restore
                     if node_config.write:
                         try:
@@ -229,20 +339,36 @@ class Pipeline:
                                 connections=self.connections,
                             )
                             if temp_node.restore():
-                                logger.info(f"Resuming: Skipped node '{node_name}' (restored)")
+                                logger.info(f"Skipping '{node_name}': {resume_reason}")
                                 return NodeResult(
                                     node_name=node_name,
                                     success=True,
                                     duration=0.0,
-                                    metadata={"skipped": True, "reason": "resume_from_failure"},
+                                    metadata={
+                                        "skipped": True,
+                                        "reason": "resume_from_failure",
+                                        "version_hash": current_hash,
+                                    },
                                 )
+                            else:
+                                logger.info(f"Re-running '{node_name}': Restore failed")
                         except Exception as e:
                             logger.warning(f"Resuming: Could not restore '{node_name}': {e}")
                     else:
                         # Cannot restore pure transform safely without more logic
-                        logger.info(f"Resuming: Re-running '{node_name}' (in-memory)")
+                        logger.info(
+                            f"Re-running '{node_name}': In-memory transform (cannot be restored)"
+                        )
+                else:
+                    logger.info(f"Re-running '{node_name}': {resume_reason}")
+
+            # Lineage: Node Start
+            node_run_id = None
+            if self.lineage and parent_run_id:
+                node_run_id = self.lineage.emit_node_start(node_config, parent_run_id)
 
             # Execute node
+            result = None
             try:
                 node = Node(
                     config=node_config,
@@ -251,11 +377,18 @@ class Pipeline:
                     connections=self.connections,
                     dry_run=dry_run,
                     retry_config=self.retry_config,
+                    catalog_manager=self.catalog_manager,
                 )
-                return node.execute()
+                result = node.execute()
             except Exception as e:
                 logger.error(f"Node '{node_name}' failed: {e}")
-                return NodeResult(node_name=node_name, success=False, duration=0.0, error=str(e))
+                result = NodeResult(node_name=node_name, success=False, duration=0.0, error=str(e))
+
+            # Lineage: Node Complete
+            if self.lineage and node_run_id:
+                self.lineage.emit_node_complete(node_config, result, node_run_id)
+
+            return result
 
         if parallel:
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -303,7 +436,15 @@ class Pipeline:
 
                                     # Check Fail Fast
                                     node_config = self.graph.nodes[node_name]
-                                    if node_config.on_error == ErrorStrategy.FAIL_FAST:
+
+                                    # Determine Error Strategy: CLI override > Node Config
+                                    strategy = (
+                                        ErrorStrategy(on_error)
+                                        if on_error
+                                        else node_config.on_error
+                                    )
+
+                                    if strategy == ErrorStrategy.FAIL_FAST:
                                         logger.error(
                                             f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline."
                                         )
@@ -365,7 +506,11 @@ class Pipeline:
 
                         # Check Fail Fast
                         node_config = self.graph.nodes[node_name]
-                        if node_config.on_error == ErrorStrategy.FAIL_FAST:
+
+                        # Determine Error Strategy: CLI override > Node Config
+                        strategy = ErrorStrategy(on_error) if on_error else node_config.on_error
+
+                        if strategy == ErrorStrategy.FAIL_FAST:
                             logger.error(
                                 f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline."
                             )
@@ -377,7 +522,19 @@ class Pipeline:
 
         # Save state if running normally (not dry run)
         if not dry_run:
-            StateManager().save_pipeline_run(self.config.pipeline, results)
+            if not state_manager and self.project_config:
+                try:
+                    backend = create_state_backend(
+                        config=self.project_config,
+                        project_root=".",
+                        spark_session=getattr(self.engine, "spark", None),
+                    )
+                    state_manager = StateManager(backend=backend)
+                except Exception as e:
+                    logger.warning(f"Could not initialize StateManager for saving run: {e}")
+
+            if state_manager:
+                state_manager.save_pipeline_run(self.config.pipeline, results)
 
         # Generate story
         if self.generate_story:
@@ -417,6 +574,14 @@ class Pipeline:
             self._send_alerts("on_failure", results)
         else:
             self._send_alerts("on_success", results)
+
+            # Phase 1: Optimize Catalog on Success
+            if self.catalog_manager:
+                self.catalog_manager.optimize()
+
+        # Lineage: Complete
+        if self.lineage:
+            self.lineage.emit_pipeline_complete(self.config, results)
 
         return results
 
@@ -495,6 +660,33 @@ class Pipeline:
             execution_order = self.graph.topological_sort()
             validation["execution_order"] = execution_order
 
+            # Validate transformer params against registered models
+            for node_name, node in self.graph.nodes.items():
+                # 1. Top-level transformer
+                if node.transformer:
+                    try:
+                        FunctionRegistry.validate_params(node.transformer, node.params)
+                    except ValueError as e:
+                        validation["errors"].append(f"Node '{node_name}' transformer error: {e}")
+                        validation["valid"] = False
+
+                # 2. Transform steps
+                if node.transform and node.transform.steps:
+                    for i, step in enumerate(node.transform.steps):
+                        # Handle string steps (SQL)
+                        if isinstance(step, str):
+                            continue
+
+                        # Handle TransformStep objects
+                        if hasattr(step, "function") and step.function:
+                            try:
+                                FunctionRegistry.validate_params(step.function, step.params)
+                            except ValueError as e:
+                                validation["errors"].append(
+                                    f"Node '{node_name}' step {i + 1} error: {e}"
+                                )
+                                validation["valid"] = False
+
         except DependencyError as e:
             validation["valid"] = False
             validation["errors"].append(str(e))
@@ -546,11 +738,58 @@ class PipelineManager:
         self.project_config = project_config
         self.connections = connections
         self._pipelines: Dict[str, Pipeline] = {}
+        self.catalog_manager = None
+        self.lineage_adapter = None
 
         # Configure logging
         configure_logging(
             structured=project_config.logging.structured, level=project_config.logging.level.value
         )
+
+        # Initialize Lineage Adapter
+        self.lineage_adapter = OpenLineageAdapter(project_config.lineage)
+
+        # Initialize CatalogManager if configured (Phase 1)
+        if project_config.system:
+            from odibi.catalog import CatalogManager
+
+            spark = None
+            engine_instance = None
+
+            if project_config.engine == "spark":
+                # We need to instantiate an engine to get the session
+                try:
+                    from odibi.engine.spark_engine import SparkEngine
+
+                    # We need connections for Spark to configure ADLS
+                    temp_engine = SparkEngine(connections=connections, config={})
+                    spark = temp_engine.spark
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Spark for System Catalog: {e}")
+
+            sys_conn = connections.get(project_config.system.connection)
+            if sys_conn:
+                base_path = sys_conn.get_path(project_config.system.path)
+
+                # If running locally (no spark), initialize a local engine for the catalog
+                if not spark:
+                    try:
+                        from odibi.engine.pandas_engine import PandasEngine
+
+                        engine_instance = PandasEngine(config={})
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize PandasEngine for System Catalog: {e}")
+
+                if spark or engine_instance:
+                    self.catalog_manager = CatalogManager(
+                        spark=spark,
+                        config=project_config.system,
+                        base_path=base_path,
+                        engine=engine_instance,
+                    )
+                    self.catalog_manager.bootstrap()
+            else:
+                logger.warning(f"System connection '{project_config.system.connection}' not found.")
 
         # Get story configuration
         story_config = self._get_story_config()
@@ -568,6 +807,8 @@ class PipelineManager:
                 retry_config=project_config.retry,
                 alerts=project_config.alerts,
                 performance_config=project_config.performance,
+                catalog_manager=self.catalog_manager,
+                lineage_adapter=self.lineage_adapter,
             )
             # Inject project config into pipeline for richer context
             self._pipelines[pipeline_name].project_config = project_config
@@ -613,6 +854,9 @@ class PipelineManager:
             >>> manager = PipelineManager.from_yaml("config.yaml", env="prod")
             >>> results = manager.run()  # Run all pipelines
         """
+        # 1. Bootstrap Registry (Standard Library)
+        register_standard_library()
+
         # Load YAML with environment variable substitution
         yaml_path_obj = Path(yaml_path)
         config_dir = yaml_path_obj.parent.absolute()
@@ -677,12 +921,17 @@ class PipelineManager:
         Raises:
             ValueError: If connection type is not supported
         """
+        from odibi.connections.factory import register_builtins
+
         connections = {}
 
-        # Load plugins
+        # 1. Register built-in connection types
+        register_builtins()
+
+        # 2. Load plugins (external)
         load_plugins()
 
-        # Build initial connection objects (without prefetching secrets)
+        # 3. Build connection objects
         for conn_name, conn_config in conn_configs.items():
             # Convert Pydantic model to dict if needed
             if hasattr(conn_config, "model_dump"):
@@ -692,199 +941,19 @@ class PipelineManager:
 
             conn_type = conn_config.get("type", "local")
 
-            # Check plugins
             factory = get_connection_factory(conn_type)
             if factory:
-                connections[conn_name] = factory(conn_name, conn_config)
-                continue
-
-            if conn_type == "local":
-                connections[conn_name] = LocalConnection(
-                    base_path=conn_config.get("base_path", "./data")
-                )
-            elif conn_type == "http":
-                from odibi.connections.http import HttpConnection
-
-                connections[conn_name] = HttpConnection(
-                    base_url=conn_config.get("base_url", ""),
-                    headers=conn_config.get("headers"),
-                    auth=conn_config.get("auth"),
-                )
-            elif conn_type == "azure_adls" or conn_type == "azure_blob":
-                # Import here to avoid dependency issues
                 try:
-                    from odibi.connections.azure_adls import AzureADLS
-                except ImportError:
-                    raise ImportError(
-                        "Azure ADLS support requires 'pip install odibi[azure]'. "
-                        "See README.md for installation instructions."
-                    )
-
-                # Handle config discrepancies (config.py vs flat structure)
-                # 1. Account name
-                account = conn_config.get("account_name") or conn_config.get("account")
-                if not account:
-                    raise ValueError(f"Connection '{conn_name}' missing 'account_name'")
-
-                # 2. Auth dictionary (preferred) vs flat structure (legacy)
-                auth_config = conn_config.get("auth", {})
-
-                # Extract auth details from auth dict OR top-level
-                key_vault_name = auth_config.get("key_vault_name") or conn_config.get(
-                    "key_vault_name"
-                )
-                secret_name = auth_config.get("secret_name") or conn_config.get("secret_name")
-                account_key = auth_config.get("account_key") or conn_config.get("account_key")
-                sas_token = auth_config.get("sas_token") or conn_config.get("sas_token")
-                tenant_id = auth_config.get("tenant_id") or conn_config.get("tenant_id")
-                client_id = auth_config.get("client_id") or conn_config.get("client_id")
-                client_secret = auth_config.get("client_secret") or conn_config.get("client_secret")
-
-                # Default auth mode if not specified
-                auth_mode = conn_config.get("auth_mode", "key_vault")
-
-                # Auto-detect auth_mode if not specified but sas_token is present
-                if "auth_mode" not in conn_config:
-                    if sas_token:
-                        auth_mode = "sas_token"
-                    elif key_vault_name and secret_name:
-                        auth_mode = "key_vault"
-                    elif account_key:
-                        auth_mode = "direct_key"
-                    elif tenant_id and client_id and client_secret:
-                        auth_mode = "service_principal"
-                    else:
-                        # Default to managed_identity if no specific credentials provided
-                        # This supports the "Default (Recommended)" option in the template
-                        auth_mode = "managed_identity"
-
-                # Check validation_mode (eager vs lazy default)
-                validation_mode = conn_config.get("validation_mode", "lazy")
-                validate = conn_config.get("validate")
-
-                if validate is None:
-                    # If not explicitly set, derive from validation_mode
-                    validate = True if validation_mode == "eager" else False
-
-                # Register secrets for redaction
-                if account_key:
-                    logger.register_secret(account_key)
-                if sas_token:
-                    logger.register_secret(sas_token)
-                if client_secret:
-                    logger.register_secret(client_secret)
-
-                connections[conn_name] = AzureADLS(
-                    account=account,
-                    container=conn_config["container"],
-                    path_prefix=conn_config.get("path_prefix", ""),
-                    auth_mode=auth_mode,
-                    key_vault_name=key_vault_name,
-                    secret_name=secret_name,
-                    account_key=account_key,
-                    sas_token=sas_token,
-                    tenant_id=tenant_id,
-                    client_id=client_id,
-                    client_secret=client_secret,
-                    validate=validate,
-                )
-            elif conn_type == "delta":
-                # Check if we have support
-                try:
-                    # For local delta, we need 'deltalake' (pandas) or 'delta-spark' (spark)
-                    # But connection object itself might just be a holder for path/catalog config
-                    # Since we don't have a dedicated DeltaConnection class yet in the core,
-                    # we can use a generic config holder or simple dict if the engine handles it.
-                    # However, to be clean, let's assume we treat it as "local" with special validation
-                    # if it's path-based, or just pass through if catalog-based.
-
-                    # Actually, better to use LocalConnection for path-based delta if no specific class
-                    if "path" in conn_config:
-                        connections[conn_name] = LocalConnection(
-                            base_path=conn_config.get("path") or conn_config.get("base_path")
-                        )
-                    else:
-                        # Catalog based (Spark only)
-                        # We can create a dummy connection object that just holds the catalog/schema info
-                        # so the Engine can read it.
-                        from odibi.connections.base import BaseConnection
-
-                        class DeltaCatalogConnection(BaseConnection):
-                            def __init__(self, catalog, schema):
-                                self.catalog = catalog
-                                self.schema = schema
-
-                            def get_path(self, table):
-                                return f"{self.catalog}.{self.schema}.{table}"
-
-                            def validate(self):
-                                pass
-
-                            def pandas_storage_options(self):
-                                return {}
-
-                        connections[conn_name] = DeltaCatalogConnection(
-                            catalog=conn_config.get("catalog"),
-                            schema=conn_config.get("schema") or "default",
-                        )
-
+                    connections[conn_name] = factory(conn_name, conn_config)
                 except Exception as e:
-                    raise ValueError(f"Failed to initialize Delta connection '{conn_name}': {e}")
-
-            elif conn_type == "azure_sql" or conn_type == "sql_server":
-                # Import AzureSQL
-                try:
-                    from odibi.connections.azure_sql import AzureSQL
-                except ImportError:
-                    raise ImportError(
-                        "Azure SQL support requires 'pip install odibi[azure]'. "
-                        "See README.md for installation instructions."
-                    )
-
-                # Extract config
-                # Support 'host' (new standard) or 'server' (legacy)
-                server = conn_config.get("host") or conn_config.get("server")
-                if not server:
-                    raise ValueError(f"Connection '{conn_name}' missing 'host' or 'server'")
-
-                auth_config = conn_config.get("auth", {})
-                username = auth_config.get("username") or conn_config.get("username")
-                password = auth_config.get("password") or conn_config.get("password")
-                key_vault_name = auth_config.get("key_vault_name") or conn_config.get(
-                    "key_vault_name"
-                )
-                secret_name = auth_config.get("secret_name") or conn_config.get("secret_name")
-
-                # Auto-detect auth_mode for SQL if not specified
-                auth_mode = conn_config.get("auth_mode")
-                if not auth_mode:
-                    if username and password:
-                        auth_mode = "sql"
-                    elif key_vault_name and secret_name and username:
-                        auth_mode = "key_vault"
-                    else:
-                        auth_mode = "aad_msi"
-
-                # Register secret
-                if password:
-                    logger.register_secret(password)
-
-                connections[conn_name] = AzureSQL(
-                    server=server,
-                    database=conn_config["database"],
-                    driver=conn_config.get("driver", "ODBC Driver 18 for SQL Server"),
-                    username=username,
-                    password=password,
-                    auth_mode=auth_mode,
-                    key_vault_name=key_vault_name,
-                    secret_name=secret_name,
-                    port=conn_config.get("port", 1433),
-                    timeout=conn_config.get("timeout", 30),
-                )
+                    # Enhance error with context
+                    raise ValueError(
+                        f"Failed to create connection '{conn_name}' (type={conn_type}): {e}"
+                    ) from e
             else:
                 raise ValueError(
                     f"Unsupported connection type: {conn_type}. "
-                    f"Supported types: local, azure_adls, azure_sql. "
+                    f"Supported types: local, azure_adls, azure_sql, delta, etc. "
                     f"See docs for connection setup."
                 )
 
@@ -908,6 +977,9 @@ class PipelineManager:
         pipelines: Optional[Union[str, List[str]]] = None,
         dry_run: bool = False,
         resume_from_failure: bool = False,
+        parallel: bool = False,
+        max_workers: int = 4,
+        on_error: Optional[str] = None,
     ) -> Union[PipelineResults, Dict[str, PipelineResults]]:
         """Run one, multiple, or all pipelines.
 
@@ -915,6 +987,9 @@ class PipelineManager:
             pipelines: Pipeline name(s) to run.
             dry_run: Whether to simulate execution.
             resume_from_failure: Whether to skip successfully completed nodes from last run.
+            parallel: Whether to run nodes in parallel.
+            max_workers: Maximum number of worker threads for parallel execution.
+            on_error: Override error handling strategy (fail_fast, fail_later, ignore).
 
         Returns:
             PipelineResults or Dict of results
@@ -939,14 +1014,13 @@ class PipelineManager:
         # Run pipelines
         results = {}
         for name in pipeline_names:
-            logger.info(f"Running pipeline: {name}")
-            if dry_run:
-                logger.info("Mode: DRY RUN (Simulation)")
-            if resume_from_failure:
-                logger.info("Mode: RESUME FROM FAILURE")
-
+            # ...
             results[name] = self._pipelines[name].run(
-                dry_run=dry_run, resume_from_failure=resume_from_failure
+                dry_run=dry_run,
+                resume_from_failure=resume_from_failure,
+                parallel=parallel,
+                max_workers=max_workers,
+                on_error=on_error,
             )
 
             # Print summary

@@ -44,10 +44,13 @@ def test_auto_optimize_enabled_boolean(mock_context, mock_engine, mock_connectio
     node = Node(config, mock_context, mock_engine, mock_connections)
 
     # Mock execute_write to do nothing
-    node._execute_write = MagicMock()
+    # node._execute_write = MagicMock() # Removed as it doesn't exist on Node
+
+    # Mock engine write to avoid side effects
+    mock_engine.write = MagicMock()
 
     # Execute write phase
-    node._execute_write_phase(MagicMock())
+    node.executor._execute_write_phase(config, MagicMock(), None)
 
     # Verify maintain_table called
     mock_engine.maintain_table.assert_called_once()
@@ -73,8 +76,9 @@ def test_auto_optimize_custom_config(mock_context, mock_engine, mock_connections
     )
 
     node = Node(config, mock_context, mock_engine, mock_connections)
-    node._execute_write = MagicMock()
-    node._execute_write_phase(MagicMock())
+    # node._execute_write = MagicMock() # Removed
+    mock_engine.write = MagicMock()
+    node.executor._execute_write_phase(config, MagicMock(), None)
 
     mock_engine.maintain_table.assert_called_once()
     opt_config = mock_engine.maintain_table.call_args.kwargs["config"]
@@ -94,8 +98,9 @@ def test_auto_optimize_disabled(mock_context, mock_engine, mock_connections):
     )
 
     node = Node(config, mock_context, mock_engine, mock_connections)
-    node._execute_write = MagicMock()
-    node._execute_write_phase(MagicMock())
+    # node._execute_write = MagicMock() # Removed
+    mock_engine.write = MagicMock()
+    node.executor._execute_write_phase(config, MagicMock(), None)
 
     mock_engine.maintain_table.assert_not_called()
 
@@ -108,8 +113,9 @@ def test_auto_optimize_none(mock_context, mock_engine, mock_connections):
     )
 
     node = Node(config, mock_context, mock_engine, mock_connections)
-    node._execute_write = MagicMock()
-    node._execute_write_phase(MagicMock())
+    # node._execute_write = MagicMock() # Removed
+    mock_engine.write = MagicMock()
+    node.executor._execute_write_phase(config, MagicMock(), None)
 
     mock_engine.maintain_table.assert_not_called()
 

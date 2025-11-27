@@ -1,0 +1,41 @@
+project: odibi_metrics
+
+connections:
+  local_data:
+    type: local
+    base_path: ./data
+
+story:
+  connection: local_data
+  path: stories
+  retention_count: 10
+
+system:
+  connection: local_data
+  path: _system_catalog
+
+pipelines:
+  - pipeline: github_health
+    description: "Tracks the health of the Odibi repository"
+    nodes:
+      - name: fetch_issues
+        transformer: fetch_github_issues
+        params:
+          repo: "henryodibi11/Odibi"
+          limit: 200
+
+        write:
+          connection: local_data
+          format: parquet
+          path: raw/issues
+
+      - name: weekly_velocity
+        depends_on: ["fetch_issues"]
+        transformer: calculate_velocity
+        params:
+          window_days: 7
+
+        write:
+          connection: local_data
+          format: csv
+          path: gold/velocity.csv

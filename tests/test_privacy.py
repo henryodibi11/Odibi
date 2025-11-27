@@ -1,9 +1,10 @@
 import pandas as pd
 import pytest
-from odibi.config import NodeConfig, PrivacyConfig, PrivacyMethod, ColumnMetadata
-from odibi.node import Node
+
+from odibi.config import ColumnMetadata, NodeConfig, PrivacyConfig, PrivacyMethod
 from odibi.context import PandasContext
 from odibi.engine.pandas_engine import PandasEngine
+from odibi.node import Node
 
 
 @pytest.fixture

@@ -14,6 +14,18 @@ try:
 except ImportError:
     pass
 
+try:
+    import polars as pl
+except ImportError:
+    pl = None
+
+try:
+    from odibi.engine.polars_engine import PolarsEngine
+
+    _ENGINES["polars"] = PolarsEngine
+except ImportError:
+    pass
+
 
 def register_engine(name: str, engine_cls: Type[Engine]) -> None:
     """Register a new engine class.

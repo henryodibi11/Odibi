@@ -1,0 +1,31 @@
+tests:
+  - name: "Test Add Status Column"
+    transform: "add_status_column"
+    inputs:
+      df:
+        - {id: 1, name: "Alice"}
+        - {id: 2, name: "Bob"}
+    expected:
+      - {id: 1, name: "Alice", status: "active"}
+      - {id: 2, name: "Bob", status: "active"}
+
+  - name: "Test Uppercase Name"
+    transform: "uppercase_name"
+    inputs:
+      df:
+        - {id: 1, name: "Alice"}
+        - {id: 2, name: "Bob"}
+    expected:
+      - {id: 1, name: "ALICE"}
+      - {id: 2, name: "BOB"}
+
+  - name: "Test SQL Transform (DuckDB)"
+    sql: "SELECT id, name, 'SQL' as source FROM df WHERE id > 1"
+    inputs:
+      df:
+        - {id: 1, name: "Alice"}
+        - {id: 2, name: "Bob"}
+        - {id: 3, name: "Charlie"}
+    expected:
+      - {id: 2, name: "Bob", source: "SQL"}
+      - {id: 3, name: "Charlie", source: "SQL"}

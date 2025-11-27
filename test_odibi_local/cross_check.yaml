@@ -1,0 +1,46 @@
+project: cross_check_test
+engine: pandas
+connections:
+  raw_data:
+    type: local
+    base_path: ./data/raw
+  delta_lake:
+    type: local
+    base_path: ./data/lake
+story:
+  connection: delta_lake
+  path: stories
+
+pipelines:
+  - pipeline: check_pipe
+    nodes:
+      - name: source_a
+        read:
+          connection: raw_data
+          format: csv
+          path: sample_data.csv
+        write:
+          connection: delta_lake
+          format: delta
+          path: silver/source_a
+
+      - name: source_b
+        read:
+          connection: raw_data
+          format: csv
+          path: sample_data.csv
+        transform:
+          steps:
+            - sql: "SELECT * FROM df LIMIT 1"
+        write:
+          connection: delta_lake
+          format: delta
+          path: silver/source_b
+
+      - name: check_node
+        depends_on: ["source_a", "source_b"]
+        transformer: cross_check
+        params:
+          type: "row_count_diff"
+          inputs: ["source_a", "source_b"]
+          threshold: 0.0

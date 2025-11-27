@@ -51,12 +51,12 @@ class TestNodeMetadataCollection:
         node = Node(config=config, context=PandasContext(), engine=PandasEngine(), connections={})
 
         # Mock execution steps
-        node._execution_steps = ["step 1"]
+        node.executor._execution_steps = ["step 1"]
 
         # Test with simple DF
         df = pd.DataFrame({"a": [1]})
 
-        meta = node._collect_metadata(df)
+        meta = node.executor._collect_metadata(config, df)
 
         assert "environment" in meta
         env = meta["environment"]
@@ -74,7 +74,7 @@ class TestNodeMetadataCollection:
         df = pd.DataFrame({"a": [1, None]})
         df.attrs["odibi_source_files"] = ["file.csv"]
 
-        meta = node._collect_metadata(df)
+        meta = node.executor._collect_metadata(config, df)
 
         assert meta["source_files"] == ["file.csv"]
         assert meta["null_profile"]["a"] == 0.5

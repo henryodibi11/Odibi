@@ -39,6 +39,7 @@ nav:
   - Tutorials:
       - Getting Started: docs/tutorials/getting_started.md
   - Guides:
+      - Dogfooding (Meta): docs/guides/dogfooding.md
       - Writing Transformations: docs/guides/writing_transformations.md
       - Master CLI: docs/guides/cli_master_guide.md
       - Python API Guide: docs/guides/python_api_guide.md

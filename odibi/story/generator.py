@@ -38,6 +38,7 @@ class StoryGenerator:
         retention_days: int = 30,
         retention_count: int = 100,
         storage_options: Optional[Dict[str, Any]] = None,
+        catalog_manager: Optional[Any] = None,
     ):
         """Initialize story generator.
 
@@ -48,12 +49,14 @@ class StoryGenerator:
             retention_days: Days to keep stories
             retention_count: Max number of stories to keep
             storage_options: Credentials for remote storage (e.g. ADLS)
+            catalog_manager: System Catalog Manager for historical context
         """
         self.pipeline_name = pipeline_name
         self.max_sample_rows = max_sample_rows
         self.output_path_str = output_path  # Store original string
         self.is_remote = "://" in output_path
         self.storage_options = storage_options or {}
+        self.catalog_manager = catalog_manager
 
         if not self.is_remote:
             self.output_path = Path(output_path)
@@ -145,6 +148,19 @@ class StoryGenerator:
                         node_name=node_name, operation="skipped", status="skipped", duration=0.0
                     )
                 )
+
+            # Enrich with Historical Context (if available)
+            current_node = metadata.nodes[-1]
+            if self.catalog_manager:
+                try:
+                    avg_rows = self.catalog_manager.get_average_volume(node_name)
+                    avg_duration = self.catalog_manager.get_average_duration(node_name)
+
+                    current_node.historical_avg_rows = avg_rows
+                    current_node.historical_avg_duration = avg_duration
+                except Exception:
+                    # Don't fail story generation if history fetch fails
+                    pass
 
         # 2. Render outputs
         timestamp_obj = datetime.now()

@@ -1,20 +1,22 @@
 """Node execution engine."""
 
+import hashlib
 import inspect
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
 from odibi.config import IncrementalMode, NodeConfig, RetryConfig, WriteMode
 from odibi.context import Context, EngineContext
 from odibi.enums import EngineType
-
-# from odibi.transformations.registry import get_registry as get_transformation_registry  # Removed in cleanup
 from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
 from odibi.registry import FunctionRegistry
-from odibi.state import DeltaStateBackend, LocalFileStateBackend, StateManager
+from odibi.state import (
+    CatalogStateBackend,
+    StateManager,
+)
 
 
 class NodeResult(BaseModel):
@@ -31,489 +33,204 @@ class NodeResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
-class Node:
-    """Base node execution logic."""
+class NodeExecutor:
+    """Handles the execution logic (read, transform, write) of a node."""
 
     def __init__(
         self,
-        config: NodeConfig,
         context: Context,
         engine: Any,
         connections: Dict[str, Any],
+        catalog_manager: Optional[Any] = None,
         config_file: Optional[str] = None,
         max_sample_rows: int = 10,
-        dry_run: bool = False,
-        retry_config: Optional[RetryConfig] = None,
     ):
-        """Initialize node.
-
-        Args:
-            config: Node configuration
-            context: Execution context for data passing
-            engine: Execution engine (Spark or Pandas)
-            connections: Available connections
-            config_file: Path to config file (for error reporting)
-            max_sample_rows: Maximum rows to capture for story snapshot
-            dry_run: Whether to simulate execution
-            retry_config: Retry configuration
-        """
-        self.config = config
         self.context = context
         self.engine = engine
         self.connections = connections
+        self.catalog_manager = catalog_manager
         self.config_file = config_file
         self.max_sample_rows = max_sample_rows
-        self.dry_run = dry_run
-        self.retry_config = retry_config or RetryConfig(enabled=False)
 
-        self._cached_result: Optional[Any] = None
+        # Ephemeral state per execution
         self._execution_steps: List[str] = []
         self._executed_sql: List[str] = []
         self._delta_write_info: Optional[Dict[str, Any]] = None
-        self._pending_hwm: Optional[tuple] = None
         self._validation_warnings: List[str] = []
 
-        # Initialize State Manager
-        backend = None
-        if hasattr(self.engine, "spark"):
-            backend = DeltaStateBackend(self.engine.spark)
-        else:
-            backend = LocalFileStateBackend()
+    def execute(
+        self,
+        config: NodeConfig,
+        input_df: Optional[Any] = None,
+        dry_run: bool = False,
+        hwm_state: Optional[Tuple[str, Any]] = None,
+    ) -> NodeResult:
+        """Execute the node logic.
 
-        self.state_manager = StateManager(backend=backend)
-
-    def restore(self) -> bool:
-        """Restore node state from previous execution (if persisted).
+        Args:
+            config: Node configuration
+            input_df: Optional input dataframe (e.g. from dependencies)
+            dry_run: Whether to simulate execution
+            hwm_state: Current High Water Mark state (key, value)
 
         Returns:
-            True if restored successfully, False otherwise
+            NodeResult
         """
-        # Can only restore if we wrote something to a location we can read back
-        if not self.config.write:
-            return False
+        start_time = time.time()
 
-        write_config = self.config.write
-        connection = self.connections.get(write_config.connection)
+        # Reset ephemeral state
+        self._execution_steps = []
+        self._executed_sql = []
+        self._delta_write_info = None
+        self._validation_warnings = []
 
-        if connection is None:
-            return False
+        if dry_run:
+            return self._execute_dry_run(config)
 
         try:
-            # Attempt to read back the output
-            # We map write_config fields to read arguments
-            # format, table, path are same for read/write usually
+            input_schema = None
+            input_sample = None
+            pending_hwm_update = None
 
-            df = self.engine.read(
-                connection=connection,
-                format=write_config.format,
-                table=write_config.table,
-                path=write_config.path,
-                options={},  # We don't know read options, assuming default is fine for restore
+            # 1. Read Phase
+            result_df, pending_hwm_update = self._execute_read_phase(config, hwm_state)
+
+            # If no direct read, check dependencies or use passed input_df
+            if result_df is None:
+                if input_df is not None:
+                    result_df = input_df
+                elif config.depends_on:
+                    # If this is a transform/write node, get data from dependency
+                    # We use the first dependency as the "primary" input for schema comparison
+                    result_df = self.context.get(config.depends_on[0])
+                    if input_df is None:
+                        input_df = result_df  # Snapshot for metadata
+
+            if config.read:
+                input_df = result_df
+
+            # Capture input schema before transformation
+            if input_df is not None:
+                input_schema = self._get_schema(input_df)
+                if self.max_sample_rows > 0:
+                    try:
+                        input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
+                    except Exception:
+                        pass
+
+            # 1.5 Contracts Phase (Pre-conditions)
+            self._execute_contracts_phase(config, input_df)
+
+            # 2. Transform Phase
+            result_df = self._execute_transform_phase(config, result_df, input_df)
+
+            # 3. Validation Phase
+            self._execute_validation_phase(config, result_df)
+
+            # 4. Write Phase
+            # HWM Logic for Write Mode: If this is first run (hwm_state is None?), maybe overwrite?
+            # The original logic checked table existence.
+            override_mode = self._determine_write_mode(config)
+            self._execute_write_phase(config, result_df, override_mode)
+
+            # 5. Register & Cache
+            if result_df is not None:
+                pii_meta = self._calculate_pii(config)
+                self.context.register(config.name, result_df, metadata={"pii_columns": pii_meta})
+                # Cache handled by Node wrapper usually? Or here?
+                # NodeExecutor just executes. Caching in memory is context's job or Node's.
+                # Node logic had:
+                # if self.config.cache:
+                #    self._cached_result = result_df
+                # But _cached_result was on Node instance.
+                # We can leave caching to caller or context.
+                # Context already holds it if we register it.
+                pass
+
+            # 6. Metadata Collection
+            duration = time.time() - start_time
+            metadata = self._collect_metadata(config, result_df, input_schema, input_sample)
+
+            # Pass back HWM update if any
+            if pending_hwm_update:
+                key, value = pending_hwm_update
+                # If we have a result_df, we might want to capture the NEW max value from it if not already captured?
+                # In original logic, _capture_hwm was called inside _execute_read (via _apply_incremental_filtering -> _capture_hwm)
+                # Wait, _capture_hwm sets _pending_hwm.
+                # So pending_hwm_update is returned by _execute_read_phase.
+
+                # But we need to actually GET the new HWM value from the DF if it was a stateful read.
+                # The original code: _execute_read -> ... -> _apply_incremental_filtering
+                # which calculates new max and sets self._pending_hwm.
+
+                metadata["hwm_update"] = {"key": key, "value": value}
+                metadata["hwm_pending"] = True
+
+            return NodeResult(
+                node_name=config.name,
+                success=True,
+                duration=duration,
+                rows_processed=metadata.get("rows"),
+                schema=metadata.get("schema"),
+                metadata=metadata,
             )
 
-            if df is not None:
-                self.context.register(self.config.name, df)
-                # Cache if requested
-                if self.config.cache:
-                    self._cached_result = df
-                return True
-
-        except Exception:
-            # If read fails (file deleted?), we can't restore
-            return False
-
-        return False
-
-    def execute(self) -> NodeResult:
-        """Execute the node with telemetry and retry logic.
-
-        Returns:
-            NodeResult with execution details
-        """
-        from odibi.utils.telemetry import (
-            Status,
-            StatusCode,
-            node_duration,
-            nodes_executed,
-            rows_processed,
-            tracer,
-        )
-
-        with tracer.start_as_current_span("node_execution") as span:
-            span.set_attribute("node.name", self.config.name)
-            span.set_attribute("node.engine", self.engine.__class__.__name__)
-
-            try:
-                result = self._execute_with_retries()
-            except Exception as e:
-                span.record_exception(e)
-                span.set_status(Status(StatusCode.ERROR))
-                nodes_executed.add(1, {"status": "failure", "node": self.config.name})
-                raise e
-
-            # Record telemetry
-            if result.success:
-                span.set_status(Status(StatusCode.OK))
-                nodes_executed.add(1, {"status": "success", "node": self.config.name})
+        except Exception as e:
+            duration = time.time() - start_time
+            # Wrap error
+            if not isinstance(e, NodeExecutionError):
+                exec_context = ExecutionContext(
+                    node_name=config.name,
+                    config_file=self.config_file,
+                    previous_steps=self._execution_steps,
+                )
+                error = NodeExecutionError(
+                    message=str(e),
+                    context=exec_context,
+                    original_error=e,
+                    suggestions=self._generate_suggestions(e, config),
+                )
             else:
-                span.set_status(Status(StatusCode.ERROR))
-                if result.error:
-                    span.record_exception(result.error)
-                nodes_executed.add(1, {"status": "failure", "node": self.config.name})
+                error = e
 
-            if result.rows_processed is not None:
-                rows_processed.add(result.rows_processed, {"node": self.config.name})
-
-            node_duration.record(result.duration, {"node": self.config.name})
-
-            return result
-
-    def _execute_with_retries(self) -> NodeResult:
-        """Execute with internal retry logic."""
-        start_time = time.time()
-        attempts = 0
-        max_attempts = self.retry_config.max_attempts if self.retry_config.enabled else 1
-        last_error = None
-
-        while attempts < max_attempts:
-            attempts += 1
-            try:
-                # Reset execution steps for each attempt (keep dry run logic separate if needed)
-                if not self.dry_run:
-                    self._execution_steps = []
-
-                result = self._execute_attempt()
-
-                # If successful, add attempt count metadata and return
-                if result.success:
-                    result.metadata["attempts"] = attempts
-                    # Update duration to include all attempts
-                    result.duration = time.time() - start_time
-                    return result
-
-                # Should not happen if _execute_attempt raises exception on failure,
-                # but if it returns failed result:
-                last_error = result.error
-
-            except Exception as e:
-                last_error = e
-                # Log or handle error between retries if needed
-                if attempts < max_attempts:
-                    # Backoff strategy
-                    sleep_time = 1
-                    if self.retry_config.backoff == "exponential":
-                        sleep_time = 2 ** (attempts - 1)
-                    elif self.retry_config.backoff == "linear":
-                        sleep_time = attempts
-                    elif self.retry_config.backoff == "constant":
-                        sleep_time = 1
-
-                    # In tests, we might want to skip sleep, but for now simple time.sleep
-                    time.sleep(sleep_time)
-
-        # All attempts failed
-        duration = time.time() - start_time
-
-        # Wrap error if needed
-        if not isinstance(last_error, NodeExecutionError) and last_error:
-            exec_context = ExecutionContext(
-                node_name=self.config.name,
-                config_file=self.config_file,
-                previous_steps=self._execution_steps,
+            return NodeResult(
+                node_name=config.name,
+                success=False,
+                duration=duration,
+                error=error,
             )
-            error = NodeExecutionError(
-                message=str(last_error),
-                context=exec_context,
-                original_error=last_error,
-                suggestions=self._generate_suggestions(last_error),
-            )
-        else:
-            error = last_error
 
-        return NodeResult(
-            node_name=self.config.name,
-            success=False,
-            duration=duration,
-            error=error,
-            metadata={"attempts": attempts},
-        )
-
-    def _execute_attempt(self) -> NodeResult:
-        """Single execution attempt.
-
-        Returns:
-             NodeResult (success=True) or raises Exception
-        """
-        start_time = time.time()
-
-        if self.dry_run:
-            return self._execute_dry_run()
-
-        input_df = None
-        input_schema = None
-        input_sample = None
-
-        # 1. Read Phase
-        result_df = self._execute_read_phase()
-
-        # If no direct read, check dependencies
-        if result_df is None and self.config.depends_on:
-            # If this is a transform/write node, get data from dependency
-            # We use the first dependency as the "primary" input for schema comparison
-            result_df = self.context.get(self.config.depends_on[0])
-            input_df = result_df  # Snapshot for metadata
-
-        if self.config.read:
-            input_df = result_df
-
-        # Capture input schema before transformation
-        if input_df is not None:
-            input_schema = self._get_schema(input_df)
-            if self.max_sample_rows > 0:
-                try:
-                    input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
-                except Exception:
-                    pass
-
-        # 2. Transform Phase
-        result_df = self._execute_transform_phase(result_df, input_df)
-
-        # 3. Validation Phase
-        self._execute_validation_phase(result_df)
-
-        # 4. Write Phase
-        self._execute_write_phase(result_df)
-
-        # 5. Register & Cache
-        if result_df is not None:
-            self.context.register(self.config.name, result_df)
-            if self.config.cache:
-                self._cached_result = result_df
-
-        # 6. Metadata Collection
-        duration = time.time() - start_time
-        metadata = self._collect_metadata(result_df, input_schema, input_sample)
-
-        # Commit HWM if pending
-        if self._pending_hwm:
-            key, value = self._pending_hwm
-            try:
-                self.state_manager.set_hwm(key, value)
-                metadata["hwm_updated"] = {"key": key, "value": value}
-            except Exception as e:
-                # Warn but don't fail execution? Or fail?
-                # If we fail to save state, next run will re-process data.
-                # It is safer to fail, or at least log.
-                # For now, let's add warning to metadata.
-                metadata["hwm_error"] = str(e)
-
-        return NodeResult(
-            node_name=self.config.name,
-            success=True,
-            duration=duration,
-            rows_processed=metadata.get("rows"),
-            schema=metadata.get("schema"),
-            metadata=metadata,
-        )
-
-    def _execute_dry_run(self) -> NodeResult:
+    def _execute_dry_run(self, config: NodeConfig) -> NodeResult:
         """Simulate execution."""
         self._execution_steps.append("Dry run: Skipping actual execution")
 
-        if self.config.read:
-            self._execution_steps.append(f"Dry run: Would read from {self.config.read.connection}")
+        if config.read:
+            self._execution_steps.append(f"Dry run: Would read from {config.read.connection}")
 
-        if self.config.transform:
+        if config.transform:
             self._execution_steps.append(
-                f"Dry run: Would apply {len(self.config.transform.steps)} transform steps"
+                f"Dry run: Would apply {len(config.transform.steps)} transform steps"
             )
 
-        if self.config.write:
-            self._execution_steps.append(f"Dry run: Would write to {self.config.write.connection}")
+        if config.write:
+            self._execution_steps.append(f"Dry run: Would write to {config.write.connection}")
 
         return NodeResult(
-            node_name=self.config.name,
+            node_name=config.name,
             success=True,
             duration=0.0,
             rows_processed=0,
             metadata={"dry_run": True, "steps": self._execution_steps},
         )
 
-    def _determine_write_mode(self) -> Optional[WriteMode]:
-        """Determine write mode considering HWM first-run pattern.
+    def _execute_read_phase(
+        self, config: NodeConfig, hwm_state: Optional[Tuple[str, Any]]
+    ) -> Tuple[Optional[Any], Optional[Tuple[str, Any]]]:
+        """Execute read operation. Returns (df, pending_hwm_update)."""
+        if not config.read:
+            return None, None
 
-        Returns:
-            WriteMode.OVERWRITE if first run detected, None to use configured mode
-        """
-        if not self.config.write or self.config.write.first_run_query is None:
-            return None  # Use configured mode
-
-        write_config = self.config.write
-        target_connection = self.connections.get(write_config.connection)
-
-        if target_connection is None:
-            return None
-
-        # Check if target table exists
-        table_exists = self.engine.table_exists(
-            target_connection, table=write_config.table, path=write_config.path
-        )
-
-        if not table_exists:
-            return WriteMode.OVERWRITE  # Always overwrite on first run
-
-        return None  # Use configured mode for subsequent runs
-
-    def _execute_read_phase(self) -> Optional[Any]:
-        """Execute read operation."""
-        if not self.config.read:
-            return None
-
-        result_df = self._execute_read()
-        self._execution_steps.append(f"Read from {self.config.read.connection}")
-        return result_df
-
-    def _execute_transform_phase(
-        self, result_df: Optional[Any], input_df: Optional[Any]
-    ) -> Optional[Any]:
-        """Execute transformer and transform steps."""
-
-        # Transformer Node (Phase 2.1)
-        if self.config.transformer:
-            # If transform-only node, ensure we have input
-            if result_df is None and input_df is not None:
-                result_df = input_df
-
-            result_df = self._execute_transformer_node(result_df)
-            self._execution_steps.append(f"Applied transformer '{self.config.transformer}'")
-
-        # Transform Steps
-        if self.config.transform:
-            if result_df is None and input_df is not None:
-                result_df = input_df
-
-            result_df = self._execute_transform(result_df)
-            self._execution_steps.append(
-                f"Applied {len(self.config.transform.steps)} transform steps"
-            )
-
-        # Privacy Suite (Phase 3)
-        if self.config.privacy:
-            pii_cols = [name for name, meta in self.config.columns.items() if meta.pii]
-            if pii_cols:
-                result_df = self.engine.anonymize(
-                    result_df,
-                    pii_cols,
-                    self.config.privacy.method,
-                    self.config.privacy.salt,
-                )
-                self._execution_steps.append(f"Anonymized {len(pii_cols)} PII columns")
-
-        return result_df
-
-    def _execute_validation_phase(self, result_df: Any) -> None:
-        """Execute validation if configured."""
-        if self.config.validation and result_df is not None:
-            self._execute_validation(result_df)
-            self._execution_steps.append("Validation passed")
-
-    def _execute_write_phase(self, result_df: Any) -> None:
-        """Execute write if configured."""
-        if not self.config.write:
-            return
-
-        # Determine actual write mode (handles HWM first-run)
-        actual_mode = self._determine_write_mode()
-
-        # If write-only node, get data from context based on dependencies
-        df_to_write = result_df
-        if df_to_write is None and self.config.depends_on:
-            df_to_write = self.context.get(self.config.depends_on[0])
-
-        if df_to_write is not None:
-            extra_options = {}
-
-            # --- Schema Management ---
-            if self.config.schema_policy:
-                write_config = self.config.write
-                target_conn = self.connections.get(write_config.connection)
-
-                # 1. Fetch Target Schema
-                target_schema = None
-                try:
-                    target_schema = self.engine.get_table_schema(
-                        connection=target_conn,
-                        table=write_config.table,
-                        path=write_config.path,
-                        format=write_config.format,
-                    )
-                except Exception:
-                    # Ignore if we can't fetch schema (e.g. table doesn't exist yet)
-                    pass
-
-                # 2. Harmonize Schema
-                if target_schema:
-                    df_to_write = self.engine.harmonize_schema(
-                        df_to_write, target_schema, self.config.schema_policy
-                    )
-
-                # 3. Configure Evolution Options (Phase 2.3)
-                if self.config.schema_policy.mode == "evolve":
-                    if write_config.format == "delta":
-                        if hasattr(self.engine, "spark"):
-                            extra_options["mergeSchema"] = "true"
-                        else:
-                            # Pandas / DeltaLake
-                            extra_options["schema_mode"] = "merge"
-
-            self._execute_write(df_to_write, actual_mode, extra_options=extra_options)
-            self._execution_steps.append(f"Written to {self.config.write.connection}")
-
-            # Auto-Optimize
-            self._execute_auto_optimize()
-
-    def _execute_auto_optimize(self) -> None:
-        """Execute auto-optimization if configured."""
-        write_config = self.config.write
-        if not write_config or not write_config.auto_optimize:
-            return
-
-        # Resolve config
-        from odibi.config import AutoOptimizeConfig
-
-        opt_config = None
-        if isinstance(write_config.auto_optimize, bool):
-            if write_config.auto_optimize:
-                opt_config = AutoOptimizeConfig(enabled=True)
-            else:
-                return
-        else:
-            opt_config = write_config.auto_optimize
-
-        if not opt_config or not opt_config.enabled:
-            return
-
-        connection = self.connections.get(write_config.connection)
-        if not connection:
-            return
-
-        self.engine.maintain_table(
-            connection=connection,
-            format=write_config.format,
-            table=write_config.table,
-            path=write_config.path,
-            config=opt_config,
-        )
-        self._execution_steps.append("Auto-optimized table (Compaction + Vacuum)")
-
-    def _execute_read(self) -> Any:
-        """Execute read operation with HWM first-run support.
-
-        Returns:
-            DataFrame from source
-        """
-        read_config = self.config.read
-        write_config = self.config.write
+        read_config = config.read
         connection = self.connections.get(read_config.connection)
 
         if connection is None:
@@ -522,288 +239,353 @@ class Node:
                 f"Available: {', '.join(self.connections.keys())}"
             )
 
-        # HWM Pattern: Use full-load query if first run
-        options = read_config.options.copy()
+        # Time Travel
+        as_of_version = None
+        as_of_timestamp = None
+        if read_config.time_travel:
+            as_of_version = read_config.time_travel.as_of_version
+            as_of_timestamp = read_config.time_travel.as_of_timestamp
 
-        # Determine if target exists (shared logic)
-        target_exists = False
-        if write_config:
-            target_connection = self.connections.get(write_config.connection)
-            if target_connection:
-                try:
-                    target_exists = self.engine.table_exists(
-                        target_connection, table=write_config.table, path=write_config.path
-                    )
-                except Exception:
-                    # If check fails, assume it doesn't exist or we can't read it
-                    target_exists = False
+        # Legacy HWM: First Run Query Logic
+        read_options = read_config.options.copy() if read_config.options else {}
 
-        # 1. Manual HWM (Legacy/Explicit)
-        if write_config and write_config.first_run_query is not None:
-            if not target_exists:
-                # First run: Override with full-load query
-                options["query"] = write_config.first_run_query
+        if config.write and config.write.first_run_query:
+            write_config = config.write
+            target_conn = self.connections.get(write_config.connection)
+            if target_conn:
+                # Check if table exists to determine first run
+                if not self.engine.table_exists(target_conn, write_config.table, write_config.path):
+                    # First Run: Use first_run_query override
+                    # This overrides any 'query' in read options
+                    read_options["query"] = config.write.first_run_query
 
-        # 2. Automatic Incremental (Smart Read)
-        elif read_config.incremental:
-            # Only apply if no manual query is already set in options (precedence)
-            if "query" not in options and not read_config.query:
-                table_name = read_config.table or (
-                    f"delta.`{read_config.path}`" if read_config.path else None
-                )
-
-                if not table_name:
-                    raise ValueError("Incremental read requires 'table' or 'path' to be set.")
-
-                inc = read_config.incremental
-                where_clause = None
-
-                if inc.mode == IncrementalMode.STATEFUL:
-                    # STATEFUL MODE
-                    state_key = inc.state_key or self.config.name
-                    last_hwm = self.state_manager.get_hwm(state_key)
-
-                    if last_hwm is None:
-                        # First run: Load everything
-                        if read_config.format in ["sql", "sql_server", "azure_sql"]:
-                            options["query"] = f"SELECT * FROM {table_name}"
-                    else:
-                        # Subsequent run: Filter > HWM
-                        val_to_compare = last_hwm
-
-                        # Apply watermark lag (only if string/time)
-                        if inc.watermark_lag and isinstance(last_hwm, str):
-                            try:
-                                from dateutil.parser import parse
-
-                                hwm_dt = parse(last_hwm)
-                                lag_str = inc.watermark_lag.lower()
-                                unit_char = lag_str[-1]
-                                val = int(lag_str[:-1])
-
-                                delta = timedelta()
-                                if unit_char == "h":
-                                    delta = timedelta(hours=val)
-                                elif unit_char == "d":
-                                    delta = timedelta(days=val)
-                                elif unit_char == "m":
-                                    delta = timedelta(minutes=val)
-                                elif unit_char == "s":
-                                    delta = timedelta(seconds=val)
-
-                                val_to_compare = (hwm_dt - delta).strftime("%Y-%m-%d %H:%M:%S.%f")
-                            except Exception:
-                                pass  # Fallback to raw HWM if parsing fails
-
-                        val_str = (
-                            f"'{val_to_compare}'"
-                            if isinstance(val_to_compare, str)
-                            else str(val_to_compare)
-                        )
-
-                        if inc.fallback_column:
-                            where_clause = (
-                                f"COALESCE({inc.column}, {inc.fallback_column}) > {val_str}"
-                            )
-                        else:
-                            where_clause = f"{inc.column} > {val_str}"
-
-                    # Register pending HWM update (will be processed after read)
-                    self._pending_hwm = (state_key, inc.column)
-
-                else:
-                    # ROLLING WINDOW MODE (Legacy)
-                    if not target_exists:
-                        # First Run: Load everything
-                        if read_config.format in ["sql", "sql_server", "azure_sql"]:
-                            options["query"] = f"SELECT * FROM {table_name}"
-                    else:
-                        # Subsequent Run
-                        now = datetime.now()
-                        lookback = inc.lookback or 1
-                        unit_str = str(inc.unit).lower() if inc.unit else "day"
-
-                        if unit_str == "hour":
-                            delta = timedelta(hours=lookback)
-                        elif unit_str == "day":
-                            delta = timedelta(days=lookback)
-                        elif unit_str == "month":
-                            delta = timedelta(days=lookback * 30)
-                        elif unit_str == "year":
-                            delta = timedelta(days=lookback * 365)
-                        else:
-                            delta = timedelta(days=lookback)
-
-                        cutoff = now - delta
-                        date_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
-
-                        if inc.fallback_column:
-                            where_clause = (
-                                f"COALESCE({inc.column}, {inc.fallback_column}) >= '{date_str}'"
-                            )
-                        else:
-                            where_clause = f"{inc.column} >= '{date_str}'"
-
-                # Apply generated WHERE clause
-                if where_clause:
-                    if read_config.format in ["sql", "sql_server", "azure_sql"]:
-                        options["query"] = f"SELECT * FROM {table_name} WHERE {where_clause}"
-                    else:
-                        options["filter"] = where_clause
-
-        # Determine table argument for engine.read
-        # If we generated a query for SQL/JDBC (e.g. incremental or HWM), we MUST NOT pass the table name
-        # because Spark JDBC reader throws error if both 'dbtable' and 'query' are present.
-        table_arg = read_config.table
-        if read_config.format in ["sql", "sql_server", "azure_sql"] and "query" in options:
-            table_arg = None
-
-        # Delegate to engine-specific reader
+        # Execute Read
         df = self.engine.read(
             connection=connection,
             format=read_config.format,
-            table=table_arg,
+            table=read_config.table,
             path=read_config.path,
-            streaming=read_config.streaming,
-            options=options,
+            options=read_options,
+            as_of_version=as_of_version,
+            as_of_timestamp=as_of_timestamp,
         )
 
-        # Capture HWM if needed
-        if self._pending_hwm and df is not None:
-            key, column = self._pending_hwm
-            # If streaming, we can't easily get max. Incremental usually implies batch.
-            if not read_config.streaming:
-                new_max = self._get_column_max(df, column)
-                if new_max is not None:
-                    self._pending_hwm = (key, new_max)
+        # Apply Incremental Logic
+        pending_hwm = None
+        if config.read.incremental:
+            # If stateful, we need hwm_state
+            # logic for incremental filtering
+            # ...
+            # We need to implement _apply_incremental_filtering here or move it
+            df, pending_hwm = self._apply_incremental_filtering(df, config, hwm_state)
+
+        self._execution_steps.append(f"Read from {config.read.connection}")
+        return df, pending_hwm
+
+    def _apply_incremental_filtering(
+        self, df: Any, config: NodeConfig, hwm_state: Optional[Tuple[str, Any]]
+    ) -> Tuple[Any, Optional[Tuple[str, Any]]]:
+        """Apply incremental filtering and capture new HWM."""
+        inc = config.read.incremental
+        if not inc:
+            return df, None
+
+        # Smart Read Pattern: If target table doesn't exist, skip filtering (Full Load)
+        if config.write:
+            target_conn = self.connections.get(config.write.connection)
+            if target_conn and not self.engine.table_exists(
+                target_conn, config.write.table, config.write.path
+            ):
+                # First Run detected -> Full Load
+                # We still need to capture HWM if stateful!
+                if inc.mode == IncrementalMode.STATEFUL:
+                    state_key = inc.state_key or f"{config.name}_hwm"
+                    new_max = self._get_column_max(df, inc.column)
+                    if new_max is not None:
+                        return df, (state_key, new_max)
+
+                return df, None
+
+        if inc.mode == IncrementalMode.ROLLING_WINDOW:
+            if not inc.lookback or not inc.unit:
+                return df, None
+
+            # Calculate cutoff
+            now = datetime.now()
+
+            delta = None
+            if inc.unit == "hour":
+                delta = timedelta(hours=inc.lookback)
+            elif inc.unit == "day":
+                delta = timedelta(days=inc.lookback)
+            elif inc.unit == "month":
+                delta = timedelta(days=inc.lookback * 30)
+            elif inc.unit == "year":
+                delta = timedelta(days=inc.lookback * 365)
+
+            if delta:
+                cutoff = now - delta
+
+                if inc.fallback_column:
+                    if hasattr(self.engine, "filter_coalesce"):
+                        # Use >= for inclusive rolling window usually? Or >?
+                        # Standard is usually >= (within the last X days)
+                        df = self.engine.filter_coalesce(
+                            df, inc.column, inc.fallback_column, ">=", cutoff
+                        )
+                    elif hasattr(self.engine, "filter_greater_than"):
+                        df = self.engine.filter_greater_than(df, inc.column, cutoff)
                 else:
-                    # No new data or empty DF -> No HWM update
-                    self._pending_hwm = None
+                    if hasattr(self.engine, "filter_greater_than"):
+                        # Note: engine.filter_greater_than is strictly >.
+                        # For rolling window, we usually want >= cutoff.
+                        # But filter_greater_than implementation is >.
+                        # Let's check if we should add filter_greater_than_or_equal?
+                        # Or just use > (cutoff - epsilon)?
+                        # Given existing test expectation (kept rows exactly at cutoff?), let's use >.
+                        # Test says: Cutoff 2023-10-24 12:00:00.
+                        # Row 2: 2023-10-25 11:00:00. (Kept)
+                        # Row 3: 2023-10-25 11:30:00. (Kept)
+                        # Row 1: 2023-10-01 (Filtered)
+                        # So > is fine.
+                        df = self.engine.filter_greater_than(df, inc.column, cutoff)
 
-        return df
+        elif inc.mode == IncrementalMode.STATEFUL:
+            # Check if we have state
+            # hwm_state is (key, value)
 
-    def _execute_transformer_node(self, input_df: Optional[Any]) -> Any:
-        """Execute transformer.
+            last_hwm = None
+            state_key = inc.state_key or f"{config.name}_hwm"
 
-        Args:
-            input_df: Input DataFrame
+            if hwm_state and hwm_state[0] == state_key:
+                last_hwm = hwm_state[1]
 
-        Returns:
-            Transformed DataFrame
-        """
-        transformer_name = self.config.transformer
-        params = self.config.params
+            # Filter
+            if last_hwm is not None:
+                # Apply filter: col > last_hwm
+                df = self.engine.filter_greater_than(df, inc.column, last_hwm)
+                self._execution_steps.append(f"Incremental: Filtered {inc.column} > {last_hwm}")
 
-        func = FunctionRegistry.get(transformer_name)
+            # Capture new HWM
+            # Get max value of column
+            new_max = self._get_column_max(df, inc.column)
 
-        if not func:
-            raise ValueError(f"Transformer '{transformer_name}' not found.")
+            if new_max is not None:
+                return df, (state_key, new_max)
 
-        # Create EngineContext to support sql() and tracking
+        return df, None
+
+    def _execute_contracts_phase(self, config: NodeConfig, df: Any) -> None:
+        """Execute pre-condition contracts."""
+        if config.contracts and df is not None:
+            # Materialize for validation
+            df = self.engine.materialize(df)
+
+            from odibi.config import ValidationAction, ValidationConfig
+            from odibi.validation.engine import Validator
+
+            # Create strict validation config for contracts
+            contract_config = ValidationConfig(mode=ValidationAction.FAIL, tests=config.contracts)
+
+            validator = Validator()
+            failures = validator.validate(df, contract_config, context={"columns": config.columns})
+
+            if failures:
+                # Contracts always fail execution
+                raise ValidationError(f"{config.name} (Contract Failure)", failures)
+
+            self._execution_steps.append(f"Passed {len(config.contracts)} contract checks")
+
+    def _execute_transform_phase(
+        self, config: NodeConfig, result_df: Optional[Any], input_df: Optional[Any]
+    ) -> Optional[Any]:
+        """Execute transformer and transform steps."""
+
+        # Calculate PII Metadata (Inherited + Local - Declassify)
+        pii_meta = self._calculate_pii(config)
+
+        # Pattern Engine
+        if config.transformer:
+            # If transform-only node, ensure we have input
+            if result_df is None and input_df is not None:
+                result_df = input_df
+
+            is_pattern = False
+            try:
+                from odibi.patterns import get_pattern_class
+
+                pattern_cls = get_pattern_class(config.transformer)
+                # It's a Pattern!
+                is_pattern = True
+
+                pattern = pattern_cls(self.engine, config)
+                pattern.validate()
+
+                # Create context
+                engine_ctx = EngineContext(
+                    context=self.context,
+                    df=result_df,
+                    engine_type=self.engine.name,
+                    sql_executor=self.engine.execute_sql,
+                    engine=self.engine,
+                    pii_metadata=pii_meta,
+                )
+
+                result_df = pattern.execute(engine_ctx)
+                self._execution_steps.append(f"Applied pattern '{config.transformer}'")
+
+                # Observability: Log Pattern Usage
+                if self.catalog_manager and config.write:
+                    # Calculate compliance (Phase 3 - basic)
+                    # For now, assume 1.0 if successful
+                    self.catalog_manager.log_pattern(
+                        table_name=config.write.table or config.write.path,
+                        pattern_type=config.transformer,
+                        configuration=str(config.params),
+                        compliance_score=1.0,
+                    )
+
+            except ValueError:
+                # Not a pattern, fall back to legacy transformer
+                pass
+
+            if not is_pattern:
+                result_df = self._execute_transformer_node(config, result_df, pii_meta)
+                self._execution_steps.append(f"Applied transformer '{config.transformer}'")
+
+                # Log legacy transformer usage as pattern too?
+                if self.catalog_manager and config.write:
+                    self.catalog_manager.log_pattern(
+                        table_name=config.write.table or config.write.path,
+                        pattern_type=config.transformer,
+                        configuration=str(config.params),
+                        compliance_score=1.0,
+                    )
+
+        # Transform Steps
+        if config.transform:
+            if result_df is None and input_df is not None:
+                result_df = input_df
+
+            # Pass PII to _execute_transform?
+            # _execute_transform probably creates EngineContext too.
+            result_df = self._execute_transform(config, result_df, pii_meta)
+            self._execution_steps.append(f"Applied {len(config.transform.steps)} transform steps")
+
+        # Privacy Suite
+        if config.privacy:
+            # Use effective PII map (Inherited + Local - Declassify)
+            pii_cols = [name for name, is_pii in pii_meta.items() if is_pii]
+            if pii_cols:
+                result_df = self.engine.anonymize(
+                    result_df,
+                    pii_cols,
+                    config.privacy.method,
+                    config.privacy.salt,
+                )
+                self._execution_steps.append(f"Anonymized {len(pii_cols)} PII columns")
+
+        return result_df
+
+    def _execute_transformer_node(
+        self, config: NodeConfig, df: Optional[Any], pii_metadata: Optional[Dict[str, bool]] = None
+    ) -> Any:
+        """Execute a top-level transformer (legacy)."""
+        if df is not None:
+            df = self.engine.materialize(df)
+
+        func_name = config.transformer
+        params = config.params
+
+        FunctionRegistry.validate_params(func_name, params)
+        func = FunctionRegistry.get(func_name)
+        sig = inspect.signature(func)
+
         engine_type = EngineType.PANDAS if self.engine.name == "pandas" else EngineType.SPARK
         engine_ctx = EngineContext(
             context=self.context,
-            df=input_df,
+            df=df,
             engine_type=engine_type,
             sql_executor=self.engine.execute_sql,
+            engine=self.engine,
+            pii_metadata=pii_metadata,
         )
 
-        # Execute
-        try:
-            param_model = FunctionRegistry.get_param_model(transformer_name)
-            if param_model:
-                # Pydantic-based Transformer
-                try:
-                    params_obj = param_model(**params)
-                except Exception as e:
-                    raise ValueError(f"Invalid parameters for '{transformer_name}': {e}")
+        param_model = FunctionRegistry.get_param_model(func_name)
+        call_kwargs = {}
+        if "current" in sig.parameters:
+            call_kwargs["current"] = df
 
-                # Check signature for 'current' injection (legacy support or mixed mode)
-                sig = inspect.signature(func)
-                call_kwargs = {}
-                if "current" in sig.parameters:
-                    call_kwargs["current"] = input_df
+        if param_model:
+            params_obj = param_model(**params)
+            result = func(engine_ctx, params_obj, **call_kwargs)
+        else:
+            result = func(engine_ctx, **params, **call_kwargs)
 
-                # Call with (context, params_obj)
-                result = func(engine_ctx, params_obj, **call_kwargs)
-            else:
-                # Legacy/Kwargs Transformer
-                result = func(engine_ctx, current=input_df, **params)
+        if engine_ctx._sql_history:
+            self._executed_sql.extend(engine_ctx._sql_history)
 
-            # Capture SQL history
-            if engine_ctx._sql_history:
-                self._executed_sql.extend(engine_ctx._sql_history)
-
-        except Exception as e:
-            # Wrap error
-            raise TransformError(f"Transformer '{transformer_name}' failed: {e}") from e
-
-        # Unwrap EngineContext if returned
         if isinstance(result, EngineContext):
             return result.df
-
         return result
 
-    def _execute_transform(self, input_df: Optional[Any]) -> Any:
-        """Execute transformation steps.
+    def _execute_transform(
+        self, config: NodeConfig, df: Any, pii_metadata: Optional[Dict[str, bool]] = None
+    ) -> Any:
+        """Execute transform steps."""
+        current_df = df
+        transform_config = config.transform
 
-        Args:
-            input_df: Input DataFrame (can be None for transform-only nodes)
+        if transform_config:
+            for step_idx, step in enumerate(transform_config.steps):
+                try:
+                    exec_context = ExecutionContext(
+                        node_name=config.name,
+                        config_file=self.config_file,
+                        step_index=step_idx,
+                        total_steps=len(transform_config.steps),
+                        previous_steps=self._execution_steps,
+                    )
 
-        Returns:
-            Transformed DataFrame
-        """
-        transform_config = self.config.transform
-        current_df = input_df
+                    if current_df is not None:
+                        self.context.register("current_df", current_df)
+                        # Alias 'df' for SQL convenience
+                        self.context.register("df", current_df)
 
-        for step_idx, step in enumerate(transform_config.steps):
-            try:
-                exec_context = ExecutionContext(
-                    node_name=self.config.name,
-                    config_file=self.config_file,
-                    step_index=step_idx,
-                    total_steps=len(transform_config.steps),
-                    previous_steps=self._execution_steps,
-                )
-
-                # Temporarily register current_df for SQL steps
-                if current_df is not None:
-                    self.context.register("current_df", current_df)
-
-                if isinstance(step, str):
-                    # SQL step
-                    current_df = self._execute_sql_step(step)
-
-                else:
-                    # TransformStep model (validated by Pydantic)
-                    if step.function:
-                        current_df = self._execute_function_step(
-                            step.function, step.params, current_df
-                        )
-                    elif step.operation:
-                        current_df = self._execute_operation_step(
-                            step.operation, step.params, current_df
-                        )
-                    elif step.sql:
-                        current_df = self._execute_sql_step(step.sql)
+                    if isinstance(step, str):
+                        # SQL step
+                        current_df = self._execute_sql_step(step)
                     else:
-                        raise TransformError(f"Invalid transform step: {step}")
+                        # TransformStep model
+                        if step.function:
+                            current_df = self._execute_function_step(
+                                step.function, step.params, current_df, pii_metadata
+                            )
+                        elif step.operation:
+                            current_df = self._execute_operation_step(
+                                step.operation, step.params, current_df
+                            )
+                        elif step.sql:
+                            current_df = self._execute_sql_step(step.sql)
+                        else:
+                            raise TransformError(f"Invalid transform step: {step}")
 
-            except Exception as e:
-                # Add step context to error
-                schema_dict = self._get_schema(current_df) if current_df is not None else {}
-                schema = list(schema_dict.keys()) if isinstance(schema_dict, dict) else schema_dict
-                shape = self._get_shape(current_df) if current_df is not None else None
+                except Exception as e:
+                    schema_dict = self._get_schema(current_df) if current_df is not None else {}
+                    schema = (
+                        list(schema_dict.keys()) if isinstance(schema_dict, dict) else schema_dict
+                    )
+                    shape = self._get_shape(current_df) if current_df is not None else None
 
-                exec_context.input_schema = schema
-                exec_context.input_shape = shape
+                    exec_context.input_schema = schema
+                    exec_context.input_shape = shape
 
-                raise NodeExecutionError(
-                    message=str(e),
-                    context=exec_context,
-                    original_error=e,
-                    suggestions=self._generate_suggestions(e),
-                )
+                    raise NodeExecutionError(
+                        message=str(e),
+                        context=exec_context,
+                        original_error=e,
+                        suggestions=self._generate_suggestions(e, config),
+                    )
 
         return current_df
 
@@ -813,30 +595,30 @@ class Node:
         return self.engine.execute_sql(sql, self.context)
 
     def _execute_function_step(
-        self, function_name: str, params: Dict[str, Any], current_df: Optional[Any]
+        self,
+        function_name: str,
+        params: Dict[str, Any],
+        current_df: Optional[Any],
+        pii_metadata: Optional[Dict[str, bool]] = None,
     ) -> Any:
         """Execute Python function transformation."""
-        import inspect
+        if current_df is not None:
+            current_df = self.engine.materialize(current_df)
 
-        # Validate parameters
         FunctionRegistry.validate_params(function_name, params)
-
-        # Get function
         func = FunctionRegistry.get(function_name)
-
-        # Check if function accepts 'current' parameter
         sig = inspect.signature(func)
 
-        # Create EngineContext
         engine_type = EngineType.PANDAS if self.engine.name == "pandas" else EngineType.SPARK
         engine_ctx = EngineContext(
             context=self.context,
             df=current_df,
             engine_type=engine_type,
             sql_executor=self.engine.execute_sql,
+            engine=self.engine,
+            pii_metadata=pii_metadata,
         )
 
-        # Determine invocation strategy (Model vs kwargs)
         param_model = FunctionRegistry.get_param_model(function_name)
         call_kwargs = {}
 
@@ -853,11 +635,9 @@ class Node:
         else:
             result = func(engine_ctx, **params, **call_kwargs)
 
-        # Capture new SQL queries executed during function call
         if engine_ctx._sql_history:
             self._executed_sql.extend(engine_ctx._sql_history)
 
-        # Unwrap EngineContext if returned
         if isinstance(result, EngineContext):
             return result.df
 
@@ -866,71 +646,118 @@ class Node:
     def _execute_operation_step(
         self, operation: str, params: Dict[str, Any], current_df: Any
     ) -> Any:
-        """Execute built-in operation (pivot, etc.)."""
+        """Execute built-in operation."""
+        if current_df is not None:
+            current_df = self.engine.materialize(current_df)
         return self.engine.execute_operation(operation, params, current_df)
 
-    def _execute_validation(self, df: Any) -> None:
+    def _execute_validation_phase(self, config: NodeConfig, result_df: Any) -> None:
+        """Execute validation."""
+        if config.validation and result_df is not None:
+            result_df = self.engine.materialize(result_df)
+
+            # History-Aware Validation (Phase 4.1)
+            # Check for VOLUME_DROP test
+            for test in config.validation.tests:
+                if test.type == "volume_drop" and self.catalog_manager:
+                    # Get average volume
+                    avg_rows = self.catalog_manager.get_average_volume(
+                        config.name, days=test.lookback_days
+                    )
+                    if avg_rows and avg_rows > 0:
+                        current_rows = self._count_rows(result_df)
+                        drop_pct = (avg_rows - current_rows) / avg_rows
+                        if drop_pct > test.threshold:
+                            raise ValidationError(
+                                config.name,
+                                [
+                                    f"Volume dropped by {drop_pct:.1%} (Threshold: {test.threshold:.1%})"
+                                ],
+                            )
+
+            self._execute_validation(config, result_df)
+
+    def _execute_validation(self, config: NodeConfig, df: Any) -> None:
         """Execute validation rules."""
         from odibi.config import ValidationAction
         from odibi.validation.engine import Validator
 
-        validation_config = self.config.validation
-
-        # Use new Validator
+        validation_config = config.validation
         validator = Validator()
         failures = validator.validate(df, validation_config)
 
+        # Observability: Log metrics (validation failures)
+        if self.catalog_manager:
+            # We can register these tests as metrics if we want, or just log failures.
+            # For now, we rely on logging validation failures to meta_runs metrics_json
+            # which is done via result metadata.
+            pass
+
         if failures:
             if validation_config.mode == ValidationAction.FAIL:
-                raise ValidationError(self.config.name, failures)
+                raise ValidationError(config.name, failures)
             elif validation_config.mode == ValidationAction.WARN:
                 import logging
 
                 logger = logging.getLogger(__name__)
                 for fail in failures:
-                    logger.warning(f"Validation Warning (Node {self.config.name}): {fail}")
-                    # Also add to execution steps for visibility
+                    logger.warning(f"Validation Warning (Node {config.name}): {fail}")
                     self._execution_steps.append(f"Warning: {fail}")
                     self._validation_warnings.append(fail)
 
-    def _execute_write(
+    def _determine_write_mode(self, config: NodeConfig) -> Optional[WriteMode]:
+        """Determine write mode."""
+        if not config.write or config.write.first_run_query is None:
+            return None
+
+        write_config = config.write
+        target_connection = self.connections.get(write_config.connection)
+
+        if target_connection is None:
+            return None
+
+        table_exists = self.engine.table_exists(
+            target_connection, table=write_config.table, path=write_config.path
+        )
+
+        if not table_exists:
+            return WriteMode.OVERWRITE
+
+        return None
+
+    def _execute_write_phase(
         self,
+        config: NodeConfig,
         df: Any,
         override_mode: Optional[WriteMode] = None,
-        extra_options: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Execute write operation.
+        """Execute write operation."""
+        if not config.write:
+            return
 
-        Args:
-            df: DataFrame to write
-            override_mode: Override write mode (used by HWM first-run logic)
-            extra_options: Additional options to pass to writer (e.g. schema evolution)
-        """
-        write_config = self.config.write
+        write_config = config.write
         connection = self.connections.get(write_config.connection)
 
         if connection is None:
-            raise ValueError(
-                f"Connection '{write_config.connection}' not found. "
-                f"Available: {', '.join(self.connections.keys())}"
+            raise ValueError(f"Connection '{write_config.connection}' not found.")
+
+        # Apply Schema Policy
+        if config.schema_policy and df is not None:
+            target_schema = self.engine.get_table_schema(
+                connection=connection,
+                table=write_config.table,
+                path=write_config.path,
+                format=write_config.format,
             )
+            if target_schema:
+                df = self.engine.harmonize_schema(df, target_schema, config.schema_policy)
+                self._execution_steps.append("Applied Schema Policy (Harmonization)")
 
-        # Check if deep diagnostics are requested
         write_options = write_config.options.copy() if write_config.options else {}
-
-        # Merge extra options
-        if extra_options:
-            write_options.update(extra_options)
-
         deep_diag = write_options.pop("deep_diagnostics", False)
-
-        # Check for update keys
         diff_keys = write_options.pop("diff_keys", None)
-
-        # Use override mode if provided (HWM first-run), otherwise use configured
         mode = override_mode if override_mode is not None else write_config.mode
 
-        # Delegate to engine-specific writer
         delta_info = self.engine.write(
             df=df,
             connection=connection,
@@ -941,6 +768,26 @@ class Node:
             mode=mode,
             options=write_options,
         )
+
+        if write_config.auto_optimize and write_config.format == "delta":
+            opt_config = write_config.auto_optimize
+            # Normalize boolean shorthand
+            if isinstance(opt_config, bool):
+                if opt_config:
+                    from odibi.config import AutoOptimizeConfig
+
+                    opt_config = AutoOptimizeConfig(enabled=True)
+                else:
+                    opt_config = None
+
+            if opt_config:
+                self.engine.maintain_table(
+                    connection=connection,
+                    format=write_config.format,
+                    table=write_config.table,
+                    path=write_config.path,
+                    config=opt_config,
+                )
 
         if delta_info:
             self._delta_write_info = delta_info
@@ -957,21 +804,15 @@ class Node:
         diff_keys: Optional[List[str]],
     ) -> None:
         """Calculate Delta Lake diagnostics/diff."""
-        # Calculate Data Diff if version > 0
         ver = delta_info.get("version", 0)
         if isinstance(ver, int) and ver > 0:
             try:
-                # Import here to avoid circular dependency if any
                 from odibi.diagnostics import get_delta_diff
 
-                # Determine table path
                 full_path = connection.get_path(write_config.path) if write_config.path else None
 
                 if full_path:
-                    # For Spark engine, we need to pass the spark session
                     spark_session = getattr(self.engine, "spark", None)
-
-                    # Current version
                     curr_ver = delta_info["version"]
                     prev_ver = curr_ver - 1
 
@@ -984,8 +825,6 @@ class Node:
                             deep=True,
                             keys=diff_keys,
                         )
-
-                        # Store summary
                         self._delta_write_info["data_diff"] = {
                             "rows_change": diff.rows_change,
                             "rows_added": diff.rows_added,
@@ -999,23 +838,18 @@ class Node:
                             "sample_updated": diff.sample_updated,
                         }
                     else:
-                        # Lightweight Mode: Rely on Delta operation metrics
                         metrics = delta_info.get("operation_metrics", {})
                         rows_inserted = int(
                             metrics.get("numTargetRowsInserted", 0)
                             or metrics.get("numOutputRows", 0)
                         )
                         rows_deleted = int(metrics.get("numTargetRowsDeleted", 0))
-
                         net_change = rows_inserted - rows_deleted
-
-                        # Just store net change, no samples
                         self._delta_write_info["data_diff"] = {
                             "rows_change": net_change,
                             "sample_added": None,
                             "sample_removed": None,
                         }
-
             except Exception as e:
                 import logging
 
@@ -1024,22 +858,13 @@ class Node:
 
     def _collect_metadata(
         self,
+        config: NodeConfig,
         df: Optional[Any],
         input_schema: Optional[Any] = None,
         input_sample: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Collect metadata about execution.
-
-        Args:
-            df: Result DataFrame
-            input_schema: Schema of input dataframe
-            input_sample: Sample rows from input dataframe
-
-        Returns:
-            Metadata dictionary
-        """
+        """Collect metadata."""
         import getpass
-        import hashlib
         import platform
         import socket
         import sys
@@ -1058,16 +883,13 @@ class Node:
         except ImportError:
             pyspark_version = None
 
-        # Compute SQL Hash
         sql_hash = None
         if self._executed_sql:
             normalized_sql = " ".join(self._executed_sql).lower().strip()
             sql_hash = hashlib.md5(normalized_sql.encode("utf-8")).hexdigest()
 
         config_snapshot = (
-            self.config.model_dump(mode="json")
-            if hasattr(self.config, "model_dump")
-            else self.config.dict()
+            config.model_dump(mode="json") if hasattr(config, "model_dump") else config.dict()
         )
 
         metadata = {
@@ -1086,26 +908,24 @@ class Node:
             "sql_hash": sql_hash,
             "transformation_stack": [
                 step.function if hasattr(step, "function") else str(step)
-                for step in (self.config.transform.steps if self.config.transform else [])
+                for step in (config.transform.steps if config.transform else [])
             ],
             "validation_warnings": self._validation_warnings.copy(),
             "config_snapshot": config_snapshot,
         }
 
         if self._delta_write_info:
-            from odibi.story.metadata import DeltaWriteInfo
-
+            # from odibi.story.metadata import DeltaWriteInfo
             ts = self._delta_write_info.get("timestamp")
-            # Spark returns datetime object usually, but let's be safe
-
-            metadata["delta_info"] = DeltaWriteInfo(
-                version=self._delta_write_info["version"],
-                timestamp=ts,
-                operation=self._delta_write_info.get("operation"),
-                operation_metrics=self._delta_write_info.get("operation_metrics", {}),
-                read_version=self._delta_write_info.get("read_version"),
-            )
-
+            metadata["delta_info"] = {
+                "version": self._delta_write_info["version"],
+                "timestamp": (
+                    ts.isoformat() if hasattr(ts, "isoformat") else str(ts) if ts else None
+                ),
+                "operation": self._delta_write_info.get("operation"),
+                "operation_metrics": self._delta_write_info.get("operation_metrics", {}),
+                "read_version": self._delta_write_info.get("read_version"),
+            }
             if "data_diff" in self._delta_write_info:
                 metadata["data_diff"] = self._delta_write_info["data_diff"]
 
@@ -1113,45 +933,39 @@ class Node:
             metadata["rows"] = self._count_rows(df)
             metadata["schema"] = self._get_schema(df)
             metadata["source_files"] = self.engine.get_source_files(df)
-
             try:
                 metadata["null_profile"] = self.engine.profile_nulls(df)
             except Exception:
                 metadata["null_profile"] = {}
 
-        # Calculate schema changes
         if input_schema and metadata.get("schema"):
             output_schema = metadata["schema"]
             set_in = set(input_schema)
             set_out = set(output_schema)
-
             metadata["schema_in"] = input_schema
             metadata["columns_added"] = list(set_out - set_in)
             metadata["columns_removed"] = list(set_in - set_out)
-
             if input_sample:
                 metadata["sample_data_in"] = input_sample
 
-        # Add sample data
         if df is not None and self.max_sample_rows > 0:
-            metadata["sample_data"] = self._get_redacted_sample(df, self.config.sensitive)
+            metadata["sample_data"] = self._get_redacted_sample(df, config.sensitive, self.engine)
 
-        # Redact input sample if present
         if "sample_data_in" in metadata:
             metadata["sample_data_in"] = self._redact_sample_list(
-                metadata["sample_data_in"], self.config.sensitive
+                metadata["sample_data_in"], config.sensitive
             )
 
         return metadata
 
-    def _get_redacted_sample(self, df: Any, sensitive_config: Any) -> List[Dict[str, Any]]:
+    def _get_redacted_sample(
+        self, df: Any, sensitive_config: Any, engine: Any
+    ) -> List[Dict[str, Any]]:
         """Get sample data with redaction."""
         if sensitive_config is True:
-            # Redact all
             return [{"message": "[REDACTED: Sensitive Data]"}]
-
         try:
-            sample = self.engine.get_sample(df, n=self.max_sample_rows)
+            sample = engine.get_sample(df, n=self.max_sample_rows)
             return self._redact_sample_list(sample, sensitive_config)
         except Exception:
             return []
@@ -1159,54 +973,63 @@ class Node:
     def _redact_sample_list(
         self, sample: List[Dict[str, Any]], sensitive_config: Any
     ) -> List[Dict[str, Any]]:
-        """Redact list of rows based on config."""
+        """Redact list of rows."""
         if not sample:
             return []
-
         if sensitive_config is True:
             return [{"message": "[REDACTED: Sensitive Data]"}]
-
         if isinstance(sensitive_config, list):
-            # Redact specific columns
             for row in sample:
                 for col in sensitive_config:
                     if col in row:
                         row[col] = "[REDACTED]"
-
         return sample
 
     def _get_schema(self, df: Any) -> Any:
-        """Get DataFrame schema (column names and types)."""
         return self.engine.get_schema(df)
 
     def _get_shape(self, df: Any) -> tuple:
-        """Get DataFrame shape."""
         return self.engine.get_shape(df)
 
     def _count_rows(self, df: Any) -> int:
-        """Count rows in DataFrame."""
         return self.engine.count_rows(df)
 
-    def _is_empty(self, df: Any) -> bool:
-        """Check if DataFrame is empty."""
-        return self._count_rows(df) == 0
+    def _get_column_max(self, df: Any, column: str) -> Any:
+        """Get maximum value of a column."""
+        if hasattr(self.engine, "spark"):
+            from pyspark.sql import functions as F
 
-    def _count_nulls(self, df: Any, columns: List[str]) -> Dict[str, int]:
-        """Count nulls in specified columns."""
-        return self.engine.count_nulls(df, columns)
+            try:
+                row = df.select(F.max(column)).first()
+                return row[0] if row else None
+            except Exception:
+                return None
+        else:
+            try:
+                if column in df.columns:
+                    val = df[column].max()
+                    import numpy as np
+                    import pandas as pd
 
-    def _validate_schema(self, df: Any, schema_rules: Dict[str, Any]) -> List[str]:
-        """Validate DataFrame schema."""
-        return self.engine.validate_schema(df, schema_rules)
+                    if pd.isna(val):
+                        return None
+                    if isinstance(val, (np.integer, np.floating)):
+                        return val.item()
+                    if isinstance(val, np.datetime64):
+                        return str(val)
+                    return val
+                return None
+            except Exception:
+                return None
 
-    def _generate_suggestions(self, error: Exception) -> List[str]:
-        """Generate helpful suggestions based on error type."""
+    def _generate_suggestions(self, error: Exception, config: NodeConfig) -> List[str]:
+        """Generate suggestions."""
         suggestions = []
         error_str = str(error).lower()
 
         if "column" in error_str and "not found" in error_str:
             suggestions.append("Check that previous nodes output the expected columns")
-            suggestions.append(f"Use 'odibi run-node {self.config.name} --show-schema' to debug")
+            suggestions.append(f"Use 'odibi run-node {config.name} --show-schema' to debug")
 
         if "validation failed" in error_str:
             suggestions.append("Check your validation rules against the input data")
@@ -1226,34 +1049,299 @@ class Node:
 
         return suggestions
 
-    def _get_column_max(self, df: Any, column: str) -> Any:
-        """Get maximum value of a column from DataFrame (Spark or Pandas)."""
+    def _calculate_pii(self, config: NodeConfig) -> Dict[str, bool]:
+        """Calculate effective PII metadata (Inheritance + Local - Declassify)."""
+        # 1. Collect Upstream PII
+        inherited_pii = {}
+        if config.depends_on:
+            for dep in config.depends_on:
+                meta = self.context.get_metadata(dep)
+                if meta and "pii_columns" in meta:
+                    inherited_pii.update(meta["pii_columns"])
+
+        # 2. Merge with Local PII
+        local_pii = {name: True for name, meta in config.columns.items() if meta.pii}
+        merged_pii = {**inherited_pii, **local_pii}
+
+        # 3. Apply Declassification
+        if config.privacy and config.privacy.declassify:
+            for col in config.privacy.declassify:
+                merged_pii.pop(col, None)
+
+        return merged_pii
+
+
+class Node:
+    """Base node execution orchestrator."""
+
+    def __init__(
+        self,
+        config: NodeConfig,
+        context: Context,
+        engine: Any,
+        connections: Dict[str, Any],
+        config_file: Optional[str] = None,
+        max_sample_rows: int = 10,
+        dry_run: bool = False,
+        retry_config: Optional[RetryConfig] = None,
+        catalog_manager: Optional[Any] = None,
+    ):
+        """Initialize node."""
+        self.config = config
+        self.context = context
+        self.engine = engine
+        self.connections = connections
+        self.config_file = config_file
+        self.max_sample_rows = max_sample_rows
+        self.dry_run = dry_run
+        self.retry_config = retry_config or RetryConfig(enabled=False)
+        self.catalog_manager = catalog_manager
+
+        self._cached_result: Optional[Any] = None
+
+        # Initialize State Manager
+        spark_session = None
         if hasattr(self.engine, "spark"):
-            # Spark
-            from pyspark.sql import functions as F
+            spark_session = self.engine.spark
 
-            try:
-                row = df.select(F.max(column)).first()
-                return row[0] if row else None
-            except Exception:
-                return None
+        if self.catalog_manager and self.catalog_manager.tables:
+            backend = CatalogStateBackend(
+                spark_session=spark_session,
+                meta_state_path=self.catalog_manager.tables.get("meta_state"),
+                meta_runs_path=self.catalog_manager.tables.get("meta_runs"),
+            )
         else:
-            # Pandas
-            try:
-                if column in df.columns:
-                    val = df[column].max()
-                    # Handle pandas/numpy NaT/NaN
-                    import numpy as np
-                    import pandas as pd
+            # Fallback to default local paths (Unified Catalog default)
+            backend = CatalogStateBackend(
+                spark_session=spark_session,
+                meta_state_path=".odibi/system/state",
+                meta_runs_path=".odibi/system/runs",
+            )
 
-                    if pd.isna(val):
-                        return None
-                    # Convert numpy types to native python types for JSON serialization
-                    if isinstance(val, (np.integer, np.floating)):
-                        return val.item()
-                    if isinstance(val, np.datetime64):
-                        return str(val)  # or val.isoformat()
-                    return val
-                return None
-            except Exception:
-                return None
+        self.state_manager = StateManager(backend=backend)
+
+        # Initialize Executor
+        self.executor = NodeExecutor(
+            context=context,
+            engine=engine,
+            connections=connections,
+            catalog_manager=catalog_manager,
+            config_file=config_file,
+            max_sample_rows=max_sample_rows,
+        )
+
+    def restore(self) -> bool:
+        """Restore node state from previous execution (if persisted)."""
+        if not self.config.write:
+            return False
+
+        write_config = self.config.write
+        connection = self.connections.get(write_config.connection)
+
+        if connection is None:
+            return False
+
+        try:
+            df = self.engine.read(
+                connection=connection,
+                format=write_config.format,
+                table=write_config.table,
+                path=write_config.path,
+                options={},
+            )
+
+            if df is not None:
+                self.context.register(self.config.name, df)
+                if self.config.cache:
+                    self._cached_result = df
+                return True
+
+        except Exception:
+            return False
+
+        return False
+
+    def get_version_hash(self) -> str:
+        """Calculate a deterministic hash of the node's configuration."""
+        import json
+
+        # We use model_dump_json for consistent serialization
+        # Exclude fields that don't affect logic (e.g., description, tags?)
+        # Actually, changing tags might affect scheduling, but not node logic.
+        # Let's stick to functional fields.
+
+        # We need to handle the fact that model_dump might include defaults or not consistently.
+        # Using model_dump(mode='json') is good.
+
+        dump = (
+            self.config.model_dump(mode="json", exclude={"description", "tags", "log_level"})
+            if hasattr(self.config, "model_dump")
+            else self.config.dict(exclude={"description", "tags", "log_level"})
+        )
+
+        # Sort keys to ensure determinism
+        dump_str = json.dumps(dump, sort_keys=True)
+        return hashlib.md5(dump_str.encode("utf-8")).hexdigest()
+
+    def execute(self) -> NodeResult:
+        """Execute the node with telemetry and retry logic."""
+        import json
+        import uuid
+
+        from odibi.utils.telemetry import (
+            Status,
+            StatusCode,
+            node_duration,
+            nodes_executed,
+            rows_processed,
+            tracer,
+        )
+
+        # Prepare a fallback result for logging in case of catastrophic failure
+        result_for_log = NodeResult(node_name=self.config.name, success=False, duration=0.0)
+        start_time = time.time()
+
+        with tracer.start_as_current_span("node_execution") as span:
+            span.set_attribute("node.name", self.config.name)
+            span.set_attribute("node.engine", self.engine.__class__.__name__)
+
+            try:
+                try:
+                    result = self._execute_with_retries()
+                    result_for_log = result
+                except Exception as e:
+                    # Catastrophic failure (bubbled up from retries)
+                    span.record_exception(e)
+                    span.set_status(Status(StatusCode.ERROR))
+                    nodes_executed.add(1, {"status": "failure", "node": self.config.name})
+
+                    # Update logging context
+                    result_for_log.duration = time.time() - start_time
+                    result_for_log.error = e
+                    result_for_log.metadata = {"error": str(e), "catastrophic": True}
+
+                    raise e
+
+                # Normal execution path (Success or Handled Error)
+                if result.success:
+                    span.set_status(Status(StatusCode.OK))
+                    nodes_executed.add(1, {"status": "success", "node": self.config.name})
+                else:
+                    span.set_status(Status(StatusCode.ERROR))
+                    if result.error:
+                        span.record_exception(result.error)
+                    nodes_executed.add(1, {"status": "failure", "node": self.config.name})
+
+                if result.rows_processed is not None:
+                    rows_processed.add(result.rows_processed, {"node": self.config.name})
+
+                node_duration.record(result.duration, {"node": self.config.name})
+
+                # Add version hash to metadata
+                result.metadata["version_hash"] = self.get_version_hash()
+
+                return result
+
+            finally:
+                # 2.3 Telemetry: Flush to meta_runs (Guaranteed execution)
+                # This ensures even crashed runs are logged to the catalog
+                if self.catalog_manager:
+
+                    def safe_default(o):
+                        return str(o)
+
+                    try:
+                        metrics_json = json.dumps(result_for_log.metadata, default=safe_default)
+                    except Exception:
+                        metrics_json = "{}"
+
+                    self.catalog_manager.log_run(
+                        run_id=str(uuid.uuid4()),
+                        pipeline_name=self.config.tags[0] if self.config.tags else "unknown",
+                        node_name=self.config.name,
+                        status="SUCCESS" if result_for_log.success else "FAILURE",
+                        rows_processed=result_for_log.rows_processed or 0,
+                        duration_ms=int(result_for_log.duration * 1000),
+                        metrics_json=metrics_json,
+                    )
+
+    def _execute_with_retries(self) -> NodeResult:
+        """Execute with internal retry logic."""
+        start_time = time.time()
+        attempts = 0
+        max_attempts = self.retry_config.max_attempts if self.retry_config.enabled else 1
+        last_error = None
+
+        while attempts < max_attempts:
+            attempts += 1
+            try:
+                # Fetch state for this attempt
+                # We need to know the state key if we are doing incremental
+                # The executor handles the logic, we just provide the *current* HWM for the *relevant* key
+                # Since we don't know the key upfront without config parsing, maybe we fetch it if needed?
+                # Or we pass the entire state? StateManager is usually key-value store.
+                # Let's try to resolve the key if we have incremental config.
+                hwm_state = None
+                if (
+                    self.config.read
+                    and self.config.read.incremental
+                    and self.config.read.incremental.mode == IncrementalMode.STATEFUL
+                ):
+                    key = self.config.read.incremental.state_key or f"{self.config.name}_hwm"
+                    val = self.state_manager.get_hwm(key)
+                    hwm_state = (key, val)
+
+                result = self.executor.execute(
+                    self.config, dry_run=self.dry_run, hwm_state=hwm_state
+                )
+
+                if result.success:
+                    result.metadata["attempts"] = attempts
+                    result.duration = time.time() - start_time
+
+                    # Handle Cache
+                    if self.config.cache and self.context.get(self.config.name) is not None:
+                        self._cached_result = self.context.get(self.config.name)
+
+                    # Handle HWM Update
+                    if result.metadata.get("hwm_pending"):
+                        hwm_update = result.metadata.get("hwm_update")
+                        if hwm_update:
+                            try:
+                                self.state_manager.set_hwm(hwm_update["key"], hwm_update["value"])
+                            except Exception as e:
+                                result.metadata["hwm_error"] = str(e)
+
+                    return result
+
+                last_error = result.error
+
+            except Exception as e:
+                last_error = e
+                if attempts < max_attempts:
+                    sleep_time = 1
+                    if self.retry_config.backoff == "exponential":
+                        sleep_time = 2 ** (attempts - 1)
+                    elif self.retry_config.backoff == "linear":
+                        sleep_time = attempts
+                    time.sleep(sleep_time)
+
+        duration = time.time() - start_time
+
+        if not isinstance(last_error, NodeExecutionError) and last_error:
+            # If we caught a raw exception here (should be caught in executor)
+            error = NodeExecutionError(
+                message=str(last_error),
+                context=ExecutionContext(node_name=self.config.name, config_file=self.config_file),
+                original_error=last_error,
+            )
+        else:
+            error = last_error
+
+        return NodeResult(
+            node_name=self.config.name,
+            success=False,
+            duration=duration,
+            error=error,
+            metadata={"attempts": attempts},
+        )

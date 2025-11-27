@@ -92,16 +92,45 @@ Odibi runs natively on Databricks clusters.
     odibi run odibi.yaml
     ```
 
-*Tip: Use the "Spark" engine in your config to leverage the cluster's power.*
+*Tip: Use the "Spark" engine for clusters or "Polars" engine for high-performance single-node tasks.*
 
 ```yaml
 project: My Big Data Project
-engine: spark  # <--- Switches from Pandas to Spark
+engine: spark  # Options: pandas, polars, spark
 ```
 
 ---
 
-## 4. Monitoring & Logging
+## 4. System Catalog (Unified State)
+
+Odibi uses a **System Catalog** (Delta Tables) to track execution history, high-water marks, and metadata. This unifies state management for both local and distributed environments.
+
+### 1. Local Development (Default)
+When running locally, the catalog is automatically created in a hidden directory (`.odibi/system/`). This uses the `deltalake` library (Rust core) for high-performance ACID transactions without needing Spark.
+
+### 2. Production (Distributed)
+In production (e.g., Databricks, Kubernetes), you should configure the System Catalog to store state in your Data Lake (ADLS/S3). This allows multiple concurrent pipelines to share state safely.
+
+```yaml
+system:
+  connection: "adls_bronze"  # Points to your data lake connection
+  path: "_odibi_system"      # Directory for system tables
+```
+
+If utilizing Spark, Odibi leverages Delta Lake's optimistic concurrency control automatically.
+
+---
+
+## 5. Monitoring & Observability
+
+### OpenLineage Integration
+Odibi emits standard OpenLineage events. To integrate with DataHub, Marquez, or Atlan:
+
+```yaml
+lineage:
+  url: "http://marquez-api:5000"
+  namespace: "odibi-production"
+```
 
 ### Logging
 Odibi logs structured JSON to stdout by default in production. This is easily ingested by Datadog, Splunk, or Azure Monitor.

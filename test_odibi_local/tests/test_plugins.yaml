@@ -1,0 +1,48 @@
+project: "PluginTest"
+engine: "pandas"
+
+performance:
+  use_duckdb: true
+
+connections:
+  my_postgres:
+    type: "mock_postgres"
+    host: "prod-db"
+    database: "customers"
+
+  local_data:
+    type: "local"
+    base_path: "test_odibi_local/data"
+
+story:
+  connection: "local_data"
+  path: "stories/"
+
+pipelines:
+  - pipeline: "test_extensions"
+    nodes:
+      # 1. Test Custom Connection (Extensibility)
+      - name: "read_custom"
+        read:
+          connection: "my_postgres"
+          format: "sql_server"
+          table: "users"
+        write:
+          connection: "local_data"
+          format: "csv"
+          path: "output/custom_read.csv"
+
+      # 2. Test DuckDB Optimization (Performance)
+      - name: "read_lazy"
+        read:
+          connection: "local_data"
+          format: "csv"
+          path: "dummy.csv"
+        transform:
+          steps:
+            # This SQL should run on the file directly via DuckDB
+            - sql: "SELECT * FROM df WHERE a > 50"
+        write:
+          connection: "local_data"
+          format: "csv"
+          path: "output/lazy_result.csv"

@@ -235,7 +235,11 @@ def unpack_struct(context: EngineContext, params: UnpackStructParams) -> EngineC
         # assuming the column contains dictionaries/structs.
         try:
             expanded = pd.DataFrame(context.df[params.column].tolist(), index=context.df.index)
-        except Exception:
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Optimized struct unpack failed (falling back to slow apply): {e}")
             # Fallback if tolist() fails (e.g. mixed types)
             expanded = context.df[params.column].apply(pd.Series)
 
@@ -610,8 +614,12 @@ def normalize_json(context: EngineContext, params: NormalizeJsonParams) -> Engin
                 # Try to parse if string
                 try:
                     s = s.apply(json.loads)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to parse JSON strings in column '{params.column}': {e}")
+                    # We proceed, but json_normalize will likely fail if data is not dicts.
 
         # json_normalize
         # Handle empty case

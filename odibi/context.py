@@ -6,6 +6,11 @@ from typing import Any, Dict, Optional, Union
 
 import pandas as pd
 
+try:
+    import polars as pl
+except ImportError:
+    pl = None
+
 from odibi.enums import EngineType
 
 
@@ -22,11 +27,15 @@ class EngineContext:
         df: Any,
         engine_type: EngineType,
         sql_executor: Optional[Any] = None,
+        engine: Optional[Any] = None,
+        pii_metadata: Optional[Dict[str, bool]] = None,
     ):
         self.context = context
         self.df = df
         self.engine_type = engine_type
         self.sql_executor = sql_executor
+        self.engine = engine
+        self.pii_metadata = pii_metadata or {}
         self._sql_history: list[str] = []
 
     @property
@@ -39,6 +48,13 @@ class EngineContext:
         return []
 
     @property
+    def schema(self) -> Dict[str, str]:
+        """Get schema types."""
+        if self.engine:
+            return self.engine.get_schema(self.df)
+        return {}
+
+    @property
     def spark(self) -> Any:
         """Helper to access SparkSession if available in context."""
         if hasattr(self.context, "spark"):
@@ -47,7 +63,9 @@ class EngineContext:
 
     def with_df(self, df: Any) -> "EngineContext":
         """Returns a new context with updated DataFrame."""
-        new_ctx = EngineContext(self.context, df, self.engine_type, self.sql_executor)
+        new_ctx = EngineContext(
+            self.context, df, self.engine_type, self.sql_executor, self.engine, self.pii_metadata
+        )
         # Preserve history? No, we want history per-transformation scope usually.
         # But wait, if we chain, we might want to pass it?
         # For now, let's keep history tied to the specific context instance used in a transform.
@@ -96,12 +114,13 @@ class Context(ABC):
     """Abstract base for execution context."""
 
     @abstractmethod
-    def register(self, name: str, df: Any) -> None:
+    def register(self, name: str, df: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Register a DataFrame for use in downstream nodes.
 
         Args:
             name: Identifier for the DataFrame
             df: DataFrame (Spark or Pandas) or Iterator (Pandas chunked)
+            metadata: Optional metadata (e.g. PII info)
         """
         pass
 
@@ -117,6 +136,18 @@ class Context(ABC):
 
         Raises:
             KeyError: If name not found in context
+        """
+        pass
+
+    @abstractmethod
+    def get_metadata(self, name: str) -> Dict[str, Any]:
+        """Retrieve metadata for a registered DataFrame.
+
+        Args:
+            name: Identifier of the DataFrame
+
+        Returns:
+            Metadata dictionary (empty if none)
         """
         pass
 
@@ -153,19 +184,36 @@ class PandasContext(Context):
     def __init__(self) -> None:
         """Initialize Pandas context."""
         self._data: Dict[str, Union[pd.DataFrame, Iterator[pd.DataFrame]]] = {}
+        self._metadata: Dict[str, Dict[str, Any]] = {}
 
-    def register(self, name: str, df: Union[pd.DataFrame, Iterator[pd.DataFrame]]) -> None:
-        """Register a Pandas DataFrame or Iterator.
+    def register(
+        self,
+        name: str,
+        df: Union[pd.DataFrame, Iterator[pd.DataFrame], Any],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Register a Pandas DataFrame, Iterator, or LazyDataset.
 
         Args:
             name: Identifier for the DataFrame
-            df: Pandas DataFrame or Iterator of DataFrames
+            df: Pandas DataFrame or Iterator of DataFrames or LazyDataset
+            metadata: Optional metadata
         """
-        from collections.abc import Iterator
+        # Relaxed type check to support LazyDataset
+        is_valid = (
+            isinstance(df, pd.DataFrame)
+            or isinstance(df, Iterator)
+            or type(df).__name__ == "LazyDataset"
+        )
 
-        if not isinstance(df, pd.DataFrame) and not isinstance(df, Iterator):
-            raise TypeError(f"Expected pandas.DataFrame or Iterator, got {type(df)}")
+        if not is_valid:
+            raise TypeError(
+                f"Expected pandas.DataFrame, Iterator, or LazyDataset, got {type(df).__module__}.{type(df).__name__}"
+            )
+
         self._data[name] = df
+        if metadata:
+            self._metadata[name] = metadata
 
     def get(self, name: str) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
         """Retrieve a registered Pandas DataFrame or Iterator.
@@ -183,6 +231,74 @@ class PandasContext(Context):
             available = ", ".join(self._data.keys()) if self._data else "none"
             raise KeyError(f"DataFrame '{name}' not found in context. Available: {available}")
         return self._data[name]
+
+    def get_metadata(self, name: str) -> Dict[str, Any]:
+        """Retrieve metadata."""
+        return self._metadata.get(name, {})
+
+    def has(self, name: str) -> bool:
+        """Check if a DataFrame exists.
+
+        Args:
+            name: Identifier to check
+
+        Returns:
+            True if exists, False otherwise
+        """
+        return name in self._data
+
+    def list_names(self) -> list[str]:
+        """List all registered DataFrame names.
+
+        Returns:
+            List of registered names
+        """
+        return list(self._data.keys())
+
+    def clear(self) -> None:
+        """Clear all registered DataFrames."""
+        self._data.clear()
+
+
+class PolarsContext(Context):
+    """Context implementation for Polars engine."""
+
+    def __init__(self) -> None:
+        """Initialize Polars context."""
+        self._data: Dict[str, Any] = {}
+        self._metadata: Dict[str, Dict[str, Any]] = {}
+
+    def register(self, name: str, df: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Register a Polars DataFrame or LazyFrame.
+
+        Args:
+            name: Identifier for the DataFrame
+            df: Polars DataFrame or LazyFrame
+            metadata: Optional metadata
+        """
+        self._data[name] = df
+        if metadata:
+            self._metadata[name] = metadata
+
+    def get(self, name: str) -> Any:
+        """Retrieve a registered Polars DataFrame.
+
+        Args:
+            name: Identifier of the DataFrame
+
+        Returns:
+            The registered DataFrame
+
+        Raises:
+            KeyError: If name not found in context
+        """
+        if name not in self._data:
+            available = ", ".join(self._data.keys()) if self._data else "none"
+            raise KeyError(f"DataFrame '{name}' not found in context. Available: {available}")
+        return self._data[name]
+
+    def get_metadata(self, name: str) -> Dict[str, Any]:
+        return self._metadata.get(name, {})
 
     def has(self, name: str) -> bool:
         """Check if a DataFrame exists.
@@ -232,6 +348,9 @@ class SparkContext(Context):
         # Lock for thread safety
         self._lock = threading.RLock()
 
+        # Metadata store
+        self._metadata: Dict[str, Dict[str, Any]] = {}
+
     def _validate_name(self, name: str) -> None:
         """Validate that node name is a valid Spark identifier.
 
@@ -252,12 +371,13 @@ class SparkContext(Context):
                 "(no spaces or hyphens). Please rename this node in your configuration."
             )
 
-    def register(self, name: str, df: Any) -> None:
+    def register(self, name: str, df: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Register a Spark DataFrame as temp view.
 
         Args:
             name: Identifier for the DataFrame
             df: Spark DataFrame
+            metadata: Optional metadata
         """
         # 1. Validate Type
         if self._spark_df_type is not Any and not isinstance(df, self._spark_df_type):
@@ -272,6 +392,8 @@ class SparkContext(Context):
         # 3. Register
         with self._lock:
             self._registered_views.add(name)
+            if metadata:
+                self._metadata[name] = metadata
 
         # Create view (metadata op)
         df.createOrReplaceTempView(name)
@@ -294,6 +416,10 @@ class SparkContext(Context):
                 raise KeyError(f"DataFrame '{name}' not found in context. Available: {available}")
 
         return self.spark.table(name)
+
+    def get_metadata(self, name: str) -> Dict[str, Any]:
+        with self._lock:
+            return self._metadata.get(name, {})
 
     def has(self, name: str) -> bool:
         """Check if a DataFrame exists.
@@ -348,5 +474,7 @@ def create_context(engine: str, spark_session: Optional[Any] = None) -> Context:
         if spark_session is None:
             raise ValueError("SparkSession required for Spark engine")
         return SparkContext(spark_session)
+    elif engine == "polars":
+        return PolarsContext()
     else:
         raise ValueError(f"Unsupported engine: {engine}. Use 'pandas' or 'spark'")

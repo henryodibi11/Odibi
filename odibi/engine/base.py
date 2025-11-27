@@ -50,6 +50,17 @@ class Engine(ABC):
         """
         pass
 
+    def materialize(self, df: Any) -> Any:
+        """Materialize lazy dataset into memory (DataFrame).
+
+        Args:
+            df: DataFrame or LazyDataset
+
+        Returns:
+            Materialized DataFrame
+        """
+        return df
+
     @abstractmethod
     def write(
         self,

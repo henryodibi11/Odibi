@@ -1,10 +1,10 @@
 from odibi.registry import FunctionRegistry
 
 # Import all transform modules
-from odibi.transformers import advanced, relational, scd, sql_core
+from odibi.transformers import advanced, relational, scd, sql_core, validation
 
 # List of all standard library modules
-_MODULES = [sql_core, relational, advanced, scd]
+_MODULES = [sql_core, relational, advanced, scd, validation]
 
 
 def register_standard_library():
@@ -69,6 +69,9 @@ def register_standard_library():
     # SCD
     registry.register(scd.scd2, "scd2", scd.SCD2Params)
 
+    # Validation
+    registry.register(validation.cross_check, "cross_check", validation.CrossCheckParams)
+
 
 # Auto-register on import
-register_standard_library()
+# register_standard_library() # Removed to allow explicit registration

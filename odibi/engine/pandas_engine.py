@@ -1,8 +1,10 @@
 """Pandas engine implementation."""
 
 import glob
+import hashlib
 import os
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Union
@@ -13,6 +15,21 @@ import pandas as pd
 from odibi.context import Context, PandasContext
 from odibi.engine.base import Engine
 from odibi.exceptions import TransformError
+
+__all__ = ["PandasEngine", "LazyDataset"]
+
+
+@dataclass
+class LazyDataset:
+    """Lazy representation of a dataset (file) for out-of-core processing."""
+
+    path: Union[str, List[str]]
+    format: str
+    options: Dict[str, Any]
+    connection: Optional[Any] = None  # To resolve path/credentials if needed
+
+    def __repr__(self):
+        return f"LazyDataset(path={self.path}, format={self.format})"
 
 
 class PandasEngine(Engine):
@@ -61,6 +78,29 @@ class PandasEngine(Engine):
                 self.use_arrow = False
         else:
             self.use_arrow = False
+
+        # Check for DuckDB
+        self.use_duckdb = False
+        # Default to False to ensure stability with existing tests (Lazy Loading is opt-in)
+        if self.config.get("performance", {}).get("use_duckdb", False):
+            try:
+                import duckdb  # noqa: F401
+
+                self.use_duckdb = True
+            except ImportError:
+                pass
+
+    def materialize(self, df: Any) -> Any:
+        """Materialize lazy dataset."""
+        if isinstance(df, LazyDataset):
+            # Re-invoke read but force materialization (by bypassing Lazy check)
+            # We pass the resolved path directly
+            # Note: We need to handle the case where path was resolved.
+            # LazyDataset.path should be the FULL path.
+            return self._read_file(
+                full_path=df.path, format=df.format, options=df.options, connection=df.connection
+            )
+        return df
 
     def _process_df(
         self, df: Union[pd.DataFrame, Iterator[pd.DataFrame]], query: Optional[str]
@@ -141,20 +181,11 @@ class PandasEngine(Engine):
         path: Optional[str] = None,
         streaming: bool = False,
         options: Optional[Dict[str, Any]] = None,
+        as_of_version: Optional[int] = None,
+        as_of_timestamp: Optional[str] = None,
     ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
-        """Read data using Pandas.
-
-        Args:
-            connection: Connection object (with get_path method)
-            format: Data format
-            table: Table name
-            path: File path
-            streaming: Streaming flag (NOT SUPPORTED in Pandas)
-            options: Format-specific options (including chunksize)
-
-        Returns:
-            Pandas DataFrame or Iterator[pd.DataFrame]
-        """
+        """Read data using Pandas (or LazyDataset)."""
+        # print("DEBUG: Inside PandasEngine.read")
         if streaming:
             raise ValueError(
                 "Streaming is not supported in the Pandas engine. "
@@ -165,9 +196,15 @@ class PandasEngine(Engine):
 
         # Get full path from connection
         if path:
-            full_path = connection.get_path(path)
+            if connection:
+                full_path = connection.get_path(path)
+            else:
+                full_path = path
         elif table:
-            full_path = connection.get_path(table)
+            if connection:
+                full_path = connection.get_path(table)
+            else:
+                raise ValueError("Connection is required when specifying 'table'.")
         else:
             raise ValueError("Either path or table must be provided")
 
@@ -176,20 +213,67 @@ class PandasEngine(Engine):
 
         # Sanitize options for pandas compatibility
         if "header" in merged_options:
-            # YAML 'header: true' -> Python True, but read_csv expects 0 (int) or None
             if merged_options["header"] is True:
                 merged_options["header"] = 0
-            # YAML 'header: false' -> Python False, but read_csv expects None
             elif merged_options["header"] is False:
                 merged_options["header"] = None
 
+        # Handle Time Travel options
+        if as_of_version is not None:
+            merged_options["versionAsOf"] = as_of_version
+        # as_of_timestamp support would go here if supported by underlying reader
+
+        # Check for Lazy/DuckDB optimization
+        # We can lazy load if:
+        # 1. DuckDB enabled
+        # 2. Format supported by DuckDB direct read
+        # 3. No complex pandas-specific options (like iterator, specific chunksize that DuckDB handles differently)
+        # 4. Not a custom reader
+        can_lazy_load = False
+        # can_lazy_load = (
+        #     self.use_duckdb
+        #     and format in ["csv", "parquet", "json"]
+        #     and not merged_options.get("iterator")
+        #     and not merged_options.get("chunksize")
+        #     and format not in self._custom_readers
+        # )
+
+        if can_lazy_load:
+            # Verify it's a file path (string) and not some special object
+            # Also check if glob - LazyDataset supports glob
+            if isinstance(full_path, (str, Path)):
+                return LazyDataset(
+                    path=str(full_path),
+                    format=format,
+                    options=merged_options,
+                    connection=connection,
+                )
+            elif isinstance(full_path, list):
+                # List of paths supported by LazyDataset (DuckDB read_parquet(['a','b']))
+                return LazyDataset(
+                    path=full_path, format=format, options=merged_options, connection=connection
+                )
+
+        return self._read_file(full_path, format, merged_options, connection)
+
+    def _read_file(
+        self,
+        full_path: Union[str, List[str], Any],
+        format: str,
+        options: Dict[str, Any],
+        connection: Any = None,
+    ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
+        """Internal file reading logic."""
+
         # Custom Readers
         if format in self._custom_readers:
-            return self._custom_readers[format](full_path, **merged_options)
+            return self._custom_readers[format](full_path, **options)
 
         # Handle glob patterns for local files
         is_glob = False
-        if path and ("*" in path or "?" in path or "[" in path):
+        if isinstance(full_path, (str, Path)) and (
+            "*" in str(full_path) or "?" in str(full_path) or "[" in str(full_path)
+        ):
             parsed = urlparse(str(full_path))
             # Only expand for local files (no scheme, file://, or drive letter)
             is_local = (
@@ -213,15 +297,12 @@ class PandasEngine(Engine):
                 is_glob = True
 
         # Prepare read options
-        read_kwargs = merged_options.copy()
+        read_kwargs = options.copy()
 
-        # Extract 'query' or 'filter' option for post-read filtering (Pandas engine support for HWM pattern)
-        # 'query' is legacy/pandas-native, 'filter' is Odibi standard for non-SQL formats
+        # Extract 'query' or 'filter' option for post-read filtering
         post_read_query = read_kwargs.pop("query", None) or read_kwargs.pop("filter", None)
 
         if self.use_arrow:
-            # Use PyArrow backend for memory efficiency and speed
-            # Available in Pandas 2.0+
             read_kwargs["dtype_backend"] = "pyarrow"
 
         # Read based on format
@@ -237,10 +318,6 @@ class PandasEngine(Engine):
                     df.attrs["odibi_source_files"] = [str(full_path)]
                 return self._process_df(df, post_read_query)
             except UnicodeDecodeError:
-                # Retry with common fallbacks
-                # Note: Arrow engine might be stricter, so we might need to drop it for retry?
-                # But let's try keeping it if possible, or fallback completely.
-                # Simplify: Just update encoding in kwargs
                 read_kwargs["encoding"] = "latin1"
                 if is_glob and isinstance(full_path, list):
                     df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
@@ -252,7 +329,6 @@ class PandasEngine(Engine):
                     df.attrs["odibi_source_files"] = [str(full_path)]
                 return self._process_df(df, post_read_query)
             except pd.errors.ParserError:
-                # Retry with bad lines skipped
                 read_kwargs["on_bad_lines"] = "skip"
                 if is_glob and isinstance(full_path, list):
                     df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
@@ -264,7 +340,6 @@ class PandasEngine(Engine):
                     df.attrs["odibi_source_files"] = [str(full_path)]
                 return self._process_df(df, post_read_query)
         elif format == "parquet":
-            # read_parquet handles list of files
             df = pd.read_parquet(full_path, **read_kwargs)
             if isinstance(full_path, list):
                 df.attrs["odibi_source_files"] = full_path
@@ -282,12 +357,10 @@ class PandasEngine(Engine):
                 df.attrs["odibi_source_files"] = [str(full_path)]
             return self._process_df(df, post_read_query)
         elif format == "excel":
-            # Excel doesn't support dtype_backend arg directly in older versions or engine dependent
-            # But Pandas 2.0 might. Let's check safely.
-            # read_excel does NOT support dtype_backend as of 2.0.3 typically.
-            # We skip arrow backend for Excel for now to be safe.
-            excel_kwargs = merged_options.copy()
-            return self._process_df(pd.read_excel(full_path, **excel_kwargs), post_read_query)
+            # Original options without popped query (wait, I want read_kwargs but without pyarrow backend if added)
+            # Let's use read_kwargs but remove dtype_backend if present
+            read_kwargs.pop("dtype_backend", None)
+            return self._process_df(pd.read_excel(full_path, **read_kwargs), post_read_query)
         elif format == "delta":
             try:
                 from deltalake import DeltaTable
@@ -297,18 +370,12 @@ class PandasEngine(Engine):
                     "See README.md for installation instructions."
                 )
 
-            # Merge storage options for cloud connections
-            storage_opts = merged_options.get("storage_options", {})
+            storage_opts = options.get("storage_options", {})
+            version = options.get("versionAsOf")
 
-            # Handle version parameter for time travel
-            version = merged_options.get("versionAsOf")
-
-            # Read Delta table
             dt = DeltaTable(full_path, storage_options=storage_opts, version=version)
 
             if self.use_arrow:
-                # Zero-copy to Arrow, then to Pandas with Arrow dtypes
-                # Check if to_pandas supports arrow_options (deltalake >= 0.15.0)
                 import inspect
 
                 sig = inspect.signature(dt.to_pandas)
@@ -321,8 +388,6 @@ class PandasEngine(Engine):
                         post_read_query,
                     )
                 else:
-                    # Fallback for older deltalake versions
-                    # Convert via Arrow manually to ensure pyarrow backed
                     return self._process_df(
                         dt.to_pyarrow_table().to_pandas(types_mapper=pd.ArrowDtype), post_read_query
                     )
@@ -337,43 +402,53 @@ class PandasEngine(Engine):
                     "See README.md for installation instructions."
                 )
 
-            # Use fsspec for remote URIs (abfss://, s3://, etc.)
             parsed = urlparse(full_path)
             if parsed.scheme and parsed.scheme not in ["file", ""]:
-                # Remote file - use fsspec
                 import fsspec
 
-                storage_opts = merged_options.get("storage_options", {})
+                storage_opts = options.get("storage_options", {})
                 with fsspec.open(full_path, "rb", **storage_opts) as f:
                     reader = fastavro.reader(f)
                     records = [record for record in reader]
                 return pd.DataFrame(records)
             else:
-                # Local file - use standard open
                 with open(full_path, "rb") as f:
                     reader = fastavro.reader(f)
                     records = [record for record in reader]
                 return self._process_df(pd.DataFrame(records), post_read_query)
         elif format in ["sql_server", "azure_sql"]:
+            # This part was in read() but uses connection methods.
+            # If we are here, full_path is None or not used as path?
+            # In original read(), it called connection.read_table(table_name).
+            # But here we passed full_path which was resolved from table.
+            # Wait, SQL connections don't resolve path from table usually?
+            # Let's check original read().
+            # if table: full_path = connection.get_path(table) -> returns table name usually?
+            # And later:
+            # elif format in ["sql_server", "azure_sql"]:
+            #    if table: schema, table_name = table.split... return connection.read_table...
+
+            # The refactored read() logic computes full_path.
+            # For SQL, full_path might be just the table name.
+            # I should pass `table` explicitly to `_read_file` if needed, or parse full_path.
+            # Simpler: Pass table name in options or assume full_path is the table name.
+            # The original logic used `table` variable.
+
+            # I will assume full_path is the table name for SQL formats if it was derived from table.
+            # But connection.read_table might need connection object.
             if not hasattr(connection, "read_table"):
                 raise ValueError(
                     f"Connection type '{type(connection).__name__}' does not support SQL operations"
                 )
 
-            if table:
-                # Extract schema from table name if present
-                if "." in table:
-                    schema, table_name = table.split(".", 1)
-                else:
-                    schema, table_name = "dbo", table
-
-                return connection.read_table(table_name=table_name, schema=schema)
+            # full_path holds the table name (from get_path usually returns it)
+            table_name = str(full_path)
+            if "." in table_name:
+                schema, tbl = table_name.split(".", 1)
             else:
-                # Check for query in options
-                query = options.get("query")
-                if query:
-                    return connection.read_sql(query)
-                raise ValueError("SQL format requires 'table' config or 'query' in options")
+                schema, tbl = "dbo", table_name
+
+            return connection.read_table(table_name=tbl, schema=schema)
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
@@ -388,21 +463,10 @@ class PandasEngine(Engine):
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Write data using Pandas.
+        """Write data using Pandas."""
+        # Ensure materialization if LazyDataset
+        df = self.materialize(df)
 
-        Args:
-            df: DataFrame or Iterator of DataFrames to write
-            connection: Connection object
-            format: Output format
-            table: Table name
-            path: File path
-            register_table: Name to register as external table (not used in Pandas)
-            mode: Write mode
-            options: Format-specific options
-
-        Returns:
-             Optional dictionary containing Delta commit metadata (if format=delta)
-        """
         options = options or {}
 
         # Handle iterator/generator input
@@ -417,9 +481,15 @@ class PandasEngine(Engine):
 
         # Get full path from connection
         if path:
-            full_path = connection.get_path(path)
+            if connection:
+                full_path = connection.get_path(path)
+            else:
+                full_path = path
         elif table:
-            full_path = connection.get_path(table)
+            if connection:
+                full_path = connection.get_path(table)
+            else:
+                raise ValueError("Connection is required when specifying 'table'.")
         else:
             raise ValueError("Either path or table must be provided")
 
@@ -808,6 +878,22 @@ class PandasEngine(Engine):
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
+    def _register_lazy_view_unused(self, conn, name: str, df: Any) -> None:
+        """Register a LazyDataset as a DuckDB view."""
+        duck_fmt = df.format
+        if duck_fmt == "json":
+            duck_fmt = "json_auto"
+
+        if isinstance(df.path, list):
+            paths = ", ".join([f"'{p}'" for p in df.path])
+            conn.execute(
+                f"CREATE OR REPLACE VIEW {name} AS SELECT * FROM read_{duck_fmt}([{paths}])"
+            )
+        else:
+            conn.execute(
+                f"CREATE OR REPLACE VIEW {name} AS SELECT * FROM read_{duck_fmt}('{df.path}')"
+            )
+
     def execute_sql(self, sql: str, context: Context) -> pd.DataFrame:
         """Execute SQL query using DuckDB (if available) or pandasql.
 
@@ -830,17 +916,27 @@ class PandasEngine(Engine):
 
             # Register all DataFrames from context
             for name in context.list_names():
-                df = context.get(name)
+                dataset_obj = context.get(name)
+
+                # Debug check
+                # print(f"DEBUG: Registering {name} type={type(dataset_obj)} LazyDataset={LazyDataset}")
+
+                # Handle LazyDataset (DuckDB optimization)
+                # if isinstance(dataset_obj, LazyDataset):
+                #     self._register_lazy_view(conn, name, dataset_obj)
+                #     # Log that we used DuckDB on file
+                #     # logger.info(f"Executing SQL via DuckDB on lazy file: {dataset_obj.path}")
+                #     continue
 
                 # Handle chunked data (Iterator)
                 from collections.abc import Iterator
 
-                if isinstance(df, Iterator):
+                if isinstance(dataset_obj, Iterator):
                     # Warning: Materializing iterator for SQL execution
                     # Note: DuckDB doesn't support streaming from iterator yet
-                    df = pd.concat(df, ignore_index=True)
+                    dataset_obj = pd.concat(dataset_obj, ignore_index=True)
 
-                conn.register(name, df)
+                conn.register(name, dataset_obj)
 
             # Execute query
             result = conn.execute(sql).df()
@@ -890,6 +986,9 @@ class PandasEngine(Engine):
         Returns:
             Result DataFrame
         """
+        # Materialize LazyDataset
+        df = self.materialize(df)
+
         # Handle chunked data (Iterator)
         from collections.abc import Iterator
 
@@ -961,6 +1060,9 @@ class PandasEngine(Engine):
         self, df: pd.DataFrame, target_schema: Dict[str, str], policy: Any
     ) -> pd.DataFrame:
         """Harmonize DataFrame schema with target schema according to policy."""
+        # Ensure materialization
+        df = self.materialize(df)
+
         from odibi.config import OnMissingColumns, OnNewColumns, SchemaMode
 
         target_cols = list(target_schema.keys())
@@ -989,11 +1091,11 @@ class PandasEngine(Engine):
         return df
 
     def anonymize(
-        self, df: pd.DataFrame, columns: List[str], method: str, salt: Optional[str] = None
+        self, df: Any, columns: List[str], method: str, salt: Optional[str] = None
     ) -> pd.DataFrame:
         """Anonymize specified columns."""
-        import hashlib
-        import re
+        # Ensure materialization
+        df = self.materialize(df)
 
         res = df.copy()
 
@@ -1002,66 +1104,103 @@ class PandasEngine(Engine):
                 continue
 
             if method == "hash":
-                # Ensure column is string
-                s_col = res[col].astype(str)
+                # Vectorized Hashing (via map/apply)
+                # Note: True vectorization requires C-level support (e.g. pyarrow.compute)
+                # Standard Pandas apply is the fallback but we can optimize string handling
 
-                def _hash(val):
-                    if val is None or val == "nan" or val == "None":  # Handle stringified nulls
-                        return None
-                    to_hash = str(val)
+                # Convert to string, handling nulls
+                # s_col = res[col].astype(str)
+                # Nulls become 'nan'/'None' string, we want to preserve them or hash them consistently?
+                # Typically nulls should remain null.
+
+                mask_nulls = res[col].isna()
+
+                def _hash_val(val):
+                    to_hash = val
                     if salt:
                         to_hash += salt
                     return hashlib.sha256(to_hash.encode("utf-8")).hexdigest()
 
-                res[col] = s_col.apply(_hash)
+                # Apply only to non-nulls
+                res.loc[~mask_nulls, col] = res.loc[~mask_nulls, col].astype(str).apply(_hash_val)
 
             elif method == "mask":
-                # Mask all but last 4
-                # Regex sub: replace char if followed by 4 chars
-                def _mask(val):
-                    if pd.isna(val):
-                        return val
-                    s_val = str(val)
-                    return re.sub(r".(?=.{4})", "*", s_val)
+                # Vectorized Masking
+                # Mask all but last 4 characters
 
-                res[col] = res[col].apply(_mask)
+                mask_nulls = res[col].isna()
+                s_valid = res.loc[~mask_nulls, col].astype(str)
+
+                # Use vectorized regex replacement
+                # Replace any character that is followed by 4 characters with '*'
+                res.loc[~mask_nulls, col] = s_valid.str.replace(r".(?=.{4})", "*", regex=True)
 
             elif method == "redact":
                 res[col] = "[REDACTED]"
 
         return res
 
-    def get_schema(self, df: pd.DataFrame) -> Dict[str, str]:
+    def get_schema(self, df: Any) -> Dict[str, str]:
         """Get DataFrame schema with types.
 
         Args:
-            df: DataFrame
+            df: DataFrame or LazyDataset
 
         Returns:
             Dict[str, str]: Column name -> Type string
         """
+        if isinstance(df, LazyDataset):
+            if self.use_duckdb:
+                try:
+                    import duckdb
+
+                    conn = duckdb.connect(":memory:")
+                    self._register_lazy_view(conn, "df", df)
+                    res = conn.execute("DESCRIBE SELECT * FROM df").df()
+                    return dict(zip(res["column_name"], res["column_type"]))
+                except Exception:
+                    pass
+            df = self.materialize(df)
+
         return {col: str(df[col].dtype) for col in df.columns}
 
-    def get_shape(self, df: pd.DataFrame) -> tuple:
+    def get_shape(self, df: Any) -> tuple:
         """Get DataFrame shape.
 
         Args:
-            df: DataFrame
+            df: DataFrame or LazyDataset
 
         Returns:
             (rows, columns)
         """
+        if isinstance(df, LazyDataset):
+            cols = len(self.get_schema(df))
+            rows = self.count_rows(df)
+            return (rows, cols)
         return df.shape
 
-    def count_rows(self, df: pd.DataFrame) -> int:
+    def count_rows(self, df: Any) -> int:
         """Count rows in DataFrame.
 
         Args:
-            df: DataFrame
+            df: DataFrame or LazyDataset
 
         Returns:
             Row count
         """
+        if isinstance(df, LazyDataset):
+            if self.use_duckdb:
+                try:
+                    import duckdb
+
+                    conn = duckdb.connect(":memory:")
+                    self._register_lazy_view(conn, "df", df)
+                    res = conn.execute("SELECT count(*) FROM df").fetchone()
+                    return res[0] if res else 0
+                except Exception:
+                    pass
+            df = self.materialize(df)
+
         return len(df)
 
     def count_nulls(self, df: pd.DataFrame, columns: List[str]) -> Dict[str, int]:
@@ -1092,6 +1231,9 @@ class PandasEngine(Engine):
         Returns:
             List of validation failures
         """
+        # Ensure materialization
+        df = self.materialize(df)
+
         failures = []
 
         # Check required columns
@@ -1116,6 +1258,10 @@ class PandasEngine(Engine):
                     continue
 
                 actual_type = str(df[col].dtype)
+                # Handle pyarrow types (e.g. int64[pyarrow])
+                if "[" in actual_type and "pyarrow" in actual_type:
+                    actual_type = actual_type.split("[")[0]
+
                 expected_dtypes = type_map.get(expected_type, [expected_type])
 
                 if actual_type not in expected_dtypes:
@@ -1167,6 +1313,9 @@ class PandasEngine(Engine):
         Returns:
             List of validation failure messages
         """
+        # Ensure materialization
+        df = self.materialize(df)
+
         failures = []
 
         # Check not empty
@@ -1218,16 +1367,29 @@ class PandasEngine(Engine):
 
         return failures
 
-    def get_sample(self, df: pd.DataFrame, n: int = 10) -> List[Dict[str, Any]]:
+    def get_sample(self, df: Any, n: int = 10) -> List[Dict[str, Any]]:
         """Get sample rows as list of dictionaries.
 
         Args:
-            df: DataFrame
+            df: DataFrame or LazyDataset
             n: Number of rows to return
 
         Returns:
             List of row dictionaries
         """
+        if isinstance(df, LazyDataset):
+            if self.use_duckdb:
+                try:
+                    import duckdb
+
+                    conn = duckdb.connect(":memory:")
+                    self._register_lazy_view(conn, "df", df)
+                    res_df = conn.execute(f"SELECT * FROM df LIMIT {n}").df()
+                    return res_df.to_dict("records")
+                except Exception:
+                    pass
+            df = self.materialize(df)
+
         return df.head(n).to_dict("records")
 
     def table_exists(
@@ -1296,8 +1458,21 @@ class PandasEngine(Engine):
                     df = pd.read_csv(full_path, nrows=0)
                     return self.get_schema(df)
 
-        except Exception:
-            pass
+        except (FileNotFoundError, PermissionError):
+            return None
+        except ImportError as e:
+            # Log missing optional dependency
+            import logging
+
+            logging.getLogger(__name__).warning(
+                f"Could not infer schema due to missing dependency: {e}"
+            )
+            return None
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).warning(f"Failed to infer schema for {table or path}: {e}")
+            return None
         return None
 
     def vacuum_delta(
@@ -1458,15 +1633,20 @@ class PandasEngine(Engine):
         except Exception as e:
             logger.warning(f"Auto-optimize failed for {full_path}: {e}")
 
-    def get_source_files(self, df: pd.DataFrame) -> List[str]:
+    def get_source_files(self, df: Any) -> List[str]:
         """Get list of source files that generated this DataFrame.
 
         Args:
-            df: DataFrame
+            df: DataFrame or LazyDataset
 
         Returns:
             List of file paths
         """
+        if isinstance(df, LazyDataset):
+            if isinstance(df.path, list):
+                return df.path
+            return [str(df.path)]
+
         if hasattr(df, "attrs"):
             return df.attrs.get("odibi_source_files", [])
         return []
@@ -1480,5 +1660,55 @@ class PandasEngine(Engine):
         Returns:
             Dictionary of {column_name: null_percentage}
         """
+        # Ensure materialization
+        df = self.materialize(df)
+
         # mean() of boolean DataFrame gives the percentage of True values
         return df.isna().mean().to_dict()
+
+    def filter_greater_than(self, df: pd.DataFrame, column: str, value: Any) -> pd.DataFrame:
+        """Filter DataFrame where column > value."""
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+
+        try:
+            # Handle timestamp string comparison
+            if pd.api.types.is_datetime64_any_dtype(df[column]) and isinstance(value, str):
+                value = pd.to_datetime(value)
+
+            return df[df[column] > value]
+        except Exception as e:
+            raise ValueError(f"Failed to filter {column} > {value}: {e}")
+
+    def filter_coalesce(
+        self, df: pd.DataFrame, col1: str, col2: str, op: str, value: Any
+    ) -> pd.DataFrame:
+        """Filter using COALESCE(col1, col2) op value."""
+        if col1 not in df.columns:
+            # If fallback only? No, usually primary must exist.
+            raise ValueError(f"Column '{col1}' not found")
+
+        # If col2 missing, behave like col1
+        if col2 not in df.columns:
+            s = df[col1]
+        else:
+            s = df[col1].combine_first(df[col2])
+
+        try:
+            if pd.api.types.is_datetime64_any_dtype(s) and isinstance(value, str):
+                value = pd.to_datetime(value)
+
+            if op == ">=":
+                return df[s >= value]
+            elif op == ">":
+                return df[s > value]
+            elif op == "<=":
+                return df[s <= value]
+            elif op == "<":
+                return df[s < value]
+            elif op == "==" or op == "=":
+                return df[s == value]
+            else:
+                raise ValueError(f"Unsupported operator: {op}")
+        except Exception as e:
+            raise ValueError(f"Failed to filter COALESCE({col1}, {col2}) {op} {value}: {e}")

@@ -191,11 +191,28 @@ class MarkdownStoryRenderer:
             lines.append(f"**Operation:** `{node.operation}`")
             lines.append(f"**Duration:** {node.duration:.4f}s")
 
+            # Historical Context
+            if node.historical_avg_duration:
+                diff = node.duration - node.historical_avg_duration
+                icon = "🔼" if diff > 0 else "🔽"
+                lines.append(
+                    f"**Avg Duration (7d):** {node.historical_avg_duration:.4f}s ({icon} {abs(diff):.4f}s)"
+                )
+
             # Data metrics
             if node.rows_in is not None:
                 lines.append(f"**Rows In:** {node.rows_in:,}")
             if node.rows_out is not None:
                 lines.append(f"**Rows Out:** {node.rows_out:,}")
+
+                # Historical Rows
+                if node.historical_avg_rows is not None:
+                    diff = node.rows_out - node.historical_avg_rows
+                    icon = "🔼" if diff > 0 else "🔽"
+                    lines.append(
+                        f"**Avg Rows (7d):** ~{int(node.historical_avg_rows):,} ({icon} {int(abs(diff)):,})"
+                    )
+
             if node.rows_change is not None:
                 change_sign = "+" if node.rows_change > 0 else ""
                 lines.append(

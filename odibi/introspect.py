@@ -14,6 +14,20 @@ except ImportError:
 
 from pydantic import BaseModel
 
+# Try to import registry/transformers to get function metadata
+try:
+    from odibi.registry import FunctionRegistry
+    from odibi.transformers import register_standard_library
+
+    # Ensure registry is populated
+    register_standard_library()
+    HAS_REGISTRY = True
+except ImportError:
+    HAS_REGISTRY = False
+    print(
+        "Warning: Could not import FunctionRegistry/transformers. Function details will be missing."
+    )
+
 # --- Data Models ---
 
 
@@ -32,6 +46,9 @@ class ModelDoc(BaseModel):
     docstring: Optional[str]
     fields: List[FieldDoc]
     group: str  # "Core", "Connection", "Transformation", "Setting"
+    category: Optional[str] = None  # Sub-category for Transformations
+    function_name: Optional[str] = None
+    function_doc: Optional[str] = None
     used_in: List[str] = []
 
 
@@ -58,9 +75,19 @@ GROUP_MAPPING = {
     "LoggingConfig": "Setting",
     "PerformanceConfig": "Setting",
     "AlertConfig": "Setting",
-    "CaseWhenParams": "Transformation",
-    "ConvertTimezoneParams": "Transformation",
-    "ConcatColumnsParams": "Transformation",
+    "LineageConfig": "Setting",
+    "StateConfig": "Setting",
+    "SystemConfig": "Core",
+}
+
+# Map modules to readable Categories
+TRANSFORM_CATEGORY_MAP = {
+    "odibi.transformers.sql_core": "Common Operations",
+    "odibi.transformers.relational": "Relational Algebra",
+    "odibi.transformers.advanced": "Advanced & Feature Engineering",
+    "odibi.transformers.scd": "Warehousing Patterns",
+    "odibi.transformers.validation": "Data Quality",
+    "odibi.transformers.merge_transformer": "Warehousing Patterns",
 }
 
 CUSTOM_ORDER = [
@@ -69,6 +96,9 @@ CUSTOM_ORDER = [
     "PipelineConfig",
     "NodeConfig",
     "ColumnMetadata",
+    "SystemConfig",
+    "StateConfig",
+    "LineageConfig",
     # Operations (ETL flow)
     "ReadConfig",
     "IncrementalConfig",
@@ -131,8 +161,8 @@ Use this for smaller operations within a `transform` block (e.g. clean_text, fil
   transform:
     steps:
       - function: "<transformer_name>"
-        params:
-          <param_name>: <value>
+         params:
+           <param_name>: <value>
 ```
 
 **Available Transformers:**
@@ -333,6 +363,28 @@ def get_pydantic_fields(cls: Type[BaseModel]) -> List[FieldDoc]:
     return fields
 
 
+def get_registry_info(model_cls: Type[BaseModel]) -> Dict[str, Optional[str]]:
+    """Lookup function info from registry using the model class."""
+    if not HAS_REGISTRY:
+        return {}
+
+    # Iterate registry to find matching model
+    # FunctionRegistry._param_models: Dict[str, BaseModel]
+    # Accessing protected member is necessary here
+    for name, model in FunctionRegistry._param_models.items():
+        if model is model_cls:
+            # Found it!
+            try:
+                func_info = FunctionRegistry.get_function_info(name)
+                return {
+                    "function_name": name,
+                    "function_doc": func_info.get("docstring"),
+                }
+            except ValueError:
+                pass
+    return {}
+
+
 def scan_module_for_models(module_name: str, group_map: Dict[str, str]) -> List[ModelDoc]:
     """Scan a module for Pydantic models."""
     try:
@@ -359,12 +411,18 @@ def scan_module_for_models(module_name: str, group_map: Dict[str, str]) -> List[
             # Only document models that are either in the module or are explicitly desired
             # For odibi.config, we want everything defined there
             if obj.__module__ == module_name:
-                # Determine Group
+                # Determine Group and Category
                 group = "Other"
+                category = None
+
                 if name in group_map:
                     group = group_map[name]
                 elif module_name.startswith("odibi.transformers"):
                     group = "Transformation"
+                    category = TRANSFORM_CATEGORY_MAP.get(module_name, "Other Transformers")
+
+                # Get Registry Info
+                reg_info = get_registry_info(obj)
 
                 fields = get_pydantic_fields(obj)
 
@@ -376,6 +434,9 @@ def scan_module_for_models(module_name: str, group_map: Dict[str, str]) -> List[
                         docstring=get_docstring(obj),
                         fields=fields,
                         group=group,
+                        category=category,
+                        function_name=reg_info.get("function_name"),
+                        function_doc=reg_info.get("function_doc"),
                     )
                 )
     return models
@@ -405,7 +466,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
     print("Scanning configuration models...")
 
     modules = discover_modules()
-    print(f"Discovered {len(modules)} modules: {modules}")
+    print(f"Discovered {len(modules)} modules.")
 
     all_models = []
     for mod in modules:
@@ -464,10 +525,119 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
         if group_key in SECTION_INTROS:
             lines.append(SECTION_INTROS[group_key].strip())
             lines.append("")
+
+            # Special handling for Transformation Grouping
+            if group_key == "Transformation":
+                lines.append("---")
+                lines.append("")
+
+                # Sort models by category, then name
+                def transform_sort_key(m):
+                    # Defined order of categories
+                    cat_order = [
+                        "Common Operations",
+                        "Relational Algebra",
+                        "Data Quality",
+                        "Warehousing Patterns",
+                        "Advanced & Feature Engineering",
+                        "Other Transformers",
+                    ]
+                    cat = m.category or "Other Transformers"
+                    try:
+                        cat_idx = cat_order.index(cat)
+                    except ValueError:
+                        cat_idx = 999
+
+                    return (cat_idx, m.function_name or m.name)
+
+                models.sort(key=transform_sort_key)
+
+                current_category = None
+
+                for model in models:
+                    # Category Header
+                    if model.category != current_category:
+                        current_category = model.category
+                        lines.append(f"### 📂 {current_category}")
+                        lines.append("")
+
+                    # Header with Function Name if available (preferred for transformers)
+                    header_name = model.name
+                    if model.function_name:
+                        header_name = f"`{model.function_name}` ({model.name})"
+
+                    lines.append(f"#### {header_name}")
+
+                    # Function Docstring (Design/Impl details)
+                    if model.function_doc:
+                        lines.append(f"{model.function_doc}")
+                        lines.append("")
+
+                    # Model Docstring (Configuration details)
+                    # If function doc is present, we might want to skip model doc if it's redundant,
+                    # but usually model doc has the YAML examples which are critical.
+                    if model.docstring:
+                        if (
+                            model.function_doc
+                            and model.docstring.strip() == model.function_doc.strip()
+                        ):
+                            pass  # Skip duplicate
+                        else:
+                            lines.append(f"{model.docstring}\n")
+
+                    lines.append("[Back to Catalog](#nodeconfig)")
+                    lines.append("")
+
+                    if model.fields:
+                        lines.append("| Field | Type | Required | Default | Description |")
+                        lines.append("| --- | --- | --- | --- | --- |")
+                        for field in model.fields:
+                            req = "Yes" if field.required else "No"
+                            default = f"`{field.default}`" if field.default else "-"
+                            desc = field.description or "-"
+                            desc = desc.replace("|", "\\|").replace("\n", " ")
+
+                            # Cross Linking
+                            th_display = field.type_hint
+                            for target in sorted(list(model_names), key=len, reverse=True):
+                                pattern = r"\\b" + re.escape(target) + r"\\b"
+                                if re.search(pattern, th_display):
+                                    th_display = re.sub(
+                                        pattern, f"[{target}](#{target.lower()})", th_display
+                                    )
+
+                            # Auto-expand aliases in description
+                            for alias, components in TYPE_ALIASES.items():
+                                if alias in field.type_hint:
+                                    links_list = []
+                                    for c in components:
+                                        if c in model_names:
+                                            links_list.append(f"[{c}](#{c.lower()})")
+                                        else:
+                                            links_list.append(c)
+
+                                    if links_list:
+                                        prefix = (
+                                            "<br>**Options:** " if desc != "-" else "**Options:** "
+                                        )
+                                        if desc == "-":
+                                            desc = ""
+                                        desc += f"{prefix}{', '.join(links_list)}"
+
+                            lines.append(
+                                f"| **{field.name}** | {th_display} | {req} | {default} | {desc} |"
+                            )
+                        lines.append("")
+
+                    lines.append("---\n")
+
+                # Skip standard processing for this group since we did custom rendering
+                continue
+
             lines.append("---")
             lines.append("")
 
-        # Sort models
+        # Sort models (Standard)
         def sort_key(m):
             try:
                 return (0, CUSTOM_ORDER.index(m.name))
@@ -514,18 +684,18 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                     # Auto-expand aliases in description (to provide navigation)
                     for alias, components in TYPE_ALIASES.items():
                         if alias in field.type_hint:
-                            links = []
+                            links_list = []
                             for c in components:
                                 if c in model_names:
-                                    links.append(f"[{c}](#{c.lower()})")
+                                    links_list.append(f"[{c}](#{c.lower()})")
                                 else:
-                                    links.append(c)
+                                    links_list.append(c)
 
-                            if links:
+                            if links_list:
                                 prefix = "<br>**Options:** " if desc != "-" else "**Options:** "
                                 if desc == "-":
                                     desc = ""
-                                desc += f"{prefix}{', '.join(links)}"
+                                desc += f"{prefix}{', '.join(links_list)}"
 
                     lines.append(
                         f"| **{field.name}** | {th_display} | {req} | {default} | {desc} |"
