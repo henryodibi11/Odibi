@@ -55,16 +55,20 @@ class StructuredLogger:
             logging.basicConfig(level=self.level, format="%(message)s", stream=sys.stdout)
 
         self.logger = logging.getLogger("odibi")
+        self.logger.setLevel(self.level)
 
-        # Suppress noisy third-party logging
-        logging.getLogger("py4j").setLevel(logging.WARNING)
-        logging.getLogger("azure").setLevel(logging.WARNING)
-        logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
-            logging.WARNING
-        )
-        logging.getLogger("adlfs").setLevel(logging.WARNING)
-        logging.getLogger("urllib3").setLevel(logging.WARNING)
-        logging.getLogger("fsspec").setLevel(logging.WARNING)
+        # Third-party loggers respect user's level, but never MORE verbose than WARNING
+        # (Azure SDK is extremely noisy at INFO/DEBUG)
+        third_party_level = max(self.level, logging.WARNING)
+        for logger_name in [
+            "py4j",
+            "azure",
+            "azure.core.pipeline.policies.http_logging_policy",
+            "adlfs",
+            "urllib3",
+            "fsspec",
+        ]:
+            logging.getLogger(logger_name).setLevel(third_party_level)
 
     def register_secret(self, secret: str):
         """Register a secret string to be redacted from logs."""
