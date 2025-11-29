@@ -1074,3 +1074,53 @@ class PipelineManager:
             available = ", ".join(self._pipelines.keys())
             raise ValueError(f"Pipeline '{name}' not found. Available: {available}")
         return self._pipelines[name]
+
+    def deploy(self, pipelines: Optional[Union[str, List[str]]] = None) -> bool:
+        """Deploy pipeline definitions to the System Catalog.
+
+        This registers pipeline and node configurations in the catalog,
+        enabling drift detection and governance features.
+
+        Args:
+            pipelines: Optional pipeline name(s) to deploy. If None, deploys all.
+
+        Returns:
+            True if deployment succeeded, False otherwise.
+
+        Example:
+            >>> manager = PipelineManager.from_yaml("odibi.yaml")
+            >>> manager.deploy()  # Deploy all pipelines
+            >>> manager.deploy("sales_daily")  # Deploy specific pipeline
+        """
+        if not self.catalog_manager:
+            logger.warning("System Catalog not configured. Cannot deploy.")
+            return False
+
+        # Determine which pipelines to deploy
+        if pipelines is None:
+            to_deploy = self.project_config.pipelines
+        elif isinstance(pipelines, str):
+            to_deploy = [p for p in self.project_config.pipelines if p.pipeline == pipelines]
+        else:
+            to_deploy = [p for p in self.project_config.pipelines if p.pipeline in pipelines]
+
+        if not to_deploy:
+            logger.warning("No matching pipelines found to deploy.")
+            return False
+
+        try:
+            self.catalog_manager.bootstrap()
+
+            for pipeline_config in to_deploy:
+                logger.info(f"Deploying pipeline: {pipeline_config.pipeline}")
+                self.catalog_manager.register_pipeline(pipeline_config, self.project_config)
+
+                for node in pipeline_config.nodes:
+                    self.catalog_manager.register_node(pipeline_config.pipeline, node)
+
+            logger.info(f"Deployed {len(to_deploy)} pipeline(s) to System Catalog.")
+            return True
+
+        except Exception as e:
+            logger.error(f"Deployment failed: {e}")
+            return False
