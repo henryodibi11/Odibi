@@ -2,7 +2,9 @@
 
 import hashlib
 import inspect
+import logging
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -31,6 +33,27 @@ class NodeResult(BaseModel):
     result_schema: Optional[Any] = Field(default=None, alias="schema")  # Renamed to avoid shadowing
     error: Optional[Exception] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+@contextmanager
+def _override_log_level(log_level: Optional[str]):
+    """Temporarily override the logging level for a node execution."""
+    if not log_level:
+        yield
+        return
+
+    from odibi.utils.logging import logger as odibi_logger
+
+    original_level = odibi_logger.level
+    new_level = getattr(logging, log_level.upper(), original_level)
+    odibi_logger.level = new_level
+    odibi_logger.logger.setLevel(new_level)
+
+    try:
+        yield
+    finally:
+        odibi_logger.level = original_level
+        odibi_logger.logger.setLevel(original_level)
 
 
 class NodeExecutor:
@@ -1197,11 +1220,17 @@ class Node:
             tracer,
         )
 
+        # Get node-level log override
+        node_log_level = self.config.log_level.value if self.config.log_level else None
+
         # Prepare a fallback result for logging in case of catastrophic failure
         result_for_log = NodeResult(node_name=self.config.name, success=False, duration=0.0)
         start_time = time.time()
 
-        with tracer.start_as_current_span("node_execution") as span:
+        with (
+            _override_log_level(node_log_level),
+            tracer.start_as_current_span("node_execution") as span,
+        ):
             span.set_attribute("node.name", self.config.name)
             span.set_attribute("node.engine", self.engine.__class__.__name__)
 
