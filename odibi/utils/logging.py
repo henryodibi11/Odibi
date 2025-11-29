@@ -56,8 +56,15 @@ class StructuredLogger:
 
         self.logger = logging.getLogger("odibi")
 
-        # Suppress noisy Py4J logging
+        # Suppress noisy third-party logging
         logging.getLogger("py4j").setLevel(logging.WARNING)
+        logging.getLogger("azure").setLevel(logging.WARNING)
+        logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
+            logging.WARNING
+        )
+        logging.getLogger("adlfs").setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("fsspec").setLevel(logging.WARNING)
 
     def register_secret(self, secret: str):
         """Register a secret string to be redacted from logs."""
