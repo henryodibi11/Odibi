@@ -78,6 +78,18 @@ GROUP_MAPPING = {
     "LineageConfig": "Setting",
     "StateConfig": "Setting",
     "SystemConfig": "Core",
+    # Contract/Test types
+    "NotNullTest": "Contract",
+    "UniqueTest": "Contract",
+    "AcceptedValuesTest": "Contract",
+    "RowCountTest": "Contract",
+    "CustomSQLTest": "Contract",
+    "RangeTest": "Contract",
+    "RegexMatchTest": "Contract",
+    "VolumeDropTest": "Contract",
+    "SchemaContract": "Contract",
+    "DistributionContract": "Contract",
+    "FreshnessContract": "Contract",
 }
 
 # Map modules to readable Categories
@@ -114,6 +126,12 @@ CUSTOM_ORDER = [
     "HttpConnectionConfig",
 ]
 
+# Map type aliases to their documentation section anchors
+TYPE_ALIAS_LINKS = {
+    "TestConfig": "contracts-data-quality-gates",
+    "ConnectionConfig": "connections",
+}
+
 # Known Type Aliases to simplify display
 TYPE_ALIASES = {
     "ConnectionConfig": [
@@ -137,9 +155,53 @@ TYPE_ALIASES = {
         "SQLConnectionStringAuth",
     ],
     "HttpAuthConfig": ["HttpNoAuth", "HttpBasicAuth", "HttpBearerAuth", "HttpApiKeyAuth"],
+    "TestConfig": [
+        "NotNullTest",
+        "UniqueTest",
+        "AcceptedValuesTest",
+        "RowCountTest",
+        "CustomSQLTest",
+        "RangeTest",
+        "RegexMatchTest",
+        "VolumeDropTest",
+        "SchemaContract",
+        "DistributionContract",
+        "FreshnessContract",
+    ],
 }
 
 SECTION_INTROS = {
+    "Contract": """
+### Pre-Condition Circuit Breakers
+
+Contracts are **fail-fast data quality checks** that run on input data **before** transformation.
+Unlike validation (which runs after transforms and can warn), contracts always halt execution on failure.
+
+**Use Cases:**
+- Ensure source data meets minimum quality standards before processing
+- Prevent bad data from propagating through the pipeline
+- Fail early to save compute resources
+
+**Example:**
+```yaml
+- name: "process_orders"
+  contracts:
+    - type: not_null
+      columns: [order_id, customer_id]
+    - type: row_count
+      min: 100
+    - type: freshness
+      column: created_at
+      max_age: "24h"
+  read:
+    source: raw_orders
+  transform:
+    steps:
+      - function: filter
+        params:
+          condition: "status != 'cancelled'"
+```
+""",
     "Transformation": """
 ### How to Use Transformers
 
@@ -167,7 +229,7 @@ Use this for smaller operations within a `transform` block (e.g. clean_text, fil
 
 **Available Transformers:**
 The models below describe the `params` required for each transformer.
-"""
+""",
 }
 
 # --- Logic ---
@@ -458,6 +520,13 @@ def build_usage_map(models: List[ModelDoc]) -> Dict[str, Set[str]]:
                 if re.search(r"\b" + re.escape(target) + r"\b", f.type_hint):
                     usage[target].add(m.name)
 
+            # Expand type aliases - if field uses an alias, mark all components as used
+            for alias, components in TYPE_ALIASES.items():
+                if alias in f.type_hint:
+                    for component in components:
+                        if component in usage and component != m.name:
+                            usage[component].add(m.name)
+
     return usage
 
 
@@ -483,6 +552,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
         "Core": [],
         "Connection": [],
         "Operation": [],
+        "Contract": [],
         "Setting": [],
         "Transformation": [],
         "Other": [],
@@ -508,6 +578,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
         ("Core", "Project Structure"),
         ("Connection", "Connections"),
         ("Operation", "Node Operations"),
+        ("Contract", "Contracts (Data Quality Gates)"),
         ("Setting", "Global Settings"),
         ("Transformation", "Transformation Reference"),
     ]
@@ -606,6 +677,14 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                                         pattern, f"[{target}](#{target.lower()})", th_display
                                     )
 
+                            # Link type aliases to their sections
+                            for alias, anchor in TYPE_ALIAS_LINKS.items():
+                                pattern = r"\\b" + re.escape(alias) + r"\\b"
+                                if re.search(pattern, th_display):
+                                    th_display = re.sub(
+                                        pattern, f"[{alias}](#{anchor})", th_display
+                                    )
+
                             # Auto-expand aliases in description
                             for alias, components in TYPE_ALIASES.items():
                                 if alias in field.type_hint:
@@ -680,6 +759,12 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                             th_display = re.sub(
                                 pattern, f"[{target}](#{target.lower()})", th_display
                             )
+
+                    # Link type aliases to their sections
+                    for alias, anchor in TYPE_ALIAS_LINKS.items():
+                        pattern = r"\b" + re.escape(alias) + r"\b"
+                        if re.search(pattern, th_display):
+                            th_display = re.sub(pattern, f"[{alias}](#{anchor})", th_display)
 
                     # Auto-expand aliases in description (to provide navigation)
                     for alias, components in TYPE_ALIASES.items():

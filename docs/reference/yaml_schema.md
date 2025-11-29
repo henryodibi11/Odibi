@@ -340,7 +340,7 @@ These are the built-in functions you can use in two ways:
 | **log_level** | Optional[LogLevel] | No | - | Override log level for this node |
 | **on_error** | ErrorStrategy | No | `ErrorStrategy.FAIL_LATER` | Failure handling strategy |
 | **validation** | Optional[[ValidationConfig](#validationconfig)] | No | - | - |
-| **contracts** | List[[NotNullTest](#notnulltest) | [UniqueTest](#uniquetest) | [AcceptedValuesTest](#acceptedvaluestest) | [RowCountTest](#rowcounttest) | [CustomSQLTest](#customsqltest) | [RangeTest](#rangetest) | [RegexMatchTest](#regexmatchtest) | [VolumeDropTest](#volumedroptest) | [SchemaContract](#schemacontract) | [DistributionContract](#distributioncontract) | [FreshnessContract](#freshnesscontract)] | No | `PydanticUndefined` | Pre-condition contracts (Circuit Breakers). Runs on input data before transformation. |
+| **contracts** | List[[TestConfig](#contracts-data-quality-gates)] | No | `PydanticUndefined` | Pre-condition contracts (Circuit Breakers). Runs on input data before transformation.<br>**Options:** [NotNullTest](#notnulltest), [UniqueTest](#uniquetest), [AcceptedValuesTest](#acceptedvaluestest), [RowCountTest](#rowcounttest), [CustomSQLTest](#customsqltest), [RangeTest](#rangetest), [RegexMatchTest](#regexmatchtest), [VolumeDropTest](#volumedroptest), [SchemaContract](#schemacontract), [DistributionContract](#distributioncontract), [FreshnessContract](#freshnesscontract) |
 | **schema_policy** | Optional[[SchemaPolicyConfig](#schemapolicyconfig)] | No | - | Schema drift handling policy |
 | **privacy** | Optional[[PrivacyConfig](#privacyconfig)] | No | - | Privacy Suite: PII anonymization settings |
 | **sensitive** | bool | List[str] | No | `False` | If true or list of columns, masks sample data in stories |
@@ -765,7 +765,7 @@ validation:
 | --- | --- | --- | --- | --- |
 | **mode** | ValidationAction | No | `ValidationAction.FAIL` | Execution mode: 'fail' (stop pipeline) or 'warn' (log only) |
 | **on_fail** | OnFailAction | No | `OnFailAction.ALERT` | Action on failure: 'alert' (send notification) or 'ignore' |
-| **tests** | List[[NotNullTest](#notnulltest) | [UniqueTest](#uniquetest) | [AcceptedValuesTest](#acceptedvaluestest) | [RowCountTest](#rowcounttest) | [CustomSQLTest](#customsqltest) | [RangeTest](#rangetest) | [RegexMatchTest](#regexmatchtest) | [VolumeDropTest](#volumedroptest) | [SchemaContract](#schemacontract) | [DistributionContract](#distributioncontract) | [FreshnessContract](#freshnesscontract)] | No | `PydanticUndefined` | List of validation tests |
+| **tests** | List[[TestConfig](#contracts-data-quality-gates)] | No | `PydanticUndefined` | List of validation tests<br>**Options:** [NotNullTest](#notnulltest), [UniqueTest](#uniquetest), [AcceptedValuesTest](#acceptedvaluestest), [RowCountTest](#rowcounttest), [CustomSQLTest](#customsqltest), [RangeTest](#rangetest), [RegexMatchTest](#regexmatchtest), [VolumeDropTest](#volumedroptest), [SchemaContract](#schemacontract), [DistributionContract](#distributioncontract), [FreshnessContract](#freshnesscontract) |
 
 ---
 
@@ -820,6 +820,277 @@ write:
 | **first_run_query** | Optional[str] | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
 | **auto_optimize** | bool | [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
+
+---
+
+## Contracts (Data Quality Gates)
+
+### Pre-Condition Circuit Breakers
+
+Contracts are **fail-fast data quality checks** that run on input data **before** transformation.
+Unlike validation (which runs after transforms and can warn), contracts always halt execution on failure.
+
+**Use Cases:**
+- Ensure source data meets minimum quality standards before processing
+- Prevent bad data from propagating through the pipeline
+- Fail early to save compute resources
+
+**Example:**
+```yaml
+- name: "process_orders"
+  contracts:
+    - type: not_null
+      columns: [order_id, customer_id]
+    - type: row_count
+      min: 100
+    - type: freshness
+      column: created_at
+      max_age: "24h"
+  read:
+    source: raw_orders
+  transform:
+    steps:
+      - function: filter
+        params:
+          condition: "status != 'cancelled'"
+```
+
+---
+
+### `AcceptedValuesTest`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Ensures a column only contains values from an allowed list.
+
+```yaml
+contracts:
+  - type: accepted_values
+    column: status
+    values: [pending, approved, rejected]
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['accepted_values'] | No | `TestType.ACCEPTED_VALUES` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
+| **column** | str | Yes | - | Column to check |
+| **values** | List[Any] | Yes | - | Allowed values |
+
+---
+
+### `CustomSQLTest`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Runs a custom SQL condition and fails if too many rows violate it.
+
+```yaml
+contracts:
+  - type: custom_sql
+    condition: "amount > 0"
+    threshold: 0.01  # Allow up to 1% failures
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['custom_sql'] | No | `TestType.CUSTOM_SQL` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
+| **condition** | str | Yes | - | SQL condition that should be true for valid rows |
+| **threshold** | float | No | `0.0` | Failure rate threshold (0.0 = strictly no failures allowed) |
+
+---
+
+### `DistributionContract`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Checks if a column's statistical distribution is within expected bounds.
+
+```yaml
+contracts:
+  - type: distribution
+    column: price
+    metric: mean
+    threshold: ">100"  # Mean must be > 100
+    on_fail: warn
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['distribution'] | No | `TestType.DISTRIBUTION` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.WARN` | - |
+| **column** | str | Yes | - | Column to analyze |
+| **metric** | Literal['mean', 'min', 'max', 'null_percentage'] | Yes | - | Statistical metric to check |
+| **threshold** | str | Yes | - | Threshold expression (e.g., '>100', '<0.05') |
+
+---
+
+### `FreshnessContract`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Ensures data is not stale by checking a timestamp column.
+
+```yaml
+contracts:
+  - type: freshness
+    column: updated_at
+    max_age: "24h"  # Data must be less than 24 hours old
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['freshness'] | No | `TestType.FRESHNESS` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | - |
+| **column** | str | No | `updated_at` | Timestamp column to check |
+| **max_age** | str | Yes | - | Maximum allowed age (e.g., '24h', '7d') |
+
+---
+
+### `NotNullTest`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Ensures specified columns contain no null values.
+
+```yaml
+contracts:
+  - type: not_null
+    columns: [customer_id, order_date]
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['not_null'] | No | `TestType.NOT_NULL` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
+| **columns** | List[str] | Yes | - | Columns that must not contain nulls |
+
+---
+
+### `RangeTest`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Ensures column values fall within a specified range.
+
+```yaml
+contracts:
+  - type: range
+    column: age
+    min: 0
+    max: 150
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['range'] | No | `TestType.RANGE` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
+| **column** | str | Yes | - | Column to check |
+| **min** | int | float | str | No | - | Minimum value (inclusive) |
+| **max** | int | float | str | No | - | Maximum value (inclusive) |
+
+---
+
+### `RegexMatchTest`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Ensures column values match a regex pattern.
+
+```yaml
+contracts:
+  - type: regex_match
+    column: email
+    pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['regex_match'] | No | `TestType.REGEX_MATCH` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
+| **column** | str | Yes | - | Column to check |
+| **pattern** | str | Yes | - | Regex pattern to match |
+
+---
+
+### `RowCountTest`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Validates that row count falls within expected bounds.
+
+```yaml
+contracts:
+  - type: row_count
+    min: 1000
+    max: 100000
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['row_count'] | No | `TestType.ROW_COUNT` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
+| **min** | Optional[int] | No | - | Minimum row count |
+| **max** | Optional[int] | No | - | Maximum row count |
+
+---
+
+### `SchemaContract`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Validates that the DataFrame schema matches expected columns.
+
+Uses the `columns` metadata from NodeConfig to verify schema.
+
+```yaml
+contracts:
+  - type: schema
+    strict: true  # Fail if extra columns present
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['schema'] | No | `TestType.SCHEMA` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | - |
+| **strict** | bool | No | `True` | If true, fail on unexpected columns |
+
+---
+
+### `UniqueTest`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Ensures specified columns (or combination) contain unique values.
+
+```yaml
+contracts:
+  - type: unique
+    columns: [order_id]
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['unique'] | No | `TestType.UNIQUE` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
+| **columns** | List[str] | Yes | - | Columns that must be unique (composite key if multiple) |
+
+---
+
+### `VolumeDropTest`
+> *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
+
+Checks if row count dropped significantly compared to history.
+Formula: (current - avg) / avg < -threshold
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['volume_drop'] | No | `TestType.VOLUME_DROP` | - |
+| **name** | Optional[str] | No | - | Optional name for the check |
+| **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
+| **threshold** | float | No | `0.5` | Max allowed drop (0.5 = 50% drop) |
+| **lookback_days** | int | No | `7` | Days of history to average |
 
 ---
 

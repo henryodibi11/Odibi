@@ -770,66 +770,186 @@ class VolumeDropTest(BaseTestConfig):
 
 
 class NotNullTest(BaseTestConfig):
+    """
+    Ensures specified columns contain no null values.
+
+    ```yaml
+    contracts:
+      - type: not_null
+        columns: [customer_id, order_date]
+    ```
+    """
+
     type: Literal[TestType.NOT_NULL] = TestType.NOT_NULL
-    columns: List[str]
+    columns: List[str] = Field(description="Columns that must not contain nulls")
 
 
 class UniqueTest(BaseTestConfig):
+    """
+    Ensures specified columns (or combination) contain unique values.
+
+    ```yaml
+    contracts:
+      - type: unique
+        columns: [order_id]
+    ```
+    """
+
     type: Literal[TestType.UNIQUE] = TestType.UNIQUE
-    columns: List[str]
+    columns: List[str] = Field(
+        description="Columns that must be unique (composite key if multiple)"
+    )
 
 
 class AcceptedValuesTest(BaseTestConfig):
+    """
+    Ensures a column only contains values from an allowed list.
+
+    ```yaml
+    contracts:
+      - type: accepted_values
+        column: status
+        values: [pending, approved, rejected]
+    ```
+    """
+
     type: Literal[TestType.ACCEPTED_VALUES] = TestType.ACCEPTED_VALUES
-    column: str
-    values: List[Any]
+    column: str = Field(description="Column to check")
+    values: List[Any] = Field(description="Allowed values")
 
 
 class RowCountTest(BaseTestConfig):
+    """
+    Validates that row count falls within expected bounds.
+
+    ```yaml
+    contracts:
+      - type: row_count
+        min: 1000
+        max: 100000
+    ```
+    """
+
     type: Literal[TestType.ROW_COUNT] = TestType.ROW_COUNT
-    min: Optional[int] = None
-    max: Optional[int] = None
+    min: Optional[int] = Field(default=None, description="Minimum row count")
+    max: Optional[int] = Field(default=None, description="Maximum row count")
 
 
 class CustomSQLTest(BaseTestConfig):
+    """
+    Runs a custom SQL condition and fails if too many rows violate it.
+
+    ```yaml
+    contracts:
+      - type: custom_sql
+        condition: "amount > 0"
+        threshold: 0.01  # Allow up to 1% failures
+    ```
+    """
+
     type: Literal[TestType.CUSTOM_SQL] = TestType.CUSTOM_SQL
-    condition: str
+    condition: str = Field(description="SQL condition that should be true for valid rows")
     threshold: float = Field(
         default=0.0, description="Failure rate threshold (0.0 = strictly no failures allowed)"
     )
 
 
 class RangeTest(BaseTestConfig):
+    """
+    Ensures column values fall within a specified range.
+
+    ```yaml
+    contracts:
+      - type: range
+        column: age
+        min: 0
+        max: 150
+    ```
+    """
+
     type: Literal[TestType.RANGE] = TestType.RANGE
-    column: str
-    min: Optional[Union[int, float, str]] = None
-    max: Optional[Union[int, float, str]] = None
+    column: str = Field(description="Column to check")
+    min: Optional[Union[int, float, str]] = Field(
+        default=None, description="Minimum value (inclusive)"
+    )
+    max: Optional[Union[int, float, str]] = Field(
+        default=None, description="Maximum value (inclusive)"
+    )
 
 
 class RegexMatchTest(BaseTestConfig):
+    """
+    Ensures column values match a regex pattern.
+
+    ```yaml
+    contracts:
+      - type: regex_match
+        column: email
+        pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+    ```
+    """
+
     type: Literal[TestType.REGEX_MATCH] = TestType.REGEX_MATCH
-    column: str
-    pattern: str
+    column: str = Field(description="Column to check")
+    pattern: str = Field(description="Regex pattern to match")
 
 
 class SchemaContract(BaseTestConfig):
+    """
+    Validates that the DataFrame schema matches expected columns.
+
+    Uses the `columns` metadata from NodeConfig to verify schema.
+
+    ```yaml
+    contracts:
+      - type: schema
+        strict: true  # Fail if extra columns present
+    ```
+    """
+
     type: Literal[TestType.SCHEMA] = TestType.SCHEMA
-    strict: bool = True
+    strict: bool = Field(default=True, description="If true, fail on unexpected columns")
     on_fail: ContractSeverity = ContractSeverity.FAIL
 
 
 class DistributionContract(BaseTestConfig):
+    """
+    Checks if a column's statistical distribution is within expected bounds.
+
+    ```yaml
+    contracts:
+      - type: distribution
+        column: price
+        metric: mean
+        threshold: ">100"  # Mean must be > 100
+        on_fail: warn
+    ```
+    """
+
     type: Literal[TestType.DISTRIBUTION] = TestType.DISTRIBUTION
-    column: str
-    metric: Literal["mean", "min", "max", "null_percentage"]
-    threshold: str
+    column: str = Field(description="Column to analyze")
+    metric: Literal["mean", "min", "max", "null_percentage"] = Field(
+        description="Statistical metric to check"
+    )
+    threshold: str = Field(description="Threshold expression (e.g., '>100', '<0.05')")
     on_fail: ContractSeverity = ContractSeverity.WARN
 
 
 class FreshnessContract(BaseTestConfig):
+    """
+    Ensures data is not stale by checking a timestamp column.
+
+    ```yaml
+    contracts:
+      - type: freshness
+        column: updated_at
+        max_age: "24h"  # Data must be less than 24 hours old
+    ```
+    """
+
     type: Literal[TestType.FRESHNESS] = TestType.FRESHNESS
     column: str = Field(default="updated_at", description="Timestamp column to check")
-    max_age: str
+    max_age: str = Field(description="Maximum allowed age (e.g., '24h', '7d')")
     on_fail: ContractSeverity = ContractSeverity.FAIL
 
 
