@@ -92,6 +92,12 @@ GROUP_MAPPING = {
     "SchemaContract": "Contract",
     "DistributionContract": "Contract",
     "FreshnessContract": "Contract",
+    # Quarantine & Quality Gates (Week 1)
+    "QuarantineConfig": "Operation",
+    "QuarantineColumnsConfig": "Operation",
+    "GateConfig": "Operation",
+    "GateThreshold": "Operation",
+    "RowCountGate": "Operation",
 }
 
 # Map modules to readable Categories
@@ -121,6 +127,11 @@ CUSTOM_ORDER = [
     "TransformConfig",
     "DeleteDetectionConfig",
     "ValidationConfig",
+    "QuarantineConfig",
+    "QuarantineColumnsConfig",
+    "GateConfig",
+    "GateThreshold",
+    "RowCountGate",
     "WriteConfig",
     "WriteMetadataConfig",
     # Connections (Common first)

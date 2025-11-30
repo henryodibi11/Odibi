@@ -2,7 +2,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 try:
     from openlineage.client import OpenLineageClient
@@ -302,3 +302,210 @@ class OpenLineageAdapter:
                 return OutputDataset(namespace=namespace, name=name, facets=facets)
         except Exception:
             return None
+
+
+class LineageTracker:
+    """Track cross-pipeline lineage relationships.
+
+    This class provides table-level lineage tracking across pipelines,
+    storing relationships in the System Catalog for later querying.
+
+    Example:
+        ```python
+        tracker = LineageTracker(catalog)
+        tracker.record_lineage(
+            read_config=node.read,
+            write_config=node.write,
+            pipeline="silver_pipeline",
+            node="process_customers",
+            run_id="run-123",
+            connections=connections
+        )
+        ```
+    """
+
+    def __init__(self, catalog: Optional[Any] = None):
+        """Initialize LineageTracker.
+
+        Args:
+            catalog: CatalogManager instance for persistence
+        """
+        self.catalog = catalog
+
+    def record_lineage(
+        self,
+        read_config: Optional[Any],
+        write_config: Optional[Any],
+        pipeline: str,
+        node: str,
+        run_id: str,
+        connections: Dict[str, Any],
+    ) -> None:
+        """Record lineage from node's read/write config.
+
+        Args:
+            read_config: ReadConfig from the node
+            write_config: WriteConfig from the node
+            pipeline: Pipeline name
+            node: Node name
+            run_id: Execution run ID
+            connections: Dictionary of connection configurations
+        """
+        if not self.catalog or not write_config:
+            return
+
+        target_table = self._resolve_table_path(write_config, connections)
+        if not target_table:
+            return
+
+        if read_config:
+            source_table = self._resolve_table_path(read_config, connections)
+            if source_table:
+                self.catalog.record_lineage(
+                    source_table=source_table,
+                    target_table=target_table,
+                    target_pipeline=pipeline,
+                    target_node=node,
+                    run_id=run_id,
+                )
+
+    def record_dependency_lineage(
+        self,
+        depends_on: List[str],
+        write_config: Optional[Any],
+        pipeline: str,
+        node: str,
+        run_id: str,
+        node_outputs: Dict[str, str],
+        connections: Dict[str, Any],
+    ) -> None:
+        """Record lineage from node dependencies.
+
+        Args:
+            depends_on: List of dependency node names
+            write_config: WriteConfig from the node
+            pipeline: Pipeline name
+            node: Node name
+            run_id: Execution run ID
+            node_outputs: Map of node names to their output table paths
+            connections: Dictionary of connection configurations
+        """
+        if not self.catalog or not write_config:
+            return
+
+        target_table = self._resolve_table_path(write_config, connections)
+        if not target_table:
+            return
+
+        for dep_node in depends_on:
+            source_table = node_outputs.get(dep_node)
+            if source_table:
+                self.catalog.record_lineage(
+                    source_table=source_table,
+                    target_table=target_table,
+                    source_pipeline=pipeline,
+                    source_node=dep_node,
+                    target_pipeline=pipeline,
+                    target_node=node,
+                    run_id=run_id,
+                )
+
+    def _resolve_table_path(
+        self,
+        config: Any,
+        connections: Dict[str, Any],
+    ) -> Optional[str]:
+        """Resolve full table path from read/write config.
+
+        Args:
+            config: ReadConfig or WriteConfig
+            connections: Dictionary of connection configurations
+
+        Returns:
+            Full table path (e.g., "connection/path" or "catalog.schema.table")
+        """
+        try:
+            conn_name = config.connection
+            path = getattr(config, "path", None)
+            table = getattr(config, "table", None)
+
+            if table:
+                conn = connections.get(conn_name)
+                if conn and hasattr(conn, "schema_name"):
+                    catalog = getattr(conn, "catalog", "")
+                    schema = conn.schema_name
+                    return f"{catalog}.{schema}.{table}" if catalog else f"{schema}.{table}"
+                return f"{conn_name}.{table}"
+
+            if path:
+                return f"{conn_name}/{path}"
+
+            return None
+        except Exception:
+            return None
+
+    def get_upstream(self, table_path: str, depth: int = 3) -> List[Dict]:
+        """Get all upstream sources for a table.
+
+        Args:
+            table_path: Table to trace upstream from
+            depth: Maximum depth to traverse (default: 3)
+
+        Returns:
+            List of upstream lineage records with depth information
+        """
+        if not self.catalog:
+            return []
+        return self.catalog.get_upstream(table_path, depth)
+
+    def get_downstream(self, table_path: str, depth: int = 3) -> List[Dict]:
+        """Get all downstream consumers of a table.
+
+        Args:
+            table_path: Table to trace downstream from
+            depth: Maximum depth to traverse (default: 3)
+
+        Returns:
+            List of downstream lineage records with depth information
+        """
+        if not self.catalog:
+            return []
+        return self.catalog.get_downstream(table_path, depth)
+
+    def get_impact_analysis(self, table_path: str, depth: int = 3) -> Dict[str, Any]:
+        """Perform impact analysis for a table.
+
+        Args:
+            table_path: Table to analyze impact for
+            depth: Maximum depth to traverse (default: 3)
+
+        Returns:
+            Dict containing:
+            - affected_tables: list of downstream tables
+            - affected_pipelines: list of affected pipelines
+            - total_depth: maximum depth reached
+        """
+        downstream = self.get_downstream(table_path, depth)
+
+        affected_tables = set()
+        affected_pipelines = set()
+        max_depth = 0
+
+        for record in downstream:
+            target = record.get("target_table")
+            if target:
+                affected_tables.add(target)
+            pipeline = record.get("target_pipeline")
+            if pipeline:
+                affected_pipelines.add(pipeline)
+            record_depth = record.get("depth", 0)
+            if record_depth > max_depth:
+                max_depth = record_depth
+
+        return {
+            "table": table_path,
+            "affected_tables": list(affected_tables),
+            "affected_pipelines": list(affected_pipelines),
+            "total_depth": max_depth,
+            "downstream_count": len(downstream),
+        }

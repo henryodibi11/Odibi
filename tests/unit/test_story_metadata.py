@@ -273,3 +273,139 @@ class TestPipelineStoryMetadata:
         assert metadata.plant == "NKC"
         assert metadata.asset == "Germ Dryer 1"
         assert metadata.business_unit == "Operations"
+
+    def test_get_total_rows_in(self):
+        """Should calculate total input rows."""
+        metadata = PipelineStoryMetadata(pipeline_name="test")
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="node1",
+                operation="read",
+                status="success",
+                duration=1.0,
+                rows_in=1000,
+                rows_out=1000,
+            )
+        )
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="node2",
+                operation="filter",
+                status="success",
+                duration=0.5,
+                rows_in=1000,
+                rows_out=800,
+            )
+        )
+
+        assert metadata.get_total_rows_in() == 2000
+
+    def test_get_rows_dropped(self):
+        """Should calculate total rows dropped (filtered)."""
+        metadata = PipelineStoryMetadata(pipeline_name="test")
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="node1",
+                operation="filter",
+                status="success",
+                duration=0.5,
+                rows_in=1000,
+                rows_out=800,
+            )
+        )
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="node2",
+                operation="clean",
+                status="success",
+                duration=0.3,
+                rows_in=800,
+                rows_out=750,
+            )
+        )
+
+        # 200 dropped in node1, 50 dropped in node2 = 250 total
+        assert metadata.get_rows_dropped() == 250
+
+    def test_get_rows_dropped_ignores_increases(self):
+        """Should not count row increases as drops."""
+        metadata = PipelineStoryMetadata(pipeline_name="test")
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="join",
+                operation="join",
+                status="success",
+                duration=0.5,
+                rows_in=100,
+                rows_out=500,  # More rows out than in
+            )
+        )
+
+        assert metadata.get_rows_dropped() == 0
+
+    def test_get_final_output_rows(self):
+        """Should get row count from last successful node."""
+        metadata = PipelineStoryMetadata(pipeline_name="test")
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="node1",
+                operation="read",
+                status="success",
+                duration=1.0,
+                rows_out=1000,
+            )
+        )
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="node2",
+                operation="filter",
+                status="success",
+                duration=0.5,
+                rows_out=850,
+            )
+        )
+
+        assert metadata.get_final_output_rows() == 850
+
+    def test_get_alert_summary(self):
+        """Should return a summary dict for alerts."""
+        metadata = PipelineStoryMetadata(pipeline_name="test")
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="read",
+                operation="read",
+                status="success",
+                duration=1.0,
+                rows_in=1000,
+                rows_out=1000,
+            )
+        )
+
+        metadata.add_node(
+            NodeExecutionMetadata(
+                node_name="filter",
+                operation="filter",
+                status="success",
+                duration=0.5,
+                rows_in=1000,
+                rows_out=900,
+            )
+        )
+
+        summary = metadata.get_alert_summary()
+
+        assert summary["total_rows_processed"] == 1900
+        assert summary["total_rows_in"] == 2000
+        assert summary["rows_dropped"] == 100
+        assert summary["final_output_rows"] == 900
+        assert summary["success_rate"] == 100.0
+        assert summary["completed_nodes"] == 2
+        assert summary["failed_nodes"] == 0

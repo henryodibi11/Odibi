@@ -8,7 +8,9 @@ from odibi.cli.doctor import add_doctor_parser, doctor_command
 from odibi.cli.export import add_export_parser, export_command
 from odibi.cli.graph import graph_command
 from odibi.cli.init_pipeline import add_init_parser, init_pipeline_command
+from odibi.cli.lineage import add_lineage_parser, lineage_command
 from odibi.cli.run import run_command
+from odibi.cli.schema import add_schema_parser, schema_command
 from odibi.cli.secrets import add_secrets_parser, secrets_command
 from odibi.cli.story import add_story_parser, story_command
 from odibi.cli.test import test_command
@@ -128,6 +130,12 @@ Examples:
     # odibi catalog
     add_catalog_parser(subparsers)
 
+    # odibi schema
+    add_schema_parser(subparsers)
+
+    # odibi lineage
+    add_lineage_parser(subparsers)
+
     args = parser.parse_args()
 
     # Configure logging
@@ -168,6 +176,10 @@ Examples:
         return export_command(args)
     elif args.command == "catalog":
         return catalog_command(args)
+    elif args.command == "schema":
+        return schema_command(args)
+    elif args.command == "lineage":
+        return lineage_command(args)
     else:
         parser.print_help()
         return 1

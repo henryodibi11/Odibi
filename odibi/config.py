@@ -75,18 +75,38 @@ class AlertEvent(str, Enum):
     ON_START = "on_start"
     ON_SUCCESS = "on_success"
     ON_FAILURE = "on_failure"
+    ON_QUARANTINE = "on_quarantine"
+    ON_GATE_BLOCK = "on_gate_block"
+    ON_THRESHOLD_BREACH = "on_threshold_breach"
 
 
 class AlertConfig(BaseModel):
     """
-    Configuration for alerts.
+    Configuration for alerts with throttling support.
+
+    Supports Slack, Teams, and generic webhooks with event-specific payloads.
+
+    **Available Events:**
+    - `on_start` - Pipeline started
+    - `on_success` - Pipeline completed successfully
+    - `on_failure` - Pipeline failed
+    - `on_quarantine` - Rows were quarantined
+    - `on_gate_block` - Quality gate blocked the pipeline
+    - `on_threshold_breach` - A threshold was exceeded
 
     Example:
     ```yaml
     alerts:
-      - type: "slack"
-        url: "https://hooks.slack.com/..."
-        on_events: ["on_failure"]
+      - type: slack
+        url: "${SLACK_WEBHOOK_URL}"
+        on_events:
+          - on_failure
+          - on_quarantine
+          - on_gate_block
+        metadata:
+          throttle_minutes: 15
+          max_per_hour: 10
+          channel: "#data-alerts"
     ```
     """
 
@@ -94,11 +114,11 @@ class AlertConfig(BaseModel):
     url: str = Field(description="Webhook URL")
     on_events: List[AlertEvent] = Field(
         default=[AlertEvent.ON_FAILURE],
-        description="Events to trigger alert: on_start, on_success, on_failure",
+        description="Events to trigger alert: on_start, on_success, on_failure, on_quarantine, on_gate_block, on_threshold_breach",
     )
     metadata: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Extra metadata for alert (must be JSON-serializable, e.g. simple strings/numbers)",
+        description="Extra metadata: throttle_minutes, max_per_hour, channel, etc.",
     )
 
 
@@ -1206,6 +1226,208 @@ TestConfig = Annotated[
 ]
 
 
+# ============================================
+# Quarantine Configuration
+# ============================================
+
+
+class QuarantineColumnsConfig(BaseModel):
+    """
+    Columns added to quarantined rows for debugging and reprocessing.
+
+    Example:
+    ```yaml
+    quarantine:
+      connection: silver
+      path: customers_quarantine
+      add_columns:
+        _rejection_reason: true
+        _rejected_at: true
+        _source_batch_id: true
+        _failed_tests: true
+        _original_node: false
+    ```
+    """
+
+    rejection_reason: bool = Field(
+        default=True,
+        description="Add _rejection_reason column with test failure description",
+    )
+    rejected_at: bool = Field(
+        default=True,
+        description="Add _rejected_at column with UTC timestamp",
+    )
+    source_batch_id: bool = Field(
+        default=True,
+        description="Add _source_batch_id column with run ID for traceability",
+    )
+    failed_tests: bool = Field(
+        default=True,
+        description="Add _failed_tests column with comma-separated list of failed test names",
+    )
+    original_node: bool = Field(
+        default=False,
+        description="Add _original_node column with source node name",
+    )
+
+
+class QuarantineConfig(BaseModel):
+    """
+    Configuration for quarantine table routing.
+
+    Routes rows that fail validation tests to a quarantine table
+    with rejection metadata for later analysis/reprocessing.
+
+    Example:
+    ```yaml
+    validation:
+      tests:
+        - type: not_null
+          columns: [customer_id]
+          on_fail: quarantine
+      quarantine:
+        connection: silver
+        path: customers_quarantine
+        add_columns:
+          _rejection_reason: true
+          _rejected_at: true
+    ```
+    """
+
+    connection: str = Field(description="Connection for quarantine writes")
+    path: Optional[str] = Field(default=None, description="Path for quarantine data")
+    table: Optional[str] = Field(default=None, description="Table name for quarantine")
+    add_columns: QuarantineColumnsConfig = Field(
+        default_factory=QuarantineColumnsConfig,
+        description="Metadata columns to add to quarantined rows",
+    )
+    retention_days: Optional[int] = Field(
+        default=90,
+        ge=1,
+        description="Days to retain quarantined data (auto-cleanup)",
+    )
+
+    @model_validator(mode="after")
+    def validate_destination(self):
+        """Ensure either path or table is specified."""
+        if not self.path and not self.table:
+            raise ValueError("QuarantineConfig requires either 'path' or 'table'")
+        return self
+
+
+# ============================================
+# Quality Gate Configuration
+# ============================================
+
+
+class GateOnFail(str, Enum):
+    """
+    Action when quality gate fails.
+
+    Values:
+    * `abort` - Stop pipeline, write nothing (default)
+    * `warn_and_write` - Log warning, write all rows anyway
+    * `write_valid_only` - Write only rows that passed validation
+    """
+
+    ABORT = "abort"
+    WARN_AND_WRITE = "warn_and_write"
+    WRITE_VALID_ONLY = "write_valid_only"
+
+
+class GateThreshold(BaseModel):
+    """
+    Per-test threshold configuration for quality gates.
+
+    Allows setting different pass rate requirements for specific tests.
+
+    Example:
+    ```yaml
+    gate:
+      thresholds:
+        - test: not_null
+          min_pass_rate: 0.99
+        - test: unique
+          min_pass_rate: 1.0
+    ```
+    """
+
+    test: str = Field(description="Test name or type to apply threshold to")
+    min_pass_rate: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Minimum pass rate required (0.0-1.0, e.g., 0.99 = 99%)",
+    )
+
+
+class RowCountGate(BaseModel):
+    """
+    Row count anomaly detection for quality gates.
+
+    Validates that batch size falls within expected bounds and
+    detects significant changes from previous runs.
+
+    Example:
+    ```yaml
+    gate:
+      row_count:
+        min: 100
+        max: 1000000
+        change_threshold: 0.5
+    ```
+    """
+
+    min: Optional[int] = Field(default=None, ge=0, description="Minimum expected row count")
+    max: Optional[int] = Field(default=None, ge=0, description="Maximum expected row count")
+    change_threshold: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Max allowed change vs previous run (e.g., 0.5 = 50% change triggers failure)",
+    )
+
+
+class GateConfig(BaseModel):
+    """
+    Quality gate configuration for batch-level validation.
+
+    Gates evaluate the entire batch before writing, ensuring
+    data quality thresholds are met.
+
+    Example:
+    ```yaml
+    gate:
+      require_pass_rate: 0.95
+      on_fail: abort
+      thresholds:
+        - test: not_null
+          min_pass_rate: 0.99
+      row_count:
+        min: 100
+        change_threshold: 0.5
+    ```
+    """
+
+    require_pass_rate: float = Field(
+        default=0.95,
+        ge=0.0,
+        le=1.0,
+        description="Minimum percentage of rows passing ALL tests",
+    )
+    on_fail: GateOnFail = Field(
+        default=GateOnFail.ABORT,
+        description="Action when gate fails",
+    )
+    thresholds: List[GateThreshold] = Field(
+        default_factory=list,
+        description="Per-test thresholds (overrides global require_pass_rate)",
+    )
+    row_count: Optional[RowCountGate] = Field(
+        default=None,
+        description="Row count anomaly detection",
+    )
+
+
 class ValidationConfig(BaseModel):
     """
     Configuration for data validation (Quality Gate).
@@ -1253,6 +1475,21 @@ class ValidationConfig(BaseModel):
           condition: "created_at <= completed_at"
           threshold: 0.01   # Allow 1% failure
     ```
+
+    **Recipe: Quarantine + Gate**
+    ```yaml
+    validation:
+      tests:
+        - type: not_null
+          columns: [customer_id]
+          on_fail: quarantine
+      quarantine:
+        connection: silver
+        path: customers_quarantine
+      gate:
+        require_pass_rate: 0.95
+        on_fail: abort
+    ```
     """
 
     mode: ValidationAction = Field(
@@ -1264,6 +1501,14 @@ class ValidationConfig(BaseModel):
         description="Action on failure: 'alert' (send notification) or 'ignore'",
     )
     tests: List[TestConfig] = Field(default_factory=list, description="List of validation tests")
+    quarantine: Optional[QuarantineConfig] = Field(
+        default=None,
+        description="Quarantine configuration for failed rows",
+    )
+    gate: Optional[GateConfig] = Field(
+        default=None,
+        description="Quality gate configuration for batch-level validation",
+    )
 
 
 class AutoOptimizeConfig(BaseModel):

@@ -108,3 +108,61 @@ class TestStoryRetention:
 
         all_files = list(tmp_path.glob("**/*.html"))
         assert len(all_files) == 5
+
+
+class TestStoryGeneratorAlertSummary:
+    """Tests for StoryGenerator alert summary features."""
+
+    def test_get_alert_summary_empty(self, tmp_path):
+        """Should return empty dict if no story generated."""
+        generator = StoryGenerator(
+            pipeline_name="test_pipeline",
+            output_path=str(tmp_path),
+        )
+
+        summary = generator.get_alert_summary()
+        assert summary == {}
+
+    def test_get_alert_summary_after_generation(self, tmp_path):
+        """Should return summary with story path after generation."""
+        from odibi.node import NodeResult
+
+        generator = StoryGenerator(
+            pipeline_name="test_pipeline",
+            output_path=str(tmp_path),
+        )
+
+        # Create mock node results
+        results = {
+            "load": NodeResult(
+                node_name="load",
+                success=True,
+                duration=1.0,
+                rows_processed=1000,
+            ),
+            "filter": NodeResult(
+                node_name="filter",
+                success=True,
+                duration=0.5,
+                rows_processed=900,
+            ),
+        }
+
+        # Generate story
+        generator.generate(
+            node_results=results,
+            completed=["load", "filter"],
+            failed=[],
+            skipped=[],
+            duration=1.5,
+            start_time="2025-11-30T10:00:00",
+            end_time="2025-11-30T10:00:01",
+        )
+
+        summary = generator.get_alert_summary()
+
+        assert "story_path" in summary
+        assert summary["story_path"] is not None
+        assert "test_pipeline" in summary["story_path"]
+        assert summary["completed_nodes"] == 2
+        assert summary["failed_nodes"] == 0

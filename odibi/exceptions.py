@@ -261,3 +261,37 @@ class ValidationError(OdibiException):
         for failure in self.failures:
             parts.append(f"\n    * {failure}")
         return "".join(parts)
+
+
+class GateFailedError(OdibiException):
+    """Quality gate check failed."""
+
+    def __init__(
+        self,
+        node_name: str,
+        pass_rate: float,
+        required_rate: float,
+        failed_rows: int,
+        total_rows: int,
+        failure_reasons: Optional[List[str]] = None,
+    ):
+        self.node_name = node_name
+        self.pass_rate = pass_rate
+        self.required_rate = required_rate
+        self.failed_rows = failed_rows
+        self.total_rows = total_rows
+        self.failure_reasons = failure_reasons or []
+        super().__init__(self._format_error())
+
+    def _format_error(self) -> str:
+        """Format gate failure error."""
+        parts = [f"[X] Quality gate failed for node: {self.node_name}"]
+        parts.append(f"\n\n  Pass rate: {self.pass_rate:.1%} (required: {self.required_rate:.1%})")
+        parts.append(f"\n  Failed rows: {self.failed_rows:,} / {self.total_rows:,}")
+
+        if self.failure_reasons:
+            parts.append("\n\n  Reasons:")
+            for reason in self.failure_reasons:
+                parts.append(f"\n    * {reason}")
+
+        return "".join(parts)

@@ -1,5 +1,8 @@
+import hashlib
+import json
 import logging
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 try:
     from pyspark.sql import SparkSession
@@ -91,6 +94,8 @@ class CatalogManager:
             "meta_state": f"{self.base_path}/meta_state",
             "meta_pipelines": f"{self.base_path}/meta_pipelines",
             "meta_nodes": f"{self.base_path}/meta_nodes",
+            "meta_schemas": f"{self.base_path}/meta_schemas",
+            "meta_lineage": f"{self.base_path}/meta_lineage",
         }
 
     def bootstrap(self) -> None:
@@ -119,6 +124,8 @@ class CatalogManager:
         )
         self._ensure_table("meta_pipelines", self._get_schema_meta_pipelines())
         self._ensure_table("meta_nodes", self._get_schema_meta_nodes())
+        self._ensure_table("meta_schemas", self._get_schema_meta_schemas())
+        self._ensure_table("meta_lineage", self._get_schema_meta_lineage())
 
     def _ensure_table(
         self,
@@ -361,6 +368,44 @@ class CatalogManager:
                 StructField("type", StringType(), True),  # read/transform/write
                 StructField("config_json", StringType(), True),
                 StructField("updated_at", TimestampType(), True),
+            ]
+        )
+
+    def _get_schema_meta_schemas(self) -> StructType:
+        """
+        meta_schemas (Schema Version Tracking): Tracks schema changes over time.
+        """
+        return StructType(
+            [
+                StructField("table_path", StringType(), False),
+                StructField("schema_version", LongType(), False),
+                StructField("schema_hash", StringType(), False),
+                StructField("columns", StringType(), False),  # JSON: {"col": "type", ...}
+                StructField("captured_at", TimestampType(), False),
+                StructField("pipeline", StringType(), True),
+                StructField("node", StringType(), True),
+                StructField("run_id", StringType(), True),
+                StructField("columns_added", ArrayType(StringType()), True),
+                StructField("columns_removed", ArrayType(StringType()), True),
+                StructField("columns_type_changed", ArrayType(StringType()), True),
+            ]
+        )
+
+    def _get_schema_meta_lineage(self) -> StructType:
+        """
+        meta_lineage (Cross-Pipeline Lineage): Tracks table-level lineage relationships.
+        """
+        return StructType(
+            [
+                StructField("source_table", StringType(), False),
+                StructField("target_table", StringType(), False),
+                StructField("source_pipeline", StringType(), True),
+                StructField("source_node", StringType(), True),
+                StructField("target_pipeline", StringType(), True),
+                StructField("target_node", StringType(), True),
+                StructField("relationship", StringType(), False),  # "feeds" | "derived_from"
+                StructField("last_observed", TimestampType(), False),
+                StructField("run_id", StringType(), True),
             ]
         )
 
@@ -1014,6 +1059,396 @@ class CatalogManager:
             # Only log debug to avoid noise if table just doesn't exist or is empty yet
             logger.debug(f"Could not read local table at {path}: {e}")
             return pd.DataFrame()
+
+    def _hash_schema(self, schema: Dict[str, str]) -> str:
+        """Generate MD5 hash of column definitions for change detection."""
+        sorted_schema = json.dumps(schema, sort_keys=True)
+        return hashlib.md5(sorted_schema.encode("utf-8")).hexdigest()
+
+    def _get_latest_schema(self, table_path: str) -> Optional[Dict[str, Any]]:
+        """Get the most recent schema record for a table."""
+        if self.spark:
+            try:
+                from pyspark.sql import functions as F
+
+                df = self.spark.read.format("delta").load(self.tables["meta_schemas"])
+                row = (
+                    df.filter(F.col("table_path") == table_path)
+                    .orderBy(F.col("schema_version").desc())
+                    .first()
+                )
+                if row:
+                    return row.asDict()
+                return None
+            except Exception:
+                return None
+        elif self.engine:
+            df = self._read_local_table(self.tables["meta_schemas"])
+            if df.empty or "table_path" not in df.columns:
+                return None
+
+            filtered = df[df["table_path"] == table_path]
+            if filtered.empty:
+                return None
+
+            if "schema_version" in filtered.columns:
+                filtered = filtered.sort_values("schema_version", ascending=False)
+            return filtered.iloc[0].to_dict()
+
+        return None
+
+    def track_schema(
+        self,
+        table_path: str,
+        schema: Dict[str, str],
+        pipeline: str,
+        node: str,
+        run_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Track schema version for a table.
+
+        Args:
+            table_path: Full path to the table (e.g., "silver/customers")
+            schema: Dictionary of column names to types
+            pipeline: Pipeline name
+            node: Node name
+            run_id: Execution run ID
+
+        Returns:
+            Dict with version info and detected changes:
+            - changed: bool indicating if schema changed
+            - version: current schema version number
+            - previous_version: previous version (if exists)
+            - columns_added: list of new columns
+            - columns_removed: list of removed columns
+            - columns_type_changed: list of columns with type changes
+        """
+        if not self.spark and not self.engine:
+            return {"changed": False, "version": 0}
+
+        try:
+            schema_hash = self._hash_schema(schema)
+            previous = self._get_latest_schema(table_path)
+
+            if previous and previous.get("schema_hash") == schema_hash:
+                return {"changed": False, "version": previous.get("schema_version", 1)}
+
+            changes: Dict[str, Any] = {
+                "columns_added": [],
+                "columns_removed": [],
+                "columns_type_changed": [],
+            }
+
+            if previous:
+                prev_cols_str = previous.get("columns", "{}")
+                prev_cols = json.loads(prev_cols_str) if isinstance(prev_cols_str, str) else {}
+
+                changes["columns_added"] = list(set(schema.keys()) - set(prev_cols.keys()))
+                changes["columns_removed"] = list(set(prev_cols.keys()) - set(schema.keys()))
+                changes["columns_type_changed"] = [
+                    col for col in schema if col in prev_cols and schema[col] != prev_cols[col]
+                ]
+                new_version = previous.get("schema_version", 0) + 1
+            else:
+                new_version = 1
+
+            record = {
+                "table_path": table_path,
+                "schema_version": new_version,
+                "schema_hash": schema_hash,
+                "columns": json.dumps(schema),
+                "captured_at": datetime.now(timezone.utc),
+                "pipeline": pipeline,
+                "node": node,
+                "run_id": run_id,
+                "columns_added": changes["columns_added"] or None,
+                "columns_removed": changes["columns_removed"] or None,
+                "columns_type_changed": changes["columns_type_changed"] or None,
+            }
+
+            if self.spark:
+                df = self.spark.createDataFrame([record])
+                df.write.format("delta").mode("append").save(self.tables["meta_schemas"])
+
+            elif self.engine:
+                import pandas as pd
+
+                df = pd.DataFrame([record])
+                self.engine.write(
+                    df,
+                    connection=None,
+                    format="delta",
+                    path=self.tables["meta_schemas"],
+                    mode="append",
+                )
+
+            result = {
+                "changed": True,
+                "version": new_version,
+                "previous_version": previous.get("schema_version") if previous else None,
+                **changes,
+            }
+
+            logger.info(
+                f"Schema tracked for {table_path}: v{new_version} "
+                f"(+{len(changes['columns_added'])}/-{len(changes['columns_removed'])}/"
+                f"~{len(changes['columns_type_changed'])})"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.warning(f"Failed to track schema for {table_path}: {e}")
+            return {"changed": False, "version": 0, "error": str(e)}
+
+    def get_schema_history(
+        self,
+        table_path: str,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get schema version history for a table.
+
+        Args:
+            table_path: Full path to the table (e.g., "silver/customers")
+            limit: Maximum number of versions to return (default: 10)
+
+        Returns:
+            List of schema version records, most recent first
+        """
+        if not self.spark and not self.engine:
+            return []
+
+        try:
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                df = self.spark.read.format("delta").load(self.tables["meta_schemas"])
+                rows = (
+                    df.filter(F.col("table_path") == table_path)
+                    .orderBy(F.col("schema_version").desc())
+                    .limit(limit)
+                    .collect()
+                )
+                return [row.asDict() for row in rows]
+
+            elif self.engine:
+                df = self._read_local_table(self.tables["meta_schemas"])
+                if df.empty or "table_path" not in df.columns:
+                    return []
+
+                filtered = df[df["table_path"] == table_path]
+                if filtered.empty:
+                    return []
+
+                if "schema_version" in filtered.columns:
+                    filtered = filtered.sort_values("schema_version", ascending=False)
+
+                return filtered.head(limit).to_dict("records")
+
+        except Exception as e:
+            logger.warning(f"Failed to get schema history for {table_path}: {e}")
+            return []
+
+        return []
+
+    def record_lineage(
+        self,
+        source_table: str,
+        target_table: str,
+        target_pipeline: str,
+        target_node: str,
+        run_id: str,
+        source_pipeline: Optional[str] = None,
+        source_node: Optional[str] = None,
+        relationship: str = "feeds",
+    ) -> None:
+        """
+        Record a lineage relationship between tables.
+
+        Args:
+            source_table: Source table path
+            target_table: Target table path
+            target_pipeline: Pipeline name writing to target
+            target_node: Node name writing to target
+            run_id: Execution run ID
+            source_pipeline: Source pipeline name (if known)
+            source_node: Source node name (if known)
+            relationship: Type of relationship ("feeds" or "derived_from")
+        """
+        if not self.spark and not self.engine:
+            return
+
+        try:
+            record = {
+                "source_table": source_table,
+                "target_table": target_table,
+                "source_pipeline": source_pipeline,
+                "source_node": source_node,
+                "target_pipeline": target_pipeline,
+                "target_node": target_node,
+                "relationship": relationship,
+                "last_observed": datetime.now(timezone.utc),
+                "run_id": run_id,
+            }
+
+            if self.spark:
+                view_name = f"_odibi_lineage_upsert_{abs(hash(f'{source_table}_{target_table}'))}"
+                df = self.spark.createDataFrame([record])
+                df.createOrReplaceTempView(view_name)
+
+                target_path = self.tables["meta_lineage"]
+
+                merge_sql = f"""
+                    MERGE INTO delta.`{target_path}` AS target
+                    USING {view_name} AS source
+                    ON target.source_table = source.source_table
+                       AND target.target_table = source.target_table
+                    WHEN MATCHED THEN UPDATE SET
+                        target.source_pipeline = source.source_pipeline,
+                        target.source_node = source.source_node,
+                        target.target_pipeline = source.target_pipeline,
+                        target.target_node = source.target_node,
+                        target.relationship = source.relationship,
+                        target.last_observed = source.last_observed,
+                        target.run_id = source.run_id
+                    WHEN NOT MATCHED THEN INSERT *
+                """
+                self.spark.sql(merge_sql)
+                self.spark.catalog.dropTempView(view_name)
+
+            elif self.engine:
+                import pandas as pd
+
+                df = pd.DataFrame([record])
+                self.engine.write(
+                    df,
+                    connection=None,
+                    format="delta",
+                    path=self.tables["meta_lineage"],
+                    mode="upsert",
+                    options={"keys": ["source_table", "target_table"]},
+                )
+
+            logger.debug(f"Recorded lineage: {source_table} -> {target_table}")
+
+        except Exception as e:
+            logger.warning(f"Failed to record lineage: {e}")
+
+    def get_upstream(
+        self,
+        table_path: str,
+        depth: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all upstream sources for a table.
+
+        Args:
+            table_path: Table to trace upstream from
+            depth: Maximum depth to traverse
+
+        Returns:
+            List of upstream lineage records with depth information
+        """
+        if not self.spark and not self.engine:
+            return []
+
+        upstream = []
+        visited = set()
+        queue = [(table_path, 0)]
+
+        try:
+            while queue:
+                current, level = queue.pop(0)
+                if current in visited or level > depth:
+                    continue
+                visited.add(current)
+
+                if self.spark:
+                    from pyspark.sql import functions as F
+
+                    df = self.spark.read.format("delta").load(self.tables["meta_lineage"])
+                    sources = df.filter(F.col("target_table") == current).collect()
+                    for row in sources:
+                        record = row.asDict()
+                        record["depth"] = level
+                        upstream.append(record)
+                        queue.append((record["source_table"], level + 1))
+
+                elif self.engine:
+                    df = self._read_local_table(self.tables["meta_lineage"])
+                    if df.empty or "target_table" not in df.columns:
+                        break
+
+                    sources = df[df["target_table"] == current]
+                    for _, row in sources.iterrows():
+                        record = row.to_dict()
+                        record["depth"] = level
+                        upstream.append(record)
+                        queue.append((record["source_table"], level + 1))
+
+        except Exception as e:
+            logger.warning(f"Failed to get upstream lineage for {table_path}: {e}")
+
+        return upstream
+
+    def get_downstream(
+        self,
+        table_path: str,
+        depth: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all downstream consumers of a table.
+
+        Args:
+            table_path: Table to trace downstream from
+            depth: Maximum depth to traverse
+
+        Returns:
+            List of downstream lineage records with depth information
+        """
+        if not self.spark and not self.engine:
+            return []
+
+        downstream = []
+        visited = set()
+        queue = [(table_path, 0)]
+
+        try:
+            while queue:
+                current, level = queue.pop(0)
+                if current in visited or level > depth:
+                    continue
+                visited.add(current)
+
+                if self.spark:
+                    from pyspark.sql import functions as F
+
+                    df = self.spark.read.format("delta").load(self.tables["meta_lineage"])
+                    targets = df.filter(F.col("source_table") == current).collect()
+                    for row in targets:
+                        record = row.asDict()
+                        record["depth"] = level
+                        downstream.append(record)
+                        queue.append((record["target_table"], level + 1))
+
+                elif self.engine:
+                    df = self._read_local_table(self.tables["meta_lineage"])
+                    if df.empty or "source_table" not in df.columns:
+                        break
+
+                    targets = df[df["source_table"] == current]
+                    for _, row in targets.iterrows():
+                        record = row.to_dict()
+                        record["depth"] = level
+                        downstream.append(record)
+                        queue.append((record["target_table"], level + 1))
+
+        except Exception as e:
+            logger.warning(f"Failed to get downstream lineage for {table_path}: {e}")
+
+        return downstream
 
     def optimize(self) -> None:
         """

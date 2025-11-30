@@ -9,11 +9,33 @@ Features:
 - Quality scoring: Detect generic/lazy documentation
 - Schema validation: Verify config structure
 - Pre-run validation: Catch errors before execution
+- Quarantine tables: Route failed rows to dedicated tables
+- Quality gates: Batch-level validation thresholds
 
 Principle: Enforce excellence, don't hope for it.
 """
 
+from .engine import Validator
 from .explanation_linter import ExplanationLinter, LintIssue
+from .gate import GateResult, evaluate_gate
+from .quarantine import (
+    QuarantineResult,
+    add_quarantine_metadata,
+    has_quarantine_tests,
+    split_valid_invalid,
+    write_quarantine,
+)
 
-__all__ = ["ExplanationLinter", "LintIssue"]
+__all__ = [
+    "ExplanationLinter",
+    "LintIssue",
+    "Validator",
+    "GateResult",
+    "evaluate_gate",
+    "QuarantineResult",
+    "add_quarantine_metadata",
+    "has_quarantine_tests",
+    "split_valid_invalid",
+    "write_quarantine",
+]
 __version__ = "1.3.0-alpha.1"

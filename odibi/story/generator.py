@@ -58,6 +58,10 @@ class StoryGenerator:
         self.storage_options = storage_options or {}
         self.catalog_manager = catalog_manager
 
+        # Track last generated story for alert enrichment
+        self._last_story_path: Optional[str] = None
+        self._last_metadata: Optional[PipelineStoryMetadata] = None
+
         if not self.is_remote:
             self.output_path = Path(output_path)
             self.output_path.mkdir(parents=True, exist_ok=True)
@@ -206,10 +210,27 @@ class StoryGenerator:
             with open(json_path, "w", encoding="utf-8") as f:
                 f.write(json_content)
 
+        # Store for alert enrichment
+        self._last_story_path = html_path
+        self._last_metadata = metadata
+
         # Cleanup
         self.cleanup()
 
         return html_path
+
+    def get_alert_summary(self) -> Dict[str, Any]:
+        """Get a summary of the last generated story for alerts.
+
+        Returns:
+            Dictionary with metrics suitable for alert payloads
+        """
+        if not self._last_metadata:
+            return {}
+
+        summary = self._last_metadata.get_alert_summary()
+        summary["story_path"] = self._last_story_path
+        return summary
 
     def _convert_result_to_metadata(
         self, result: NodeResult, node_name: str

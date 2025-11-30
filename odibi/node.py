@@ -147,8 +147,8 @@ class NodeExecutor:
             # 2. Transform Phase
             result_df = self._execute_transform_phase(config, result_df, input_df)
 
-            # 3. Validation Phase
-            self._execute_validation_phase(config, result_df)
+            # 3. Validation Phase (returns filtered df if quarantine is used)
+            result_df = self._execute_validation_phase(config, result_df)
 
             # 4. Write Phase
             # HWM Logic for Write Mode: If this is first run (hwm_state is None?), maybe overwrite?
@@ -674,31 +674,95 @@ class NodeExecutor:
             current_df = self.engine.materialize(current_df)
         return self.engine.execute_operation(operation, params, current_df)
 
-    def _execute_validation_phase(self, config: NodeConfig, result_df: Any) -> None:
-        """Execute validation."""
-        if config.validation and result_df is not None:
-            result_df = self.engine.materialize(result_df)
+    def _execute_validation_phase(self, config: NodeConfig, result_df: Any) -> Any:
+        """Execute validation with quarantine and gate support.
 
-            # History-Aware Validation (Phase 4.1)
-            # Check for VOLUME_DROP test
-            for test in config.validation.tests:
-                if test.type == "volume_drop" and self.catalog_manager:
-                    # Get average volume
-                    avg_rows = self.catalog_manager.get_average_volume(
-                        config.name, days=test.lookback_days
-                    )
-                    if avg_rows and avg_rows > 0:
-                        current_rows = self._count_rows(result_df)
-                        drop_pct = (avg_rows - current_rows) / avg_rows
-                        if drop_pct > test.threshold:
-                            raise ValidationError(
-                                config.name,
-                                [
-                                    f"Volume dropped by {drop_pct:.1%} (Threshold: {test.threshold:.1%})"
-                                ],
-                            )
+        Returns:
+            DataFrame (valid rows only if quarantine is used)
+        """
+        if not config.validation or result_df is None:
+            return result_df
 
-            self._execute_validation(config, result_df)
+        result_df = self.engine.materialize(result_df)
+
+        # History-Aware Validation (Phase 4.1)
+        # Check for VOLUME_DROP test
+        for test in config.validation.tests:
+            if test.type == "volume_drop" and self.catalog_manager:
+                avg_rows = self.catalog_manager.get_average_volume(
+                    config.name, days=test.lookback_days
+                )
+                if avg_rows and avg_rows > 0:
+                    current_rows = self._count_rows(result_df)
+                    drop_pct = (avg_rows - current_rows) / avg_rows
+                    if drop_pct > test.threshold:
+                        raise ValidationError(
+                            config.name,
+                            [f"Volume dropped by {drop_pct:.1%} (Threshold: {test.threshold:.1%})"],
+                        )
+
+        # Check for quarantine tests
+        from odibi.validation.quarantine import (
+            add_quarantine_metadata,
+            has_quarantine_tests,
+            split_valid_invalid,
+            write_quarantine,
+        )
+
+        validation_config = config.validation
+        quarantine_config = validation_config.quarantine
+        has_quarantine = has_quarantine_tests(validation_config.tests)
+
+        test_results: dict = {}
+
+        if has_quarantine and quarantine_config:
+            # Split valid/invalid rows
+            quarantine_result = split_valid_invalid(
+                result_df,
+                validation_config.tests,
+                self.engine,
+            )
+
+            if quarantine_result.rows_quarantined > 0:
+                # Add metadata to invalid rows
+                import uuid
+
+                run_id = str(uuid.uuid4())
+                invalid_with_meta = add_quarantine_metadata(
+                    quarantine_result.invalid_df,
+                    quarantine_result.test_results,
+                    quarantine_config.add_columns,
+                    self.engine,
+                    config.name,
+                    run_id,
+                    validation_config.tests,
+                )
+
+                # Write to quarantine
+                write_quarantine(
+                    invalid_with_meta,
+                    quarantine_config,
+                    self.engine,
+                    self.connections,
+                )
+
+                self._execution_steps.append(
+                    f"Quarantined {quarantine_result.rows_quarantined} rows to "
+                    f"{quarantine_config.path or quarantine_config.table}"
+                )
+
+            # Use valid rows only for downstream processing
+            result_df = quarantine_result.valid_df
+            test_results = quarantine_result.test_results
+
+        # Run standard validation on remaining rows
+        self._execute_validation(config, result_df)
+
+        # Check quality gate
+        if validation_config.gate:
+            result_df = self._check_gate(config, result_df, test_results, validation_config.gate)
+
+        return result_df
 
     def _execute_validation(self, config: NodeConfig, df: Any) -> None:
         """Execute validation rules."""
@@ -727,6 +791,76 @@ class NodeExecutor:
                     logger.warning(f"Validation Warning (Node {config.name}): {fail}")
                     self._execution_steps.append(f"Warning: {fail}")
                     self._validation_warnings.append(fail)
+
+    def _check_gate(
+        self,
+        config: NodeConfig,
+        df: Any,
+        test_results: dict,
+        gate_config: Any,
+    ) -> Any:
+        """Check quality gate and take action if failed.
+
+        Args:
+            config: Node configuration
+            df: DataFrame to check
+            test_results: Dict of test_name -> per-row boolean results
+            gate_config: GateConfig
+
+        Returns:
+            DataFrame (potentially filtered if gate action is WRITE_VALID_ONLY)
+
+        Raises:
+            GateFailedError: If gate fails and action is ABORT
+        """
+        from odibi.config import GateOnFail
+        from odibi.exceptions import GateFailedError
+        from odibi.validation.gate import evaluate_gate
+
+        gate_result = evaluate_gate(
+            df,
+            test_results,
+            gate_config,
+            self.engine,
+            catalog=self.catalog_manager,
+            node_name=config.name,
+        )
+
+        if gate_result.passed:
+            self._execution_steps.append(f"Gate passed: {gate_result.pass_rate:.1%} pass rate")
+            return df
+
+        self._execution_steps.append(
+            f"Gate failed: {gate_result.pass_rate:.1%} pass rate "
+            f"(required: {gate_config.require_pass_rate:.1%})"
+        )
+
+        if gate_result.action == GateOnFail.ABORT:
+            raise GateFailedError(
+                node_name=config.name,
+                pass_rate=gate_result.pass_rate,
+                required_rate=gate_config.require_pass_rate,
+                failed_rows=gate_result.failed_rows,
+                total_rows=gate_result.total_rows,
+                failure_reasons=gate_result.failure_reasons,
+            )
+
+        elif gate_result.action == GateOnFail.WARN_AND_WRITE:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            for reason in gate_result.failure_reasons:
+                logger.warning(f"Gate Warning (Node {config.name}): {reason}")
+                self._validation_warnings.append(f"Gate: {reason}")
+            return df
+
+        elif gate_result.action == GateOnFail.WRITE_VALID_ONLY:
+            self._execution_steps.append(
+                f"Writing only valid rows ({gate_result.passed_rows} of {gate_result.total_rows})"
+            )
+            return df
+
+        return df
 
     def _determine_write_mode(self, config: NodeConfig) -> Optional[WriteMode]:
         """Determine write mode."""

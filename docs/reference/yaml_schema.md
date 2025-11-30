@@ -837,11 +837,168 @@ validation:
       threshold: 0.01   # Allow 1% failure
 ```
 
+**Recipe: Quarantine + Gate**
+```yaml
+validation:
+  tests:
+    - type: not_null
+      columns: [customer_id]
+      on_fail: quarantine
+  quarantine:
+    connection: silver
+    path: customers_quarantine
+  gate:
+    require_pass_rate: 0.95
+    on_fail: abort
+```
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **mode** | ValidationAction | No | `ValidationAction.FAIL` | Execution mode: 'fail' (stop pipeline) or 'warn' (log only) |
 | **on_fail** | OnFailAction | No | `OnFailAction.ALERT` | Action on failure: 'alert' (send notification) or 'ignore' |
 | **tests** | List[[TestConfig](#contracts-data-quality-gates)] | No | `PydanticUndefined` | List of validation tests<br>**Options:** [NotNullTest](#notnulltest), [UniqueTest](#uniquetest), [AcceptedValuesTest](#acceptedvaluestest), [RowCountTest](#rowcounttest), [CustomSQLTest](#customsqltest), [RangeTest](#rangetest), [RegexMatchTest](#regexmatchtest), [VolumeDropTest](#volumedroptest), [SchemaContract](#schemacontract), [DistributionContract](#distributioncontract), [FreshnessContract](#freshnesscontract) |
+| **quarantine** | Optional[[QuarantineConfig](#quarantineconfig)] | No | - | Quarantine configuration for failed rows |
+| **gate** | Optional[[GateConfig](#gateconfig)] | No | - | Quality gate configuration for batch-level validation |
+
+---
+
+### `QuarantineConfig`
+> *Used in: [ValidationConfig](#validationconfig)*
+
+Configuration for quarantine table routing.
+
+Routes rows that fail validation tests to a quarantine table
+with rejection metadata for later analysis/reprocessing.
+
+Example:
+```yaml
+validation:
+  tests:
+    - type: not_null
+      columns: [customer_id]
+      on_fail: quarantine
+  quarantine:
+    connection: silver
+    path: customers_quarantine
+    add_columns:
+      _rejection_reason: true
+      _rejected_at: true
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **connection** | str | Yes | - | Connection for quarantine writes |
+| **path** | Optional[str] | No | - | Path for quarantine data |
+| **table** | Optional[str] | No | - | Table name for quarantine |
+| **add_columns** | [QuarantineColumnsConfig](#quarantinecolumnsconfig) | No | `PydanticUndefined` | Metadata columns to add to quarantined rows |
+| **retention_days** | Optional[int] | No | `90` | Days to retain quarantined data (auto-cleanup) |
+
+---
+
+### `QuarantineColumnsConfig`
+> *Used in: [QuarantineConfig](#quarantineconfig)*
+
+Columns added to quarantined rows for debugging and reprocessing.
+
+Example:
+```yaml
+quarantine:
+  connection: silver
+  path: customers_quarantine
+  add_columns:
+    _rejection_reason: true
+    _rejected_at: true
+    _source_batch_id: true
+    _failed_tests: true
+    _original_node: false
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **rejection_reason** | bool | No | `True` | Add _rejection_reason column with test failure description |
+| **rejected_at** | bool | No | `True` | Add _rejected_at column with UTC timestamp |
+| **source_batch_id** | bool | No | `True` | Add _source_batch_id column with run ID for traceability |
+| **failed_tests** | bool | No | `True` | Add _failed_tests column with comma-separated list of failed test names |
+| **original_node** | bool | No | `False` | Add _original_node column with source node name |
+
+---
+
+### `GateConfig`
+> *Used in: [ValidationConfig](#validationconfig)*
+
+Quality gate configuration for batch-level validation.
+
+Gates evaluate the entire batch before writing, ensuring
+data quality thresholds are met.
+
+Example:
+```yaml
+gate:
+  require_pass_rate: 0.95
+  on_fail: abort
+  thresholds:
+    - test: not_null
+      min_pass_rate: 0.99
+  row_count:
+    min: 100
+    change_threshold: 0.5
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **require_pass_rate** | float | No | `0.95` | Minimum percentage of rows passing ALL tests |
+| **on_fail** | GateOnFail | No | `GateOnFail.ABORT` | Action when gate fails |
+| **thresholds** | List[[GateThreshold](#gatethreshold)] | No | `PydanticUndefined` | Per-test thresholds (overrides global require_pass_rate) |
+| **row_count** | Optional[[RowCountGate](#rowcountgate)] | No | - | Row count anomaly detection |
+
+---
+
+### `GateThreshold`
+> *Used in: [GateConfig](#gateconfig)*
+
+Per-test threshold configuration for quality gates.
+
+Allows setting different pass rate requirements for specific tests.
+
+Example:
+```yaml
+gate:
+  thresholds:
+    - test: not_null
+      min_pass_rate: 0.99
+    - test: unique
+      min_pass_rate: 1.0
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **test** | str | Yes | - | Test name or type to apply threshold to |
+| **min_pass_rate** | float | Yes | - | Minimum pass rate required (0.0-1.0, e.g., 0.99 = 99%) |
+
+---
+
+### `RowCountGate`
+> *Used in: [GateConfig](#gateconfig)*
+
+Row count anomaly detection for quality gates.
+
+Validates that batch size falls within expected bounds and
+detects significant changes from previous runs.
+
+Example:
+```yaml
+gate:
+  row_count:
+    min: 100
+    max: 1000000
+    change_threshold: 0.5
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **min** | Optional[int] | No | - | Minimum expected row count |
+| **max** | Optional[int] | No | - | Maximum expected row count |
+| **change_threshold** | Optional[float] | No | - | Max allowed change vs previous run (e.g., 0.5 = 50% change triggers failure) |
 
 ---
 
@@ -1246,22 +1403,39 @@ lineage:
 ### `AlertConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
-Configuration for alerts.
+Configuration for alerts with throttling support.
+
+Supports Slack, Teams, and generic webhooks with event-specific payloads.
+
+**Available Events:**
+- `on_start` - Pipeline started
+- `on_success` - Pipeline completed successfully
+- `on_failure` - Pipeline failed
+- `on_quarantine` - Rows were quarantined
+- `on_gate_block` - Quality gate blocked the pipeline
+- `on_threshold_breach` - A threshold was exceeded
 
 Example:
 ```yaml
 alerts:
-  - type: "slack"
-    url: "https://hooks.slack.com/..."
-    on_events: ["on_failure"]
+  - type: slack
+    url: "${SLACK_WEBHOOK_URL}"
+    on_events:
+      - on_failure
+      - on_quarantine
+      - on_gate_block
+    metadata:
+      throttle_minutes: 15
+      max_per_hour: 10
+      channel: "#data-alerts"
 ```
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | AlertType | Yes | - | - |
 | **url** | str | Yes | - | Webhook URL |
-| **on_events** | List[AlertEvent] | No | `[<AlertEvent.ON_FAILURE: 'on_failure'>]` | Events to trigger alert: on_start, on_success, on_failure |
-| **metadata** | Dict[str, Any] | No | `PydanticUndefined` | Extra metadata for alert (must be JSON-serializable, e.g. simple strings/numbers) |
+| **on_events** | List[AlertEvent] | No | `[<AlertEvent.ON_FAILURE: 'on_failure'>]` | Events to trigger alert: on_start, on_success, on_failure, on_quarantine, on_gate_block, on_threshold_breach |
+| **metadata** | Dict[str, Any] | No | `PydanticUndefined` | Extra metadata: throttle_minutes, max_per_hour, channel, etc. |
 
 ---
 

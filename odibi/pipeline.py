@@ -610,7 +610,13 @@ class Pipeline:
                     "duration": results.duration,
                     "timestamp": datetime.now().isoformat(),
                     "project_config": self.project_config,
+                    "event_type": event,
                 }
+
+                # Enrich with story summary (row counts, story URL)
+                if event != "on_start" and self.generate_story:
+                    story_summary = self.story_generator.get_alert_summary()
+                    context.update(story_summary)
 
                 msg = f"Pipeline '{self.config.pipeline}' {status}"
                 if results.failed:

@@ -248,6 +248,48 @@ class PipelineStoryMetadata:
                 total += node.rows_out
         return total
 
+    def get_total_rows_in(self) -> int:
+        """Calculate total input rows across all nodes."""
+        total = 0
+        for node in self.nodes:
+            if node.rows_in is not None:
+                total += node.rows_in
+        return total
+
+    def get_rows_dropped(self) -> int:
+        """Calculate total rows dropped (filtered) across all nodes."""
+        dropped = 0
+        for node in self.nodes:
+            if node.rows_in is not None and node.rows_out is not None:
+                diff = node.rows_in - node.rows_out
+                if diff > 0:
+                    dropped += diff
+        return dropped
+
+    def get_final_output_rows(self) -> Optional[int]:
+        """Get the row count from the last successful node (final output)."""
+        for node in reversed(self.nodes):
+            if node.status == "success" and node.rows_out is not None:
+                return node.rows_out
+        return None
+
+    def get_alert_summary(self) -> Dict[str, Any]:
+        """Get a summary suitable for alert payloads.
+
+        Returns:
+            Dictionary with key metrics for alerts
+        """
+        return {
+            "total_rows_processed": self.get_total_rows_processed(),
+            "total_rows_in": self.get_total_rows_in(),
+            "rows_dropped": self.get_rows_dropped(),
+            "final_output_rows": self.get_final_output_rows(),
+            "success_rate": self.get_success_rate(),
+            "completed_nodes": self.completed_nodes,
+            "failed_nodes": self.failed_nodes,
+            "skipped_nodes": self.skipped_nodes,
+        }
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {

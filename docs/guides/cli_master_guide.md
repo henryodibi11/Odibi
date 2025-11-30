@@ -129,6 +129,95 @@ odibi catalog stats config.yaml --days 30
 
 ---
 
+## 🔍 Level 5: Schema & Lineage Tracking
+
+### Schema Version History
+Track how table schemas evolve over time.
+
+```bash
+# View schema history for a table
+odibi schema history silver/customers --config config.yaml
+
+# Compare two schema versions
+odibi schema diff silver/customers --config config.yaml --from-version 3 --to-version 5
+
+# Output as JSON
+odibi schema history silver/customers --config config.yaml --format json
+```
+
+**Example Output:**
+```
+Schema History: silver/customers
+================================================================================
+Version    Captured At            Changes
+--------------------------------------------------------------------------------
+v5         2024-01-30 10:15:00    +loyalty_tier
+v4         2024-01-15 08:30:00    ~email (VARCHAR→STRING)
+v3         2024-01-01 12:00:00    -legacy_id
+v2         2023-12-15 09:00:00    +created_at, +updated_at
+v1         2023-12-01 10:00:00    Initial schema (12 columns)
+```
+
+### Cross-Pipeline Lineage
+Trace data dependencies across pipelines.
+
+```bash
+# Trace upstream sources
+odibi lineage upstream gold/customer_360 --config config.yaml
+
+# Trace downstream consumers
+odibi lineage downstream bronze/customers_raw --config config.yaml
+
+# Impact analysis - what would be affected by changes?
+odibi lineage impact bronze/customers_raw --config config.yaml
+```
+
+**Example Output (upstream):**
+```
+Upstream Lineage: gold/customer_360
+============================================================
+gold/customer_360
+└── silver/dim_customers (silver_pipeline.process_customers)
+    └── bronze/customers_raw (bronze_pipeline.ingest_customers)
+```
+
+**Example Output (impact):**
+```
+⚠️  Impact Analysis: bronze/customers_raw
+============================================================
+
+Changes to bronze/customers_raw would affect:
+
+  Affected Tables:
+    - silver/dim_customers (pipeline: silver_pipeline)
+    - gold/customer_360 (pipeline: gold_pipeline)
+    - gold/churn_features (pipeline: ml_pipeline)
+
+  Summary:
+    Total: 3 downstream table(s) in 2 pipeline(s)
+```
+
+**Schema Subcommands:**
+| Subcommand | Description |
+| :--- | :--- |
+| `history` | View schema version history for a table |
+| `diff` | Compare two schema versions |
+
+**Lineage Subcommands:**
+| Subcommand | Description |
+| :--- | :--- |
+| `upstream` | Trace upstream sources of a table |
+| `downstream` | Trace downstream consumers of a table |
+| `impact` | Impact analysis for schema changes |
+
+**Common Flags:**
+* `--config <path>`: Path to YAML config file (required)
+* `--depth <n>`: Maximum depth to traverse (default: 3)
+* `--format json`: Output as JSON
+* `--limit <n>`: Limit results (schema history only)
+
+---
+
 ## 📄 Command Reference
 
 | Command | Description |
@@ -141,4 +230,6 @@ odibi catalog stats config.yaml --days 30
 | `story` | Manage and compare execution reports (`generate`, `diff`, `list`). |
 | `secrets` | Manage local secure secrets (`init`, `validate`). |
 | `catalog` | Query System Catalog (`runs`, `pipelines`, `nodes`, `state`, `stats`). |
+| `schema` | Schema version tracking (`history`, `diff`). |
+| `lineage` | Cross-pipeline lineage (`upstream`, `downstream`, `impact`). |
 | `init-vscode` | Setup VS Code environment. |
