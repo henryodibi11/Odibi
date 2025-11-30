@@ -84,6 +84,51 @@ odibi secrets set MY_API_KEY value123
 
 ---
 
+## 🧠 Level 4: System Catalog (The Brain)
+
+### Query the System Catalog
+The System Catalog stores metadata about all your runs, pipelines, nodes, and state. Query it without manually reading Delta tables.
+
+```bash
+# List recent runs
+odibi catalog runs config.yaml
+
+# Filter by pipeline and status
+odibi catalog runs config.yaml --pipeline my_etl --status SUCCESS --days 14
+
+# List registered pipelines
+odibi catalog pipelines config.yaml
+
+# List nodes (optionally filter by pipeline)
+odibi catalog nodes config.yaml --pipeline my_etl
+
+# View HWM state checkpoints
+odibi catalog state config.yaml
+
+# Get execution statistics
+odibi catalog stats config.yaml --days 30
+```
+
+**Catalog Subcommands:**
+| Subcommand | Description |
+| :--- | :--- |
+| `runs` | List execution runs from `meta_runs` |
+| `pipelines` | List registered pipelines from `meta_pipelines` |
+| `nodes` | List registered nodes from `meta_nodes` |
+| `state` | List HWM state checkpoints from `meta_state` |
+| `tables` | List registered assets from `meta_tables` |
+| `metrics` | List metrics definitions from `meta_metrics` |
+| `patterns` | List pattern compliance from `meta_patterns` |
+| `stats` | Show execution statistics (success rate, avg duration, etc.) |
+
+**Common Flags:**
+* `--format json`: Output as JSON instead of ASCII table
+* `--pipeline <name>`: Filter by pipeline name
+* `--days <n>`: Show data from last N days (default: 7)
+* `--limit <n>`: Limit number of results (default: 20)
+
+---
+
 ## 📄 Command Reference
 
 | Command | Description |
@@ -95,4 +140,5 @@ odibi secrets set MY_API_KEY value123
 | `graph` | Visualize pipeline dependencies. |
 | `story` | Manage and compare execution reports (`generate`, `diff`, `list`). |
 | `secrets` | Manage local secure secrets (`init`, `validate`). |
+| `catalog` | Query System Catalog (`runs`, `pipelines`, `nodes`, `state`, `stats`). |
 | `init-vscode` | Setup VS Code environment. |

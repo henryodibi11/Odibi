@@ -1,10 +1,17 @@
 from odibi.registry import FunctionRegistry
 
 # Import all transform modules
-from odibi.transformers import advanced, relational, scd, sql_core, validation
+from odibi.transformers import (
+    advanced,
+    delete_detection,
+    relational,
+    scd,
+    sql_core,
+    validation,
+)
 
 # List of all standard library modules
-_MODULES = [sql_core, relational, advanced, scd, validation]
+_MODULES = [sql_core, relational, advanced, scd, validation, delete_detection]
 
 
 def register_standard_library():
@@ -71,6 +78,11 @@ def register_standard_library():
 
     # Validation
     registry.register(validation.cross_check, "cross_check", validation.CrossCheckParams)
+
+    # Delete Detection
+    from odibi.config import DeleteDetectionConfig
+
+    registry.register(delete_detection.detect_deletes, "detect_deletes", DeleteDetectionConfig)
 
 
 # Auto-register on import

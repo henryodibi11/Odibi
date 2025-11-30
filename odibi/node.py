@@ -776,6 +776,11 @@ class NodeExecutor:
                 df = self.engine.harmonize_schema(df, target_schema, config.schema_policy)
                 self._execution_steps.append("Applied Schema Policy (Harmonization)")
 
+        # Add metadata columns if configured
+        if write_config.add_metadata and df is not None:
+            df = self._add_write_metadata(config, df)
+            self._execution_steps.append("Added Bronze metadata columns")
+
         write_options = write_config.options.copy() if write_config.options else {}
         deep_diag = write_options.pop("deep_diagnostics", False)
         diff_keys = write_options.pop("diff_keys", None)
@@ -817,6 +822,47 @@ class NodeExecutor:
             self._calculate_delta_diagnostics(
                 delta_info, connection, write_config, deep_diag, diff_keys
             )
+
+    def _add_write_metadata(self, config: NodeConfig, df: Any) -> Any:
+        """Add Bronze metadata columns to DataFrame before writing.
+
+        Args:
+            config: Node configuration containing read/write settings
+            df: DataFrame to add metadata to
+
+        Returns:
+            DataFrame with metadata columns added
+        """
+        write_config = config.write
+        read_config = config.read
+
+        # Determine source info from read config
+        source_connection = None
+        source_table = None
+        source_path = None
+        is_file_source = False
+
+        if read_config:
+            source_connection = read_config.connection
+            source_table = read_config.table
+
+            # Determine if file source based on format
+            read_format = str(read_config.format).lower()
+            file_formats = {"csv", "parquet", "json", "avro", "excel"}
+            is_file_source = read_format in file_formats
+
+            if is_file_source:
+                source_path = read_config.path
+
+        # Call engine's metadata helper
+        return self.engine.add_write_metadata(
+            df=df,
+            metadata_config=write_config.add_metadata,
+            source_connection=source_connection,
+            source_table=source_table,
+            source_path=source_path,
+            is_file_source=is_file_source,
+        )
 
     def _calculate_delta_diagnostics(
         self,

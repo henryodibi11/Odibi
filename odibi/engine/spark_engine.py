@@ -736,6 +736,60 @@ class SparkEngine(Engine):
 
         return None
 
+    def add_write_metadata(
+        self,
+        df,
+        metadata_config,
+        source_connection: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_path: Optional[str] = None,
+        is_file_source: bool = False,
+    ):
+        """Add metadata columns to DataFrame before writing (Bronze layer lineage).
+
+        Args:
+            df: Spark DataFrame
+            metadata_config: WriteMetadataConfig or True (for all defaults)
+            source_connection: Name of the source connection
+            source_table: Name of the source table (SQL sources)
+            source_path: Path of the source file (file sources)
+            is_file_source: True if source is a file-based read
+
+        Returns:
+            DataFrame with metadata columns added
+        """
+        from pyspark.sql.functions import current_timestamp, input_file_name, lit
+
+        from odibi.config import WriteMetadataConfig
+
+        # Normalize config: True -> all defaults
+        if metadata_config is True:
+            config = WriteMetadataConfig()
+        elif isinstance(metadata_config, WriteMetadataConfig):
+            config = metadata_config
+        else:
+            return df  # None or invalid -> no metadata
+
+        # _extracted_at: always applicable
+        if config.extracted_at:
+            df = df.withColumn("_extracted_at", current_timestamp())
+
+        # _source_file: only for file sources
+        if config.source_file and is_file_source:
+            # input_file_name() returns the file path for each row
+            # This only works if the DataFrame was read from files
+            df = df.withColumn("_source_file", input_file_name())
+
+        # _source_connection: all sources
+        if config.source_connection and source_connection:
+            df = df.withColumn("_source_connection", lit(source_connection))
+
+        # _source_table: SQL sources only
+        if config.source_table and source_table:
+            df = df.withColumn("_source_table", lit(source_table))
+
+        return df
+
     def execute_sql(self, sql: str, context) -> Any:
         """Execute SQL query using Spark SQL.
 

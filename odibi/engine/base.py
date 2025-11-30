@@ -307,3 +307,27 @@ class Engine(ABC):
             config: AutoOptimizeConfig object
         """
         pass
+
+    def add_write_metadata(
+        self,
+        df: Any,
+        metadata_config: Any,
+        source_connection: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_path: Optional[str] = None,
+        is_file_source: bool = False,
+    ) -> Any:
+        """Add metadata columns to DataFrame before writing (Bronze layer lineage).
+
+        Args:
+            df: DataFrame
+            metadata_config: WriteMetadataConfig or True (for all defaults)
+            source_connection: Name of the source connection
+            source_table: Name of the source table (SQL sources)
+            source_path: Path of the source file (file sources)
+            is_file_source: True if source is a file-based read
+
+        Returns:
+            DataFrame with metadata columns added (or unchanged if metadata_config is None/False)
+        """
+        return df  # Default: no-op

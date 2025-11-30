@@ -61,7 +61,7 @@ flowchart TB
 ### The Rule
 
 ```
-Bronze = append(raw_row + _extracted_at + _batch_id)
+Bronze = append(raw_row + _extracted_at + metadata)
 ```
 
 **Never dedupe in Bronze. Never delete in Bronze.**
@@ -92,7 +92,7 @@ nodes:
       connection: bronze
       table: customers
       mode: append              # ALWAYS append for Bronze
-      add_metadata: true        # adds _extracted_at, _batch_id
+      add_metadata: true        # adds _extracted_at, _source_file, etc.
 ```
 
 ---
@@ -187,8 +187,9 @@ deleted_keys = (keys in previous_snapshot) - (keys in current_snapshot)
 
 **Implementation Concept:**
 ```python
-prev = bronze.filter(_batch_id == N-1).select(keys).distinct()
-curr = bronze.filter(_batch_id == N).select(keys).distinct()
+# Uses Delta time travel (no batch_id column needed)
+prev = delta_table.version(N-1).select(keys).distinct()
+curr = delta_table.version(N).select(keys).distinct()
 deleted = prev.exceptAll(curr)
 ```
 
@@ -272,17 +273,25 @@ For tables like **downtime, production, energy** where:
 - Records can be hard-deleted (reversals)
 - But volume is high
 
-**Recommended:** Daily HWM with weekly full snapshot
+**Recommended approaches:**
+
+1. **Use `sql_compare`** (simpler) - If source is authoritative and reachable, just use HWM with `sql_compare`. No full snapshots needed.
+
+2. **Hybrid HWM + Snapshot** (complex) - If source is unreliable/staging:
+   - Daily: HWM ingestion
+   - Weekly: Full snapshot (enables `snapshot_diff`)
+   - Requires filtering Bronze to latest snapshot in Silver
 
 ```yaml
-ingestion:
-  strategy: hybrid
-  hwm:
-    column: updated_at
-    watermark_lag: 2h
-  snapshot:
-    schedule: "0 0 * * SAT"  # Weekly full refresh
-    delete_detection: snapshot_diff
+# Option 1: sql_compare (recommended)
+incremental:
+  mode: stateful
+  column: updated_at
+  watermark_lag: 2h
+# Then use detect_deletes with mode: sql_compare
+
+# Option 2: Hybrid (only if sql_compare won't work)
+# Use two separate pipeline runs or orchestrator-controlled mode
 ```
 
 ---
@@ -298,20 +307,21 @@ nodes:
       connection: bronze
       table: customers
     transform:
-      # REQUIRED: Deduplication
-      - dedupe:
-          keys: [customer_id]
-          order_by: _extracted_at DESC
+      steps:
+        # REQUIRED: Deduplication
+        - operation: deduplicate
+          params:
+            keys: [customer_id]
+            order_by: _extracted_at DESC
 
-      # OPTIONAL: Delete Detection
-      - delete_detection:
-          mode: snapshot_diff   # or: sql_compare, none
-          keys: [customer_id]
-          soft_delete_col: _is_deleted  # adds flag instead of removing
-
-          # For sql_compare mode only:
-          # source_connection: azure_sql
-          # source_table: dbo.Customers
+        # OPTIONAL: Delete Detection (sql_compare recommended for HWM)
+        - operation: detect_deletes
+          params:
+            mode: sql_compare
+            keys: [customer_id]
+            source_connection: azure_sql
+            source_table: dbo.Customers
+            soft_delete_col: _is_deleted
     write:
       connection: silver
       table: customers
@@ -326,10 +336,12 @@ nodes:
 | `mode` | enum | `none`, `snapshot_diff`, `sql_compare` |
 | `keys` | list | Business key columns for comparison |
 | `soft_delete_col` | string | Column to flag deletes (default: `_is_deleted`). If null, hard-delete. |
-| `lookback_batches` | int | For `snapshot_diff`: compare to N batches ago (default: 1) |
 | `source_connection` | string | For `sql_compare`: connection to query |
 | `source_table` | string | For `sql_compare`: table to query |
 | `source_query` | string | For `sql_compare`: custom query (overrides source_table) |
+| `max_delete_percent` | float | Safety threshold: warn/error if more than X% would be deleted (default: 50) |
+| `on_threshold_breach` | enum | Behavior when threshold exceeded: `warn`, `error`, `skip` |
+| `on_first_run` | enum | Behavior when no previous version exists: `skip`, `error` |
 
 ---
 
@@ -338,10 +350,10 @@ nodes:
 | Table Type | Example | Ingestion | Delete Mode | Why |
 |------------|---------|-----------|-------------|-----|
 | **Immutable facts** | Events, logs, sensor data | HWM on `created_at` | `none` | Facts don't delete |
-| **Mutable facts** | Downtime, production records | HWM + periodic snapshot | `snapshot_diff` | Corrections happen |
+| **Mutable facts** | Downtime, production records | HWM on `updated_at` | `sql_compare` | Source is authoritative |
 | **Dimensions (SQL auth)** | Customers from ERP | HWM on `updated_at` | `sql_compare` | ERP is truth |
-| **Dimensions (staging)** | Staging from RPA | Daily snapshot | `snapshot_diff` | Staging is ephemeral |
-| **Reference data** | Country codes, units | Snapshot | `snapshot_diff` | Rarely changes |
+| **Dimensions (staging)** | Staging from RPA | Full snapshot | `snapshot_diff` | Staging is ephemeral |
+| **Reference data** | Country codes, units | Full snapshot | `snapshot_diff` | Rarely changes, small tables |
 
 ---
 

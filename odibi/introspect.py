@@ -61,6 +61,8 @@ GROUP_MAPPING = {
     "ReadConfig": "Operation",
     "IncrementalConfig": "Operation",
     "WriteConfig": "Operation",
+    "WriteMetadataConfig": "Operation",
+    "DeleteDetectionConfig": "Operation",
     "TransformConfig": "Operation",
     "ValidationConfig": "Operation",
     "ColumnMetadata": "Core",
@@ -100,6 +102,7 @@ TRANSFORM_CATEGORY_MAP = {
     "odibi.transformers.scd": "Warehousing Patterns",
     "odibi.transformers.validation": "Data Quality",
     "odibi.transformers.merge_transformer": "Warehousing Patterns",
+    "odibi.transformers.delete_detection": "Data Engineering Patterns",
 }
 
 CUSTOM_ORDER = [
@@ -116,8 +119,10 @@ CUSTOM_ORDER = [
     "IncrementalConfig",
     "TimeTravelConfig",
     "TransformConfig",
+    "DeleteDetectionConfig",
     "ValidationConfig",
     "WriteConfig",
+    "WriteMetadataConfig",
     # Connections (Common first)
     "LocalConnectionConfig",
     "DeltaConnectionConfig",
@@ -610,6 +615,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                         "Relational Algebra",
                         "Data Quality",
                         "Warehousing Patterns",
+                        "Data Engineering Patterns",
                         "Advanced & Feature Engineering",
                         "Other Transformers",
                     ]

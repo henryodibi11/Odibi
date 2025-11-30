@@ -1,8 +1,15 @@
 import json
+import re
 import sys
 from io import StringIO
 
 from odibi.utils.logging import StructuredLogger
+
+
+def strip_ansi(text):
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 class TestStructuredLogger:
@@ -25,7 +32,7 @@ class TestStructuredLogger:
             logger = StructuredLogger(structured=False)
             logger.info("Test message", extra="value")
 
-            output = captured.getvalue()
+            output = strip_ansi(captured.getvalue())
             assert "Test message" in output
             assert "extra=value" in output
             assert "{" not in output  # Should not be JSON

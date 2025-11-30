@@ -712,6 +712,82 @@ transform:
 
 ---
 
+### `DeleteDetectionConfig`
+Configuration for delete detection in Silver layer.
+
+### 🔍 "CDC Without CDC" Guide
+
+**Business Problem:**
+"Records are deleted in our Azure SQL source, but our Silver tables still show them."
+
+**The Solution:**
+Use delete detection to identify and flag records that no longer exist in the source.
+
+**Recipe 1: SQL Compare (Recommended for HWM)**
+```yaml
+transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: azure_sql
+        source_table: dbo.Customers
+```
+
+**Recipe 2: Snapshot Diff (For Full Snapshot Sources)**
+Use ONLY with full snapshot ingestion, NOT with HWM incremental.
+```yaml
+transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: snapshot_diff
+        keys: [customer_id]
+```
+
+**Recipe 3: Conservative Threshold**
+```yaml
+transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: erp
+        source_table: dbo.Customers
+        max_delete_percent: 20.0
+        on_threshold_breach: error
+```
+
+**Recipe 4: Hard Delete (Remove Rows)**
+```yaml
+transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: azure_sql
+        source_table: dbo.Customers
+        soft_delete_col: null  # removes rows instead of flagging
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **mode** | DeleteDetectionMode | No | `DeleteDetectionMode.NONE` | Delete detection strategy: none, snapshot_diff, sql_compare |
+| **keys** | List[str] | No | `PydanticUndefined` | Business key columns for comparison |
+| **soft_delete_col** | Optional[str] | No | `_is_deleted` | Column to flag deletes (True = deleted). Set to null for hard-delete (removes rows). |
+| **source_connection** | Optional[str] | No | - | For sql_compare: connection name to query live source |
+| **source_table** | Optional[str] | No | - | For sql_compare: table to query for current keys |
+| **source_query** | Optional[str] | No | - | For sql_compare: custom SQL query for keys (overrides source_table) |
+| **snapshot_column** | Optional[str] | No | - | For snapshot_diff on non-Delta: column to identify snapshots. If None, uses Delta time travel (default). |
+| **on_first_run** | FirstRunBehavior | No | `FirstRunBehavior.SKIP` | Behavior when no previous version exists for snapshot_diff |
+| **max_delete_percent** | Optional[float] | No | `50.0` | Safety threshold: warn/error if more than X% of rows would be deleted |
+| **on_threshold_breach** | ThresholdBreachAction | No | `ThresholdBreachAction.WARN` | Behavior when delete percentage exceeds max_delete_percent |
+
+---
+
 ### `ValidationConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
@@ -820,6 +896,57 @@ write:
 | **first_run_query** | Optional[str] | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
 | **auto_optimize** | bool | [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
+| **add_metadata** | bool | [WriteMetadataConfig](#writemetadataconfig) | No | - | Add metadata columns for Bronze layer lineage. Set to `true` to add all applicable columns, or provide a WriteMetadataConfig for selective columns. Columns: _extracted_at, _source_file (file sources), _source_connection, _source_table (SQL sources). |
+
+---
+
+### `WriteMetadataConfig`
+> *Used in: [WriteConfig](#writeconfig)*
+
+Configuration for metadata columns added during Bronze writes.
+
+### 📋 Bronze Metadata Guide
+
+**Business Problem:**
+"We need lineage tracking and debugging info for our Bronze layer data."
+
+**The Solution:**
+Add metadata columns during ingestion for traceability.
+
+**Recipe 1: Add All Metadata (Recommended)**
+```yaml
+write:
+  connection: bronze
+  table: customers
+  mode: append
+  add_metadata: true  # adds all applicable columns
+```
+
+**Recipe 2: Selective Metadata**
+```yaml
+write:
+  connection: bronze
+  table: customers
+  mode: append
+  add_metadata:
+    extracted_at: true
+    source_file: true
+    source_connection: false
+    source_table: false
+```
+
+**Available Columns:**
+- `_extracted_at`: Pipeline execution timestamp (all sources)
+- `_source_file`: Source filename/path (file sources only)
+- `_source_connection`: Connection name used (all sources)
+- `_source_table`: Table or query name (SQL sources only)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **extracted_at** | bool | No | `True` | Add _extracted_at column with pipeline execution timestamp |
+| **source_file** | bool | No | `True` | Add _source_file column with source filename (file sources only) |
+| **source_connection** | bool | No | `False` | Add _source_connection column with connection name |
+| **source_table** | bool | No | `False` | Add _source_table column with table/query name (SQL sources only) |
 
 ---
 

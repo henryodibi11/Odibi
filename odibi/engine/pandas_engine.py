@@ -878,6 +878,59 @@ class PandasEngine(Engine):
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
+    def add_write_metadata(
+        self,
+        df: pd.DataFrame,
+        metadata_config,
+        source_connection: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_path: Optional[str] = None,
+        is_file_source: bool = False,
+    ) -> pd.DataFrame:
+        """Add metadata columns to DataFrame before writing (Bronze layer lineage).
+
+        Args:
+            df: Pandas DataFrame
+            metadata_config: WriteMetadataConfig or True (for all defaults)
+            source_connection: Name of the source connection
+            source_table: Name of the source table (SQL sources)
+            source_path: Path of the source file (file sources)
+            is_file_source: True if source is a file-based read
+
+        Returns:
+            DataFrame with metadata columns added
+        """
+        from odibi.config import WriteMetadataConfig
+
+        # Normalize config: True -> all defaults
+        if metadata_config is True:
+            config = WriteMetadataConfig()
+        elif isinstance(metadata_config, WriteMetadataConfig):
+            config = metadata_config
+        else:
+            return df  # None or invalid -> no metadata
+
+        # Work on a copy to avoid modifying original
+        df = df.copy()
+
+        # _extracted_at: always applicable
+        if config.extracted_at:
+            df["_extracted_at"] = pd.Timestamp.now()
+
+        # _source_file: only for file sources
+        if config.source_file and is_file_source and source_path:
+            df["_source_file"] = source_path
+
+        # _source_connection: all sources
+        if config.source_connection and source_connection:
+            df["_source_connection"] = source_connection
+
+        # _source_table: SQL sources only
+        if config.source_table and source_table:
+            df["_source_table"] = source_table
+
+        return df
+
     def _register_lazy_view_unused(self, conn, name: str, df: Any) -> None:
         """Register a LazyDataset as a DuckDB view."""
         duck_fmt = df.format

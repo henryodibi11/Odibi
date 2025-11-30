@@ -3,6 +3,7 @@
 import argparse
 import sys
 
+from odibi.cli.catalog import add_catalog_parser, catalog_command
 from odibi.cli.doctor import add_doctor_parser, doctor_command
 from odibi.cli.export import add_export_parser, export_command
 from odibi.cli.graph import graph_command
@@ -124,6 +125,9 @@ Examples:
     # odibi export
     add_export_parser(subparsers)
 
+    # odibi catalog
+    add_catalog_parser(subparsers)
+
     args = parser.parse_args()
 
     # Configure logging
@@ -162,6 +166,8 @@ Examples:
         return ui_command(args)
     elif args.command == "export":
         return export_command(args)
+    elif args.command == "catalog":
+        return catalog_command(args)
     else:
         parser.print_help()
         return 1

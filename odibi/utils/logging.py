@@ -22,7 +22,12 @@ class StructuredLogger:
         self._secrets = set()
 
         # Fix Windows Unicode handling
-        if sys.platform == "win32" and sys.stdout.encoding.lower() != "utf-8":
+        if (
+            sys.platform == "win32"
+            and sys.stdout
+            and sys.stdout.encoding
+            and sys.stdout.encoding.lower() != "utf-8"
+        ):
             try:
                 sys.stdout.reconfigure(encoding="utf-8")
             except AttributeError:
