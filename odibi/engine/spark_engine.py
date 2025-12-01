@@ -810,22 +810,18 @@ class SparkEngine(Engine):
         # Register as External Table if requested
         if register_table and format == "delta":
             try:
-                import logging
-
-                logger = logging.getLogger(__name__)
-                logger.info(f"Registering external table '{register_table}' at '{full_path}'")
+                print(f"[ODIBI] Registering external table '{register_table}' at '{full_path}'")
                 self.spark.sql(
                     f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
                 )
-                logger.info(f"Successfully registered table '{register_table}'")
+                print(f"[ODIBI] Successfully registered table '{register_table}'")
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
-                logger.error(f"Failed to register external table '{register_table}': {e}")
+                print(f"[ODIBI] Failed to register external table '{register_table}': {e}")
                 raise RuntimeError(
                     f"Failed to register external table '{register_table}': {e}"
                 ) from e
+        else:
+            print(f"[ODIBI] Skipping register_table: register_table={register_table}, format={format}")
 
         if format == "delta":
             return self._get_last_delta_commit_info(full_path, is_table=False)
