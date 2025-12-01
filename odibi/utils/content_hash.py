@@ -88,14 +88,13 @@ def compute_spark_dataframe_hash(
     return hashlib.sha256(csv_bytes).hexdigest()
 
 
-HASH_METADATA_KEY = "odibi.content_hash"
-HASH_TIMESTAMP_KEY = "odibi.content_hash_timestamp"
+HASH_METADATA_FILENAME = "_odibi_content_hash.json"
 
 
 def get_delta_content_hash(
     table_path: str, storage_options: Optional[dict] = None
 ) -> Optional[str]:
-    """Retrieve stored content hash from Delta table metadata.
+    """Retrieve stored content hash from Delta table metadata file.
 
     Args:
         table_path: Path to Delta table
@@ -104,14 +103,15 @@ def get_delta_content_hash(
     Returns:
         Previously stored hash string, or None if not found
     """
+    import json
+    import os
+
     try:
-        from deltalake import DeltaTable
-
-        dt = DeltaTable(table_path, storage_options=storage_options)
-        metadata = dt.metadata()
-
-        if metadata.configuration:
-            return metadata.configuration.get(HASH_METADATA_KEY)
+        hash_file = os.path.join(table_path, HASH_METADATA_FILENAME)
+        if os.path.exists(hash_file):
+            with open(hash_file) as f:
+                data = json.load(f)
+                return data.get("content_hash")
         return None
     except Exception:
         return None
@@ -122,27 +122,24 @@ def set_delta_content_hash(
     content_hash: str,
     storage_options: Optional[dict] = None,
 ) -> None:
-    """Store content hash in Delta table metadata.
+    """Store content hash in Delta table metadata file.
 
     Args:
         table_path: Path to Delta table
         content_hash: Hash string to store
         storage_options: Cloud storage options (for Azure, S3, etc.)
     """
+    import json
+    import os
     from datetime import datetime
 
-    from deltalake import DeltaTable
-
-    dt = DeltaTable(table_path, storage_options=storage_options)
-
-    current_config = dt.metadata().configuration or {}
-    new_config = {
-        **current_config,
-        HASH_METADATA_KEY: content_hash,
-        HASH_TIMESTAMP_KEY: datetime.utcnow().isoformat(),
+    hash_file = os.path.join(table_path, HASH_METADATA_FILENAME)
+    data = {
+        "content_hash": content_hash,
+        "timestamp": datetime.utcnow().isoformat(),
     }
-
-    dt.alter.set_table_properties(new_config)
+    with open(hash_file, "w") as f:
+        json.dump(data, f)
 
 
 def get_spark_delta_content_hash(
@@ -150,7 +147,7 @@ def get_spark_delta_content_hash(
     table: Optional[str] = None,
     path: Optional[str] = None,
 ) -> Optional[str]:
-    """Retrieve stored content hash from Delta table metadata (Spark).
+    """Retrieve stored content hash from Delta table metadata file (Spark).
 
     Args:
         spark: SparkSession
@@ -160,17 +157,27 @@ def get_spark_delta_content_hash(
     Returns:
         Previously stored hash string, or None if not found
     """
+    import json
+
     try:
-        from delta.tables import DeltaTable
-
         if table:
-            dt = DeltaTable.forName(spark, table)
-        else:
-            dt = DeltaTable.forPath(spark, path)
+            from delta.tables import DeltaTable
 
-        detail = dt.detail().collect()[0]
-        properties = detail.properties or {}
-        return properties.get(HASH_METADATA_KEY)
+            dt = DeltaTable.forName(spark, table)
+            table_path = dt.detail().collect()[0].location
+        else:
+            table_path = path
+
+        hash_file = f"{table_path}/{HASH_METADATA_FILENAME}"
+
+        try:
+            content = spark.read.text(hash_file).collect()
+            if content:
+                data = json.loads(content[0][0])
+                return data.get("content_hash")
+        except Exception:
+            pass
+        return None
     except Exception:
         return None
 
@@ -181,7 +188,7 @@ def set_spark_delta_content_hash(
     table: Optional[str] = None,
     path: Optional[str] = None,
 ) -> None:
-    """Store content hash in Delta table metadata (Spark).
+    """Store content hash in Delta table metadata file (Spark).
 
     Args:
         spark: SparkSession
@@ -189,17 +196,23 @@ def set_spark_delta_content_hash(
         table: Table name (catalog)
         path: Table path
     """
+    import json
     from datetime import datetime
 
-    target = table if table else f"delta.`{path}`"
-    timestamp = datetime.utcnow().isoformat()
+    if table:
+        from delta.tables import DeltaTable
 
-    spark.sql(
-        f"""
-        ALTER TABLE {target}
-        SET TBLPROPERTIES (
-            '{HASH_METADATA_KEY}' = '{content_hash}',
-            '{HASH_TIMESTAMP_KEY}' = '{timestamp}'
-        )
-    """
+        dt = DeltaTable.forName(spark, table)
+        table_path = dt.detail().collect()[0].location
+    else:
+        table_path = path
+
+    hash_file = f"{table_path}/{HASH_METADATA_FILENAME}"
+    data = json.dumps(
+        {
+            "content_hash": content_hash,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
     )
+
+    spark.createDataFrame([(data,)], ["value"]).coalesce(1).write.mode("overwrite").text(hash_file)
