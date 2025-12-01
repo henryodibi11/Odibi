@@ -7,7 +7,6 @@ modules = [
     "odibi/pipeline.py",
     "odibi/config.py",
     "odibi/context.py",
-    "odibi/state.py",
 ]
 
 # Check if we are in a build environment that supports compilation
