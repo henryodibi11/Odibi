@@ -109,51 +109,61 @@ class TestComputeDataframeHash:
         assert all(c in "0123456789abcdef" for c in hash_val)
 
 
-class TestDeltaContentHashStorage:
-    """Tests for Delta table hash storage/retrieval."""
+class TestContentHashStateStorage:
+    """Tests for content hash storage via state backend."""
 
     @pytest.fixture
-    def temp_delta_path(self, tmp_path):
-        """Create a temporary Delta table."""
-        delta_path = tmp_path / "test_delta"
+    def mock_state_backend(self):
+        """Create a mock state backend."""
+        from unittest.mock import MagicMock
 
-        try:
-            from deltalake import write_deltalake
-        except ImportError:
-            pytest.skip("deltalake not installed")
+        backend = MagicMock()
+        backend._hwm_store = {}
 
-        df = pd.DataFrame({"id": [1, 2, 3], "value": ["a", "b", "c"]})
-        write_deltalake(str(delta_path), df)
+        def get_hwm(key):
+            return backend._hwm_store.get(key)
 
-        return str(delta_path)
+        def set_hwm(key, value):
+            backend._hwm_store[key] = value
 
-    def test_get_hash_returns_none_for_new_table(self, temp_delta_path):
+        backend.get_hwm = get_hwm
+        backend.set_hwm = set_hwm
+        return backend
+
+    def test_get_hash_returns_none_when_not_set(self, mock_state_backend):
         """Should return None if no hash has been stored."""
-        from odibi.utils.content_hash import get_delta_content_hash
+        from odibi.utils.content_hash import get_content_hash_from_state
 
-        result = get_delta_content_hash(temp_delta_path)
+        result = get_content_hash_from_state(mock_state_backend, "test_node", "test_table")
         assert result is None
 
-    def test_set_and_get_hash(self, temp_delta_path):
+    def test_set_and_get_hash(self, mock_state_backend):
         """Should be able to store and retrieve hash."""
         from odibi.utils.content_hash import (
-            get_delta_content_hash,
-            set_delta_content_hash,
+            get_content_hash_from_state,
+            set_content_hash_in_state,
         )
 
         test_hash = "abc123def456" * 5 + "abcd"  # 64 chars
 
-        set_delta_content_hash(temp_delta_path, test_hash)
-        retrieved = get_delta_content_hash(temp_delta_path)
+        set_content_hash_in_state(mock_state_backend, "test_node", "test_table", test_hash)
+        retrieved = get_content_hash_from_state(mock_state_backend, "test_node", "test_table")
 
         assert retrieved == test_hash
 
-    def test_get_hash_nonexistent_table(self):
-        """Should return None for non-existent table."""
-        from odibi.utils.content_hash import get_delta_content_hash
+    def test_get_hash_with_none_backend(self):
+        """Should return None when backend is None."""
+        from odibi.utils.content_hash import get_content_hash_from_state
 
-        result = get_delta_content_hash("/nonexistent/path/to/table")
+        result = get_content_hash_from_state(None, "test_node", "test_table")
         assert result is None
+
+    def test_make_content_hash_key(self):
+        """Should generate correct key format."""
+        from odibi.utils.content_hash import make_content_hash_key
+
+        key = make_content_hash_key("my_node", "my_table")
+        assert key == "content_hash:my_node:my_table"
 
 
 class TestWriteConfigSkipIfUnchanged:

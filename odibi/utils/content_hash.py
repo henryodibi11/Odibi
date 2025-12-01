@@ -88,131 +88,65 @@ def compute_spark_dataframe_hash(
     return hashlib.sha256(csv_bytes).hexdigest()
 
 
-HASH_METADATA_FILENAME = "_odibi_content_hash.json"
-
-
-def get_delta_content_hash(
-    table_path: str, storage_options: Optional[dict] = None
-) -> Optional[str]:
-    """Retrieve stored content hash from Delta table metadata file.
+def make_content_hash_key(node_name: str, table_name: str) -> str:
+    """Generate a state key for content hash storage.
 
     Args:
-        table_path: Path to Delta table
-        storage_options: Cloud storage options (for Azure, S3, etc.)
+        node_name: Pipeline node name
+        table_name: Target table name
+
+    Returns:
+        State key string
+    """
+    return f"content_hash:{node_name}:{table_name}"
+
+
+def get_content_hash_from_state(state_backend, node_name: str, table_name: str) -> Optional[str]:
+    """Retrieve stored content hash from state backend (catalog).
+
+    Args:
+        state_backend: CatalogStateBackend or compatible state backend
+        node_name: Pipeline node name
+        table_name: Target table name
 
     Returns:
         Previously stored hash string, or None if not found
     """
-    import json
-    import os
+    if state_backend is None:
+        return None
 
     try:
-        hash_file = os.path.join(table_path, HASH_METADATA_FILENAME)
-        if os.path.exists(hash_file):
-            with open(hash_file) as f:
-                data = json.load(f)
-                return data.get("content_hash")
+        key = make_content_hash_key(node_name, table_name)
+        value = state_backend.get_hwm(key)
+        if isinstance(value, dict):
+            return value.get("hash")
         return None
     except Exception:
         return None
 
 
-def set_delta_content_hash(
-    table_path: str,
+def set_content_hash_in_state(
+    state_backend,
+    node_name: str,
+    table_name: str,
     content_hash: str,
-    storage_options: Optional[dict] = None,
 ) -> None:
-    """Store content hash in Delta table metadata file.
+    """Store content hash in state backend (catalog).
 
     Args:
-        table_path: Path to Delta table
+        state_backend: CatalogStateBackend or compatible state backend
+        node_name: Pipeline node name
+        table_name: Target table name
         content_hash: Hash string to store
-        storage_options: Cloud storage options (for Azure, S3, etc.)
     """
-    import json
-    import os
+    if state_backend is None:
+        return
+
     from datetime import datetime
 
-    hash_file = os.path.join(table_path, HASH_METADATA_FILENAME)
-    data = {
-        "content_hash": content_hash,
+    key = make_content_hash_key(node_name, table_name)
+    value = {
+        "hash": content_hash,
         "timestamp": datetime.utcnow().isoformat(),
     }
-    with open(hash_file, "w") as f:
-        json.dump(data, f)
-
-
-def get_spark_delta_content_hash(
-    spark,
-    table: Optional[str] = None,
-    path: Optional[str] = None,
-) -> Optional[str]:
-    """Retrieve stored content hash from Delta table metadata file (Spark).
-
-    Args:
-        spark: SparkSession
-        table: Table name (catalog)
-        path: Table path
-
-    Returns:
-        Previously stored hash string, or None if not found
-    """
-    import json
-
-    try:
-        if table:
-            from delta.tables import DeltaTable
-
-            dt = DeltaTable.forName(spark, table)
-            table_path = dt.detail().collect()[0].location
-        else:
-            table_path = path
-
-        hash_file = f"{table_path}/{HASH_METADATA_FILENAME}"
-
-        try:
-            content = spark.read.text(hash_file).collect()
-            if content:
-                data = json.loads(content[0][0])
-                return data.get("content_hash")
-        except Exception:
-            pass
-        return None
-    except Exception:
-        return None
-
-
-def set_spark_delta_content_hash(
-    spark,
-    content_hash: str,
-    table: Optional[str] = None,
-    path: Optional[str] = None,
-) -> None:
-    """Store content hash in Delta table metadata file (Spark).
-
-    Args:
-        spark: SparkSession
-        content_hash: Hash string to store
-        table: Table name (catalog)
-        path: Table path
-    """
-    import json
-    from datetime import datetime
-
-    if table:
-        from delta.tables import DeltaTable
-
-        dt = DeltaTable.forName(spark, table)
-        table_path = dt.detail().collect()[0].location
-    else:
-        table_path = path
-
-    hash_file = f"{table_path}/{HASH_METADATA_FILENAME}"
-    data = json.dumps(
-        {
-            "content_hash": content_hash,
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-    )
-
-    spark.createDataFrame([(data,)], ["value"]).coalesce(1).write.mode("overwrite").text(hash_file)
+    state_backend.set_hwm(key, value)

@@ -1046,29 +1046,18 @@ class NodeExecutor:
             return {"should_skip": False, "hash": None}
 
         from odibi.enums import EngineType
+        from odibi.utils.content_hash import get_content_hash_from_state
 
         if self.engine_type == EngineType.SPARK:
-            from odibi.utils.content_hash import (
-                compute_spark_dataframe_hash,
-                get_spark_delta_content_hash,
-            )
+            from odibi.utils.content_hash import compute_spark_dataframe_hash
 
             current_hash = compute_spark_dataframe_hash(
                 df,
                 columns=write_config.skip_hash_columns,
                 sort_columns=write_config.skip_hash_sort_columns,
             )
-
-            previous_hash = get_spark_delta_content_hash(
-                self.engine.spark,
-                table=write_config.table,
-                path=connection.get_path(write_config.path) if write_config.path else None,
-            )
         else:
-            from odibi.utils.content_hash import (
-                compute_dataframe_hash,
-                get_delta_content_hash,
-            )
+            from odibi.utils.content_hash import compute_dataframe_hash
 
             pandas_df = df
             if hasattr(df, "to_pandas"):
@@ -1080,12 +1069,11 @@ class NodeExecutor:
                 sort_columns=write_config.skip_hash_sort_columns,
             )
 
-            table_path = connection.get_path(write_config.path or write_config.table)
-            storage_opts = {}
-            if hasattr(connection, "pandas_storage_options"):
-                storage_opts = connection.pandas_storage_options() or {}
-
-            previous_hash = get_delta_content_hash(table_path, storage_opts)
+        table_name = write_config.table or write_config.path
+        state_backend = (
+            getattr(self.state_manager, "backend", None) if hasattr(self, "state_manager") else None
+        )
+        previous_hash = get_content_hash_from_state(state_backend, config.name, table_name)
 
         if previous_hash and current_hash == previous_hash:
             return {"should_skip": True, "hash": current_hash}
@@ -1098,34 +1086,24 @@ class NodeExecutor:
         config: NodeConfig,
         connection: Any,
     ) -> None:
-        """Store content hash in Delta table metadata after successful write."""
+        """Store content hash in state catalog after successful write."""
         if not hasattr(self, "_pending_content_hash") or not self._pending_content_hash:
             return
 
         write_config = config.write
         content_hash = self._pending_content_hash
 
-        from odibi.enums import EngineType
+        from odibi.utils.content_hash import set_content_hash_in_state
 
         try:
-            if self.engine_type == EngineType.SPARK:
-                from odibi.utils.content_hash import set_spark_delta_content_hash
+            table_name = write_config.table or write_config.path
+            state_backend = (
+                getattr(self.state_manager, "backend", None)
+                if hasattr(self, "state_manager")
+                else None
+            )
 
-                set_spark_delta_content_hash(
-                    self.engine.spark,
-                    content_hash,
-                    table=write_config.table,
-                    path=connection.get_path(write_config.path) if write_config.path else None,
-                )
-            else:
-                from odibi.utils.content_hash import set_delta_content_hash
-
-                table_path = connection.get_path(write_config.path or write_config.table)
-                storage_opts = {}
-                if hasattr(connection, "pandas_storage_options"):
-                    storage_opts = connection.pandas_storage_options() or {}
-
-                set_delta_content_hash(table_path, content_hash, storage_opts)
+            set_content_hash_in_state(state_backend, config.name, table_name, content_hash)
 
             from odibi.utils.logging import logger
 
