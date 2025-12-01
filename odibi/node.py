@@ -1048,7 +1048,8 @@ class NodeExecutor:
         from odibi.enums import EngineType
         from odibi.utils.content_hash import get_content_hash_from_state
 
-        if self.engine_type == EngineType.SPARK:
+        engine_type = EngineType.SPARK if self.engine.name == "spark" else EngineType.PANDAS
+        if engine_type == EngineType.SPARK:
             from odibi.utils.content_hash import compute_spark_dataframe_hash
 
             current_hash = compute_spark_dataframe_hash(

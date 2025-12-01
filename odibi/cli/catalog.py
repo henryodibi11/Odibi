@@ -376,10 +376,10 @@ def _state_command(args) -> int:
             print("No state checkpoints found in catalog.")
             return 0
 
-        if args.pipeline and "pipeline_name" in df.columns:
-            df = df[df["pipeline_name"] == args.pipeline]
+        if args.pipeline and "key" in df.columns:
+            df = df[df["key"].str.contains(args.pipeline, na=False)]
 
-        headers = ["pipeline_name", "node_name", "hwm_value"]
+        headers = ["key", "value", "updated_at"]
         available_cols = [c for c in headers if c in df.columns]
 
         rows = df[available_cols].values.tolist() if available_cols else []

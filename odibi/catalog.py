@@ -119,9 +119,7 @@ class CatalogManager:
         )
         self._ensure_table("meta_patterns", self._get_schema_meta_patterns())
         self._ensure_table("meta_metrics", self._get_schema_meta_metrics())
-        self._ensure_table(
-            "meta_state", self._get_schema_meta_state(), partition_cols=["pipeline_name"]
-        )
+        self._ensure_table("meta_state", self._get_schema_meta_state())
         self._ensure_table("meta_pipelines", self._get_schema_meta_pipelines())
         self._ensure_table("meta_nodes", self._get_schema_meta_nodes())
         self._ensure_table("meta_schemas", self._get_schema_meta_schemas())
@@ -330,13 +328,14 @@ class CatalogManager:
 
     def _get_schema_meta_state(self) -> StructType:
         """
-        meta_state (Checkpoints): Tracks incremental progress.
+        meta_state (HWM Key-Value Store): Tracks high-water marks for incremental loads.
+        Uses a generic key/value pattern for flexibility.
         """
         return StructType(
             [
-                StructField("pipeline_name", StringType(), True),
-                StructField("node_name", StringType(), True),
-                StructField("hwm_value", StringType(), True),
+                StructField("key", StringType(), False),
+                StructField("value", StringType(), True),
+                StructField("updated_at", TimestampType(), True),
             ]
         )
 
