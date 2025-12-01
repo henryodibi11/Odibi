@@ -192,7 +192,7 @@ class MarkdownStoryRenderer:
             lines.append(f"**Duration:** {node.duration:.4f}s")
 
             # Historical Context
-            if node.historical_avg_duration:
+            if node.historical_avg_duration and node.duration is not None:
                 diff = node.duration - node.historical_avg_duration
                 icon = "🔼" if diff > 0 else "🔽"
                 lines.append(
@@ -206,7 +206,7 @@ class MarkdownStoryRenderer:
                 lines.append(f"**Rows Out:** {node.rows_out:,}")
 
                 # Historical Rows
-                if node.historical_avg_rows is not None:
+                if node.historical_avg_rows is not None and node.rows_out is not None:
                     diff = node.rows_out - node.historical_avg_rows
                     icon = "🔼" if diff > 0 else "🔽"
                     lines.append(

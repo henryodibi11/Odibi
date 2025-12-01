@@ -409,23 +409,26 @@ class StoryGenerator:
         from datetime import timedelta
 
         # 1. Count retention
-        if len(stories) > self.retention_count:
+        if self.retention_count is not None and len(stories) > self.retention_count:
             to_delete = stories[self.retention_count :]
             for path in to_delete:
                 path.unlink(missing_ok=True)
 
-        if len(json_stories) > self.retention_count:
+        if self.retention_count is not None and len(json_stories) > self.retention_count:
             to_delete = json_stories[self.retention_count :]
             for path in to_delete:
                 path.unlink(missing_ok=True)
 
         # 2. Time retention
         now = datetime.now()
+        if self.retention_days is None:
+            return
         cutoff = now - timedelta(days=self.retention_days)
 
         # Check remaining files
         # For nested files, we could parse date from folder name, but mtime is safer fallback
-        remaining = stories[: self.retention_count] + json_stories[: self.retention_count]
+        retention_count = self.retention_count or 100
+        remaining = stories[:retention_count] + json_stories[:retention_count]
 
         for path in remaining:
             if path.exists():
