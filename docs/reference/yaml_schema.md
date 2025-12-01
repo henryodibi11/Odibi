@@ -1054,6 +1054,9 @@ write:
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
 | **auto_optimize** | bool | [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
 | **add_metadata** | bool | [WriteMetadataConfig](#writemetadataconfig) | No | - | Add metadata columns for Bronze layer lineage. Set to `true` to add all applicable columns, or provide a WriteMetadataConfig for selective columns. Columns: _extracted_at, _source_file (file sources), _source_connection, _source_table (SQL sources). |
+| **skip_if_unchanged** | bool | No | `False` | Skip write if DataFrame content is identical to previous write. Computes SHA256 hash of entire DataFrame and compares to stored hash in Delta table metadata. Useful for snapshot tables without timestamps to avoid redundant appends. Only supported for Delta format. |
+| **skip_hash_columns** | Optional[List[str]] | No | - | Columns to include in hash computation for skip_if_unchanged. If None, all columns are used. Specify a subset to ignore volatile columns like timestamps. |
+| **skip_hash_sort_columns** | Optional[List[str]] | No | - | Columns to sort by before hashing for deterministic comparison. Required if row order may vary between runs. Typically your business key columns. |
 
 ---
 
