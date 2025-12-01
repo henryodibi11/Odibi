@@ -347,7 +347,7 @@
                                                 {% if col in node.columns_added %}<span style="font-size: 0.8em;">(NEW)</span>{% endif %}
 
                                                 {% if node.null_profile %}
-                                                    {% set null_pct = node.null_profile.get(col, 0.0) %}
+                                                    {% set null_pct = node.null_profile.get(col, 0.0) or 0.0 %}
                                                     {% if null_pct > 0 %}
                                                         <span class="badge {% if null_pct > 0.9 %}badge-red{% elif null_pct > 0.1 %}badge-orange{% else %}badge-gray{% endif %}" style="font-size: 0.75em; margin-left: 6px;">
                                                             {{ "%.0f"|format(null_pct * 100) }}% Null
@@ -365,7 +365,7 @@
                                             {% if col in node.columns_added %}<span style="font-size: 0.8em;">(NEW)</span>{% endif %}
 
                                             {% if node.null_profile %}
-                                                {% set null_pct = node.null_profile.get(col, 0.0) %}
+                                                {% set null_pct = node.null_profile.get(col, 0.0) or 0.0 %}
                                                 {% if null_pct > 0 %}
                                                     <span class="badge {% if null_pct > 0.9 %}badge-red{% elif null_pct > 0.1 %}badge-orange{% else %}badge-gray{% endif %}" style="font-size: 0.75em; margin-left: 6px;">
                                                         {{ "%.0f"|format(null_pct * 100) }}% Null
