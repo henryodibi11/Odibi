@@ -337,6 +337,7 @@ class Pipeline:
                                 context=self.context,
                                 engine=self.engine,
                                 connections=self.connections,
+                                performance_config=self.performance_config,
                             )
                             # If using dry run or mock engine in tests, restore might always succeed or fail based on implementation
                             # In the failing test case, the mock engine's read is mocked but restore() calls engine.read
@@ -384,6 +385,7 @@ class Pipeline:
                     dry_run=dry_run,
                     retry_config=self.retry_config,
                     catalog_manager=self.catalog_manager,
+                    performance_config=self.performance_config,
                 )
                 result = node.execute()
             except Exception as e:
@@ -649,6 +651,7 @@ class Pipeline:
             context=self.context,
             engine=self.engine,
             connections=self.connections,
+            performance_config=self.performance_config,
         )
 
         return node.execute()

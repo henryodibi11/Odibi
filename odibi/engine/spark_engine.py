@@ -94,6 +94,9 @@ class SparkEngine(Engine):
         # Configure all ADLS connections upfront
         self._configure_all_connections()
 
+        # Apply user-defined Spark configs from performance settings
+        self._apply_spark_config()
+
     def _configure_all_connections(self) -> None:
         """Configure Spark with all ADLS connection credentials.
 
@@ -103,6 +106,68 @@ class SparkEngine(Engine):
         for conn_name, connection in self.connections.items():
             if hasattr(connection, "configure_spark"):
                 connection.configure_spark(self.spark)
+
+    def _apply_spark_config(self) -> None:
+        """Apply user-defined Spark configurations from performance settings.
+
+        Applies configs via spark.conf.set() for runtime-settable options.
+        For existing sessions (e.g., Databricks), only modifiable configs take effect.
+
+        Common runtime-safe configs:
+        - spark.sql.shuffle.partitions
+        - spark.sql.adaptive.enabled
+        - spark.sql.adaptive.coalescePartitions.enabled
+        - spark.databricks.delta.optimizeWrite.enabled
+        - spark.databricks.delta.autoCompact.enabled
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        performance = self.config.get("performance", {})
+        spark_config = performance.get("spark_config", {})
+
+        if not spark_config:
+            return
+
+        for key, value in spark_config.items():
+            try:
+                self.spark.conf.set(key, value)
+                logger.debug(f"Applied Spark config: {key}={value}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to set Spark config '{key}': {e}. "
+                    "This config may require session restart."
+                )
+
+    def _apply_table_properties(
+        self, target: str, properties: Dict[str, str], is_table: bool = False
+    ) -> None:
+        """Apply table properties to a Delta table.
+
+        Args:
+            target: Table name or file path
+            properties: Dictionary of property name -> value
+            is_table: True if target is a table name, False if path
+
+        Example properties:
+            {"delta.columnMapping.mode": "name"}
+        """
+        if not properties:
+            return
+
+        try:
+            table_ref = target if is_table else f"delta.`{target}`"
+
+            for prop_name, prop_value in properties.items():
+                sql = f"ALTER TABLE {table_ref} SET TBLPROPERTIES ('{prop_name}' = '{prop_value}')"
+                self.spark.sql(sql)
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to set table properties on {target}: {e}")
 
     def _optimize_delta_write(
         self, target: str, options: Dict[str, Any], is_table: bool = False
@@ -700,6 +765,23 @@ class SparkEngine(Engine):
                     )
                 return None
 
+        # Extract table_properties from options (don't pass to writer.option)
+        table_properties = options.pop("table_properties", None)
+
+        # For column mapping and other properties that must be set BEFORE write,
+        # temporarily set Spark session defaults
+        original_configs = {}
+        if table_properties and format == "delta":
+            for prop_name, prop_value in table_properties.items():
+                spark_conf_key = (
+                    f"spark.databricks.delta.properties.defaults.{prop_name.replace('delta.', '')}"
+                )
+                try:
+                    original_configs[spark_conf_key] = self.spark.conf.get(spark_conf_key, None)
+                except Exception:
+                    original_configs[spark_conf_key] = None
+                self.spark.conf.set(spark_conf_key, prop_value)
+
         writer = df.write.format(format).mode(mode)
 
         # Apply partitioning if specified
@@ -712,15 +794,21 @@ class SparkEngine(Engine):
         for key, value in options.items():
             writer = writer.option(key, value)
 
-        writer.save(full_path)
+        try:
+            writer.save(full_path)
+        finally:
+            # Restore original Spark session configs
+            for conf_key, original_value in original_configs.items():
+                if original_value is None:
+                    self.spark.conf.unset(conf_key)
+                else:
+                    self.spark.conf.set(conf_key, original_value)
 
         if format == "delta":
             self._optimize_delta_write(full_path, options, is_table=False)
 
         # Register as External Table if requested
         if register_table and format == "delta":
-            # Only Delta supports easy external registration like this usually
-            # Parquet can too, but Delta is the main use case.
             try:
                 self.spark.sql(
                     f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"

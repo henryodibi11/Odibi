@@ -67,6 +67,7 @@ class NodeExecutor:
         catalog_manager: Optional[Any] = None,
         config_file: Optional[str] = None,
         max_sample_rows: int = 10,
+        performance_config: Optional[Any] = None,
     ):
         self.context = context
         self.engine = engine
@@ -74,6 +75,7 @@ class NodeExecutor:
         self.catalog_manager = catalog_manager
         self.config_file = config_file
         self.max_sample_rows = max_sample_rows
+        self.performance_config = performance_config
 
         # Ephemeral state per execution
         self._execution_steps: List[str] = []
@@ -935,6 +937,21 @@ class NodeExecutor:
         diff_keys = write_options.pop("diff_keys", None)
         mode = override_mode if override_mode is not None else write_config.mode
 
+        # Include table_properties in options for Delta writes
+        # Merge global (performance_config) with node-level (node-level takes precedence)
+        if write_config.format == "delta":
+            merged_props = {}
+            # Global defaults from performance_config
+            if self.performance_config and hasattr(
+                self.performance_config, "delta_table_properties"
+            ):
+                merged_props.update(self.performance_config.delta_table_properties or {})
+            # Node-level overrides
+            if write_config.table_properties:
+                merged_props.update(write_config.table_properties)
+            if merged_props:
+                write_options["table_properties"] = merged_props
+
         delta_info = self.engine.write(
             df=df,
             connection=connection,
@@ -1406,6 +1423,7 @@ class Node:
         dry_run: bool = False,
         retry_config: Optional[RetryConfig] = None,
         catalog_manager: Optional[Any] = None,
+        performance_config: Optional[Any] = None,
     ):
         """Initialize node."""
         self.config = config
@@ -1417,6 +1435,7 @@ class Node:
         self.dry_run = dry_run
         self.retry_config = retry_config or RetryConfig(enabled=False)
         self.catalog_manager = catalog_manager
+        self.performance_config = performance_config
 
         self._cached_result: Optional[Any] = None
 
@@ -1449,6 +1468,7 @@ class Node:
             catalog_manager=catalog_manager,
             config_file=config_file,
             max_sample_rows=max_sample_rows,
+            performance_config=performance_config,
         )
 
     def restore(self) -> bool:

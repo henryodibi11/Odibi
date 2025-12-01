@@ -1586,7 +1586,11 @@ class WriteConfig(BaseModel):
         description="List of columns to Z-Order by. Improves read performance for high-cardinality columns used in filters/joins (Delta only).",
     )
     table_properties: Dict[str, str] = Field(
-        default_factory=dict, description="Table properties (e.g. comments, retention)"
+        default_factory=dict,
+        description=(
+            "Delta table properties. Overrides global performance.delta_table_properties. "
+            "Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names."
+        ),
     )
     merge_schema: bool = Field(
         default=False, description="Allow schema evolution (mergeSchema option in Delta)"
@@ -2140,11 +2144,46 @@ class LoggingConfig(BaseModel):
 
 
 class PerformanceConfig(BaseModel):
-    """Performance tuning configuration."""
+    """
+    Performance tuning configuration.
+
+    Example:
+    ```yaml
+    performance:
+      use_arrow: true
+      spark_config:
+        "spark.sql.shuffle.partitions": "200"
+        "spark.sql.adaptive.enabled": "true"
+        "spark.databricks.delta.optimizeWrite.enabled": "true"
+      delta_table_properties:
+        "delta.columnMapping.mode": "name"
+    ```
+
+    **Spark Config Notes:**
+    - Configs are applied via `spark.conf.set()` at runtime
+    - For existing sessions (e.g., Databricks), only runtime-settable configs will take effect
+    - Session-level configs (e.g., `spark.executor.memory`) require session restart
+    - Common runtime-safe configs: shuffle partitions, adaptive query execution, Delta optimizations
+    """
 
     use_arrow: bool = Field(
         default=True,
         description="Use Apache Arrow-backed DataFrames (Pandas only). Reduces memory and speeds up I/O.",
+    )
+    spark_config: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Spark configuration settings applied at runtime via spark.conf.set(). "
+            "Example: {'spark.sql.shuffle.partitions': '200', 'spark.sql.adaptive.enabled': 'true'}. "
+            "Note: Some configs require session restart and cannot be set at runtime."
+        ),
+    )
+    delta_table_properties: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Default table properties applied to all Delta writes. "
+            "Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names."
+        ),
     )
 
 

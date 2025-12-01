@@ -1048,7 +1048,7 @@ write:
 | **mode** | WriteMode | No | `WriteMode.OVERWRITE` | Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once' |
 | **partition_by** | List[str] | No | `PydanticUndefined` | List of columns to physically partition the output by (folder structure). Use for low-cardinality columns (e.g. date, country). |
 | **zorder_by** | List[str] | No | `PydanticUndefined` | List of columns to Z-Order by. Improves read performance for high-cardinality columns used in filters/joins (Delta only). |
-| **table_properties** | Dict[str, str] | No | `PydanticUndefined` | Table properties (e.g. comments, retention) |
+| **table_properties** | Dict[str, str] | No | `PydanticUndefined` | Delta table properties. Overrides global performance.delta_table_properties. Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names. |
 | **merge_schema** | bool | No | `False` | Allow schema evolution (mergeSchema option in Delta) |
 | **first_run_query** | Optional[str] | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
@@ -1467,9 +1467,29 @@ logging:
 
 Performance tuning configuration.
 
+Example:
+```yaml
+performance:
+  use_arrow: true
+  spark_config:
+    "spark.sql.shuffle.partitions": "200"
+    "spark.sql.adaptive.enabled": "true"
+    "spark.databricks.delta.optimizeWrite.enabled": "true"
+  delta_table_properties:
+    "delta.columnMapping.mode": "name"
+```
+
+**Spark Config Notes:**
+- Configs are applied via `spark.conf.set()` at runtime
+- For existing sessions (e.g., Databricks), only runtime-settable configs will take effect
+- Session-level configs (e.g., `spark.executor.memory`) require session restart
+- Common runtime-safe configs: shuffle partitions, adaptive query execution, Delta optimizations
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **use_arrow** | bool | No | `True` | Use Apache Arrow-backed DataFrames (Pandas only). Reduces memory and speeds up I/O. |
+| **spark_config** | Dict[str, str] | No | `PydanticUndefined` | Spark configuration settings applied at runtime via spark.conf.set(). Example: {'spark.sql.shuffle.partitions': '200', 'spark.sql.adaptive.enabled': 'true'}. Note: Some configs require session restart and cannot be set at runtime. |
+| **delta_table_properties** | Dict[str, str] | No | `PydanticUndefined` | Default table properties applied to all Delta writes. Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names. |
 
 ---
 
