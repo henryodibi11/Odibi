@@ -1677,7 +1677,7 @@ class PandasEngine(Engine):
 
             # 2. VACUUM
             retention = config.vacuum_retention_hours
-            if retention > 0:
+            if retention is not None and retention > 0:
                 logger.info(
                     f"Running Auto-Optimize (VACUUM) on {full_path} (Retention: {retention}h)..."
                 )

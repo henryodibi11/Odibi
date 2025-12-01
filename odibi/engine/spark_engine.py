@@ -810,14 +810,22 @@ class SparkEngine(Engine):
         # Register as External Table if requested
         if register_table and format == "delta":
             try:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(f"Registering external table '{register_table}' at '{full_path}'")
                 self.spark.sql(
                     f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
                 )
+                logger.info(f"Successfully registered table '{register_table}'")
             except Exception as e:
                 import logging
 
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to register external table '{register_table}': {e}")
+                raise RuntimeError(
+                    f"Failed to register external table '{register_table}': {e}"
+                ) from e
 
         if format == "delta":
             return self._get_last_delta_commit_info(full_path, is_table=False)
@@ -1339,7 +1347,7 @@ class SparkEngine(Engine):
 
             # 2. VACUUM (Cleanup)
             retention = config.vacuum_retention_hours
-            if retention > 0:
+            if retention is not None and retention > 0:
                 logger.info(
                     f"Running Auto-Optimize (VACUUM) on {target} (Retention: {retention}h)..."
                 )
