@@ -821,7 +821,9 @@ class SparkEngine(Engine):
                     f"Failed to register external table '{register_table}': {e}"
                 ) from e
         else:
-            print(f"[ODIBI] Skipping register_table: register_table={register_table}, format={format}")
+            print(
+                f"[ODIBI] Skipping register_table: register_table={register_table}, format={format}"
+            )
 
         if format == "delta":
             return self._get_last_delta_commit_info(full_path, is_table=False)
