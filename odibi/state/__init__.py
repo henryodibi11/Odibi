@@ -1,8 +1,11 @@
 import json
+import logging
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 # Try to import deltalake, but don't fail yet (it might be a Spark run)
 try:
@@ -63,8 +66,8 @@ class LocalJSONStateBackend(StateBackend):
             try:
                 with open(self.state_path, "r") as f:
                     return json.load(f)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to load state from {self.state_path}: {e}")
         return {"pipelines": {}, "hwm": {}}
 
     def _save_to_disk(self) -> None:
@@ -161,11 +164,14 @@ class CatalogStateBackend(StateBackend):
                 if row.metadata:
                     try:
                         meta = json.loads(row.metadata)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Failed to parse metadata JSON: {e}")
                 return {"success": (row.status == "SUCCESS"), "metadata": meta}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                f"Failed to get last run info from {self.meta_runs_path} "
+                f"for {pipeline_name}/{node_name}: {e}"
+            )
         return None
 
     def _get_last_run_local(self, pipeline_name, node_name):
@@ -200,13 +206,17 @@ class CatalogStateBackend(StateBackend):
             if row.get("metadata"):
                 try:
                     meta = json.loads(row["metadata"])
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to parse metadata JSON: {e}")
 
             status = row.get("status")
             return {"success": (status == "SUCCESS"), "metadata": meta}
 
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f"Failed to get last run info from {self.meta_runs_path} "
+                f"for {pipeline_name}/{node_name}: {e}"
+            )
             return None
 
     def get_last_run_status(self, pipeline_name: str, node_name: str) -> Optional[bool]:
@@ -229,10 +239,11 @@ class CatalogStateBackend(StateBackend):
             if row and row.value:
                 try:
                     return json.loads(row.value)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Failed to parse HWM value as JSON for key '{key}': {e}")
                     return row.value
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to get HWM for key '{key}' from {self.meta_state_path}: {e}")
         return None
 
     def _get_hwm_local(self, key):
@@ -253,10 +264,11 @@ class CatalogStateBackend(StateBackend):
             if val_str:
                 try:
                     return json.loads(val_str)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Failed to parse HWM value as JSON for key '{key}': {e}")
                     return val_str
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to get HWM for key '{key}' from {self.meta_state_path}: {e}")
         return None
 
     def set_hwm(self, key: str, value: Any) -> None:
@@ -332,7 +344,8 @@ class CatalogStateBackend(StateBackend):
     def _spark_table_exists(self, path: str) -> bool:
         try:
             return self.spark.read.format("delta").load(path).count() >= 0
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Table does not exist at {path}: {e}")
             return False
 
 
@@ -439,7 +452,9 @@ def create_state_backend(
 
     elif conn_config.type == "azure_blob":
         # Construct abfss://
-        base_uri = f"abfss://{conn_config.container}@{conn_config.account_name}.dfs.core.windows.net/{config.system.path}"
+        account = conn_config.account_name
+        container = conn_config.container
+        base_uri = f"abfss://{container}@{account}.dfs.core.windows.net/{config.system.path}"
 
         # Set up storage options
         # Depends on auth mode
@@ -472,8 +487,8 @@ def create_state_backend(
         # Default fallback if something went wrong or unsupported
         base_uri = os.path.join(project_root, ".odibi/system")
 
-    meta_state_path = f"{base_uri}/state"
-    meta_runs_path = f"{base_uri}/runs"
+    meta_state_path = f"{base_uri}/meta_state"
+    meta_runs_path = f"{base_uri}/meta_runs"
 
     return CatalogStateBackend(
         meta_runs_path=meta_runs_path,

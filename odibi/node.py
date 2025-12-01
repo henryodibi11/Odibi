@@ -1454,8 +1454,8 @@ class Node:
             # Fallback to default local paths (Unified Catalog default)
             backend = CatalogStateBackend(
                 spark_session=spark_session,
-                meta_state_path=".odibi/system/state",
-                meta_runs_path=".odibi/system/runs",
+                meta_state_path=".odibi/system/meta_state",
+                meta_runs_path=".odibi/system/meta_runs",
             )
 
         self.state_manager = StateManager(backend=backend)
