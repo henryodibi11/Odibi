@@ -1612,6 +1612,29 @@ class WriteConfig(BaseModel):
             "Columns: _extracted_at, _source_file (file sources), _source_connection, _source_table (SQL sources)."
         ),
     )
+    skip_if_unchanged: bool = Field(
+        default=False,
+        description=(
+            "Skip write if DataFrame content is identical to previous write. "
+            "Computes SHA256 hash of entire DataFrame and compares to stored hash in Delta table metadata. "
+            "Useful for snapshot tables without timestamps to avoid redundant appends. "
+            "Only supported for Delta format."
+        ),
+    )
+    skip_hash_columns: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Columns to include in hash computation for skip_if_unchanged. "
+            "If None, all columns are used. Specify a subset to ignore volatile columns like timestamps."
+        ),
+    )
+    skip_hash_sort_columns: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Columns to sort by before hashing for deterministic comparison. "
+            "Required if row order may vary between runs. Typically your business key columns."
+        ),
+    )
 
     @model_validator(mode="after")
     def check_table_or_path(self):

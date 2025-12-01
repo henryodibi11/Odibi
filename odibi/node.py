@@ -898,6 +898,21 @@ class NodeExecutor:
         if connection is None:
             raise ValueError(f"Connection '{write_config.connection}' not found.")
 
+        # Skip-if-unchanged check (before any transformations that add metadata)
+        if write_config.skip_if_unchanged and df is not None:
+            skip_result = self._check_skip_if_unchanged(config, df, connection)
+            if skip_result["should_skip"]:
+                self._execution_steps.append(
+                    f"Skipped write: content unchanged (hash: {skip_result['hash'][:12]}...)"
+                )
+                from odibi.utils.logging import logger
+
+                logger.info(
+                    f"[{config.name}] Skipping write - content unchanged "
+                    f"(hash: {skip_result['hash'][:12]}...)"
+                )
+                return
+
         # Apply Schema Policy
         if config.schema_policy and df is not None:
             target_schema = self.engine.get_table_schema(
@@ -957,6 +972,10 @@ class NodeExecutor:
                 delta_info, connection, write_config, deep_diag, diff_keys
             )
 
+        # Store content hash after successful write (for skip_if_unchanged)
+        if write_config.skip_if_unchanged and write_config.format == "delta":
+            self._store_content_hash_after_write(config, connection)
+
     def _add_write_metadata(self, config: NodeConfig, df: Any) -> Any:
         """Add Bronze metadata columns to DataFrame before writing.
 
@@ -997,6 +1016,126 @@ class NodeExecutor:
             source_path=source_path,
             is_file_source=is_file_source,
         )
+
+    def _check_skip_if_unchanged(
+        self,
+        config: NodeConfig,
+        df: Any,
+        connection: Any,
+    ) -> Dict[str, Any]:
+        """Check if write should be skipped due to unchanged content.
+
+        Args:
+            config: Node configuration
+            df: DataFrame to check
+            connection: Target connection
+
+        Returns:
+            Dict with 'should_skip' (bool) and 'hash' (str)
+        """
+        write_config = config.write
+        format_str = str(write_config.format).lower()
+
+        if format_str != "delta":
+            from odibi.utils.logging import logger
+
+            logger.warning(
+                f"[{config.name}] skip_if_unchanged only supported for Delta format, "
+                f"got '{format_str}'. Proceeding with write."
+            )
+            return {"should_skip": False, "hash": None}
+
+        from odibi.enums import EngineType
+
+        if self.engine_type == EngineType.SPARK:
+            from odibi.utils.content_hash import (
+                compute_spark_dataframe_hash,
+                get_spark_delta_content_hash,
+            )
+
+            current_hash = compute_spark_dataframe_hash(
+                df,
+                columns=write_config.skip_hash_columns,
+                sort_columns=write_config.skip_hash_sort_columns,
+            )
+
+            previous_hash = get_spark_delta_content_hash(
+                self.engine.spark,
+                table=write_config.table,
+                path=connection.get_path(write_config.path) if write_config.path else None,
+            )
+        else:
+            from odibi.utils.content_hash import (
+                compute_dataframe_hash,
+                get_delta_content_hash,
+            )
+
+            pandas_df = df
+            if hasattr(df, "to_pandas"):
+                pandas_df = df.to_pandas()
+
+            current_hash = compute_dataframe_hash(
+                pandas_df,
+                columns=write_config.skip_hash_columns,
+                sort_columns=write_config.skip_hash_sort_columns,
+            )
+
+            table_path = connection.get_path(write_config.path or write_config.table)
+            storage_opts = {}
+            if hasattr(connection, "pandas_storage_options"):
+                storage_opts = connection.pandas_storage_options() or {}
+
+            previous_hash = get_delta_content_hash(table_path, storage_opts)
+
+        if previous_hash and current_hash == previous_hash:
+            return {"should_skip": True, "hash": current_hash}
+
+        self._pending_content_hash = current_hash
+        return {"should_skip": False, "hash": current_hash}
+
+    def _store_content_hash_after_write(
+        self,
+        config: NodeConfig,
+        connection: Any,
+    ) -> None:
+        """Store content hash in Delta table metadata after successful write."""
+        if not hasattr(self, "_pending_content_hash") or not self._pending_content_hash:
+            return
+
+        write_config = config.write
+        content_hash = self._pending_content_hash
+
+        from odibi.enums import EngineType
+
+        try:
+            if self.engine_type == EngineType.SPARK:
+                from odibi.utils.content_hash import set_spark_delta_content_hash
+
+                set_spark_delta_content_hash(
+                    self.engine.spark,
+                    content_hash,
+                    table=write_config.table,
+                    path=connection.get_path(write_config.path) if write_config.path else None,
+                )
+            else:
+                from odibi.utils.content_hash import set_delta_content_hash
+
+                table_path = connection.get_path(write_config.path or write_config.table)
+                storage_opts = {}
+                if hasattr(connection, "pandas_storage_options"):
+                    storage_opts = connection.pandas_storage_options() or {}
+
+                set_delta_content_hash(table_path, content_hash, storage_opts)
+
+            from odibi.utils.logging import logger
+
+            logger.debug(f"[{config.name}] Stored content hash: {content_hash[:12]}...")
+        except Exception as e:
+            from odibi.utils.logging import logger
+
+            logger.warning(f"[{config.name}] Failed to store content hash: {e}")
+        finally:
+            self._pending_content_hash = None
 
     def _calculate_delta_diagnostics(
         self,

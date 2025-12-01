@@ -51,6 +51,15 @@ This directory contains documentation for common data pipeline patterns used in 
 
 ---
 
+### [6. Skip If Unchanged (Snapshot Optimization)](./skip_if_unchanged.md)
+**Problem:** My hourly pipeline appends identical data 24 times/day when the source hasn't changed.
+
+**Pattern:** Compute a hash of the DataFrame content before writing. If hash matches previous write, skip the append entirely.
+
+**When to use:** Snapshot tables without timestamps, reference data that changes infrequently, or when change frequency is unknown.
+
+---
+
 ## Design Principles
 
 These patterns are built on the **Odibi Architecture Manifesto**:
@@ -73,6 +82,7 @@ These patterns are built on the **Odibi Architecture Manifesto**:
 | Merge/Upsert | Raw (micro-batch) | Silver | `merge` | Yes (by key) |
 | SCD Type 2 | Raw (micro-batch) | Silver/Gold | `overwrite` | Yes (full history) |
 | Windowed Reprocess | Silver (window) | Gold | `overwrite` (partition) | Yes (recalculated) |
+| Skip If Unchanged | Snapshot Source | Raw | `append` (conditional) | Yes (hash-based) |
 
 ---
 
