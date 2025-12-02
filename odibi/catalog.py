@@ -384,9 +384,9 @@ class CatalogManager:
                 StructField("pipeline", StringType(), True),
                 StructField("node", StringType(), True),
                 StructField("run_id", StringType(), True),
-                StructField("columns_added", ArrayType(StringType()), True),
-                StructField("columns_removed", ArrayType(StringType()), True),
-                StructField("columns_type_changed", ArrayType(StringType()), True),
+                StructField("columns_added", StringType(), True),  # JSON array as string
+                StructField("columns_removed", StringType(), True),  # JSON array as string
+                StructField("columns_type_changed", StringType(), True),  # JSON array as string
             ]
         )
 
@@ -1161,13 +1161,21 @@ class CatalogManager:
                 "pipeline": pipeline,
                 "node": node,
                 "run_id": run_id,
-                "columns_added": changes["columns_added"] or None,
-                "columns_removed": changes["columns_removed"] or None,
-                "columns_type_changed": changes["columns_type_changed"] or None,
+                "columns_added": json.dumps(changes["columns_added"])
+                if changes["columns_added"]
+                else None,
+                "columns_removed": json.dumps(changes["columns_removed"])
+                if changes["columns_removed"]
+                else None,
+                "columns_type_changed": (
+                    json.dumps(changes["columns_type_changed"])
+                    if changes["columns_type_changed"]
+                    else None
+                ),
             }
 
             if self.spark:
-                df = self.spark.createDataFrame([record])
+                df = self.spark.createDataFrame([record], schema=self._get_schema_meta_schemas())
                 df.write.format("delta").mode("append").save(self.tables["meta_schemas"])
 
             elif self.engine:
@@ -1294,7 +1302,7 @@ class CatalogManager:
 
             if self.spark:
                 view_name = f"_odibi_lineage_upsert_{abs(hash(f'{source_table}_{target_table}'))}"
-                df = self.spark.createDataFrame([record])
+                df = self.spark.createDataFrame([record], schema=self._get_schema_meta_lineage())
                 df.createOrReplaceTempView(view_name)
 
                 target_path = self.tables["meta_lineage"]
