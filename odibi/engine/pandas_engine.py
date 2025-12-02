@@ -182,6 +182,7 @@ class PandasEngine(Engine):
         table: Optional[str] = None,
         path: Optional[str] = None,
         streaming: bool = False,
+        schema: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
         as_of_version: Optional[int] = None,
         as_of_timestamp: Optional[str] = None,

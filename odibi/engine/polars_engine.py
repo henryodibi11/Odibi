@@ -59,7 +59,10 @@ class PolarsEngine(Engine):
         format: str,
         table: Optional[str] = None,
         path: Optional[str] = None,
+        streaming: bool = False,
+        schema: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> Any:
         """Read data using Polars (Lazy by default).
 
