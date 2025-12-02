@@ -1688,3 +1688,50 @@ class SparkEngine(Engine):
     def filter_coalesce(self, df, col1: str, col2: str, op: str, value: Any) -> Any:
         """Filter using COALESCE(col1, col2) op value."""
         return df.filter(f"COALESCE({col1}, {col2}) {op} '{value}'")
+
+    def add_write_metadata(
+        self,
+        df,
+        metadata_config,
+        source_connection: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_path: Optional[str] = None,
+        is_file_source: bool = False,
+    ):
+        """Add metadata columns to DataFrame before writing (Bronze layer lineage).
+
+        Args:
+            df: Spark DataFrame
+            metadata_config: WriteMetadataConfig or True (for all defaults)
+            source_connection: Name of the source connection
+            source_table: Name of the source table (SQL sources)
+            source_path: Path of the source file (file sources)
+            is_file_source: True if source is a file-based read
+
+        Returns:
+            DataFrame with metadata columns added
+        """
+        from pyspark.sql import functions as F
+
+        from odibi.config import WriteMetadataConfig
+
+        if metadata_config is True:
+            config = WriteMetadataConfig()
+        elif isinstance(metadata_config, WriteMetadataConfig):
+            config = metadata_config
+        else:
+            return df
+
+        if config.extracted_at:
+            df = df.withColumn("_extracted_at", F.current_timestamp())
+
+        if config.source_file and is_file_source and source_path:
+            df = df.withColumn("_source_file", F.lit(source_path))
+
+        if config.source_connection and source_connection:
+            df = df.withColumn("_source_connection", F.lit(source_connection))
+
+        if config.source_table and source_table:
+            df = df.withColumn("_source_table", F.lit(source_table))
+
+        return df
