@@ -3,6 +3,7 @@
 import glob
 import hashlib
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,6 +16,7 @@ import pandas as pd
 from odibi.context import Context, PandasContext
 from odibi.engine.base import Engine
 from odibi.exceptions import TransformError
+from odibi.utils.logging_context import get_logging_context
 
 __all__ = ["PandasEngine", "LazyDataset"]
 
@@ -185,8 +187,24 @@ class PandasEngine(Engine):
         as_of_timestamp: Optional[str] = None,
     ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
         """Read data using Pandas (or LazyDataset)."""
-        # print("DEBUG: Inside PandasEngine.read")
+        ctx = get_logging_context().with_context(engine="pandas")
+        start = time.time()
+
+        source = path or table
+        ctx.debug(
+            "Starting read operation",
+            format=format,
+            path=source,
+            streaming=streaming,
+            use_arrow=self.use_arrow,
+        )
+
         if streaming:
+            ctx.error(
+                "Streaming not supported in Pandas engine",
+                format=format,
+                path=source,
+            )
             raise ValueError(
                 "Streaming is not supported in the Pandas engine. "
                 "Please use 'engine: spark' for streaming pipelines."
@@ -204,8 +222,13 @@ class PandasEngine(Engine):
             if connection:
                 full_path = connection.get_path(table)
             else:
+                ctx.error(
+                    "Connection required when specifying 'table'",
+                    table=table,
+                )
                 raise ValueError("Connection is required when specifying 'table'.")
         else:
+            ctx.error("Neither path nor table provided for read operation")
             raise ValueError("Either path or table must be provided")
 
         # Merge storage options for cloud connections
@@ -221,26 +244,13 @@ class PandasEngine(Engine):
         # Handle Time Travel options
         if as_of_version is not None:
             merged_options["versionAsOf"] = as_of_version
-        # as_of_timestamp support would go here if supported by underlying reader
+            ctx.debug("Time travel enabled", version=as_of_version)
 
         # Check for Lazy/DuckDB optimization
-        # We can lazy load if:
-        # 1. DuckDB enabled
-        # 2. Format supported by DuckDB direct read
-        # 3. No complex pandas-specific options (like iterator, specific chunksize that DuckDB handles differently)
-        # 4. Not a custom reader
         can_lazy_load = False
-        # can_lazy_load = (
-        #     self.use_duckdb
-        #     and format in ["csv", "parquet", "json"]
-        #     and not merged_options.get("iterator")
-        #     and not merged_options.get("chunksize")
-        #     and format not in self._custom_readers
-        # )
 
         if can_lazy_load:
-            # Verify it's a file path (string) and not some special object
-            # Also check if glob - LazyDataset supports glob
+            ctx.debug("Using lazy loading via DuckDB", path=str(full_path))
             if isinstance(full_path, (str, Path)):
                 return LazyDataset(
                     path=str(full_path),
@@ -249,12 +259,37 @@ class PandasEngine(Engine):
                     connection=connection,
                 )
             elif isinstance(full_path, list):
-                # List of paths supported by LazyDataset (DuckDB read_parquet(['a','b']))
                 return LazyDataset(
                     path=full_path, format=format, options=merged_options, connection=connection
                 )
 
-        return self._read_file(full_path, format, merged_options, connection)
+        result = self._read_file(full_path, format, merged_options, connection)
+
+        # Log metrics for materialized DataFrames
+        elapsed = (time.time() - start) * 1000
+        if isinstance(result, pd.DataFrame):
+            row_count = len(result)
+            memory_mb = result.memory_usage(deep=True).sum() / (1024 * 1024)
+
+            ctx.log_file_io(
+                path=str(full_path) if not isinstance(full_path, list) else str(full_path[0]),
+                format=format,
+                mode="read",
+                rows=row_count,
+            )
+            ctx.log_pandas_metrics(
+                memory_mb=memory_mb,
+                dtypes={col: str(dtype) for col, dtype in result.dtypes.items()},
+            )
+            ctx.info(
+                "Read completed",
+                format=format,
+                rows=row_count,
+                elapsed_ms=round(elapsed, 2),
+                memory_mb=round(memory_mb, 2),
+            )
+
+        return result
 
     def _read_file(
         self,
@@ -264,9 +299,17 @@ class PandasEngine(Engine):
         connection: Any = None,
     ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
         """Internal file reading logic."""
+        ctx = get_logging_context().with_context(engine="pandas")
+
+        ctx.debug(
+            "Reading file",
+            path=str(full_path) if not isinstance(full_path, list) else f"{len(full_path)} files",
+            format=format,
+        )
 
         # Custom Readers
         if format in self._custom_readers:
+            ctx.debug(f"Using custom reader for format: {format}")
             return self._custom_readers[format](full_path, **options)
 
         # Handle glob patterns for local files
@@ -291,8 +334,17 @@ class PandasEngine(Engine):
 
                 matched_files = glob.glob(glob_path)
                 if not matched_files:
+                    ctx.error(
+                        "No files matched glob pattern",
+                        pattern=glob_path,
+                    )
                     raise FileNotFoundError(f"No files matched pattern: {glob_path}")
 
+                ctx.info(
+                    "Glob pattern expanded",
+                    pattern=glob_path,
+                    matched_files=len(matched_files),
+                )
                 full_path = matched_files
                 is_glob = True
 
@@ -309,6 +361,10 @@ class PandasEngine(Engine):
         if format == "csv":
             try:
                 if is_glob and isinstance(full_path, list):
+                    ctx.debug(
+                        "Parallel CSV read",
+                        file_count=len(full_path),
+                    )
                     df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
                     df.attrs["odibi_source_files"] = full_path
                     return self._process_df(df, post_read_query)
@@ -318,6 +374,10 @@ class PandasEngine(Engine):
                     df.attrs["odibi_source_files"] = [str(full_path)]
                 return self._process_df(df, post_read_query)
             except UnicodeDecodeError:
+                ctx.warning(
+                    "UnicodeDecodeError, retrying with latin1 encoding",
+                    path=str(full_path),
+                )
                 read_kwargs["encoding"] = "latin1"
                 if is_glob and isinstance(full_path, list):
                     df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
@@ -329,6 +389,10 @@ class PandasEngine(Engine):
                     df.attrs["odibi_source_files"] = [str(full_path)]
                 return self._process_df(df, post_read_query)
             except pd.errors.ParserError:
+                ctx.warning(
+                    "ParserError, retrying with on_bad_lines='skip'",
+                    path=str(full_path),
+                )
                 read_kwargs["on_bad_lines"] = "skip"
                 if is_glob and isinstance(full_path, list):
                     df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
@@ -340,6 +404,7 @@ class PandasEngine(Engine):
                     df.attrs["odibi_source_files"] = [str(full_path)]
                 return self._process_df(df, post_read_query)
         elif format == "parquet":
+            ctx.debug("Reading parquet", path=str(full_path))
             df = pd.read_parquet(full_path, **read_kwargs)
             if isinstance(full_path, list):
                 df.attrs["odibi_source_files"] = full_path
@@ -348,6 +413,10 @@ class PandasEngine(Engine):
             return self._process_df(df, post_read_query)
         elif format == "json":
             if is_glob and isinstance(full_path, list):
+                ctx.debug(
+                    "Parallel JSON read",
+                    file_count=len(full_path),
+                )
                 df = self._read_parallel(pd.read_json, full_path, **read_kwargs)
                 df.attrs["odibi_source_files"] = full_path
                 return self._process_df(df, post_read_query)
@@ -357,23 +426,28 @@ class PandasEngine(Engine):
                 df.attrs["odibi_source_files"] = [str(full_path)]
             return self._process_df(df, post_read_query)
         elif format == "excel":
-            # Original options without popped query (wait, I want read_kwargs but without pyarrow backend if added)
-            # Let's use read_kwargs but remove dtype_backend if present
+            ctx.debug("Reading Excel file", path=str(full_path))
             read_kwargs.pop("dtype_backend", None)
             return self._process_df(pd.read_excel(full_path, **read_kwargs), post_read_query)
         elif format == "delta":
+            ctx.debug("Reading Delta table", path=str(full_path))
             try:
                 from deltalake import DeltaTable
             except ImportError:
+                ctx.error(
+                    "Delta Lake library not installed",
+                    path=str(full_path),
+                )
                 raise ImportError(
-                    "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
-                    "See README.md for installation instructions."
+                    "Delta Lake support requires 'pip install odibi[pandas]' "
+                    "or 'pip install deltalake'. See README.md for installation instructions."
                 )
 
             storage_opts = options.get("storage_options", {})
             version = options.get("versionAsOf")
 
             dt = DeltaTable(full_path, storage_options=storage_opts, version=version)
+            ctx.debug("Delta table loaded", version=version)
 
             if self.use_arrow:
                 import inspect
@@ -389,17 +463,23 @@ class PandasEngine(Engine):
                     )
                 else:
                     return self._process_df(
-                        dt.to_pyarrow_table().to_pandas(types_mapper=pd.ArrowDtype), post_read_query
+                        dt.to_pyarrow_table().to_pandas(types_mapper=pd.ArrowDtype),
+                        post_read_query,
                     )
             else:
                 return self._process_df(dt.to_pandas(), post_read_query)
         elif format == "avro":
+            ctx.debug("Reading Avro file", path=str(full_path))
             try:
                 import fastavro
             except ImportError:
+                ctx.error(
+                    "fastavro library not installed",
+                    path=str(full_path),
+                )
                 raise ImportError(
-                    "Avro support requires 'pip install odibi[pandas]' or 'pip install fastavro'. "
-                    "See README.md for installation instructions."
+                    "Avro support requires 'pip install odibi[pandas]' "
+                    "or 'pip install fastavro'. See README.md for installation instructions."
                 )
 
             parsed = urlparse(full_path)
@@ -417,39 +497,26 @@ class PandasEngine(Engine):
                     records = [record for record in reader]
                 return self._process_df(pd.DataFrame(records), post_read_query)
         elif format in ["sql_server", "azure_sql"]:
-            # This part was in read() but uses connection methods.
-            # If we are here, full_path is None or not used as path?
-            # In original read(), it called connection.read_table(table_name).
-            # But here we passed full_path which was resolved from table.
-            # Wait, SQL connections don't resolve path from table usually?
-            # Let's check original read().
-            # if table: full_path = connection.get_path(table) -> returns table name usually?
-            # And later:
-            # elif format in ["sql_server", "azure_sql"]:
-            #    if table: schema, table_name = table.split... return connection.read_table...
-
-            # The refactored read() logic computes full_path.
-            # For SQL, full_path might be just the table name.
-            # I should pass `table` explicitly to `_read_file` if needed, or parse full_path.
-            # Simpler: Pass table name in options or assume full_path is the table name.
-            # The original logic used `table` variable.
-
-            # I will assume full_path is the table name for SQL formats if it was derived from table.
-            # But connection.read_table might need connection object.
+            ctx.debug("Reading SQL table", table=str(full_path), format=format)
             if not hasattr(connection, "read_table"):
+                ctx.error(
+                    "Connection does not support SQL operations",
+                    connection_type=type(connection).__name__,
+                )
                 raise ValueError(
                     f"Connection type '{type(connection).__name__}' does not support SQL operations"
                 )
 
-            # full_path holds the table name (from get_path usually returns it)
             table_name = str(full_path)
             if "." in table_name:
                 schema, tbl = table_name.split(".", 1)
             else:
                 schema, tbl = "dbo", table_name
 
+            ctx.debug("Executing SQL read", schema=schema, table=tbl)
             return connection.read_table(table_name=tbl, schema=schema)
         else:
+            ctx.error("Unsupported format", format=format)
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
 
     def write(
@@ -464,6 +531,17 @@ class PandasEngine(Engine):
         options: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Write data using Pandas."""
+        ctx = get_logging_context().with_context(engine="pandas")
+        start = time.time()
+
+        destination = path or table
+        ctx.debug(
+            "Starting write operation",
+            format=format,
+            destination=destination,
+            mode=mode,
+        )
+
         # Ensure materialization if LazyDataset
         df = self.materialize(df)
 
@@ -473,10 +551,20 @@ class PandasEngine(Engine):
         from collections.abc import Iterator
 
         if isinstance(df, Iterator):
+            ctx.debug("Writing iterator/generator input")
             return self._write_iterator(df, connection, format, table, path, mode, options)
+
+        row_count = len(df)
+        memory_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
+
+        ctx.log_pandas_metrics(
+            memory_mb=memory_mb,
+            dtypes={col: str(dtype) for col, dtype in df.dtypes.items()},
+        )
 
         # SQL Server / Azure SQL Support
         if format in ["sql_server", "azure_sql"]:
+            ctx.debug("Writing to SQL", table=table, mode=mode)
             return self._write_sql(df, connection, table, mode, options)
 
         # Get full path from connection
@@ -489,8 +577,10 @@ class PandasEngine(Engine):
             if connection:
                 full_path = connection.get_path(table)
             else:
+                ctx.error("Connection required when specifying 'table'", table=table)
                 raise ValueError("Connection is required when specifying 'table'.")
         else:
+            ctx.error("Neither path nor table provided for write operation")
             raise ValueError("Either path or table must be provided")
 
         # Merge storage options for cloud connections
@@ -498,7 +588,7 @@ class PandasEngine(Engine):
 
         # Custom Writers
         if format in self._custom_writers:
-            # Clean up custom options
+            ctx.debug(f"Using custom writer for format: {format}")
             writer_options = merged_options.copy()
             writer_options.pop("keys", None)
             self._custom_writers[format](df, full_path, mode=mode, **writer_options)
@@ -512,14 +602,47 @@ class PandasEngine(Engine):
 
         # Delta Lake Write
         if format == "delta":
-            return self._write_delta(df, full_path, mode, merged_options)
+            ctx.debug("Writing Delta table", path=str(full_path), mode=mode)
+            result = self._write_delta(df, full_path, mode, merged_options)
+            elapsed = (time.time() - start) * 1000
+            ctx.log_file_io(
+                path=str(full_path),
+                format=format,
+                mode=mode,
+                rows=row_count,
+            )
+            ctx.info(
+                "Write completed",
+                format=format,
+                rows=row_count,
+                elapsed_ms=round(elapsed, 2),
+            )
+            return result
 
         # Handle Generic Upsert/Append-Once for non-Delta
         if mode in ["upsert", "append_once"]:
+            ctx.debug(f"Handling {mode} mode for non-Delta format")
             df, mode = self._handle_generic_upsert(df, full_path, format, mode, merged_options)
+            row_count = len(df)
 
         # Standard File Write
-        return self._write_file(df, full_path, format, mode, merged_options)
+        result = self._write_file(df, full_path, format, mode, merged_options)
+
+        elapsed = (time.time() - start) * 1000
+        ctx.log_file_io(
+            path=str(full_path),
+            format=format,
+            mode=mode,
+            rows=row_count,
+        )
+        ctx.info(
+            "Write completed",
+            format=format,
+            rows=row_count,
+            elapsed_ms=round(elapsed, 2),
+        )
+
+        return result
 
     def _write_iterator(
         self,
@@ -1548,17 +1671,27 @@ class PandasEngine(Engine):
         Returns:
             Dictionary with files_deleted count
         """
+        ctx = get_logging_context().with_context(engine="pandas")
+        start = time.time()
+
+        ctx.debug(
+            "Starting Delta VACUUM",
+            path=path,
+            retention_hours=retention_hours,
+            dry_run=dry_run,
+        )
+
         try:
             from deltalake import DeltaTable
         except ImportError:
+            ctx.error("Delta Lake library not installed", path=path)
             raise ImportError(
-                "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
-                "See README.md for installation instructions."
+                "Delta Lake support requires 'pip install odibi[pandas]' "
+                "or 'pip install deltalake'. See README.md for installation instructions."
             )
 
         full_path = connection.get_path(path)
 
-        # Get storage options if connection provides them
         storage_opts = {}
         if hasattr(connection, "pandas_storage_options"):
             storage_opts = connection.pandas_storage_options()
@@ -1568,6 +1701,15 @@ class PandasEngine(Engine):
             retention_hours=retention_hours,
             dry_run=dry_run,
             enforce_retention_duration=enforce_retention_duration,
+        )
+
+        elapsed = (time.time() - start) * 1000
+        ctx.info(
+            "Delta VACUUM completed",
+            path=str(full_path),
+            files_deleted=len(deleted_files),
+            dry_run=dry_run,
+            elapsed_ms=round(elapsed, 2),
         )
 
         return {"files_deleted": len(deleted_files)}
@@ -1585,23 +1727,36 @@ class PandasEngine(Engine):
         Returns:
             List of version metadata dictionaries
         """
+        ctx = get_logging_context().with_context(engine="pandas")
+        start = time.time()
+
+        ctx.debug("Getting Delta table history", path=path, limit=limit)
+
         try:
             from deltalake import DeltaTable
         except ImportError:
+            ctx.error("Delta Lake library not installed", path=path)
             raise ImportError(
-                "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
-                "See README.md for installation instructions."
+                "Delta Lake support requires 'pip install odibi[pandas]' "
+                "or 'pip install deltalake'. See README.md for installation instructions."
             )
 
         full_path = connection.get_path(path)
 
-        # Get storage options if connection provides them
         storage_opts = {}
         if hasattr(connection, "pandas_storage_options"):
             storage_opts = connection.pandas_storage_options()
 
         dt = DeltaTable(full_path, storage_options=storage_opts)
         history = dt.history(limit=limit)
+
+        elapsed = (time.time() - start) * 1000
+        ctx.info(
+            "Delta history retrieved",
+            path=str(full_path),
+            versions_returned=len(history) if history else 0,
+            elapsed_ms=round(elapsed, 2),
+        )
 
         return history
 
@@ -1613,23 +1768,36 @@ class PandasEngine(Engine):
             path: Delta table path
             version: Version number to restore to
         """
+        ctx = get_logging_context().with_context(engine="pandas")
+        start = time.time()
+
+        ctx.info("Starting Delta table restore", path=path, target_version=version)
+
         try:
             from deltalake import DeltaTable
         except ImportError:
+            ctx.error("Delta Lake library not installed", path=path)
             raise ImportError(
-                "Delta Lake support requires 'pip install odibi[pandas]' or 'pip install deltalake'. "
-                "See README.md for installation instructions."
+                "Delta Lake support requires 'pip install odibi[pandas]' "
+                "or 'pip install deltalake'. See README.md for installation instructions."
             )
 
         full_path = connection.get_path(path)
 
-        # Get storage options if connection provides them
         storage_opts = {}
         if hasattr(connection, "pandas_storage_options"):
             storage_opts = connection.pandas_storage_options()
 
         dt = DeltaTable(full_path, storage_options=storage_opts)
         dt.restore(version)
+
+        elapsed = (time.time() - start) * 1000
+        ctx.info(
+            "Delta table restored",
+            path=str(full_path),
+            restored_to_version=version,
+            elapsed_ms=round(elapsed, 2),
+        )
 
     def maintain_table(
         self,
@@ -1640,51 +1808,64 @@ class PandasEngine(Engine):
         config: Optional[Any] = None,
     ) -> None:
         """Run table maintenance operations (optimize, vacuum)."""
+        ctx = get_logging_context().with_context(engine="pandas")
+
         if format != "delta" or not config or not config.enabled:
             return
 
-        # Pandas engine only supports path-based Delta (resolved from table or path)
         if not path and not table:
             return
 
         full_path = connection.get_path(path if path else table)
+        start = time.time()
+
+        ctx.info("Starting table maintenance", path=str(full_path))
 
         try:
             from deltalake import DeltaTable
         except ImportError:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "Auto-optimize skipped: 'deltalake' library not installed."
+            ctx.warning(
+                "Auto-optimize skipped: 'deltalake' library not installed",
+                path=str(full_path),
             )
             return
 
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         try:
-            # Storage options
             storage_opts = {}
             if hasattr(connection, "pandas_storage_options"):
                 storage_opts = connection.pandas_storage_options()
 
             dt = DeltaTable(full_path, storage_options=storage_opts)
 
-            # 1. OPTIMIZE (Compaction)
-            logger.info(f"Running Auto-Optimize (Compaction) on {full_path}...")
+            ctx.info("Running Delta OPTIMIZE (compaction)", path=str(full_path))
             dt.optimize.compact()
 
-            # 2. VACUUM
             retention = config.vacuum_retention_hours
             if retention is not None and retention > 0:
-                logger.info(
-                    f"Running Auto-Optimize (VACUUM) on {full_path} (Retention: {retention}h)..."
+                ctx.info(
+                    "Running Delta VACUUM",
+                    path=str(full_path),
+                    retention_hours=retention,
                 )
-                dt.vacuum(retention_hours=retention, enforce_retention_duration=True, dry_run=False)
+                dt.vacuum(
+                    retention_hours=retention,
+                    enforce_retention_duration=True,
+                    dry_run=False,
+                )
+
+            elapsed = (time.time() - start) * 1000
+            ctx.info(
+                "Table maintenance completed",
+                path=str(full_path),
+                elapsed_ms=round(elapsed, 2),
+            )
 
         except Exception as e:
-            logger.warning(f"Auto-optimize failed for {full_path}: {e}")
+            ctx.warning(
+                "Auto-optimize failed",
+                path=str(full_path),
+                error=str(e),
+            )
 
     def get_source_files(self, df: Any) -> List[str]:
         """Get list of source files that generated this DataFrame.

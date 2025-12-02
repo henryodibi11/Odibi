@@ -22,7 +22,7 @@ Enable it by setting `mode: stateful` in the `incremental` block.
 
     incremental:
       mode: "stateful"              # Enable State Tracking
-      key_column: "updated_at"      # Column to track (max value is saved)
+      column: "updated_at"      # Column to track (max value is saved)
       fallback_column: "created_at" # Optional: Use this if key_column is NULL
       watermark_lag: "30m"          # Safety buffer (overlaps the window)
       state_key: "orders_ingest"    # Optional: Custom ID for the state file

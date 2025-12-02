@@ -1,12 +1,10 @@
-import logging
 from typing import Any, Dict, List, Optional
 
 from odibi.config import (
     TestType,
     ValidationConfig,
 )
-
-logger = logging.getLogger(__name__)
+from odibi.utils.logging_context import get_logging_context
 
 
 class Validator:
@@ -29,16 +27,19 @@ class Validator:
         Returns:
             List of error messages (empty if all checks pass)
         """
+        ctx = get_logging_context()
+        test_count = len(config.tests)
         failures = []
         is_spark = False
         is_polars = False
+        engine_type = "pandas"
 
-        # Detect engine
         try:
             import pyspark
 
             if isinstance(df, pyspark.sql.DataFrame):
                 is_spark = True
+                engine_type = "spark"
         except ImportError:
             pass
 
@@ -48,8 +49,16 @@ class Validator:
 
                 if isinstance(df, (pl.DataFrame, pl.LazyFrame)):
                     is_polars = True
+                    engine_type = "polars"
             except ImportError:
                 pass
+
+        ctx.debug(
+            "Starting validation",
+            test_count=test_count,
+            engine=engine_type,
+            df_type=type(df).__name__,
+        )
 
         if is_spark:
             failures = self._validate_spark(df, config, context)
@@ -58,18 +67,48 @@ class Validator:
         else:
             failures = self._validate_pandas(df, config, context)
 
+        tests_passed = test_count - len(failures)
+        ctx.info(
+            "Validation complete",
+            total_tests=test_count,
+            tests_passed=tests_passed,
+            tests_failed=len(failures),
+            engine=engine_type,
+        )
+
+        ctx.log_validation_result(
+            passed=len(failures) == 0,
+            rule_name="batch_validation",
+            failures=failures[:5] if failures else None,
+            total_tests=test_count,
+            tests_passed=tests_passed,
+            tests_failed=len(failures),
+        )
+
         return failures
 
     def _handle_failure(self, message: str, test: Any) -> Optional[str]:
         """Handle failure based on severity."""
         from odibi.config import ContractSeverity
 
+        ctx = get_logging_context()
         severity = getattr(test, "on_fail", ContractSeverity.FAIL)
+        test_type = getattr(test, "type", "unknown")
 
         if severity == ContractSeverity.WARN:
-            logger.warning(f"Validation Warning: {message}")
+            ctx.warning(
+                f"Validation Warning: {message}",
+                test_type=str(test_type),
+                severity="warn",
+            )
             return None
-        # Fail or Quarantine (Quarantine not implemented here, treated as fail for execution flow)
+
+        ctx.error(
+            f"Validation Failed: {message}",
+            test_type=str(test_type),
+            severity="fail",
+            test_config=str(test),
+        )
         return message
 
     def _validate_polars(
@@ -77,14 +116,20 @@ class Validator:
     ) -> List[str]:
         import polars as pl
 
-        # Ensure materialization for now as validation is complex
+        ctx = get_logging_context()
+
         if isinstance(df, pl.LazyFrame):
             df = df.collect()
+
+        row_count = len(df)
+        ctx.debug("Validating Polars DataFrame", row_count=row_count)
 
         failures = []
 
         for test in config.tests:
             msg = None
+            test_type = getattr(test, "type", "unknown")
+            ctx.debug("Executing test", test_type=str(test_type))
 
             if test.type == TestType.SCHEMA:
                 if context and "columns" in context:
@@ -99,15 +144,12 @@ class Validator:
                             msg = f"Schema mismatch. Missing columns: {missing}"
 
             elif test.type == TestType.FRESHNESS:
-                # Check max age
                 col = getattr(test, "column", "updated_at")
                 if col in df.columns:
                     max_ts = df[col].max()
                     if max_ts:
                         from datetime import datetime, timedelta
 
-                        # Parse duration "2h", "1d"
-                        # Simple parser
                         duration_str = test.max_age
                         delta = None
                         if duration_str.endswith("h"):
@@ -129,12 +171,15 @@ class Validator:
                         null_count = df[col].null_count()
                         if null_count > 0:
                             msg = f"Column '{col}' contains {null_count} NULLs"
+                            ctx.debug(
+                                "NOT_NULL check failed",
+                                column=col,
+                                null_count=null_count,
+                                row_count=row_count,
+                            )
                             if msg:
                                 failures.append(self._handle_failure(msg, test))
-                            msg = None  # Reset for loop
-
-            # ... implement other tests for Polars as needed ...
-            # For brevity, I implemented the new ones and basic one.
+                            msg = None
 
             if msg:
                 res = self._handle_failure(msg, test)
@@ -149,13 +194,17 @@ class Validator:
         """Execute checks using Spark SQL."""
         from pyspark.sql import functions as F
 
+        ctx = get_logging_context()
         failures = []
-        # Cache for multiple checks if needed, but let's rely on Spark's optimization for now
-        # df.cache()
         row_count = df.count()
+
+        ctx.debug("Validating Spark DataFrame", row_count=row_count)
 
         for test in config.tests:
             msg = None
+            test_type = getattr(test, "type", "unknown")
+            ctx.debug("Executing test", test_type=str(test_type))
+
             if test.type == TestType.ROW_COUNT:
                 if test.min is not None and row_count < test.min:
                     msg = f"Row count {row_count} < min {test.min}"
@@ -201,6 +250,12 @@ class Validator:
                         null_count = df.filter(F.col(col).isNull()).count()
                         if null_count > 0:
                             col_msg = f"Column '{col}' contains {null_count} NULLs"
+                            ctx.debug(
+                                "NOT_NULL check failed",
+                                column=col,
+                                null_count=null_count,
+                                row_count=row_count,
+                            )
                             res = self._handle_failure(col_msg, test)
                             if res:
                                 failures.append(res)
@@ -214,6 +269,11 @@ class Validator:
                     dup_count = df.groupBy(*cols).count().filter("count > 1").count()
                     if dup_count > 0:
                         msg = f"Column '{', '.join(cols)}' is not unique"
+                        ctx.debug(
+                            "UNIQUE check failed",
+                            columns=cols,
+                            duplicate_groups=dup_count,
+                        )
 
             elif test.type == TestType.ACCEPTED_VALUES:
                 col = test.column
@@ -224,6 +284,12 @@ class Validator:
                         examples_rows = invalid_df.select(col).limit(3).collect()
                         examples = [r[0] for r in examples_rows]
                         msg = f"Column '{col}' contains invalid values. Found: {examples}"
+                        ctx.debug(
+                            "ACCEPTED_VALUES check failed",
+                            column=col,
+                            invalid_count=invalid_count,
+                            examples=examples,
+                        )
                 else:
                     msg = f"Accepted values check failed: Column '{col}' not found"
 
@@ -239,19 +305,30 @@ class Validator:
                     invalid_count = df.filter(cond).count()
                     if invalid_count > 0:
                         msg = f"Column '{col}' contains {invalid_count} values out of range"
+                        ctx.debug(
+                            "RANGE check failed",
+                            column=col,
+                            invalid_count=invalid_count,
+                            min=test.min,
+                            max=test.max,
+                        )
                 else:
                     msg = f"Range check failed: Column '{col}' not found"
 
             elif test.type == TestType.REGEX_MATCH:
                 col = test.column
                 if col in df.columns:
-                    # Spark uses Java regex. Python regex might need adaptation if complex.
-                    # For simple anchors ^ and $ and classes \w, it works.
                     invalid_count = df.filter(
                         F.col(col).isNotNull() & ~F.col(col).rlike(test.pattern)
                     ).count()
                     if invalid_count > 0:
                         msg = f"Column '{col}' contains {invalid_count} values that does not match pattern '{test.pattern}'"
+                        ctx.debug(
+                            "REGEX_MATCH check failed",
+                            column=col,
+                            invalid_count=invalid_count,
+                            pattern=test.pattern,
+                        )
                 else:
                     msg = f"Regex check failed: Column '{col}' not found"
 
@@ -260,8 +337,18 @@ class Validator:
                     invalid_count = df.filter(f"NOT ({test.condition})").count()
                     if invalid_count > 0:
                         msg = f"Custom check '{getattr(test, 'name', 'custom_sql')}' failed. Found {invalid_count} invalid rows."
+                        ctx.debug(
+                            "CUSTOM_SQL check failed",
+                            condition=test.condition,
+                            invalid_count=invalid_count,
+                        )
                 except Exception as e:
                     msg = f"Failed to execute custom SQL '{test.condition}': {e}"
+                    ctx.error(
+                        "CUSTOM_SQL execution error",
+                        condition=test.condition,
+                        error=str(e),
+                    )
 
             if msg:
                 res = self._handle_failure(msg, test)
@@ -274,11 +361,16 @@ class Validator:
         self, df: Any, config: ValidationConfig, context: Dict[str, Any] = None
     ) -> List[str]:
         """Execute checks using Pandas."""
+        ctx = get_logging_context()
         failures = []
         row_count = len(df)
 
+        ctx.debug("Validating Pandas DataFrame", row_count=row_count)
+
         for test in config.tests:
             msg = None
+            test_type = getattr(test, "type", "unknown")
+            ctx.debug("Executing test", test_type=str(test_type))
 
             if test.type == TestType.SCHEMA:
                 if context and "columns" in context:
@@ -295,7 +387,6 @@ class Validator:
             elif test.type == TestType.FRESHNESS:
                 col = getattr(test, "column", "updated_at")
                 if col in df.columns:
-                    # Ensure datetime
                     import pandas as pd
 
                     if not pd.api.types.is_datetime64_any_dtype(df[col]):
@@ -336,11 +427,21 @@ class Validator:
                         null_count = df[col].isnull().sum()
                         if null_count > 0:
                             col_msg = f"Column '{col}' contains {null_count} NULLs"
+                            ctx.debug(
+                                "NOT_NULL check failed",
+                                column=col,
+                                null_count=int(null_count),
+                                row_count=row_count,
+                            )
                             res = self._handle_failure(col_msg, test)
                             if res:
                                 failures.append(res)
                     else:
                         col_msg = f"Column '{col}' not found in DataFrame"
+                        ctx.debug(
+                            "NOT_NULL check failed - column missing",
+                            column=col,
+                        )
                         res = self._handle_failure(col_msg, test)
                         if res:
                             failures.append(res)
@@ -352,17 +453,27 @@ class Validator:
                     msg = f"Unique check failed: Columns {set(test.columns) - set(cols)} not found"
                 else:
                     if df.duplicated(subset=cols).any():
+                        dup_count = df.duplicated(subset=cols).sum()
                         msg = f"Column '{', '.join(cols)}' is not unique"
+                        ctx.debug(
+                            "UNIQUE check failed",
+                            columns=cols,
+                            duplicate_rows=int(dup_count),
+                        )
 
             elif test.type == TestType.ACCEPTED_VALUES:
                 col = test.column
                 if col in df.columns:
-                    # Find invalid values
                     invalid = df[~df[col].isin(test.values)]
                     if not invalid.empty:
-                        # Show top 3 invalid
                         examples = invalid[col].unique()[:3]
                         msg = f"Column '{col}' contains invalid values. Found: {examples}"
+                        ctx.debug(
+                            "ACCEPTED_VALUES check failed",
+                            column=col,
+                            invalid_count=len(invalid),
+                            examples=list(examples),
+                        )
                 else:
                     msg = f"Accepted values check failed: Column '{col}' not found"
 
@@ -377,37 +488,51 @@ class Validator:
 
                     if invalid_count > 0:
                         msg = f"Column '{col}' contains {invalid_count} values out of range"
+                        ctx.debug(
+                            "RANGE check failed",
+                            column=col,
+                            invalid_count=int(invalid_count),
+                            min=test.min,
+                            max=test.max,
+                        )
                 else:
                     msg = f"Range check failed: Column '{col}' not found"
 
             elif test.type == TestType.REGEX_MATCH:
                 col = test.column
                 if col in df.columns:
-                    # Convert to string and check
-                    # Use match (anchored) or contains? RegexMatch usually implies full match or search.
-                    # Test uses ^...$ so it expects full match.
-                    # pandas str.match matches from start.
-
-                    # Filter non-nulls
                     valid_series = df[col].dropna().astype(str)
                     if not valid_series.empty:
                         matches = valid_series.str.match(test.pattern)
                         invalid_count = (~matches).sum()
                         if invalid_count > 0:
                             msg = f"Column '{col}' contains {invalid_count} values that does not match pattern '{test.pattern}'"
+                            ctx.debug(
+                                "REGEX_MATCH check failed",
+                                column=col,
+                                invalid_count=int(invalid_count),
+                                pattern=test.pattern,
+                            )
                 else:
                     msg = f"Regex check failed: Column '{col}' not found"
 
             elif test.type == TestType.CUSTOM_SQL:
-                # Pandas 'query' uses syntax slightly different from SQL but compatible for simple exprs
                 try:
-                    # Condition is expected to be TRUE for valid rows
-                    # We want to find invalid rows: NOT (condition)
                     invalid = df.query(f"not ({test.condition})")
                     if not invalid.empty:
                         msg = f"Custom check '{getattr(test, 'name', 'custom_sql')}' failed. Found {len(invalid)} invalid rows."
+                        ctx.debug(
+                            "CUSTOM_SQL check failed",
+                            condition=test.condition,
+                            invalid_count=len(invalid),
+                        )
                 except Exception as e:
                     msg = f"Failed to execute custom SQL '{test.condition}': {e}"
+                    ctx.error(
+                        "CUSTOM_SQL execution error",
+                        condition=test.condition,
+                        error=str(e),
+                    )
 
             if msg:
                 res = self._handle_failure(msg, test)

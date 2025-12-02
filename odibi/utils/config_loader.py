@@ -4,6 +4,8 @@ from typing import Any, Dict
 
 import yaml
 
+from odibi.utils.logging import logger
+
 # Pattern to match ${VAR} or ${env:VAR}
 # Captures the variable name in group 1
 ENV_PATTERN = re.compile(r"\$\{(?:env:)?([A-Za-z0-9_]+)\}")
@@ -20,11 +22,23 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
     result = base.copy()
     for key, value in override.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            logger.debug(
+                "Deep merging nested dictionary",
+                key=key,
+                base_keys=list(result[key].keys()),
+                override_keys=list(value.keys()),
+            )
             result[key] = _deep_merge(result[key], value)
         elif key == "pipelines" and isinstance(value, list) and isinstance(result.get(key), list):
-            # Special case: Append pipelines instead of overwriting
+            logger.debug(
+                "Appending pipelines list",
+                existing_count=len(result[key]),
+                new_count=len(value),
+            )
             result[key] = result[key] + value
         else:
+            if key in result:
+                logger.debug("Overwriting key during merge", key=key)
             result[key] = value
     return result
 
@@ -49,34 +63,66 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
         ValueError: If environment variable is missing
         yaml.YAMLError: If YAML parsing fails
     """
+    logger.debug("Loading YAML configuration", path=path, env=env)
+
     if not os.path.exists(path):
+        logger.error("Configuration file not found", path=path)
         raise FileNotFoundError(f"YAML file not found: {path}")
 
     # Get absolute path for relative import resolution
     abs_path = os.path.abspath(path)
     base_dir = os.path.dirname(abs_path)
 
+    logger.debug("Reading configuration file", absolute_path=abs_path)
+
     with open(abs_path, "r") as f:
         content = f.read()
 
+    logger.debug("File content loaded", file_size=len(content))
+
+    env_vars_found = []
+
     def replace_env(match):
         var_name = match.group(1)
+        env_vars_found.append(var_name)
         value = os.environ.get(var_name)
         if value is None:
+            logger.error(
+                "Missing required environment variable",
+                variable=var_name,
+                file=abs_path,
+            )
             raise ValueError(f"Missing environment variable: {var_name}")
+        logger.debug("Environment variable substituted", variable=var_name)
         return value
 
     # Substitute variables
     substituted_content = ENV_PATTERN.sub(replace_env, content)
 
+    if env_vars_found:
+        logger.debug(
+            "Environment variable substitution complete",
+            variables_substituted=env_vars_found,
+            count=len(env_vars_found),
+        )
+
     # Parse YAML
-    data = yaml.safe_load(substituted_content) or {}
+    logger.debug("Parsing YAML content", path=abs_path)
+    try:
+        data = yaml.safe_load(substituted_content) or {}
+    except yaml.YAMLError as e:
+        logger.error("YAML parsing failed", path=abs_path, error=str(e))
+        raise
+
+    logger.debug("YAML parsed successfully", top_level_keys=list(data.keys()))
 
     # Handle imports
     imports = data.pop("imports", [])
     if imports:
         if isinstance(imports, str):
             imports = [imports]
+
+        logger.debug("Processing imports", import_count=len(imports), imports=imports)
 
         # Start with current data as the base
         merged_data = data.copy()
@@ -88,33 +134,89 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
             else:
                 full_import_path = import_path
 
+            logger.debug(
+                "Resolving import",
+                import_path=import_path,
+                resolved_path=full_import_path,
+            )
+
+            if not os.path.exists(full_import_path):
+                logger.error(
+                    "Imported configuration file not found",
+                    import_path=import_path,
+                    resolved_path=full_import_path,
+                    parent_file=abs_path,
+                )
+                raise FileNotFoundError(f"Imported YAML file not found: {full_import_path}")
+
             # Recursive load
             # Note: We pass env down to imported files too
+            logger.debug("Loading imported configuration", path=full_import_path)
             imported_data = load_yaml_with_env(full_import_path, env=env)
 
             # Merge imported data INTO the current data
             # This way, the main file acts as the "master" that accumulates imports
+            logger.debug(
+                "Merging imported configuration",
+                import_path=full_import_path,
+                imported_keys=list(imported_data.keys()),
+            )
             merged_data = _deep_merge(merged_data, imported_data)
 
         data = merged_data
+        logger.debug("All imports processed and merged", import_count=len(imports))
 
     # Apply Environment Overrides from "environments" block in main file
     if env:
         environments = data.get("environments", {})
         if env in environments:
+            logger.debug(
+                "Applying environment overrides from environments block",
+                env=env,
+                override_keys=list(environments[env].keys()),
+            )
             override = environments[env]
             data = _deep_merge(data, override)
+        else:
+            logger.debug(
+                "No environment override found in environments block",
+                env=env,
+                available_environments=list(environments.keys()),
+            )
 
     # Apply Environment Overrides from external env.{env}.yaml file
     if env:
         env_file_name = f"env.{env}.yaml"
         env_file_path = os.path.join(base_dir, env_file_name)
         if os.path.exists(env_file_path):
+            logger.debug(
+                "Loading external environment override file",
+                env=env,
+                env_file=env_file_path,
+            )
             # Load the env file (recursively, so it can have imports too)
             # We pass env=None to avoid infinite recursion if it somehow references itself,
             # though strictly it shouldn't matter as we look for env.{env}.yaml based on the passed env.
             # But logically, an env specific file shouldn't load other env specific files for the same env.
             env_data = load_yaml_with_env(env_file_path, env=None)
+            logger.debug(
+                "Merging external environment overrides",
+                env_file=env_file_path,
+                override_keys=list(env_data.keys()),
+            )
             data = _deep_merge(data, env_data)
+        else:
+            logger.debug(
+                "No external environment override file found",
+                env=env,
+                expected_path=env_file_path,
+            )
+
+    logger.debug(
+        "Configuration loading complete",
+        path=path,
+        env=env,
+        final_keys=list(data.keys()),
+    )
 
     return data

@@ -11,6 +11,8 @@ import pandas as pd
 
 from odibi.connections.base import BaseConnection
 from odibi.exceptions import ConnectionError
+from odibi.utils.logging import logger
+from odibi.utils.logging_context import get_logging_context
 
 
 class AzureSQL(BaseConnection):
@@ -53,6 +55,17 @@ class AzureSQL(BaseConnection):
             port: SQL Server port (default: 1433)
             timeout: Connection timeout in seconds (default: 30)
         """
+        ctx = get_logging_context()
+        ctx.log_connection(
+            connection_type="azure_sql",
+            connection_name=f"{server}/{database}",
+            action="init",
+            server=server,
+            database=database,
+            auth_mode=auth_mode,
+            port=port,
+        )
+
         self.server = server
         self.database = database
         self.driver = driver
@@ -66,17 +79,49 @@ class AzureSQL(BaseConnection):
         self._engine = None
         self._cached_key = None  # For consistency with ADLS / parallel fetch
 
+        ctx.debug(
+            "AzureSQL connection initialized",
+            server=server,
+            database=database,
+            auth_mode=auth_mode,
+            driver=driver,
+        )
+
     def get_password(self) -> Optional[str]:
         """Get password (cached)."""
+        ctx = get_logging_context()
+
         if self.password:
+            ctx.debug(
+                "Using provided password",
+                server=self.server,
+                database=self.database,
+            )
             return self.password
 
         if self._cached_key:
+            ctx.debug(
+                "Using cached password",
+                server=self.server,
+                database=self.database,
+            )
             return self._cached_key
 
         if self.auth_mode == "key_vault":
             if not self.key_vault_name or not self.secret_name:
+                ctx.error(
+                    "Key Vault mode requires key_vault_name and secret_name",
+                    server=self.server,
+                    database=self.database,
+                )
                 raise ValueError("key_vault mode requires key_vault_name and secret_name")
+
+            ctx.debug(
+                "Fetching password from Key Vault",
+                server=self.server,
+                key_vault_name=self.key_vault_name,
+                secret_name=self.secret_name,
+            )
 
             try:
                 from azure.identity import DefaultAzureCredential
@@ -87,12 +132,29 @@ class AzureSQL(BaseConnection):
                 client = SecretClient(vault_url=kv_uri, credential=credential)
                 secret = client.get_secret(self.secret_name)
                 self._cached_key = secret.value
+                logger.register_secret(self._cached_key)
+
+                ctx.info(
+                    "Successfully fetched password from Key Vault",
+                    server=self.server,
+                    key_vault_name=self.key_vault_name,
+                )
                 return self._cached_key
-            except ImportError:
+            except ImportError as e:
+                ctx.error(
+                    "Key Vault support requires azure libraries",
+                    server=self.server,
+                    error=str(e),
+                )
                 raise ImportError(
                     "Key Vault support requires 'azure-identity' and 'azure-keyvault-secrets'"
                 )
 
+        ctx.debug(
+            "No password required for auth_mode",
+            server=self.server,
+            auth_mode=self.auth_mode,
+        )
         return None
 
     def odbc_dsn(self) -> str:
@@ -106,6 +168,14 @@ class AzureSQL(BaseConnection):
             >>> conn.odbc_dsn()
             'Driver={ODBC Driver 18 for SQL Server};Server=tcp:myserver...'
         """
+        ctx = get_logging_context()
+        ctx.debug(
+            "Building ODBC connection string",
+            server=self.server,
+            database=self.database,
+            auth_mode=self.auth_mode,
+        )
+
         dsn = (
             f"Driver={{{self.driver}}};"
             f"Server=tcp:{self.server},1433;"
@@ -118,11 +188,23 @@ class AzureSQL(BaseConnection):
         pwd = self.get_password()
         if self.username and pwd:
             dsn += f"UID={self.username};PWD={pwd};"
+            ctx.debug(
+                "Using SQL authentication",
+                server=self.server,
+                username=self.username,
+            )
         elif self.auth_mode == "aad_msi":
             dsn += "Authentication=ActiveDirectoryMsi;"
+            ctx.debug(
+                "Using AAD Managed Identity authentication",
+                server=self.server,
+            )
         elif self.auth_mode == "aad_service_principal":
             # Not fully supported via ODBC string simply without token usually
-            pass
+            ctx.debug(
+                "Using AAD Service Principal authentication",
+                server=self.server,
+            )
 
         return dsn
 
@@ -132,26 +214,67 @@ class AzureSQL(BaseConnection):
 
     def validate(self) -> None:
         """Validate Azure SQL connection configuration."""
+        ctx = get_logging_context()
+        ctx.debug(
+            "Validating AzureSQL connection",
+            server=self.server,
+            database=self.database,
+            auth_mode=self.auth_mode,
+        )
+
         if not self.server:
+            ctx.error("AzureSQL validation failed: missing 'server'")
             raise ValueError("Azure SQL connection requires 'server'")
         if not self.database:
+            ctx.error(
+                "AzureSQL validation failed: missing 'database'",
+                server=self.server,
+            )
             raise ValueError("Azure SQL connection requires 'database'")
 
         if self.auth_mode == "sql":
             if not self.username:
+                ctx.error(
+                    "AzureSQL validation failed: SQL auth requires username",
+                    server=self.server,
+                    database=self.database,
+                )
                 raise ValueError("Azure SQL with auth_mode='sql' requires username")
             if not self.password and not (self.key_vault_name and self.secret_name):
+                ctx.error(
+                    "AzureSQL validation failed: SQL auth requires password",
+                    server=self.server,
+                    database=self.database,
+                )
                 raise ValueError(
-                    "Azure SQL with auth_mode='sql' requires password (or key_vault_name/secret_name)"
+                    "Azure SQL with auth_mode='sql' requires password "
+                    "(or key_vault_name/secret_name)"
                 )
 
         if self.auth_mode == "key_vault":
             if not self.key_vault_name or not self.secret_name:
+                ctx.error(
+                    "AzureSQL validation failed: key_vault mode missing config",
+                    server=self.server,
+                    database=self.database,
+                )
                 raise ValueError(
                     "Azure SQL with auth_mode='key_vault' requires key_vault_name and secret_name"
                 )
             if not self.username:
+                ctx.error(
+                    "AzureSQL validation failed: key_vault mode requires username",
+                    server=self.server,
+                    database=self.database,
+                )
                 raise ValueError("Azure SQL with auth_mode='key_vault' requires username")
+
+        ctx.info(
+            "AzureSQL connection validated successfully",
+            server=self.server,
+            database=self.database,
+            auth_mode=self.auth_mode,
+        )
 
     def get_engine(self):
         """
@@ -163,14 +286,33 @@ class AzureSQL(BaseConnection):
         Raises:
             ConnectionError: If connection fails or drivers missing
         """
+        ctx = get_logging_context()
+
         if self._engine is not None:
+            ctx.debug(
+                "Using cached SQLAlchemy engine",
+                server=self.server,
+                database=self.database,
+            )
             return self._engine
+
+        ctx.debug(
+            "Creating SQLAlchemy engine",
+            server=self.server,
+            database=self.database,
+        )
 
         try:
             from urllib.parse import quote_plus
 
             from sqlalchemy import create_engine
-        except ImportError:
+        except ImportError as e:
+            ctx.error(
+                "SQLAlchemy import failed",
+                server=self.server,
+                database=self.database,
+                error=str(e),
+            )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason="Required packages 'sqlalchemy' or 'pyodbc' not found.",
@@ -185,6 +327,12 @@ class AzureSQL(BaseConnection):
             conn_str = self.odbc_dsn()
             connection_url = f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}"
 
+            ctx.debug(
+                "Creating SQLAlchemy engine with connection pooling",
+                server=self.server,
+                database=self.database,
+            )
+
             # Create engine with connection pooling
             self._engine = create_engine(
                 connection_url,
@@ -197,10 +345,23 @@ class AzureSQL(BaseConnection):
             with self._engine.connect():
                 pass
 
+            ctx.info(
+                "SQLAlchemy engine created successfully",
+                server=self.server,
+                database=self.database,
+            )
+
             return self._engine
 
         except Exception as e:
             suggestions = self._get_error_suggestions(str(e))
+            ctx.error(
+                "Failed to create SQLAlchemy engine",
+                server=self.server,
+                database=self.database,
+                error=str(e),
+                suggestions=suggestions,
+            )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason=f"Failed to create engine: {str(e)}",
@@ -221,12 +382,34 @@ class AzureSQL(BaseConnection):
         Raises:
             ConnectionError: If execution fails
         """
+        ctx = get_logging_context()
+        ctx.debug(
+            "Executing SQL query",
+            server=self.server,
+            database=self.database,
+            query_length=len(query),
+        )
+
         try:
             engine = self.get_engine()
-            return pd.read_sql(query, engine, params=params)
+            result = pd.read_sql(query, engine, params=params)
+
+            ctx.info(
+                "SQL query executed successfully",
+                server=self.server,
+                database=self.database,
+                rows_returned=len(result),
+            )
+            return result
         except Exception as e:
             if isinstance(e, ConnectionError):
                 raise
+            ctx.error(
+                "SQL query execution failed",
+                server=self.server,
+                database=self.database,
+                error=str(e),
+            )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason=f"Query execution failed: {str(e)}",
@@ -244,6 +427,15 @@ class AzureSQL(BaseConnection):
         Returns:
             Table contents as pandas DataFrame
         """
+        ctx = get_logging_context()
+        ctx.info(
+            "Reading table",
+            server=self.server,
+            database=self.database,
+            table_name=table_name,
+            schema=schema,
+        )
+
         if schema:
             query = f"SELECT * FROM [{schema}].[{table_name}]"
         else:
@@ -277,6 +469,18 @@ class AzureSQL(BaseConnection):
         Raises:
             ConnectionError: If write fails
         """
+        ctx = get_logging_context()
+        ctx.info(
+            "Writing DataFrame to table",
+            server=self.server,
+            database=self.database,
+            table_name=table_name,
+            schema=schema,
+            rows=len(df),
+            if_exists=if_exists,
+            chunksize=chunksize,
+        )
+
         try:
             engine = self.get_engine()
 
@@ -290,10 +494,25 @@ class AzureSQL(BaseConnection):
                 method="multi",  # Use multi-row INSERT for better performance
             )
 
-            return rows_written if rows_written is not None else len(df)
+            result_rows = rows_written if rows_written is not None else len(df)
+            ctx.info(
+                "Table write completed successfully",
+                server=self.server,
+                database=self.database,
+                table_name=table_name,
+                rows_written=result_rows,
+            )
+            return result_rows
         except Exception as e:
             if isinstance(e, ConnectionError):
                 raise
+            ctx.error(
+                "Table write failed",
+                server=self.server,
+                database=self.database,
+                table_name=table_name,
+                error=str(e),
+            )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason=f"Write operation failed: {str(e)}",
@@ -314,6 +533,14 @@ class AzureSQL(BaseConnection):
         Raises:
             ConnectionError: If execution fails
         """
+        ctx = get_logging_context()
+        ctx.debug(
+            "Executing SQL statement",
+            server=self.server,
+            database=self.database,
+            statement_length=len(sql),
+        )
+
         try:
             engine = self.get_engine()
             from sqlalchemy import text
@@ -321,10 +548,22 @@ class AzureSQL(BaseConnection):
             with engine.connect() as conn:
                 result = conn.execute(text(sql), params or {})
                 conn.commit()
+
+                ctx.info(
+                    "SQL statement executed successfully",
+                    server=self.server,
+                    database=self.database,
+                )
                 return result
         except Exception as e:
             if isinstance(e, ConnectionError):
                 raise
+            ctx.error(
+                "SQL statement execution failed",
+                server=self.server,
+                database=self.database,
+                error=str(e),
+            )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
                 reason=f"Statement execution failed: {str(e)}",
@@ -333,9 +572,21 @@ class AzureSQL(BaseConnection):
 
     def close(self):
         """Close database connection and dispose of engine."""
+        ctx = get_logging_context()
+        ctx.debug(
+            "Closing AzureSQL connection",
+            server=self.server,
+            database=self.database,
+        )
+
         if self._engine:
             self._engine.dispose()
             self._engine = None
+            ctx.info(
+                "AzureSQL connection closed",
+                server=self.server,
+                database=self.database,
+            )
 
     def _get_error_suggestions(self, error_msg: str) -> List[str]:
         """Generate suggestions based on error message."""
@@ -364,18 +615,34 @@ class AzureSQL(BaseConnection):
         Returns:
             Dictionary of Spark JDBC options (url, user, password, etc.)
         """
-        # Build JDBC URL
-        # Note: Spark uses its own JDBC driver (usually com.microsoft.sqlserver.jdbc.SQLServerDriver)
-        # We rely on the driver being present in the Spark environment.
+        ctx = get_logging_context()
+        ctx.info(
+            "Building Spark JDBC options",
+            server=self.server,
+            database=self.database,
+            auth_mode=self.auth_mode,
+        )
 
-        jdbc_url = f"jdbc:sqlserver://{self.server}:{self.port};databaseName={self.database};encrypt=true;trustServerCertificate=true;"
+        jdbc_url = (
+            f"jdbc:sqlserver://{self.server}:{self.port};"
+            f"databaseName={self.database};encrypt=true;trustServerCertificate=true;"
+        )
 
         if self.auth_mode == "aad_msi":
-            # For MSI, append authentication property to URL
-            jdbc_url += "hostNameInCertificate=*.database.windows.net;loginTimeout=30;authentication=ActiveDirectoryMsi;"
+            jdbc_url += (
+                "hostNameInCertificate=*.database.windows.net;"
+                "loginTimeout=30;authentication=ActiveDirectoryMsi;"
+            )
+            ctx.debug(
+                "Configured JDBC URL for AAD MSI",
+                server=self.server,
+            )
         elif self.auth_mode == "aad_service_principal":
             # Not fully implemented in init yet, but placeholder
-            pass
+            ctx.debug(
+                "Configured JDBC URL for AAD Service Principal",
+                server=self.server,
+            )
 
         options = {
             "url": jdbc_url,
@@ -389,5 +656,17 @@ class AzureSQL(BaseConnection):
             pwd = self.get_password()
             if pwd:
                 options["password"] = pwd
+
+            ctx.debug(
+                "Added SQL authentication to Spark options",
+                server=self.server,
+                username=self.username,
+            )
+
+        ctx.info(
+            "Spark JDBC options built successfully",
+            server=self.server,
+            database=self.database,
+        )
 
         return options

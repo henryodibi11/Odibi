@@ -10,6 +10,7 @@ import yaml
 from odibi.node import NodeResult
 from odibi.story.metadata import DeltaWriteInfo, NodeExecutionMetadata, PipelineStoryMetadata
 from odibi.story.renderers import HTMLStoryRenderer, JSONStoryRenderer
+from odibi.utils.logging_context import get_logging_context
 
 
 # Custom class to force block style for multiline strings
@@ -71,6 +72,16 @@ class StoryGenerator:
         self.retention_days = retention_days
         self.retention_count = retention_count
 
+        ctx = get_logging_context()
+        ctx.debug(
+            "StoryGenerator initialized",
+            pipeline=pipeline_name,
+            output_path=output_path,
+            is_remote=self.is_remote,
+            retention_days=retention_days,
+            retention_count=retention_count,
+        )
+
     def generate(
         self,
         node_results: Dict[str, NodeResult],
@@ -99,6 +110,16 @@ class StoryGenerator:
         Returns:
             Path to generated HTML story file
         """
+        ctx = get_logging_context()
+        ctx.debug(
+            "Generating story",
+            pipeline=self.pipeline_name,
+            node_count=len(node_results),
+            completed=len(completed),
+            failed=len(failed),
+            skipped=len(skipped),
+        )
+
         # 1. Build metadata object
         metadata = PipelineStoryMetadata(
             pipeline_name=self.pipeline_name,
@@ -201,14 +222,31 @@ class StoryGenerator:
         json_content = json_renderer.render(metadata)
 
         # Write files
-        if self.is_remote:
-            self._write_remote(html_path, html_content)
-            self._write_remote(json_path, json_content)
-        else:
-            with open(html_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
-            with open(json_path, "w", encoding="utf-8") as f:
-                f.write(json_content)
+        try:
+            if self.is_remote:
+                self._write_remote(html_path, html_content)
+                self._write_remote(json_path, json_content)
+            else:
+                with open(html_path, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                with open(json_path, "w", encoding="utf-8") as f:
+                    f.write(json_content)
+
+            ctx.debug(
+                "Story files written",
+                html_path=html_path,
+                html_size=len(html_content),
+                json_path=json_path,
+                json_size=len(json_content),
+            )
+        except Exception as e:
+            ctx.error(
+                "Failed to write story files",
+                error=str(e),
+                html_path=html_path,
+                json_path=json_path,
+            )
+            raise
 
         # Store for alert enrichment
         self._last_story_path = html_path
@@ -216,6 +254,13 @@ class StoryGenerator:
 
         # Cleanup
         self.cleanup()
+
+        ctx.info(
+            "Story generated",
+            path=html_path,
+            nodes=len(metadata.nodes),
+            success_rate=metadata.get_success_rate(),
+        )
 
         return html_path
 
@@ -285,12 +330,14 @@ class StoryGenerator:
 
     def _write_remote(self, path: str, content: str) -> None:
         """Write content to remote path using fsspec."""
+        ctx = get_logging_context()
         try:
             import fsspec
 
             # Use provided storage options (credentials)
             with fsspec.open(path, "w", encoding="utf-8", **self.storage_options) as f:
                 f.write(content)
+            ctx.debug("Remote file written", path=path, size=len(content))
         except ImportError:
             # Fallback for environments without fsspec (e.g., minimal Spark)
             # Try dbutils if on Databricks
@@ -302,8 +349,16 @@ class StoryGenerator:
                 dbutils = DBUtils(spark)
                 # dbutils.fs.put expects string
                 dbutils.fs.put(path, content, True)
-            except Exception:
-                print(f"Warning: Could not write story to {path}. Install 'fsspec' or 'adlfs'.")
+                ctx.debug("Remote file written via dbutils", path=path, size=len(content))
+            except Exception as e:
+                ctx.error(
+                    "Failed to write remote story",
+                    path=path,
+                    error=str(e),
+                )
+                raise RuntimeError(
+                    f"Could not write story to {path}. Install 'fsspec' or 'adlfs'."
+                ) from e
 
     def _clean_config_for_dump(self, config: Any) -> Any:
         """Clean configuration for YAML dumping.
@@ -347,16 +402,10 @@ class StoryGenerator:
 
     def cleanup(self) -> None:
         """Remove old stories based on retention policy."""
+        ctx = get_logging_context()
 
         if self.is_remote:
-            # Remote cleanup not yet implemented
-            # We log a warning to ensure visibility
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                "Remote cleanup for stories is not yet supported. Storage usage may grow."
-            )
+            ctx.warning("Remote cleanup for stories is not yet supported. Storage usage may grow.")
             return
 
         if self.output_path is None:
@@ -400,9 +449,15 @@ class StoryGenerator:
                 # but for simplicity let's just clean legacy based on their own existence
                 self._apply_retention(legacy_stories, [])
 
+            ctx.debug(
+                "Retention policy applied",
+                pipeline=self.pipeline_name,
+                retention_days=self.retention_days,
+                retention_count=self.retention_count,
+            )
+
         except Exception as e:
-            # Don't fail generation if cleanup fails
-            print(f"Warning: Story cleanup failed: {e}")
+            ctx.warning("Story cleanup failed", error=str(e))
 
     def _apply_retention(self, stories: List[Path], json_stories: List[Path]) -> None:
         """Apply count and time retention policies."""

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from odibi.utils.logging_context import get_logging_context
+
 
 @dataclass
 class DeltaWriteInfo:
@@ -83,21 +85,39 @@ class NodeExecutionMetadata:
 
     def calculate_row_change(self):
         """Calculate row count change metrics."""
+        ctx = get_logging_context()
         if self.rows_in is not None and self.rows_out is not None:
             self.rows_change = self.rows_out - self.rows_in
             if self.rows_in > 0:
                 self.rows_change_pct = (self.rows_change / self.rows_in) * 100
             else:
                 self.rows_change_pct = 0.0 if self.rows_out == 0 else 100.0
+            ctx.debug(
+                "Row change calculated",
+                node=self.node_name,
+                rows_in=self.rows_in,
+                rows_out=self.rows_out,
+                change=self.rows_change,
+                change_pct=self.rows_change_pct,
+            )
 
     def calculate_schema_changes(self):
         """Calculate schema changes between input and output."""
+        ctx = get_logging_context()
         if self.schema_in and self.schema_out:
             set_in = set(self.schema_in)
             set_out = set(self.schema_out)
 
             self.columns_added = list(set_out - set_in)
             self.columns_removed = list(set_in - set_out)
+
+            if self.columns_added or self.columns_removed:
+                ctx.debug(
+                    "Schema changes detected",
+                    node=self.node_name,
+                    columns_added=self.columns_added,
+                    columns_removed=self.columns_removed,
+                )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -149,6 +169,12 @@ class NodeExecutionMetadata:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "NodeExecutionMetadata":
         """Create instance from dictionary."""
+        ctx = get_logging_context()
+        ctx.debug(
+            "Collecting node metadata from dict",
+            node_name=data.get("node_name"),
+        )
+
         delta_info = None
         if "delta_info" in data and data["delta_info"]:
             d_info = data["delta_info"]
@@ -167,6 +193,12 @@ class NodeExecutionMetadata:
                 operation_metrics=d_info.get("operation_metrics", {}),
                 read_version=d_info.get("read_version"),
             )
+            ctx.debug(
+                "Delta version info extracted",
+                node_name=data.get("node_name"),
+                version=d_info.get("version"),
+                operation=d_info.get("operation"),
+            )
 
         # Filter out unknown keys to be safe
         valid_keys = cls.__annotations__.keys()
@@ -175,6 +207,15 @@ class NodeExecutionMetadata:
         # Remove nested objects handled separately
         if "delta_info" in clean_data:
             del clean_data["delta_info"]
+
+        # Log data diff collection if present
+        if "data_diff" in data and data["data_diff"]:
+            ctx.debug(
+                "Data diff collected",
+                node_name=data.get("node_name"),
+                has_added=bool(data["data_diff"].get("added")),
+                has_removed=bool(data["data_diff"].get("removed")),
+            )
 
         return cls(delta_info=delta_info, **clean_data)
 
@@ -224,6 +265,7 @@ class PipelineStoryMetadata:
         Args:
             node_metadata: Metadata for the node execution
         """
+        ctx = get_logging_context()
         self.nodes.append(node_metadata)
         self.total_nodes += 1
 
@@ -233,6 +275,14 @@ class PipelineStoryMetadata:
             self.failed_nodes += 1
         elif node_metadata.status == "skipped":
             self.skipped_nodes += 1
+
+        ctx.debug(
+            "Node metadata added to story",
+            pipeline=self.pipeline_name,
+            node=node_metadata.node_name,
+            status=node_metadata.status,
+            total_nodes=self.total_nodes,
+        )
 
     def get_success_rate(self) -> float:
         """Calculate success rate as percentage."""

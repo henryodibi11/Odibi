@@ -1,10 +1,12 @@
 import os
+import time
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
 from odibi.context import EngineContext
 from odibi.enums import EngineType
+from odibi.utils.logging_context import get_logging_context
 
 
 class SCD2Params(BaseModel):
@@ -60,14 +62,57 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
 
     Returns the FULL history dataset (to be written via Overwrite).
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "SCD2 starting",
+        target=params.target,
+        keys=params.keys,
+        track_cols=params.track_cols,
+    )
+
     source_df = context.df if current is None else current
 
+    rows_before = None
+    try:
+        rows_before = source_df.shape[0] if hasattr(source_df, "shape") else None
+        if rows_before is None and hasattr(source_df, "count"):
+            rows_before = source_df.count()
+    except Exception:
+        pass
+
+    ctx.debug(
+        "SCD2 source loaded",
+        source_rows=rows_before,
+    )
+
     if context.engine_type == EngineType.SPARK:
-        return _scd2_spark(context, source_df, params)
+        result = _scd2_spark(context, source_df, params)
     elif context.engine_type == EngineType.PANDAS:
-        return _scd2_pandas(context, source_df, params)
+        result = _scd2_pandas(context, source_df, params)
     else:
+        ctx.error("SCD2 failed: unsupported engine", engine_type=str(context.engine_type))
         raise ValueError(f"Unsupported engine: {context.engine_type}")
+
+    rows_after = None
+    try:
+        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
+        if rows_after is None and hasattr(result.df, "count"):
+            rows_after = result.df.count()
+    except Exception:
+        pass
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "SCD2 completed",
+        target=params.target,
+        source_rows=rows_before,
+        result_rows=rows_after,
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
 
 
 def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:

@@ -1,5 +1,5 @@
-import logging
 import os
+import time
 from enum import Enum
 from typing import List, Optional
 
@@ -7,13 +7,12 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from odibi.context import EngineContext, PandasContext, SparkContext
 from odibi.registry import transform
+from odibi.utils.logging_context import get_logging_context
 
 try:
     from delta.tables import DeltaTable
 except ImportError:
     DeltaTable = None
-
-logger = logging.getLogger(__name__)
 
 
 class MergeStrategy(str, Enum):
@@ -158,9 +157,30 @@ def merge(context, current, **params):
     Merge transformer implementation.
     Handles Upsert, Append-Only, and Delete-Match strategies.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
     # Validate params using Pydantic model
     # This ensures runtime behavior matches the "Cookbook" docs
     merge_params = MergeParams(**params)
+
+    ctx.debug(
+        "Merge starting",
+        target=merge_params.target,
+        keys=merge_params.keys,
+        strategy=merge_params.strategy.value,
+    )
+
+    # Get source row count
+    rows_before = None
+    try:
+        rows_before = current.shape[0] if hasattr(current, "shape") else None
+        if rows_before is None and hasattr(current, "count"):
+            rows_before = current.count()
+    except Exception:
+        pass
+
+    ctx.debug("Merge source loaded", source_rows=rows_before)
 
     # Unwrap EngineContext if present
     real_context = context
@@ -178,7 +198,7 @@ def merge(context, current, **params):
     cluster_by = merge_params.cluster_by
 
     if isinstance(real_context, SparkContext):
-        return _merge_spark(
+        result = _merge_spark(
             context,  # Pass EngineContext wrapper to access .spark and potentially .engine
             current,
             target,
@@ -194,11 +214,23 @@ def merge(context, current, **params):
             params,  # pass raw params if needed by internal logic or refactor internal logic
         )
     elif isinstance(real_context, PandasContext):
-        return _merge_pandas(
+        result = _merge_pandas(
             context, current, target, keys, strategy, audit_cols, params
         )  # Pass EngineContext wrapper
     else:
+        ctx.error("Merge failed: unsupported context", context_type=str(type(real_context)))
         raise ValueError(f"Unsupported context type: {type(real_context)}")
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "Merge completed",
+        target=merge_params.target,
+        strategy=merge_params.strategy.value,
+        source_rows=rows_before,
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
 
 
 def _merge_spark(
@@ -312,7 +344,9 @@ def _merge_spark(
         else:
             # Table does not exist
             if strategy == MergeStrategy.DELETE_MATCH:
-                logger.warning(f"Target {target} does not exist. Delete match skipped.")
+                get_logging_context().warning(
+                    f"Target {target} does not exist. Delete match skipped."
+                )
                 return
 
             # Initial write
@@ -369,7 +403,7 @@ def _merge_spark(
 
                 spark.sql(sql)
             except Exception as e:
-                logger.warning(f"Optimization failed for {target}: {e}")
+                get_logging_context().warning(f"Optimization failed for {target}: {e}")
 
     if source_df.isStreaming:
         # For streaming, wraps logic in foreachBatch
@@ -516,7 +550,7 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
 
         except Exception as e:
             # Fallback to Pandas if DuckDB fails (e.g. complex types, memory)
-            logger.warning(f"DuckDB merge failed, falling back to Pandas: {e}")
+            get_logging_context().warning(f"DuckDB merge failed, falling back to Pandas: {e}")
             pass
 
     # --- PANDAS FALLBACK ---

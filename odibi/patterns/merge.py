@@ -1,8 +1,10 @@
+import time
 from typing import Any
 
 from odibi.context import EngineContext
 from odibi.patterns.base import Pattern
 from odibi.transformers.merge_transformer import MergeParams, merge
+from odibi.utils.logging_context import get_logging_context
 
 
 class MergePattern(Pattern):
@@ -16,45 +18,94 @@ class MergePattern(Pattern):
     """
 
     def validate(self) -> None:
+        ctx = get_logging_context()
+        ctx.debug(
+            "MergePattern validation starting",
+            pattern="MergePattern",
+            target=self.params.get("target"),
+            keys=self.params.get("keys"),
+            strategy=self.params.get("strategy"),
+        )
+
         if not self.params.get("target"):
+            ctx.error(
+                "MergePattern validation failed: 'target' is required",
+                pattern="MergePattern",
+            )
             raise ValueError("MergePattern: 'target' is required.")
         if not self.params.get("keys"):
+            ctx.error(
+                "MergePattern validation failed: 'keys' is required",
+                pattern="MergePattern",
+            )
             raise ValueError("MergePattern: 'keys' is required.")
 
+        ctx.debug(
+            "MergePattern validation passed",
+            pattern="MergePattern",
+            target=self.params.get("target"),
+            keys=self.params.get("keys"),
+            strategy=self.params.get("strategy", "upsert"),
+        )
+
     def execute(self, context: EngineContext) -> Any:
-        # Map dictionary params to MergeParams model
+        ctx = get_logging_context()
+        start_time = time.time()
+
+        target = self.params.get("target")
+        keys = self.params.get("keys")
+        strategy = self.params.get("strategy", "upsert")
+
+        ctx.debug(
+            "Merge pattern starting",
+            pattern="MergePattern",
+            target=target,
+            keys=keys,
+            strategy=strategy,
+        )
+
+        source_count = None
+        try:
+            if context.engine_type == "spark":
+                source_count = context.df.count()
+            else:
+                source_count = len(context.df)
+            ctx.debug(
+                "Merge source data loaded",
+                pattern="MergePattern",
+                source_rows=source_count,
+            )
+        except Exception:
+            ctx.debug("Merge could not determine source row count", pattern="MergePattern")
+
         valid_keys = MergeParams.model_fields.keys()
         filtered_params = {k: v for k, v in self.params.items() if k in valid_keys}
 
-        # Execute logic
-        # The merge transformer performs the write/merge operation and returns the source_df
-        # (or Query object for streaming).
-        # Since the pattern execution happens BEFORE the Node's write phase,
-        # we need to be careful.
-        # If 'merge' transformer writes to the target, then the Node's write phase should probably be skipped
-        # or point to a dummy location?
-        # OR the MergePattern should just prepare the data?
+        try:
+            merge(context, context.df, **filtered_params)
+        except Exception as e:
+            elapsed_ms = (time.time() - start_time) * 1000
+            ctx.error(
+                f"Merge pattern execution failed: {e}",
+                pattern="MergePattern",
+                error_type=type(e).__name__,
+                elapsed_ms=round(elapsed_ms, 2),
+                target=target,
+                keys=keys,
+                strategy=strategy,
+            )
+            raise
 
-        # In odibi/transformers/merge_transformer.py, the `merge` function performs the ACTUAL write/merge.
-        # It returns the source_df.
+        elapsed_ms = (time.time() - start_time) * 1000
 
-        # Issue: If Pattern executes the Write, and Node also executes Write, we write twice.
-        # But Node config might not have a 'write' block if the pattern handles it?
-        # The Node validation requires "at least one of read, transform, write, transformer".
-        # If 'transformer' is set, 'write' is optional in NodeConfig?
-        # Let's check NodeConfig model.
-        # Yes, 'at_least_one_operation' check.
+        ctx.info(
+            "Merge pattern completed",
+            pattern="MergePattern",
+            elapsed_ms=round(elapsed_ms, 2),
+            source_rows=source_count,
+            target=target,
+            keys=keys,
+            strategy=strategy,
+        )
 
-        # So if user configures:
-        # - name: my_merge
-        #   transformer: merge
-        #   params: ...
-        #   # No write block
-
-        # Then Node._execute_write_phase will do nothing (if self.config.write is None).
-        # This is correct. The Pattern handles the persistence.
-
-        merge(context, context.df, **filtered_params)
-
-        # Return the dataframe for potential downstream usage (though likely end of chain)
         return context.df

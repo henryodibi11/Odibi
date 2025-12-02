@@ -1,3 +1,4 @@
+import time
 from enum import Enum
 from typing import Dict, List, Literal, Optional, Union
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from odibi.context import EngineContext
 from odibi.enums import EngineType
+from odibi.utils.logging_context import get_logging_context
 
 # -------------------------------------------------------------------------
 # 1. Join
@@ -54,12 +56,54 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
     """
     Joins the current dataset with another dataset from the context.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "Join starting",
+        right_dataset=params.right_dataset,
+        join_type=params.how,
+        keys=params.on,
+    )
+
+    # Get row count before transformation
+    rows_before = None
+    try:
+        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
+        if rows_before is None and hasattr(context.df, "count"):
+            rows_before = context.df.count()
+    except Exception:
+        pass
+
     # Get Right DF
     right_df = context.get(params.right_dataset)
     if right_df is None:
+        ctx.error(
+            "Join failed: right dataset not found",
+            right_dataset=params.right_dataset,
+            available_datasets=(
+                list(context.context._data.keys()) if hasattr(context, "context") else None
+            ),
+        )
         raise ValueError(
             f"Dataset '{params.right_dataset}' not found in context. Ensure it is in 'depends_on'."
         )
+
+    # Get right df row count
+    right_rows = None
+    try:
+        right_rows = right_df.shape[0] if hasattr(right_df, "shape") else None
+        if right_rows is None and hasattr(right_df, "count"):
+            right_rows = right_df.count()
+    except Exception:
+        pass
+
+    ctx.debug(
+        "Join datasets loaded",
+        left_rows=rows_before,
+        right_rows=right_rows,
+        right_dataset=params.right_dataset,
+    )
 
     # Register Right DF as temp view
     right_view_name = f"join_right_{params.right_dataset}"
@@ -84,6 +128,20 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
         # Pandas defaults to ('_x', '_y'). We want ('', '_{prefix or right_dataset}')
         suffix = f"_{params.prefix}" if params.prefix else f"_{params.right_dataset}"
         res = context.df.merge(right_df, on=params.on, how=params.how, suffixes=("", suffix))
+
+        rows_after = res.shape[0] if hasattr(res, "shape") else None
+        elapsed_ms = (time.time() - start_time) * 1000
+
+        ctx.debug(
+            "Join completed",
+            join_type=params.how,
+            rows_before=rows_before,
+            rows_after=rows_after,
+            row_delta=rows_after - rows_before if rows_before and rows_after else None,
+            right_rows=right_rows,
+            elapsed_ms=round(elapsed_ms, 2),
+        )
+
         return context.with_df(res)
 
     # 3. For SQL/Spark, build explicit projection
@@ -116,7 +174,29 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
         {params.how.upper()} JOIN {right_view_name}
         ON {join_condition}
     """
-    return context.sql(sql_query)
+    result = context.sql(sql_query)
+
+    # Log completion
+    rows_after = None
+    try:
+        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
+        if rows_after is None and hasattr(result.df, "count"):
+            rows_after = result.df.count()
+    except Exception:
+        pass
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "Join completed",
+        join_type=params.how,
+        rows_before=rows_before,
+        rows_after=rows_after,
+        row_delta=rows_after - rows_before if rows_before and rows_after else None,
+        right_rows=right_rows,
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
 
 
 # -------------------------------------------------------------------------
@@ -151,7 +231,26 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
     """
     Unions current dataset with others.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "Union starting",
+        datasets=params.datasets,
+        by_name=params.by_name,
+    )
+
+    # Get row count of current df
+    rows_before = None
+    try:
+        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
+        if rows_before is None and hasattr(context.df, "count"):
+            rows_before = context.df.count()
+    except Exception:
+        pass
+
     union_sqls = []
+    dataset_row_counts = {"current": rows_before}
 
     # Add current
     union_sqls.append("SELECT * FROM df")
@@ -160,11 +259,30 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
     for ds_name in params.datasets:
         other_df = context.get(ds_name)
         if other_df is None:
+            ctx.error(
+                "Union failed: dataset not found",
+                missing_dataset=ds_name,
+                requested_datasets=params.datasets,
+            )
             raise ValueError(f"Dataset '{ds_name}' not found.")
+
+        # Get row count of other df
+        try:
+            other_rows = other_df.shape[0] if hasattr(other_df, "shape") else None
+            if other_rows is None and hasattr(other_df, "count"):
+                other_rows = other_df.count()
+            dataset_row_counts[ds_name] = other_rows
+        except Exception:
+            pass
 
         view_name = f"union_{ds_name}"
         context.register_temp_view(view_name, other_df)
         union_sqls.append(f"SELECT * FROM {view_name}")
+
+    ctx.debug(
+        "Union datasets loaded",
+        dataset_row_counts=dataset_row_counts,
+    )
 
     # Construct Query
     # DuckDB supports "UNION ALL BY NAME", Spark does too in recent versions.
@@ -174,7 +292,26 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
     # Spark < 3.1 might need logic.
 
     sql_query = f" {operator} ".join(union_sqls)
-    return context.sql(sql_query)
+    result = context.sql(sql_query)
+
+    # Log completion
+    rows_after = None
+    try:
+        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
+        if rows_after is None and hasattr(result.df, "count"):
+            rows_after = result.df.count()
+    except Exception:
+        pass
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "Union completed",
+        datasets_count=len(params.datasets) + 1,
+        rows_after=rows_after,
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
 
 
 # -------------------------------------------------------------------------
@@ -218,6 +355,27 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
     """
     Pivots row values into columns.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "Pivot starting",
+        group_by=params.group_by,
+        pivot_col=params.pivot_col,
+        agg_col=params.agg_col,
+        agg_func=params.agg_func,
+        values=params.values,
+    )
+
+    # Get row count before transformation
+    rows_before = None
+    try:
+        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
+        if rows_before is None and hasattr(context.df, "count"):
+            rows_before = context.df.count()
+    except Exception:
+        pass
+
     if context.engine_type == EngineType.SPARK:
         df = context.df.groupBy(*params.group_by)
 
@@ -232,6 +390,16 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
         agg_expr = getattr(F, params.agg_func)(params.agg_col)
 
         res = pivot_op.agg(agg_expr)
+
+        rows_after = res.count() if hasattr(res, "count") else None
+        elapsed_ms = (time.time() - start_time) * 1000
+        ctx.debug(
+            "Pivot completed",
+            rows_before=rows_before,
+            rows_after=rows_after,
+            elapsed_ms=round(elapsed_ms, 2),
+        )
+
         return context.with_df(res)
 
     elif context.engine_type == EngineType.PANDAS:
@@ -245,9 +413,24 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
             values=params.agg_col,
             aggfunc=params.agg_func,
         ).reset_index()
+
+        rows_after = res.shape[0] if hasattr(res, "shape") else None
+        elapsed_ms = (time.time() - start_time) * 1000
+        ctx.debug(
+            "Pivot completed",
+            rows_before=rows_before,
+            rows_after=rows_after,
+            columns_after=len(res.columns) if hasattr(res, "columns") else None,
+            elapsed_ms=round(elapsed_ms, 2),
+        )
+
         return context.with_df(res)
 
     else:
+        ctx.error(
+            "Pivot failed: unsupported engine",
+            engine_type=str(context.engine_type),
+        )
         raise ValueError(f"Unsupported engine: {context.engine_type}")
 
 
@@ -280,6 +463,26 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
     """
     Unpivots columns into rows (Melt/Stack).
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "Unpivot starting",
+        id_cols=params.id_cols,
+        value_vars=params.value_vars,
+        var_name=params.var_name,
+        value_name=params.value_name,
+    )
+
+    # Get row count before transformation
+    rows_before = None
+    try:
+        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
+        if rows_before is None and hasattr(context.df, "count"):
+            rows_before = context.df.count()
+    except Exception:
+        pass
+
     if context.engine_type == EngineType.PANDAS:
         res = context.df.melt(
             id_vars=params.id_cols,
@@ -287,6 +490,17 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
             var_name=params.var_name,
             value_name=params.value_name,
         )
+
+        rows_after = res.shape[0] if hasattr(res, "shape") else None
+        elapsed_ms = (time.time() - start_time) * 1000
+        ctx.debug(
+            "Unpivot completed",
+            rows_before=rows_before,
+            rows_after=rows_after,
+            value_vars_count=len(params.value_vars),
+            elapsed_ms=round(elapsed_ms, 2),
+        )
+
         return context.with_df(res)
 
     elif context.engine_type == EngineType.SPARK:
@@ -301,12 +515,30 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
             stack_args.append(f"'{col}'")  # The label
             stack_args.append(col)  # The value
 
-        stack_expr = f"stack({num_vars}, {', '.join(stack_args)}) as ({params.var_name}, {params.value_name})"
+        stack_expr = (
+            f"stack({num_vars}, {', '.join(stack_args)}) "
+            f"as ({params.var_name}, {params.value_name})"
+        )
 
         res = context.df.select(*params.id_cols, F.expr(stack_expr))
+
+        rows_after = res.count() if hasattr(res, "count") else None
+        elapsed_ms = (time.time() - start_time) * 1000
+        ctx.debug(
+            "Unpivot completed",
+            rows_before=rows_before,
+            rows_after=rows_after,
+            value_vars_count=len(params.value_vars),
+            elapsed_ms=round(elapsed_ms, 2),
+        )
+
         return context.with_df(res)
 
     else:
+        ctx.error(
+            "Unpivot failed: unsupported engine",
+            engine_type=str(context.engine_type),
+        )
         raise ValueError(f"Unsupported engine: {context.engine_type}")
 
 
@@ -349,6 +581,24 @@ def aggregate(context: EngineContext, params: AggregateParams) -> EngineContext:
     """
     Performs grouping and aggregation via SQL.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "Aggregate starting",
+        group_by=params.group_by,
+        aggregations={col: func.value for col, func in params.aggregations.items()},
+    )
+
+    # Get row count before transformation
+    rows_before = None
+    try:
+        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
+        if rows_before is None and hasattr(context.df, "count"):
+            rows_before = context.df.count()
+    except Exception:
+        pass
+
     group_cols = ", ".join(params.group_by)
     agg_exprs = []
 
@@ -362,4 +612,25 @@ def aggregate(context: EngineContext, params: AggregateParams) -> EngineContext:
     select_clause = ", ".join(select_items)
 
     sql_query = f"SELECT {select_clause} FROM df GROUP BY {group_cols}"
-    return context.sql(sql_query)
+    result = context.sql(sql_query)
+
+    # Log completion
+    rows_after = None
+    try:
+        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
+        if rows_after is None and hasattr(result.df, "count"):
+            rows_after = result.df.count()
+    except Exception:
+        pass
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "Aggregate completed",
+        group_by=params.group_by,
+        rows_before=rows_before,
+        rows_after=rows_after,
+        aggregation_count=len(params.aggregations),
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result

@@ -531,8 +531,8 @@ def _stats_command(args) -> int:
         if "duration_ms" in df.columns:
             avg_duration_ms = df["duration_ms"].mean()
             total_duration_ms = df["duration_ms"].sum()
-            print(f"\nAvg Duration:   {avg_duration_ms/1000:.2f}s")
-            print(f"Total Runtime:  {total_duration_ms/1000:.2f}s")
+            print(f"\nAvg Duration:   {avg_duration_ms / 1000:.2f}s")
+            print(f"Total Runtime:  {total_duration_ms / 1000:.2f}s")
 
         if "pipeline_name" in df.columns:
             print("\n--- Runs by Pipeline ---")

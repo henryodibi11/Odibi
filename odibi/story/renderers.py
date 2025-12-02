@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from odibi.story.metadata import PipelineStoryMetadata
+from odibi.utils.logging_context import get_logging_context
 
 
 class HTMLStoryRenderer:
@@ -48,34 +49,58 @@ class HTMLStoryRenderer:
         Returns:
             HTML string
         """
+        ctx = get_logging_context()
+        ctx.debug(
+            "Rendering HTML story",
+            template=str(self.template_path),
+            pipeline=metadata.pipeline_name,
+        )
+
         try:
             from jinja2 import Template
-        except ImportError:
+        except ImportError as e:
+            ctx.error("jinja2 not installed for HTML rendering")
             raise ImportError(
                 "jinja2 is required for HTML rendering. Install with: pip install jinja2"
+            ) from e
+
+        try:
+            # Load template
+            with open(self.template_path, "r", encoding="utf-8") as f:
+                template_content = f.read()
+
+            # Apply theme if provided
+            if self.theme:
+                # Inject theme CSS variables into template
+                theme_css = self.theme.to_css_string()
+                template_content = template_content.replace(
+                    ":root {", theme_css.split("}")[0] + "}"
+                )
+
+            template = Template(template_content)
+
+            # Register custom filter
+            # Note: Template creates its own environment, so we attach to that
+            template.environment.filters["to_yaml"] = self._to_yaml
+
+            # Render with metadata and theme
+            html = template.render(metadata=metadata, theme=self.theme)
+
+            ctx.debug(
+                "HTML story rendered",
+                output_format="html",
+                size=len(html),
+                nodes=len(metadata.nodes),
             )
 
-        # Load template
-        with open(self.template_path, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
-        # Apply theme if provided
-        if self.theme:
-            # Inject theme CSS variables into template
-            theme_css = self.theme.to_css_string()
-            template_content = template_content.replace(":root {", theme_css.split("}")[0] + "}")
-
-        template = Template(template_content)
-
-        # Register custom filter
-        # Note: Template creates its own environment, so we attach to that
-        template.environment.filters["to_yaml"] = self._to_yaml
-
-        # Render with metadata and theme
-
-        html = template.render(metadata=metadata, theme=self.theme)
-
-        return html
+            return html
+        except Exception as e:
+            ctx.error(
+                "HTML template rendering failed",
+                template=str(self.template_path),
+                error=str(e),
+            )
+            raise
 
     def _to_yaml(self, value) -> str:
         """Convert value to YAML string."""
@@ -96,13 +121,23 @@ class HTMLStoryRenderer:
         Returns:
             Path to saved file
         """
+        ctx = get_logging_context()
         html = self.render(metadata)
 
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(html)
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(html)
+            ctx.debug(
+                "HTML story written to file",
+                path=str(output_file),
+                size=len(html),
+            )
+        except Exception as e:
+            ctx.error("Failed to write HTML story", path=str(output_file), error=str(e))
+            raise
 
         return str(output_file)
 
@@ -128,6 +163,13 @@ class MarkdownStoryRenderer:
         Returns:
             Markdown string
         """
+        ctx = get_logging_context()
+        ctx.debug(
+            "Rendering Markdown story",
+            output_format="markdown",
+            pipeline=metadata.pipeline_name,
+        )
+
         lines = []
 
         # Header
@@ -248,7 +290,14 @@ class MarkdownStoryRenderer:
             lines.append("---")
             lines.append("")
 
-        return "\n".join(lines)
+        result = "\n".join(lines)
+        ctx.debug(
+            "Markdown story rendered",
+            output_format="markdown",
+            size=len(result),
+            nodes=len(metadata.nodes),
+        )
+        return result
 
     def render_to_file(self, metadata: PipelineStoryMetadata, output_path: str) -> str:
         """
@@ -261,13 +310,23 @@ class MarkdownStoryRenderer:
         Returns:
             Path to saved file
         """
+        ctx = get_logging_context()
         markdown = self.render(metadata)
 
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(markdown)
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(markdown)
+            ctx.debug(
+                "Markdown story written to file",
+                path=str(output_file),
+                size=len(markdown),
+            )
+        except Exception as e:
+            ctx.error("Failed to write Markdown story", path=str(output_file), error=str(e))
+            raise
 
         return str(output_file)
 
@@ -292,7 +351,22 @@ class JSONStoryRenderer:
         Returns:
             JSON string
         """
-        return json.dumps(metadata.to_dict(), indent=2, default=str)
+        ctx = get_logging_context()
+        ctx.debug(
+            "Rendering JSON story",
+            output_format="json",
+            pipeline=metadata.pipeline_name,
+        )
+
+        result = json.dumps(metadata.to_dict(), indent=2, default=str)
+
+        ctx.debug(
+            "JSON story rendered",
+            output_format="json",
+            size=len(result),
+            nodes=len(metadata.nodes),
+        )
+        return result
 
     def render_to_file(self, metadata: PipelineStoryMetadata, output_path: str) -> str:
         """
@@ -305,13 +379,23 @@ class JSONStoryRenderer:
         Returns:
             Path to saved file
         """
+        ctx = get_logging_context()
         json_str = self.render(metadata)
 
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(json_str)
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(json_str)
+            ctx.debug(
+                "JSON story written to file",
+                path=str(output_file),
+                size=len(json_str),
+            )
+        except Exception as e:
+            ctx.error("Failed to write JSON story", path=str(output_file), error=str(e))
+            raise
 
         return str(output_file)
 

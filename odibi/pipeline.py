@@ -21,6 +21,10 @@ from odibi.transformers import register_standard_library
 from odibi.utils import load_yaml_with_env
 from odibi.utils.alerting import send_alert
 from odibi.utils.logging import configure_logging, logger
+from odibi.utils.logging_context import (
+    create_logging_context,
+    set_logging_context,
+)
 
 
 @dataclass
@@ -107,6 +111,19 @@ class Pipeline:
         self.catalog_manager = catalog_manager
         self.lineage = lineage_adapter
 
+        # Create logging context for this pipeline
+        self._ctx = create_logging_context(
+            pipeline_id=pipeline_config.pipeline,
+            engine=engine,
+        )
+
+        self._ctx.info(
+            f"Initializing pipeline: {pipeline_config.pipeline}",
+            engine=engine,
+            node_count=len(pipeline_config.nodes),
+            connections=list(self.connections.keys()) if self.connections else [],
+        )
+
         # Initialize story generator
         story_config = story_config or {}
 
@@ -145,12 +162,24 @@ class Pipeline:
         else:
             self.engine = EngineClass(config=engine_config)
 
+        self._ctx.debug(f"Engine initialized: {engine}")
+
         # Initialize context
         spark_session = getattr(self.engine, "spark", None)
         self.context = create_context(engine, spark_session=spark_session)
 
         # Build dependency graph
         self.graph = DependencyGraph(pipeline_config.nodes)
+
+        # Log graph structure
+        layers = self.graph.get_execution_layers()
+        edge_count = sum(len(n.depends_on) for n in pipeline_config.nodes)
+        self._ctx.log_graph_operation(
+            operation="build",
+            node_count=len(pipeline_config.nodes),
+            edge_count=edge_count,
+            layer_count=len(layers),
+        )
 
     @classmethod
     def from_yaml(cls, yaml_path: str) -> "PipelineManager":
@@ -202,6 +231,34 @@ class Pipeline:
 
         results = PipelineResults(pipeline_name=self.config.pipeline, start_time=start_timestamp)
 
+        # Set global logging context for this pipeline run
+        set_logging_context(self._ctx)
+
+        # Get execution plan info for logging
+        layers = self.graph.get_execution_layers()
+        execution_order = self.graph.topological_sort()
+
+        self._ctx.info(
+            f"Starting pipeline: {self.config.pipeline}",
+            mode="parallel" if parallel else "serial",
+            dry_run=dry_run,
+            resume_from_failure=resume_from_failure,
+            node_count=len(self.graph.nodes),
+            layer_count=len(layers),
+            max_workers=max_workers if parallel else 1,
+        )
+
+        if parallel:
+            self._ctx.debug(
+                f"Parallel execution plan: {len(layers)} layers",
+                layers=[list(layer) for layer in layers],
+            )
+        else:
+            self._ctx.debug(
+                f"Serial execution order: {len(execution_order)} nodes",
+                order=execution_order,
+            )
+
         # Alert: on_start
         self._send_alerts("on_start", results)
 
@@ -228,19 +285,28 @@ class Pipeline:
                 remote_hash = self.catalog_manager.get_pipeline_hash(self.config.pipeline)
 
                 if remote_hash and remote_hash != local_hash:
-                    logger.warning(
-                        f"⚠️ DRIFT DETECTED: Local pipeline definition differs from Catalog.\n"
-                        f"   Local Hash: {local_hash[:8]}\n"
-                        f"   Catalog Hash: {remote_hash[:8]}\n"
-                        f"   Advice: Deploy changes using 'odibi deploy' before running in production."
+                    self._ctx.warning(
+                        "DRIFT DETECTED: Local pipeline differs from Catalog",
+                        local_hash=local_hash[:8],
+                        catalog_hash=remote_hash[:8],
+                        suggestion="Deploy changes using 'odibi deploy' before production",
                     )
                 elif not remote_hash:
-                    logger.info("ℹ️ Pipeline not found in Catalog (Running un-deployed code)")
+                    self._ctx.info(
+                        "Pipeline not found in Catalog (Running un-deployed code)",
+                        catalog_status="not_deployed",
+                    )
+                else:
+                    self._ctx.debug(
+                        "Drift check passed",
+                        hash=local_hash[:8],
+                    )
             except Exception as e:
-                logger.debug(f"Drift detection check failed: {e}")
+                self._ctx.debug(f"Drift detection check failed: {e}")
 
         state_manager = None
         if resume_from_failure:
+            self._ctx.info("Resume from failure enabled - checking previous run state")
             if self.project_config:
                 try:
                     backend = create_state_backend(
@@ -249,21 +315,33 @@ class Pipeline:
                         spark_session=getattr(self.engine, "spark", None),
                     )
                     state_manager = StateManager(backend=backend)
+                    self._ctx.debug("StateManager initialized for resume capability")
                 except Exception as e:
-                    logger.warning(f"Could not initialize StateManager: {e}")
+                    self._ctx.warning(
+                        f"Could not initialize StateManager: {e}",
+                        suggestion="Check state backend configuration",
+                    )
             else:
-                logger.warning("Resume capability unavailable: Project configuration missing.")
+                self._ctx.warning(
+                    "Resume capability unavailable: Project configuration missing",
+                    suggestion="Ensure project config is set for resume support",
+                )
 
         # Define node processing function (inner function to capture self/context)
         def process_node(node_name: str) -> NodeResult:
-            # Check dependencies (thread-safe check on results object? No, need synchronization if strictly parallel)
-            # But since we execute by layers, dependencies (previous layers) are guaranteed to be done.
-            # So we only need to check if any dependency FAILED.
+            node_ctx = self._ctx.with_context(node_id=node_name)
 
             node_config = self.graph.nodes[node_name]
-            deps_failed = any(dep in results.failed for dep in node_config.depends_on)
+            deps_failed_list = [dep for dep in node_config.depends_on if dep in results.failed]
+            deps_failed = len(deps_failed_list) > 0
 
             if deps_failed:
+                node_ctx.warning(
+                    "Skipping node due to dependency failure",
+                    skipped=True,
+                    failed_dependencies=deps_failed_list,
+                    suggestion="Fix upstream node failures first",
+                )
                 return NodeResult(
                     node_name=node_name,
                     success=False,
@@ -275,25 +353,12 @@ class Pipeline:
             if resume_from_failure and state_manager:
                 last_info = state_manager.get_last_run_info(self.config.pipeline, node_name)
 
-                # logger.info(f"DEBUG: last_info for {node_name}: {last_info}")
-
                 can_resume = False
                 resume_reason = ""
 
                 if last_info and last_info.get("success"):
-                    # Check 1: Version Hash (Code/Config Change)
                     last_hash = last_info.get("metadata", {}).get("version_hash")
-                    # current_hash = self.graph.nodes[node_name].get_version_hash()
 
-                    # Note: We need to access Node object to get hash, but we only have NodeConfig here.
-                    # Wait, graph.nodes[node_name] IS NodeConfig.
-                    # NodeConfig doesn't have get_version_hash method (it's on Node class).
-                    # We can instantiate a temporary Node or move the hash logic to a utility/config method.
-                    # Node.get_version_hash uses self.config.
-                    # Let's use a static helper or re-instantiate.
-                    # Since get_version_hash is simple, we can just compute it here.
-
-                    # Calculate hash from config
                     import hashlib
                     import json
 
@@ -309,11 +374,8 @@ class Pipeline:
                     current_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
 
                     if last_hash == current_hash:
-                        # Check 2: Cascading Invalidation
-                        # If any dependency was NOT skipped (meaning it ran), we must run.
                         deps_ran = False
                         for dep in node_config.depends_on:
-                            # If dep is in completed but NOT in skipped list -> It executed this run
                             if dep in results.completed and dep not in results.skipped:
                                 deps_ran = True
                                 break
@@ -324,12 +386,14 @@ class Pipeline:
                         else:
                             resume_reason = "Upstream dependency executed"
                     else:
-                        resume_reason = f"Configuration changed (Hash mismatch: {str(last_hash)[:7]}... != {str(current_hash)[:7]}...)"
+                        resume_reason = (
+                            f"Configuration changed (Hash: {str(last_hash)[:7]}... "
+                            f"!= {str(current_hash)[:7]}...)"
+                        )
                 else:
                     resume_reason = "No successful previous run found"
 
                 if can_resume:
-                    # Try to restore
                     if node_config.write:
                         try:
                             temp_node = Node(
@@ -339,11 +403,13 @@ class Pipeline:
                                 connections=self.connections,
                                 performance_config=self.performance_config,
                             )
-                            # If using dry run or mock engine in tests, restore might always succeed or fail based on implementation
-                            # In the failing test case, the mock engine's read is mocked but restore() calls engine.read
-                            # Let's ensure we pass the result properly.
                             if temp_node.restore():
-                                logger.info(f"Skipping '{node_name}': {resume_reason}")
+                                node_ctx.info(
+                                    "Skipping node (restored from previous run)",
+                                    skipped=True,
+                                    reason="resume_from_failure",
+                                    version_hash=current_hash[:8],
+                                )
                                 result = NodeResult(
                                     node_name=node_name,
                                     success=True,
@@ -354,28 +420,40 @@ class Pipeline:
                                         "version_hash": current_hash,
                                     },
                                 )
-                                # IMPORTANT: Set rows_processed/schema from restored if possible?
-                                # For now just returning metadata is key.
                                 return result
                             else:
-                                logger.info(f"Re-running '{node_name}': Restore failed")
+                                node_ctx.debug(
+                                    "Re-running node: Restore failed",
+                                    reason="restore_failed",
+                                )
                         except Exception as e:
-                            logger.warning(f"Resuming: Could not restore '{node_name}': {e}")
+                            node_ctx.warning(
+                                f"Could not restore node: {e}",
+                                reason="restore_error",
+                            )
                     else:
-                        # Cannot restore pure transform safely without more logic
-                        logger.info(
-                            f"Re-running '{node_name}': In-memory transform (cannot be restored)"
+                        node_ctx.debug(
+                            "Re-running node: In-memory transform (cannot be restored)",
+                            reason="no_write_config",
                         )
                 else:
-                    logger.info(f"Re-running '{node_name}': {resume_reason}")
+                    node_ctx.debug(f"Re-running node: {resume_reason}")
 
             # Lineage: Node Start
             node_run_id = None
             if self.lineage and parent_run_id:
                 node_run_id = self.lineage.emit_node_start(node_config, parent_run_id)
 
-            # Execute node
+            # Execute node with operation context
             result = None
+            node_start = time.time()
+            node_ctx.debug(
+                "Executing node",
+                transformer=node_config.transformer,
+                has_read=bool(node_config.read),
+                has_write=bool(node_config.write),
+            )
+
             try:
                 node = Node(
                     config=node_config,
@@ -388,8 +466,29 @@ class Pipeline:
                     performance_config=self.performance_config,
                 )
                 result = node.execute()
+
+                node_duration = time.time() - node_start
+                if result.success:
+                    node_ctx.info(
+                        "Node completed successfully",
+                        duration_ms=round(node_duration * 1000, 2),
+                        rows_processed=result.rows_processed,
+                    )
+                else:
+                    node_ctx.error(
+                        "Node execution failed",
+                        duration_ms=round(node_duration * 1000, 2),
+                        error=result.error,
+                    )
+
             except Exception as e:
-                logger.error(f"Node '{node_name}' failed: {e}")
+                node_duration = time.time() - node_start
+                node_ctx.error(
+                    f"Node raised exception: {e}",
+                    duration_ms=round(node_duration * 1000, 2),
+                    error_type=type(e).__name__,
+                    suggestion="Check node configuration and input data",
+                )
                 result = NodeResult(node_name=node_name, success=False, duration=0.0, error=str(e))
 
             # Lineage: Node Complete
@@ -401,17 +500,27 @@ class Pipeline:
         if parallel:
             from concurrent.futures import ThreadPoolExecutor, as_completed
 
-            # Get execution layers (nodes in a layer are independent)
             layers = self.graph.get_execution_layers()
+            self._ctx.info(
+                f"Starting parallel execution with {max_workers} workers",
+                total_layers=len(layers),
+                max_workers=max_workers,
+            )
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                for layer in layers:
-                    # Submit all nodes in layer
+                for layer_idx, layer in enumerate(layers):
+                    layer_start = time.time()
+                    self._ctx.debug(
+                        f"Executing layer {layer_idx + 1}/{len(layers)}",
+                        layer_index=layer_idx,
+                        nodes_in_layer=list(layer),
+                        node_count=len(layer),
+                    )
+
                     future_to_node = {
                         executor.submit(process_node, node_name): node_name for node_name in layer
                     }
 
-                    # Wait for layer to complete
                     layer_failed = False
                     for future in as_completed(future_to_node):
                         node_name = future_to_node[future]
@@ -420,15 +529,9 @@ class Pipeline:
                             results.node_results[node_name] = result
 
                             if result.success:
-                                # specific check for skipped result
                                 if result.metadata.get("skipped"):
                                     if result.metadata.get("reason") == "dependency_failed":
                                         results.skipped.append(node_name)
-                                        # Treat dependency failure as failure for downstream?
-                                        # Logic says if node skipped due to deps, it didn't "fail" execution,
-                                        # but downstream will also skip.
-                                        # Wait, process_node logic returns success=False for dep failure above?
-                                        # Let's fix process_node return values.
                                     else:
                                         results.completed.append(node_name)
                                 else:
@@ -436,16 +539,12 @@ class Pipeline:
                             else:
                                 if result.metadata.get("skipped"):
                                     results.skipped.append(node_name)
-                                    # Add to failed so downstream skips?
                                     results.failed.append(node_name)
                                 else:
                                     results.failed.append(node_name)
                                     layer_failed = True
 
-                                    # Check Fail Fast
                                     node_config = self.graph.nodes[node_name]
-
-                                    # Determine Error Strategy: CLI override > Node Config
                                     strategy = (
                                         ErrorStrategy(on_error)
                                         if on_error
@@ -453,46 +552,58 @@ class Pipeline:
                                     )
 
                                     if strategy == ErrorStrategy.FAIL_FAST:
-                                        logger.error(
-                                            f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline."
+                                        self._ctx.error(
+                                            "FAIL_FAST triggered: Stopping pipeline",
+                                            failed_node=node_name,
+                                            error=result.error,
+                                            remaining_nodes=len(future_to_node) - 1,
                                         )
                                         executor.shutdown(cancel_futures=True, wait=False)
                                         break
 
                         except Exception as exc:
-                            logger.error(f"Node '{node_name}' generated exception: {exc}")
+                            self._ctx.error(
+                                "Node generated exception",
+                                node=node_name,
+                                error=str(exc),
+                                error_type=type(exc).__name__,
+                            )
                             results.failed.append(node_name)
                             layer_failed = True
 
-                            # Check Fail Fast
                             node_config = self.graph.nodes[node_name]
                             if node_config.on_error == ErrorStrategy.FAIL_FAST:
-                                logger.error(
-                                    f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline."
+                                self._ctx.error(
+                                    "FAIL_FAST triggered: Stopping pipeline",
+                                    failed_node=node_name,
                                 )
                                 executor.shutdown(cancel_futures=True, wait=False)
                                 break
 
-                    # If any node in layer failed, we continue to next layer (unless fail_fast triggered break)
+                    layer_duration = time.time() - layer_start
+                    self._ctx.debug(
+                        f"Layer {layer_idx + 1} completed",
+                        layer_index=layer_idx,
+                        duration_ms=round(layer_duration * 1000, 2),
+                        layer_failed=layer_failed,
+                    )
+
                     if layer_failed:
-                        # Check if any failure was fail_fast (if we broke loop above)
-                        # We need to check if we should stop completely
-                        # Actually, if we broke the inner loop, we are here.
-                        # We need to break outer loop too if fail_fast happened.
-                        # Let's check results for fail_fast trigger?
-                        # Or just check if executor is shutdown? Hard to check.
-                        # Let's check the failed nodes' config.
                         for failed_node in results.failed:
                             if self.graph.nodes[failed_node].on_error == ErrorStrategy.FAIL_FAST:
                                 return results
 
         else:
-            # Serial execution (existing logic refactored to use process_node for consistency?)
-            # Or keep original robust logic?
-            # Let's keep original linear execution but use layers to be consistent,
-            # or use topological sort which is safer for serial.
+            self._ctx.info("Starting serial execution")
             execution_order = self.graph.topological_sort()
-            for node_name in execution_order:
+            for idx, node_name in enumerate(execution_order):
+                self._ctx.debug(
+                    f"Executing node {idx + 1}/{len(execution_order)}",
+                    node=node_name,
+                    order=idx + 1,
+                    total=len(execution_order),
+                )
+
                 result = process_node(node_name)
                 results.node_results[node_name] = result
 
@@ -502,7 +613,7 @@ class Pipeline:
                         and result.metadata.get("reason") == "dependency_failed"
                     ):
                         results.skipped.append(node_name)
-                        results.failed.append(node_name)  # Mark as failed so downstream skips
+                        results.failed.append(node_name)
                     else:
                         results.completed.append(node_name)
                 else:
@@ -512,21 +623,33 @@ class Pipeline:
                     else:
                         results.failed.append(node_name)
 
-                        # Check Fail Fast
                         node_config = self.graph.nodes[node_name]
-
-                        # Determine Error Strategy: CLI override > Node Config
                         strategy = ErrorStrategy(on_error) if on_error else node_config.on_error
 
                         if strategy == ErrorStrategy.FAIL_FAST:
-                            logger.error(
-                                f"FAIL_FAST: Node '{node_name}' failed. Stopping pipeline."
+                            self._ctx.error(
+                                "FAIL_FAST triggered: Stopping pipeline",
+                                failed_node=node_name,
+                                error=result.error,
+                                remaining_nodes=len(execution_order) - idx - 1,
                             )
                             break
 
         # Calculate duration
         results.duration = time.time() - start_time
         results.end_time = datetime.now().isoformat()
+
+        # Log pipeline completion summary
+        status = "SUCCESS" if not results.failed else "FAILED"
+        self._ctx.info(
+            f"Pipeline {status}: {self.config.pipeline}",
+            status=status,
+            duration_s=round(results.duration, 2),
+            completed=len(results.completed),
+            failed=len(results.failed),
+            skipped=len(results.skipped),
+            total_nodes=len(self.graph.nodes),
+        )
 
         # Save state if running normally (not dry run)
         if not dry_run:
@@ -539,27 +662,28 @@ class Pipeline:
                     )
                     state_manager = StateManager(backend=backend)
                 except Exception as e:
-                    logger.warning(f"Could not initialize StateManager for saving run: {e}")
+                    self._ctx.warning(
+                        f"Could not initialize StateManager for saving run: {e}",
+                        suggestion="Check state backend configuration",
+                    )
 
             if state_manager:
                 state_manager.save_pipeline_run(self.config.pipeline, results)
+                self._ctx.debug("Pipeline run state saved")
 
         # Generate story
         if self.generate_story:
-            # Convert config to JSON-compatible dict (resolves Enums to strings)
             if hasattr(self.config, "model_dump"):
                 config_dump = self.config.model_dump(mode="json")
             else:
                 config_dump = self.config.dict()
 
-            # Merge project-level config if available
             if self.project_config:
                 project_dump = (
                     self.project_config.model_dump(mode="json")
                     if hasattr(self.project_config, "model_dump")
                     else self.project_config.dict()
                 )
-                # Merge relevant fields
                 for field in ["project", "plant", "asset", "business_unit", "layer"]:
                     if field in project_dump and project_dump[field]:
                         config_dump[field] = project_dump[field]
@@ -576,6 +700,7 @@ class Pipeline:
                 config=config_dump,
             )
             results.story_path = story_path
+            self._ctx.info("Story generated", story_path=story_path)
 
         # Alert: on_success / on_failure
         if results.failed:
@@ -583,9 +708,9 @@ class Pipeline:
         else:
             self._send_alerts("on_success", results)
 
-            # Phase 1: Optimize Catalog on Success
             if self.catalog_manager:
                 self.catalog_manager.optimize()
+                self._ctx.debug("Catalog optimized")
 
         # Lineage: Complete
         if self.lineage:
@@ -662,6 +787,8 @@ class Pipeline:
         Returns:
             Validation results
         """
+        self._ctx.info("Validating pipeline configuration")
+
         validation = {
             "valid": True,
             "errors": [],
@@ -671,28 +798,31 @@ class Pipeline:
         }
 
         try:
-            # Test topological sort
             execution_order = self.graph.topological_sort()
             validation["execution_order"] = execution_order
+            self._ctx.debug(
+                "Dependency graph validated",
+                execution_order=execution_order,
+            )
 
-            # Validate transformer params against registered models
             for node_name, node in self.graph.nodes.items():
-                # 1. Top-level transformer
                 if node.transformer:
                     try:
                         FunctionRegistry.validate_params(node.transformer, node.params)
                     except ValueError as e:
                         validation["errors"].append(f"Node '{node_name}' transformer error: {e}")
                         validation["valid"] = False
+                        self._ctx.log_validation_result(
+                            passed=False,
+                            rule_name=f"transformer_params:{node_name}",
+                            failures=[str(e)],
+                        )
 
-                # 2. Transform steps
                 if node.transform and node.transform.steps:
                     for i, step in enumerate(node.transform.steps):
-                        # Handle string steps (SQL)
                         if isinstance(step, str):
                             continue
 
-                        # Handle TransformStep objects
                         if hasattr(step, "function") and step.function:
                             try:
                                 FunctionRegistry.validate_params(step.function, step.params)
@@ -701,12 +831,20 @@ class Pipeline:
                                     f"Node '{node_name}' step {i + 1} error: {e}"
                                 )
                                 validation["valid"] = False
+                                self._ctx.log_validation_result(
+                                    passed=False,
+                                    rule_name=f"step_params:{node_name}:step_{i + 1}",
+                                    failures=[str(e)],
+                                )
 
         except DependencyError as e:
             validation["valid"] = False
             validation["errors"].append(str(e))
+            self._ctx.error(
+                "Dependency graph validation failed",
+                error=str(e),
+            )
 
-        # Check for missing connections
         for node in self.config.nodes:
             if node.read and node.read.connection not in self.connections:
                 validation["warnings"].append(
@@ -716,6 +854,13 @@ class Pipeline:
                 validation["warnings"].append(
                     f"Node '{node.name}': connection '{node.write.connection}' not configured"
                 )
+
+        self._ctx.info(
+            f"Validation {'passed' if validation['valid'] else 'failed'}",
+            valid=validation["valid"],
+            errors=len(validation["errors"]),
+            warnings=len(validation["warnings"]),
+        )
 
         return validation
 
@@ -761,10 +906,21 @@ class PipelineManager:
             structured=project_config.logging.structured, level=project_config.logging.level.value
         )
 
+        # Create manager-level logging context
+        self._ctx = create_logging_context(engine=project_config.engine)
+
+        self._ctx.info(
+            "Initializing PipelineManager",
+            project=project_config.project,
+            engine=project_config.engine,
+            pipeline_count=len(project_config.pipelines),
+            connection_count=len(connections),
+        )
+
         # Initialize Lineage Adapter
         self.lineage_adapter = OpenLineageAdapter(project_config.lineage)
 
-        # Initialize CatalogManager if configured (Phase 1)
+        # Initialize CatalogManager if configured
         if project_config.system:
             from odibi.catalog import CatalogManager
 
@@ -772,28 +928,32 @@ class PipelineManager:
             engine_instance = None
 
             if project_config.engine == "spark":
-                # We need to instantiate an engine to get the session
                 try:
                     from odibi.engine.spark_engine import SparkEngine
 
-                    # We need connections for Spark to configure ADLS
                     temp_engine = SparkEngine(connections=connections, config={})
                     spark = temp_engine.spark
+                    self._ctx.debug("Spark session initialized for System Catalog")
                 except Exception as e:
-                    logger.warning(f"Failed to initialize Spark for System Catalog: {e}")
+                    self._ctx.warning(
+                        f"Failed to initialize Spark for System Catalog: {e}",
+                        suggestion="Check Spark configuration",
+                    )
 
             sys_conn = connections.get(project_config.system.connection)
             if sys_conn:
                 base_path = sys_conn.get_path(project_config.system.path)
 
-                # If running locally (no spark), initialize a local engine for the catalog
                 if not spark:
                     try:
                         from odibi.engine.pandas_engine import PandasEngine
 
                         engine_instance = PandasEngine(config={})
+                        self._ctx.debug("PandasEngine initialized for System Catalog")
                     except Exception as e:
-                        logger.warning(f"Failed to initialize PandasEngine for System Catalog: {e}")
+                        self._ctx.warning(
+                            f"Failed to initialize PandasEngine for System Catalog: {e}"
+                        )
 
                 if spark or engine_instance:
                     self.catalog_manager = CatalogManager(
@@ -803,13 +963,21 @@ class PipelineManager:
                         engine=engine_instance,
                     )
                     self.catalog_manager.bootstrap()
+                    self._ctx.info("System Catalog initialized", path=base_path)
             else:
-                logger.warning(f"System connection '{project_config.system.connection}' not found.")
+                self._ctx.warning(
+                    f"System connection '{project_config.system.connection}' not found",
+                    suggestion="Configure the system connection in your config",
+                )
 
         # Get story configuration
         story_config = self._get_story_config()
 
-        # Create all pipeline instances from project_config.pipelines
+        # Create all pipeline instances
+        self._ctx.debug(
+            "Creating pipeline instances",
+            pipelines=[p.pipeline for p in project_config.pipelines],
+        )
         for pipeline_config in project_config.pipelines:
             pipeline_name = pipeline_config.pipeline
 
@@ -825,8 +993,12 @@ class PipelineManager:
                 catalog_manager=self.catalog_manager,
                 lineage_adapter=self.lineage_adapter,
             )
-            # Inject project config into pipeline for richer context
             self._pipelines[pipeline_name].project_config = project_config
+
+        self._ctx.info(
+            "PipelineManager ready",
+            pipelines=list(self._pipelines.keys()),
+        )
 
     def _get_story_config(self) -> Dict[str, Any]:
         """Build story config from project_config.story.
@@ -869,15 +1041,13 @@ class PipelineManager:
             >>> manager = PipelineManager.from_yaml("config.yaml", env="prod")
             >>> results = manager.run()  # Run all pipelines
         """
-        # 1. Bootstrap Registry (Standard Library)
+        logger.info(f"Loading configuration from: {yaml_path}")
+
         register_standard_library()
 
-        # Load YAML with environment variable substitution
         yaml_path_obj = Path(yaml_path)
         config_dir = yaml_path_obj.parent.absolute()
 
-        # --- Auto-Discovery of Custom Transforms ---
-        # Check for 'transforms.py' in config directory and CWD
         import importlib.util
         import os
         import sys
@@ -894,28 +1064,26 @@ class PipelineManager:
                 except Exception as e:
                     logger.warning(f"Failed to auto-load transforms from {path}: {e}")
 
-        # 1. Config Directory
         load_transforms_module(os.path.join(config_dir, "transforms.py"))
 
-        # 2. Current Working Directory (if different)
         cwd = os.getcwd()
         if os.path.abspath(cwd) != str(config_dir):
             load_transforms_module(os.path.join(cwd, "transforms.py"))
 
-        # Path check is now handled inside load_yaml_with_env but we can keep/remove it.
-        # load_yaml_with_env takes a str, so passing str(yaml_path_obj) is safer.
-
         try:
             config = load_yaml_with_env(str(yaml_path_obj), env=env)
+            logger.debug("Configuration loaded successfully")
         except FileNotFoundError:
-            # Re-raise to maintain backward compatibility with existing error handling if needed
-            # or just let it bubble up. The original raised FileNotFoundError manually.
+            logger.error(f"YAML file not found: {yaml_path}")
             raise FileNotFoundError(f"YAML file not found: {yaml_path}")
 
-        # Parse and validate entire YAML as ProjectConfig (single source of truth)
         project_config = ProjectConfig(**config)
+        logger.debug(
+            "Project config validated",
+            project=project_config.project,
+            pipelines=len(project_config.pipelines),
+        )
 
-        # Build connections from project_config.connections
         connections = cls._build_connections(project_config.connections)
 
         return cls(
@@ -938,17 +1106,14 @@ class PipelineManager:
         """
         from odibi.connections.factory import register_builtins
 
+        logger.debug(f"Building {len(conn_configs)} connections")
+
         connections = {}
 
-        # 1. Register built-in connection types
         register_builtins()
-
-        # 2. Load plugins (external)
         load_plugins()
 
-        # 3. Build connection objects
         for conn_name, conn_config in conn_configs.items():
-            # Convert Pydantic model to dict if needed
             if hasattr(conn_config, "model_dump"):
                 conn_config = conn_config.model_dump()
             elif hasattr(conn_config, "dict"):
@@ -960,20 +1125,31 @@ class PipelineManager:
             if factory:
                 try:
                     connections[conn_name] = factory(conn_name, conn_config)
+                    logger.debug(
+                        f"Connection created: {conn_name}",
+                        type=conn_type,
+                    )
                 except Exception as e:
-                    # Enhance error with context
+                    logger.error(
+                        f"Failed to create connection '{conn_name}'",
+                        type=conn_type,
+                        error=str(e),
+                    )
                     raise ValueError(
                         f"Failed to create connection '{conn_name}' (type={conn_type}): {e}"
                     ) from e
             else:
+                logger.error(
+                    f"Unsupported connection type: {conn_type}",
+                    connection=conn_name,
+                    suggestion="Check supported connection types in docs",
+                )
                 raise ValueError(
                     f"Unsupported connection type: {conn_type}. "
                     f"Supported types: local, azure_adls, azure_sql, delta, etc. "
                     f"See docs for connection setup."
                 )
 
-        # Parallel Key Vault fetch (Optimization)
-        # We run this after all connections are instantiated to batch the requests
         try:
             from odibi.utils import configure_connections_parallel
 
@@ -982,8 +1158,9 @@ class PipelineManager:
                 for error in errors:
                     logger.warning(error)
         except ImportError:
-            # Optional utility, skip if not available or fails
             pass
+
+        logger.info(f"Built {len(connections)} connections successfully")
 
         return connections
 
@@ -1009,27 +1186,37 @@ class PipelineManager:
         Returns:
             PipelineResults or Dict of results
         """
-        # Determine which pipelines to run
         if pipelines is None:
-            # Run all pipelines in order
             pipeline_names = list(self._pipelines.keys())
         elif isinstance(pipelines, str):
-            # Single pipeline
             pipeline_names = [pipelines]
         else:
-            # List of pipelines
             pipeline_names = pipelines
 
-        # Validate pipeline names
         for name in pipeline_names:
             if name not in self._pipelines:
                 available = ", ".join(self._pipelines.keys())
+                self._ctx.error(
+                    f"Pipeline not found: {name}",
+                    available=list(self._pipelines.keys()),
+                )
                 raise ValueError(f"Pipeline '{name}' not found. Available pipelines: {available}")
 
-        # Run pipelines
+        self._ctx.info(
+            f"Running {len(pipeline_names)} pipeline(s)",
+            pipelines=pipeline_names,
+            dry_run=dry_run,
+            parallel=parallel,
+        )
+
         results = {}
-        for name in pipeline_names:
-            # ...
+        for idx, name in enumerate(pipeline_names):
+            self._ctx.info(
+                f"Executing pipeline {idx + 1}/{len(pipeline_names)}: {name}",
+                pipeline=name,
+                order=idx + 1,
+            )
+
             results[name] = self._pipelines[name].run(
                 dry_run=dry_run,
                 resume_from_failure=resume_from_failure,
@@ -1038,22 +1225,19 @@ class PipelineManager:
                 on_error=on_error,
             )
 
-            # Print summary
             result = results[name]
             status = "SUCCESS" if not result.failed else "FAILED"
-            if result.failed:
-                logger.error(f"{status} - {name}", duration=f"{result.duration:.2f}s")
-            else:
-                logger.info(f"{status} - {name}", duration=f"{result.duration:.2f}s")
-
-            logger.info(f"Completed: {len(result.completed)} nodes")
-            if result.failed:
-                logger.info(f"Failed: {len(result.failed)} nodes")
+            self._ctx.info(
+                f"Pipeline {status}: {name}",
+                status=status,
+                duration_s=round(result.duration, 2),
+                completed=len(result.completed),
+                failed=len(result.failed),
+            )
 
             if result.story_path:
-                logger.info(f"Story: {result.story_path}")
+                self._ctx.debug(f"Story generated: {result.story_path}")
 
-        # Return single result if only one pipeline, otherwise dict
         if len(pipeline_names) == 1:
             return results[pipeline_names[0]]
         else:
@@ -1102,10 +1286,12 @@ class PipelineManager:
             >>> manager.deploy("sales_daily")  # Deploy specific pipeline
         """
         if not self.catalog_manager:
-            logger.warning("System Catalog not configured. Cannot deploy.")
+            self._ctx.warning(
+                "System Catalog not configured. Cannot deploy.",
+                suggestion="Configure system catalog in your YAML config",
+            )
             return False
 
-        # Determine which pipelines to deploy
         if pipelines is None:
             to_deploy = self.project_config.pipelines
         elif isinstance(pipelines, str):
@@ -1114,22 +1300,37 @@ class PipelineManager:
             to_deploy = [p for p in self.project_config.pipelines if p.pipeline in pipelines]
 
         if not to_deploy:
-            logger.warning("No matching pipelines found to deploy.")
+            self._ctx.warning("No matching pipelines found to deploy.")
             return False
+
+        self._ctx.info(
+            f"Deploying {len(to_deploy)} pipeline(s) to System Catalog",
+            pipelines=[p.pipeline for p in to_deploy],
+        )
 
         try:
             self.catalog_manager.bootstrap()
 
             for pipeline_config in to_deploy:
-                logger.info(f"Deploying pipeline: {pipeline_config.pipeline}")
+                self._ctx.debug(
+                    f"Deploying pipeline: {pipeline_config.pipeline}",
+                    node_count=len(pipeline_config.nodes),
+                )
                 self.catalog_manager.register_pipeline(pipeline_config, self.project_config)
 
                 for node in pipeline_config.nodes:
                     self.catalog_manager.register_node(pipeline_config.pipeline, node)
 
-            logger.info(f"Deployed {len(to_deploy)} pipeline(s) to System Catalog.")
+            self._ctx.info(
+                f"Deployment complete: {len(to_deploy)} pipeline(s)",
+                deployed=[p.pipeline for p in to_deploy],
+            )
             return True
 
         except Exception as e:
-            logger.error(f"Deployment failed: {e}")
+            self._ctx.error(
+                f"Deployment failed: {e}",
+                error_type=type(e).__name__,
+                suggestion="Check catalog configuration and permissions",
+            )
             return False

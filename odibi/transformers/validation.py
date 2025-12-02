@@ -1,5 +1,6 @@
 """Validation transformers."""
 
+import time
 from typing import Any, List
 
 from pydantic import BaseModel, Field
@@ -7,6 +8,7 @@ from pydantic import BaseModel, Field
 from odibi.context import EngineContext
 from odibi.exceptions import ValidationError
 from odibi.registry import transform
+from odibi.utils.logging_context import get_logging_context
 
 
 class CrossCheckParams(BaseModel):
@@ -44,28 +46,54 @@ def cross_check(context: EngineContext, params: CrossCheckParams) -> Any:
     Does not return a DataFrame (returns None).
     Raises ValidationError on failure.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "CrossCheck starting",
+        check_type=params.type,
+        inputs=params.inputs,
+        threshold=params.threshold,
+    )
+
     if len(params.inputs) < 2:
+        ctx.error(
+            "CrossCheck failed: insufficient inputs",
+            inputs_count=len(params.inputs),
+        )
         raise ValueError("Cross-check requires at least 2 inputs")
 
     dfs = {}
     for name in params.inputs:
         df = context.context.get(name)
         if df is None:
+            ctx.error(
+                "CrossCheck failed: input not found",
+                missing_input=name,
+                available_inputs=(
+                    list(context.context._data.keys())
+                    if hasattr(context.context, "_data")
+                    else None
+                ),
+            )
             raise ValueError(f"Input '{name}' not found in context")
         dfs[name] = df
 
     if params.type == "row_count_diff":
-        # Check if row counts differ by more than threshold
         counts = {name: context.engine.count_rows(df) for name, df in dfs.items()}
         base_name = params.inputs[0]
         base_count = counts[base_name]
+
+        ctx.debug(
+            "CrossCheck row counts",
+            counts=counts,
+        )
 
         failures = []
         for name, count in counts.items():
             if name == base_name:
                 continue
 
-            # Calculate diff relative to base
             if base_count == 0:
                 if count > 0:
                     diff = 1.0
@@ -81,10 +109,13 @@ def cross_check(context: EngineContext, params: CrossCheckParams) -> Any:
                 )
 
         if failures:
+            ctx.warning(
+                "CrossCheck validation failed",
+                failures=failures,
+            )
             raise ValidationError("cross_check", failures)
 
     elif params.type == "schema_match":
-        # Check if schemas are identical
         base_name = params.inputs[0]
         base_schema = context.engine.get_schema(dfs[base_name])
 
@@ -94,9 +125,7 @@ def cross_check(context: EngineContext, params: CrossCheckParams) -> Any:
                 continue
 
             schema = context.engine.get_schema(df)
-            # Compare dicts
             if base_schema != schema:
-                # Find diffs
                 set_base = set(base_schema.items())
                 set_curr = set(schema.items())
 
@@ -111,6 +140,18 @@ def cross_check(context: EngineContext, params: CrossCheckParams) -> Any:
                 failures.append(msg)
 
         if failures:
+            ctx.warning(
+                "CrossCheck validation failed",
+                failures=failures,
+            )
             raise ValidationError("cross_check", failures)
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "CrossCheck completed",
+        check_type=params.type,
+        passed=True,
+        elapsed_ms=round(elapsed_ms, 2),
+    )
 
     return None

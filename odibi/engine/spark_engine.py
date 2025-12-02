@@ -3,9 +3,11 @@
 Status: Phase 2B implemented - Delta Lake read/write, VACUUM, history, restore
 """
 
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from odibi.exceptions import TransformError
+from odibi.utils.logging_context import get_logging_context
 
 from .base import Engine
 
@@ -35,13 +37,23 @@ class SparkEngine(Engine):
         Raises:
             ImportError: If pyspark not installed
         """
+        ctx = get_logging_context().with_context(engine="spark")
+        ctx.debug("Initializing SparkEngine", connections_count=len(connections or {}))
+
         try:
             from pyspark.sql import SparkSession
         except ImportError as e:
+            ctx.error(
+                "PySpark not installed",
+                error_type="ImportError",
+                suggestion="pip install odibi[spark]",
+            )
             raise ImportError(
                 "Spark support requires 'pip install odibi[spark]'. "
                 "See docs/setup_databricks.md for setup instructions."
             ) from e
+
+        start_time = time.time()
 
         # Configure Delta Lake support
         try:
@@ -52,12 +64,10 @@ class SparkEngine(Engine):
             )
 
             # Performance Optimizations
-            # 1. Enable Arrow for PySpark (faster conversion to/from Pandas)
             builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
-            # 2. Enable Adaptive Query Execution (usually default in 3.x, but ensuring it)
             builder = builder.config("spark.sql.adaptive.enabled", "true")
 
-            # 3. Reduce Verbosity (Silence Py4J and Spark logs)
+            # Reduce Verbosity
             builder = builder.config(
                 "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR, console"
             )
@@ -66,12 +76,12 @@ class SparkEngine(Engine):
             )
 
             self.spark = spark_session or configure_spark_with_delta_pip(builder).getOrCreate()
-
-            # Programmatically set log level after creation
             self.spark.sparkContext.setLogLevel("ERROR")
 
+            ctx.debug("Delta Lake support enabled")
+
         except ImportError:
-            # Delta not available - use regular Spark
+            ctx.debug("Delta Lake not available, using standard Spark")
             builder = SparkSession.builder.appName("odibi").config(
                 "spark.sql.sources.partitionOverwriteMode", "dynamic"
             )
@@ -97,32 +107,49 @@ class SparkEngine(Engine):
         # Apply user-defined Spark configs from performance settings
         self._apply_spark_config()
 
+        elapsed = (time.time() - start_time) * 1000
+        ctx.info(
+            "SparkEngine initialized",
+            elapsed_ms=round(elapsed, 2),
+            app_name=self.spark.sparkContext.appName,
+            spark_version=self.spark.version,
+            connections_configured=len(self.connections),
+            using_existing_session=spark_session is not None,
+        )
+
     def _configure_all_connections(self) -> None:
         """Configure Spark with all ADLS connection credentials.
 
         This sets all storage account keys upfront so Spark can access
         multiple accounts. Keys are scoped by account name, so no conflicts.
         """
+        ctx = get_logging_context().with_context(engine="spark")
+
         for conn_name, connection in self.connections.items():
             if hasattr(connection, "configure_spark"):
-                connection.configure_spark(self.spark)
+                ctx.log_connection(
+                    connection_type=type(connection).__name__,
+                    connection_name=conn_name,
+                    action="configure_spark",
+                )
+                try:
+                    connection.configure_spark(self.spark)
+                    ctx.debug(f"Configured ADLS connection: {conn_name}")
+                except Exception as e:
+                    ctx.error(
+                        f"Failed to configure ADLS connection: {conn_name}",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                    )
+                    raise
 
     def _apply_spark_config(self) -> None:
         """Apply user-defined Spark configurations from performance settings.
 
         Applies configs via spark.conf.set() for runtime-settable options.
         For existing sessions (e.g., Databricks), only modifiable configs take effect.
-
-        Common runtime-safe configs:
-        - spark.sql.shuffle.partitions
-        - spark.sql.adaptive.enabled
-        - spark.sql.adaptive.coalescePartitions.enabled
-        - spark.databricks.delta.optimizeWrite.enabled
-        - spark.databricks.delta.autoCompact.enabled
         """
-        import logging
-
-        logger = logging.getLogger(__name__)
+        ctx = get_logging_context().with_context(engine="spark")
 
         performance = self.config.get("performance", {})
         spark_config = performance.get("spark_config", {})
@@ -130,63 +157,65 @@ class SparkEngine(Engine):
         if not spark_config:
             return
 
+        ctx.debug("Applying Spark configuration", config_count=len(spark_config))
+
         for key, value in spark_config.items():
             try:
                 self.spark.conf.set(key, value)
-                logger.debug(f"Applied Spark config: {key}={value}")
+                ctx.debug(
+                    f"Applied Spark config: {key}={value}", config_key=key, config_value=value
+                )
             except Exception as e:
-                logger.warning(
-                    f"Failed to set Spark config '{key}': {e}. "
-                    "This config may require session restart."
+                ctx.warning(
+                    f"Failed to set Spark config '{key}'",
+                    config_key=key,
+                    error_message=str(e),
+                    suggestion="This config may require session restart",
                 )
 
     def _apply_table_properties(
         self, target: str, properties: Dict[str, str], is_table: bool = False
     ) -> None:
-        """Apply table properties to a Delta table.
-
-        Args:
-            target: Table name or file path
-            properties: Dictionary of property name -> value
-            is_table: True if target is a table name, False if path
-
-        Example properties:
-            {"delta.columnMapping.mode": "name"}
-        """
+        """Apply table properties to a Delta table."""
         if not properties:
             return
 
+        ctx = get_logging_context().with_context(engine="spark")
+
         try:
             table_ref = target if is_table else f"delta.`{target}`"
+            ctx.debug(
+                f"Applying table properties to {target}",
+                properties_count=len(properties),
+                is_table=is_table,
+            )
 
             for prop_name, prop_value in properties.items():
                 sql = f"ALTER TABLE {table_ref} SET TBLPROPERTIES ('{prop_name}' = '{prop_value}')"
                 self.spark.sql(sql)
+                ctx.debug(f"Set table property: {prop_name}={prop_value}")
 
         except Exception as e:
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to set table properties on {target}: {e}")
+            ctx.warning(
+                f"Failed to set table properties on {target}",
+                error_type=type(e).__name__,
+                error_message=str(e),
+            )
 
     def _optimize_delta_write(
         self, target: str, options: Dict[str, Any], is_table: bool = False
     ) -> None:
-        """Run Delta Lake optimization (OPTIMIZE / ZORDER).
-
-        Args:
-            target: Table name or file path
-            options: Write options containing 'optimize_write' and 'zorder_by'
-            is_table: True if target is a table name, False if path
-        """
+        """Run Delta Lake optimization (OPTIMIZE / ZORDER)."""
         should_optimize = options.get("optimize_write", False)
         zorder_by = options.get("zorder_by")
 
         if not should_optimize and not zorder_by:
             return
 
+        ctx = get_logging_context().with_context(engine="spark")
+        start_time = time.time()
+
         try:
-            # Construct SQL command
             if is_table:
                 sql = f"OPTIMIZE {target}"
             else:
@@ -195,30 +224,35 @@ class SparkEngine(Engine):
             if zorder_by:
                 if isinstance(zorder_by, str):
                     zorder_by = [zorder_by]
-                # Join columns
                 cols = ", ".join(zorder_by)
                 sql += f" ZORDER BY ({cols})"
 
+            ctx.debug("Running Delta optimization", sql=sql, target=target)
             self.spark.sql(sql)
 
-        except Exception as e:
-            import logging
+            elapsed = (time.time() - start_time) * 1000
+            ctx.info(
+                "Delta optimization completed",
+                target=target,
+                zorder_by=zorder_by,
+                elapsed_ms=round(elapsed, 2),
+            )
 
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Optimization failed for {target}: {e}")
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            ctx.warning(
+                f"Optimization failed for {target}",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                elapsed_ms=round(elapsed, 2),
+            )
 
     def _get_last_delta_commit_info(
         self, target: str, is_table: bool = False
     ) -> Optional[Dict[str, Any]]:
-        """Get metadata for the most recent Delta commit.
+        """Get metadata for the most recent Delta commit."""
+        ctx = get_logging_context().with_context(engine="spark")
 
-        Args:
-            target: Table name or file path
-            is_table: True if target is a table name
-
-        Returns:
-            Dictionary with version, timestamp, operation, metrics
-        """
         try:
             from delta.tables import DeltaTable
 
@@ -227,10 +261,8 @@ class SparkEngine(Engine):
             else:
                 dt = DeltaTable.forPath(self.spark, target)
 
-            # Get last commit
             last_commit = dt.history(1).collect()[0]
 
-            # Safely access Row fields (handles PySpark Row which supports dictionary-like access OR attribute access)
             def safe_get(row, field):
                 if hasattr(row, field):
                     return getattr(row, field)
@@ -241,18 +273,29 @@ class SparkEngine(Engine):
                         return None
                 return None
 
-            return {
+            commit_info = {
                 "version": safe_get(last_commit, "version"),
                 "timestamp": safe_get(last_commit, "timestamp"),
                 "operation": safe_get(last_commit, "operation"),
                 "operation_metrics": safe_get(last_commit, "operationMetrics"),
                 "read_version": safe_get(last_commit, "readVersion"),
             }
-        except Exception as e:
-            import logging
 
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to fetch Delta commit info for {target}: {e}")
+            ctx.debug(
+                "Delta commit metadata retrieved",
+                target=target,
+                version=commit_info.get("version"),
+                operation=commit_info.get("operation"),
+            )
+
+            return commit_info
+
+        except Exception as e:
+            ctx.warning(
+                f"Failed to fetch Delta commit info for {target}",
+                error_type=type(e).__name__,
+                error_message=str(e),
+            )
             return None
 
     def harmonize_schema(self, df, target_schema: Dict[str, str], policy: Any):
@@ -261,76 +304,91 @@ class SparkEngine(Engine):
 
         from odibi.config import OnMissingColumns, OnNewColumns, SchemaMode
 
+        ctx = get_logging_context().with_context(engine="spark")
+
         target_cols = list(target_schema.keys())
         current_cols = df.columns
 
         missing = set(target_cols) - set(current_cols)
         new_cols = set(current_cols) - set(target_cols)
 
-        # 1. Check Validations
+        ctx.debug(
+            "Schema harmonization",
+            target_columns=len(target_cols),
+            current_columns=len(current_cols),
+            missing_columns=list(missing) if missing else None,
+            new_columns=list(new_cols) if new_cols else None,
+            policy_mode=policy.mode.value if hasattr(policy.mode, "value") else str(policy.mode),
+        )
+
+        # Check Validations
         if missing and policy.on_missing_columns == OnMissingColumns.FAIL:
+            ctx.error(
+                f"Schema Policy Violation: Missing columns {missing}",
+                missing_columns=list(missing),
+            )
             raise ValueError(f"Schema Policy Violation: Missing columns {missing}")
 
         if new_cols and policy.on_new_columns == OnNewColumns.FAIL:
+            ctx.error(
+                f"Schema Policy Violation: New columns {new_cols}",
+                new_columns=list(new_cols),
+            )
             raise ValueError(f"Schema Policy Violation: New columns {new_cols}")
 
-        # 2. Apply Transformations
+        # Apply Transformations
         if policy.mode == SchemaMode.EVOLVE and policy.on_new_columns == OnNewColumns.ADD_NULLABLE:
-            # Evolve: Add missing cols, Keep new cols
             res = df
             for c in missing:
                 res = res.withColumn(c, lit(None))
+            ctx.debug("Schema evolved: added missing columns as null")
             return res
         else:
-            # Enforce / Ignore New: Project to target schema
             select_exprs = []
             for c in target_cols:
                 if c in current_cols:
                     select_exprs.append(col(c))
                 else:
-                    # Missing column, add as null
                     select_exprs.append(lit(None).alias(c))
 
+            ctx.debug("Schema enforced: projected to target schema")
             return df.select(*select_exprs)
 
     def anonymize(self, df, columns: List[str], method: str, salt: Optional[str] = None):
         """Anonymize columns using Spark functions."""
         from pyspark.sql.functions import col, concat, lit, regexp_replace, sha2
 
+        ctx = get_logging_context().with_context(engine="spark")
+        ctx.debug(
+            "Anonymizing columns",
+            columns=columns,
+            method=method,
+            has_salt=salt is not None,
+        )
+
         res = df
         for c in columns:
             if c not in df.columns:
+                ctx.warning(f"Column '{c}' not found for anonymization, skipping", column=c)
                 continue
 
             if method == "hash":
                 if salt:
-                    # sha2(concat(col, salt), 256)
                     res = res.withColumn(c, sha2(concat(col(c), lit(salt)), 256))
                 else:
                     res = res.withColumn(c, sha2(col(c), 256))
 
             elif method == "mask":
-                # Mask all but last 4 characters
-                # Logic: Replace any character that is followed by at least 4 characters with '*'
-                # Regex: '.(?=.{4})'
-                # Note: If string is shorter than 4, it won't match and won't be masked (which is usually desired behavior or we mask all)
-                # Spec says "regex masking". Let's use standard pattern.
                 res = res.withColumn(c, regexp_replace(col(c), ".(?=.{4})", "*"))
 
             elif method == "redact":
                 res = res.withColumn(c, lit("[REDACTED]"))
 
+        ctx.debug(f"Anonymization completed using {method}")
         return res
 
     def get_schema(self, df) -> Dict[str, str]:
-        """Get DataFrame schema with types.
-
-        Args:
-            df: Spark DataFrame
-
-        Returns:
-            Dict[str, str]: Column name -> Type string
-        """
+        """Get DataFrame schema with types."""
         return {f.name: f.dataType.simpleString() for f in df.schema}
 
     def get_shape(self, df) -> Tuple[int, int]:
@@ -367,122 +425,197 @@ class SparkEngine(Engine):
         Returns:
             Spark DataFrame (or Streaming DataFrame)
         """
+        ctx = get_logging_context().with_context(engine="spark")
+        start_time = time.time()
         options = options or {}
 
-        # Handle Time Travel options (Inject into options for Delta)
+        source_identifier = table or path or "unknown"
+        ctx.debug(
+            "Starting Spark read",
+            format=format,
+            source=source_identifier,
+            streaming=streaming,
+            as_of_version=as_of_version,
+            as_of_timestamp=as_of_timestamp,
+        )
+
+        # Handle Time Travel options
         if as_of_version is not None:
             options["versionAsOf"] = as_of_version
+            ctx.debug(f"Time travel enabled: version {as_of_version}")
         if as_of_timestamp is not None:
             options["timestampAsOf"] = as_of_timestamp
+            ctx.debug(f"Time travel enabled: timestamp {as_of_timestamp}")
 
         # SQL Server / Azure SQL Support
         if format in ["sql", "sql_server", "azure_sql"]:
             if streaming:
+                ctx.error("Streaming not supported for SQL Server / Azure SQL")
                 raise ValueError("Streaming not supported for SQL Server / Azure SQL yet.")
 
             if not hasattr(connection, "get_spark_options"):
-                raise ValueError(
-                    f"Connection type '{type(connection).__name__}' does not support Spark SQL read"
-                )
+                conn_type = type(connection).__name__
+                msg = f"Connection type '{conn_type}' does not support Spark SQL read"
+                ctx.error(msg, connection_type=conn_type)
+                raise ValueError(msg)
 
             jdbc_options = connection.get_spark_options()
-
-            # Merge with user options (user options take precedence)
             merged_options = {**jdbc_options, **options}
 
-            # Prioritize 'query' option if present (e.g. from Incremental read)
             if "query" in merged_options:
-                # If query is present, ensure dbtable is NOT present to avoid Spark error:
-                # "Both 'dbtable' and 'query' can not be specified at the same time."
                 merged_options.pop("dbtable", None)
             elif table:
                 merged_options["dbtable"] = table
             elif "dbtable" not in merged_options:
+                ctx.error("SQL format requires 'table' config or 'query' option")
                 raise ValueError("SQL format requires 'table' config or 'query' option")
 
-            return self.spark.read.format("jdbc").options(**merged_options).load()
+            ctx.debug("Executing JDBC read", has_query="query" in merged_options)
+
+            try:
+                df = self.spark.read.format("jdbc").options(**merged_options).load()
+                elapsed = (time.time() - start_time) * 1000
+                partition_count = df.rdd.getNumPartitions()
+
+                ctx.log_file_io(path=source_identifier, format=format, mode="read")
+                ctx.log_spark_metrics(partition_count=partition_count)
+                ctx.info(
+                    "JDBC read completed",
+                    source=source_identifier,
+                    elapsed_ms=round(elapsed, 2),
+                    partitions=partition_count,
+                )
+                return df
+
+            except Exception as e:
+                elapsed = (time.time() - start_time) * 1000
+                ctx.error(
+                    "JDBC read failed",
+                    source=source_identifier,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    elapsed_ms=round(elapsed, 2),
+                )
+                raise
 
         # Read based on format
         if table:
             # Managed/External Table (Catalog)
+            ctx.debug(f"Reading from catalog table: {table}")
+
             if streaming:
                 reader = self.spark.readStream.format(format)
             else:
                 reader = self.spark.read.format(format)
 
-            # Apply options
             for key, value in options.items():
                 reader = reader.option(key, value)
 
-            df = reader.table(table)
+            try:
+                df = reader.table(table)
 
-            # Apply filter if present (Smart Read support)
-            if "filter" in options:
-                df = df.filter(options["filter"])
+                if "filter" in options:
+                    df = df.filter(options["filter"])
+                    ctx.debug(f"Applied filter: {options['filter']}")
 
-            return df
+                elapsed = (time.time() - start_time) * 1000
+
+                if not streaming:
+                    partition_count = df.rdd.getNumPartitions()
+                    ctx.log_spark_metrics(partition_count=partition_count)
+                    ctx.log_file_io(path=table, format=format, mode="read")
+                    ctx.info(
+                        f"Table read completed: {table}",
+                        elapsed_ms=round(elapsed, 2),
+                        partitions=partition_count,
+                    )
+                else:
+                    ctx.info(f"Streaming read started: {table}", elapsed_ms=round(elapsed, 2))
+
+                return df
+
+            except Exception as e:
+                elapsed = (time.time() - start_time) * 1000
+                ctx.error(
+                    f"Table read failed: {table}",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    elapsed_ms=round(elapsed, 2),
+                )
+                raise
 
         elif path:
             # File Path
             full_path = connection.get_path(path)
+            ctx.debug(f"Reading from path: {full_path}")
 
             # Auto-detect encoding for CSV (Batch only)
             if not streaming and format == "csv" and options.get("auto_encoding"):
-                # Create copy to not modify original options
                 options = options.copy()
                 options.pop("auto_encoding")
 
                 if "encoding" not in options:
                     try:
-                        # Local import to avoid circular dependency if any
-                        import logging
-
                         from odibi.utils.encoding import detect_encoding
-
-                        logger = logging.getLogger(__name__)
 
                         detected = detect_encoding(connection, path)
                         if detected:
                             options["encoding"] = detected
-                            logger.info(f"Detected encoding '{detected}' for {path}")
+                            ctx.debug(f"Detected encoding: {detected}", path=path)
                     except ImportError:
-                        pass  # optional dependencies might be missing
+                        pass
                     except Exception as e:
-                        import logging
-
-                        logger = logging.getLogger(__name__)
-                        logger.warning(f"Encoding detection failed for {path}: {e}")
+                        ctx.warning(
+                            f"Encoding detection failed for {path}",
+                            error_message=str(e),
+                        )
 
             if streaming:
                 reader = self.spark.readStream.format(format)
-                # Handle schema inference for CSV/JSON in streaming (required)
-                if (
-                    format in ["csv", "json"]
-                    and "schema" not in options
-                    and "inferSchema" not in options
-                ):
-                    # Force inference for better UX, though usually recommended to provide schema
-                    # For now, we let Spark fail or user provide it.
-                    pass
             else:
                 reader = self.spark.read.format(format)
 
-            # Apply options
             for key, value in options.items():
-                # Normalize header for Spark (True -> "true")
                 if key == "header" and isinstance(value, bool):
                     value = str(value).lower()
-
                 reader = reader.option(key, value)
 
-            df = reader.load(full_path)
+            try:
+                df = reader.load(full_path)
 
-            # Apply filter if present (Smart Read support)
-            if "filter" in options:
-                df = df.filter(options["filter"])
+                if "filter" in options:
+                    df = df.filter(options["filter"])
+                    ctx.debug(f"Applied filter: {options['filter']}")
 
-            return df
+                elapsed = (time.time() - start_time) * 1000
+
+                if not streaming:
+                    partition_count = df.rdd.getNumPartitions()
+                    ctx.log_spark_metrics(partition_count=partition_count)
+                    ctx.log_file_io(path=path, format=format, mode="read")
+                    ctx.info(
+                        f"File read completed: {path}",
+                        elapsed_ms=round(elapsed, 2),
+                        partitions=partition_count,
+                        format=format,
+                    )
+                else:
+                    ctx.info(f"Streaming read started: {path}", elapsed_ms=round(elapsed, 2))
+
+                return df
+
+            except Exception as e:
+                elapsed = (time.time() - start_time) * 1000
+                ctx.error(
+                    f"File read failed: {path}",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    elapsed_ms=round(elapsed, 2),
+                    format=format,
+                )
+                raise
         else:
+            ctx.error("Either path or table must be provided")
             raise ValueError("Either path or table must be provided")
 
     def write(
@@ -511,15 +644,28 @@ class SparkEngine(Engine):
         Returns:
             Optional dictionary containing Delta commit metadata (if format=delta)
         """
+        ctx = get_logging_context().with_context(engine="spark")
+        start_time = time.time()
         options = options or {}
+
+        target_identifier = table or path or "unknown"
+        partition_count = df.rdd.getNumPartitions()
+
+        ctx.debug(
+            "Starting Spark write",
+            format=format,
+            target=target_identifier,
+            mode=mode,
+            partitions=partition_count,
+        )
 
         # SQL Server / Azure SQL Support
         if format in ["sql", "sql_server", "azure_sql"]:
-            # ... existing SQL logic ...
             if not hasattr(connection, "get_spark_options"):
-                raise ValueError(
-                    f"Connection type '{type(connection).__name__}' does not support Spark SQL write"
-                )
+                conn_type = type(connection).__name__
+                msg = f"Connection type '{conn_type}' does not support Spark SQL write"
+                ctx.error(msg, connection_type=conn_type)
+                raise ValueError(msg)
 
             jdbc_options = connection.get_spark_options()
             merged_options = {**jdbc_options, **options}
@@ -527,40 +673,64 @@ class SparkEngine(Engine):
             if table:
                 merged_options["dbtable"] = table
             elif "dbtable" not in merged_options:
+                ctx.error("SQL format requires 'table' config or 'dbtable' option")
                 raise ValueError("SQL format requires 'table' config or 'dbtable' option")
 
-            # Map mode
             if mode not in ["overwrite", "append", "ignore", "error"]:
                 if mode == "fail":
                     mode = "error"
                 else:
+                    ctx.error(f"Write mode '{mode}' not supported for Spark SQL write")
                     raise ValueError(f"Write mode '{mode}' not supported for Spark SQL write")
 
-            df.write.format("jdbc").options(**merged_options).mode(mode).save()
-            return
+            ctx.debug("Executing JDBC write", target=table or merged_options.get("dbtable"))
+
+            try:
+                df.write.format("jdbc").options(**merged_options).mode(mode).save()
+                elapsed = (time.time() - start_time) * 1000
+                ctx.log_file_io(path=target_identifier, format=format, mode="write")
+                ctx.info(
+                    "JDBC write completed",
+                    target=target_identifier,
+                    mode=mode,
+                    elapsed_ms=round(elapsed, 2),
+                )
+                return None
+
+            except Exception as e:
+                elapsed = (time.time() - start_time) * 1000
+                ctx.error(
+                    "JDBC write failed",
+                    target=target_identifier,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    elapsed_ms=round(elapsed, 2),
+                )
+                raise
 
         # Handle Upsert/AppendOnce (Delta Only)
         if mode in ["upsert", "append_once"]:
             if format != "delta":
+                ctx.error(f"Mode '{mode}' only supported for Delta format")
                 raise NotImplementedError(
                     f"Mode '{mode}' only supported for Delta format in Spark engine."
                 )
 
             keys = options.get("keys")
             if not keys:
+                ctx.error(f"Mode '{mode}' requires 'keys' list in options")
                 raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
 
             if isinstance(keys, str):
                 keys = [keys]
 
-            # Check if target exists
             exists = self.table_exists(connection, table, path)
+            ctx.debug("Table existence check for merge", target=target_identifier, exists=exists)
 
             if not exists:
-                # Fallback to overwrite (creation)
                 mode = "overwrite"
+                ctx.debug("Target does not exist, falling back to overwrite mode")
             else:
-                # Perform Merge
                 from delta.tables import DeltaTable
 
                 target_dt = None
@@ -577,46 +747,101 @@ class SparkEngine(Engine):
                     target_name = full_path
                     is_table_target = False
 
-                # Build condition: target.key = source.key
                 condition = " AND ".join([f"target.`{k}` = source.`{k}`" for k in keys])
+                ctx.debug("Executing Delta merge", merge_mode=mode, keys=keys, condition=condition)
 
                 merge_builder = target_dt.alias("target").merge(df.alias("source"), condition)
 
-                if mode == "upsert":
-                    merge_builder.whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
-                elif mode == "append_once":
-                    merge_builder.whenNotMatchedInsertAll().execute()
+                try:
+                    if mode == "upsert":
+                        merge_builder.whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+                    elif mode == "append_once":
+                        merge_builder.whenNotMatchedInsertAll().execute()
 
-                # Optimization & Metadata
-                self._optimize_delta_write(target_name, options, is_table=is_table_target)
-                return self._get_last_delta_commit_info(target_name, is_table=is_table_target)
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.info(
+                        "Delta merge completed",
+                        target=target_name,
+                        mode=mode,
+                        elapsed_ms=round(elapsed, 2),
+                    )
+
+                    self._optimize_delta_write(target_name, options, is_table=is_table_target)
+                    commit_info = self._get_last_delta_commit_info(
+                        target_name, is_table=is_table_target
+                    )
+
+                    if commit_info:
+                        ctx.debug(
+                            "Delta commit info",
+                            version=commit_info.get("version"),
+                            operation=commit_info.get("operation"),
+                        )
+
+                    return commit_info
+
+                except Exception as e:
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.error(
+                        "Delta merge failed",
+                        target=target_name,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        elapsed_ms=round(elapsed, 2),
+                    )
+                    raise
 
         # Get output location
         if table:
             # Managed/External Table (Catalog)
+            ctx.debug(f"Writing to catalog table: {table}")
             writer = df.write.format(format).mode(mode)
 
             partition_by = options.get("partition_by")
-            # Apply partitioning if specified
             if partition_by:
                 if isinstance(partition_by, str):
                     partition_by = [partition_by]
                 writer = writer.partitionBy(*partition_by)
+                ctx.debug(f"Partitioning by: {partition_by}")
 
-            # Apply other options
             for key, value in options.items():
                 writer = writer.option(key, value)
 
-            writer.saveAsTable(table)
+            try:
+                writer.saveAsTable(table)
+                elapsed = (time.time() - start_time) * 1000
 
-            if format == "delta":
-                self._optimize_delta_write(table, options, is_table=True)
-                return self._get_last_delta_commit_info(table, is_table=True)
-            return None
+                ctx.log_file_io(
+                    path=table,
+                    format=format,
+                    mode=mode,
+                    partitions=partition_by,
+                )
+                ctx.info(
+                    f"Table write completed: {table}",
+                    mode=mode,
+                    elapsed_ms=round(elapsed, 2),
+                )
+
+                if format == "delta":
+                    self._optimize_delta_write(table, options, is_table=True)
+                    return self._get_last_delta_commit_info(table, is_table=True)
+                return None
+
+            except Exception as e:
+                elapsed = (time.time() - start_time) * 1000
+                ctx.error(
+                    f"Table write failed: {table}",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    elapsed_ms=round(elapsed, 2),
+                )
+                raise
 
         elif path:
             full_path = connection.get_path(path)
         else:
+            ctx.error("Either path or table must be provided")
             raise ValueError("Either path or table must be provided")
 
         # Extract partition_by option
@@ -629,6 +854,11 @@ class SparkEngine(Engine):
         if partition_by and cluster_by:
             import warnings
 
+            ctx.warning(
+                "Conflict: Both 'partition_by' and 'cluster_by' are set",
+                partition_by=partition_by,
+                cluster_by=cluster_by,
+            )
             warnings.warn(
                 "⚠️  Conflict: Both 'partition_by' and 'cluster_by' (Liquid Clustering) are set. "
                 "Liquid Clustering supersedes partitioning. 'partition_by' will be ignored "
@@ -639,6 +869,10 @@ class SparkEngine(Engine):
         elif partition_by:
             import warnings
 
+            ctx.warning(
+                "Partitioning warning: ensure low-cardinality columns",
+                partition_by=partition_by,
+            )
             warnings.warn(
                 "⚠️  Partitioning can cause performance issues if misused. "
                 "Only partition on low-cardinality columns (< 1000 unique values) "
@@ -651,57 +885,73 @@ class SparkEngine(Engine):
             try:
                 from delta.tables import DeltaTable
             except ImportError:
+                ctx.error("Delta Lake support requires 'delta-spark'")
                 raise ImportError("Delta Lake support requires 'delta-spark'")
 
             if "keys" not in options:
+                ctx.error(f"Mode '{mode}' requires 'keys' list in options")
                 raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
 
-            # Check if table exists
             if DeltaTable.isDeltaTable(self.spark, full_path):
+                ctx.debug(f"Performing Delta merge at path: {full_path}")
                 delta_table = DeltaTable.forPath(self.spark, full_path)
                 keys = options["keys"]
                 if isinstance(keys, str):
                     keys = [keys]
 
                 condition = " AND ".join([f"target.{k} = source.{k}" for k in keys])
-
                 merger = delta_table.alias("target").merge(df.alias("source"), condition)
 
-                if mode == "upsert":
-                    merger.whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
-                else:  # append_once
-                    merger.whenNotMatchedInsertAll().execute()
+                try:
+                    if mode == "upsert":
+                        merger.whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+                    else:
+                        merger.whenNotMatchedInsertAll().execute()
 
-                # Register if requested (even after merge)
-                if register_table:
-                    try:
-                        self.spark.sql(
-                            f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
-                        )
-                    except Exception as e:
-                        import logging
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.info(
+                        "Delta merge completed at path",
+                        path=path,
+                        mode=mode,
+                        elapsed_ms=round(elapsed, 2),
+                    )
 
-                        logger = logging.getLogger(__name__)
-                        logger.error(f"Failed to register external table '{register_table}': {e}")
-                        # Don't raise, as data write was successful
+                    if register_table:
+                        try:
+                            create_sql = (
+                                f"CREATE TABLE IF NOT EXISTS {register_table} "
+                                f"USING DELTA LOCATION '{full_path}'"
+                            )
+                            self.spark.sql(create_sql)
+                            ctx.info(f"Registered table: {register_table}", path=full_path)
+                        except Exception as e:
+                            ctx.error(
+                                f"Failed to register external table '{register_table}'",
+                                error_message=str(e),
+                            )
 
-                self._optimize_delta_write(full_path, options, is_table=False)
-                return self._get_last_delta_commit_info(full_path, is_table=False)
+                    self._optimize_delta_write(full_path, options, is_table=False)
+                    return self._get_last_delta_commit_info(full_path, is_table=False)
+
+                except Exception as e:
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.error(
+                        "Delta merge failed at path",
+                        path=path,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        elapsed_ms=round(elapsed, 2),
+                    )
+                    raise
             else:
-                # Table does not exist, fall back to standard write (create)
-                # Usually initial write is overwrite/create
                 mode = "overwrite"
+                ctx.debug("Target does not exist, falling back to overwrite mode")
 
         # Write based on format (Path-based)
+        ctx.debug(f"Writing to path: {full_path}")
 
         # Handle Liquid Clustering (New Table Creation via SQL)
-        # We only do this if we are creating a new table (overwrite or append-to-non-existent)
-        # For Delta, CTAS (Create Table As Select) is the most reliable way to set CLUSTER BY
         if format == "delta" and cluster_by:
-            # Check if we should use CTAS
-            # If table exists and mode is append, we just append (clustering is already set)
-            # If table exists and mode is overwrite, we REPLACE TABLE ... CLUSTER BY
-
             should_create = False
             target_name = None
 
@@ -710,7 +960,6 @@ class SparkEngine(Engine):
                 if mode == "overwrite":
                     should_create = True
                 elif mode == "append":
-                    # Check existence
                     if not self.spark.catalog.tableExists(table):
                         should_create = True
             elif path:
@@ -719,7 +968,6 @@ class SparkEngine(Engine):
                 if mode == "overwrite":
                     should_create = True
                 elif mode == "append":
-                    # Check existence via DeltaTable
                     try:
                         from delta.tables import DeltaTable
 
@@ -742,34 +990,59 @@ class SparkEngine(Engine):
                     else "CREATE TABLE IF NOT EXISTS"
                 )
 
-                sql = f"{create_cmd} {target_name} USING DELTA CLUSTER BY ({cols}) AS SELECT * FROM {temp_view}"
+                sql = (
+                    f"{create_cmd} {target_name} USING DELTA CLUSTER BY ({cols}) "
+                    f"AS SELECT * FROM {temp_view}"
+                )
 
-                self.spark.sql(sql)
-                self.spark.catalog.dropTempView(temp_view)
+                ctx.debug("Creating clustered Delta table", sql=sql, cluster_by=cluster_by)
 
-                # Register as External Table if requested (Path-based)
-                if register_table and path:
-                    try:
-                        self.spark.sql(
-                            f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
+                try:
+                    self.spark.sql(sql)
+                    self.spark.catalog.dropTempView(temp_view)
+
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.info(
+                        "Clustered Delta table created",
+                        target=target_name,
+                        cluster_by=cluster_by,
+                        elapsed_ms=round(elapsed, 2),
+                    )
+
+                    if register_table and path:
+                        try:
+                            reg_sql = (
+                                f"CREATE TABLE IF NOT EXISTS {register_table} "
+                                f"USING DELTA LOCATION '{full_path}'"
+                            )
+                            self.spark.sql(reg_sql)
+                            ctx.info(f"Registered table: {register_table}")
+                        except Exception:
+                            pass
+
+                    if format == "delta":
+                        self._optimize_delta_write(
+                            target_name if table else full_path, options, is_table=bool(table)
                         )
-                    except Exception:
-                        pass
+                        return self._get_last_delta_commit_info(
+                            target_name if table else full_path, is_table=bool(table)
+                        )
+                    return None
 
-                if format == "delta":
-                    self._optimize_delta_write(
-                        target_name if table else full_path, options, is_table=bool(table)
+                except Exception as e:
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.error(
+                        "Failed to create clustered Delta table",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        elapsed_ms=round(elapsed, 2),
                     )
-                    return self._get_last_delta_commit_info(
-                        target_name if table else full_path, is_table=bool(table)
-                    )
-                return None
+                    raise
 
-        # Extract table_properties from options (don't pass to writer.option)
+        # Extract table_properties from options
         table_properties = options.pop("table_properties", None)
 
-        # For column mapping and other properties that must be set BEFORE write,
-        # temporarily set Spark session defaults
+        # For column mapping and other properties that must be set BEFORE write
         original_configs = {}
         if table_properties and format == "delta":
             for prop_name, prop_value in table_properties.items():
@@ -781,23 +1054,49 @@ class SparkEngine(Engine):
                 except Exception:
                     original_configs[spark_conf_key] = None
                 self.spark.conf.set(spark_conf_key, prop_value)
+            ctx.debug(
+                "Applied table properties as session defaults",
+                properties=list(table_properties.keys()),
+            )
 
         writer = df.write.format(format).mode(mode)
 
-        # Apply partitioning if specified
         if partition_by:
             if isinstance(partition_by, str):
                 partition_by = [partition_by]
             writer = writer.partitionBy(*partition_by)
+            ctx.debug(f"Partitioning by: {partition_by}")
 
-        # Apply other options
         for key, value in options.items():
             writer = writer.option(key, value)
 
         try:
             writer.save(full_path)
+            elapsed = (time.time() - start_time) * 1000
+
+            ctx.log_file_io(
+                path=path,
+                format=format,
+                mode=mode,
+                partitions=partition_by,
+            )
+            ctx.info(
+                f"File write completed: {path}",
+                format=format,
+                mode=mode,
+                elapsed_ms=round(elapsed, 2),
+            )
+
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            ctx.error(
+                f"File write failed: {path}",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                elapsed_ms=round(elapsed, 2),
+            )
+            raise
         finally:
-            # Restore original Spark session configs
             for conf_key, original_value in original_configs.items():
                 if original_value is None:
                     self.spark.conf.unset(conf_key)
@@ -807,18 +1106,20 @@ class SparkEngine(Engine):
         if format == "delta":
             self._optimize_delta_write(full_path, options, is_table=False)
 
-        # Register as External Table if requested
         if register_table and format == "delta":
-            import logging
-
-            logger = logging.getLogger(__name__)
             try:
-                logger.info(f"Registering table '{register_table}' at '{full_path}'")
-                self.spark.sql(
-                    f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{full_path}'"
+                ctx.debug(f"Registering table '{register_table}' at '{full_path}'")
+                reg_sql = (
+                    f"CREATE TABLE IF NOT EXISTS {register_table} "
+                    f"USING DELTA LOCATION '{full_path}'"
                 )
+                self.spark.sql(reg_sql)
+                ctx.info(f"Registered table: {register_table}", path=full_path)
             except Exception as e:
-                logger.error(f"Failed to register table '{register_table}': {e}")
+                ctx.error(
+                    f"Failed to register table '{register_table}'",
+                    error_message=str(e),
+                )
                 raise RuntimeError(
                     f"Failed to register external table '{register_table}': {e}"
                 ) from e
@@ -828,87 +1129,65 @@ class SparkEngine(Engine):
 
         return None
 
-    def add_write_metadata(
-        self,
-        df,
-        metadata_config,
-        source_connection: Optional[str] = None,
-        source_table: Optional[str] = None,
-        source_path: Optional[str] = None,
-        is_file_source: bool = False,
-    ):
-        """Add metadata columns to DataFrame before writing (Bronze layer lineage).
-
-        Args:
-            df: Spark DataFrame
-            metadata_config: WriteMetadataConfig or True (for all defaults)
-            source_connection: Name of the source connection
-            source_table: Name of the source table (SQL sources)
-            source_path: Path of the source file (file sources)
-            is_file_source: True if source is a file-based read
-
-        Returns:
-            DataFrame with metadata columns added
-        """
-        from pyspark.sql.functions import current_timestamp, input_file_name, lit
-
-        from odibi.config import WriteMetadataConfig
-
-        # Normalize config: True -> all defaults
-        if metadata_config is True:
-            config = WriteMetadataConfig()
-        elif isinstance(metadata_config, WriteMetadataConfig):
-            config = metadata_config
-        else:
-            return df  # None or invalid -> no metadata
-
-        # _extracted_at: always applicable
-        if config.extracted_at:
-            df = df.withColumn("_extracted_at", current_timestamp())
-
-        # _source_file: only for file sources
-        if config.source_file and is_file_source:
-            # input_file_name() returns the file path for each row
-            # This only works if the DataFrame was read from files
-            df = df.withColumn("_source_file", input_file_name())
-
-        # _source_connection: all sources
-        if config.source_connection and source_connection:
-            df = df.withColumn("_source_connection", lit(source_connection))
-
-        # _source_table: SQL sources only
-        if config.source_table and source_table:
-            df = df.withColumn("_source_table", lit(source_table))
-
-        return df
-
-    def execute_sql(self, sql: str, context) -> Any:
-        """Execute SQL query using Spark SQL.
+    def execute_sql(self, sql: str, context: Any = None):
+        """Execute SQL query in Spark.
 
         Args:
             sql: SQL query string
-            context: Context object (SparkContext)
+            context: Execution context (optional, not used for Spark)
 
         Returns:
-            Result DataFrame
-
-        Raises:
-            TransformError: If SQL execution fails
+            Spark DataFrame with query results
         """
-        # Register all DataFrames as temporary views
-        # Context doesn't have .items(), use list_names() and get()
-        for name in context.list_names():
-            df = context.get(name)
-            df.createOrReplaceTempView(name)
+        ctx = get_logging_context().with_context(engine="spark")
+        start_time = time.time()
+
+        ctx.debug("Executing Spark SQL", query_preview=sql[:200] if len(sql) > 200 else sql)
 
         try:
-            return self.spark.sql(sql)
+            result = self.spark.sql(sql)
+            elapsed = (time.time() - start_time) * 1000
+            partition_count = result.rdd.getNumPartitions()
+
+            ctx.log_spark_metrics(partition_count=partition_count)
+            ctx.info(
+                "Spark SQL executed",
+                elapsed_ms=round(elapsed, 2),
+                partitions=partition_count,
+            )
+
+            return result
+
         except Exception as e:
-            # Try to identify AnalysisException by name to avoid hard dependency on pyspark import
-            if "AnalysisException" in type(e).__name__:
+            elapsed = (time.time() - start_time) * 1000
+            error_type = type(e).__name__
+
+            if "AnalysisException" in error_type:
+                ctx.error(
+                    "Spark SQL Analysis Error",
+                    error_type=error_type,
+                    error_message=str(e),
+                    query_preview=sql[:200] if len(sql) > 200 else sql,
+                    elapsed_ms=round(elapsed, 2),
+                )
                 raise TransformError(f"Spark SQL Analysis Error: {e}") from e
-            if "ParseException" in type(e).__name__:
+
+            if "ParseException" in error_type:
+                ctx.error(
+                    "Spark SQL Parse Error",
+                    error_type=error_type,
+                    error_message=str(e),
+                    query_preview=sql[:200] if len(sql) > 200 else sql,
+                    elapsed_ms=round(elapsed, 2),
+                )
                 raise TransformError(f"Spark SQL Parse Error: {e}") from e
+
+            ctx.error(
+                "Spark SQL execution failed",
+                error_type=error_type,
+                error_message=str(e),
+                elapsed_ms=round(elapsed, 2),
+            )
             raise e
 
     def execute_transform(self, *args, **kwargs):
@@ -918,40 +1197,29 @@ class SparkEngine(Engine):
         )
 
     def execute_operation(self, operation: str, params: Dict[str, Any], df) -> Any:
-        """Execute built-in operation on Spark DataFrame.
-
-        Args:
-            operation: Operation name
-            params: Operation parameters
-            df: Spark DataFrame
-
-        Returns:
-            Transformed Spark DataFrame
-        """
+        """Execute built-in operation on Spark DataFrame."""
+        ctx = get_logging_context().with_context(engine="spark")
         params = params or {}
 
+        ctx.debug(f"Executing operation: {operation}", params=list(params.keys()))
+
         if operation == "pivot":
-            # Spark implementation of pivot
-            # Params: group_by, pivot_column, value_column, agg_func
             group_by = params.get("group_by", [])
             pivot_column = params.get("pivot_column")
             value_column = params.get("value_column")
             agg_func = params.get("agg_func", "first")
 
             if not pivot_column or not value_column:
+                ctx.error("Pivot requires 'pivot_column' and 'value_column'")
                 raise ValueError("Pivot requires 'pivot_column' and 'value_column'")
 
             if isinstance(group_by, str):
                 group_by = [group_by]
 
-            # Simple mapping for aggregation functions
-            # Spark's agg accepts dict {col: func_name}
             agg_expr = {value_column: agg_func}
-
             return df.groupBy(*group_by).pivot(pivot_column).agg(agg_expr)
 
         elif operation == "drop_duplicates":
-            # Spark uses dropDuplicates(subset=...)
             subset = params.get("subset")
             if subset:
                 if isinstance(subset, str):
@@ -960,14 +1228,11 @@ class SparkEngine(Engine):
             return df.dropDuplicates()
 
         elif operation == "fillna":
-            # Spark uses fillna(value, subset=...)
-            # Pandas uses fillna(value=..., subset=...) or dict
             value = params.get("value")
             subset = params.get("subset")
             return df.fillna(value, subset=subset)
 
         elif operation == "drop":
-            # Spark uses drop(*cols)
             columns = params.get("columns")
             if not columns:
                 return df
@@ -976,8 +1241,6 @@ class SparkEngine(Engine):
             return df.drop(*columns)
 
         elif operation == "rename":
-            # Spark uses withColumnRenamed(existing, new) per column
-            # Params: columns={"old": "new"}
             columns = params.get("columns")
             if not columns:
                 return df
@@ -988,7 +1251,6 @@ class SparkEngine(Engine):
             return res
 
         elif operation == "sort":
-            # Spark uses orderBy/sort
             by = params.get("by")
             ascending = params.get("ascending", True)
 
@@ -1001,72 +1263,44 @@ class SparkEngine(Engine):
             if not ascending:
                 from pyspark.sql.functions import desc
 
-                # If multiple cols, desc applies to all? Spark API is complex here.
-                # Simplification: Sort all descending if ascending=False
                 sort_cols = [desc(c) for c in by]
                 return df.orderBy(*sort_cols)
 
             return df.orderBy(*by)
 
         elif operation == "sample":
-            # Spark uses sample(withReplacement, fraction, seed)
-            # Pandas uses n=... or frac=...
             fraction = params.get("frac", 0.1)
             seed = params.get("random_state")
             with_replacement = params.get("replace", False)
             return df.sample(withReplacement=with_replacement, fraction=fraction, seed=seed)
 
         else:
+            ctx.error(f"Unsupported operation for Spark engine: {operation}")
             raise ValueError(f"Unsupported operation for Spark engine: {operation}")
 
     def count_nulls(self, df, columns: List[str]) -> Dict[str, int]:
-        """Count nulls in specified columns.
-
-        Args:
-            df: Spark DataFrame
-            columns: Columns to check
-
-        Returns:
-            Dictionary of column -> null count
-        """
+        """Count nulls in specified columns."""
         from pyspark.sql.functions import col, count, when
 
-        # Validate columns exist
         missing = set(columns) - set(df.columns)
         if missing:
             raise ValueError(f"Columns not found in DataFrame: {', '.join(missing)}")
 
-        # Build aggregation expression
         aggs = [count(when(col(c).isNull(), c)).alias(c) for c in columns]
-
-        # Execute single pass
         result = df.select(*aggs).collect()[0].asDict()
-
         return result
 
     def validate_schema(self, df, schema_rules: Dict[str, Any]) -> List[str]:
-        """Validate DataFrame schema.
-
-        Args:
-            df: Spark DataFrame
-            schema_rules: Validation rules
-
-        Returns:
-            List of validation failures
-        """
+        """Validate DataFrame schema."""
         failures = []
 
-        # Check required columns
         if "required_columns" in schema_rules:
             required = schema_rules["required_columns"]
             missing = set(required) - set(df.columns)
             if missing:
                 failures.append(f"Missing required columns: {', '.join(missing)}")
 
-        # Check column types
         if "types" in schema_rules:
-            # Map common types to Spark type strings
-            # Note: Spark types are like 'integer', 'string', 'double', 'boolean'
             type_map = {
                 "int": ["integer", "long", "short", "byte"],
                 "float": ["double", "float"],
@@ -1079,8 +1313,6 @@ class SparkEngine(Engine):
                     failures.append(f"Column '{col_name}' not found for type validation")
                     continue
 
-                # Get actual type (simple string representation)
-                # e.g. 'integer', 'string', 'array<string>'
                 actual_type = dict(df.dtypes)[col_name]
                 expected_dtypes = type_map.get(expected_type, [expected_type])
 
@@ -1092,37 +1324,26 @@ class SparkEngine(Engine):
         return failures
 
     def validate_data(self, df, validation_config: Any) -> List[str]:
-        """Validate DataFrame against rules.
-
-        Args:
-            df: Spark DataFrame
-            validation_config: ValidationConfig object
-
-        Returns:
-            List of validation failure messages
-        """
+        """Validate DataFrame against rules."""
         from pyspark.sql.functions import col
 
+        ctx = get_logging_context().with_context(engine="spark")
         failures = []
 
-        # Check not empty
         if validation_config.not_empty:
             if df.isEmpty():
                 failures.append("DataFrame is empty")
 
-        # Check for nulls in specified columns
         if validation_config.no_nulls:
             null_counts = self.count_nulls(df, validation_config.no_nulls)
             for col_name, count in null_counts.items():
                 if count > 0:
                     failures.append(f"Column '{col_name}' has {count} null values")
 
-        # Schema validation
         if validation_config.schema_validation:
             schema_failures = self.validate_schema(df, validation_config.schema_validation)
             failures.extend(schema_failures)
 
-        # Range validation
         if validation_config.ranges:
             for col_name, bounds in validation_config.ranges.items():
                 if col_name in df.columns:
@@ -1141,66 +1362,64 @@ class SparkEngine(Engine):
                 else:
                     failures.append(f"Column '{col_name}' not found for range validation")
 
-        # Allowed values validation
         if validation_config.allowed_values:
             for col_name, allowed in validation_config.allowed_values.items():
                 if col_name in df.columns:
-                    # Check for values not in allowed list
                     count = df.filter(~col(col_name).isin(allowed)).count()
                     if count > 0:
                         failures.append(f"Column '{col_name}' has invalid values")
                 else:
                     failures.append(f"Column '{col_name}' not found for allowed values validation")
 
+        ctx.log_validation_result(
+            passed=len(failures) == 0,
+            rule_name="data_validation",
+            failures=failures if failures else None,
+        )
+
         return failures
 
     def get_sample(self, df, n: int = 10) -> List[Dict[str, Any]]:
-        """Get sample rows as list of dictionaries.
-
-        Args:
-            df: Spark DataFrame
-            n: Number of rows to return
-
-        Returns:
-            List of row dictionaries
-        """
+        """Get sample rows as list of dictionaries."""
         return [row.asDict() for row in df.limit(n).collect()]
 
     def table_exists(
         self, connection: Any, table: Optional[str] = None, path: Optional[str] = None
     ) -> bool:
-        """Check if table or location exists.
+        """Check if table or location exists."""
+        ctx = get_logging_context().with_context(engine="spark")
 
-        Args:
-            connection: Connection object
-            table: Table name (for catalog tables)
-            path: File path (for path-based Delta tables)
-
-        Returns:
-            True if table/location exists, False otherwise
-        """
         if table:
-            # Check catalog table
-            return self.spark.catalog.tableExists(table)
+            exists = self.spark.catalog.tableExists(table)
+            ctx.debug(f"Table existence check: {table}", exists=exists)
+            return exists
         elif path:
-            # Check path-based Delta table
             try:
                 from delta.tables import DeltaTable
 
                 full_path = connection.get_path(path)
-                return DeltaTable.isDeltaTable(self.spark, full_path)
+                exists = DeltaTable.isDeltaTable(self.spark, full_path)
+                ctx.debug(f"Delta table existence check: {path}", exists=exists)
+                return exists
             except ImportError:
-                # Delta not available, try simple file existence
                 try:
                     full_path = connection.get_path(path)
-                    return self.spark.sparkContext._gateway.jvm.org.apache.hadoop.fs.FileSystem.get(
-                        self.spark.sparkContext._jsc.hadoopConfiguration()
-                    ).exists(
-                        self.spark.sparkContext._gateway.jvm.org.apache.hadoop.fs.Path(full_path)
+                    exists = (
+                        self.spark.sparkContext._gateway.jvm.org.apache.hadoop.fs.FileSystem.get(
+                            self.spark.sparkContext._jsc.hadoopConfiguration()
+                        ).exists(
+                            self.spark.sparkContext._gateway.jvm.org.apache.hadoop.fs.Path(
+                                full_path
+                            )
+                        )
                     )
-                except Exception:
+                    ctx.debug(f"Path existence check: {path}", exists=exists)
+                    return exists
+                except Exception as e:
+                    ctx.warning(f"Path existence check failed: {path}", error_message=str(e))
                     return False
-            except Exception:
+            except Exception as e:
+                ctx.warning(f"Table existence check failed: {path}", error_message=str(e))
                 return False
         return False
 
@@ -1212,24 +1431,38 @@ class SparkEngine(Engine):
         format: Optional[str] = None,
     ) -> Optional[Dict[str, str]]:
         """Get schema of an existing table/file."""
+        ctx = get_logging_context().with_context(engine="spark")
+
         try:
             if table:
                 if self.spark.catalog.tableExists(table):
-                    return self.get_schema(self.spark.table(table))
+                    schema = self.get_schema(self.spark.table(table))
+                    ctx.debug(f"Retrieved schema for table: {table}", columns=len(schema))
+                    return schema
             elif path:
                 full_path = connection.get_path(path)
                 if format == "delta":
                     from delta.tables import DeltaTable
 
                     if DeltaTable.isDeltaTable(self.spark, full_path):
-                        return self.get_schema(DeltaTable.forPath(self.spark, full_path).toDF())
+                        schema = self.get_schema(DeltaTable.forPath(self.spark, full_path).toDF())
+                        ctx.debug(f"Retrieved Delta schema: {path}", columns=len(schema))
+                        return schema
                 elif format == "parquet":
-                    return self.get_schema(self.spark.read.parquet(full_path))
+                    schema = self.get_schema(self.spark.read.parquet(full_path))
+                    ctx.debug(f"Retrieved Parquet schema: {path}", columns=len(schema))
+                    return schema
                 elif format:
-                    # Generic try
-                    return self.get_schema(self.spark.read.format(format).load(full_path))
-        except Exception:
-            pass
+                    schema = self.get_schema(self.spark.read.format(format).load(full_path))
+                    ctx.debug(f"Retrieved schema: {path}", format=format, columns=len(schema))
+                    return schema
+        except Exception as e:
+            ctx.warning(
+                "Failed to get schema",
+                table=table,
+                path=path,
+                error_message=str(e),
+            )
         return None
 
     def vacuum_delta(
@@ -1238,16 +1471,20 @@ class SparkEngine(Engine):
         path: str,
         retention_hours: int = 168,
     ) -> None:
-        """VACUUM a Delta table to remove old files.
+        """VACUUM a Delta table to remove old files."""
+        ctx = get_logging_context().with_context(engine="spark")
+        start_time = time.time()
 
-        Args:
-            connection: Connection object
-            path: Delta table path
-            retention_hours: Retention period (default 168 = 7 days)
-        """
+        ctx.debug(
+            "Starting Delta VACUUM",
+            path=path,
+            retention_hours=retention_hours,
+        )
+
         try:
             from delta.tables import DeltaTable
         except ImportError:
+            ctx.error("Delta Lake support requires 'delta-spark'")
             raise ImportError(
                 "Delta Lake support requires 'pip install odibi[spark]' "
                 "with delta-spark. "
@@ -1255,25 +1492,43 @@ class SparkEngine(Engine):
             )
 
         full_path = connection.get_path(path)
-        delta_table = DeltaTable.forPath(self.spark, full_path)
-        delta_table.vacuum(retention_hours / 24.0)  # Convert hours to days
+
+        try:
+            delta_table = DeltaTable.forPath(self.spark, full_path)
+            delta_table.vacuum(retention_hours / 24.0)
+
+            elapsed = (time.time() - start_time) * 1000
+            ctx.info(
+                "Delta VACUUM completed",
+                path=path,
+                retention_hours=retention_hours,
+                elapsed_ms=round(elapsed, 2),
+            )
+
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            ctx.error(
+                "Delta VACUUM failed",
+                path=path,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                elapsed_ms=round(elapsed, 2),
+            )
+            raise
 
     def get_delta_history(
         self, connection: Any, path: str, limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """Get Delta table history.
+        """Get Delta table history."""
+        ctx = get_logging_context().with_context(engine="spark")
+        start_time = time.time()
 
-        Args:
-            connection: Connection object
-            path: Delta table path
-            limit: Maximum number of versions to return
+        ctx.debug("Fetching Delta history", path=path, limit=limit)
 
-        Returns:
-            List of version metadata dictionaries
-        """
         try:
             from delta.tables import DeltaTable
         except ImportError:
+            ctx.error("Delta Lake support requires 'delta-spark'")
             raise ImportError(
                 "Delta Lake support requires 'pip install odibi[spark]' "
                 "with delta-spark. "
@@ -1281,23 +1536,44 @@ class SparkEngine(Engine):
             )
 
         full_path = connection.get_path(path)
-        delta_table = DeltaTable.forPath(self.spark, full_path)
-        history_df = delta_table.history(limit) if limit else delta_table.history()
 
-        # Convert to list of dictionaries
-        return [row.asDict() for row in history_df.collect()]
+        try:
+            delta_table = DeltaTable.forPath(self.spark, full_path)
+            history_df = delta_table.history(limit) if limit else delta_table.history()
+            history = [row.asDict() for row in history_df.collect()]
+
+            elapsed = (time.time() - start_time) * 1000
+            ctx.info(
+                "Delta history retrieved",
+                path=path,
+                versions_returned=len(history),
+                elapsed_ms=round(elapsed, 2),
+            )
+
+            return history
+
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            ctx.error(
+                "Failed to get Delta history",
+                path=path,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                elapsed_ms=round(elapsed, 2),
+            )
+            raise
 
     def restore_delta(self, connection: Any, path: str, version: int) -> None:
-        """Restore Delta table to a specific version.
+        """Restore Delta table to a specific version."""
+        ctx = get_logging_context().with_context(engine="spark")
+        start_time = time.time()
 
-        Args:
-            connection: Connection object
-            path: Delta table path
-            version: Version number to restore to
-        """
+        ctx.debug("Restoring Delta table", path=path, version=version)
+
         try:
             from delta.tables import DeltaTable
         except ImportError:
+            ctx.error("Delta Lake support requires 'delta-spark'")
             raise ImportError(
                 "Delta Lake support requires 'pip install odibi[spark]' "
                 "with delta-spark. "
@@ -1305,8 +1581,30 @@ class SparkEngine(Engine):
             )
 
         full_path = connection.get_path(path)
-        delta_table = DeltaTable.forPath(self.spark, full_path)
-        delta_table.restoreToVersion(version)
+
+        try:
+            delta_table = DeltaTable.forPath(self.spark, full_path)
+            delta_table.restoreToVersion(version)
+
+            elapsed = (time.time() - start_time) * 1000
+            ctx.info(
+                "Delta table restored",
+                path=path,
+                version=version,
+                elapsed_ms=round(elapsed, 2),
+            )
+
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            ctx.error(
+                "Delta restore failed",
+                path=path,
+                version=version,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                elapsed_ms=round(elapsed, 2),
+            )
+            raise
 
     def maintain_table(
         self,
@@ -1320,7 +1618,9 @@ class SparkEngine(Engine):
         if format != "delta" or not config or not config.enabled:
             return
 
-        # Determine target identifier
+        ctx = get_logging_context().with_context(engine="spark")
+        start_time = time.time()
+
         if table:
             target = table
         elif path:
@@ -1329,57 +1629,45 @@ class SparkEngine(Engine):
         else:
             return
 
-        import logging
-
-        logger = logging.getLogger(__name__)
+        ctx.debug("Starting table maintenance", target=target)
 
         try:
-            # 1. OPTIMIZE (Compaction)
-            # We always run basic optimization. If Z-Order was needed, it should have been
-            # configured in write options (zorder_by) which runs during write.
-            # This acts as a catch-all compaction.
-            logger.info(f"Running Auto-Optimize (Compaction) on {target}...")
+            ctx.debug(f"Running OPTIMIZE on {target}")
             self.spark.sql(f"OPTIMIZE {target}")
 
-            # 2. VACUUM (Cleanup)
             retention = config.vacuum_retention_hours
             if retention is not None and retention > 0:
-                logger.info(
-                    f"Running Auto-Optimize (VACUUM) on {target} (Retention: {retention}h)..."
-                )
+                ctx.debug(f"Running VACUUM on {target}", retention_hours=retention)
                 self.spark.sql(f"VACUUM {target} RETAIN {retention} HOURS")
 
+            elapsed = (time.time() - start_time) * 1000
+            ctx.info(
+                "Table maintenance completed",
+                target=target,
+                vacuum_retention_hours=retention,
+                elapsed_ms=round(elapsed, 2),
+            )
+
         except Exception as e:
-            logger.warning(f"Auto-optimize failed for {target}: {e}")
+            elapsed = (time.time() - start_time) * 1000
+            ctx.warning(
+                f"Auto-optimize failed for {target}",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                elapsed_ms=round(elapsed, 2),
+            )
 
     def get_source_files(self, df) -> List[str]:
-        """Get list of source files that generated this DataFrame.
-
-        Args:
-            df: Spark DataFrame
-
-        Returns:
-            List of file paths
-        """
+        """Get list of source files that generated this DataFrame."""
         try:
             return df.inputFiles()
         except Exception:
-            # inputFiles() might fail for non-file sources or complex transformations
             return []
 
     def profile_nulls(self, df) -> Dict[str, float]:
-        """Calculate null percentage for each column.
-
-        Args:
-            df: Spark DataFrame
-
-        Returns:
-            Dictionary of {column_name: null_percentage} (0.0 to 1.0)
-        """
+        """Calculate null percentage for each column."""
         from pyspark.sql.functions import col, mean, when
 
-        # Build aggregation expression for all columns in one pass
-        # mean(when(col.isNull, 1).otherwise(0))
         aggs = []
         for c in df.columns:
             aggs.append(mean(when(col(c).isNull(), 1).otherwise(0)).alias(c))
@@ -1395,10 +1683,8 @@ class SparkEngine(Engine):
 
     def filter_greater_than(self, df, column: str, value: Any) -> Any:
         """Filter DataFrame where column > value."""
-        # Use SQL expression string for consistency with tests and simpler debugging
         return df.filter(f"{column} > '{value}'")
 
     def filter_coalesce(self, df, col1: str, col2: str, op: str, value: Any) -> Any:
         """Filter using COALESCE(col1, col2) op value."""
-        # Use SQL expression string
         return df.filter(f"COALESCE({col1}, {col2}) {op} '{value}'")

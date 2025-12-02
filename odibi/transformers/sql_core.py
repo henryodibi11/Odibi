@@ -1,9 +1,11 @@
+import time
 from enum import Enum
 from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from odibi.context import EngineContext
+from odibi.utils.logging_context import get_logging_context
 
 # -------------------------------------------------------------------------
 # 1. Filter Rows
@@ -40,8 +42,44 @@ def filter_rows(context: EngineContext, params: FilterRowsParams) -> EngineConte
     - SQL-First: Pushes filtering to the engine's optimizer.
     - Zero-Copy: No data movement to Python.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "FilterRows starting",
+        condition=params.condition,
+    )
+
+    rows_before = None
+    try:
+        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
+        if rows_before is None and hasattr(context.df, "count"):
+            rows_before = context.df.count()
+    except Exception:
+        pass
+
     sql_query = f"SELECT * FROM df WHERE {params.condition}"
-    return context.sql(sql_query)
+    result = context.sql(sql_query)
+
+    rows_after = None
+    try:
+        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
+        if rows_after is None and hasattr(result.df, "count"):
+            rows_after = result.df.count()
+    except Exception:
+        pass
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    rows_filtered = rows_before - rows_after if rows_before and rows_after else None
+    ctx.debug(
+        "FilterRows completed",
+        rows_before=rows_before,
+        rows_after=rows_after,
+        rows_filtered=rows_filtered,
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
 
 
 # -------------------------------------------------------------------------
@@ -76,11 +114,33 @@ def derive_columns(context: EngineContext, params: DeriveColumnsParams) -> Engin
     - Uses projection to add fields.
     - Keeps all existing columns via `*`.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "DeriveColumns starting",
+        derivations=list(params.derivations.keys()),
+    )
+
+    columns_before = len(context.columns) if context.columns else 0
+
     expressions = [f"{expr} AS {col}" for col, expr in params.derivations.items()]
     select_clause = ", ".join(expressions)
 
     sql_query = f"SELECT *, {select_clause} FROM df"
-    return context.sql(sql_query)
+    result = context.sql(sql_query)
+
+    columns_after = len(result.columns) if result.columns else 0
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "DeriveColumns completed",
+        columns_added=list(params.derivations.keys()),
+        columns_before=columns_before,
+        columns_after=columns_after,
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
 
 
 # -------------------------------------------------------------------------

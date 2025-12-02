@@ -1,3 +1,4 @@
+import time
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from odibi.context import EngineContext
 from odibi.enums import EngineType
+from odibi.utils.logging_context import get_logging_context
 
 # -------------------------------------------------------------------------
 # 1. Deduplicate (Window)
@@ -36,6 +38,24 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
     """
     Deduplicates data using Window functions.
     """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "Deduplicate starting",
+        keys=params.keys,
+        order_by=params.order_by,
+    )
+
+    # Get row count before transformation
+    rows_before = None
+    try:
+        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
+        if rows_before is None and hasattr(context.df, "count"):
+            rows_before = context.df.count()
+    except Exception:
+        pass
+
     partition_clause = ", ".join(params.keys)
     order_clause = params.order_by if params.order_by else "(SELECT NULL)"
 
@@ -52,7 +72,29 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
             FROM df
         ) WHERE _rn = 1
     """
-    return context.sql(sql_query)
+    result = context.sql(sql_query)
+
+    # Log completion
+    rows_after = None
+    try:
+        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
+        if rows_after is None and hasattr(result.df, "count"):
+            rows_after = result.df.count()
+    except Exception:
+        pass
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    duplicates_removed = rows_before - rows_after if rows_before and rows_after else None
+    ctx.debug(
+        "Deduplicate completed",
+        keys=params.keys,
+        rows_before=rows_before,
+        rows_after=rows_after,
+        duplicates_removed=duplicates_removed,
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
 
 
 # -------------------------------------------------------------------------
@@ -80,21 +122,58 @@ class ExplodeParams(BaseModel):
 
 
 def explode_list_column(context: EngineContext, params: ExplodeParams) -> EngineContext:
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "Explode starting",
+        column=params.column,
+        outer=params.outer,
+    )
+
+    rows_before = None
+    try:
+        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
+        if rows_before is None and hasattr(context.df, "count"):
+            rows_before = context.df.count()
+    except Exception:
+        pass
+
     if context.engine_type == EngineType.SPARK:
         import pyspark.sql.functions as F
 
         func = F.explode_outer if params.outer else F.explode
         df = context.df.withColumn(params.column, func(F.col(params.column)))
+
+        rows_after = df.count() if hasattr(df, "count") else None
+        elapsed_ms = (time.time() - start_time) * 1000
+        ctx.debug(
+            "Explode completed",
+            column=params.column,
+            rows_before=rows_before,
+            rows_after=rows_after,
+            elapsed_ms=round(elapsed_ms, 2),
+        )
         return context.with_df(df)
 
     elif context.engine_type == EngineType.PANDAS:
         df = context.df.explode(params.column)
         if not params.outer:
-            # Inner explode behavior: Drop rows where explode resulted in NaN (empty list source)
             df = df.dropna(subset=[params.column])
+
+        rows_after = df.shape[0] if hasattr(df, "shape") else None
+        elapsed_ms = (time.time() - start_time) * 1000
+        ctx.debug(
+            "Explode completed",
+            column=params.column,
+            rows_before=rows_before,
+            rows_after=rows_after,
+            elapsed_ms=round(elapsed_ms, 2),
+        )
         return context.with_df(df)
 
     else:
+        ctx.error("Explode failed: unsupported engine", engine_type=str(context.engine_type))
         raise ValueError(f"Unsupported engine: {context.engine_type}")
 
 
@@ -494,34 +573,38 @@ def validate_and_flag(context: EngineContext, params: ValidateAndFlagParams) -> 
     """
     Validates rules and appends a column with a list/string of failed rule names.
     """
-    # Strategy:
-    # Use CONCAT_WS (Spark) or list_value/string concatenation (DuckDB)
-    # to build a list of failed rules.
-    # For each rule, IF NOT condition THEN 'rule_name' ELSE NULL
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "ValidateAndFlag starting",
+        rules=list(params.rules.keys()),
+        flag_col=params.flag_col,
+    )
 
     rule_exprs = []
 
     for name, condition in params.rules.items():
-        # If condition fails (NOT condition), return name, else NULL
         expr = f"CASE WHEN NOT ({condition}) THEN '{name}' ELSE NULL END"
         rule_exprs.append(expr)
 
     if not rule_exprs:
         return context.sql(f"SELECT *, NULL AS {params.flag_col} FROM df")
 
-    # Both Spark and DuckDB support concat_ws which skips NULLs
     concatted = f"concat_ws(', ', {', '.join(rule_exprs)})"
-
-    # If result is empty string, replace with NULL to indicate clean?
-    # Or keep empty string. Let's keep empty string if that's what concat_ws returns for all nulls.
-    # Actually, for validation, NULL usually means "no issues".
-    # concat_ws returns "" if all inputs are null (in Spark) or empty string.
-    # We can wrap in NULLIF(..., '')
-
     final_expr = f"NULLIF({concatted}, '')"
 
     sql_query = f"SELECT *, {final_expr} AS {params.flag_col} FROM df"
-    return context.sql(sql_query)
+    result = context.sql(sql_query)
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "ValidateAndFlag completed",
+        rules_count=len(params.rules),
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
 
 
 # -------------------------------------------------------------------------

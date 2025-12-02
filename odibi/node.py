@@ -19,6 +19,12 @@ from odibi.state import (
     CatalogStateBackend,
     StateManager,
 )
+from odibi.utils.logging_context import (
+    LoggingContext,
+    OperationType,
+    create_logging_context,
+    get_logging_context,
+)
 
 
 class NodeResult(BaseModel):
@@ -109,121 +115,164 @@ class NodeExecutor:
         self._delta_write_info = None
         self._validation_warnings = []
 
+        ctx = create_logging_context(
+            node_id=config.name,
+            engine=self.engine.__class__.__name__,
+        )
+
         if dry_run:
+            ctx.debug("Executing node in dry-run mode")
             return self._execute_dry_run(config)
 
-        try:
-            input_schema = None
-            input_sample = None
-            pending_hwm_update = None
+        with ctx.operation(OperationType.EXECUTE, f"node:{config.name}") as metrics:
+            try:
+                input_schema = None
+                input_sample = None
+                pending_hwm_update = None
+                rows_in = None
 
-            # 1. Read Phase
-            result_df, pending_hwm_update = self._execute_read_phase(config, hwm_state)
+                # 1. Read Phase
+                result_df, pending_hwm_update = self._execute_read_phase(config, hwm_state, ctx)
 
-            # If no direct read, check dependencies or use passed input_df
-            if result_df is None:
+                # If no direct read, check dependencies or use passed input_df
+                if result_df is None:
+                    if input_df is not None:
+                        result_df = input_df
+                        ctx.debug(
+                            "Using provided input_df",
+                            rows=self._count_rows(input_df) if input_df is not None else 0,
+                        )
+                    elif config.depends_on:
+                        result_df = self.context.get(config.depends_on[0])
+                        if input_df is None:
+                            input_df = result_df
+                        ctx.debug(
+                            f"Using data from dependency: {config.depends_on[0]}",
+                            rows=self._count_rows(result_df) if result_df is not None else 0,
+                        )
+
+                if config.read:
+                    input_df = result_df
+
+                # Capture input schema before transformation
                 if input_df is not None:
-                    result_df = input_df
-                elif config.depends_on:
-                    # If this is a transform/write node, get data from dependency
-                    # We use the first dependency as the "primary" input for schema comparison
-                    result_df = self.context.get(config.depends_on[0])
-                    if input_df is None:
-                        input_df = result_df  # Snapshot for metadata
+                    input_schema = self._get_schema(input_df)
+                    rows_in = self._count_rows(input_df)
+                    metrics.rows_in = rows_in
+                    metrics.schema_before = input_schema if isinstance(input_schema, dict) else None
+                    if self.max_sample_rows > 0:
+                        try:
+                            input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
+                        except Exception:
+                            pass
 
-            if config.read:
-                input_df = result_df
+                # 1.5 Contracts Phase (Pre-conditions)
+                self._execute_contracts_phase(config, input_df, ctx)
 
-            # Capture input schema before transformation
-            if input_df is not None:
-                input_schema = self._get_schema(input_df)
-                if self.max_sample_rows > 0:
-                    try:
-                        input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
-                    except Exception:
-                        pass
+                # 2. Transform Phase
+                result_df = self._execute_transform_phase(config, result_df, input_df, ctx)
 
-            # 1.5 Contracts Phase (Pre-conditions)
-            self._execute_contracts_phase(config, input_df)
+                # 3. Validation Phase (returns filtered df if quarantine is used)
+                result_df = self._execute_validation_phase(config, result_df, ctx)
 
-            # 2. Transform Phase
-            result_df = self._execute_transform_phase(config, result_df, input_df)
+                # 4. Write Phase
+                override_mode = self._determine_write_mode(config)
+                self._execute_write_phase(config, result_df, override_mode, ctx)
 
-            # 3. Validation Phase (returns filtered df if quarantine is used)
-            result_df = self._execute_validation_phase(config, result_df)
+                # 5. Register & Cache
+                if result_df is not None:
+                    pii_meta = self._calculate_pii(config)
+                    self.context.register(
+                        config.name, result_df, metadata={"pii_columns": pii_meta}
+                    )
 
-            # 4. Write Phase
-            # HWM Logic for Write Mode: If this is first run (hwm_state is None?), maybe overwrite?
-            # The original logic checked table existence.
-            override_mode = self._determine_write_mode(config)
-            self._execute_write_phase(config, result_df, override_mode)
+                # 6. Metadata Collection
+                duration = time.time() - start_time
+                metadata = self._collect_metadata(config, result_df, input_schema, input_sample)
 
-            # 5. Register & Cache
-            if result_df is not None:
-                pii_meta = self._calculate_pii(config)
-                self.context.register(config.name, result_df, metadata={"pii_columns": pii_meta})
-                # Cache handled by Node wrapper usually? Or here?
-                # NodeExecutor just executes. Caching in memory is context's job or Node's.
-                # Node logic had:
-                # if self.config.cache:
-                #    self._cached_result = result_df
-                # But _cached_result was on Node instance.
-                # We can leave caching to caller or context.
-                # Context already holds it if we register it.
-                pass
+                rows_out = metadata.get("rows")
+                metrics.rows_out = rows_out
 
-            # 6. Metadata Collection
-            duration = time.time() - start_time
-            metadata = self._collect_metadata(config, result_df, input_schema, input_sample)
+                # Log schema changes
+                if input_schema and metadata.get("schema"):
+                    output_schema = metadata["schema"]
+                    if isinstance(input_schema, dict) and isinstance(output_schema, dict):
+                        ctx.log_schema_change(
+                            input_schema, output_schema, operation="node_execution"
+                        )
+                    cols_added = metadata.get("columns_added", [])
+                    cols_removed = metadata.get("columns_removed", [])
+                    if cols_added or cols_removed:
+                        ctx.debug(
+                            "Schema modified",
+                            columns_added=cols_added,
+                            columns_removed=cols_removed,
+                        )
 
-            # Pass back HWM update if any
-            if pending_hwm_update:
-                key, value = pending_hwm_update
-                # If we have a result_df, we might want to capture the NEW max value from it if not already captured?
-                # In original logic, _capture_hwm was called inside _execute_read (via _apply_incremental_filtering -> _capture_hwm)
-                # Wait, _capture_hwm sets _pending_hwm.
-                # So pending_hwm_update is returned by _execute_read_phase.
+                # Log row count delta
+                if isinstance(rows_in, (int, float)) and isinstance(rows_out, (int, float)):
+                    delta = rows_out - rows_in
+                    if delta != 0:
+                        ctx.log_row_count_change(rows_in, rows_out, operation="node_execution")
 
-                # But we need to actually GET the new HWM value from the DF if it was a stateful read.
-                # The original code: _execute_read -> ... -> _apply_incremental_filtering
-                # which calculates new max and sets self._pending_hwm.
+                # Pass back HWM update if any
+                if pending_hwm_update:
+                    key, value = pending_hwm_update
+                    metadata["hwm_update"] = {"key": key, "value": value}
+                    metadata["hwm_pending"] = True
+                    ctx.debug(f"HWM pending update: {key}={value}")
 
-                metadata["hwm_update"] = {"key": key, "value": value}
-                metadata["hwm_pending"] = True
+                ctx.info(
+                    "Node execution completed successfully",
+                    rows_in=rows_in,
+                    rows_out=rows_out,
+                    elapsed_ms=round((time.time() - start_time) * 1000, 2),
+                )
 
-            return NodeResult(
-                node_name=config.name,
-                success=True,
-                duration=duration,
-                rows_processed=metadata.get("rows"),
-                schema=metadata.get("schema"),
-                metadata=metadata,
-            )
-
-        except Exception as e:
-            duration = time.time() - start_time
-            # Wrap error
-            if not isinstance(e, NodeExecutionError):
-                exec_context = ExecutionContext(
+                return NodeResult(
                     node_name=config.name,
-                    config_file=self.config_file,
-                    previous_steps=self._execution_steps,
+                    success=True,
+                    duration=duration,
+                    rows_processed=metadata.get("rows"),
+                    schema=metadata.get("schema"),
+                    metadata=metadata,
                 )
-                error = NodeExecutionError(
-                    message=str(e),
-                    context=exec_context,
-                    original_error=e,
-                    suggestions=self._generate_suggestions(e, config),
-                )
-            else:
-                error = e
 
-            return NodeResult(
-                node_name=config.name,
-                success=False,
-                duration=duration,
-                error=error,
-            )
+            except Exception as e:
+                duration = time.time() - start_time
+                suggestions = self._generate_suggestions(e, config)
+
+                # Log error with full context before re-raising
+                ctx.error(
+                    f"Node execution failed: {type(e).__name__}: {e}",
+                    elapsed_ms=round(duration * 1000, 2),
+                    steps_completed=self._execution_steps.copy(),
+                )
+                if suggestions:
+                    ctx.info(f"Suggestions: {'; '.join(suggestions)}")
+
+                # Wrap error
+                if not isinstance(e, NodeExecutionError):
+                    exec_context = ExecutionContext(
+                        node_name=config.name,
+                        config_file=self.config_file,
+                        previous_steps=self._execution_steps,
+                    )
+                    error = NodeExecutionError(
+                        message=str(e),
+                        context=exec_context,
+                        original_error=e,
+                        suggestions=suggestions,
+                    )
+                else:
+                    error = e
+
+                return NodeResult(
+                    node_name=config.name,
+                    success=False,
+                    duration=duration,
+                    error=error,
+                )
 
     def _execute_dry_run(self, config: NodeConfig) -> NodeResult:
         """Simulate execution."""
@@ -249,9 +298,15 @@ class NodeExecutor:
         )
 
     def _execute_read_phase(
-        self, config: NodeConfig, hwm_state: Optional[Tuple[str, Any]]
+        self,
+        config: NodeConfig,
+        hwm_state: Optional[Tuple[str, Any]],
+        ctx: Optional["LoggingContext"] = None,
     ) -> Tuple[Optional[Any], Optional[Tuple[str, Any]]]:
         """Execute read operation. Returns (df, pending_hwm_update)."""
+        if ctx is None:
+            ctx = get_logging_context()
+
         if not config.read:
             return None, None
 
@@ -264,48 +319,73 @@ class NodeExecutor:
                 f"Available: {', '.join(self.connections.keys())}"
             )
 
-        # Time Travel
-        as_of_version = None
-        as_of_timestamp = None
-        if read_config.time_travel:
-            as_of_version = read_config.time_travel.as_of_version
-            as_of_timestamp = read_config.time_travel.as_of_timestamp
-
-        # Legacy HWM: First Run Query Logic
-        read_options = read_config.options.copy() if read_config.options else {}
-
-        if config.write and config.write.first_run_query:
-            write_config = config.write
-            target_conn = self.connections.get(write_config.connection)
-            if target_conn:
-                # Check if table exists to determine first run
-                if not self.engine.table_exists(target_conn, write_config.table, write_config.path):
-                    # First Run: Use first_run_query override
-                    # This overrides any 'query' in read options
-                    read_options["query"] = config.write.first_run_query
-
-        # Execute Read
-        df = self.engine.read(
-            connection=connection,
+        with ctx.operation(
+            OperationType.READ,
+            f"source:{read_config.connection}",
             format=read_config.format,
             table=read_config.table,
             path=read_config.path,
-            options=read_options,
-            as_of_version=as_of_version,
-            as_of_timestamp=as_of_timestamp,
-        )
+        ) as metrics:
+            # Time Travel
+            as_of_version = None
+            as_of_timestamp = None
+            if read_config.time_travel:
+                as_of_version = read_config.time_travel.as_of_version
+                as_of_timestamp = read_config.time_travel.as_of_timestamp
+                ctx.debug(
+                    "Time travel read",
+                    as_of_version=as_of_version,
+                    as_of_timestamp=str(as_of_timestamp) if as_of_timestamp else None,
+                )
 
-        # Apply Incremental Logic
-        pending_hwm = None
-        if config.read.incremental:
-            # If stateful, we need hwm_state
-            # logic for incremental filtering
-            # ...
-            # We need to implement _apply_incremental_filtering here or move it
-            df, pending_hwm = self._apply_incremental_filtering(df, config, hwm_state)
+            # Legacy HWM: First Run Query Logic
+            read_options = read_config.options.copy() if read_config.options else {}
 
-        self._execution_steps.append(f"Read from {config.read.connection}")
-        return df, pending_hwm
+            if config.write and config.write.first_run_query:
+                write_config = config.write
+                target_conn = self.connections.get(write_config.connection)
+                if target_conn:
+                    if not self.engine.table_exists(
+                        target_conn, write_config.table, write_config.path
+                    ):
+                        read_options["query"] = config.write.first_run_query
+                        ctx.debug("Using first_run_query (target table does not exist)")
+
+            # Execute Read
+            df = self.engine.read(
+                connection=connection,
+                format=read_config.format,
+                table=read_config.table,
+                path=read_config.path,
+                options=read_options,
+                as_of_version=as_of_version,
+                as_of_timestamp=as_of_timestamp,
+            )
+
+            row_count = self._count_rows(df) if df is not None else 0
+            metrics.rows_out = row_count
+
+            ctx.info(
+                f"Read completed from {read_config.connection}",
+                format=read_config.format,
+                table=read_config.table,
+                path=read_config.path,
+                rows=row_count,
+            )
+
+            # Apply Incremental Logic
+            pending_hwm = None
+            if config.read.incremental:
+                df, pending_hwm = self._apply_incremental_filtering(df, config, hwm_state)
+                if pending_hwm:
+                    ctx.debug(
+                        "Incremental filtering applied",
+                        hwm_key=pending_hwm[0],
+                        hwm_value=str(pending_hwm[1]),
+                    )
+
+            self._execution_steps.append(f"Read from {config.read.connection}")
+            return df, pending_hwm
 
     def _apply_incremental_filtering(
         self, df: Any, config: NodeConfig, hwm_state: Optional[Tuple[str, Any]]
@@ -367,7 +447,7 @@ class NodeExecutor:
                         # But filter_greater_than implementation is >.
                         # Let's check if we should add filter_greater_than_or_equal?
                         # Or just use > (cutoff - epsilon)?
-                        # Given existing test expectation (kept rows exactly at cutoff?), let's use >.
+                        # Given existing test expectation (kept rows at cutoff?), use >.
                         # Test says: Cutoff 2023-10-24 12:00:00.
                         # Row 2: 2023-10-25 11:00:00. (Kept)
                         # Row 3: 2023-10-25 11:30:00. (Kept)
@@ -400,91 +480,142 @@ class NodeExecutor:
 
         return df, None
 
-    def _execute_contracts_phase(self, config: NodeConfig, df: Any) -> None:
+    def _execute_contracts_phase(
+        self,
+        config: NodeConfig,
+        df: Any,
+        ctx: Optional["LoggingContext"] = None,
+    ) -> None:
         """Execute pre-condition contracts."""
+        if ctx is None:
+            ctx = get_logging_context()
+
         if config.contracts and df is not None:
-            # Materialize for validation
+            ctx.debug(
+                "Starting contract validation",
+                contract_count=len(config.contracts),
+            )
+
             df = self.engine.materialize(df)
 
             from odibi.config import ValidationAction, ValidationConfig
             from odibi.validation.engine import Validator
 
-            # Create strict validation config for contracts
             contract_config = ValidationConfig(mode=ValidationAction.FAIL, tests=config.contracts)
 
             validator = Validator()
             failures = validator.validate(df, contract_config, context={"columns": config.columns})
 
             if failures:
-                # Contracts always fail execution
+                ctx.error(
+                    "Contract validation failed",
+                    failures=failures,
+                    contract_count=len(config.contracts),
+                )
                 raise ValidationError(f"{config.name} (Contract Failure)", failures)
 
+            ctx.info(
+                "Contract validation passed",
+                contract_count=len(config.contracts),
+            )
             self._execution_steps.append(f"Passed {len(config.contracts)} contract checks")
 
     def _execute_transform_phase(
-        self, config: NodeConfig, result_df: Optional[Any], input_df: Optional[Any]
+        self,
+        config: NodeConfig,
+        result_df: Optional[Any],
+        input_df: Optional[Any],
+        ctx: Optional["LoggingContext"] = None,
     ) -> Optional[Any]:
         """Execute transformer and transform steps."""
+        if ctx is None:
+            ctx = get_logging_context()
 
-        # Calculate PII Metadata (Inherited + Local - Declassify)
         pii_meta = self._calculate_pii(config)
+        rows_before = self._count_rows(result_df) if result_df is not None else None
+        schema_before = self._get_schema(result_df) if result_df is not None else None
 
         # Pattern Engine
         if config.transformer:
-            # If transform-only node, ensure we have input
             if result_df is None and input_df is not None:
                 result_df = input_df
+                rows_before = self._count_rows(result_df)
+                schema_before = self._get_schema(result_df)
 
-            is_pattern = False
-            try:
-                from odibi.patterns import get_pattern_class
+            with ctx.operation(
+                OperationType.PATTERN,
+                f"transformer:{config.transformer}",
+            ) as metrics:
+                metrics.rows_in = rows_before
+                if isinstance(schema_before, dict):
+                    metrics.schema_before = schema_before
 
-                pattern_cls = get_pattern_class(config.transformer)
-                # It's a Pattern!
-                is_pattern = True
+                is_pattern = False
+                try:
+                    from odibi.patterns import get_pattern_class
 
-                pattern = pattern_cls(self.engine, config)
-                pattern.validate()
+                    pattern_cls = get_pattern_class(config.transformer)
+                    is_pattern = True
 
-                # Create context
-                engine_ctx = EngineContext(
-                    context=self.context,
-                    df=result_df,
-                    engine_type=self.engine.name,
-                    sql_executor=self.engine.execute_sql,
-                    engine=self.engine,
-                    pii_metadata=pii_meta,
-                )
+                    pattern = pattern_cls(self.engine, config)
+                    pattern.validate()
 
-                result_df = pattern.execute(engine_ctx)
-                self._execution_steps.append(f"Applied pattern '{config.transformer}'")
-
-                # Observability: Log Pattern Usage
-                if self.catalog_manager and config.write:
-                    # Calculate compliance (Phase 3 - basic)
-                    # For now, assume 1.0 if successful
-                    self.catalog_manager.log_pattern(
-                        table_name=config.write.table or config.write.path,
-                        pattern_type=config.transformer,
-                        configuration=str(config.params),
-                        compliance_score=1.0,
+                    engine_ctx = EngineContext(
+                        context=self.context,
+                        df=result_df,
+                        engine_type=self.engine.name,
+                        sql_executor=self.engine.execute_sql,
+                        engine=self.engine,
+                        pii_metadata=pii_meta,
                     )
 
-            except ValueError:
-                # Not a pattern, fall back to legacy transformer
-                pass
+                    result_df = pattern.execute(engine_ctx)
+                    self._execution_steps.append(f"Applied pattern '{config.transformer}'")
 
-            if not is_pattern:
-                result_df = self._execute_transformer_node(config, result_df, pii_meta)
-                self._execution_steps.append(f"Applied transformer '{config.transformer}'")
+                    if self.catalog_manager and config.write:
+                        self.catalog_manager.log_pattern(
+                            table_name=config.write.table or config.write.path,
+                            pattern_type=config.transformer,
+                            configuration=str(config.params),
+                            compliance_score=1.0,
+                        )
 
-                # Log legacy transformer usage as pattern too?
-                if self.catalog_manager and config.write:
-                    self.catalog_manager.log_pattern(
-                        table_name=config.write.table or config.write.path,
-                        pattern_type=config.transformer,
-                        configuration=str(config.params),
-                        compliance_score=1.0,
+                except ValueError:
+                    pass
+
+                if not is_pattern:
+                    result_df = self._execute_transformer_node(config, result_df, pii_meta)
+                    self._execution_steps.append(f"Applied transformer '{config.transformer}'")
+
+                    if self.catalog_manager and config.write:
+                        self.catalog_manager.log_pattern(
+                            table_name=config.write.table or config.write.path,
+                            pattern_type=config.transformer,
+                            configuration=str(config.params),
+                            compliance_score=1.0,
+                        )
+
+                rows_after = self._count_rows(result_df) if result_df is not None else None
+                schema_after = self._get_schema(result_df) if result_df is not None else None
+                metrics.rows_out = rows_after
+                if isinstance(schema_after, dict):
+                    metrics.schema_after = schema_after
+
+                if (
+                    isinstance(rows_before, (int, float))
+                    and isinstance(rows_after, (int, float))
+                    and rows_before != rows_after
+                ):
+                    ctx.log_row_count_change(
+                        rows_before, rows_after, operation=f"transformer:{config.transformer}"
+                    )
+                if (
+                    isinstance(schema_before, dict)
+                    and isinstance(schema_after, dict)
+                    and schema_before != schema_after
+                ):
+                    ctx.log_schema_change(
+                        schema_before, schema_after, operation=f"transformer:{config.transformer}"
                     )
 
         # Transform Steps
@@ -492,16 +623,17 @@ class NodeExecutor:
             if result_df is None and input_df is not None:
                 result_df = input_df
 
-            # Pass PII to _execute_transform?
-            # _execute_transform probably creates EngineContext too.
-            result_df = self._execute_transform(config, result_df, pii_meta)
-            self._execution_steps.append(f"Applied {len(config.transform.steps)} transform steps")
+            step_count = len(config.transform.steps)
+            ctx.debug(f"Executing {step_count} transform steps")
+
+            result_df = self._execute_transform(config, result_df, pii_meta, ctx)
+            self._execution_steps.append(f"Applied {step_count} transform steps")
 
         # Privacy Suite
         if config.privacy:
-            # Use effective PII map (Inherited + Local - Declassify)
             pii_cols = [name for name, is_pii in pii_meta.items() if is_pii]
             if pii_cols:
+                ctx.debug(f"Anonymizing {len(pii_cols)} PII columns", columns=pii_cols)
                 result_df = self.engine.anonymize(
                     result_df,
                     pii_cols,
@@ -555,45 +687,86 @@ class NodeExecutor:
         return result
 
     def _execute_transform(
-        self, config: NodeConfig, df: Any, pii_metadata: Optional[Dict[str, bool]] = None
+        self,
+        config: NodeConfig,
+        df: Any,
+        pii_metadata: Optional[Dict[str, bool]] = None,
+        ctx: Optional["LoggingContext"] = None,
     ) -> Any:
         """Execute transform steps."""
+        if ctx is None:
+            ctx = get_logging_context()
+
         current_df = df
         transform_config = config.transform
 
         if transform_config:
+            total_steps = len(transform_config.steps)
             for step_idx, step in enumerate(transform_config.steps):
+                step_name = self._get_step_name(step)
+                rows_before = self._count_rows(current_df) if current_df is not None else None
+                schema_before = self._get_schema(current_df) if current_df is not None else None
+
                 try:
                     exec_context = ExecutionContext(
                         node_name=config.name,
                         config_file=self.config_file,
                         step_index=step_idx,
-                        total_steps=len(transform_config.steps),
+                        total_steps=total_steps,
                         previous_steps=self._execution_steps,
                     )
 
-                    if current_df is not None:
-                        self.context.register("current_df", current_df)
-                        # Alias 'df' for SQL convenience
-                        self.context.register("df", current_df)
+                    with ctx.operation(
+                        OperationType.TRANSFORM,
+                        f"step[{step_idx + 1}/{total_steps}]:{step_name}",
+                    ) as metrics:
+                        metrics.rows_in = rows_before
+                        if isinstance(schema_before, dict):
+                            metrics.schema_before = schema_before
 
-                    if isinstance(step, str):
-                        # SQL step
-                        current_df = self._execute_sql_step(step)
-                    else:
-                        # TransformStep model
-                        if step.function:
-                            current_df = self._execute_function_step(
-                                step.function, step.params, current_df, pii_metadata
-                            )
-                        elif step.operation:
-                            current_df = self._execute_operation_step(
-                                step.operation, step.params, current_df
-                            )
-                        elif step.sql:
-                            current_df = self._execute_sql_step(step.sql)
+                        if current_df is not None:
+                            self.context.register("current_df", current_df)
+                            self.context.register("df", current_df)
+
+                        if isinstance(step, str):
+                            current_df = self._execute_sql_step(step)
                         else:
-                            raise TransformError(f"Invalid transform step: {step}")
+                            if step.function:
+                                current_df = self._execute_function_step(
+                                    step.function, step.params, current_df, pii_metadata
+                                )
+                            elif step.operation:
+                                current_df = self._execute_operation_step(
+                                    step.operation, step.params, current_df
+                                )
+                            elif step.sql:
+                                current_df = self._execute_sql_step(step.sql)
+                            else:
+                                raise TransformError(f"Invalid transform step: {step}")
+
+                        rows_after = (
+                            self._count_rows(current_df) if current_df is not None else None
+                        )
+                        schema_after = (
+                            self._get_schema(current_df) if current_df is not None else None
+                        )
+                        metrics.rows_out = rows_after
+                        if isinstance(schema_after, dict):
+                            metrics.schema_after = schema_after
+
+                        if (
+                            isinstance(rows_before, (int, float))
+                            and isinstance(rows_after, (int, float))
+                            and rows_before != rows_after
+                        ):
+                            ctx.log_row_count_change(rows_before, rows_after, operation=step_name)
+
+                        if (
+                            isinstance(schema_before, dict)
+                            and isinstance(schema_after, dict)
+                            and schema_before != schema_after
+                        ):
+                            ctx.log_schema_change(schema_before, schema_after, operation=step_name)
 
                 except Exception as e:
                     schema_dict = self._get_schema(current_df) if current_df is not None else {}
@@ -605,14 +778,39 @@ class NodeExecutor:
                     exec_context.input_schema = schema
                     exec_context.input_shape = shape
 
+                    suggestions = self._generate_suggestions(e, config)
+
+                    ctx.error(
+                        f"Transform step failed: {step_name}",
+                        step_index=step_idx,
+                        total_steps=total_steps,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                    )
+                    if suggestions:
+                        ctx.info(f"Suggestions: {'; '.join(suggestions)}")
+
                     raise NodeExecutionError(
                         message=str(e),
                         context=exec_context,
                         original_error=e,
-                        suggestions=self._generate_suggestions(e, config),
+                        suggestions=suggestions,
                     )
 
         return current_df
+
+    def _get_step_name(self, step: Any) -> str:
+        """Get human-readable name for a transform step."""
+        if isinstance(step, str):
+            return f"sql:{step[:50]}..." if len(step) > 50 else f"sql:{step}"
+        if hasattr(step, "function") and step.function:
+            return f"function:{step.function}"
+        if hasattr(step, "operation") and step.operation:
+            return f"operation:{step.operation}"
+        if hasattr(step, "sql") and step.sql:
+            sql_preview = step.sql[:50] + "..." if len(step.sql) > 50 else step.sql
+            return f"sql:{sql_preview}"
+        return "unknown"
 
     def _execute_sql_step(self, sql: str) -> Any:
         """Execute SQL transformation."""
@@ -676,85 +874,109 @@ class NodeExecutor:
             current_df = self.engine.materialize(current_df)
         return self.engine.execute_operation(operation, params, current_df)
 
-    def _execute_validation_phase(self, config: NodeConfig, result_df: Any) -> Any:
+    def _execute_validation_phase(
+        self,
+        config: NodeConfig,
+        result_df: Any,
+        ctx: Optional["LoggingContext"] = None,
+    ) -> Any:
         """Execute validation with quarantine and gate support.
 
         Returns:
             DataFrame (valid rows only if quarantine is used)
         """
+        if ctx is None:
+            ctx = get_logging_context()
+
         if not config.validation or result_df is None:
             return result_df
 
-        result_df = self.engine.materialize(result_df)
+        test_count = len(config.validation.tests)
+        ctx.debug("Starting validation phase", test_count=test_count)
 
-        # History-Aware Validation (Phase 4.1)
-        # Check for VOLUME_DROP test
-        for test in config.validation.tests:
-            if test.type == "volume_drop" and self.catalog_manager:
-                avg_rows = self.catalog_manager.get_average_volume(
-                    config.name, days=test.lookback_days
-                )
-                if avg_rows and avg_rows > 0:
-                    current_rows = self._count_rows(result_df)
-                    drop_pct = (avg_rows - current_rows) / avg_rows
-                    if drop_pct > test.threshold:
-                        raise ValidationError(
-                            config.name,
-                            [f"Volume dropped by {drop_pct:.1%} (Threshold: {test.threshold:.1%})"],
-                        )
+        with ctx.operation(OperationType.VALIDATE, f"validation:{config.name}") as metrics:
+            rows_before = self._count_rows(result_df)
+            metrics.rows_in = rows_before
 
-        # Check for quarantine tests
-        from odibi.validation.quarantine import (
-            add_quarantine_metadata,
-            has_quarantine_tests,
-            split_valid_invalid,
-            write_quarantine,
-        )
+            result_df = self.engine.materialize(result_df)
 
-        validation_config = config.validation
-        quarantine_config = validation_config.quarantine
-        has_quarantine = has_quarantine_tests(validation_config.tests)
+            for test in config.validation.tests:
+                if test.type == "volume_drop" and self.catalog_manager:
+                    avg_rows = self.catalog_manager.get_average_volume(
+                        config.name, days=test.lookback_days
+                    )
+                    if avg_rows and avg_rows > 0:
+                        current_rows = self._count_rows(result_df)
+                        drop_pct = (avg_rows - current_rows) / avg_rows
+                        if drop_pct > test.threshold:
+                            ctx.error(
+                                "Volume drop validation failed",
+                                drop_percentage=f"{drop_pct:.1%}",
+                                threshold=f"{test.threshold:.1%}",
+                                current_rows=current_rows,
+                                average_rows=avg_rows,
+                            )
+                            raise ValidationError(
+                                config.name,
+                                [
+                                    f"Volume dropped by {drop_pct:.1%} "
+                                    f"(Threshold: {test.threshold:.1%})"
+                                ],
+                            )
 
-        test_results: dict = {}
-
-        if has_quarantine and quarantine_config:
-            # Split valid/invalid rows
-            quarantine_result = split_valid_invalid(
-                result_df,
-                validation_config.tests,
-                self.engine,
+            from odibi.validation.quarantine import (
+                add_quarantine_metadata,
+                has_quarantine_tests,
+                split_valid_invalid,
+                write_quarantine,
             )
 
-            if quarantine_result.rows_quarantined > 0:
-                # Add metadata to invalid rows
-                import uuid
+            validation_config = config.validation
+            quarantine_config = validation_config.quarantine
+            has_quarantine = has_quarantine_tests(validation_config.tests)
 
-                run_id = str(uuid.uuid4())
-                invalid_with_meta = add_quarantine_metadata(
-                    quarantine_result.invalid_df,
-                    quarantine_result.test_results,
-                    quarantine_config.add_columns,
-                    self.engine,
-                    config.name,
-                    run_id,
+            test_results: dict = {}
+
+            if has_quarantine and quarantine_config:
+                quarantine_result = split_valid_invalid(
+                    result_df,
                     validation_config.tests,
-                )
-
-                # Write to quarantine
-                write_quarantine(
-                    invalid_with_meta,
-                    quarantine_config,
                     self.engine,
-                    self.connections,
                 )
 
-                self._execution_steps.append(
-                    f"Quarantined {quarantine_result.rows_quarantined} rows to "
-                    f"{quarantine_config.path or quarantine_config.table}"
-                )
+                if quarantine_result.rows_quarantined > 0:
+                    import uuid
 
-            # Use valid rows only for downstream processing
-            result_df = quarantine_result.valid_df
+                    run_id = str(uuid.uuid4())
+                    invalid_with_meta = add_quarantine_metadata(
+                        quarantine_result.invalid_df,
+                        quarantine_result.test_results,
+                        quarantine_config.add_columns,
+                        self.engine,
+                        config.name,
+                        run_id,
+                        validation_config.tests,
+                    )
+
+                    write_quarantine(
+                        invalid_with_meta,
+                        quarantine_config,
+                        self.engine,
+                        self.connections,
+                    )
+
+                    ctx.warning(
+                        f"Quarantined {quarantine_result.rows_quarantined} rows",
+                        quarantine_path=quarantine_config.path or quarantine_config.table,
+                        rows_quarantined=quarantine_result.rows_quarantined,
+                    )
+
+                    self._execution_steps.append(
+                        f"Quarantined {quarantine_result.rows_quarantined} rows to "
+                        f"{quarantine_config.path or quarantine_config.table}"
+                    )
+
+                result_df = quarantine_result.valid_df
             test_results = quarantine_result.test_results
 
         # Run standard validation on remaining rows
@@ -889,8 +1111,12 @@ class NodeExecutor:
         config: NodeConfig,
         df: Any,
         override_mode: Optional[WriteMode] = None,
+        ctx: Optional[LoggingContext] = None,
     ) -> None:
         """Execute write operation."""
+        if ctx is None:
+            ctx = get_logging_context()
+
         if not config.write:
             return
 
@@ -900,98 +1126,112 @@ class NodeExecutor:
         if connection is None:
             raise ValueError(f"Connection '{write_config.connection}' not found.")
 
-        # Skip-if-unchanged check (before any transformations that add metadata)
-        if write_config.skip_if_unchanged and df is not None:
-            skip_result = self._check_skip_if_unchanged(config, df, connection)
-            if skip_result["should_skip"]:
-                self._execution_steps.append(
-                    f"Skipped write: content unchanged (hash: {skip_result['hash'][:12]}...)"
-                )
-                from odibi.utils.logging import logger
-
-                logger.info(
-                    f"[{config.name}] Skipping write - content unchanged "
-                    f"(hash: {skip_result['hash'][:12]}...)"
-                )
-                return
-
-        # Apply Schema Policy
-        if config.schema_policy and df is not None:
-            target_schema = self.engine.get_table_schema(
-                connection=connection,
-                table=write_config.table,
-                path=write_config.path,
-                format=write_config.format,
-            )
-            if target_schema:
-                df = self.engine.harmonize_schema(df, target_schema, config.schema_policy)
-                self._execution_steps.append("Applied Schema Policy (Harmonization)")
-
-        # Add metadata columns if configured
-        if write_config.add_metadata and df is not None:
-            df = self._add_write_metadata(config, df)
-            self._execution_steps.append("Added Bronze metadata columns")
-
-        write_options = write_config.options.copy() if write_config.options else {}
-        deep_diag = write_options.pop("deep_diagnostics", False)
-        diff_keys = write_options.pop("diff_keys", None)
+        row_count = self._count_rows(df) if df is not None else 0
         mode = override_mode if override_mode is not None else write_config.mode
 
-        # Include table_properties in options for Delta writes
-        # Merge global (performance_config) with node-level (node-level takes precedence)
-        if write_config.format == "delta":
-            merged_props = {}
-            # Global defaults from performance_config
-            if self.performance_config and hasattr(
-                self.performance_config, "delta_table_properties"
-            ):
-                merged_props.update(self.performance_config.delta_table_properties or {})
-            # Node-level overrides
-            if write_config.table_properties:
-                merged_props.update(write_config.table_properties)
-            if merged_props:
-                write_options["table_properties"] = merged_props
-
-        delta_info = self.engine.write(
-            df=df,
-            connection=connection,
+        with ctx.operation(
+            OperationType.WRITE,
+            f"target:{write_config.connection}",
             format=write_config.format,
             table=write_config.table,
             path=write_config.path,
-            register_table=write_config.register_table,
-            mode=mode,
-            options=write_options,
-        )
+            mode=str(mode) if mode else None,
+        ) as metrics:
+            metrics.rows_in = row_count
 
-        if write_config.auto_optimize and write_config.format == "delta":
-            opt_config = write_config.auto_optimize
-            # Normalize boolean shorthand
-            if isinstance(opt_config, bool):
-                if opt_config:
-                    from odibi.config import AutoOptimizeConfig
+            if write_config.skip_if_unchanged and df is not None:
+                skip_result = self._check_skip_if_unchanged(config, df, connection)
+                if skip_result["should_skip"]:
+                    self._execution_steps.append(
+                        f"Skipped write: content unchanged (hash: {skip_result['hash'][:12]}...)"
+                    )
+                    ctx.info(
+                        "Skipping write - content unchanged",
+                        content_hash=skip_result["hash"][:12],
+                    )
+                    return
 
-                    opt_config = AutoOptimizeConfig(enabled=True)
-                else:
-                    opt_config = None
-
-            if opt_config:
-                self.engine.maintain_table(
+            if config.schema_policy and df is not None:
+                target_schema = self.engine.get_table_schema(
                     connection=connection,
-                    format=write_config.format,
                     table=write_config.table,
                     path=write_config.path,
-                    config=opt_config,
+                    format=write_config.format,
                 )
+                if target_schema:
+                    df = self.engine.harmonize_schema(df, target_schema, config.schema_policy)
+                    ctx.debug("Applied schema harmonization")
+                    self._execution_steps.append("Applied Schema Policy (Harmonization)")
 
-        if delta_info:
-            self._delta_write_info = delta_info
-            self._calculate_delta_diagnostics(
-                delta_info, connection, write_config, deep_diag, diff_keys
+            if write_config.add_metadata and df is not None:
+                df = self._add_write_metadata(config, df)
+                self._execution_steps.append("Added Bronze metadata columns")
+
+            write_options = write_config.options.copy() if write_config.options else {}
+            deep_diag = write_options.pop("deep_diagnostics", False)
+            diff_keys = write_options.pop("diff_keys", None)
+
+            if write_config.format == "delta":
+                merged_props = {}
+                if self.performance_config and hasattr(
+                    self.performance_config, "delta_table_properties"
+                ):
+                    merged_props.update(self.performance_config.delta_table_properties or {})
+                if write_config.table_properties:
+                    merged_props.update(write_config.table_properties)
+                if merged_props:
+                    write_options["table_properties"] = merged_props
+
+            delta_info = self.engine.write(
+                df=df,
+                connection=connection,
+                format=write_config.format,
+                table=write_config.table,
+                path=write_config.path,
+                register_table=write_config.register_table,
+                mode=mode,
+                options=write_options,
             )
 
-        # Store content hash after successful write (for skip_if_unchanged)
-        if write_config.skip_if_unchanged and write_config.format == "delta":
-            self._store_content_hash_after_write(config, connection)
+            metrics.rows_out = row_count
+
+            ctx.info(
+                f"Write completed to {write_config.connection}",
+                format=write_config.format,
+                table=write_config.table,
+                path=write_config.path,
+                mode=str(mode) if mode else None,
+                rows=row_count,
+            )
+
+            if write_config.auto_optimize and write_config.format == "delta":
+                opt_config = write_config.auto_optimize
+                if isinstance(opt_config, bool):
+                    if opt_config:
+                        from odibi.config import AutoOptimizeConfig
+
+                        opt_config = AutoOptimizeConfig(enabled=True)
+                    else:
+                        opt_config = None
+
+                if opt_config:
+                    ctx.debug("Running auto-optimize on Delta table")
+                    self.engine.maintain_table(
+                        connection=connection,
+                        format=write_config.format,
+                        table=write_config.table,
+                        path=write_config.path,
+                        config=opt_config,
+                    )
+
+            if delta_info:
+                self._delta_write_info = delta_info
+                self._calculate_delta_diagnostics(
+                    delta_info, connection, write_config, deep_diag, diff_keys
+                )
+
+            if write_config.skip_if_unchanged and write_config.format == "delta":
+                self._store_content_hash_after_write(config, connection)
 
     def _add_write_metadata(self, config: NodeConfig, df: Any) -> Any:
         """Add Bronze metadata columns to DataFrame before writing.
@@ -1473,16 +1713,29 @@ class Node:
 
     def restore(self) -> bool:
         """Restore node state from previous execution (if persisted)."""
+        ctx = create_logging_context(
+            node_id=self.config.name,
+            engine=self.engine.__class__.__name__,
+        )
+
         if not self.config.write:
+            ctx.debug("No write config, skipping restore")
             return False
 
         write_config = self.config.write
         connection = self.connections.get(write_config.connection)
 
         if connection is None:
+            ctx.debug(f"Connection '{write_config.connection}' not found, skipping restore")
             return False
 
         try:
+            ctx.debug(
+                "Attempting to restore node from persisted state",
+                table=write_config.table,
+                path=write_config.path,
+            )
+
             df = self.engine.read(
                 connection=connection,
                 format=write_config.format,
@@ -1492,12 +1745,23 @@ class Node:
             )
 
             if df is not None:
+                row_count = self.engine.count_rows(df) if df is not None else 0
                 self.context.register(self.config.name, df)
                 if self.config.cache:
                     self._cached_result = df
+                ctx.info(
+                    "Node state restored successfully",
+                    rows=row_count,
+                    table=write_config.table,
+                    path=write_config.path,
+                )
                 return True
 
-        except Exception:
+        except Exception as e:
+            ctx.warning(
+                f"Failed to restore node state: {e}",
+                error_type=type(e).__name__,
+            )
             return False
 
         return False
@@ -1538,12 +1802,22 @@ class Node:
             tracer,
         )
 
-        # Get node-level log override
+        ctx = create_logging_context(
+            node_id=self.config.name,
+            engine=self.engine.__class__.__name__,
+        )
+
         node_log_level = self.config.log_level.value if self.config.log_level else None
 
-        # Prepare a fallback result for logging in case of catastrophic failure
         result_for_log = NodeResult(node_name=self.config.name, success=False, duration=0.0)
         start_time = time.time()
+
+        ctx.info(
+            f"Starting node execution: {self.config.name}",
+            engine=self.engine.__class__.__name__,
+            dry_run=self.dry_run,
+            retry_enabled=self.retry_config.enabled if self.retry_config else False,
+        )
 
         with (
             _override_log_level(node_log_level),
@@ -1557,41 +1831,53 @@ class Node:
                     result = self._execute_with_retries()
                     result_for_log = result
                 except Exception as e:
-                    # Catastrophic failure (bubbled up from retries)
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR))
                     nodes_executed.add(1, {"status": "failure", "node": self.config.name})
 
-                    # Update logging context
                     result_for_log.duration = time.time() - start_time
                     result_for_log.error = e
                     result_for_log.metadata = {"error": str(e), "catastrophic": True}
 
+                    ctx.error(
+                        "Catastrophic failure in node execution",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        elapsed_ms=round(result_for_log.duration * 1000, 2),
+                    )
+
                     raise e
 
-                # Normal execution path (Success or Handled Error)
                 if result.success:
                     span.set_status(Status(StatusCode.OK))
                     nodes_executed.add(1, {"status": "success", "node": self.config.name})
+                    ctx.info(
+                        "Node execution succeeded",
+                        rows_processed=result.rows_processed,
+                        elapsed_ms=round(result.duration * 1000, 2),
+                        attempts=result.metadata.get("attempts", 1),
+                    )
                 else:
                     span.set_status(Status(StatusCode.ERROR))
                     if result.error:
                         span.record_exception(result.error)
                     nodes_executed.add(1, {"status": "failure", "node": self.config.name})
+                    ctx.error(
+                        "Node execution failed",
+                        error_type=type(result.error).__name__ if result.error else "Unknown",
+                        elapsed_ms=round(result.duration * 1000, 2),
+                    )
 
                 if result.rows_processed is not None:
                     rows_processed.add(result.rows_processed, {"node": self.config.name})
 
                 node_duration.record(result.duration, {"node": self.config.name})
 
-                # Add version hash to metadata
                 result.metadata["version_hash"] = self.get_version_hash()
 
                 return result
 
             finally:
-                # 2.3 Telemetry: Flush to meta_runs (Guaranteed execution)
-                # This ensures even crashed runs are logged to the catalog
                 if self.catalog_manager:
 
                     def safe_default(o):
@@ -1614,20 +1900,33 @@ class Node:
 
     def _execute_with_retries(self) -> NodeResult:
         """Execute with internal retry logic."""
+        ctx = create_logging_context(
+            node_id=self.config.name,
+            engine=self.engine.__class__.__name__,
+        )
+
         start_time = time.time()
         attempts = 0
         max_attempts = self.retry_config.max_attempts if self.retry_config.enabled else 1
         last_error = None
 
+        if max_attempts > 1:
+            ctx.debug(
+                "Retry logic enabled",
+                max_attempts=max_attempts,
+                backoff=self.retry_config.backoff,
+            )
+
         while attempts < max_attempts:
             attempts += 1
+
+            if attempts > 1:
+                ctx.info(
+                    f"Retry attempt {attempts}/{max_attempts}",
+                    previous_error=str(last_error) if last_error else None,
+                )
+
             try:
-                # Fetch state for this attempt
-                # We need to know the state key if we are doing incremental
-                # The executor handles the logic, we just provide the *current* HWM for the *relevant* key
-                # Since we don't know the key upfront without config parsing, maybe we fetch it if needed?
-                # Or we pass the entire state? StateManager is usually key-value store.
-                # Let's try to resolve the key if we have incremental config.
                 hwm_state = None
                 if (
                     self.config.read
@@ -1646,18 +1945,22 @@ class Node:
                     result.metadata["attempts"] = attempts
                     result.duration = time.time() - start_time
 
-                    # Handle Cache
                     if self.config.cache and self.context.get(self.config.name) is not None:
                         self._cached_result = self.context.get(self.config.name)
 
-                    # Handle HWM Update
                     if result.metadata.get("hwm_pending"):
                         hwm_update = result.metadata.get("hwm_update")
                         if hwm_update:
                             try:
                                 self.state_manager.set_hwm(hwm_update["key"], hwm_update["value"])
+                                ctx.debug(
+                                    "HWM state updated",
+                                    hwm_key=hwm_update["key"],
+                                    hwm_value=str(hwm_update["value"]),
+                                )
                             except Exception as e:
                                 result.metadata["hwm_error"] = str(e)
+                                ctx.warning(f"Failed to update HWM state: {e}")
 
                     return result
 
@@ -1671,12 +1974,25 @@ class Node:
                         sleep_time = 2 ** (attempts - 1)
                     elif self.retry_config.backoff == "linear":
                         sleep_time = attempts
+
+                    ctx.warning(
+                        f"Attempt {attempts} failed, retrying in {sleep_time}s",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        backoff_seconds=sleep_time,
+                    )
                     time.sleep(sleep_time)
 
         duration = time.time() - start_time
 
+        ctx.error(
+            "All retry attempts exhausted",
+            attempts=attempts,
+            max_attempts=max_attempts,
+            elapsed_ms=round(duration * 1000, 2),
+        )
+
         if not isinstance(last_error, NodeExecutionError) and last_error:
-            # If we caught a raw exception here (should be caught in executor)
             error = NodeExecutionError(
                 message=str(last_error),
                 context=ExecutionContext(node_name=self.config.name, config_file=self.config_file),
