@@ -664,7 +664,7 @@ class SparkEngine(Engine):
         start_time = time.time()
         options = options or {}
 
-        if df.isStreaming:
+        if getattr(df, "isStreaming", False) is True:
             return self._write_streaming(
                 df=df,
                 connection=connection,
@@ -1180,7 +1180,7 @@ class SparkEngine(Engine):
         Returns:
             Dictionary with streaming query information
         """
-        ctx = get_logging_context().with_context(engine="spark", streaming=True)
+        ctx = get_logging_context().with_context(engine="spark")
         start_time = time.time()
         options = options or {}
 
