@@ -1390,6 +1390,7 @@ class NodeExecutor:
                 register_table=write_config.register_table,
                 mode=mode,
                 options=write_options,
+                streaming_config=write_config.streaming,
             )
 
             metrics.rows_out = row_count
