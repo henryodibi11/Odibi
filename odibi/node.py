@@ -1823,19 +1823,28 @@ class NodeExecutor:
         }
 
         if self._delta_write_info:
-            # from odibi.story.metadata import DeltaWriteInfo
-            ts = self._delta_write_info.get("timestamp")
-            metadata["delta_info"] = {
-                "version": self._delta_write_info["version"],
-                "timestamp": (
-                    ts.isoformat() if hasattr(ts, "isoformat") else str(ts) if ts else None
-                ),
-                "operation": self._delta_write_info.get("operation"),
-                "operation_metrics": self._delta_write_info.get("operation_metrics", {}),
-                "read_version": self._delta_write_info.get("read_version"),
-            }
-            if "data_diff" in self._delta_write_info:
-                metadata["data_diff"] = self._delta_write_info["data_diff"]
+            if self._delta_write_info.get("streaming"):
+                metadata["streaming_info"] = {
+                    "query_id": self._delta_write_info.get("query_id"),
+                    "query_name": self._delta_write_info.get("query_name"),
+                    "status": self._delta_write_info.get("status"),
+                    "target": self._delta_write_info.get("target"),
+                    "output_mode": self._delta_write_info.get("output_mode"),
+                    "checkpoint_location": self._delta_write_info.get("checkpoint_location"),
+                }
+            else:
+                ts = self._delta_write_info.get("timestamp")
+                metadata["delta_info"] = {
+                    "version": self._delta_write_info["version"],
+                    "timestamp": (
+                        ts.isoformat() if hasattr(ts, "isoformat") else str(ts) if ts else None
+                    ),
+                    "operation": self._delta_write_info.get("operation"),
+                    "operation_metrics": self._delta_write_info.get("operation_metrics", {}),
+                    "read_version": self._delta_write_info.get("read_version"),
+                }
+                if "data_diff" in self._delta_write_info:
+                    metadata["data_diff"] = self._delta_write_info["data_diff"]
 
         if df is not None:
             metadata["rows"] = self._count_rows(df)
