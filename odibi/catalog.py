@@ -1161,12 +1161,12 @@ class CatalogManager:
                 "pipeline": pipeline,
                 "node": node,
                 "run_id": run_id,
-                "columns_added": json.dumps(changes["columns_added"])
-                if changes["columns_added"]
-                else None,
-                "columns_removed": json.dumps(changes["columns_removed"])
-                if changes["columns_removed"]
-                else None,
+                "columns_added": (
+                    json.dumps(changes["columns_added"]) if changes["columns_added"] else None
+                ),
+                "columns_removed": (
+                    json.dumps(changes["columns_removed"]) if changes["columns_removed"] else None
+                ),
                 "columns_type_changed": (
                     json.dumps(changes["columns_type_changed"])
                     if changes["columns_type_changed"]
