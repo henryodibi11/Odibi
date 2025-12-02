@@ -243,7 +243,16 @@ class CatalogStateBackend(StateBackend):
                     logger.debug(f"Failed to parse HWM value as JSON for key '{key}': {e}")
                     return row.value
         except Exception as e:
-            logger.warning(f"Failed to get HWM for key '{key}' from {self.meta_state_path}: {e}")
+            error_str = str(e)
+            if "PATH_NOT_FOUND" in error_str or "does not exist" in error_str.lower():
+                logger.debug(
+                    f"HWM state table does not exist yet at {self.meta_state_path}. "
+                    "It will be created on first write."
+                )
+            else:
+                logger.warning(
+                    f"Failed to get HWM for key '{key}' from {self.meta_state_path}: {e}"
+                )
         return None
 
     def _get_hwm_local(self, key):
@@ -272,7 +281,7 @@ class CatalogStateBackend(StateBackend):
         return None
 
     def set_hwm(self, key: str, value: Any) -> None:
-        val_str = json.dumps(value)
+        val_str = json.dumps(value, default=str)
         row = {"key": key, "value": val_str, "updated_at": datetime.utcnow()}
 
         if self.spark:
