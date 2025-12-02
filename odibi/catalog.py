@@ -233,6 +233,88 @@ class CatalogManager:
                 except ImportError:
                     pass
             logger.debug(f"System table exists: {name}")
+            self._migrate_schema_if_needed(name, path, schema)
+
+    def _migrate_schema_if_needed(self, name: str, path: str, expected_schema: StructType) -> None:
+        """
+        Migrate table schema if there are incompatible type changes.
+        This handles cases like ArrayType -> StringType migrations.
+        """
+        try:
+            if self.spark:
+                existing_df = self.spark.read.format("delta").load(path)
+                existing_fields = {f.name: f.dataType for f in existing_df.schema.fields}
+                expected_fields = {f.name: f.dataType for f in expected_schema.fields}
+
+                needs_migration = False
+                for field_name, expected_type in expected_fields.items():
+                    if field_name in existing_fields:
+                        existing_type = existing_fields[field_name]
+                        if type(existing_type) is not type(expected_type):
+                            logger.info(
+                                f"Schema migration needed for {name}.{field_name}: "
+                                f"{existing_type} -> {expected_type}"
+                            )
+                            needs_migration = True
+                            break
+
+                if needs_migration:
+                    logger.info(f"Migrating schema for {name}...")
+                    migrated_df = existing_df
+                    for field in expected_schema.fields:
+                        if field.name in existing_fields:
+                            existing_type = existing_fields[field.name]
+                            if type(existing_type) is not type(field.dataType):
+                                from pyspark.sql import functions as F
+
+                                if isinstance(existing_type, ArrayType) and isinstance(
+                                    field.dataType, StringType
+                                ):
+                                    migrated_df = migrated_df.withColumn(
+                                        field.name, F.to_json(F.col(field.name))
+                                    )
+
+                    migrated_df.write.format("delta").mode("overwrite").option(
+                        "overwriteSchema", "true"
+                    ).save(path)
+                    logger.info(f"Schema migration completed for {name}")
+
+            elif self.engine and self.engine.name == "pandas":
+                from deltalake import DeltaTable
+
+                dt = DeltaTable(path)
+                existing_schema = dt.schema()
+                existing_fields = {f.name: f.type for f in existing_schema.fields}
+
+                needs_migration = False
+                for field in expected_schema.fields:
+                    if field.name in existing_fields:
+                        existing_type_str = str(existing_fields[field.name])
+                        expected_type_str = field.dataType.simpleString()
+                        if "array" in existing_type_str.lower() and expected_type_str == "string":
+                            needs_migration = True
+                            break
+
+                if needs_migration:
+                    logger.info(f"Migrating schema for {name}...")
+                    import json
+
+                    df = dt.to_pandas()
+                    for field in expected_schema.fields:
+                        if field.name in df.columns and field.name in existing_fields:
+                            existing_type_str = str(existing_fields[field.name])
+                            if "array" in existing_type_str.lower():
+                                df[field.name] = df[field.name].apply(
+                                    lambda x: json.dumps(x) if isinstance(x, list) else x
+                                )
+
+                    from deltalake import write_deltalake
+
+                    write_deltalake(path, df, mode="overwrite", overwrite_schema=True)
+                    logger.info(f"Schema migration completed for {name}")
+
+        except Exception as e:
+            logger.warning(f"Schema migration check failed for {name}: {e}")
 
     def _table_exists(self, path: str) -> bool:
         if self.spark:
