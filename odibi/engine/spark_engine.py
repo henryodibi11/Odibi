@@ -1261,22 +1261,6 @@ class SparkEngine(Engine):
                     query_id=str(query.id),
                     query_name=query.name,
                 )
-
-                if register_table and format == "delta":
-                    try:
-                        self.spark.sql(
-                            f"CREATE TABLE IF NOT EXISTS {register_table} "
-                            f"USING DELTA LOCATION '{full_path}'"
-                        )
-                        ctx.info(
-                            f"Registered external table: {register_table}",
-                            path=full_path,
-                        )
-                    except Exception as reg_err:
-                        ctx.warning(
-                            f"Failed to register external table '{register_table}'",
-                            error=str(reg_err),
-                        )
             else:
                 ctx.error("Either path or table must be provided for streaming write")
                 raise ValueError("Either path or table must be provided for streaming write")
@@ -1294,7 +1278,13 @@ class SparkEngine(Engine):
                 "elapsed_ms": round(elapsed, 2),
             }
 
-            if streaming_config.await_termination:
+            should_wait = streaming_config.await_termination
+            if streaming_config.trigger:
+                trigger = streaming_config.trigger
+                if trigger.once or trigger.available_now:
+                    should_wait = True
+
+            if should_wait:
                 ctx.info(
                     "Awaiting streaming query termination",
                     timeout_seconds=streaming_config.timeout_seconds,
@@ -1308,8 +1298,31 @@ class SparkEngine(Engine):
                     query_id=str(query.id),
                     elapsed_ms=round(elapsed, 2),
                 )
+
+                if register_table and path and format == "delta":
+                    full_path = connection.get_path(path)
+                    try:
+                        self.spark.sql(
+                            f"CREATE TABLE IF NOT EXISTS {register_table} "
+                            f"USING DELTA LOCATION '{full_path}'"
+                        )
+                        ctx.info(
+                            f"Registered external table: {register_table}",
+                            path=full_path,
+                        )
+                        result["registered_table"] = register_table
+                    except Exception as reg_err:
+                        ctx.warning(
+                            f"Failed to register external table '{register_table}'",
+                            error=str(reg_err),
+                        )
             else:
                 result["streaming_query"] = query
+                if register_table:
+                    ctx.warning(
+                        "register_table ignored for continuous streaming. "
+                        "Table will be registered after query terminates or manually."
+                    )
 
             return result
 
