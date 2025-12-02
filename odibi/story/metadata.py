@@ -73,7 +73,21 @@ class NodeExecutionMetadata:
     # Error info
     error_message: Optional[str] = None
     error_type: Optional[str] = None
+    error_traceback: Optional[str] = None
+    error_traceback_cleaned: Optional[str] = None
     validation_warnings: List[str] = field(default_factory=list)
+
+    # Execution steps (troubleshooting)
+    execution_steps: List[str] = field(default_factory=list)
+
+    # Failed rows samples (per validation name -> sample rows)
+    failed_rows_samples: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    failed_rows_counts: Dict[str, int] = field(default_factory=dict)
+    failed_rows_truncated: bool = False
+    truncated_validations: List[str] = field(default_factory=list)
+
+    # Retry history
+    retry_history: List[Dict[str, Any]] = field(default_factory=list)
 
     # Historical Context (Catalog)
     historical_avg_rows: Optional[float] = None
@@ -138,7 +152,15 @@ class NodeExecutionMetadata:
             "columns_removed": self.columns_removed,
             "error_message": self.error_message,
             "error_type": self.error_type,
+            "error_traceback": self.error_traceback,
+            "error_traceback_cleaned": self.error_traceback_cleaned,
             "validation_warnings": self.validation_warnings,
+            "execution_steps": self.execution_steps,
+            "failed_rows_samples": self.failed_rows_samples,
+            "failed_rows_counts": self.failed_rows_counts,
+            "failed_rows_truncated": self.failed_rows_truncated,
+            "truncated_validations": self.truncated_validations,
+            "retry_history": self.retry_history,
             "historical_avg_rows": self.historical_avg_rows,
             "historical_avg_duration": self.historical_avg_duration,
             "started_at": self.started_at,

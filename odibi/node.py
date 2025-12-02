@@ -4,6 +4,7 @@ import hashlib
 import inspect
 import logging
 import time
+import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -11,7 +12,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from odibi.config import IncrementalMode, NodeConfig, RetryConfig, WriteMode
-from odibi.utils.duration import parse_duration
 from odibi.context import Context, EngineContext
 from odibi.enums import EngineType
 from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
@@ -20,6 +20,7 @@ from odibi.state import (
     CatalogStateBackend,
     StateManager,
 )
+from odibi.utils.duration import parse_duration
 from odibi.utils.logging_context import (
     LoggingContext,
     OperationType,
@@ -258,6 +259,10 @@ class NodeExecutor:
                 duration = time.time() - start_time
                 suggestions = self._generate_suggestions(e, config)
 
+                # Capture traceback
+                raw_traceback = traceback.format_exc()
+                cleaned_traceback = self._clean_spark_traceback(raw_traceback)
+
                 # Log error with full context before re-raising
                 ctx.error(
                     f"Node execution failed: {type(e).__name__}: {e}",
@@ -288,6 +293,11 @@ class NodeExecutor:
                     success=False,
                     duration=duration,
                     error=error,
+                    metadata={
+                        "steps": self._execution_steps.copy(),
+                        "error_traceback": raw_traceback,
+                        "error_traceback_cleaned": cleaned_traceback,
+                    },
                 )
 
     def _execute_dry_run(self, config: NodeConfig) -> NodeResult:
@@ -1946,6 +1956,58 @@ class NodeExecutor:
 
         return suggestions
 
+    def _clean_spark_traceback(self, raw_traceback: str) -> str:
+        """Clean Spark/Py4J traceback to show only relevant Python info.
+
+        Removes Java stack traces and Py4J noise to make errors more readable.
+
+        Args:
+            raw_traceback: Full traceback string
+
+        Returns:
+            Cleaned traceback with Java/Py4J details removed
+        """
+        import re
+
+        lines = raw_traceback.split("\n")
+        cleaned_lines = []
+        skip_until_python = False
+
+        for line in lines:
+            # Skip Java stack trace lines
+            if re.match(r"\s+at (org\.|java\.|scala\.|py4j\.)", line):
+                skip_until_python = True
+                continue
+
+            # Skip Py4J internal lines
+            if "py4j.protocol" in line or "Py4JJavaError" in line:
+                continue
+
+            # Skip lines that are just "..."
+            if line.strip() == "...":
+                continue
+
+            # If we hit a Python traceback line, resume capturing
+            if line.strip().startswith("File ") or line.strip().startswith("Traceback"):
+                skip_until_python = False
+
+            if not skip_until_python:
+                # Clean up common Spark error prefixes
+                cleaned_line = re.sub(r"org\.apache\.spark\.[a-zA-Z.]+Exception: ", "", line)
+                cleaned_lines.append(cleaned_line)
+
+        # Remove duplicate empty lines
+        result_lines = []
+        prev_empty = False
+        for line in cleaned_lines:
+            is_empty = not line.strip()
+            if is_empty and prev_empty:
+                continue
+            result_lines.append(line)
+            prev_empty = is_empty
+
+        return "\n".join(result_lines).strip()
+
     def _calculate_pii(self, config: NodeConfig) -> Dict[str, bool]:
         """Calculate effective PII metadata (Inheritance + Local - Declassify)."""
         # 1. Collect Upstream PII
@@ -2229,6 +2291,7 @@ class Node:
         attempts = 0
         max_attempts = self.retry_config.max_attempts if self.retry_config.enabled else 1
         last_error = None
+        retry_history: List[Dict[str, Any]] = []
 
         if max_attempts > 1:
             ctx.debug(
@@ -2239,6 +2302,7 @@ class Node:
 
         while attempts < max_attempts:
             attempts += 1
+            attempt_start = time.time()
 
             if attempts > 1:
                 ctx.info(
@@ -2261,8 +2325,18 @@ class Node:
                     self.config, dry_run=self.dry_run, hwm_state=hwm_state
                 )
 
+                attempt_duration = time.time() - attempt_start
+
                 if result.success:
+                    retry_history.append(
+                        {
+                            "attempt": attempts,
+                            "success": True,
+                            "duration": round(attempt_duration, 3),
+                        }
+                    )
                     result.metadata["attempts"] = attempts
+                    result.metadata["retry_history"] = retry_history
                     result.duration = time.time() - start_time
 
                     if self.config.cache and self.context.get(self.config.name) is not None:
@@ -2285,9 +2359,29 @@ class Node:
                     return result
 
                 last_error = result.error
+                retry_history.append(
+                    {
+                        "attempt": attempts,
+                        "success": False,
+                        "error": str(last_error) if last_error else "Unknown error",
+                        "error_type": type(last_error).__name__ if last_error else "Unknown",
+                        "duration": round(attempt_duration, 3),
+                    }
+                )
 
             except Exception as e:
+                attempt_duration = time.time() - attempt_start
                 last_error = e
+                retry_history.append(
+                    {
+                        "attempt": attempts,
+                        "success": False,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "duration": round(attempt_duration, 3),
+                    }
+                )
+
                 if attempts < max_attempts:
                     sleep_time = 1
                     if self.retry_config.backoff == "exponential":
@@ -2328,5 +2422,5 @@ class Node:
             success=False,
             duration=duration,
             error=error,
-            metadata={"attempts": attempts},
+            metadata={"attempts": attempts, "retry_history": retry_history},
         )

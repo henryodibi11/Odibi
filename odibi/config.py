@@ -2302,7 +2302,15 @@ class StoryConfig(BaseModel):
       connection: "local_data"
       path: "stories/"
       retention_days: 30
+      failure_sample_size: 100
+      max_failure_samples: 500
+      max_sampled_validations: 5
     ```
+
+    **Failure Sample Settings:**
+    - `failure_sample_size`: Number of failed rows to capture per validation (default: 100)
+    - `max_failure_samples`: Total failed rows across all validations (default: 500)
+    - `max_sampled_validations`: After this many validations, show only counts (default: 5)
     """
 
     connection: str = Field(
@@ -2314,6 +2322,26 @@ class StoryConfig(BaseModel):
     retention_days: Optional[int] = Field(default=30, ge=1, description="Days to keep stories")
     retention_count: Optional[int] = Field(
         default=100, ge=1, description="Max number of stories to keep"
+    )
+
+    # Failure sample settings (troubleshooting)
+    failure_sample_size: int = Field(
+        default=100,
+        ge=0,
+        le=1000,
+        description="Number of failed rows to capture per validation rule",
+    )
+    max_failure_samples: int = Field(
+        default=500,
+        ge=0,
+        le=5000,
+        description="Maximum total failed rows across all validations",
+    )
+    max_sampled_validations: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="After this many validations, show only counts (no samples)",
     )
 
     @model_validator(mode="after")

@@ -101,6 +101,133 @@ class TestNodeExecutionMetadata:
         assert result["rows_change"] == -50
         assert "duration" in result
 
+    def test_execution_steps(self):
+        """Should store execution steps."""
+        metadata = NodeExecutionMetadata(
+            node_name="test_node",
+            operation="transform",
+            status="success",
+            duration=1.0,
+            execution_steps=[
+                "Read from bronze_db",
+                "Applied pattern 'deduplicate'",
+                "Executed 2 pre-SQL statement(s)",
+            ],
+        )
+
+        assert len(metadata.execution_steps) == 3
+        assert "Read from bronze_db" in metadata.execution_steps
+
+        result = metadata.to_dict()
+        assert "execution_steps" in result
+        assert len(result["execution_steps"]) == 3
+
+    def test_error_traceback(self):
+        """Should store error traceback fields."""
+        metadata = NodeExecutionMetadata(
+            node_name="failed_node",
+            operation="sql",
+            status="failed",
+            duration=0.5,
+            error_message="Division by zero",
+            error_type="ZeroDivisionError",
+            error_traceback="Traceback (most recent call last):\n  File ...\nZeroDivisionError: division by zero",
+            error_traceback_cleaned="File ...\nZeroDivisionError: division by zero",
+        )
+
+        assert metadata.error_traceback is not None
+        assert "Traceback" in metadata.error_traceback
+        assert metadata.error_traceback_cleaned is not None
+        assert "Traceback" not in metadata.error_traceback_cleaned
+
+        result = metadata.to_dict()
+        assert "error_traceback" in result
+        assert "error_traceback_cleaned" in result
+
+    def test_retry_history(self):
+        """Should store retry history."""
+        metadata = NodeExecutionMetadata(
+            node_name="retried_node",
+            operation="read",
+            status="success",
+            duration=5.0,
+            retry_history=[
+                {"attempt": 1, "success": False, "error": "Connection timeout", "duration": 1.2},
+                {"attempt": 2, "success": False, "error": "Connection timeout", "duration": 2.4},
+                {"attempt": 3, "success": True, "duration": 0.8},
+            ],
+        )
+
+        assert len(metadata.retry_history) == 3
+        assert metadata.retry_history[0]["success"] is False
+        assert metadata.retry_history[2]["success"] is True
+
+        result = metadata.to_dict()
+        assert "retry_history" in result
+        assert len(result["retry_history"]) == 3
+
+    def test_failed_rows_samples(self):
+        """Should store failed rows samples per validation."""
+        metadata = NodeExecutionMetadata(
+            node_name="validated_node",
+            operation="validation",
+            status="failed",
+            duration=1.0,
+            failed_rows_samples={
+                "not_null_customer_id": [
+                    {"order_id": 123, "customer_id": None},
+                    {"order_id": 456, "customer_id": None},
+                ],
+                "positive_amount": [
+                    {"order_id": 789, "amount": -10.00},
+                ],
+            },
+            failed_rows_counts={
+                "not_null_customer_id": 150,
+                "positive_amount": 25,
+            },
+            failed_rows_truncated=False,
+            truncated_validations=[],
+        )
+
+        assert len(metadata.failed_rows_samples) == 2
+        assert "not_null_customer_id" in metadata.failed_rows_samples
+        assert len(metadata.failed_rows_samples["not_null_customer_id"]) == 2
+        assert metadata.failed_rows_counts["not_null_customer_id"] == 150
+
+        result = metadata.to_dict()
+        assert "failed_rows_samples" in result
+        assert "failed_rows_counts" in result
+
+    def test_failed_rows_truncation(self):
+        """Should track truncated validations."""
+        metadata = NodeExecutionMetadata(
+            node_name="validated_node",
+            operation="validation",
+            status="failed",
+            duration=1.0,
+            failed_rows_samples={
+                "val1": [{"id": 1}],
+                "val2": [{"id": 2}],
+            },
+            failed_rows_counts={
+                "val1": 100,
+                "val2": 200,
+                "val3": 300,
+                "val4": 400,
+            },
+            failed_rows_truncated=True,
+            truncated_validations=["val3", "val4"],
+        )
+
+        assert metadata.failed_rows_truncated is True
+        assert "val3" in metadata.truncated_validations
+        assert "val4" in metadata.truncated_validations
+
+        result = metadata.to_dict()
+        assert result["failed_rows_truncated"] is True
+        assert len(result["truncated_validations"]) == 2
+
 
 class TestPipelineStoryMetadata:
     """Tests for PipelineStoryMetadata class."""

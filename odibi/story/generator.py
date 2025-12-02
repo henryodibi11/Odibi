@@ -319,7 +319,15 @@ class StoryGenerator:
             columns_removed=meta.get("columns_removed", []),
             error_message=str(result.error) if result.error else None,
             error_type=type(result.error).__name__ if result.error else None,
+            error_traceback=meta.get("error_traceback"),
+            error_traceback_cleaned=meta.get("error_traceback_cleaned"),
             validation_warnings=meta.get("validation_warnings", []),
+            execution_steps=meta.get("steps", []),
+            failed_rows_samples=meta.get("failed_rows_samples", {}),
+            failed_rows_counts=meta.get("failed_rows_counts", {}),
+            failed_rows_truncated=meta.get("failed_rows_truncated", False),
+            truncated_validations=meta.get("truncated_validations", []),
+            retry_history=meta.get("retry_history", []),
         )
 
         # Calculate derived metrics

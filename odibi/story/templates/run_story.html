@@ -299,6 +299,131 @@
                     <div style="background: #fff5f5; color: #c92a2a; padding: 15px; border-radius: 4px; border: 1px solid #ffa8a8; margin-bottom: 20px;">
                         <strong>Error: {{ node.error_type }}</strong>
                         <pre style="background: none; color: #c92a2a; padding: 0; margin-top: 10px;">{{ node.error_message }}</pre>
+                        
+                        {% if node.error_traceback_cleaned %}
+                        <details style="margin-top: 15px;">
+                            <summary style="cursor: pointer; font-weight: 600; color: #c92a2a;">Show Traceback (Cleaned)</summary>
+                            <pre style="background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; margin-top: 10px; overflow-x: auto; font-size: 0.85em;">{{ node.error_traceback_cleaned }}</pre>
+                        </details>
+                        {% endif %}
+                        
+                        {% if node.error_traceback %}
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; font-weight: 500; color: #999; font-size: 0.9em;">Show Full Traceback (Raw)</summary>
+                            <pre style="background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; margin-top: 10px; overflow-x: auto; font-size: 0.8em; max-height: 400px; overflow-y: auto;">{{ node.error_traceback }}</pre>
+                        </details>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if node.execution_steps %}
+                    <div style="margin-bottom: 20px; border: 1px solid #e1e4e8; border-radius: 6px; overflow: hidden;">
+                        <details open>
+                            <summary style="background: #f8f9fa; padding: 10px 15px; cursor: pointer; font-weight: 600; color: #333;">
+                                🔧 Execution Steps ({{ node.execution_steps|length }})
+                            </summary>
+                            <div style="padding: 15px;">
+                                <ol style="margin: 0; padding-left: 20px; font-size: 0.9em; color: #555;">
+                                    {% for step in node.execution_steps %}
+                                    <li style="padding: 4px 0;">{{ step }}</li>
+                                    {% endfor %}
+                                </ol>
+                            </div>
+                        </details>
+                    </div>
+                    {% endif %}
+
+                    {% if node.retry_history and node.retry_history|length > 1 %}
+                    <div style="margin-bottom: 20px; border: 1px solid #ffe066; border-radius: 6px; overflow: hidden;">
+                        <details open>
+                            <summary style="background: #fff9db; padding: 10px 15px; cursor: pointer; font-weight: 600; color: #e0a800;">
+                                🔄 Retry History ({{ node.retry_history|length }} attempts)
+                            </summary>
+                            <div style="padding: 15px;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                                    <thead>
+                                        <tr>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e1e4e8;">Attempt</th>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e1e4e8;">Status</th>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e1e4e8;">Duration</th>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e1e4e8;">Error</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for attempt in node.retry_history %}
+                                        <tr>
+                                            <td style="padding: 8px; border-bottom: 1px solid #eee;">#{{ attempt.attempt }}</td>
+                                            <td style="padding: 8px; border-bottom: 1px solid #eee;">
+                                                {% if attempt.success %}
+                                                <span class="badge badge-green">✓ Success</span>
+                                                {% else %}
+                                                <span class="badge badge-red">✗ Failed</span>
+                                                {% endif %}
+                                            </td>
+                                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{{ attempt.duration }}s</td>
+                                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-family: var(--mono-font); font-size: 0.85em; color: #c92a2a;">
+                                                {% if attempt.error %}{{ attempt.error|truncate(100) }}{% else %}-{% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    </div>
+                    {% endif %}
+
+                    {% if node.failed_rows_samples %}
+                    <div style="margin-bottom: 20px; border: 1px solid #ffa8a8; border-radius: 6px; overflow: hidden;">
+                        <details>
+                            <summary style="background: #fff5f5; padding: 10px 15px; cursor: pointer; font-weight: 600; color: #c92a2a;">
+                                ❌ Failed Rows Samples ({{ node.failed_rows_samples|length }} validation{% if node.failed_rows_samples|length > 1 %}s{% endif %})
+                                {% if node.failed_rows_truncated %}<span style="font-weight: normal; font-size: 0.85em;">(truncated)</span>{% endif %}
+                            </summary>
+                            <div style="padding: 15px;">
+                                {% for validation_name, rows in node.failed_rows_samples.items() %}
+                                <div style="margin-bottom: 20px;">
+                                    <h5 style="margin: 0 0 10px 0; color: #c92a2a; font-size: 0.95em;">
+                                        {{ validation_name }}
+                                        {% if node.failed_rows_counts and node.failed_rows_counts[validation_name] %}
+                                        <span style="font-weight: normal; color: #999;">({{ node.failed_rows_counts[validation_name] }} total failed)</span>
+                                        {% endif %}
+                                    </h5>
+                                    {% if rows|length > 0 %}
+                                    <div style="overflow-x: auto; border: 1px solid #ffa8a8; border-radius: 4px;">
+                                        <table style="width: 100%; margin: 0; font-size: 0.85em;">
+                                            <thead>
+                                                <tr style="background: #fff5f5;">
+                                                    {% for key in rows[0].keys() %}<th style="padding: 6px 10px;">{{ key }}</th>{% endfor %}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for row in rows %}
+                                                <tr>
+                                                    {% for val in row.values() %}<td style="padding: 6px 10px; border-top: 1px solid #ffa8a8;">{{ val }}</td>{% endfor %}
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <p style="color: #999; font-style: italic; margin: 0;">No sample data available</p>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                                
+                                {% if node.truncated_validations %}
+                                <div style="padding: 10px; background: #f8f9fa; border-radius: 4px; color: #666; font-size: 0.9em;">
+                                    <strong>{{ node.truncated_validations|length }} more validation{% if node.truncated_validations|length > 1 %}s{% endif %} failed</strong> (showing counts only):
+                                    <ul style="margin: 5px 0 0 0; padding-left: 20px;">
+                                        {% for val_name in node.truncated_validations %}
+                                        <li>{{ val_name }}: {{ node.failed_rows_counts.get(val_name, 'N/A') }} failed rows</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </details>
                     </div>
                     {% endif %}
 
@@ -444,13 +569,24 @@
                 <!-- Tab: SQL -->
                 {% if node.executed_sql %}
                 <div id="sql-{{ loop.index }}" class="tab-content">
+                    <h4 style="margin: 0 0 15px 0; color: #333;">
+                        💾 Executed SQL ({{ node.executed_sql|length }} statement{% if node.executed_sql|length > 1 %}s{% endif %})
+                    </h4>
                     {% for sql in node.executed_sql %}
-                    <div style="margin-bottom: 20px;">
-                        <pre>{{ sql }}</pre>
-                    </div>
+                    <details {% if loop.first %}open{% endif %} style="margin-bottom: 15px;">
+                        <summary style="cursor: pointer; padding: 8px; background: #f8f9fa; border: 1px solid #e1e4e8; border-radius: 4px; font-weight: 500; font-size: 0.9em;">
+                            Statement #{{ loop.index }}
+                            {% if sql|length > 100 %}
+                            <span style="color: #666; font-weight: normal;"> - {{ sql[:50]|replace('\n', ' ') }}...</span>
+                            {% endif %}
+                        </summary>
+                        <pre style="margin-top: 10px; border-left: 3px solid var(--primary-color);">{{ sql }}</pre>
+                    </details>
                     {% endfor %}
                     {% if node.sql_hash %}
-                    <div style="margin-top: 10px; color: #999; font-size: 0.8em;">Hash: {{ node.sql_hash }}</div>
+                    <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; color: #666; font-size: 0.85em;">
+                        <strong>SQL Hash:</strong> <code style="background: #e9ecef; padding: 2px 6px; border-radius: 3px;">{{ node.sql_hash }}</code>
+                    </div>
                     {% endif %}
                 </div>
                 {% endif %}

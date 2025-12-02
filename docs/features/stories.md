@@ -18,20 +18,28 @@ Odibi's Story system provides:
 
 ```yaml
 story:
-  output_path: stories/
+  connection: "local_data"
+  path: "stories/"
   max_sample_rows: 10
   retention_days: 30
   retention_count: 100
+  failure_sample_size: 100
+  max_failure_samples: 500
+  max_sampled_validations: 5
 ```
 
 ### Story Config Options
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `output_path` | string | No | `stories/` | Directory for story output (local or remote) |
+| `connection` | string | Yes | - | Connection name for story output |
+| `path` | string | Yes | - | Path for stories (relative to connection base_path) |
 | `max_sample_rows` | int | No | `10` | Maximum rows to include in samples |
 | `retention_days` | int | No | `30` | Days to keep stories before cleanup |
 | `retention_count` | int | No | `100` | Maximum number of stories to retain |
+| `failure_sample_size` | int | No | `100` | Rows to capture per validation failure |
+| `max_failure_samples` | int | No | `500` | Total failed rows across all validations |
+| `max_sampled_validations` | int | No | `5` | After this many validations, show only counts |
 | `theme` | string | No | `default` | Theme name or path to YAML theme file |
 | `include_samples` | bool | No | `true` | Whether to include data samples |
 
@@ -123,6 +131,67 @@ Error details for failed nodes:
 ```yaml
 error_type: ValueError
 error_message: "Column 'order_id' contains duplicate values"
+error_traceback: "Full Python traceback..."
+error_traceback_cleaned: "Cleaned traceback (Spark/Java noise removed)"
+```
+
+### Execution Steps
+
+Stories capture the execution steps taken during node processing for debugging:
+
+```yaml
+execution_steps:
+  - "Read from bronze_db"
+  - "Applied pattern 'deduplicate'"
+  - "Executed 2 pre-SQL statement(s)"
+  - "Passed 3 contract checks"
+```
+
+### Failed Rows Samples
+
+When validations fail, stories capture sample rows that failed each validation:
+
+```yaml
+failed_rows_samples:
+  not_null_customer_id:
+    - { order_id: 123, customer_id: null, amount: 50.00 }
+    - { order_id: 456, customer_id: null, amount: 75.00 }
+  positive_amount:
+    - { order_id: 789, customer_id: "C001", amount: -10.00 }
+
+failed_rows_counts:
+  not_null_customer_id: 150
+  positive_amount: 25
+```
+
+Configure failure sample limits:
+
+```yaml
+story:
+  failure_sample_size: 100        # Max rows per validation
+  max_failure_samples: 500        # Total rows across all validations
+  max_sampled_validations: 5      # After 5 validations, show only counts
+```
+
+### Retry History
+
+When retries occur, the full history is captured:
+
+```yaml
+retry_history:
+  - attempt: 1
+    success: false
+    error: "Connection timeout"
+    error_type: "TimeoutError"
+    duration: 1.2
+  - attempt: 2
+    success: false
+    error: "Connection timeout"
+    error_type: "TimeoutError"
+    duration: 2.4
+  - attempt: 3
+    success: true
+    duration: 0.8
 ```
 
 ### Delta Lake Info
