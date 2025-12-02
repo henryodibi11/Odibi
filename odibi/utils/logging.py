@@ -15,7 +15,6 @@ import logging
 import sys
 from datetime import datetime
 
-
 try:
     from rich.console import Console
     from rich.logging import RichHandler

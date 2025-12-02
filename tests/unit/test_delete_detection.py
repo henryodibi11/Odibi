@@ -7,9 +7,10 @@ Covers:
 3. Metadata column tests (add_write_metadata)
 """
 
+from unittest.mock import MagicMock, patch
+
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock, patch
 
 from odibi.config import (
     DeleteDetectionConfig,
@@ -24,7 +25,6 @@ from odibi.transformers.delete_detection import (
     DeleteThresholdExceeded,
     detect_deletes,
 )
-
 
 # ============================================================
 # Section 1: Config Validation Tests

@@ -4,7 +4,6 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-
 from odibi.pipeline import PipelineManager
 from odibi.utils.extensions import load_extensions
 from odibi.utils.logging import logger

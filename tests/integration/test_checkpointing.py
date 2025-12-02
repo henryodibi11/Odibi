@@ -119,7 +119,7 @@ class TestCheckpointing:
             pipeline.context = context
 
             # Inject mock ProjectConfig for state management
-            from odibi.config import ProjectConfig, SystemConfig, StoryConfig
+            from odibi.config import ProjectConfig, StoryConfig, SystemConfig
 
             pipeline.project_config = ProjectConfig(
                 project="test_project",

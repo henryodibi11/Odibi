@@ -1000,9 +1000,7 @@ class PandasEngine(Engine):
             for col in df_avro.columns:
                 if pd.api.types.is_datetime64_any_dtype(df_avro[col].dtype):
                     df_avro[col] = df_avro[col].apply(
-                        lambda x: int(x.timestamp() * 1_000_000)
-                        if pd.notna(x)
-                        else None
+                        lambda x: int(x.timestamp() * 1_000_000) if pd.notna(x) else None
                     )
 
             records = df_avro.to_dict("records")
@@ -1505,9 +1503,7 @@ class PandasEngine(Engine):
                     "type": "long",
                     "logicalType": "timestamp-micros",
                 }
-            elif dtype_str == "date" or (
-                hasattr(dtype, "name") and "date" in dtype.name.lower()
-            ):
+            elif dtype_str == "date" or (hasattr(dtype, "name") and "date" in dtype.name.lower()):
                 avro_type = {
                     "type": "int",
                     "logicalType": "date",

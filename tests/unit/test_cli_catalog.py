@@ -1,15 +1,15 @@
 """Tests for catalog CLI command."""
 
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 import pandas as pd
-from datetime import datetime, timezone
 
 from odibi.cli.catalog import (
+    _format_output,
+    _format_table,
     add_catalog_parser,
     catalog_command,
-    _format_table,
-    _format_output,
 )
 
 
