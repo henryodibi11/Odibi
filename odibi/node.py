@@ -1899,11 +1899,15 @@ class NodeExecutor:
     def _get_shape(self, df: Any) -> tuple:
         return self.engine.get_shape(df)
 
-    def _count_rows(self, df: Any) -> int:
+    def _count_rows(self, df: Any) -> Optional[int]:
+        if df is not None and getattr(df, "isStreaming", False):
+            return None
         return self.engine.count_rows(df)
 
     def _get_column_max(self, df: Any, column: str, fallback_column: Optional[str] = None) -> Any:
         """Get maximum value of a column, with optional fallback for NULL values."""
+        if df is not None and getattr(df, "isStreaming", False):
+            return None
         if hasattr(self.engine, "spark"):
             from pyspark.sql import functions as F
 
