@@ -697,6 +697,30 @@ class TestPandasEngineAvroSchema:
         assert name_to_type["s"] == "string"
         assert isinstance(name_to_type["s2"], list) and "string" in name_to_type["s2"]
 
+    def test_infer_avro_schema_datetime(self, engine):
+        """Infer Avro schema with datetime columns uses logical types."""
+        df = pd.DataFrame(
+            {
+                "id": [1, 2],
+                "created_at": pd.to_datetime(["2024-01-01", "2024-01-02"]),
+                "updated_at": pd.to_datetime(["2024-01-01 10:00:00", None]),
+            }
+        )
+
+        schema = engine._infer_avro_schema(df)
+        name_to_type = {f["name"]: f["type"] for f in schema["fields"]}
+
+        # Non-nullable datetime should be timestamp-micros
+        assert name_to_type["created_at"]["type"] == "long"
+        assert name_to_type["created_at"]["logicalType"] == "timestamp-micros"
+
+        # Nullable datetime should be union with timestamp-micros
+        assert isinstance(name_to_type["updated_at"], list)
+        assert "null" in name_to_type["updated_at"]
+        ts_type = [t for t in name_to_type["updated_at"] if t != "null"][0]
+        assert ts_type["type"] == "long"
+        assert ts_type["logicalType"] == "timestamp-micros"
+
 
 # ========================
 # Delta Lake Utilities

@@ -995,7 +995,17 @@ class PandasEngine(Engine):
             except ImportError:
                 raise ImportError("Avro support requires 'pip install fastavro'")
 
-            records = df.to_dict("records")
+            # Convert datetime columns to microseconds for Avro timestamp-micros
+            df_avro = df.copy()
+            for col in df_avro.columns:
+                if pd.api.types.is_datetime64_any_dtype(df_avro[col].dtype):
+                    df_avro[col] = df_avro[col].apply(
+                        lambda x: int(x.timestamp() * 1_000_000)
+                        if pd.notna(x)
+                        else None
+                    )
+
+            records = df_avro.to_dict("records")
             schema = self._infer_avro_schema(df)
 
             # Use fsspec for remote URIs (abfss://, s3://, etc.)
@@ -1486,8 +1496,29 @@ class PandasEngine(Engine):
 
         fields = []
         for col in df.columns:
-            dtype_str = str(df[col].dtype)
-            avro_type = type_mapping.get(dtype_str, "string")
+            dtype = df[col].dtype
+            dtype_str = str(dtype)
+
+            # Handle datetime types with Avro logical types
+            if pd.api.types.is_datetime64_any_dtype(dtype):
+                avro_type = {
+                    "type": "long",
+                    "logicalType": "timestamp-micros",
+                }
+            elif dtype_str == "date" or (
+                hasattr(dtype, "name") and "date" in dtype.name.lower()
+            ):
+                avro_type = {
+                    "type": "int",
+                    "logicalType": "date",
+                }
+            elif pd.api.types.is_timedelta64_dtype(dtype):
+                avro_type = {
+                    "type": "long",
+                    "logicalType": "time-micros",
+                }
+            else:
+                avro_type = type_mapping.get(dtype_str, "string")
 
             # Handle nullable columns
             if df[col].isnull().any():
