@@ -467,13 +467,23 @@ class NodeExecutor:
 
             # Filter
             if last_hwm is not None:
-                # Apply filter: col > last_hwm
-                df = self.engine.filter_greater_than(df, inc.column, last_hwm)
-                self._execution_steps.append(f"Incremental: Filtered {inc.column} > {last_hwm}")
+                # Apply filter: col > last_hwm (with fallback if configured)
+                if inc.fallback_column and hasattr(self.engine, "filter_coalesce"):
+                    df = self.engine.filter_coalesce(
+                        df, inc.column, inc.fallback_column, ">", last_hwm
+                    )
+                    self._execution_steps.append(
+                        f"Incremental: Filtered COALESCE({inc.column}, "
+                        f"{inc.fallback_column}) > {last_hwm}"
+                    )
+                else:
+                    df = self.engine.filter_greater_than(df, inc.column, last_hwm)
+                    self._execution_steps.append(
+                        f"Incremental: Filtered {inc.column} > {last_hwm}"
+                    )
 
-            # Capture new HWM
-            # Get max value of column
-            new_max = self._get_column_max(df, inc.column)
+            # Capture new HWM (use fallback column if configured)
+            new_max = self._get_column_max(df, inc.column, inc.fallback_column)
 
             if new_max is not None:
                 return df, (state_key, new_max)
@@ -1572,31 +1582,40 @@ class NodeExecutor:
     def _count_rows(self, df: Any) -> int:
         return self.engine.count_rows(df)
 
-    def _get_column_max(self, df: Any, column: str) -> Any:
-        """Get maximum value of a column."""
+    def _get_column_max(self, df: Any, column: str, fallback_column: Optional[str] = None) -> Any:
+        """Get maximum value of a column, with optional fallback for NULL values."""
         if hasattr(self.engine, "spark"):
             from pyspark.sql import functions as F
 
             try:
-                row = df.select(F.max(column)).first()
+                if fallback_column:
+                    coalesce_col = F.coalesce(F.col(column), F.col(fallback_column))
+                    row = df.select(F.max(coalesce_col)).first()
+                else:
+                    row = df.select(F.max(column)).first()
                 return row[0] if row else None
             except Exception:
                 return None
         else:
             try:
-                if column in df.columns:
-                    val = df[column].max()
-                    import numpy as np
-                    import pandas as pd
+                import numpy as np
+                import pandas as pd
 
-                    if pd.isna(val):
-                        return None
-                    if isinstance(val, (np.integer, np.floating)):
-                        return val.item()
-                    if isinstance(val, np.datetime64):
-                        return str(val)
-                    return val
-                return None
+                if fallback_column and fallback_column in df.columns:
+                    combined = df[column].combine_first(df[fallback_column])
+                    val = combined.max()
+                elif column in df.columns:
+                    val = df[column].max()
+                else:
+                    return None
+
+                if pd.isna(val):
+                    return None
+                if isinstance(val, (np.integer, np.floating)):
+                    return val.item()
+                if isinstance(val, np.datetime64):
+                    return str(val)
+                return val
             except Exception:
                 return None
 
