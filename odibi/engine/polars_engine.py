@@ -136,6 +136,7 @@ class PolarsEngine(Engine):
         path: Optional[str] = None,
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
+        streaming_config: Optional[Any] = None,
     ) -> None:
         """Write data using Polars."""
         options = options or {}

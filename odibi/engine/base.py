@@ -71,6 +71,7 @@ class Engine(ABC):
         path: Optional[str] = None,
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
+        streaming_config: Optional[Any] = None,
     ) -> None:
         """Write data to destination.
 

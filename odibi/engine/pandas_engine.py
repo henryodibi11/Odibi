@@ -548,6 +548,7 @@ class PandasEngine(Engine):
         register_table: Optional[str] = None,
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
+        streaming_config: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """Write data using Pandas."""
         ctx = get_logging_context().with_context(engine="pandas")
