@@ -395,6 +395,7 @@ class NodeExecutor:
                 table=read_config.table,
                 path=read_config.path,
                 streaming=read_config.streaming,
+                schema=getattr(read_config, "schema_ddl", None),
                 options=read_options,
                 as_of_version=as_of_version,
                 as_of_timestamp=as_of_timestamp,
