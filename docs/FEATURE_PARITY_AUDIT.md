@@ -93,20 +93,31 @@ But these flags **do not exist** in the CLI.
 
 ---
 
-### 5. Streaming Write Not Implemented (Read Only)
+### 5. ~~Streaming Write Not Implemented (Read Only)~~ ✅ FIXED
 
-**Location:** `odibi/engine/spark_engine.py`
+**Location:** `odibi/engine/spark_engine.py`, `odibi/config.py`
 
-**Issue:** Streaming **read** is supported via `readStream`, but streaming **write** is not implemented - `write()` method doesn't handle streaming DataFrames.
+**Status:** ✅ Implemented
 
-**Evidence:**
-- Read supports streaming: [spark_engine.py#L506-L507](file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/engine/spark_engine.py#L506-L507)
-- Write has no streaming handling (only batch write modes)
-- Config allows `streaming: true` at node level
+**Implementation:**
+- Added `StreamingWriteConfig` and `TriggerConfig` models in `config.py`
+- Added `streaming` field to `WriteConfig`
+- Implemented `_write_streaming()` method in `SparkEngine`
+- Supports all trigger types: `processing_time`, `once`, `available_now`, `continuous`
+- Supports all output modes: `append`, `update`, `complete`
 
-**Impact:** Streaming pipelines will fail on write phase.
-
-**Fix:** Add `writeStream` handling in `write()` method for streaming DataFrames.
+**Usage:**
+```yaml
+write:
+  connection: delta_lake
+  format: delta
+  table: events_stream
+  streaming:
+    output_mode: append
+    checkpoint_location: "/checkpoints/events"
+    trigger:
+      processing_time: "10 seconds"
+```
 
 ---
 

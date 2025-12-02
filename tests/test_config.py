@@ -10,7 +10,9 @@ from odibi.config import (
     PipelineConfig,
     ProjectConfig,
     ReadConfig,
+    StreamingWriteConfig,
     TransformConfig,
+    TriggerConfig,
     WriteConfig,
     WriteMode,
 )
@@ -91,6 +93,131 @@ class TestWriteConfig:
             connection="local", format="csv", path="output.csv", mode=WriteMode.APPEND
         )
         assert config.mode == WriteMode.APPEND
+
+    def test_write_config_with_streaming(self):
+        """Write config with streaming configuration."""
+        config = WriteConfig(
+            connection="delta",
+            format="delta",
+            table="events_stream",
+            streaming=StreamingWriteConfig(
+                output_mode="append",
+                checkpoint_location="/checkpoints/events",
+            ),
+        )
+        assert config.streaming is not None
+        assert config.streaming.output_mode == "append"
+        assert config.streaming.checkpoint_location == "/checkpoints/events"
+
+    def test_write_config_streaming_with_trigger(self):
+        """Write config with streaming and trigger."""
+        config = WriteConfig(
+            connection="delta",
+            format="delta",
+            table="events_stream",
+            streaming=StreamingWriteConfig(
+                output_mode="append",
+                checkpoint_location="/checkpoints/events",
+                trigger=TriggerConfig(processing_time="10 seconds"),
+            ),
+        )
+        assert config.streaming.trigger is not None
+        assert config.streaming.trigger.processing_time == "10 seconds"
+
+    def test_write_config_streaming_once_trigger(self):
+        """Write config with once trigger for batch-like streaming."""
+        config = WriteConfig(
+            connection="delta",
+            format="delta",
+            table="events_batch",
+            streaming=StreamingWriteConfig(
+                output_mode="append",
+                checkpoint_location="/checkpoints/events_batch",
+                trigger=TriggerConfig(once=True),
+                await_termination=True,
+            ),
+        )
+        assert config.streaming.trigger.once is True
+        assert config.streaming.await_termination is True
+
+
+class TestStreamingWriteConfig:
+    """Test StreamingWriteConfig validation."""
+
+    def test_valid_streaming_write_config(self):
+        """Valid streaming config should parse correctly."""
+        config = StreamingWriteConfig(
+            output_mode="append",
+            checkpoint_location="/checkpoints/test",
+        )
+        assert config.output_mode == "append"
+        assert config.checkpoint_location == "/checkpoints/test"
+        assert config.trigger is None
+        assert config.await_termination is False
+
+    def test_streaming_write_config_default_output_mode(self):
+        """Default output mode should be append."""
+        config = StreamingWriteConfig(checkpoint_location="/checkpoints/test")
+        assert config.output_mode == "append"
+
+    def test_streaming_write_config_with_query_name(self):
+        """Streaming config with query name."""
+        config = StreamingWriteConfig(
+            checkpoint_location="/checkpoints/test",
+            query_name="my_streaming_query",
+        )
+        assert config.query_name == "my_streaming_query"
+
+    def test_streaming_write_config_complete_mode(self):
+        """Streaming config with complete output mode."""
+        config = StreamingWriteConfig(
+            output_mode="complete",
+            checkpoint_location="/checkpoints/test",
+        )
+        assert config.output_mode == "complete"
+
+    def test_streaming_write_requires_checkpoint_location(self):
+        """Streaming config requires checkpoint_location."""
+        with pytest.raises(ValidationError):
+            StreamingWriteConfig(output_mode="append")
+
+
+class TestTriggerConfig:
+    """Test TriggerConfig validation."""
+
+    def test_processing_time_trigger(self):
+        """Processing time trigger should parse correctly."""
+        config = TriggerConfig(processing_time="10 seconds")
+        assert config.processing_time == "10 seconds"
+        assert config.once is None
+
+    def test_once_trigger(self):
+        """Once trigger should parse correctly."""
+        config = TriggerConfig(once=True)
+        assert config.once is True
+        assert config.processing_time is None
+
+    def test_available_now_trigger(self):
+        """Available now trigger should parse correctly."""
+        config = TriggerConfig(available_now=True)
+        assert config.available_now is True
+
+    def test_continuous_trigger(self):
+        """Continuous trigger should parse correctly."""
+        config = TriggerConfig(continuous="1 second")
+        assert config.continuous == "1 second"
+
+    def test_multiple_triggers_raises_error(self):
+        """Only one trigger type can be specified."""
+        with pytest.raises(ValidationError) as exc_info:
+            TriggerConfig(processing_time="10 seconds", once=True)
+        assert "specify exactly one" in str(exc_info.value)
+
+    def test_empty_trigger_is_valid(self):
+        """Empty trigger config is valid (defaults to processing as fast as possible)."""
+        config = TriggerConfig()
+        assert config.processing_time is None
+        assert config.once is None
 
 
 class TestTransformConfig:

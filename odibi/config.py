@@ -893,6 +893,14 @@ class ReadConfig(BaseModel):
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based sources")
     streaming: bool = Field(default=False, description="Enable streaming read (Spark only)")
+    schema_ddl: Optional[str] = Field(
+        default=None,
+        description=(
+            "Schema for streaming reads from file sources (required for Avro, JSON, CSV). "
+            "Use Spark DDL format: 'col1 STRING, col2 INT, col3 TIMESTAMP'. "
+            "Not required for Delta (schema is inferred from table metadata)."
+        ),
+    )
     query: Optional[str] = Field(
         default=None,
         description="SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector.",
@@ -1557,6 +1565,141 @@ class AutoOptimizeConfig(BaseModel):
     )
 
 
+class TriggerConfig(BaseModel):
+    """
+    Configuration for streaming trigger intervals.
+
+    Specify exactly one of the trigger options.
+
+    Example:
+    ```yaml
+    trigger:
+      processing_time: "10 seconds"
+    ```
+
+    Or for one-time processing:
+    ```yaml
+    trigger:
+      once: true
+    ```
+    """
+
+    processing_time: Optional[str] = Field(
+        default=None,
+        description="Trigger interval as duration string (e.g., '10 seconds', '1 minute')",
+    )
+    once: Optional[bool] = Field(
+        default=None,
+        description="Process all available data once and stop",
+    )
+    available_now: Optional[bool] = Field(
+        default=None,
+        description="Process all available data in multiple batches, then stop",
+    )
+    continuous: Optional[str] = Field(
+        default=None,
+        description="Continuous processing with checkpoint interval (e.g., '1 second')",
+    )
+
+    @model_validator(mode="after")
+    def check_exactly_one_trigger(self):
+        """Ensure exactly one trigger type is specified."""
+        triggers = [
+            self.processing_time is not None,
+            self.once is True,
+            self.available_now is True,
+            self.continuous is not None,
+        ]
+        if sum(triggers) > 1:
+            raise ValueError(
+                "TriggerConfig: specify exactly one of 'processing_time', 'once', "
+                "'available_now', or 'continuous'"
+            )
+        return self
+
+
+class StreamingWriteConfig(BaseModel):
+    """
+    Configuration for Spark Structured Streaming writes.
+
+    ### 🚀 "Real-Time Pipeline" Guide
+
+    **Business Problem:**
+    "I need to process data continuously as it arrives from Kafka/Event Hubs
+    and write it to Delta Lake in near real-time."
+
+    **The Solution:**
+    Configure streaming write with checkpoint location for fault tolerance
+    and trigger interval for processing frequency.
+
+    **Recipe: Streaming Ingestion**
+    ```yaml
+    write:
+      connection: "silver_lake"
+      format: "delta"
+      table: "events_stream"
+      streaming:
+        output_mode: append
+        checkpoint_location: "/checkpoints/events_stream"
+        trigger:
+          processing_time: "10 seconds"
+    ```
+
+    **Recipe: One-Time Streaming (Batch-like)**
+    ```yaml
+    write:
+      connection: "silver_lake"
+      format: "delta"
+      table: "events_batch"
+      streaming:
+        output_mode: append
+        checkpoint_location: "/checkpoints/events_batch"
+        trigger:
+          available_now: true
+    ```
+    """
+
+    output_mode: Literal["append", "update", "complete"] = Field(
+        default="append",
+        description=(
+            "Output mode for streaming writes. "
+            "'append' - Only new rows. 'update' - Updated rows only. "
+            "'complete' - Entire result table (requires aggregation)."
+        ),
+    )
+    checkpoint_location: str = Field(
+        description=(
+            "Path for streaming checkpoints. Required for fault tolerance. "
+            "Must be a reliable storage location (e.g., cloud storage, DBFS)."
+        ),
+    )
+    trigger: Optional[TriggerConfig] = Field(
+        default=None,
+        description=(
+            "Trigger configuration. If not specified, processes data as fast as possible. "
+            "Use 'processing_time' for micro-batch intervals, 'once' for single batch, "
+            "'available_now' for processing all available data then stopping."
+        ),
+    )
+    query_name: Optional[str] = Field(
+        default=None,
+        description="Name for the streaming query (useful for monitoring and debugging)",
+    )
+    await_termination: Optional[bool] = Field(
+        default=False,
+        description=(
+            "Wait for the streaming query to terminate. "
+            "Set to True for batch-like streaming with 'once' or 'available_now' triggers."
+        ),
+    )
+    timeout_seconds: Optional[int] = Field(
+        default=None,
+        description=(
+            "Timeout in seconds when await_termination is True. If None, waits indefinitely."
+        ),
+    )
+
+
 class WriteConfig(BaseModel):
     """
     Configuration for writing data.
@@ -1664,6 +1807,14 @@ class WriteConfig(BaseModel):
         description=(
             "Columns to sort by before hashing for deterministic comparison. "
             "Required if row order may vary between runs. Typically your business key columns."
+        ),
+    )
+    streaming: Optional[StreamingWriteConfig] = Field(
+        default=None,
+        description=(
+            "Streaming write configuration for Spark Structured Streaming. "
+            "When set, uses writeStream instead of batch write. "
+            "Requires a streaming DataFrame from a streaming read source."
         ),
     )
 

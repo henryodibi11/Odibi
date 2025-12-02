@@ -660,6 +660,7 @@ read:
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based sources |
 | **streaming** | bool | No | `False` | Enable streaming read (Spark only) |
+| **schema_ddl** | Optional[str] | No | - | Schema for streaming reads from file sources (required for Avro, JSON, CSV). Use Spark DDL format: 'col1 STRING, col2 INT, col3 TIMESTAMP'. Not required for Delta (schema is inferred from table metadata). |
 | **query** | Optional[str] | No | - | SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector. |
 | **incremental** | Optional[[IncrementalConfig](#incrementalconfig)] | No | - | Automatic incremental loading strategy (CDC-like). If set, generates query based on target state (HWM). |
 | **time_travel** | Optional[[TimeTravelConfig](#timetravelconfig)] | No | - | Time travel options (Delta only) |
@@ -1130,6 +1131,7 @@ write:
 | **skip_if_unchanged** | bool | No | `False` | Skip write if DataFrame content is identical to previous write. Computes SHA256 hash of entire DataFrame and compares to stored hash in Delta table metadata. Useful for snapshot tables without timestamps to avoid redundant appends. Only supported for Delta format. |
 | **skip_hash_columns** | Optional[List[str]] | No | - | Columns to include in hash computation for skip_if_unchanged. If None, all columns are used. Specify a subset to ignore volatile columns like timestamps. |
 | **skip_hash_sort_columns** | Optional[List[str]] | No | - | Columns to sort by before hashing for deterministic comparison. Required if row order may vary between runs. Typically your business key columns. |
+| **streaming** | Optional[[StreamingWriteConfig](#streamingwriteconfig)] | No | - | Streaming write configuration for Spark Structured Streaming. When set, uses writeStream instead of batch write. Requires a streaming DataFrame from a streaming read source. |
 
 ---
 
@@ -1180,6 +1182,105 @@ write:
 | **source_file** | bool | No | `True` | Add _source_file column with source filename (file sources only) |
 | **source_connection** | bool | No | `False` | Add _source_connection column with connection name |
 | **source_table** | bool | No | `False` | Add _source_table column with table/query name (SQL sources only) |
+
+---
+
+### `StreamingWriteConfig`
+> *Used in: [WriteConfig](#writeconfig)*
+
+Configuration for Spark Structured Streaming writes.
+
+### 🚀 "Real-Time Pipeline" Guide
+
+**Business Problem:**
+"I need to process data continuously as it arrives from Kafka/Event Hubs
+and write it to Delta Lake in near real-time."
+
+**The Solution:**
+Configure streaming write with checkpoint location for fault tolerance
+and trigger interval for processing frequency.
+
+**Recipe: Streaming Ingestion**
+```yaml
+write:
+  connection: "silver_lake"
+  format: "delta"
+  table: "events_stream"
+  streaming:
+    output_mode: append
+    checkpoint_location: "/checkpoints/events_stream"
+    trigger:
+      processing_time: "10 seconds"
+```
+
+**Recipe: One-Time Streaming (Batch-like)**
+```yaml
+write:
+  connection: "silver_lake"
+  format: "delta"
+  table: "events_batch"
+  streaming:
+    output_mode: append
+    checkpoint_location: "/checkpoints/events_batch"
+    trigger:
+      available_now: true
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **output_mode** | Literal['append', 'update', 'complete'] | No | `append` | Output mode for streaming writes. 'append' - Only new rows. 'update' - Updated rows only. 'complete' - Entire result table (requires aggregation). |
+| **checkpoint_location** | str | Yes | - | Path for streaming checkpoints. Required for fault tolerance. Must be a reliable storage location (e.g., cloud storage, DBFS). |
+| **trigger** | Optional[[TriggerConfig](#triggerconfig)] | No | - | Trigger configuration. If not specified, processes data as fast as possible. Use 'processing_time' for micro-batch intervals, 'once' for single batch, 'available_now' for processing all available data then stopping. |
+| **query_name** | Optional[str] | No | - | Name for the streaming query (useful for monitoring and debugging) |
+| **await_termination** | Optional[bool] | No | `False` | Wait for the streaming query to terminate. Set to True for batch-like streaming with 'once' or 'available_now' triggers. |
+| **timeout_seconds** | Optional[int] | No | - | Timeout in seconds when await_termination is True. If None, waits indefinitely. |
+
+---
+
+### `TriggerConfig`
+> *Used in: [StreamingWriteConfig](#streamingwriteconfig)*
+
+Configuration for streaming trigger intervals.
+
+Specify exactly one of the trigger options.
+
+Example:
+```yaml
+trigger:
+  processing_time: "10 seconds"
+```
+
+Or for one-time processing:
+```yaml
+trigger:
+  once: true
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **processing_time** | Optional[str] | No | - | Trigger interval as duration string (e.g., '10 seconds', '1 minute') |
+| **once** | Optional[bool] | No | - | Process all available data once and stop |
+| **available_now** | Optional[bool] | No | - | Process all available data in multiple batches, then stop |
+| **continuous** | Optional[str] | No | - | Continuous processing with checkpoint interval (e.g., '1 second') |
+
+---
+
+### `AutoOptimizeConfig`
+> *Used in: [WriteConfig](#writeconfig)*
+
+Configuration for Delta Lake automatic optimization.
+
+Example:
+```yaml
+auto_optimize:
+  enabled: true
+  vacuum_retention_hours: 168
+```
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **enabled** | bool | No | `True` | Enable auto optimization |
+| **vacuum_retention_hours** | int | No | `168` | Hours to retain history for VACUUM (default 7 days). Set to 0 to disable VACUUM. |
 
 ---
 

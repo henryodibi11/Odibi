@@ -406,6 +406,7 @@ class SparkEngine(Engine):
         table: Optional[str] = None,
         path: Optional[str] = None,
         streaming: bool = False,
+        schema: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
         as_of_version: Optional[int] = None,
         as_of_timestamp: Optional[str] = None,
@@ -418,6 +419,7 @@ class SparkEngine(Engine):
             table: Table name
             path: File path
             streaming: Whether to read as a stream (readStream)
+            schema: Schema string in DDL format (required for streaming file sources)
             options: Format-specific options (including versionAsOf for Delta time travel)
             as_of_version: Time travel version
             as_of_timestamp: Time travel timestamp
@@ -572,8 +574,19 @@ class SparkEngine(Engine):
 
             if streaming:
                 reader = self.spark.readStream.format(format)
+                if schema:
+                    reader = reader.schema(schema)
+                    ctx.debug(f"Applied schema for streaming read: {schema[:100]}...")
+                elif format not in ["delta", "parquet"]:
+                    ctx.warning(
+                        f"Streaming read from '{format}' format without schema. "
+                        "Schema inference is not supported for streaming sources. "
+                        "Consider adding 'schema' to your read config."
+                    )
             else:
                 reader = self.spark.read.format(format)
+                if schema:
+                    reader = reader.schema(schema)
 
             for key, value in options.items():
                 if key == "header" and isinstance(value, bool):
@@ -628,6 +641,7 @@ class SparkEngine(Engine):
         register_table: Optional[str] = None,
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
+        streaming_config: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """Write data using Spark.
 
@@ -640,13 +654,26 @@ class SparkEngine(Engine):
             register_table: Name to register as external table (if path is used)
             mode: Write mode (overwrite, append, error, ignore, upsert, append_once)
             options: Format-specific options (including partition_by for partitioning)
+            streaming_config: StreamingWriteConfig for streaming DataFrames
 
         Returns:
-            Optional dictionary containing Delta commit metadata (if format=delta)
+            Optional dictionary containing Delta commit metadata (if format=delta),
+            or streaming query info (if streaming)
         """
         ctx = get_logging_context().with_context(engine="spark")
         start_time = time.time()
         options = options or {}
+
+        if df.isStreaming:
+            return self._write_streaming(
+                df=df,
+                connection=connection,
+                format=format,
+                table=table,
+                path=path,
+                options=options,
+                streaming_config=streaming_config,
+            )
 
         target_identifier = table or path or "unknown"
         partition_count = df.rdd.getNumPartitions()
@@ -1128,6 +1155,143 @@ class SparkEngine(Engine):
             return self._get_last_delta_commit_info(full_path, is_table=False)
 
         return None
+
+    def _write_streaming(
+        self,
+        df,
+        connection: Any,
+        format: str,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+        streaming_config: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Write streaming DataFrame using Spark Structured Streaming.
+
+        Args:
+            df: Streaming Spark DataFrame
+            connection: Connection object
+            format: Output format (delta, kafka, etc.)
+            table: Table name
+            path: File path
+            options: Format-specific options
+            streaming_config: StreamingWriteConfig with streaming parameters
+
+        Returns:
+            Dictionary with streaming query information
+        """
+        ctx = get_logging_context().with_context(engine="spark", streaming=True)
+        start_time = time.time()
+        options = options or {}
+
+        if streaming_config is None:
+            ctx.error("Streaming DataFrame requires streaming_config")
+            raise ValueError(
+                "Streaming DataFrame detected but no streaming_config provided. "
+                "Add a 'streaming' section to your write config with at least "
+                "'checkpoint_location' specified."
+            )
+
+        target_identifier = table or path or "unknown"
+
+        ctx.debug(
+            "Starting streaming write",
+            format=format,
+            target=target_identifier,
+            output_mode=streaming_config.output_mode,
+            checkpoint=streaming_config.checkpoint_location,
+        )
+
+        writer = df.writeStream.format(format)
+        writer = writer.outputMode(streaming_config.output_mode)
+        writer = writer.option("checkpointLocation", streaming_config.checkpoint_location)
+
+        if streaming_config.query_name:
+            writer = writer.queryName(streaming_config.query_name)
+
+        if streaming_config.trigger:
+            trigger = streaming_config.trigger
+            if trigger.once:
+                writer = writer.trigger(once=True)
+            elif trigger.available_now:
+                writer = writer.trigger(availableNow=True)
+            elif trigger.processing_time:
+                writer = writer.trigger(processingTime=trigger.processing_time)
+            elif trigger.continuous:
+                writer = writer.trigger(continuous=trigger.continuous)
+
+        partition_by = options.pop("partition_by", None) or options.pop("partitionBy", None)
+        if partition_by:
+            if isinstance(partition_by, str):
+                partition_by = [partition_by]
+            writer = writer.partitionBy(*partition_by)
+            ctx.debug(f"Partitioning by: {partition_by}")
+
+        for key, value in options.items():
+            writer = writer.option(key, value)
+
+        try:
+            if table:
+                query = writer.toTable(table)
+                ctx.info(
+                    f"Streaming query started: writing to table {table}",
+                    query_id=str(query.id),
+                    query_name=query.name,
+                )
+            elif path:
+                full_path = connection.get_path(path)
+                query = writer.start(full_path)
+                ctx.info(
+                    f"Streaming query started: writing to path {path}",
+                    query_id=str(query.id),
+                    query_name=query.name,
+                )
+            else:
+                ctx.error("Either path or table must be provided for streaming write")
+                raise ValueError("Either path or table must be provided for streaming write")
+
+            elapsed = (time.time() - start_time) * 1000
+
+            result = {
+                "streaming": True,
+                "query_id": str(query.id),
+                "query_name": query.name,
+                "status": "running",
+                "target": target_identifier,
+                "output_mode": streaming_config.output_mode,
+                "checkpoint_location": streaming_config.checkpoint_location,
+                "elapsed_ms": round(elapsed, 2),
+            }
+
+            if streaming_config.await_termination:
+                ctx.info(
+                    "Awaiting streaming query termination",
+                    timeout_seconds=streaming_config.timeout_seconds,
+                )
+                query.awaitTermination(streaming_config.timeout_seconds)
+                result["status"] = "terminated"
+                elapsed = (time.time() - start_time) * 1000
+                result["elapsed_ms"] = round(elapsed, 2)
+                ctx.info(
+                    "Streaming query terminated",
+                    query_id=str(query.id),
+                    elapsed_ms=round(elapsed, 2),
+                )
+            else:
+                result["streaming_query"] = query
+
+            return result
+
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            ctx.error(
+                "Streaming write failed",
+                target=target_identifier,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                elapsed_ms=round(elapsed, 2),
+            )
+            raise
 
     def execute_sql(self, sql: str, context: Any = None):
         """Execute SQL query in Spark.
