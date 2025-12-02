@@ -1601,7 +1601,15 @@ story:
   connection: "local_data"
   path: "stories/"
   retention_days: 30
+  failure_sample_size: 100
+  max_failure_samples: 500
+  max_sampled_validations: 5
 ```
+
+**Failure Sample Settings:**
+- `failure_sample_size`: Number of failed rows to capture per validation (default: 100)
+- `max_failure_samples`: Total failed rows across all validations (default: 500)
+- `max_sampled_validations`: After this many validations, show only counts (default: 5)
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1611,6 +1619,9 @@ story:
 | **auto_generate** | bool | No | `True` | - |
 | **retention_days** | Optional[int] | No | `30` | Days to keep stories |
 | **retention_count** | Optional[int] | No | `100` | Max number of stories to keep |
+| **failure_sample_size** | int | No | `100` | Number of failed rows to capture per validation rule |
+| **max_failure_samples** | int | No | `500` | Maximum total failed rows across all validations |
+| **max_sampled_validations** | int | No | `5` | After this many validations, show only counts (no samples) |
 
 ---
 
