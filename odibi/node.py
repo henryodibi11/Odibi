@@ -516,6 +516,14 @@ class NodeExecutor:
                         f"Applying watermark_lag: {inc.watermark_lag}",
                         original_hwm=str(last_hwm),
                     )
+                    # Parse string HWM to datetime if needed (HWM is stored as JSON string)
+                    if isinstance(last_hwm, str):
+                        try:
+                            last_hwm = datetime.fromisoformat(last_hwm)
+                        except ValueError:
+                            ctx.warning(
+                                f"Could not parse HWM '{last_hwm}' as datetime for watermark_lag"
+                            )
                     # Subtract lag from HWM to handle late-arriving data
                     if hasattr(last_hwm, "__sub__"):
                         last_hwm = last_hwm - lag_delta

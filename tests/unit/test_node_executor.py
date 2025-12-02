@@ -184,6 +184,44 @@ class TestWatermarkLag:
         assert args[1] == "updated_at"
         assert args[2] == expected_hwm
 
+    def test_watermark_lag_parses_string_hwm(self, mock_context, mock_engine, connections):
+        """Test that watermark_lag correctly parses string HWM from state storage."""
+        from datetime import datetime, timedelta
+
+        df = pd.DataFrame({"id": [1, 2], "updated_at": [datetime.now(), datetime.now()]})
+        mock_engine.read.return_value = df
+        mock_engine.filter_greater_than.return_value = df
+
+        # HWM stored as ISO string (as it would be from JSON deserialization)
+        hwm_value = datetime(2024, 1, 15, 12, 0, 0)
+        hwm_state = ("test_node_hwm", hwm_value.isoformat())
+
+        config = NodeConfig(
+            name="test_node",
+            read={
+                "connection": "src",
+                "format": "delta",
+                "table": "source_table",
+                "incremental": {
+                    "mode": "stateful",
+                    "column": "updated_at",
+                    "watermark_lag": "5d",
+                },
+            },
+        )
+
+        executor = NodeExecutor(mock_context, mock_engine, connections)
+
+        with patch.object(executor, "_get_column_max", return_value=datetime.now()):
+            executor.execute(config, hwm_state=hwm_state)
+
+        # Verify filter was called with adjusted HWM (5 days earlier)
+        expected_hwm = hwm_value - timedelta(days=5)
+        mock_engine.filter_greater_than.assert_called()
+        args, _ = mock_engine.filter_greater_than.call_args
+        assert args[1] == "updated_at"
+        assert args[2] == expected_hwm
+
 
 class TestStreamingRead:
     """Tests for streaming config in ReadConfig."""
