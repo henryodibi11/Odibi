@@ -137,16 +137,56 @@ Cross-pipeline table lineage relationships.
 | `last_observed` | timestamp | Last time relationship was seen |
 | `run_id` | string | Execution run ID |
 
+### meta_tables
+
+Registry of all written tables/assets for discovery.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `table_path` | string | Full path to the table |
+| `table_name` | string | Table name |
+| `pipeline` | string | Pipeline that owns the table |
+| `node` | string | Node that writes the table |
+| `format` | string | Storage format (delta, parquet, etc.) |
+| `connection` | string | Connection name |
+| `last_updated` | timestamp | Last write timestamp |
+
+### meta_metrics
+
+Business metric definitions for governance and documentation.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `metric_name` | string | Unique metric identifier |
+| `definition_sql` | string | SQL definition of the metric |
+| `dimensions` | array | List of dimension columns |
+| `source_table` | string | Source table for the metric |
+
 ## Features
+
+### Auto-Registration
+
+Pipelines and nodes are **automatically registered** when you run them—no explicit `deploy()` calls required:
+
+```python
+from odibi.pipeline import PipelineManager
+
+manager = PipelineManager.from_yaml("config.yaml")
+
+# Auto-registers pipeline and nodes before execution
+manager.run("my_pipeline")
+```
+
+This ensures `meta_pipelines` and `meta_nodes` are always populated. Version hashes detect configuration drift automatically.
 
 ### Pipeline Registration
 
-Pipelines are automatically registered on deployment. The version hash detects configuration drift:
+For explicit registration (e.g., CI/CD pipelines), use:
 
 ```python
 from odibi.catalog import CatalogManager
 
-# Automatic registration during pipeline execution
+# Explicit registration
 catalog.register_pipeline(pipeline_config)
 ```
 
@@ -157,65 +197,60 @@ When a pipeline's configuration changes, the `version_hash` updates, providing:
 
 ### Schema Tracking
 
-Automatic schema evolution tracking with change detection:
+Schema evolution is tracked **automatically** after every successful write. No manual calls required:
+
+- `meta_schemas` is updated with column changes (added, removed, type changes)
+- Version numbers increment on each schema change
+- Change detection compares against the previous version
+
+**Querying schema history:**
 
 ```python
-# Track schema for a table
-result = catalog.track_schema(
-    table_path="silver/customers",
-    schema={"id": "long", "name": "string", "email": "string"},
-    pipeline="customer_pipeline",
-    node="transform_customers",
-    run_id="run_123"
-)
+# Get schema history for a table
+history = manager.get_schema_history("silver/customers", limit=10)
 
-# Result includes change details
-# {
-#   "changed": True,
-#   "version": 2,
-#   "previous_version": 1,
-#   "columns_added": ["email"],
-#   "columns_removed": [],
-#   "columns_type_changed": []
-# }
-
-# Get schema history
-history = catalog.get_schema_history("silver/customers", limit=10)
+# Returns DataFrame with columns_added, columns_removed, columns_type_changed
 ```
 
 ### Lineage Tracking
 
-Track table-level data lineage:
+Lineage is tracked **automatically** based on node dependencies and read/write operations:
+
+- Source tables (from `read` config) are recorded as upstream
+- Target tables (from `write` config) are recorded as downstream  
+- Cross-pipeline relationships are captured via `meta_lineage`
+
+**Querying lineage:**
 
 ```python
-# Record a lineage relationship
-catalog.record_lineage(
-    source_table="bronze/raw_orders",
-    target_table="silver/orders",
-    target_pipeline="orders_pipeline",
-    target_node="transform_orders",
-    run_id="run_456",
-    relationship="feeds"
-)
+# Get upstream and downstream lineage
+lineage_df = manager.get_lineage("silver/orders", direction="both")
 
-# Get upstream sources
+# Or use CatalogManager directly
 upstream = catalog.get_upstream("gold/order_summary", depth=3)
-
-# Get downstream consumers
 downstream = catalog.get_downstream("bronze/raw_orders", depth=3)
 ```
 
 ### Run History and Metrics
 
-Query execution history for observability:
+Execution runs are logged **automatically** after each node completes:
+
+- Status (SUCCESS/FAILURE), duration, rows processed
+- Metrics stored in `meta_runs`, partitioned by pipeline and date
+
+**Querying run history:**
 
 ```python
-# Get average duration for a node (last 7 days)
-avg_seconds = catalog.get_average_duration("transform_orders", days=7)
+# Get recent runs
+runs_df = manager.list_runs(pipeline="orders_pipeline", limit=20)
 
-# Direct table access for custom queries
-runs_df = spark.read.format("delta").load(catalog.tables["meta_runs"])
+# Get average duration for a node
+avg_seconds = catalog.get_average_duration("transform_orders", days=7)
 ```
+
+### Asset Registration
+
+Tables are registered **automatically** in `meta_tables` after writes, enabling discovery across the catalog.
 
 ### Catalog Optimization
 
@@ -224,6 +259,26 @@ Maintenance operations for Spark deployments:
 ```python
 # Run VACUUM and OPTIMIZE on meta_runs
 catalog.optimize()
+```
+
+### Cleanup and Removal
+
+Remove stale pipelines, nodes, or orphaned entries:
+
+```python
+# Remove a pipeline and cascade to associated nodes
+deleted = catalog.remove_pipeline("old_pipeline")
+
+# Remove a specific node
+deleted = catalog.remove_node("my_pipeline", "deprecated_node")
+
+# Cleanup orphans: remove entries not in current config
+results = catalog.cleanup_orphans(project_config)
+# Returns: {"meta_pipelines": 2, "meta_nodes": 5}
+
+# Clear state entries
+catalog.clear_state_key("my_pipeline::my_node::hwm")
+catalog.clear_state_pattern("my_pipeline::*")  # Wildcards supported
 ```
 
 ## CatalogManager API
@@ -256,7 +311,76 @@ catalog = CatalogManager(
 | `get_upstream(table, depth)` | Get upstream dependencies |
 | `get_downstream(table, depth)` | Get downstream consumers |
 | `get_average_duration(node, days)` | Get average node duration |
+| `log_metrics(...)` | Log business metric definitions |
+| `remove_pipeline(name)` | Remove pipeline and cascade to nodes |
+| `remove_node(pipeline, node)` | Remove a specific node |
+| `cleanup_orphans(config)` | Remove entries not in current config |
+| `clear_state_key(key)` | Remove a state entry by key |
+| `clear_state_pattern(pattern)` | Remove state entries matching pattern |
 | `optimize()` | Run VACUUM and OPTIMIZE (Spark only) |
+
+## PipelineManager Query API
+
+The `PipelineManager` provides convenient query methods that wrap catalog operations with smart path resolution:
+
+### Smart Path Resolution
+
+Query methods accept user-friendly identifiers that are automatically resolved:
+
+```python
+# All these work:
+manager.get_schema_history("silver/orders")           # Relative path
+manager.get_lineage("test.vw_customers")              # Registered table
+manager.get_lineage("transform_orders")               # Node name
+manager.get_schema_history("abfss://container/...")   # Full path (as-is)
+```
+
+### Query Methods
+
+| Method | Description |
+|--------|-------------|
+| `list_registered_pipelines()` | DataFrame of all pipelines from `meta_pipelines` |
+| `list_registered_nodes(pipeline=None)` | DataFrame of nodes, optionally filtered by pipeline |
+| `list_runs(pipeline, node, status, limit)` | DataFrame of recent runs with filters |
+| `list_tables()` | DataFrame of registered assets from `meta_tables` |
+| `get_state(key)` | Get specific state entry (HWM, etc.) as dict |
+| `get_all_state(prefix=None)` | DataFrame of state entries, optionally filtered |
+| `clear_state(key)` | Remove a state entry |
+| `get_schema_history(table, limit)` | DataFrame of schema versions |
+| `get_lineage(table, direction)` | DataFrame of upstream/downstream lineage |
+| `get_pipeline_status(pipeline)` | Dict with last run status, duration, timestamp |
+| `get_node_stats(node, days)` | Dict with success rate, avg duration, avg rows |
+
+### Usage Examples
+
+```python
+from odibi.pipeline import PipelineManager
+
+manager = PipelineManager.from_yaml("config.yaml")
+
+# List all registered pipelines
+pipelines_df = manager.list_registered_pipelines()
+
+# List nodes in a specific pipeline
+nodes_df = manager.list_registered_nodes(pipeline="orders_pipeline")
+
+# Get recent failed runs
+failed_runs = manager.list_runs(status="FAILURE", limit=20)
+
+# Get HWM state for a node
+hwm = manager.get_state("orders_pipeline::load_orders::hwm")
+
+# Get lineage for a table (both directions)
+lineage_df = manager.get_lineage("silver/orders", direction="both")
+
+# Get node statistics
+stats = manager.get_node_stats("transform_orders", days=7)
+# Returns: {"node": "...", "runs": 42, "success_rate": 0.95, "avg_duration_s": 12.5, ...}
+
+# Get pipeline status
+status = manager.get_pipeline_status("orders_pipeline")
+# Returns: {"pipeline": "...", "last_status": "SUCCESS", "last_run_at": "...", ...}
+```
 
 ## CLI Integration
 
@@ -351,12 +475,12 @@ connections:
     type: adls
     account: "${STORAGE_ACCOUNT}"
     container: metadata
-    
+
   bronze:
     type: adls
     account: "${STORAGE_ACCOUNT}"
     container: bronze
-    
+
   silver:
     type: adls
     account: "${STORAGE_ACCOUNT}"
@@ -372,19 +496,19 @@ pipelines:
         connection: bronze
         path: raw/orders
         format: delta
-        
+
       - name: transform_orders
         type: transform
         input: read_raw_orders
         transform: |
-          SELECT 
+          SELECT
             order_id,
             customer_id,
             order_date,
             total_amount
           FROM {input}
           WHERE order_date >= '2024-01-01'
-          
+
       - name: write_orders
         type: write
         input: transform_orders
@@ -414,15 +538,15 @@ odibi catalog stats config.yaml --pipeline orders_bronze_to_silver
 
 # Output:
 # === Execution Statistics (Last 7 Days) ===
-# 
+#
 # Total Runs:     42
 # Successful:     40
 # Failed:         2
 # Success Rate:   95.2%
-# 
+#
 # Total Rows:     1,250,000
 # Avg Rows/Run:   29,762
-# 
+#
 # Avg Duration:   12.45s
 # Total Runtime:  522.90s
 ```

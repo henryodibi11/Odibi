@@ -4,7 +4,10 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from odibi.config import AlertConfig, ErrorStrategy, PipelineConfig, ProjectConfig, RetryConfig
 from odibi.context import create_context
@@ -1229,6 +1232,10 @@ class PipelineManager:
                 )
                 raise ValueError(f"Pipeline '{name}' not found. Available pipelines: {available}")
 
+        # Phase 2: Auto-register pipelines and nodes before execution
+        if self.catalog_manager:
+            self._auto_register_pipelines(pipeline_names)
+
         self._ctx.info(
             f"Running {len(pipeline_names)} pipeline(s)",
             pipelines=pipeline_names,
@@ -1363,3 +1370,449 @@ class PipelineManager:
                 suggestion="Check catalog configuration and permissions",
             )
             return False
+
+    def _auto_register_pipelines(self, pipeline_names: List[str]) -> None:
+        """Auto-register pipelines and nodes before execution.
+
+        This ensures meta_pipelines and meta_nodes are populated automatically
+        when running pipelines, without requiring explicit deploy() calls.
+
+        Args:
+            pipeline_names: List of pipeline names to register
+        """
+        if not self.catalog_manager:
+            return
+
+        try:
+            for name in pipeline_names:
+                pipeline = self._pipelines[name]
+                config = pipeline.config
+
+                self._ctx.debug(
+                    f"Auto-registering pipeline: {name}",
+                    node_count=len(config.nodes),
+                )
+
+                self.catalog_manager.register_pipeline(config, self.project_config)
+
+                for node in config.nodes:
+                    self.catalog_manager.register_node(config.pipeline, node)
+
+            self._ctx.debug(
+                f"Auto-registered {len(pipeline_names)} pipeline(s)",
+                pipelines=pipeline_names,
+            )
+
+        except Exception as e:
+            self._ctx.warning(
+                f"Auto-registration failed (non-fatal): {e}",
+                error_type=type(e).__name__,
+            )
+
+    # -------------------------------------------------------------------------
+    # Phase 5: List/Query Methods
+    # -------------------------------------------------------------------------
+
+    def list_registered_pipelines(self) -> "pd.DataFrame":
+        """List all registered pipelines from the system catalog.
+
+        Returns:
+            DataFrame with pipeline metadata from meta_pipelines
+        """
+        import pandas as pd
+
+        if not self.catalog_manager:
+            self._ctx.warning("Catalog manager not configured")
+            return pd.DataFrame()
+
+        try:
+            df = self.catalog_manager._read_local_table(
+                self.catalog_manager.tables["meta_pipelines"]
+            )
+            return df
+        except Exception as e:
+            self._ctx.warning(f"Failed to list pipelines: {e}")
+            return pd.DataFrame()
+
+    def list_registered_nodes(self, pipeline: Optional[str] = None) -> "pd.DataFrame":
+        """List nodes from the system catalog.
+
+        Args:
+            pipeline: Optional pipeline name to filter by
+
+        Returns:
+            DataFrame with node metadata from meta_nodes
+        """
+        import pandas as pd
+
+        if not self.catalog_manager:
+            self._ctx.warning("Catalog manager not configured")
+            return pd.DataFrame()
+
+        try:
+            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_nodes"])
+            if not df.empty and pipeline:
+                df = df[df["pipeline_name"] == pipeline]
+            return df
+        except Exception as e:
+            self._ctx.warning(f"Failed to list nodes: {e}")
+            return pd.DataFrame()
+
+    def list_runs(
+        self,
+        pipeline: Optional[str] = None,
+        node: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 10,
+    ) -> "pd.DataFrame":
+        """List recent runs with optional filters.
+
+        Args:
+            pipeline: Optional pipeline name to filter by
+            node: Optional node name to filter by
+            status: Optional status to filter by (SUCCESS, FAILURE)
+            limit: Maximum number of runs to return
+
+        Returns:
+            DataFrame with run history from meta_runs
+        """
+        import pandas as pd
+
+        if not self.catalog_manager:
+            self._ctx.warning("Catalog manager not configured")
+            return pd.DataFrame()
+
+        try:
+            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_runs"])
+            if df.empty:
+                return df
+
+            if pipeline:
+                df = df[df["pipeline_name"] == pipeline]
+            if node:
+                df = df[df["node_name"] == node]
+            if status:
+                df = df[df["status"] == status]
+
+            if "timestamp" in df.columns:
+                df = df.sort_values("timestamp", ascending=False)
+
+            return df.head(limit)
+        except Exception as e:
+            self._ctx.warning(f"Failed to list runs: {e}")
+            return pd.DataFrame()
+
+    def list_tables(self) -> "pd.DataFrame":
+        """List registered assets from meta_tables.
+
+        Returns:
+            DataFrame with table/asset metadata
+        """
+        import pandas as pd
+
+        if not self.catalog_manager:
+            self._ctx.warning("Catalog manager not configured")
+            return pd.DataFrame()
+
+        try:
+            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_tables"])
+            return df
+        except Exception as e:
+            self._ctx.warning(f"Failed to list tables: {e}")
+            return pd.DataFrame()
+
+    # -------------------------------------------------------------------------
+    # Phase 5.2: State Methods
+    # -------------------------------------------------------------------------
+
+    def get_state(self, key: str) -> Optional[Dict[str, Any]]:
+        """Get a specific state entry (HWM, content hash, etc.).
+
+        Args:
+            key: The state key to look up
+
+        Returns:
+            Dictionary with state data or None if not found
+        """
+
+        if not self.catalog_manager:
+            return None
+
+        try:
+            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_state"])
+            if df.empty or "key" not in df.columns:
+                return None
+
+            row = df[df["key"] == key]
+            if row.empty:
+                return None
+
+            return row.iloc[0].to_dict()
+        except Exception:
+            return None
+
+    def get_all_state(self, prefix: Optional[str] = None) -> "pd.DataFrame":
+        """Get all state entries, optionally filtered by key prefix.
+
+        Args:
+            prefix: Optional key prefix to filter by
+
+        Returns:
+            DataFrame with state entries
+        """
+        import pandas as pd
+
+        if not self.catalog_manager:
+            return pd.DataFrame()
+
+        try:
+            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_state"])
+            if not df.empty and prefix and "key" in df.columns:
+                df = df[df["key"].str.startswith(prefix)]
+            return df
+        except Exception as e:
+            self._ctx.warning(f"Failed to get state: {e}")
+            return pd.DataFrame()
+
+    def clear_state(self, key: str) -> bool:
+        """Remove a state entry.
+
+        Args:
+            key: The state key to remove
+
+        Returns:
+            True if deleted, False otherwise
+        """
+        if not self.catalog_manager:
+            return False
+
+        try:
+            return self.catalog_manager.clear_state_key(key)
+        except Exception as e:
+            self._ctx.warning(f"Failed to clear state: {e}")
+            return False
+
+    # -------------------------------------------------------------------------
+    # Phase 5.3-5.4: Schema/Lineage and Stats Methods
+    # -------------------------------------------------------------------------
+
+    def get_schema_history(
+        self,
+        table: str,
+        limit: int = 5,
+    ) -> "pd.DataFrame":
+        """Get schema version history for a table.
+
+        Args:
+            table: Table identifier (supports smart path resolution)
+            limit: Maximum number of versions to return
+
+        Returns:
+            DataFrame with schema history
+        """
+        import pandas as pd
+
+        if not self.catalog_manager:
+            return pd.DataFrame()
+
+        try:
+            resolved_path = self._resolve_table_path(table)
+            history = self.catalog_manager.get_schema_history(resolved_path, limit)
+            return pd.DataFrame(history)
+        except Exception as e:
+            self._ctx.warning(f"Failed to get schema history: {e}")
+            return pd.DataFrame()
+
+    def get_lineage(
+        self,
+        table: str,
+        direction: str = "both",
+    ) -> "pd.DataFrame":
+        """Get lineage for a table.
+
+        Args:
+            table: Table identifier (supports smart path resolution)
+            direction: "upstream", "downstream", or "both"
+
+        Returns:
+            DataFrame with lineage relationships
+        """
+        import pandas as pd
+
+        if not self.catalog_manager:
+            return pd.DataFrame()
+
+        try:
+            resolved_path = self._resolve_table_path(table)
+
+            results = []
+            if direction in ("upstream", "both"):
+                upstream = self.catalog_manager.get_upstream(resolved_path)
+                for r in upstream:
+                    r["direction"] = "upstream"
+                results.extend(upstream)
+
+            if direction in ("downstream", "both"):
+                downstream = self.catalog_manager.get_downstream(resolved_path)
+                for r in downstream:
+                    r["direction"] = "downstream"
+                results.extend(downstream)
+
+            return pd.DataFrame(results)
+        except Exception as e:
+            self._ctx.warning(f"Failed to get lineage: {e}")
+            return pd.DataFrame()
+
+    def get_pipeline_status(self, pipeline: str) -> Dict[str, Any]:
+        """Get last run status, duration, timestamp for a pipeline.
+
+        Args:
+            pipeline: Pipeline name
+
+        Returns:
+            Dict with status info
+        """
+        if not self.catalog_manager:
+            return {}
+
+        try:
+            runs = self.list_runs(pipeline=pipeline, limit=1)
+            if runs.empty:
+                return {"status": "never_run", "pipeline": pipeline}
+
+            last_run = runs.iloc[0].to_dict()
+            return {
+                "pipeline": pipeline,
+                "last_status": last_run.get("status"),
+                "last_run_at": last_run.get("timestamp"),
+                "last_duration_ms": last_run.get("duration_ms"),
+                "last_node": last_run.get("node_name"),
+            }
+        except Exception as e:
+            self._ctx.warning(f"Failed to get pipeline status: {e}")
+            return {}
+
+    def get_node_stats(self, node: str, days: int = 7) -> Dict[str, Any]:
+        """Get average duration, row counts, success rate over period.
+
+        Args:
+            node: Node name
+            days: Number of days to look back
+
+        Returns:
+            Dict with node statistics
+        """
+        import pandas as pd
+
+        if not self.catalog_manager:
+            return {}
+
+        try:
+            avg_duration = self.catalog_manager.get_average_duration(node, days)
+
+            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_runs"])
+            if df.empty:
+                return {"node": node, "runs": 0}
+
+            if "timestamp" in df.columns:
+                cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)
+                if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
+                    df["timestamp"] = pd.to_datetime(df["timestamp"])
+                if df["timestamp"].dt.tz is None:
+                    df["timestamp"] = df["timestamp"].dt.tz_localize("UTC")
+                df = df[df["timestamp"] >= cutoff]
+
+            node_runs = df[df["node_name"] == node]
+            if node_runs.empty:
+                return {"node": node, "runs": 0}
+
+            total = len(node_runs)
+            success = len(node_runs[node_runs["status"] == "SUCCESS"])
+            avg_rows = node_runs["rows_processed"].mean() if "rows_processed" in node_runs else None
+
+            return {
+                "node": node,
+                "runs": total,
+                "success_rate": success / total if total > 0 else 0,
+                "avg_duration_s": avg_duration,
+                "avg_rows": avg_rows,
+                "period_days": days,
+            }
+        except Exception as e:
+            self._ctx.warning(f"Failed to get node stats: {e}")
+            return {}
+
+    # -------------------------------------------------------------------------
+    # Phase 6: Smart Path Resolution
+    # -------------------------------------------------------------------------
+
+    def _resolve_table_path(self, identifier: str) -> str:
+        """Resolve a user-friendly identifier to a full table path.
+
+        Accepts:
+        - Relative path: "bronze/OEE/vw_OSMPerformanceOEE"
+        - Registered table: "test.vw_OSMPerformanceOEE"
+        - Node name: "opsvisdata_vw_OSMPerformanceOEE"
+        - Full path: "abfss://..." (used as-is)
+
+        Args:
+            identifier: User-friendly table identifier
+
+        Returns:
+            Full table path
+        """
+        if self._is_full_path(identifier):
+            return identifier
+
+        if self.catalog_manager:
+            resolved = self._lookup_in_catalog(identifier)
+            if resolved:
+                return resolved
+
+        for pipeline in self._pipelines.values():
+            for node in pipeline.config.nodes:
+                if node.name == identifier and node.write:
+                    conn = self.connections.get(node.write.connection)
+                    if conn:
+                        return conn.get_path(node.write.path or node.write.table)
+
+        sys_conn_name = (
+            self.project_config.system.connection if self.project_config.system else None
+        )
+        if sys_conn_name:
+            sys_conn = self.connections.get(sys_conn_name)
+            if sys_conn:
+                return sys_conn.get_path(identifier)
+
+        return identifier
+
+    def _is_full_path(self, identifier: str) -> bool:
+        """Check if identifier is already a full path."""
+        full_path_prefixes = ("abfss://", "s3://", "gs://", "hdfs://", "/", "C:", "D:")
+        return identifier.startswith(full_path_prefixes)
+
+    def _lookup_in_catalog(self, identifier: str) -> Optional[str]:
+        """Look up identifier in meta_tables catalog."""
+        if not self.catalog_manager:
+            return None
+
+        try:
+            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_tables"])
+            if df.empty or "table_name" not in df.columns:
+                return None
+
+            match = df[df["table_name"] == identifier]
+            if not match.empty and "path" in match.columns:
+                return match.iloc[0]["path"]
+
+            if "." in identifier:
+                parts = identifier.split(".", 1)
+                if len(parts) == 2:
+                    match = df[df["table_name"] == parts[1]]
+                    if not match.empty and "path" in match.columns:
+                        return match.iloc[0]["path"]
+
+        except Exception:
+            pass
+
+        return None

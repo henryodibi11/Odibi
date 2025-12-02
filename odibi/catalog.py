@@ -1475,3 +1475,394 @@ class CatalogManager:
 
         except Exception as e:
             logger.warning(f"Catalog Optimization failed: {e}")
+
+    # -------------------------------------------------------------------------
+    # Phase 3.6: Metrics Logging
+    # -------------------------------------------------------------------------
+
+    def log_metrics(
+        self,
+        metric_name: str,
+        definition_sql: str,
+        dimensions: List[str],
+        source_table: str,
+    ) -> None:
+        """Log a business metric definition to meta_metrics.
+
+        Args:
+            metric_name: Name of the metric
+            definition_sql: SQL definition of the metric
+            dimensions: List of dimension columns
+            source_table: Source table for the metric
+        """
+        if not self.spark and not self.engine:
+            return
+
+        try:
+            if self.spark:
+                rows = [(metric_name, definition_sql, dimensions, source_table)]
+                schema = self._get_schema_meta_metrics()
+
+                df = self.spark.createDataFrame(rows, schema)
+                df.write.format("delta").mode("append").save(self.tables["meta_metrics"])
+
+            elif self.engine:
+                import pandas as pd
+
+                data = {
+                    "metric_name": [metric_name],
+                    "definition_sql": [definition_sql],
+                    "dimensions": [dimensions],
+                    "source_table": [source_table],
+                }
+                df = pd.DataFrame(data)
+
+                self.engine.write(
+                    df,
+                    connection=None,
+                    format="delta",
+                    path=self.tables["meta_metrics"],
+                    mode="append",
+                )
+
+            logger.debug(f"Logged metric: {metric_name}")
+
+        except Exception as e:
+            logger.warning(f"Failed to log metric to system catalog: {e}")
+
+    # -------------------------------------------------------------------------
+    # Phase 4: Cleanup/Removal Methods
+    # -------------------------------------------------------------------------
+
+    def remove_pipeline(self, pipeline_name: str) -> int:
+        """Remove pipeline and cascade to nodes, state entries.
+
+        Args:
+            pipeline_name: Name of the pipeline to remove
+
+        Returns:
+            Count of deleted entries
+        """
+        if not self.spark and not self.engine:
+            return 0
+
+        deleted_count = 0
+
+        try:
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                # Delete from meta_pipelines
+                df = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                initial_count = df.count()
+                df = df.filter(F.col("pipeline_name") != pipeline_name)
+                df.write.format("delta").mode("overwrite").save(self.tables["meta_pipelines"])
+                deleted_count += initial_count - df.count()
+
+                # Delete associated nodes from meta_nodes
+                df_nodes = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                nodes_initial = df_nodes.count()
+                df_nodes = df_nodes.filter(F.col("pipeline_name") != pipeline_name)
+                df_nodes.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
+                deleted_count += nodes_initial - df_nodes.count()
+
+            elif self.engine:
+                # Delete from meta_pipelines
+                df = self._read_local_table(self.tables["meta_pipelines"])
+                if not df.empty and "pipeline_name" in df.columns:
+                    initial_count = len(df)
+                    df = df[df["pipeline_name"] != pipeline_name]
+                    self.engine.write(
+                        df,
+                        connection=None,
+                        format="delta",
+                        path=self.tables["meta_pipelines"],
+                        mode="overwrite",
+                    )
+                    deleted_count += initial_count - len(df)
+
+                # Delete associated nodes from meta_nodes
+                df_nodes = self._read_local_table(self.tables["meta_nodes"])
+                if not df_nodes.empty and "pipeline_name" in df_nodes.columns:
+                    nodes_initial = len(df_nodes)
+                    df_nodes = df_nodes[df_nodes["pipeline_name"] != pipeline_name]
+                    self.engine.write(
+                        df_nodes,
+                        connection=None,
+                        format="delta",
+                        path=self.tables["meta_nodes"],
+                        mode="overwrite",
+                    )
+                    deleted_count += nodes_initial - len(df_nodes)
+
+            logger.info(f"Removed pipeline '{pipeline_name}': {deleted_count} entries deleted")
+
+        except Exception as e:
+            logger.warning(f"Failed to remove pipeline: {e}")
+
+        return deleted_count
+
+    def remove_node(self, pipeline_name: str, node_name: str) -> int:
+        """Remove node and associated state entries.
+
+        Args:
+            pipeline_name: Pipeline name
+            node_name: Node name to remove
+
+        Returns:
+            Count of deleted entries
+        """
+        if not self.spark and not self.engine:
+            return 0
+
+        deleted_count = 0
+
+        try:
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                # Delete from meta_nodes
+                df = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                initial_count = df.count()
+                df = df.filter(
+                    ~((F.col("pipeline_name") == pipeline_name) & (F.col("node_name") == node_name))
+                )
+                df.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
+                deleted_count = initial_count - df.count()
+
+            elif self.engine:
+                df = self._read_local_table(self.tables["meta_nodes"])
+                if not df.empty and "pipeline_name" in df.columns and "node_name" in df.columns:
+                    initial_count = len(df)
+                    df = df[
+                        ~((df["pipeline_name"] == pipeline_name) & (df["node_name"] == node_name))
+                    ]
+                    self.engine.write(
+                        df,
+                        connection=None,
+                        format="delta",
+                        path=self.tables["meta_nodes"],
+                        mode="overwrite",
+                    )
+                    deleted_count = initial_count - len(df)
+
+            logger.info(
+                f"Removed node '{node_name}' from pipeline '{pipeline_name}': "
+                f"{deleted_count} entries deleted"
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to remove node: {e}")
+
+        return deleted_count
+
+    def cleanup_orphans(self, current_config: Any) -> Dict[str, int]:
+        """Compare catalog against current config, remove stale entries.
+
+        Args:
+            current_config: ProjectConfig with current pipeline definitions
+
+        Returns:
+            Dict of {table: deleted_count}
+        """
+        if not self.spark and not self.engine:
+            return {}
+
+        results = {"meta_pipelines": 0, "meta_nodes": 0}
+
+        try:
+            # Get current pipeline and node names from config
+            current_pipelines = set()
+            current_nodes = {}  # {pipeline_name: set(node_names)}
+
+            for pipeline in current_config.pipelines:
+                current_pipelines.add(pipeline.pipeline)
+                current_nodes[pipeline.pipeline] = {node.name for node in pipeline.nodes}
+
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                # Cleanup orphan pipelines
+                df_pipelines = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                initial_pipelines = df_pipelines.count()
+                df_pipelines = df_pipelines.filter(
+                    F.col("pipeline_name").isin(list(current_pipelines))
+                )
+                df_pipelines.write.format("delta").mode("overwrite").save(
+                    self.tables["meta_pipelines"]
+                )
+                results["meta_pipelines"] = initial_pipelines - df_pipelines.count()
+
+                # Cleanup orphan nodes
+                df_nodes = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                initial_nodes = df_nodes.count()
+
+                # Filter: keep only nodes that belong to current pipelines and exist in config
+                valid_nodes = []
+                for p_name, nodes in current_nodes.items():
+                    for n_name in nodes:
+                        valid_nodes.append((p_name, n_name))
+
+                if valid_nodes:
+                    valid_df = self.spark.createDataFrame(
+                        valid_nodes, ["pipeline_name", "node_name"]
+                    )
+                    df_nodes = df_nodes.join(valid_df, ["pipeline_name", "node_name"], "inner")
+                else:
+                    df_nodes = df_nodes.limit(0)
+
+                df_nodes.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
+                results["meta_nodes"] = initial_nodes - df_nodes.count()
+
+            elif self.engine:
+                # Cleanup orphan pipelines
+                df_pipelines = self._read_local_table(self.tables["meta_pipelines"])
+                if not df_pipelines.empty and "pipeline_name" in df_pipelines.columns:
+                    initial_pipelines = len(df_pipelines)
+                    df_pipelines = df_pipelines[
+                        df_pipelines["pipeline_name"].isin(current_pipelines)
+                    ]
+                    self.engine.write(
+                        df_pipelines,
+                        connection=None,
+                        format="delta",
+                        path=self.tables["meta_pipelines"],
+                        mode="overwrite",
+                    )
+                    results["meta_pipelines"] = initial_pipelines - len(df_pipelines)
+
+                # Cleanup orphan nodes
+                df_nodes = self._read_local_table(self.tables["meta_nodes"])
+                if not df_nodes.empty and "pipeline_name" in df_nodes.columns:
+                    initial_nodes = len(df_nodes)
+
+                    valid_node_tuples = set()
+                    for p_name, nodes in current_nodes.items():
+                        for n_name in nodes:
+                            valid_node_tuples.add((p_name, n_name))
+
+                    df_nodes["_valid"] = df_nodes.apply(
+                        lambda row: (row["pipeline_name"], row["node_name"]) in valid_node_tuples,
+                        axis=1,
+                    )
+                    df_nodes = df_nodes[df_nodes["_valid"]].drop(columns=["_valid"])
+
+                    self.engine.write(
+                        df_nodes,
+                        connection=None,
+                        format="delta",
+                        path=self.tables["meta_nodes"],
+                        mode="overwrite",
+                    )
+                    results["meta_nodes"] = initial_nodes - len(df_nodes)
+
+            logger.info(
+                f"Cleanup orphans completed: {results['meta_pipelines']} pipelines, "
+                f"{results['meta_nodes']} nodes removed"
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to cleanup orphans: {e}")
+
+        return results
+
+    def clear_state_key(self, key: str) -> bool:
+        """Remove a single state entry by key.
+
+        Args:
+            key: State key to remove
+
+        Returns:
+            True if deleted, False otherwise
+        """
+        if not self.spark and not self.engine:
+            return False
+
+        try:
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                df = self.spark.read.format("delta").load(self.tables["meta_state"])
+                initial_count = df.count()
+                df = df.filter(F.col("key") != key)
+                df.write.format("delta").mode("overwrite").save(self.tables["meta_state"])
+                return df.count() < initial_count
+
+            elif self.engine:
+                df = self._read_local_table(self.tables["meta_state"])
+                if df.empty or "key" not in df.columns:
+                    return False
+
+                initial_count = len(df)
+                df = df[df["key"] != key]
+
+                if len(df) < initial_count:
+                    self.engine.write(
+                        df,
+                        connection=None,
+                        format="delta",
+                        path=self.tables["meta_state"],
+                        mode="overwrite",
+                    )
+                    return True
+
+                return False
+
+        except Exception as e:
+            logger.warning(f"Failed to clear state key '{key}': {e}")
+            return False
+
+    def clear_state_pattern(self, key_pattern: str) -> int:
+        """Remove state entries matching pattern (supports wildcards).
+
+        Args:
+            key_pattern: Pattern with optional * wildcards
+
+        Returns:
+            Count of deleted entries
+        """
+        if not self.spark and not self.engine:
+            return 0
+
+        try:
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                df = self.spark.read.format("delta").load(self.tables["meta_state"])
+                initial_count = df.count()
+
+                # Convert wildcard pattern to SQL LIKE pattern
+                like_pattern = key_pattern.replace("*", "%")
+                df = df.filter(~F.col("key").like(like_pattern))
+                df.write.format("delta").mode("overwrite").save(self.tables["meta_state"])
+
+                return initial_count - df.count()
+
+            elif self.engine:
+                import re
+
+                df = self._read_local_table(self.tables["meta_state"])
+                if df.empty or "key" not in df.columns:
+                    return 0
+
+                initial_count = len(df)
+
+                # Convert wildcard pattern to regex
+                regex_pattern = "^" + key_pattern.replace("*", ".*") + "$"
+                pattern = re.compile(regex_pattern)
+                df = df[~df["key"].apply(lambda x: bool(pattern.match(str(x))))]
+
+                if len(df) < initial_count:
+                    self.engine.write(
+                        df,
+                        connection=None,
+                        format="delta",
+                        path=self.tables["meta_state"],
+                        mode="overwrite",
+                    )
+
+                return initial_count - len(df)
+
+        except Exception as e:
+            logger.warning(f"Failed to clear state pattern '{key_pattern}': {e}")
+            return 0

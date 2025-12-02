@@ -75,6 +75,7 @@ class NodeExecutor:
         config_file: Optional[str] = None,
         max_sample_rows: int = 10,
         performance_config: Optional[Any] = None,
+        state_manager: Optional[Any] = None,
     ):
         self.context = context
         self.engine = engine
@@ -83,6 +84,7 @@ class NodeExecutor:
         self.config_file = config_file
         self.max_sample_rows = max_sample_rows
         self.performance_config = performance_config
+        self.state_manager = state_manager
 
         # Ephemeral state per execution
         self._execution_steps: List[str] = []
@@ -1411,6 +1413,136 @@ class NodeExecutor:
             if write_config.skip_if_unchanged and write_config.format == "delta":
                 self._store_content_hash_after_write(config, connection)
 
+            # Phase 3: Catalog integration after successful write
+            self._register_catalog_entries(config, df, connection, write_config, ctx)
+
+    def _register_catalog_entries(
+        self,
+        config: NodeConfig,
+        df: Any,
+        connection: Any,
+        write_config: Any,
+        ctx: Optional["LoggingContext"] = None,
+    ) -> None:
+        """Register catalog entries after successful write.
+
+        Handles Phase 3.2-3.5: register_asset, track_schema, log_pattern, record_lineage
+        """
+        if not self.catalog_manager:
+            return
+
+        if ctx is None:
+            ctx = get_logging_context()
+
+        import uuid
+
+        run_id = str(uuid.uuid4())
+
+        # Determine table path
+        table_path = None
+        if hasattr(connection, "get_path"):
+            table_path = connection.get_path(write_config.path or write_config.table)
+        else:
+            table_path = write_config.path or write_config.table
+
+        # 3.2: Register asset (meta_tables)
+        try:
+            project_name = "unknown"
+            if hasattr(self, "project_config") and self.project_config:
+                project_name = getattr(self.project_config, "project", "unknown")
+
+            table_name = write_config.table or config.name
+            pattern_type = config.materialized or "table"
+
+            schema_hash = ""
+            if df is not None:
+                schema = self._get_schema(df)
+                if isinstance(schema, dict):
+                    import hashlib
+                    import json
+
+                    schema_hash = hashlib.md5(
+                        json.dumps(schema, sort_keys=True).encode()
+                    ).hexdigest()
+
+            self.catalog_manager.register_asset(
+                project_name=project_name,
+                table_name=table_name,
+                path=table_path or "",
+                format=write_config.format or "delta",
+                pattern_type=pattern_type,
+                schema_hash=schema_hash,
+            )
+            ctx.debug(f"Registered asset: {table_name}")
+
+        except Exception as e:
+            ctx.debug(f"Failed to register asset: {e}")
+
+        # 3.3: Track schema changes (meta_schemas)
+        try:
+            if df is not None and table_path:
+                schema = self._get_schema(df)
+                if isinstance(schema, dict):
+                    pipeline_name = config.tags[0] if config.tags else "unknown"
+                    self.catalog_manager.track_schema(
+                        table_path=table_path,
+                        schema=schema,
+                        pipeline=pipeline_name,
+                        node=config.name,
+                        run_id=run_id,
+                    )
+                    ctx.debug(f"Tracked schema for: {table_path}")
+
+        except Exception as e:
+            ctx.debug(f"Failed to track schema: {e}")
+
+        # 3.4: Log pattern usage (meta_patterns)
+        try:
+            if config.materialized:
+                import json
+
+                pattern_config = {
+                    "materialized": config.materialized,
+                    "format": write_config.format,
+                    "mode": str(write_config.mode) if write_config.mode else None,
+                }
+                table_name = write_config.table or config.name
+                self.catalog_manager.log_pattern(
+                    table_name=table_name,
+                    pattern_type=config.materialized,
+                    configuration=json.dumps(pattern_config),
+                    compliance_score=1.0,
+                )
+                ctx.debug(f"Logged pattern: {config.materialized}")
+
+        except Exception as e:
+            ctx.debug(f"Failed to log pattern: {e}")
+
+        # 3.5: Record lineage (meta_lineage)
+        try:
+            if config.read and table_path:
+                source_path = None
+                read_config = config.read
+                read_conn = self.connections.get(read_config.connection)
+                if read_conn and hasattr(read_conn, "get_path"):
+                    source_path = read_conn.get_path(read_config.path or read_config.table)
+                else:
+                    source_path = read_config.path or read_config.table
+
+                if source_path:
+                    pipeline_name = config.tags[0] if config.tags else "unknown"
+                    self.catalog_manager.record_lineage(
+                        source_table=source_path,
+                        target_table=table_path,
+                        target_pipeline=pipeline_name,
+                        target_node=config.name,
+                        run_id=run_id,
+                    )
+                    ctx.debug(f"Recorded lineage: {source_path} -> {table_path}")
+
+        except Exception as e:
+            ctx.debug(f"Failed to record lineage: {e}")
+
     def _add_write_metadata(self, config: NodeConfig, df: Any) -> Any:
         """Add Bronze metadata columns to DataFrame before writing.
 
@@ -1896,6 +2028,7 @@ class Node:
             config_file=config_file,
             max_sample_rows=max_sample_rows,
             performance_config=performance_config,
+            state_manager=self.state_manager,
         )
 
     def restore(self) -> bool:
