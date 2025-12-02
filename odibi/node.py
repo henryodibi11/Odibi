@@ -478,9 +478,7 @@ class NodeExecutor:
                     )
                 else:
                     df = self.engine.filter_greater_than(df, inc.column, last_hwm)
-                    self._execution_steps.append(
-                        f"Incremental: Filtered {inc.column} > {last_hwm}"
-                    )
+                    self._execution_steps.append(f"Incremental: Filtered {inc.column} > {last_hwm}")
 
             # Capture new HWM (use fallback column if configured)
             new_max = self._get_column_max(df, inc.column, inc.fallback_column)
