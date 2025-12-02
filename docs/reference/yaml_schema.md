@@ -319,6 +319,59 @@ These are the built-in functions you can use in two ways:
   # ...
 ```
 
+**Scenario 4: Pre/Post SQL Hooks**
+*Setup and cleanup with SQL statements.*
+```yaml
+- name: "optimize_sales"
+  depends_on: ["load_sales"]
+  pre_sql:
+    - "SET spark.sql.shuffle.partitions = 200"
+    - "CREATE TEMP VIEW staging AS SELECT * FROM bronze.raw_sales"
+  transform:
+    steps:
+      - sql: "SELECT * FROM staging WHERE amount > 0"
+  post_sql:
+    - "OPTIMIZE gold.fact_sales ZORDER BY (customer_id)"
+    - "VACUUM gold.fact_sales RETAIN 168 HOURS"
+  write:
+    connection: "gold"
+    format: "delta"
+    table: "fact_sales"
+```
+
+**Scenario 5: Materialization Strategies**
+*Choose how output is persisted.*
+```yaml
+# Option 1: View (no physical storage, logical model)
+- name: "vw_active_customers"
+  materialized: "view"  # Creates SQL view instead of table
+  transform:
+    steps:
+      - sql: "SELECT * FROM customers WHERE status = 'active'"
+  write:
+    connection: "gold"
+    table: "vw_active_customers"
+
+# Option 2: Incremental (append to existing Delta table)
+- name: "fact_events"
+  materialized: "incremental"  # Uses APPEND mode
+  read:
+    connection: "bronze"
+    table: "raw_events"
+    incremental:
+      mode: "stateful"
+      column: "event_time"
+  write:
+    connection: "silver"
+    format: "delta"
+    table: "fact_events"
+
+# Option 3: Table (default - full overwrite)
+- name: "dim_products"
+  materialized: "table"  # Default behavior
+  # ...
+```
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique node name |
@@ -333,9 +386,9 @@ These are the built-in functions you can use in two ways:
 | **streaming** | bool | No | `False` | Enable streaming execution for this node (Spark only) |
 | **transformer** | Optional[str] | No | - | Name of the 'App' logic to run (e.g., 'deduplicate', 'scd2'). See Transformer Catalog for options. |
 | **params** | Dict[str, Any] | No | `PydanticUndefined` | Parameters for transformer |
-| **pre_sql** | List[str] | No | `PydanticUndefined` | SQL to run before node execution |
-| **post_sql** | List[str] | No | `PydanticUndefined` | SQL to run after node execution |
-| **materialized** | Optional[Literal['table', 'view', 'incremental']] | No | - | Materialization strategy (Gold layer) |
+| **pre_sql** | List[str] | No | `PydanticUndefined` | List of SQL statements to execute before node runs. Use for setup: temp tables, variable initialization, grants. Example: ['SET spark.sql.shuffle.partitions=200', 'CREATE TEMP VIEW src AS SELECT * FROM raw'] |
+| **post_sql** | List[str] | No | `PydanticUndefined` | List of SQL statements to execute after node completes. Use for cleanup, optimization, or audit logging. Example: ['OPTIMIZE gold.fact_sales', 'VACUUM gold.fact_sales RETAIN 168 HOURS'] |
+| **materialized** | Optional[Literal['table', 'view', 'incremental']] | No | - | Materialization strategy. Options: 'table' (default physical write), 'view' (creates SQL view instead of table), 'incremental' (uses append mode for Delta tables). Views are useful for Gold layer logical models. |
 | **cache** | bool | No | `False` | Cache result for reuse |
 | **log_level** | Optional[LogLevel] | No | - | Override log level for this node |
 | **on_error** | ErrorStrategy | No | `ErrorStrategy.FAIL_LATER` | Failure handling strategy |
@@ -589,6 +642,17 @@ read:
   query: "SELECT * FROM huge_table WHERE date >= '2024-01-01'"
 ```
 
+**Recipe 4: Archive Bad Records (Spark)**
+*Capture malformed records for later inspection.*
+```yaml
+read:
+  connection: "landing"
+  format: "json"
+  path: "events/*.json"
+  archive_options:
+    badRecordsPath: "/mnt/quarantine/bad_records"
+```
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name from project.yaml |
@@ -640,6 +704,15 @@ incremental:
   state_key: "last_processed_id"
 ```
 
+Example (Stateful with Watermark Lag):
+```yaml
+incremental:
+  mode: "stateful"
+  column: "updated_at"
+  # Handle late-arriving data: look back 2 hours from HWM
+  watermark_lag: "2h"
+```
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **mode** | IncrementalMode | No | `IncrementalMode.ROLLING_WINDOW` | Incremental strategy: 'rolling_window' or 'stateful' |
@@ -648,7 +721,7 @@ incremental:
 | **lookback** | Optional[int] | No | - | Time units to look back (Rolling Window only) |
 | **unit** | Optional[IncrementalUnit] | No | - | Time unit for lookback (Rolling Window only). Options: 'hour', 'day', 'month', 'year' |
 | **state_key** | Optional[str] | No | - | Unique ID for state tracking. Defaults to node name if not provided. |
-| **watermark_lag** | Optional[str] | No | - | Safety buffer to handle late-arriving data. Subtracts this duration (e.g., '2h', '30m') from the stored High Water Mark when generating the query. Useful if your source system has eventual consistency or replication lag. |
+| **watermark_lag** | Optional[str] | No | - | Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency. |
 
 ---
 

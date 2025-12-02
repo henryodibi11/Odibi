@@ -16,6 +16,7 @@ class EngineType(str, Enum):
 
     SPARK = "spark"
     PANDAS = "pandas"
+    POLARS = "polars"
 
 
 class ConnectionType(str, Enum):
@@ -773,6 +774,15 @@ class IncrementalConfig(BaseModel):
       # Optional: track separate column for HWM state
       state_key: "last_processed_id"
     ```
+
+    Example (Stateful with Watermark Lag):
+    ```yaml
+    incremental:
+      mode: "stateful"
+      column: "updated_at"
+      # Handle late-arriving data: look back 2 hours from HWM
+      watermark_lag: "2h"
+    ```
     """
 
     model_config = {"populate_by_name": True}
@@ -807,7 +817,13 @@ class IncrementalConfig(BaseModel):
     )
     watermark_lag: Optional[str] = Field(
         default=None,
-        description="Safety buffer to handle late-arriving data. Subtracts this duration (e.g., '2h', '30m') from the stored High Water Mark when generating the query. Useful if your source system has eventual consistency or replication lag.",
+        description=(
+            "Safety buffer for late-arriving data in stateful mode. "
+            "Subtracts this duration from the stored HWM when filtering. "
+            "Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. "
+            "Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). "
+            "Use when source has replication lag or eventual consistency."
+        ),
     )
 
     @model_validator(mode="after")
@@ -858,6 +874,17 @@ class ReadConfig(BaseModel):
       format: "sql"
       # Use the query option to filter at source!
       query: "SELECT * FROM huge_table WHERE date >= '2024-01-01'"
+    ```
+
+    **Recipe 4: Archive Bad Records (Spark)**
+    *Capture malformed records for later inspection.*
+    ```yaml
+    read:
+      connection: "landing"
+      format: "json"
+      path: "events/*.json"
+      archive_options:
+        badRecordsPath: "/mnt/quarantine/bad_records"
     ```
     """
 
@@ -1972,6 +1999,59 @@ class NodeConfig(BaseModel):
       tags: ["daily", "reporting"]
       # ...
     ```
+
+    **Scenario 4: Pre/Post SQL Hooks**
+    *Setup and cleanup with SQL statements.*
+    ```yaml
+    - name: "optimize_sales"
+      depends_on: ["load_sales"]
+      pre_sql:
+        - "SET spark.sql.shuffle.partitions = 200"
+        - "CREATE TEMP VIEW staging AS SELECT * FROM bronze.raw_sales"
+      transform:
+        steps:
+          - sql: "SELECT * FROM staging WHERE amount > 0"
+      post_sql:
+        - "OPTIMIZE gold.fact_sales ZORDER BY (customer_id)"
+        - "VACUUM gold.fact_sales RETAIN 168 HOURS"
+      write:
+        connection: "gold"
+        format: "delta"
+        table: "fact_sales"
+    ```
+
+    **Scenario 5: Materialization Strategies**
+    *Choose how output is persisted.*
+    ```yaml
+    # Option 1: View (no physical storage, logical model)
+    - name: "vw_active_customers"
+      materialized: "view"  # Creates SQL view instead of table
+      transform:
+        steps:
+          - sql: "SELECT * FROM customers WHERE status = 'active'"
+      write:
+        connection: "gold"
+        table: "vw_active_customers"
+
+    # Option 2: Incremental (append to existing Delta table)
+    - name: "fact_events"
+      materialized: "incremental"  # Uses APPEND mode
+      read:
+        connection: "bronze"
+        table: "raw_events"
+        incremental:
+          mode: "stateful"
+          column: "event_time"
+      write:
+        connection: "silver"
+        format: "delta"
+        table: "fact_events"
+
+    # Option 3: Table (default - full overwrite)
+    - name: "dim_products"
+      materialized: "table"  # Default behavior
+      # ...
+    ```
     """
 
     name: str = Field(description="Unique node name")
@@ -2013,10 +2093,32 @@ class NodeConfig(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict, description="Parameters for transformer")
 
     # Optional features
-    pre_sql: List[str] = Field(default_factory=list, description="SQL to run before node execution")
-    post_sql: List[str] = Field(default_factory=list, description="SQL to run after node execution")
+    pre_sql: List[str] = Field(
+        default_factory=list,
+        description=(
+            "List of SQL statements to execute before node runs. "
+            "Use for setup: temp tables, variable initialization, grants. "
+            "Example: ['SET spark.sql.shuffle.partitions=200', "
+            "'CREATE TEMP VIEW src AS SELECT * FROM raw']"
+        ),
+    )
+    post_sql: List[str] = Field(
+        default_factory=list,
+        description=(
+            "List of SQL statements to execute after node completes. "
+            "Use for cleanup, optimization, or audit logging. "
+            "Example: ['OPTIMIZE gold.fact_sales', 'VACUUM gold.fact_sales RETAIN 168 HOURS']"
+        ),
+    )
     materialized: Optional[Literal["table", "view", "incremental"]] = Field(
-        default=None, description="Materialization strategy (Gold layer)"
+        default=None,
+        description=(
+            "Materialization strategy. Options: "
+            "'table' (default physical write), "
+            "'view' (creates SQL view instead of table), "
+            "'incremental' (uses append mode for Delta tables). "
+            "Views are useful for Gold layer logical models."
+        ),
     )
 
     cache: bool = Field(default=False, description="Cache result for reuse")

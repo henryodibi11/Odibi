@@ -245,6 +245,9 @@ class PandasEngine(Engine):
         if as_of_version is not None:
             merged_options["versionAsOf"] = as_of_version
             ctx.debug("Time travel enabled", version=as_of_version)
+        if as_of_timestamp is not None:
+            merged_options["timestampAsOf"] = as_of_timestamp
+            ctx.debug("Time travel enabled", timestamp=as_of_timestamp)
 
         # Check for Lazy/DuckDB optimization
         can_lazy_load = False
@@ -445,9 +448,24 @@ class PandasEngine(Engine):
 
             storage_opts = options.get("storage_options", {})
             version = options.get("versionAsOf")
+            timestamp = options.get("timestampAsOf")
 
-            dt = DeltaTable(full_path, storage_options=storage_opts, version=version)
-            ctx.debug("Delta table loaded", version=version)
+            if timestamp is not None:
+                from datetime import datetime as dt_module
+
+                if isinstance(timestamp, str):
+                    ts = dt_module.fromisoformat(timestamp.replace("Z", "+00:00"))
+                else:
+                    ts = timestamp
+                dt = DeltaTable(full_path, storage_options=storage_opts)
+                dt.load_with_datetime(ts)
+                ctx.debug("Delta table loaded with timestamp", timestamp=str(ts))
+            elif version is not None:
+                dt = DeltaTable(full_path, storage_options=storage_opts, version=version)
+                ctx.debug("Delta table loaded with version", version=version)
+            else:
+                dt = DeltaTable(full_path, storage_options=storage_opts)
+                ctx.debug("Delta table loaded (latest version)")
 
             if self.use_arrow:
                 import inspect

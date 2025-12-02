@@ -75,6 +75,20 @@ Examples:
         choices=["fail_fast", "fail_later", "ignore"],
         help="Override error handling strategy",
     )
+    run_parser.add_argument(
+        "--tag",
+        help="Filter nodes by tag (e.g., --tag daily)",
+    )
+    run_parser.add_argument(
+        "--pipeline",
+        dest="pipeline_name",
+        help="Run specific pipeline by name",
+    )
+    run_parser.add_argument(
+        "--node",
+        dest="node_name",
+        help="Run specific node by name",
+    )
 
     # odibi deploy
     deploy_parser = subparsers.add_parser("deploy", help="Deploy definitions to System Catalog")

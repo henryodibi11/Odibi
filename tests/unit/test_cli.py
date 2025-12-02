@@ -99,11 +99,14 @@ class TestRunCommand:
             assert result == 0  # Success
             MockManager.from_yaml.assert_called_once_with("test.yaml", env="dev")
             mock_manager.run.assert_called_once_with(
+                pipelines=ANY,
                 dry_run=False,
                 resume_from_failure=False,
                 parallel=False,
                 max_workers=4,
                 on_error=ANY,
+                tag=ANY,
+                node=ANY,
             )
 
 

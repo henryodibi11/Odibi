@@ -26,11 +26,14 @@ def run_command(args):
 
             manager = PipelineManager.from_yaml(config_path.name, env=args.env)
             results = manager.run(
+                pipelines=getattr(args, "pipeline_name", None),
                 dry_run=args.dry_run,
                 resume_from_failure=args.resume,
                 parallel=args.parallel,
                 max_workers=args.workers,
                 on_error=args.on_error,
+                tag=getattr(args, "tag", None),
+                node=getattr(args, "node_name", None),
             )
         finally:
             # Restore CWD

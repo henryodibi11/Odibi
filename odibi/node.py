@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from odibi.config import IncrementalMode, NodeConfig, RetryConfig, WriteMode
+from odibi.utils.duration import parse_duration
 from odibi.context import Context, EngineContext
 from odibi.enums import EngineType
 from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
@@ -120,6 +121,13 @@ class NodeExecutor:
             engine=self.engine.__class__.__name__,
         )
 
+        # Handle materialized field - controls output as table/view/incremental
+        if config.materialized:
+            ctx.info(
+                f"Materialization strategy: {config.materialized}",
+                materialized=config.materialized,
+            )
+
         if dry_run:
             ctx.debug("Executing node in dry-run mode")
             return self._execute_dry_run(config)
@@ -130,6 +138,9 @@ class NodeExecutor:
                 input_sample = None
                 pending_hwm_update = None
                 rows_in = None
+
+                # 0. Pre-SQL Phase
+                self._execute_pre_sql(config, ctx)
 
                 # 1. Read Phase
                 result_df, pending_hwm_update = self._execute_read_phase(config, hwm_state, ctx)
@@ -178,6 +189,9 @@ class NodeExecutor:
                 # 4. Write Phase
                 override_mode = self._determine_write_mode(config)
                 self._execute_write_phase(config, result_df, override_mode, ctx)
+
+                # 4.5 Post-SQL Phase
+                self._execute_post_sql(config, ctx)
 
                 # 5. Register & Cache
                 if result_df is not None:
@@ -351,16 +365,32 @@ class NodeExecutor:
                         read_options["query"] = config.write.first_run_query
                         ctx.debug("Using first_run_query (target table does not exist)")
 
+            # Merge archive_options into read_options (e.g., badRecordsPath for Spark)
+            if read_config.archive_options:
+                read_options.update(read_config.archive_options)
+                ctx.debug(
+                    "Applied archive_options",
+                    archive_options=list(read_config.archive_options.keys()),
+                )
+                self._execution_steps.append(
+                    f"Applied archive_options: {list(read_config.archive_options.keys())}"
+                )
+
             # Execute Read
             df = self.engine.read(
                 connection=connection,
                 format=read_config.format,
                 table=read_config.table,
                 path=read_config.path,
+                streaming=read_config.streaming,
                 options=read_options,
                 as_of_version=as_of_version,
                 as_of_timestamp=as_of_timestamp,
             )
+
+            if read_config.streaming:
+                ctx.info("Streaming read enabled")
+                self._execution_steps.append("Streaming read enabled")
 
             row_count = self._count_rows(df) if df is not None else 0
             metrics.rows_out = row_count
@@ -465,6 +495,25 @@ class NodeExecutor:
             if hwm_state and hwm_state[0] == state_key:
                 last_hwm = hwm_state[1]
 
+            # Apply watermark_lag: subtract lag duration from HWM for late-arriving data
+            if last_hwm is not None and inc.watermark_lag:
+                lag_delta = parse_duration(inc.watermark_lag)
+                if lag_delta:
+                    ctx = get_logging_context()
+                    ctx.debug(
+                        f"Applying watermark_lag: {inc.watermark_lag}",
+                        original_hwm=str(last_hwm),
+                    )
+                    # Subtract lag from HWM to handle late-arriving data
+                    if hasattr(last_hwm, "__sub__"):
+                        last_hwm = last_hwm - lag_delta
+                        ctx.info(
+                            "Watermark lag applied",
+                            lag=inc.watermark_lag,
+                            adjusted_hwm=str(last_hwm),
+                        )
+                        self._execution_steps.append(f"Applied watermark_lag: {inc.watermark_lag}")
+
             # Filter
             if last_hwm is not None:
                 # Apply filter: col > last_hwm (with fallback if configured)
@@ -487,6 +536,64 @@ class NodeExecutor:
                 return df, (state_key, new_max)
 
         return df, None
+
+    def _execute_pre_sql(
+        self,
+        config: NodeConfig,
+        ctx: Optional["LoggingContext"] = None,
+    ) -> None:
+        """Execute pre-SQL statements before node runs."""
+        if ctx is None:
+            ctx = get_logging_context()
+
+        if not config.pre_sql:
+            return
+
+        ctx.info(f"Executing {len(config.pre_sql)} pre-SQL statement(s)")
+
+        for i, sql in enumerate(config.pre_sql, 1):
+            ctx.debug(f"Executing pre_sql [{i}/{len(config.pre_sql)}]", sql_preview=sql[:100])
+            try:
+                self.engine.execute_sql(sql, self.context)
+                self._executed_sql.append(f"pre_sql[{i}]: {sql[:50]}...")
+            except Exception as e:
+                ctx.error(
+                    "Pre-SQL statement failed",
+                    statement_index=i,
+                    error=str(e),
+                )
+                raise
+
+        self._execution_steps.append(f"Executed {len(config.pre_sql)} pre-SQL statement(s)")
+
+    def _execute_post_sql(
+        self,
+        config: NodeConfig,
+        ctx: Optional["LoggingContext"] = None,
+    ) -> None:
+        """Execute post-SQL statements after node completes."""
+        if ctx is None:
+            ctx = get_logging_context()
+
+        if not config.post_sql:
+            return
+
+        ctx.info(f"Executing {len(config.post_sql)} post-SQL statement(s)")
+
+        for i, sql in enumerate(config.post_sql, 1):
+            ctx.debug(f"Executing post_sql [{i}/{len(config.post_sql)}]", sql_preview=sql[:100])
+            try:
+                self.engine.execute_sql(sql, self.context)
+                self._executed_sql.append(f"post_sql[{i}]: {sql[:50]}...")
+            except Exception as e:
+                ctx.error(
+                    "Post-SQL statement failed",
+                    statement_index=i,
+                    error=str(e),
+                )
+                raise
+
+        self._execution_steps.append(f"Executed {len(config.post_sql)} post-SQL statement(s)")
 
     def _execute_contracts_phase(
         self,
@@ -1179,6 +1286,36 @@ class NodeExecutor:
             deep_diag = write_options.pop("deep_diagnostics", False)
             diff_keys = write_options.pop("diff_keys", None)
 
+            # Extract partition_by from WriteConfig and add to write_options
+            if write_config.partition_by:
+                write_options["partition_by"] = write_config.partition_by
+                ctx.debug("Partitioning by", columns=write_config.partition_by)
+                self._execution_steps.append(f"Partition by: {write_config.partition_by}")
+
+            # Extract zorder_by from WriteConfig and add to write_options (Delta only)
+            if write_config.zorder_by:
+                if write_config.format == "delta":
+                    write_options["zorder_by"] = write_config.zorder_by
+                    ctx.debug("Z-Ordering by", columns=write_config.zorder_by)
+                    self._execution_steps.append(f"Z-Order by: {write_config.zorder_by}")
+                else:
+                    ctx.warning(
+                        "zorder_by is only supported for Delta format, ignoring",
+                        format=write_config.format,
+                    )
+
+            # Extract merge_schema from WriteConfig (Delta schema evolution)
+            if write_config.merge_schema:
+                if write_config.format == "delta":
+                    write_options["mergeSchema"] = True
+                    ctx.debug("Schema evolution enabled (mergeSchema=true)")
+                    self._execution_steps.append("Schema evolution enabled (mergeSchema)")
+                else:
+                    # For Spark with other formats, use schema_mode if applicable
+                    write_options["schema_mode"] = "merge"
+                    ctx.debug("Schema merge mode enabled")
+                    self._execution_steps.append("Schema merge mode enabled")
+
             if write_config.format == "delta":
                 merged_props = {}
                 if self.performance_config and hasattr(
@@ -1189,6 +1326,39 @@ class NodeExecutor:
                     merged_props.update(write_config.table_properties)
                 if merged_props:
                     write_options["table_properties"] = merged_props
+
+            # Handle materialized strategy
+            if config.materialized:
+                if config.materialized == "view":
+                    # Create a view instead of writing to table
+                    if write_config.table and hasattr(self.engine, "create_view"):
+                        ctx.info(f"Creating view: {write_config.table}")
+                        self.engine.create_view(
+                            df=df,
+                            view_name=write_config.table,
+                            connection=connection,
+                        )
+                        self._execution_steps.append(f"Created view: {write_config.table}")
+                        ctx.info(
+                            f"View created: {write_config.table}",
+                            materialized="view",
+                            rows=row_count,
+                        )
+                        return
+                    else:
+                        ctx.warning(
+                            "View materialization requires table name and engine support",
+                            table=write_config.table,
+                        )
+                elif config.materialized == "incremental":
+                    # Use append mode for incremental materialization
+                    mode = WriteMode.APPEND
+                    ctx.debug("Using append mode for incremental materialization")
+                    self._execution_steps.append("Materialized: incremental (append mode)")
+                elif config.materialized == "table":
+                    # Default table write behavior
+                    ctx.debug("Using table materialization (default write)")
+                    self._execution_steps.append("Materialized: table")
 
             delta_info = self.engine.write(
                 df=df,
@@ -1991,6 +2161,8 @@ class Node:
                         sleep_time = 2 ** (attempts - 1)
                     elif self.retry_config.backoff == "linear":
                         sleep_time = attempts
+                    elif self.retry_config.backoff == "constant":
+                        sleep_time = 1
 
                     ctx.warning(
                         f"Attempt {attempts} failed, retrying in {sleep_time}s",

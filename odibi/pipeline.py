@@ -214,6 +214,8 @@ class Pipeline:
         resume_from_failure: bool = False,
         max_workers: int = 4,
         on_error: Optional[str] = None,
+        tag: Optional[str] = None,
+        node: Optional[str] = None,
     ) -> PipelineResults:
         """Execute the pipeline.
 
@@ -222,6 +224,9 @@ class Pipeline:
             dry_run: Whether to simulate execution without running operations
             resume_from_failure: Whether to skip successfully completed nodes from last run
             max_workers: Maximum number of parallel threads (default: 4)
+            on_error: Override error handling strategy
+            tag: Filter nodes by tag (only nodes with this tag will run)
+            node: Run only the specific node by name
 
         Returns:
             PipelineResults with execution details
@@ -237,6 +242,24 @@ class Pipeline:
         # Get execution plan info for logging
         layers = self.graph.get_execution_layers()
         execution_order = self.graph.topological_sort()
+
+        # Apply node filters (--tag, --node)
+        filtered_nodes = set(execution_order)
+        if tag:
+            filtered_nodes = {name for name in filtered_nodes if tag in self.graph.nodes[name].tags}
+            self._ctx.info(f"Filtering by tag '{tag}': {len(filtered_nodes)} nodes match")
+        if node:
+            if node in self.graph.nodes:
+                filtered_nodes = {node}
+                self._ctx.info(f"Running single node: {node}")
+            else:
+                available = ", ".join(self.graph.nodes.keys())
+                raise ValueError(f"Node '{node}' not found. Available: {available}")
+
+        # Update execution order to only include filtered nodes
+        execution_order = [n for n in execution_order if n in filtered_nodes]
+        layers = [[n for n in layer if n in filtered_nodes] for layer in layers]
+        layers = [layer for layer in layers if layer]  # Remove empty layers
 
         self._ctx.info(
             f"Starting pipeline: {self.config.pipeline}",
@@ -1172,6 +1195,8 @@ class PipelineManager:
         parallel: bool = False,
         max_workers: int = 4,
         on_error: Optional[str] = None,
+        tag: Optional[str] = None,
+        node: Optional[str] = None,
     ) -> Union[PipelineResults, Dict[str, PipelineResults]]:
         """Run one, multiple, or all pipelines.
 
@@ -1182,6 +1207,8 @@ class PipelineManager:
             parallel: Whether to run nodes in parallel.
             max_workers: Maximum number of worker threads for parallel execution.
             on_error: Override error handling strategy (fail_fast, fail_later, ignore).
+            tag: Filter nodes by tag (only nodes with this tag will run).
+            node: Run only the specific node by name.
 
         Returns:
             PipelineResults or Dict of results
@@ -1223,6 +1250,8 @@ class PipelineManager:
                 parallel=parallel,
                 max_workers=max_workers,
                 on_error=on_error,
+                tag=tag,
+                node=node,
             )
 
             result = results[name]
