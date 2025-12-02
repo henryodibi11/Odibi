@@ -671,6 +671,7 @@ class SparkEngine(Engine):
                 format=format,
                 table=table,
                 path=path,
+                register_table=register_table,
                 options=options,
                 streaming_config=streaming_config,
             )
@@ -1163,6 +1164,7 @@ class SparkEngine(Engine):
         format: str,
         table: Optional[str] = None,
         path: Optional[str] = None,
+        register_table: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
         streaming_config: Optional[Any] = None,
     ) -> Dict[str, Any]:
@@ -1174,6 +1176,7 @@ class SparkEngine(Engine):
             format: Output format (delta, kafka, etc.)
             table: Table name
             path: File path
+            register_table: Name to register as external table (if path is used)
             options: Format-specific options
             streaming_config: StreamingWriteConfig with streaming parameters
 
@@ -1194,17 +1197,29 @@ class SparkEngine(Engine):
 
         target_identifier = table or path or "unknown"
 
+        checkpoint_location = streaming_config.checkpoint_location
+        if checkpoint_location and connection:
+            if not checkpoint_location.startswith(
+                ("abfss://", "s3://", "gs://", "dbfs://", "hdfs://", "wasbs://")
+            ):
+                checkpoint_location = connection.get_path(checkpoint_location)
+                ctx.debug(
+                    "Resolved checkpoint location through connection",
+                    original=streaming_config.checkpoint_location,
+                    resolved=checkpoint_location,
+                )
+
         ctx.debug(
             "Starting streaming write",
             format=format,
             target=target_identifier,
             output_mode=streaming_config.output_mode,
-            checkpoint=streaming_config.checkpoint_location,
+            checkpoint=checkpoint_location,
         )
 
         writer = df.writeStream.format(format)
         writer = writer.outputMode(streaming_config.output_mode)
-        writer = writer.option("checkpointLocation", streaming_config.checkpoint_location)
+        writer = writer.option("checkpointLocation", checkpoint_location)
 
         if streaming_config.query_name:
             writer = writer.queryName(streaming_config.query_name)
@@ -1246,6 +1261,22 @@ class SparkEngine(Engine):
                     query_id=str(query.id),
                     query_name=query.name,
                 )
+
+                if register_table and format == "delta":
+                    try:
+                        self.spark.sql(
+                            f"CREATE TABLE IF NOT EXISTS {register_table} "
+                            f"USING DELTA LOCATION '{full_path}'"
+                        )
+                        ctx.info(
+                            f"Registered external table: {register_table}",
+                            path=full_path,
+                        )
+                    except Exception as reg_err:
+                        ctx.warning(
+                            f"Failed to register external table '{register_table}'",
+                            error=str(reg_err),
+                        )
             else:
                 ctx.error("Either path or table must be provided for streaming write")
                 raise ValueError("Either path or table must be provided for streaming write")
