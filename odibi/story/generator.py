@@ -413,7 +413,7 @@ class StoryGenerator:
         ctx = get_logging_context()
 
         if self.is_remote:
-            ctx.warning("Remote cleanup for stories is not yet supported. Storage usage may grow.")
+            self._cleanup_remote()
             return
 
         if self.output_path is None:
@@ -510,6 +510,114 @@ class StoryGenerator:
                 mtime = datetime.fromtimestamp(path.stat().st_mtime)
                 if mtime < cutoff:
                     path.unlink(missing_ok=True)
+
+    def _cleanup_remote(self) -> None:
+        """Clean up old stories from remote storage using fsspec."""
+        ctx = get_logging_context()
+
+        try:
+            import fsspec
+            from datetime import timedelta
+
+            # Build the pipeline stories path
+            pipeline_path = f"{self.output_path_str.rstrip('/')}/{self.pipeline_name}"
+
+            # Get filesystem from the path
+            fs, path_prefix = fsspec.core.url_to_fs(pipeline_path, **self.storage_options)
+
+            # Check if path exists
+            if not fs.exists(path_prefix):
+                ctx.debug("Remote story path does not exist yet", path=pipeline_path)
+                return
+
+            # List all files recursively
+            all_files = []
+            try:
+                for root, dirs, files in fs.walk(path_prefix):
+                    for f in files:
+                        if f.endswith((".html", ".json")):
+                            full_path = f"{root}/{f}" if root else f
+                            all_files.append(full_path)
+            except Exception as e:
+                ctx.debug(f"Could not walk remote path: {e}")
+                return
+
+            if not all_files:
+                return
+
+            # Sort by path (which includes date folders) - newest first
+            all_files.sort(reverse=True)
+
+            # Separate html and json
+            html_files = [f for f in all_files if f.endswith(".html")]
+            json_files = [f for f in all_files if f.endswith(".json")]
+
+            deleted_count = 0
+
+            # Apply count retention
+            if self.retention_count is not None:
+                if len(html_files) > self.retention_count:
+                    for f in html_files[self.retention_count :]:
+                        try:
+                            fs.rm(f)
+                            deleted_count += 1
+                        except Exception:
+                            pass
+
+                if len(json_files) > self.retention_count:
+                    for f in json_files[self.retention_count :]:
+                        try:
+                            fs.rm(f)
+                            deleted_count += 1
+                        except Exception:
+                            pass
+
+            # Apply time retention
+            if self.retention_days is not None:
+                cutoff = datetime.now() - timedelta(days=self.retention_days)
+                cutoff_str = cutoff.strftime("%Y-%m-%d")
+
+                # Check remaining files
+                retention_count = self.retention_count or 100
+                remaining = html_files[:retention_count] + json_files[:retention_count]
+
+                for f in remaining:
+                    # Try to parse date from path (format: .../YYYY-MM-DD/run_*.html)
+                    try:
+                        parts = f.replace("\\", "/").split("/")
+                        for part in parts:
+                            if len(part) == 10 and part[4] == "-" and part[7] == "-":
+                                if part < cutoff_str:
+                                    try:
+                                        fs.rm(f)
+                                        deleted_count += 1
+                                    except Exception:
+                                        pass
+                                break
+                    except Exception:
+                        pass
+
+            # Clean empty date directories
+            try:
+                for item in fs.ls(path_prefix, detail=False):
+                    if fs.isdir(item):
+                        contents = fs.ls(item, detail=False)
+                        if not contents:
+                            fs.rmdir(item)
+            except Exception:
+                pass
+
+            if deleted_count > 0:
+                ctx.debug(
+                    "Remote story cleanup completed",
+                    deleted=deleted_count,
+                    pipeline=self.pipeline_name,
+                )
+
+        except ImportError:
+            ctx.debug("fsspec not available for remote cleanup")
+        except Exception as e:
+            ctx.warning(f"Remote story cleanup failed: {e}")
 
     # Legacy methods removed as they are now handled by renderers
     # _generate_node_section, _sample_to_markdown, _dataframe_to_markdown
