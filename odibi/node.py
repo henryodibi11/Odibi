@@ -2404,6 +2404,7 @@ class Node:
                 return result
 
             finally:
+
                 def safe_default(o):
                     return str(o)
 
