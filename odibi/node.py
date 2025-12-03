@@ -1505,7 +1505,9 @@ class NodeExecutor:
             if df is not None and table_path:
                 schema = self._get_schema(df)
                 if isinstance(schema, dict):
-                    pipeline_name = self.pipeline_name or (config.tags[0] if config.tags else "unknown")
+                    pipeline_name = self.pipeline_name or (
+                        config.tags[0] if config.tags else "unknown"
+                    )
                     self.catalog_manager.track_schema(
                         table_path=table_path,
                         schema=schema,
@@ -1552,7 +1554,9 @@ class NodeExecutor:
                     source_path = read_config.path or read_config.table
 
                 if source_path:
-                    pipeline_name = self.pipeline_name or (config.tags[0] if config.tags else "unknown")
+                    pipeline_name = self.pipeline_name or (
+                        config.tags[0] if config.tags else "unknown"
+                    )
                     self.catalog_manager.record_lineage(
                         source_table=source_path,
                         target_table=table_path,
@@ -2300,7 +2304,8 @@ class Node:
 
                     self.catalog_manager.log_run(
                         run_id=str(uuid.uuid4()),
-                        pipeline_name=self.pipeline_name or (self.config.tags[0] if self.config.tags else "unknown"),
+                        pipeline_name=self.pipeline_name
+                        or (self.config.tags[0] if self.config.tags else "unknown"),
                         node_name=self.config.name,
                         status="SUCCESS" if result_for_log.success else "FAILURE",
                         rows_processed=result_for_log.rows_processed or 0,

@@ -601,11 +601,7 @@ class Pipeline:
                             layer_failed = True
 
                             node_config = self.graph.nodes[node_name]
-                            strategy = (
-                                ErrorStrategy(on_error)
-                                if on_error
-                                else node_config.on_error
-                            )
+                            strategy = ErrorStrategy(on_error) if on_error else node_config.on_error
                             if strategy == ErrorStrategy.FAIL_FAST:
                                 self._ctx.error(
                                     "FAIL_FAST triggered: Stopping pipeline",
