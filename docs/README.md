@@ -15,9 +15,11 @@ Step-by-step lessons that take you from "Zero" to "Running Pipeline".
 ### 2. 📘 How-To Guides (Task-Oriented)
 *Read these when you need to solve a specific problem.*
 Practical recipes for common tasks.
+*   **[Best Practices](guides/best_practices.md):** Project organization, naming, performance, and more.
 *   **[Writing Custom Transformations](guides/writing_transformations.md):** How to write Python logic for your pipeline.
 *   **[Using the CLI](guides/cli_master_guide.md):** Running, stress-testing, and debugging.
 *   **[Production Deployment](guides/production_deployment.md):** Moving from laptop to cloud.
+*   **[Performance Tuning](guides/performance_tuning.md):** Optimize for speed and scale.
 *   **[WSL Setup](guides/wsl_setup.md):** The definitive guide for Windows users.
 
 ### 3. ⚙️ Reference (Information-Oriented)
@@ -41,4 +43,4 @@ Practical recipes for common tasks.
 
 ---
 
-*This documentation is versioned with the Odibi framework. Last updated: November 2025.*
+*This documentation is versioned with the Odibi framework. Last updated: December 2025.*

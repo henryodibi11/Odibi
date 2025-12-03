@@ -82,6 +82,41 @@ def my_func(df, threshold=10):
 
 ---
 
+## Cross-Pipeline Dependencies
+
+Reference outputs from other pipelines using `$pipeline.node` syntax:
+
+```yaml
+nodes:
+  - name: enriched_data
+    inputs:
+      # Cross-pipeline reference
+      events: $read_bronze.shift_events
+
+      # Explicit read config
+      calendar:
+        connection: prod
+        path: "bronze/calendar"
+        format: delta
+    transform:
+      steps:
+        - operation: join
+          left: events
+          right: calendar
+          on: [date_id]
+```
+
+| Syntax | Example | Description |
+| :--- | :--- | :--- |
+| `$pipeline.node` | `$read_bronze.orders` | Reference node output from another pipeline |
+
+**Requirements:**
+- Referenced pipeline must have run first
+- Referenced node must have a `write` block
+- Cannot use both `read` and `inputs` in same node
+
+---
+
 ## SQL Templates
 
 | Variable | Value |

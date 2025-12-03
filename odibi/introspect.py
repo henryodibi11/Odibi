@@ -101,6 +101,8 @@ GROUP_MAPPING = {
     "GateConfig": "Operation",
     "GateThreshold": "Operation",
     "RowCountGate": "Operation",
+    # Cross-Pipeline Dependencies
+    "ReferenceResolutionError": "Core",
 }
 
 # Map modules to readable Categories

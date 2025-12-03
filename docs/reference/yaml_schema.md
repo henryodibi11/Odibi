@@ -380,7 +380,8 @@ These are the built-in functions you can use in two ways:
 | **tags** | List[str] | No | `PydanticUndefined` | Operational tags for selective execution (e.g., 'daily', 'critical'). Use with `odibi run --tag`. |
 | **depends_on** | List[str] | No | `PydanticUndefined` | List of parent nodes that must complete before this node runs. The output of these nodes is available for reading. |
 | **columns** | Dict[str, [ColumnMetadata](#columnmetadata)] | No | `PydanticUndefined` | Data Dictionary defining the output schema. Used for documentation, PII tagging, and validation. |
-| **read** | Optional[[ReadConfig](#readconfig)] | No | - | Input operation (Load). If missing, data is taken from the first dependency. |
+| **read** | Optional[[ReadConfig](#readconfig)] | No | - | Input operation (Load). If missing, data is taken from the first dependency. Cannot be used with `inputs`. |
+| **inputs** | Optional[Dict[str, str \| Dict]] | No | - | Multi-input support for cross-pipeline dependencies. Map input names to `$pipeline.node` references or explicit read configs. Cannot be used with `read`. See [Cross-Pipeline Dependencies](#cross-pipeline-dependencies). |
 | **transform** | Optional[[TransformConfig](#transformconfig)] | No | - | Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present. |
 | **write** | Optional[[WriteConfig](#writeconfig)] | No | - | Output operation (Save to file/table). |
 | **streaming** | bool | No | `False` | Enable streaming execution for this node (Spark only) |
@@ -397,6 +398,75 @@ These are the built-in functions you can use in two ways:
 | **schema_policy** | Optional[[SchemaPolicyConfig](#schemapolicyconfig)] | No | - | Schema drift handling policy |
 | **privacy** | Optional[[PrivacyConfig](#privacyconfig)] | No | - | Privacy Suite: PII anonymization settings |
 | **sensitive** | bool | List[str] | No | `False` | If true or list of columns, masks sample data in stories |
+
+---
+
+### Cross-Pipeline Dependencies
+
+The `inputs` block enables multi-input nodes that read from other pipelines' outputs. This supports the medallion architecture pattern (bronze → silver → gold).
+
+#### Reference Syntax: `$pipeline.node`
+
+```yaml
+inputs:
+  # Cross-pipeline reference: resolved via Odibi Catalog
+  events: $read_bronze.shift_events
+
+  # Explicit read config (for non-dependent reads)
+  calendar:
+    connection: goat_prod
+    path: "bronze/calendar"
+    format: delta
+```
+
+#### How It Works
+
+1. **Bronze pipeline runs first**, writes data with a `write` block
+2. **Odibi Catalog** stores output metadata in `meta_outputs` table
+3. **Silver pipeline** references bronze outputs using `$pipeline.node`
+4. **At runtime**, references are resolved to actual paths/tables
+
+#### Full Example
+
+**Bronze Pipeline:**
+```yaml
+pipeline: read_bronze
+nodes:
+  - name: shift_events
+    read:
+      connection: opsvisdata
+      table: OEE.ShiftDowntimeEvents
+    write:
+      connection: goat_prod
+      format: delta
+      path: "bronze/OEE/shift_events"
+```
+
+**Silver Pipeline:**
+```yaml
+pipeline: transform_silver
+nodes:
+  - name: enriched_events
+    inputs:
+      events: $read_bronze.shift_events      # ← Cross-pipeline reference
+      calendar: $read_bronze.vw_calendar     # ← Another reference
+    transform:
+      steps:
+        - operation: join
+          left: events
+          right: calendar
+          on: [DateId]
+    write:
+      connection: goat_prod
+      format: delta
+      path: "silver/OEE/enriched_events"
+```
+
+#### Validation Rules
+
+- Cannot use both `read` and `inputs` in the same node
+- Referenced pipeline must have run previously
+- Referenced node must have a `write` block
 
 ---
 

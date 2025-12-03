@@ -2242,6 +2242,17 @@ class NodeConfig(BaseModel):
         default=None,
         description="Input operation (Load). If missing, data is taken from the first dependency.",
     )
+    inputs: Optional[Dict[str, Union[str, Dict[str, Any]]]] = Field(
+        default=None,
+        description=(
+            "Multi-input support for cross-pipeline dependencies. "
+            "Map input names to either: "
+            "1) $pipeline.node reference (e.g., '$read_bronze.shift_events') "
+            "2) Explicit read config dict. "
+            "Cannot be used with 'read'. "
+            "Example: inputs: {events: '$read_bronze.events', calendar: {connection: 'goat', path: 'cal'}}"
+        ),
+    )
     transform: Optional[TransformConfig] = Field(
         default=None,
         description="Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present.",
@@ -2312,9 +2323,19 @@ class NodeConfig(BaseModel):
     @model_validator(mode="after")
     def check_at_least_one_operation(self):
         """Ensure at least one operation is defined."""
-        if not any([self.read, self.transform, self.write, self.transformer]):
+        if not any([self.read, self.inputs, self.transform, self.write, self.transformer]):
             raise ValueError(
-                f"Node '{self.name}' must have at least one of: read, transform, write, transformer"
+                f"Node '{self.name}' must have at least one of: read, inputs, transform, write, transformer"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_read_inputs_exclusive(self):
+        """Ensure read and inputs are mutually exclusive."""
+        if self.read and self.inputs:
+            raise ValueError(
+                f"Node '{self.name}': Cannot have both 'read' and 'inputs'. "
+                "Use 'read' for single-source nodes or 'inputs' for multi-source cross-pipeline dependencies."
             )
         return self
 

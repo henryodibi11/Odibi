@@ -96,11 +96,13 @@ class CatalogManager:
             "meta_nodes": f"{self.base_path}/meta_nodes",
             "meta_schemas": f"{self.base_path}/meta_schemas",
             "meta_lineage": f"{self.base_path}/meta_lineage",
+            "meta_outputs": f"{self.base_path}/meta_outputs",
         }
 
         # Cache for meta table reads (invalidated on write operations)
         self._pipelines_cache: Optional[Dict[str, Dict[str, Any]]] = None
         self._nodes_cache: Optional[Dict[str, Dict[str, str]]] = None
+        self._outputs_cache: Optional[Dict[str, Dict[str, Any]]] = None
 
     @property
     def is_spark_mode(self) -> bool:
@@ -121,6 +123,7 @@ class CatalogManager:
         """Invalidate all cached meta table data."""
         self._pipelines_cache = None
         self._nodes_cache = None
+        self._outputs_cache = None
 
     def _get_all_pipelines_cached(self) -> Dict[str, Dict[str, Any]]:
         """Get all pipelines with caching."""
@@ -207,6 +210,7 @@ class CatalogManager:
         self._ensure_table("meta_nodes", self._get_schema_meta_nodes())
         self._ensure_table("meta_schemas", self._get_schema_meta_schemas())
         self._ensure_table("meta_lineage", self._get_schema_meta_lineage())
+        self._ensure_table("meta_outputs", self._get_schema_meta_outputs())
 
     def _ensure_table(
         self,
@@ -347,7 +351,7 @@ class CatalogManager:
                     for field in expected_schema.fields:
                         if field.name in existing_fields:
                             existing_type = existing_fields[field.name]
-                            if type(existing_type) is not type(field.dataType):
+                            if not isinstance(existing_type, type(field.dataType)):
                                 from pyspark.sql import functions as F
 
                                 if isinstance(existing_type, ArrayType) and isinstance(
@@ -570,6 +574,30 @@ class CatalogManager:
                 StructField("relationship", StringType(), False),  # "feeds" | "derived_from"
                 StructField("last_observed", TimestampType(), False),
                 StructField("run_id", StringType(), True),
+            ]
+        )
+
+    def _get_schema_meta_outputs(self) -> StructType:
+        """
+        meta_outputs (Node Outputs Registry): Tracks output metadata for cross-pipeline dependencies.
+
+        Stores output metadata for every node that has a `write` block.
+        Primary key: (pipeline_name, node_name)
+        """
+        return StructType(
+            [
+                StructField("pipeline_name", StringType(), False),
+                StructField("node_name", StringType(), False),
+                StructField(
+                    "output_type", StringType(), False
+                ),  # "external_table" | "managed_table"
+                StructField("connection_name", StringType(), True),
+                StructField("path", StringType(), True),
+                StructField("format", StringType(), True),
+                StructField("table_name", StringType(), True),
+                StructField("last_run", TimestampType(), False),
+                StructField("row_count", LongType(), True),
+                StructField("updated_at", TimestampType(), False),
             ]
         )
 
@@ -798,6 +826,172 @@ class CatalogManager:
 
         except Exception as e:
             logger.warning(f"Failed to batch register nodes: {e}")
+
+    def register_outputs_batch(
+        self,
+        records: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Batch registers/upserts multiple node outputs to meta_outputs.
+
+        Uses MERGE INTO for efficient upsert. This is performance critical -
+        all outputs are collected during pipeline execution and written in a
+        single batch at the end.
+
+        Args:
+            records: List of dicts with keys:
+                - pipeline_name: str (pipeline identifier)
+                - node_name: str (node identifier)
+                - output_type: str ("external_table" | "managed_table")
+                - connection_name: str (nullable, for external tables)
+                - path: str (nullable, storage path)
+                - format: str (delta, parquet, etc.)
+                - table_name: str (nullable, registered table name)
+                - last_run: datetime (execution timestamp)
+                - row_count: int (nullable)
+        """
+        if not self.spark and not self.engine:
+            return
+
+        if not records:
+            return
+
+        try:
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                schema = self._get_schema_meta_outputs()
+                input_schema = StructType(schema.fields[:-1])  # Exclude updated_at
+
+                rows = [
+                    (
+                        r["pipeline_name"],
+                        r["node_name"],
+                        r["output_type"],
+                        r.get("connection_name"),
+                        r.get("path"),
+                        r.get("format"),
+                        r.get("table_name"),
+                        r["last_run"],
+                        r.get("row_count"),
+                    )
+                    for r in records
+                ]
+                df = self.spark.createDataFrame(rows, input_schema)
+                df = df.withColumn("updated_at", F.current_timestamp())
+
+                view_name = "_odibi_meta_outputs_batch_upsert"
+                df.createOrReplaceTempView(view_name)
+
+                target_path = self.tables["meta_outputs"]
+
+                merge_sql = f"""
+                    MERGE INTO delta.`{target_path}` AS target
+                    USING {view_name} AS source
+                    ON target.pipeline_name = source.pipeline_name
+                       AND target.node_name = source.node_name
+                    WHEN MATCHED THEN UPDATE SET
+                        target.output_type = source.output_type,
+                        target.connection_name = source.connection_name,
+                        target.path = source.path,
+                        target.format = source.format,
+                        target.table_name = source.table_name,
+                        target.last_run = source.last_run,
+                        target.row_count = source.row_count,
+                        target.updated_at = source.updated_at
+                    WHEN NOT MATCHED THEN INSERT *
+                """
+                self.spark.sql(merge_sql)
+                self.spark.catalog.dropTempView(view_name)
+
+            elif self.engine:
+                import pandas as pd
+
+                data = {
+                    "pipeline_name": [r["pipeline_name"] for r in records],
+                    "node_name": [r["node_name"] for r in records],
+                    "output_type": [r["output_type"] for r in records],
+                    "connection_name": [r.get("connection_name") for r in records],
+                    "path": [r.get("path") for r in records],
+                    "format": [r.get("format") for r in records],
+                    "table_name": [r.get("table_name") for r in records],
+                    "last_run": [r["last_run"] for r in records],
+                    "row_count": [r.get("row_count") for r in records],
+                    "updated_at": [datetime.now(timezone.utc) for _ in records],
+                }
+                df = pd.DataFrame(data)
+
+                self.engine.write(
+                    df,
+                    connection=None,
+                    format="delta",
+                    path=self.tables["meta_outputs"],
+                    mode="upsert",
+                    options={"keys": ["pipeline_name", "node_name"]},
+                )
+
+            self._outputs_cache = None
+            logger.debug(f"Batch registered {len(records)} output(s)")
+
+        except Exception as e:
+            logger.warning(f"Failed to batch register outputs: {e}")
+
+    def _get_all_outputs_cached(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get all outputs with caching.
+
+        Returns:
+            Dict mapping "{pipeline_name}.{node_name}" -> output record
+        """
+        if self._outputs_cache is not None:
+            return self._outputs_cache
+
+        self._outputs_cache = {}
+        if not self.spark and not self.engine:
+            return self._outputs_cache
+
+        try:
+            if self.spark:
+                df = self.spark.read.format("delta").load(self.tables["meta_outputs"])
+                rows = df.collect()
+                for row in rows:
+                    row_dict = row.asDict()
+                    key = f"{row_dict['pipeline_name']}.{row_dict['node_name']}"
+                    self._outputs_cache[key] = row_dict
+            elif self.engine:
+                df = self._read_local_table(self.tables["meta_outputs"])
+                if not df.empty and "pipeline_name" in df.columns:
+                    for _, row in df.iterrows():
+                        key = f"{row['pipeline_name']}.{row['node_name']}"
+                        self._outputs_cache[key] = row.to_dict()
+        except Exception as e:
+            logger.debug(f"Could not cache outputs: {e}")
+            self._outputs_cache = {}
+
+        return self._outputs_cache
+
+    def get_node_output(
+        self,
+        pipeline_name: str,
+        node_name: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieves output metadata for a specific node.
+
+        Used for cross-pipeline dependency resolution ($pipeline.node references).
+
+        Args:
+            pipeline_name: Name of the pipeline
+            node_name: Name of the node
+
+        Returns:
+            Dict with output metadata or None if not found.
+            Keys: pipeline_name, node_name, output_type, connection_name,
+                  path, format, table_name, last_run, row_count
+        """
+        outputs_cache = self._get_all_outputs_cached()
+        key = f"{pipeline_name}.{node_name}"
+        return outputs_cache.get(key)
 
     def _prepare_pipeline_record(self, pipeline_config: Any) -> Dict[str, Any]:
         """Prepare a pipeline record for batch registration."""

@@ -278,10 +278,12 @@ class TestNodeConfig:
         assert config.write is not None
 
     def test_node_requires_at_least_one_operation(self):
-        """Node must have at least one of: read, transform, write."""
+        """Node must have at least one of: read, inputs, transform, write, transformer."""
         with pytest.raises(ValidationError) as exc_info:
             NodeConfig(name="empty_node")
-        assert "must have at least one of: read, transform, write" in str(exc_info.value)
+        assert "must have at least one of: read, inputs, transform, write, transformer" in str(
+            exc_info.value
+        )
 
     def test_node_with_dependencies(self):
         """Node can declare dependencies."""

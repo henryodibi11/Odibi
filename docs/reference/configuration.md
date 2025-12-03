@@ -279,6 +279,7 @@ class NodeConfig(BaseModel):
     name: str  # Required (unique within pipeline)
     depends_on: List[str] = []
     read: Optional[ReadConfig] = None
+    inputs: Optional[Dict[str, Union[str, Dict[str, Any]]]] = None  # Cross-pipeline dependencies
     transform: Optional[TransformConfig] = None
     write: Optional[WriteConfig] = None
     cache: bool = False
@@ -298,10 +299,37 @@ nodes:
     cache: true                  # → cache
 ```
 
+**Cross-Pipeline Dependencies (`inputs` block):**
+
+For multi-input nodes that read from other pipelines, use the `inputs` block instead of `read`:
+
+```yaml
+nodes:
+  - name: enriched_data
+    inputs:
+      events: $read_bronze.shift_events      # Cross-pipeline reference
+      calendar:                               # Explicit read config
+        connection: goat_prod
+        path: "bronze/calendar"
+        format: delta
+    transform:
+      steps:
+        - operation: join
+          left: events
+          right: calendar
+          on: [date_id]
+```
+
+**Reference Syntax:** `$pipeline_name.node_name`
+- The `$` prefix indicates a cross-pipeline reference
+- References are resolved via the Odibi Catalog (`meta_outputs` table)
+- The referenced node must have a `write` block and the pipeline must have run previously
+
 **Validation Rules:**
-- Node must have **at least one** of: `read`, `transform`, `write`
+- Node must have **at least one** of: `read`, `inputs`, `transform`, `write`
 - All node names must be **unique** within a pipeline
 - Connections referenced in `read.connection` or `write.connection` should exist (warned, not enforced)
+- **Cannot have both `read` and `inputs`** — use `read` for single-source nodes or `inputs` for multi-source cross-pipeline dependencies
 
 ---
 

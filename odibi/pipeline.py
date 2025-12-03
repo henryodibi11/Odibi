@@ -778,6 +778,24 @@ class Pipeline:
                     record_count=len(run_records),
                 )
 
+            # Batch write output metadata for cross-pipeline dependencies
+            output_records = []
+            for node_result in results.node_results.values():
+                if node_result.metadata and "_output_record" in node_result.metadata:
+                    output_records.append(node_result.metadata.pop("_output_record"))
+            if output_records:
+                try:
+                    self.catalog_manager.register_outputs_batch(output_records)
+                    self._ctx.debug(
+                        f"Batch registered {len(output_records)} output(s)",
+                        output_count=len(output_records),
+                    )
+                except Exception as e:
+                    self._ctx.warning(
+                        f"Failed to register outputs (non-fatal): {e}",
+                        error_type=type(e).__name__,
+                    )
+
         # Finish progress display
         if progress:
             progress.finish(

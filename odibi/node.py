@@ -195,29 +195,46 @@ class NodeExecutor:
                 with phase_timer.phase("pre_sql"):
                     self._execute_pre_sql(config, ctx)
 
-                # 1. Read Phase
-                with phase_timer.phase("read"):
-                    result_df, pending_hwm_update = self._execute_read_phase(config, hwm_state, ctx)
+                # 1. Read Phase (either single read, multi-input, or dependency)
+                input_dataframes: Dict[str, Any] = {}
 
-                # If no direct read, check dependencies or use passed input_df
-                if result_df is None:
-                    if input_df is not None:
-                        result_df = input_df
-                        ctx.debug(
-                            "Using provided input_df",
-                            rows=self._count_rows(input_df) if input_df is not None else 0,
-                        )
-                    elif config.depends_on:
-                        result_df = self.context.get(config.depends_on[0])
-                        if input_df is None:
-                            input_df = result_df
-                        ctx.debug(
-                            f"Using data from dependency: {config.depends_on[0]}",
-                            rows=self._count_rows(result_df) if result_df is not None else 0,
+                if config.inputs:
+                    # Multi-input mode for cross-pipeline dependencies
+                    with phase_timer.phase("inputs"):
+                        input_dataframes = self._execute_inputs_phase(config, ctx)
+                        # For transform phase, use first input as primary (or "df" if named)
+                        if "df" in input_dataframes:
+                            result_df = input_dataframes["df"]
+                        elif input_dataframes:
+                            first_key = next(iter(input_dataframes))
+                            result_df = input_dataframes[first_key]
+                        input_df = result_df
+                else:
+                    # Standard single read or dependency
+                    with phase_timer.phase("read"):
+                        result_df, pending_hwm_update = self._execute_read_phase(
+                            config, hwm_state, ctx
                         )
 
-                if config.read:
-                    input_df = result_df
+                    # If no direct read, check dependencies or use passed input_df
+                    if result_df is None:
+                        if input_df is not None:
+                            result_df = input_df
+                            ctx.debug(
+                                "Using provided input_df",
+                                rows=self._count_rows(input_df) if input_df is not None else 0,
+                            )
+                        elif config.depends_on:
+                            result_df = self.context.get(config.depends_on[0])
+                            if input_df is None:
+                                input_df = result_df
+                            ctx.debug(
+                                f"Using data from dependency: {config.depends_on[0]}",
+                                rows=self._count_rows(result_df) if result_df is not None else 0,
+                            )
+
+                    if config.read:
+                        input_df = result_df
 
                 # Capture input schema before transformation
                 with phase_timer.phase("schema_capture"):
@@ -247,7 +264,9 @@ class NodeExecutor:
 
                 # 2. Transform Phase
                 with phase_timer.phase("transform"):
-                    result_df = self._execute_transform_phase(config, result_df, input_df, ctx)
+                    result_df = self._execute_transform_phase(
+                        config, result_df, input_df, ctx, input_dataframes
+                    )
 
                 # 3. Validation Phase (returns filtered df if quarantine is used)
                 with phase_timer.phase("validation"):
@@ -504,6 +523,91 @@ class NodeExecutor:
             self._execution_steps.append(f"Read from {config.read.connection}")
             return df, pending_hwm
 
+    def _execute_inputs_phase(
+        self,
+        config: NodeConfig,
+        ctx: Optional["LoggingContext"] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute inputs block for cross-pipeline dependencies.
+
+        Returns a dict of {input_name: DataFrame} for use in transforms.
+        """
+        if ctx is None:
+            ctx = get_logging_context()
+
+        if not config.inputs:
+            return {}
+
+        from odibi.references import is_pipeline_reference, resolve_input_reference
+
+        dataframes = {}
+
+        for name, ref in config.inputs.items():
+            if is_pipeline_reference(ref):
+                if not self.catalog_manager:
+                    raise ValueError(
+                        f"Cannot resolve cross-pipeline reference '{ref}' without catalog manager. "
+                        "Ensure system catalog is configured."
+                    )
+
+                read_config = resolve_input_reference(ref, self.catalog_manager)
+                ctx.debug(
+                    f"Resolved reference '{ref}'",
+                    input_name=name,
+                    resolved_config=read_config,
+                )
+
+                connection = None
+                if "connection" in read_config and read_config["connection"]:
+                    connection = self.connections.get(read_config["connection"])
+                    if connection is None:
+                        raise ValueError(
+                            f"Connection '{read_config['connection']}' not found for input '{name}'. "
+                            f"Available: {', '.join(self.connections.keys())}"
+                        )
+
+                df = self.engine.read(
+                    connection=connection,
+                    format=read_config.get("format"),
+                    table=read_config.get("table"),
+                    path=read_config.get("path"),
+                )
+
+            elif isinstance(ref, dict):
+                conn_name = ref.get("connection")
+                connection = self.connections.get(conn_name) if conn_name else None
+
+                if conn_name and connection is None:
+                    raise ValueError(
+                        f"Connection '{conn_name}' not found for input '{name}'. "
+                        f"Available: {', '.join(self.connections.keys())}"
+                    )
+
+                df = self.engine.read(
+                    connection=connection,
+                    format=ref.get("format"),
+                    table=ref.get("table"),
+                    path=ref.get("path"),
+                )
+
+            else:
+                raise ValueError(
+                    f"Invalid input format for '{name}': {ref}. "
+                    "Expected $pipeline.node reference or read config dict."
+                )
+
+            dataframes[name] = df
+            row_count = self._count_rows(df) if df is not None else 0
+            ctx.info(
+                f"Loaded input '{name}'",
+                rows=row_count,
+                source=ref if isinstance(ref, str) else ref.get("path") or ref.get("table"),
+            )
+            self._execution_steps.append(f"Loaded input '{name}' ({row_count} rows)")
+
+        return dataframes
+
     def _apply_incremental_filtering(
         self, df: Any, config: NodeConfig, hwm_state: Optional[Tuple[str, Any]]
     ) -> Tuple[Any, Optional[Tuple[str, Any]]]:
@@ -736,14 +840,35 @@ class NodeExecutor:
         result_df: Optional[Any],
         input_df: Optional[Any],
         ctx: Optional["LoggingContext"] = None,
+        input_dataframes: Optional[Dict[str, Any]] = None,
     ) -> Optional[Any]:
-        """Execute transformer and transform steps."""
+        """
+        Execute transformer and transform steps.
+
+        Args:
+            config: Node configuration
+            result_df: Current result DataFrame
+            input_df: Input DataFrame (for single-input nodes)
+            ctx: Logging context
+            input_dataframes: Dict of named DataFrames for multi-input nodes (inputs block)
+        """
         if ctx is None:
             ctx = get_logging_context()
+
+        input_dataframes = input_dataframes or {}
 
         pii_meta = self._calculate_pii(config)
         rows_before = self._count_rows(result_df) if result_df is not None else None
         schema_before = self._get_schema(result_df) if result_df is not None else None
+
+        # Register named inputs in context for SQL access
+        if input_dataframes:
+            for name, df in input_dataframes.items():
+                self.context.register(name, df)
+            ctx.debug(
+                f"Registered {len(input_dataframes)} named inputs for transforms",
+                inputs=list(input_dataframes.keys()),
+            )
 
         # Pattern Engine
         if config.transformer:
@@ -1991,6 +2116,12 @@ class NodeExecutor:
                 metadata["sample_data_in"], config.sensitive
             )
 
+        # Create output record for cross-pipeline dependencies (batch written at end of pipeline)
+        if config.write:
+            output_record = self._create_output_record(config, metadata.get("rows"))
+            if output_record:
+                metadata["_output_record"] = output_record
+
         return metadata
 
     def _get_redacted_sample(
@@ -2019,6 +2150,42 @@ class NodeExecutor:
                     if col in row:
                         row[col] = "[REDACTED]"
         return sample
+
+    def _create_output_record(
+        self, config: NodeConfig, row_count: Optional[int]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Create an output record for cross-pipeline dependency tracking.
+
+        This record is collected during execution and batch-written to meta_outputs
+        at the end of pipeline execution for performance.
+
+        Args:
+            config: Node configuration
+            row_count: Number of rows written
+
+        Returns:
+            Dict with output metadata or None if no write config
+        """
+        if not config.write:
+            return None
+
+        write_cfg = config.write
+        output_type = (
+            "managed_table" if write_cfg.table and not write_cfg.path else "external_table"
+        )
+
+        return {
+            "pipeline_name": self.pipeline_name,
+            "node_name": config.name,
+            "output_type": output_type,
+            "connection_name": write_cfg.connection,
+            "path": write_cfg.path,
+            "format": write_cfg.format,
+            "table_name": write_cfg.register_table or write_cfg.table,
+            "last_run": datetime.now(),
+            "row_count": row_count,
+        }
 
     def _get_schema(self, df: Any) -> Any:
         return self.engine.get_schema(df)
