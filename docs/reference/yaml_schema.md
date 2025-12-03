@@ -653,6 +653,21 @@ read:
     badRecordsPath: "/mnt/quarantine/bad_records"
 ```
 
+**Recipe 5: Optimize JDBC Parallelism (Spark)**
+*Control partition count for SQL sources to reduce task overhead.*
+```yaml
+read:
+  connection: "enterprise_dw"
+  format: "sql"
+  table: "small_lookup_table"
+  options:
+    numPartitions: 1  # Single partition for small tables
+```
+
+**Performance Tip:** For small tables (<100K rows), use `numPartitions: 1` to avoid
+excessive Spark task scheduling overhead. For large tables, increase partitions
+to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name from project.yaml |
