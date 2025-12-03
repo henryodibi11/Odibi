@@ -371,9 +371,7 @@ class PipelineProgress:
         else:
             self._print_phase_timing_plain(aggregate, total_ms)
 
-    def _print_phase_timing_rich(
-        self, aggregate: Dict[str, float], total_ms: float
-    ) -> None:
+    def _print_phase_timing_rich(self, aggregate: Dict[str, float], total_ms: float) -> None:
         """Print phase timing report with Rich."""
         from rich.panel import Panel
         from rich.table import Table
@@ -408,9 +406,7 @@ class PipelineProgress:
         )
         console.print(panel)
 
-    def _print_phase_timing_plain(
-        self, aggregate: Dict[str, float], total_ms: float
-    ) -> None:
+    def _print_phase_timing_plain(self, aggregate: Dict[str, float], total_ms: float) -> None:
         """Print phase timing report in plain text."""
         print("\n--- Phase Timing Breakdown ---")
         sorted_phases = sorted(aggregate.items(), key=lambda x: x[1], reverse=True)

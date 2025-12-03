@@ -195,9 +195,7 @@ class NodeExecutor:
 
                 # 1. Read Phase
                 with phase_timer.phase("read"):
-                    result_df, pending_hwm_update = self._execute_read_phase(
-                        config, hwm_state, ctx
-                    )
+                    result_df, pending_hwm_update = self._execute_read_phase(config, hwm_state, ctx)
 
                 # If no direct read, check dependencies or use passed input_df
                 if result_df is None:
@@ -268,9 +266,7 @@ class NodeExecutor:
                 # 6. Metadata Collection
                 with phase_timer.phase("metadata"):
                     duration = time.time() - start_time
-                    metadata = self._collect_metadata(
-                        config, result_df, input_schema, input_sample
-                    )
+                    metadata = self._collect_metadata(config, result_df, input_schema, input_sample)
 
                 rows_out = metadata.get("rows")
                 metrics.rows_out = rows_out
