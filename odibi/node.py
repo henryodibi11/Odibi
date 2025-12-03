@@ -1264,7 +1264,11 @@ class NodeExecutor:
         if connection is None:
             raise ValueError(f"Connection '{write_config.connection}' not found.")
 
-        row_count = self._count_rows(df) if df is not None else 0
+        # For Delta writes, defer row count to avoid double DAG execution.
+        # We'll extract row count from Delta commit metadata after write.
+        # For non-Delta formats, count upfront as before.
+        defer_row_count = write_config.format == "delta" and df is not None
+        row_count = None if defer_row_count else (self._count_rows(df) if df is not None else 0)
         mode = override_mode if override_mode is not None else write_config.mode
 
         with ctx.operation(
@@ -1394,6 +1398,24 @@ class NodeExecutor:
                 options=write_options,
                 streaming_config=write_config.streaming,
             )
+
+            # Extract row count from Delta commit metadata if deferred
+            if defer_row_count:
+                if delta_info:
+                    op_metrics = delta_info.get("operation_metrics") or {}
+                    # Delta returns numOutputRows for most operations
+                    row_count = op_metrics.get("numOutputRows") or op_metrics.get(
+                        "numTargetRowsInserted"
+                    )
+                    if row_count is not None:
+                        try:
+                            row_count = int(row_count)
+                        except (ValueError, TypeError):
+                            row_count = None
+                # Fallback: count if Delta metrics unavailable (e.g., older Delta versions)
+                if row_count is None:
+                    ctx.debug("Delta commit metrics unavailable, falling back to count")
+                    row_count = self._count_rows(df) if df is not None else 0
 
             metrics.rows_out = row_count
 
