@@ -694,7 +694,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                             # Cross Linking
                             th_display = field.type_hint
                             for target in sorted(list(model_names), key=len, reverse=True):
-                                pattern = r"\\b" + re.escape(target) + r"\\b"
+                                pattern = r"\b" + re.escape(target) + r"\b"
                                 if re.search(pattern, th_display):
                                     th_display = re.sub(
                                         pattern, f"[{target}](#{target.lower()})", th_display
@@ -702,7 +702,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
 
                             # Link type aliases to their sections
                             for alias, anchor in TYPE_ALIAS_LINKS.items():
-                                pattern = r"\\b" + re.escape(alias) + r"\\b"
+                                pattern = r"\b" + re.escape(alias) + r"\b"
                                 if re.search(pattern, th_display):
                                     th_display = re.sub(
                                         pattern, f"[{alias}](#{anchor})", th_display

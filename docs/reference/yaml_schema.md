@@ -1806,7 +1806,7 @@ case_when:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **cases** | List[CaseWhenCase] | Yes | - | List of conditional branches |
+| **cases** | List[[CaseWhenCase](#casewhencase)] | Yes | - | List of conditional branches |
 | **default** | str | No | `NULL` | Default value if no condition met |
 | **output_col** | str | Yes | - | Name of the resulting column |
 
@@ -2489,7 +2489,7 @@ params:
 | **target** | str | Yes | - | Target table name or path |
 | **keys** | List[str] | Yes | - | List of join keys |
 | **strategy** | MergeStrategy | No | `MergeStrategy.UPSERT` | Merge behavior: 'upsert', 'append_only', 'delete_match' |
-| **audit_cols** | Optional[AuditColumnsConfig] | No | - | {'created_col': '...', 'updated_col': '...'} |
+| **audit_cols** | Optional[[AuditColumnsConfig](#auditcolumnsconfig)] | No | - | {'created_col': '...', 'updated_col': '...'} |
 | **optimize_write** | bool | No | `False` | Run OPTIMIZE after write (Spark) |
 | **zorder_by** | Optional[List[str]] | No | - | Columns to Z-Order by |
 | **cluster_by** | Optional[List[str]] | No | - | Columns to Liquid Cluster by (Delta) |
