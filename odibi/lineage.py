@@ -64,7 +64,7 @@ class OpenLineageAdapter:
             self.pipeline_run_id = None
             self.pipeline_name = None
         except Exception as e:
-            logger.warning(f"Failed to initialize OpenLineage client: {e}")
+            logger.warning(f"Failed to initialize OpenLineage client: {e}", exc_info=True)
             self.enabled = False
 
     def emit_pipeline_start(self, pipeline_config: PipelineConfig) -> str:
@@ -116,7 +116,7 @@ class OpenLineageAdapter:
             return self.pipeline_run_id
 
         except Exception as e:
-            logger.warning(f"Failed to emit OpenLineage pipeline start: {e}")
+            logger.warning(f"Failed to emit OpenLineage pipeline start: {e}", exc_info=True)
             return str(uuid.uuid4())
 
     def emit_pipeline_complete(self, pipeline_config: PipelineConfig, results: Any):
@@ -155,7 +155,7 @@ class OpenLineageAdapter:
             self.client.emit(event)
 
         except Exception as e:
-            logger.warning(f"Failed to emit OpenLineage pipeline complete: {e}")
+            logger.warning(f"Failed to emit OpenLineage pipeline complete: {e}", exc_info=True)
 
     def emit_node_start(self, config: NodeConfig, parent_run_id: str):
         """Emit node start event."""

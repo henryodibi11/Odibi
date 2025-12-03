@@ -185,6 +185,29 @@ class Pipeline:
             layer_count=len(layers),
         )
 
+    def __enter__(self) -> "Pipeline":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit - cleanup connections."""
+        self._cleanup_connections()
+
+    def _cleanup_connections(self) -> None:
+        """Clean up all connection resources."""
+        if not self.connections:
+            return
+
+        for name, conn in self.connections.items():
+            if hasattr(conn, "close"):
+                try:
+                    conn.close()
+                    self._ctx.debug(f"Closed connection: {name}")
+                except Exception as e:
+                    self._ctx.warning(
+                        f"Failed to close connection {name}: {e}", exc_info=True
+                    )
+
     @classmethod
     def from_yaml(cls, yaml_path: str) -> "PipelineManager":
         """Create PipelineManager from YAML file (recommended).
@@ -398,19 +421,10 @@ class Pipeline:
                 if last_info and last_info.get("success"):
                     last_hash = last_info.get("metadata", {}).get("version_hash")
 
-                    import hashlib
-                    import json
+                    from odibi.utils.hashing import calculate_node_hash
 
                     node_cfg = self.graph.nodes[node_name]
-                    dump = (
-                        node_cfg.model_dump(
-                            mode="json", exclude={"description", "tags", "log_level"}
-                        )
-                        if hasattr(node_cfg, "model_dump")
-                        else node_cfg.dict(exclude={"description", "tags", "log_level"})
-                    )
-                    dump_str = json.dumps(dump, sort_keys=True)
-                    current_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
+                    current_hash = calculate_node_hash(node_cfg)
 
                     if last_hash == current_hash:
                         deps_ran = False
@@ -752,6 +766,19 @@ class Pipeline:
         # Calculate duration
         results.duration = time.time() - start_time
         results.end_time = datetime.now().isoformat()
+
+        # Batch write run records to catalog (much faster than per-node writes)
+        if self.catalog_manager:
+            run_records = []
+            for node_result in results.node_results.values():
+                if node_result.metadata and "_run_record" in node_result.metadata:
+                    run_records.append(node_result.metadata.pop("_run_record"))
+            if run_records:
+                self.catalog_manager.log_runs_batch(run_records)
+                self._ctx.debug(
+                    f"Batch logged {len(run_records)} run records",
+                    record_count=len(run_records),
+                )
 
         # Finish progress display
         if progress:
@@ -1480,6 +1507,11 @@ class PipelineManager:
         This ensures meta_pipelines and meta_nodes are populated automatically
         when running pipelines, without requiring explicit deploy() calls.
 
+        Uses "check-before-write" pattern with batch writes for performance:
+        - Reads existing hashes in one read
+        - Compares version_hash to skip unchanged records
+        - Batch writes only changed/new records
+
         Args:
             pipeline_names: List of pipeline names to register
         """
@@ -1487,24 +1519,88 @@ class PipelineManager:
             return
 
         try:
+            import hashlib
+            import json
+
+            existing_pipelines = self.catalog_manager.get_all_registered_pipelines()
+            existing_nodes = self.catalog_manager.get_all_registered_nodes(pipeline_names)
+
+            pipeline_records = []
+            node_records = []
+
             for name in pipeline_names:
                 pipeline = self._pipelines[name]
                 config = pipeline.config
 
-                self._ctx.debug(
-                    f"Auto-registering pipeline: {name}",
-                    node_count=len(config.nodes),
-                )
+                if hasattr(config, "model_dump"):
+                    dump = config.model_dump(mode="json")
+                else:
+                    dump = config.dict()
+                dump_str = json.dumps(dump, sort_keys=True)
+                pipeline_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
 
-                self.catalog_manager.register_pipeline(config, self.project_config)
+                if existing_pipelines.get(name) != pipeline_hash:
+                    all_tags = set()
+                    for node in config.nodes:
+                        if node.tags:
+                            all_tags.update(node.tags)
 
+                    pipeline_records.append(
+                        {
+                            "pipeline_name": name,
+                            "version_hash": pipeline_hash,
+                            "description": config.description or "",
+                            "layer": config.layer or "",
+                            "schedule": "",
+                            "tags_json": json.dumps(list(all_tags)),
+                        }
+                    )
+
+                pipeline_existing_nodes = existing_nodes.get(name, {})
                 for node in config.nodes:
-                    self.catalog_manager.register_node(config.pipeline, node)
+                    if hasattr(node, "model_dump"):
+                        node_dump = node.model_dump(
+                            mode="json", exclude={"description", "tags", "log_level"}
+                        )
+                    else:
+                        node_dump = node.dict(exclude={"description", "tags", "log_level"})
+                    node_dump_str = json.dumps(node_dump, sort_keys=True)
+                    node_hash = hashlib.md5(node_dump_str.encode("utf-8")).hexdigest()
 
-            self._ctx.debug(
-                f"Auto-registered {len(pipeline_names)} pipeline(s)",
-                pipelines=pipeline_names,
-            )
+                    if pipeline_existing_nodes.get(node.name) != node_hash:
+                        node_type = "transform"
+                        if node.read:
+                            node_type = "read"
+                        if node.write:
+                            node_type = "write"
+
+                        node_records.append(
+                            {
+                                "pipeline_name": name,
+                                "node_name": node.name,
+                                "version_hash": node_hash,
+                                "type": node_type,
+                                "config_json": json.dumps(node_dump),
+                            }
+                        )
+
+            if pipeline_records:
+                self.catalog_manager.register_pipelines_batch(pipeline_records)
+                self._ctx.debug(
+                    f"Batch registered {len(pipeline_records)} changed pipeline(s)",
+                    pipelines=[r["pipeline_name"] for r in pipeline_records],
+                )
+            else:
+                self._ctx.debug("All pipelines unchanged - skipping registration")
+
+            if node_records:
+                self.catalog_manager.register_nodes_batch(node_records)
+                self._ctx.debug(
+                    f"Batch registered {len(node_records)} changed node(s)",
+                    nodes=[r["node_name"] for r in node_records],
+                )
+            else:
+                self._ctx.debug("All nodes unchanged - skipping registration")
 
         except Exception as e:
             self._ctx.warning(

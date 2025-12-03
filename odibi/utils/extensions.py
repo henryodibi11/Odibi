@@ -25,4 +25,4 @@ def load_extensions(path: Path):
                     spec.loader.exec_module(module)
                     logger.info(f"Loaded extension: {file_path}")
             except Exception as e:
-                logger.warning(f"Failed to load {name}: {e}")
+                logger.warning(f"Failed to load {name}: {e}", exc_info=True)

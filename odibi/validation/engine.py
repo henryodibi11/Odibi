@@ -245,9 +245,15 @@ class Validator:
                     msg = f"Freshness check failed: Column '{col}' not found"
 
             elif test.type == TestType.NOT_NULL:
-                for col in test.columns:
-                    if col in df.columns:
-                        null_count = df.filter(F.col(col).isNull()).count()
+                valid_cols = [c for c in test.columns if c in df.columns]
+                if valid_cols:
+                    null_aggs = [
+                        F.sum(F.when(F.col(c).isNull(), 1).otherwise(0)).alias(c)
+                        for c in valid_cols
+                    ]
+                    null_counts = df.agg(*null_aggs).collect()[0].asDict()
+                    for col in valid_cols:
+                        null_count = null_counts.get(col, 0) or 0
                         if null_count > 0:
                             col_msg = f"Column '{col}' contains {null_count} NULLs"
                             ctx.debug(

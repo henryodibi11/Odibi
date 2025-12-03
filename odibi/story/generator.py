@@ -183,9 +183,13 @@ class StoryGenerator:
 
                     current_node.historical_avg_rows = avg_rows
                     current_node.historical_avg_duration = avg_duration
-                except Exception:
-                    # Don't fail story generation if history fetch fails
-                    pass
+                except Exception as e:
+                    ctx = get_logging_context()
+                    ctx.debug(
+                        "Failed to fetch historical metrics for node",
+                        node_name=node_name,
+                        error=str(e),
+                    )
 
         # 2. Render outputs
         timestamp_obj = datetime.now()

@@ -62,7 +62,7 @@ def load_plugins():
                 register_connection_factory(ep.name, factory)
                 logger.info(f"Loaded plugin: {ep.name}")
             except Exception as e:
-                logger.error(f"Failed to load plugin {ep.name}: {e}")
+                logger.error(f"Failed to load plugin {ep.name}: {e}", exc_info=True)
 
     except Exception as e:
-        logger.error(f"Plugin discovery failed: {e}")
+        logger.error(f"Plugin discovery failed: {e}", exc_info=True)

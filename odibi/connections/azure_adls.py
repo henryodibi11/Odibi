@@ -2,6 +2,7 @@
 
 import os
 import posixpath
+import threading
 import warnings
 from typing import Any, Dict, Optional
 
@@ -75,6 +76,7 @@ class AzureADLS(BaseConnection):
         self.client_secret = client_secret
 
         self._cached_key: Optional[str] = None
+        self._cache_lock = threading.Lock()
 
         if validate:
             self.validate()
@@ -215,103 +217,104 @@ class AzureADLS(BaseConnection):
         """
         ctx = get_logging_context()
 
-        # Return cached key if available
-        if self._cached_key:
-            ctx.debug(
-                "Using cached storage key",
-                account=self.account,
-                container=self.container,
-            )
-            return self._cached_key
-
-        if self.auth_mode == "key_vault":
-            ctx.debug(
-                "Fetching storage key from Key Vault",
-                account=self.account,
-                key_vault_name=self.key_vault_name,
-                secret_name=self.secret_name,
-                timeout=timeout,
-            )
-
-            try:
-                import concurrent.futures
-
-                from azure.identity import DefaultAzureCredential
-                from azure.keyvault.secrets import SecretClient
-            except ImportError as e:
-                ctx.error(
-                    "Key Vault authentication failed: missing azure libraries",
+        with self._cache_lock:
+            # Return cached key if available (double-check inside lock)
+            if self._cached_key:
+                ctx.debug(
+                    "Using cached storage key",
                     account=self.account,
-                    error=str(e),
+                    container=self.container,
                 )
-                raise ImportError(
-                    "Key Vault authentication requires 'azure-identity' and "
-                    "'azure-keyvault-secrets'. Install with: pip install odibi[azure]"
-                ) from e
+                return self._cached_key
 
-            # Create Key Vault client
-            credential = DefaultAzureCredential()
-            kv_uri = f"https://{self.key_vault_name}.vault.azure.net"
-            client = SecretClient(vault_url=kv_uri, credential=credential)
+            if self.auth_mode == "key_vault":
+                ctx.debug(
+                    "Fetching storage key from Key Vault",
+                    account=self.account,
+                    key_vault_name=self.key_vault_name,
+                    secret_name=self.secret_name,
+                    timeout=timeout,
+                )
 
-            ctx.debug(
-                "Connecting to Key Vault",
-                key_vault_uri=kv_uri,
-                secret_name=self.secret_name,
-            )
-
-            # Fetch secret with timeout protection
-            def _fetch():
-                secret = client.get_secret(self.secret_name)
-                return secret.value
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_fetch)
                 try:
-                    self._cached_key = future.result(timeout=timeout)
-                    logger.register_secret(self._cached_key)
-                    ctx.info(
-                        "Successfully fetched storage key from Key Vault",
-                        account=self.account,
-                        key_vault_name=self.key_vault_name,
-                    )
-                    return self._cached_key
-                except concurrent.futures.TimeoutError:
+                    import concurrent.futures
+
+                    from azure.identity import DefaultAzureCredential
+                    from azure.keyvault.secrets import SecretClient
+                except ImportError as e:
                     ctx.error(
-                        "Key Vault fetch timed out",
+                        "Key Vault authentication failed: missing azure libraries",
                         account=self.account,
-                        key_vault_name=self.key_vault_name,
-                        secret_name=self.secret_name,
-                        timeout=timeout,
+                        error=str(e),
                     )
-                    raise TimeoutError(
-                        f"Key Vault fetch timed out after {timeout}s for "
-                        f"vault '{self.key_vault_name}', secret '{self.secret_name}'"
-                    )
+                    raise ImportError(
+                        "Key Vault authentication requires 'azure-identity' and "
+                        "'azure-keyvault-secrets'. Install with: pip install odibi[azure]"
+                    ) from e
 
-        elif self.auth_mode == "direct_key":
+                # Create Key Vault client
+                credential = DefaultAzureCredential()
+                kv_uri = f"https://{self.key_vault_name}.vault.azure.net"
+                client = SecretClient(vault_url=kv_uri, credential=credential)
+
+                ctx.debug(
+                    "Connecting to Key Vault",
+                    key_vault_uri=kv_uri,
+                    secret_name=self.secret_name,
+                )
+
+                # Fetch secret with timeout protection
+                def _fetch():
+                    secret = client.get_secret(self.secret_name)
+                    return secret.value
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(_fetch)
+                    try:
+                        self._cached_key = future.result(timeout=timeout)
+                        logger.register_secret(self._cached_key)
+                        ctx.info(
+                            "Successfully fetched storage key from Key Vault",
+                            account=self.account,
+                            key_vault_name=self.key_vault_name,
+                        )
+                        return self._cached_key
+                    except concurrent.futures.TimeoutError:
+                        ctx.error(
+                            "Key Vault fetch timed out",
+                            account=self.account,
+                            key_vault_name=self.key_vault_name,
+                            secret_name=self.secret_name,
+                            timeout=timeout,
+                        )
+                        raise TimeoutError(
+                            f"Key Vault fetch timed out after {timeout}s for "
+                            f"vault '{self.key_vault_name}', secret '{self.secret_name}'"
+                        )
+
+            elif self.auth_mode == "direct_key":
+                ctx.debug(
+                    "Using direct account key",
+                    account=self.account,
+                )
+                return self.account_key
+
+            elif self.auth_mode == "sas_token":
+                # Return cached key (fetched from KV) if available, else sas_token arg
+                ctx.debug(
+                    "Using SAS token",
+                    account=self.account,
+                    from_cache=bool(self._cached_key),
+                )
+                return self._cached_key or self.sas_token
+
+            # For other modes (SP, MI), we don't use an account key
             ctx.debug(
-                "Using direct account key",
+                "No storage key required for auth_mode",
                 account=self.account,
+                auth_mode=self.auth_mode,
             )
-            return self.account_key
-
-        elif self.auth_mode == "sas_token":
-            # Return cached key (fetched from KV) if available, else sas_token arg
-            ctx.debug(
-                "Using SAS token",
-                account=self.account,
-                from_cache=bool(self._cached_key),
-            )
-            return self._cached_key or self.sas_token
-
-        # For other modes (SP, MI), we don't use an account key
-        ctx.debug(
-            "No storage key required for auth_mode",
-            account=self.account,
-            auth_mode=self.auth_mode,
-        )
-        return None
+            return None
 
     def get_client_secret(self) -> Optional[str]:
         """Get Service Principal client secret (cached or literal)."""

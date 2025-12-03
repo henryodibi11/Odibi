@@ -2404,26 +2404,25 @@ class Node:
                 return result
 
             finally:
-                if self.catalog_manager:
+                def safe_default(o):
+                    return str(o)
 
-                    def safe_default(o):
-                        return str(o)
+                try:
+                    metrics_json = json.dumps(result_for_log.metadata, default=safe_default)
+                except Exception:
+                    metrics_json = "{}"
 
-                    try:
-                        metrics_json = json.dumps(result_for_log.metadata, default=safe_default)
-                    except Exception:
-                        metrics_json = "{}"
-
-                    self.catalog_manager.log_run(
-                        run_id=str(uuid.uuid4()),
-                        pipeline_name=self.pipeline_name
-                        or (self.config.tags[0] if self.config.tags else "unknown"),
-                        node_name=self.config.name,
-                        status="SUCCESS" if result_for_log.success else "FAILURE",
-                        rows_processed=result_for_log.rows_processed or 0,
-                        duration_ms=int(result_for_log.duration * 1000),
-                        metrics_json=metrics_json,
-                    )
+                run_record = {
+                    "run_id": str(uuid.uuid4()),
+                    "pipeline_name": self.pipeline_name
+                    or (self.config.tags[0] if self.config.tags else "unknown"),
+                    "node_name": self.config.name,
+                    "status": "SUCCESS" if result_for_log.success else "FAILURE",
+                    "rows_processed": result_for_log.rows_processed or 0,
+                    "duration_ms": int(result_for_log.duration * 1000),
+                    "metrics_json": metrics_json,
+                }
+                result_for_log.metadata["_run_record"] = run_record
 
     def _execute_with_retries(self) -> NodeResult:
         """Execute with internal retry logic."""

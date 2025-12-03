@@ -98,6 +98,89 @@ class CatalogManager:
             "meta_lineage": f"{self.base_path}/meta_lineage",
         }
 
+        # Cache for meta table reads (invalidated on write operations)
+        self._pipelines_cache: Optional[Dict[str, Dict[str, Any]]] = None
+        self._nodes_cache: Optional[Dict[str, Dict[str, str]]] = None
+
+    @property
+    def is_spark_mode(self) -> bool:
+        """Check if running in Spark mode."""
+        return self.spark is not None
+
+    @property
+    def is_pandas_mode(self) -> bool:
+        """Check if running in Pandas mode."""
+        return self.engine is not None and self.engine.name == "pandas"
+
+    @property
+    def has_backend(self) -> bool:
+        """Check if any backend (Spark or engine) is available."""
+        return self.spark is not None or self.engine is not None
+
+    def invalidate_cache(self) -> None:
+        """Invalidate all cached meta table data."""
+        self._pipelines_cache = None
+        self._nodes_cache = None
+
+    def _get_all_pipelines_cached(self) -> Dict[str, Dict[str, Any]]:
+        """Get all pipelines with caching."""
+        if self._pipelines_cache is not None:
+            return self._pipelines_cache
+
+        self._pipelines_cache = {}
+        if not self.spark and not self.engine:
+            return self._pipelines_cache
+
+        try:
+            if self.spark:
+                df = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                rows = df.collect()
+                for row in rows:
+                    row_dict = row.asDict()
+                    self._pipelines_cache[row_dict["pipeline_name"]] = row_dict
+            elif self.engine:
+                df = self._read_local_table(self.tables["meta_pipelines"])
+                if not df.empty and "pipeline_name" in df.columns:
+                    for _, row in df.iterrows():
+                        self._pipelines_cache[row["pipeline_name"]] = row.to_dict()
+        except Exception as e:
+            logger.debug(f"Could not cache pipelines: {e}")
+            self._pipelines_cache = {}
+
+        return self._pipelines_cache
+
+    def _get_all_nodes_cached(self) -> Dict[str, Dict[str, str]]:
+        """Get all nodes grouped by pipeline with caching."""
+        if self._nodes_cache is not None:
+            return self._nodes_cache
+
+        self._nodes_cache = {}
+        if not self.spark and not self.engine:
+            return self._nodes_cache
+
+        try:
+            if self.spark:
+                df = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                rows = df.select("pipeline_name", "node_name", "version_hash").collect()
+                for row in rows:
+                    p_name = row["pipeline_name"]
+                    if p_name not in self._nodes_cache:
+                        self._nodes_cache[p_name] = {}
+                    self._nodes_cache[p_name][row["node_name"]] = row["version_hash"]
+            elif self.engine:
+                df = self._read_local_table(self.tables["meta_nodes"])
+                if not df.empty and "pipeline_name" in df.columns:
+                    for _, row in df.iterrows():
+                        p_name = row["pipeline_name"]
+                        if p_name not in self._nodes_cache:
+                            self._nodes_cache[p_name] = {}
+                        self._nodes_cache[p_name][row["node_name"]] = row["version_hash"]
+        except Exception as e:
+            logger.debug(f"Could not cache nodes: {e}")
+            self._nodes_cache = {}
+
+        return self._nodes_cache
+
     def bootstrap(self) -> None:
         """
         Ensures all system tables exist. Creates them if missing.
@@ -490,76 +573,99 @@ class CatalogManager:
             ]
         )
 
-    def register_pipeline(
+    def get_registered_pipeline(self, pipeline_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get existing registered pipeline record with version_hash.
+
+        Args:
+            pipeline_name: Name of the pipeline to look up
+
+        Returns:
+            Dict with pipeline record including version_hash, or None if not found
+        """
+        pipelines_cache = self._get_all_pipelines_cached()
+        return pipelines_cache.get(pipeline_name)
+
+    def get_registered_nodes(self, pipeline_name: str) -> Dict[str, str]:
+        """
+        Get existing registered nodes for a pipeline with their version hashes.
+
+        Args:
+            pipeline_name: Name of the pipeline to look up nodes for
+
+        Returns:
+            Dict mapping node_name -> version_hash for all registered nodes
+        """
+        nodes_cache = self._get_all_nodes_cached()
+        return nodes_cache.get(pipeline_name, {})
+
+    def get_all_registered_pipelines(self) -> Dict[str, str]:
+        """
+        Get all registered pipelines with their version hashes.
+
+        Returns:
+            Dict mapping pipeline_name -> version_hash
+        """
+        pipelines_cache = self._get_all_pipelines_cached()
+        return {name: data.get("version_hash", "") for name, data in pipelines_cache.items()}
+
+    def get_all_registered_nodes(self, pipeline_names: List[str]) -> Dict[str, Dict[str, str]]:
+        """
+        Get all registered nodes for multiple pipelines with their version hashes.
+
+        Args:
+            pipeline_names: List of pipeline names to look up nodes for
+
+        Returns:
+            Dict mapping pipeline_name -> {node_name -> version_hash}
+        """
+        nodes_cache = self._get_all_nodes_cached()
+        return {name: nodes_cache.get(name, {}) for name in pipeline_names}
+
+    def register_pipelines_batch(
         self,
-        pipeline_config: Any,
-        project_config: Optional[Any] = None,
+        records: List[Dict[str, Any]],
     ) -> None:
         """
-        Registers/Upserts a pipeline definition to meta_pipelines.
+        Batch registers/upserts multiple pipeline definitions to meta_pipelines.
+
+        Args:
+            records: List of dicts with keys: pipeline_name, version_hash, description,
+                     layer, schedule, tags_json
         """
         if not self.spark and not self.engine:
             return
 
+        if not records:
+            return
+
         try:
-            import hashlib
-            import json
             from datetime import datetime, timezone
 
-            # 1. Calculate Pipeline Hash (Configuration State)
-            # We hash the entire pipeline config (including nodes) to track version changes
-            if hasattr(pipeline_config, "model_dump"):
-                dump = pipeline_config.model_dump(mode="json")
-            else:
-                dump = pipeline_config.dict()
-
-            dump_str = json.dumps(dump, sort_keys=True)
-            version_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
-
-            # 2. Prepare Fields
-            pipeline_name = pipeline_config.pipeline
-            description = pipeline_config.description or ""
-            layer = pipeline_config.layer or ""
-
-            # Schedule is not yet in PipelineConfig, try to find it in vars or metadata if available
-            # For now, we leave it empty or future-proof it
-            schedule = ""
-
-            # Aggregate tags from nodes for high-level view
-            all_tags = set()
-            for node in pipeline_config.nodes:
-                if node.tags:
-                    all_tags.update(node.tags)
-            tags_json = json.dumps(list(all_tags))
-
-            # 3. Upsert
             if self.spark:
                 from pyspark.sql import functions as F
 
-                rows = [
-                    (
-                        pipeline_name,
-                        version_hash,
-                        description,
-                        layer,
-                        schedule,
-                        tags_json,
-                    )
-                ]
                 schema = self._get_schema_meta_pipelines()
                 input_schema = StructType(schema.fields[:-1])  # Exclude updated_at
 
+                rows = [
+                    (
+                        r["pipeline_name"],
+                        r["version_hash"],
+                        r["description"],
+                        r["layer"],
+                        r["schedule"],
+                        r["tags_json"],
+                    )
+                    for r in records
+                ]
                 df = self.spark.createDataFrame(rows, input_schema)
                 df = df.withColumn("updated_at", F.current_timestamp())
 
-                # Merge Logic
-                view_name = f"_odibi_meta_pipelines_upsert_{abs(hash(pipeline_name))}"
+                view_name = "_odibi_meta_pipelines_batch_upsert"
                 df.createOrReplaceTempView(view_name)
 
                 target_path = self.tables["meta_pipelines"]
-
-                # Only update if hash changed (Optimization) or force update timestamp?
-                # We usually want to know when it was last deployed.
 
                 merge_sql = f"""
                     MERGE INTO delta.`{target_path}` AS target
@@ -581,13 +687,13 @@ class CatalogManager:
                 import pandas as pd
 
                 data = {
-                    "pipeline_name": [pipeline_name],
-                    "version_hash": [version_hash],
-                    "description": [description],
-                    "layer": [layer],
-                    "schedule": [schedule],
-                    "tags_json": [tags_json],
-                    "updated_at": [datetime.now(timezone.utc)],
+                    "pipeline_name": [r["pipeline_name"] for r in records],
+                    "version_hash": [r["version_hash"] for r in records],
+                    "description": [r["description"] for r in records],
+                    "layer": [r["layer"] for r in records],
+                    "schedule": [r["schedule"] for r in records],
+                    "tags_json": [r["tags_json"] for r in records],
+                    "updated_at": [datetime.now(timezone.utc) for _ in records],
                 }
                 df = pd.DataFrame(data)
 
@@ -600,68 +706,52 @@ class CatalogManager:
                     options={"keys": ["pipeline_name"]},
                 )
 
-        except Exception as e:
-            logger.warning(f"Failed to register pipeline '{pipeline_config.pipeline}': {e}")
+            self._pipelines_cache = None
+            logger.debug(f"Batch registered {len(records)} pipeline(s)")
 
-    def register_node(
+        except Exception as e:
+            logger.warning(f"Failed to batch register pipelines: {e}")
+
+    def register_nodes_batch(
         self,
-        pipeline_name: str,
-        node_config: Any,
+        records: List[Dict[str, Any]],
     ) -> None:
         """
-        Registers/Upserts a node definition to meta_nodes.
+        Batch registers/upserts multiple node definitions to meta_nodes.
+
+        Args:
+            records: List of dicts with keys: pipeline_name, node_name, version_hash,
+                     type, config_json
         """
         if not self.spark and not self.engine:
             return
 
+        if not records:
+            return
+
         try:
-            import hashlib
-            import json
             from datetime import datetime, timezone
 
-            # 1. Calculate Node Hash
-            if hasattr(node_config, "model_dump"):
-                dump = node_config.model_dump(
-                    mode="json", exclude={"description", "tags", "log_level"}
-                )
-            else:
-                dump = node_config.dict(exclude={"description", "tags", "log_level"})
-
-            dump_str = json.dumps(dump, sort_keys=True)
-            version_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
-
-            # 2. Determine Type
-            node_type = "transform"
-            if node_config.read:
-                node_type = "read"
-            if node_config.write:
-                node_type = "write"
-                # If it has both, it's usually a loader/ETL node, effectively "write" is the dominant effect
-
-            # 3. Serialize Config
-            # We store the full config for runtime retrieval
-            config_json = json.dumps(dump)
-
-            # 4. Upsert
             if self.spark:
                 from pyspark.sql import functions as F
 
+                schema = self._get_schema_meta_nodes()
+                input_schema = StructType(schema.fields[:-1])  # Exclude updated_at
+
                 rows = [
                     (
-                        pipeline_name,
-                        node_config.name,
-                        version_hash,
-                        node_type,
-                        config_json,
+                        r["pipeline_name"],
+                        r["node_name"],
+                        r["version_hash"],
+                        r["type"],
+                        r["config_json"],
                     )
+                    for r in records
                 ]
-                schema = self._get_schema_meta_nodes()
-                input_schema = StructType(schema.fields[:-1])
-
                 df = self.spark.createDataFrame(rows, input_schema)
                 df = df.withColumn("updated_at", F.current_timestamp())
 
-                view_name = f"_odibi_meta_nodes_upsert_{abs(hash(node_config.name))}"
+                view_name = "_odibi_meta_nodes_batch_upsert"
                 df.createOrReplaceTempView(view_name)
 
                 target_path = self.tables["meta_nodes"]
@@ -685,12 +775,12 @@ class CatalogManager:
                 import pandas as pd
 
                 data = {
-                    "pipeline_name": [pipeline_name],
-                    "node_name": [node_config.name],
-                    "version_hash": [version_hash],
-                    "type": [node_type],
-                    "config_json": [config_json],
-                    "updated_at": [datetime.now(timezone.utc)],
+                    "pipeline_name": [r["pipeline_name"] for r in records],
+                    "node_name": [r["node_name"] for r in records],
+                    "version_hash": [r["version_hash"] for r in records],
+                    "type": [r["type"] for r in records],
+                    "config_json": [r["config_json"] for r in records],
+                    "updated_at": [datetime.now(timezone.utc) for _ in records],
                 }
                 df = pd.DataFrame(data)
 
@@ -703,8 +793,160 @@ class CatalogManager:
                     options={"keys": ["pipeline_name", "node_name"]},
                 )
 
+            self._nodes_cache = None
+            logger.debug(f"Batch registered {len(records)} node(s)")
+
+        except Exception as e:
+            logger.warning(f"Failed to batch register nodes: {e}")
+
+    def _prepare_pipeline_record(self, pipeline_config: Any) -> Dict[str, Any]:
+        """Prepare a pipeline record for batch registration."""
+        from odibi.utils.hashing import calculate_pipeline_hash
+
+        version_hash = calculate_pipeline_hash(pipeline_config)
+
+        all_tags = set()
+        for node in pipeline_config.nodes:
+            if node.tags:
+                all_tags.update(node.tags)
+
+        return {
+            "pipeline_name": pipeline_config.pipeline,
+            "version_hash": version_hash,
+            "description": pipeline_config.description or "",
+            "layer": pipeline_config.layer or "",
+            "schedule": "",
+            "tags_json": json.dumps(list(all_tags)),
+        }
+
+    def register_pipeline(
+        self,
+        pipeline_config: Any,
+        project_config: Optional[Any] = None,
+        skip_if_unchanged: bool = False,
+    ) -> bool:
+        """
+        Registers/Upserts a pipeline definition to meta_pipelines.
+
+        .. deprecated::
+            Use :meth:`register_pipelines_batch` for better performance.
+
+        Args:
+            pipeline_config: The pipeline configuration object
+            project_config: Optional project configuration
+            skip_if_unchanged: If True, skip write if version_hash matches existing
+
+        Returns:
+            True if write was performed, False if skipped
+        """
+        import warnings
+
+        warnings.warn(
+            "register_pipeline is deprecated, use register_pipelines_batch for better performance",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        if not self.spark and not self.engine:
+            return False
+
+        try:
+            record = self._prepare_pipeline_record(pipeline_config)
+
+            if skip_if_unchanged:
+                existing = self.get_registered_pipeline(pipeline_config.pipeline)
+                if existing and existing.get("version_hash") == record["version_hash"]:
+                    logger.debug(f"Skipping pipeline '{pipeline_config.pipeline}' - unchanged")
+                    return False
+
+            self.register_pipelines_batch([record])
+            return True
+
+        except Exception as e:
+            logger.warning(f"Failed to register pipeline '{pipeline_config.pipeline}': {e}")
+            return False
+
+    def _prepare_node_record(
+        self, pipeline_name: str, node_config: Any
+    ) -> Dict[str, Any]:
+        """Prepare a node record for batch registration."""
+        from odibi.utils.hashing import calculate_node_hash
+
+        version_hash = calculate_node_hash(node_config)
+
+        node_type = "transform"
+        if node_config.read:
+            node_type = "read"
+        if node_config.write:
+            node_type = "write"
+
+        if hasattr(node_config, "model_dump"):
+            dump = node_config.model_dump(
+                mode="json", exclude={"description", "tags", "log_level"}
+            )
+        else:
+            dump = node_config.dict(exclude={"description", "tags", "log_level"})
+
+        return {
+            "pipeline_name": pipeline_name,
+            "node_name": node_config.name,
+            "version_hash": version_hash,
+            "type": node_type,
+            "config_json": json.dumps(dump),
+        }
+
+    def register_node(
+        self,
+        pipeline_name: str,
+        node_config: Any,
+        skip_if_unchanged: bool = False,
+        existing_hash: Optional[str] = None,
+    ) -> bool:
+        """
+        Registers/Upserts a node definition to meta_nodes.
+
+        .. deprecated::
+            Use :meth:`register_nodes_batch` for better performance.
+
+        Args:
+            pipeline_name: Name of the parent pipeline
+            node_config: The node configuration object
+            skip_if_unchanged: If True, skip write if version_hash matches existing
+            existing_hash: Pre-fetched existing hash (to avoid re-reading)
+
+        Returns:
+            True if write was performed, False if skipped
+        """
+        import warnings
+
+        warnings.warn(
+            "register_node is deprecated, use register_nodes_batch for better performance",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        if not self.spark and not self.engine:
+            return False
+
+        try:
+            record = self._prepare_node_record(pipeline_name, node_config)
+
+            if skip_if_unchanged:
+                current_hash = existing_hash
+                if current_hash is None:
+                    nodes = self.get_registered_nodes(pipeline_name)
+                    current_hash = nodes.get(node_config.name)
+
+                if current_hash == record["version_hash"]:
+                    logger.debug(f"Skipping node '{node_config.name}' - unchanged")
+                    return False
+
+            self.register_nodes_batch([record])
+            return True
+
         except Exception as e:
             logger.warning(f"Failed to register node '{node_config.name}': {e}")
+            return False
 
     def log_run(
         self,
@@ -718,6 +960,8 @@ class CatalogManager:
     ) -> None:
         """
         Logs execution telemetry to meta_runs.
+
+        Note: For better performance with multiple nodes, use log_runs_batch() instead.
         """
         if not self.spark and not self.engine:
             return
@@ -738,8 +982,6 @@ class CatalogManager:
                     )
                 ]
                 schema = self._get_schema_meta_runs()
-                # Schema has timestamp and date at the end, which we'll add via withColumn
-                # So we use a subset schema for creation
                 input_schema = StructType(schema.fields[:-2])
 
                 df = self.spark.createDataFrame(rows, input_schema)
@@ -768,20 +1010,96 @@ class CatalogManager:
                 }
                 df = pd.DataFrame(data)
 
-                # Use engine to write (handles Delta if available)
-                # Note: System tables are usually Delta.
-                # We assume 'meta_runs' path is a Delta table path
                 self.engine.write(
                     df,
-                    connection=None,  # direct path
+                    connection=None,
                     format="delta",
                     path=self.tables["meta_runs"],
                     mode="append",
-                    options={"schema_mode": "merge"},  # Allow schema evolution
+                    options={"schema_mode": "merge"},
                 )
 
         except Exception as e:
             logger.warning(f"Failed to log run to system catalog: {e}")
+
+    def log_runs_batch(
+        self,
+        records: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Batch logs multiple execution records to meta_runs in a single write.
+
+        This is much more efficient than calling log_run() for each node individually.
+
+        Args:
+            records: List of dicts with keys: run_id, pipeline_name, node_name,
+                     status, rows_processed, duration_ms, metrics_json
+        """
+        if not self.spark and not self.engine:
+            return
+
+        if not records:
+            return
+
+        try:
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                rows = [
+                    (
+                        r["run_id"],
+                        r["pipeline_name"],
+                        r["node_name"],
+                        r["status"],
+                        r.get("rows_processed", 0),
+                        r.get("duration_ms", 0),
+                        r.get("metrics_json", "{}"),
+                    )
+                    for r in records
+                ]
+                schema = self._get_schema_meta_runs()
+                input_schema = StructType(schema.fields[:-2])
+
+                df = self.spark.createDataFrame(rows, input_schema)
+                df = df.withColumn("timestamp", F.current_timestamp()).withColumn(
+                    "date", F.to_date(F.col("timestamp"))
+                )
+
+                df.write.format("delta").mode("append").save(self.tables["meta_runs"])
+                logger.debug(f"Batch logged {len(records)} run records to meta_runs")
+
+            elif self.engine:
+                from datetime import datetime, timezone
+
+                import pandas as pd
+
+                timestamp = datetime.now(timezone.utc)
+
+                data = {
+                    "run_id": [r["run_id"] for r in records],
+                    "pipeline_name": [r["pipeline_name"] for r in records],
+                    "node_name": [r["node_name"] for r in records],
+                    "status": [r["status"] for r in records],
+                    "rows_processed": [r.get("rows_processed", 0) for r in records],
+                    "duration_ms": [r.get("duration_ms", 0) for r in records],
+                    "metrics_json": [r.get("metrics_json", "{}") for r in records],
+                    "timestamp": [timestamp] * len(records),
+                    "date": [timestamp.date()] * len(records),
+                }
+                df = pd.DataFrame(data)
+
+                self.engine.write(
+                    df,
+                    connection=None,
+                    format="delta",
+                    path=self.tables["meta_runs"],
+                    mode="append",
+                    options={"schema_mode": "merge"},
+                )
+                logger.debug(f"Batch logged {len(records)} run records to meta_runs")
+
+        except Exception as e:
+            logger.warning(f"Failed to batch log runs to system catalog: {e}")
 
     def log_pattern(
         self,
@@ -1663,17 +1981,25 @@ class CatalogManager:
 
                 # Delete from meta_pipelines
                 df = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                df.cache()
                 initial_count = df.count()
-                df = df.filter(F.col("pipeline_name") != pipeline_name)
-                df.write.format("delta").mode("overwrite").save(self.tables["meta_pipelines"])
-                deleted_count += initial_count - df.count()
+                df_filtered = df.filter(F.col("pipeline_name") != pipeline_name)
+                df_filtered.write.format("delta").mode("overwrite").save(
+                    self.tables["meta_pipelines"]
+                )
+                deleted_count += initial_count - df_filtered.count()
+                df.unpersist()
 
                 # Delete associated nodes from meta_nodes
                 df_nodes = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                df_nodes.cache()
                 nodes_initial = df_nodes.count()
-                df_nodes = df_nodes.filter(F.col("pipeline_name") != pipeline_name)
-                df_nodes.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
-                deleted_count += nodes_initial - df_nodes.count()
+                df_nodes_filtered = df_nodes.filter(F.col("pipeline_name") != pipeline_name)
+                df_nodes_filtered.write.format("delta").mode("overwrite").save(
+                    self.tables["meta_nodes"]
+                )
+                deleted_count += nodes_initial - df_nodes_filtered.count()
+                df_nodes.unpersist()
 
             elif self.engine:
                 # Delete from meta_pipelines
@@ -1704,6 +2030,7 @@ class CatalogManager:
                     )
                     deleted_count += nodes_initial - len(df_nodes)
 
+            self.invalidate_cache()
             logger.info(f"Removed pipeline '{pipeline_name}': {deleted_count} entries deleted")
 
         except Exception as e:
@@ -1732,12 +2059,14 @@ class CatalogManager:
 
                 # Delete from meta_nodes
                 df = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                df.cache()
                 initial_count = df.count()
-                df = df.filter(
+                df_filtered = df.filter(
                     ~((F.col("pipeline_name") == pipeline_name) & (F.col("node_name") == node_name))
                 )
-                df.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
-                deleted_count = initial_count - df.count()
+                df_filtered.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
+                deleted_count = initial_count - df_filtered.count()
+                df.unpersist()
 
             elif self.engine:
                 df = self._read_local_table(self.tables["meta_nodes"])
@@ -1755,6 +2084,7 @@ class CatalogManager:
                     )
                     deleted_count = initial_count - len(df)
 
+            self._nodes_cache = None
             logger.info(
                 f"Removed node '{node_name}' from pipeline '{pipeline_name}': "
                 f"{deleted_count} entries deleted"
@@ -1793,17 +2123,20 @@ class CatalogManager:
 
                 # Cleanup orphan pipelines
                 df_pipelines = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                df_pipelines.cache()
                 initial_pipelines = df_pipelines.count()
-                df_pipelines = df_pipelines.filter(
+                df_pipelines_filtered = df_pipelines.filter(
                     F.col("pipeline_name").isin(list(current_pipelines))
                 )
-                df_pipelines.write.format("delta").mode("overwrite").save(
+                df_pipelines_filtered.write.format("delta").mode("overwrite").save(
                     self.tables["meta_pipelines"]
                 )
-                results["meta_pipelines"] = initial_pipelines - df_pipelines.count()
+                results["meta_pipelines"] = initial_pipelines - df_pipelines_filtered.count()
+                df_pipelines.unpersist()
 
                 # Cleanup orphan nodes
                 df_nodes = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                df_nodes.cache()
                 initial_nodes = df_nodes.count()
 
                 # Filter: keep only nodes that belong to current pipelines and exist in config
@@ -1816,12 +2149,17 @@ class CatalogManager:
                     valid_df = self.spark.createDataFrame(
                         valid_nodes, ["pipeline_name", "node_name"]
                     )
-                    df_nodes = df_nodes.join(valid_df, ["pipeline_name", "node_name"], "inner")
+                    df_nodes_filtered = df_nodes.join(
+                        valid_df, ["pipeline_name", "node_name"], "inner"
+                    )
                 else:
-                    df_nodes = df_nodes.limit(0)
+                    df_nodes_filtered = df_nodes.limit(0)
 
-                df_nodes.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
-                results["meta_nodes"] = initial_nodes - df_nodes.count()
+                df_nodes_filtered.write.format("delta").mode("overwrite").save(
+                    self.tables["meta_nodes"]
+                )
+                results["meta_nodes"] = initial_nodes - df_nodes_filtered.count()
+                df_nodes.unpersist()
 
             elif self.engine:
                 # Cleanup orphan pipelines
@@ -1865,6 +2203,7 @@ class CatalogManager:
                     )
                     results["meta_nodes"] = initial_nodes - len(df_nodes)
 
+            self.invalidate_cache()
             logger.info(
                 f"Cleanup orphans completed: {results['meta_pipelines']} pipelines, "
                 f"{results['meta_nodes']} nodes removed"
