@@ -29,6 +29,50 @@ from odibi.utils.logging_context import (
 )
 
 
+class PhaseTimer:
+    """Track timing for individual execution phases.
+
+    Usage:
+        timer = PhaseTimer()
+        with timer.phase("read"):
+            # do read
+        with timer.phase("transform"):
+            # do transform
+        print(timer.summary())  # {"read": 1.23, "transform": 0.45, ...}
+    """
+
+    def __init__(self):
+        self._timings: Dict[str, float] = {}
+        self._current_phase: Optional[str] = None
+        self._phase_start: Optional[float] = None
+
+    @contextmanager
+    def phase(self, name: str):
+        """Context manager to time a phase."""
+        start = time.time()
+        try:
+            yield
+        finally:
+            elapsed = time.time() - start
+            self._timings[name] = self._timings.get(name, 0) + elapsed
+
+    def record(self, name: str, duration: float):
+        """Manually record a phase duration."""
+        self._timings[name] = self._timings.get(name, 0) + duration
+
+    def get(self, name: str) -> float:
+        """Get duration for a specific phase."""
+        return self._timings.get(name, 0)
+
+    def summary(self) -> Dict[str, float]:
+        """Get all phase timings rounded to 3 decimal places."""
+        return {k: round(v, 3) for k, v in self._timings.items()}
+
+    def summary_ms(self) -> Dict[str, float]:
+        """Get all phase timings in milliseconds."""
+        return {k: round(v * 1000, 2) for k, v in self._timings.items()}
+
+
 class NodeResult(BaseModel):
     """Result of node execution."""
 
@@ -143,12 +187,17 @@ class NodeExecutor:
                 input_sample = None
                 pending_hwm_update = None
                 rows_in = None
+                phase_timer = PhaseTimer()
 
                 # 0. Pre-SQL Phase
-                self._execute_pre_sql(config, ctx)
+                with phase_timer.phase("pre_sql"):
+                    self._execute_pre_sql(config, ctx)
 
                 # 1. Read Phase
-                result_df, pending_hwm_update = self._execute_read_phase(config, hwm_state, ctx)
+                with phase_timer.phase("read"):
+                    result_df, pending_hwm_update = self._execute_read_phase(
+                        config, hwm_state, ctx
+                    )
 
                 # If no direct read, check dependencies or use passed input_df
                 if result_df is None:
@@ -171,43 +220,57 @@ class NodeExecutor:
                     input_df = result_df
 
                 # Capture input schema before transformation
-                if input_df is not None:
-                    input_schema = self._get_schema(input_df)
-                    rows_in = self._count_rows(input_df)
-                    metrics.rows_in = rows_in
-                    metrics.schema_before = input_schema if isinstance(input_schema, dict) else None
-                    if self.max_sample_rows > 0:
-                        try:
-                            input_sample = self.engine.get_sample(input_df, n=self.max_sample_rows)
-                        except Exception:
-                            pass
+                with phase_timer.phase("schema_capture"):
+                    if input_df is not None:
+                        input_schema = self._get_schema(input_df)
+                        rows_in = self._count_rows(input_df)
+                        metrics.rows_in = rows_in
+                        metrics.schema_before = (
+                            input_schema if isinstance(input_schema, dict) else None
+                        )
+                        if self.max_sample_rows > 0:
+                            try:
+                                input_sample = self.engine.get_sample(
+                                    input_df, n=self.max_sample_rows
+                                )
+                            except Exception:
+                                pass
 
                 # 1.5 Contracts Phase (Pre-conditions)
-                self._execute_contracts_phase(config, input_df, ctx)
+                with phase_timer.phase("contracts"):
+                    self._execute_contracts_phase(config, input_df, ctx)
 
                 # 2. Transform Phase
-                result_df = self._execute_transform_phase(config, result_df, input_df, ctx)
+                with phase_timer.phase("transform"):
+                    result_df = self._execute_transform_phase(config, result_df, input_df, ctx)
 
                 # 3. Validation Phase (returns filtered df if quarantine is used)
-                result_df = self._execute_validation_phase(config, result_df, ctx)
+                with phase_timer.phase("validation"):
+                    result_df = self._execute_validation_phase(config, result_df, ctx)
 
                 # 4. Write Phase
-                override_mode = self._determine_write_mode(config)
-                self._execute_write_phase(config, result_df, override_mode, ctx)
+                with phase_timer.phase("write"):
+                    override_mode = self._determine_write_mode(config)
+                    self._execute_write_phase(config, result_df, override_mode, ctx)
 
                 # 4.5 Post-SQL Phase
-                self._execute_post_sql(config, ctx)
+                with phase_timer.phase("post_sql"):
+                    self._execute_post_sql(config, ctx)
 
                 # 5. Register & Cache
-                if result_df is not None:
-                    pii_meta = self._calculate_pii(config)
-                    self.context.register(
-                        config.name, result_df, metadata={"pii_columns": pii_meta}
-                    )
+                with phase_timer.phase("register"):
+                    if result_df is not None:
+                        pii_meta = self._calculate_pii(config)
+                        self.context.register(
+                            config.name, result_df, metadata={"pii_columns": pii_meta}
+                        )
 
                 # 6. Metadata Collection
-                duration = time.time() - start_time
-                metadata = self._collect_metadata(config, result_df, input_schema, input_sample)
+                with phase_timer.phase("metadata"):
+                    duration = time.time() - start_time
+                    metadata = self._collect_metadata(
+                        config, result_df, input_schema, input_sample
+                    )
 
                 rows_out = metadata.get("rows")
                 metrics.rows_out = rows_out
@@ -241,11 +304,15 @@ class NodeExecutor:
                     metadata["hwm_pending"] = True
                     ctx.debug(f"HWM pending update: {key}={value}")
 
+                # Add phase timings to metadata
+                metadata["phase_timings_ms"] = phase_timer.summary_ms()
+
                 ctx.info(
                     "Node execution completed successfully",
                     rows_in=rows_in,
                     rows_out=rows_out,
                     elapsed_ms=round((time.time() - start_time) * 1000, 2),
+                    phase_timings_ms=phase_timer.summary_ms(),
                 )
 
                 return NodeResult(

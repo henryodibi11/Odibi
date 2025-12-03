@@ -191,6 +191,7 @@ class PipelineProgress:
         status: str,
         duration: Optional[float] = None,
         rows: Optional[int] = None,
+        phase_timings: Optional[Dict[str, float]] = None,
     ) -> None:
         """Update node status.
 
@@ -199,6 +200,7 @@ class PipelineProgress:
             status: Status from NodeStatus constants.
             duration: Execution duration in seconds.
             rows: Number of rows processed.
+            phase_timings: Optional dict of phase name -> duration in ms.
         """
         if name not in self._node_statuses:
             return
@@ -207,6 +209,7 @@ class PipelineProgress:
             "status": status,
             "duration": duration,
             "rows": rows,
+            "phase_timings": phase_timings,
         }
 
         if self.use_rich:
@@ -329,3 +332,93 @@ class PipelineProgress:
         print(f"  Duration: {duration:.2f}s")
         print(f"  Completed: {completed}, Failed: {failed}, Skipped: {skipped}")
         print(f"{'=' * 60}\n")
+
+    def get_phase_timing_summary(self) -> Dict[str, Dict[str, float]]:
+        """Get phase timing breakdown for all nodes.
+
+        Returns:
+            Dict mapping node names to their phase timings (in ms).
+        """
+        return {
+            name: info.get("phase_timings", {})
+            for name, info in self._node_statuses.items()
+            if info.get("phase_timings")
+        }
+
+    def get_aggregate_phase_timings(self) -> Dict[str, float]:
+        """Get aggregate phase timings across all nodes.
+
+        Returns:
+            Dict mapping phase names to total time spent (in ms).
+        """
+        aggregate: Dict[str, float] = {}
+        for info in self._node_statuses.values():
+            phase_timings = info.get("phase_timings", {})
+            for phase, duration_ms in phase_timings.items():
+                aggregate[phase] = aggregate.get(phase, 0) + duration_ms
+        return {k: round(v, 2) for k, v in aggregate.items()}
+
+    def print_phase_timing_report(self) -> None:
+        """Print a detailed phase timing report."""
+        aggregate = self.get_aggregate_phase_timings()
+        if not aggregate:
+            return
+
+        total_ms = sum(aggregate.values())
+
+        if self.use_rich:
+            self._print_phase_timing_rich(aggregate, total_ms)
+        else:
+            self._print_phase_timing_plain(aggregate, total_ms)
+
+    def _print_phase_timing_rich(
+        self, aggregate: Dict[str, float], total_ms: float
+    ) -> None:
+        """Print phase timing report with Rich."""
+        from rich.panel import Panel
+        from rich.table import Table
+
+        console = get_console()
+
+        table = Table(
+            show_header=True,
+            header_style="bold",
+            box=None,
+            padding=(0, 1),
+        )
+        table.add_column("Phase", style="cyan")
+        table.add_column("Total Time", justify="right")
+        table.add_column("% of Total", justify="right")
+
+        # Sort by time descending
+        sorted_phases = sorted(aggregate.items(), key=lambda x: x[1], reverse=True)
+
+        for phase, duration_ms in sorted_phases:
+            pct = (duration_ms / total_ms * 100) if total_ms > 0 else 0
+            duration_str = (
+                f"{duration_ms:.0f}ms" if duration_ms < 1000 else f"{duration_ms/1000:.2f}s"
+            )
+            table.add_row(phase, duration_str, f"{pct:.1f}%")
+
+        panel = Panel(
+            table,
+            title="[bold]Phase Timing Breakdown[/bold]",
+            border_style="dim",
+            padding=(0, 1),
+        )
+        console.print(panel)
+
+    def _print_phase_timing_plain(
+        self, aggregate: Dict[str, float], total_ms: float
+    ) -> None:
+        """Print phase timing report in plain text."""
+        print("\n--- Phase Timing Breakdown ---")
+        sorted_phases = sorted(aggregate.items(), key=lambda x: x[1], reverse=True)
+
+        for phase, duration_ms in sorted_phases:
+            pct = (duration_ms / total_ms * 100) if total_ms > 0 else 0
+            duration_str = (
+                f"{duration_ms:.0f}ms" if duration_ms < 1000 else f"{duration_ms/1000:.2f}s"
+            )
+            print(f"  {phase}: {duration_str} ({pct:.1f}%)")
+        print("------------------------------\n")

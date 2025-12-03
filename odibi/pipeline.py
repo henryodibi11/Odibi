@@ -598,6 +598,7 @@ class Pipeline:
                                             NodeStatus.SUCCESS,
                                             result.duration,
                                             result.rows_processed,
+                                            result.metadata.get("phase_timings_ms"),
                                         )
                             else:
                                 if result.metadata.get("skipped"):
@@ -760,6 +761,8 @@ class Pipeline:
                 skipped=len(results.skipped),
                 duration=results.duration,
             )
+            # Print phase timing breakdown for performance analysis
+            progress.print_phase_timing_report()
 
         # Log pipeline completion summary
         status = "SUCCESS" if not results.failed else "FAILED"
