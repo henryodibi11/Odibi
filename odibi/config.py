@@ -2453,6 +2453,13 @@ class PerformanceConfig(BaseModel):
             "Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names."
         ),
     )
+    skip_null_profiling: bool = Field(
+        default=False,
+        description=(
+            "Skip null profiling in metadata collection phase. "
+            "Reduces execution time for large DataFrames by avoiding an additional Spark job."
+        ),
+    )
 
 
 class StoryConfig(BaseModel):

@@ -1961,10 +1961,18 @@ class NodeExecutor:
             )
             metadata["schema"] = self._get_schema(df)
             metadata["source_files"] = self.engine.get_source_files(df)
-            try:
-                metadata["null_profile"] = self.engine.profile_nulls(df)
-            except Exception:
+            # Skip null profiling if configured (expensive for large Spark DataFrames)
+            skip_null_profiling = (
+                self.performance_config
+                and getattr(self.performance_config, "skip_null_profiling", False)
+            )
+            if skip_null_profiling:
                 metadata["null_profile"] = {}
+            else:
+                try:
+                    metadata["null_profile"] = self.engine.profile_nulls(df)
+                except Exception:
+                    metadata["null_profile"] = {}
 
         if input_schema and metadata.get("schema"):
             output_schema = metadata["schema"]
