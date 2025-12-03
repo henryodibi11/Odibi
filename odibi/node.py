@@ -1927,7 +1927,7 @@ class NodeExecutor:
             "config_snapshot": config_snapshot,
         }
 
-        if self._delta_write_info:
+        if self._delta_write_info and "version" in self._delta_write_info:
             if self._delta_write_info.get("streaming"):
                 metadata["streaming_info"] = {
                     "query_id": self._delta_write_info.get("query_id"),
