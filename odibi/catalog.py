@@ -866,9 +866,7 @@ class CatalogManager:
             logger.warning(f"Failed to register pipeline '{pipeline_config.pipeline}': {e}")
             return False
 
-    def _prepare_node_record(
-        self, pipeline_name: str, node_config: Any
-    ) -> Dict[str, Any]:
+    def _prepare_node_record(self, pipeline_name: str, node_config: Any) -> Dict[str, Any]:
         """Prepare a node record for batch registration."""
         from odibi.utils.hashing import calculate_node_hash
 
@@ -881,9 +879,7 @@ class CatalogManager:
             node_type = "write"
 
         if hasattr(node_config, "model_dump"):
-            dump = node_config.model_dump(
-                mode="json", exclude={"description", "tags", "log_level"}
-            )
+            dump = node_config.model_dump(mode="json", exclude={"description", "tags", "log_level"})
         else:
             dump = node_config.dict(exclude={"description", "tags", "log_level"})
 

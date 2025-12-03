@@ -204,9 +204,7 @@ class Pipeline:
                     conn.close()
                     self._ctx.debug(f"Closed connection: {name}")
                 except Exception as e:
-                    self._ctx.warning(
-                        f"Failed to close connection {name}: {e}", exc_info=True
-                    )
+                    self._ctx.warning(f"Failed to close connection {name}: {e}", exc_info=True)
 
     @classmethod
     def from_yaml(cls, yaml_path: str) -> "PipelineManager":
