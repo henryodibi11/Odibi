@@ -138,6 +138,7 @@ class NodeExecutor:
         self._executed_sql: List[str] = []
         self._delta_write_info: Optional[Dict[str, Any]] = None
         self._validation_warnings: List[str] = []
+        self._read_row_count: Optional[int] = None  # Cache row count from read phase
 
     def execute(
         self,
@@ -164,6 +165,7 @@ class NodeExecutor:
         self._executed_sql = []
         self._delta_write_info = None
         self._validation_warnings = []
+        self._read_row_count = None
 
         ctx = create_logging_context(
             node_id=config.name,
@@ -221,7 +223,12 @@ class NodeExecutor:
                 with phase_timer.phase("schema_capture"):
                     if input_df is not None:
                         input_schema = self._get_schema(input_df)
-                        rows_in = self._count_rows(input_df)
+                        # Reuse row count from read phase if available (avoids redundant count)
+                        rows_in = (
+                            self._read_row_count
+                            if self._read_row_count is not None
+                            else self._count_rows(input_df)
+                        )
                         metrics.rows_in = rows_in
                         metrics.schema_before = (
                             input_schema if isinstance(input_schema, dict) else None
@@ -472,6 +479,8 @@ class NodeExecutor:
 
             row_count = self._count_rows(df) if df is not None else 0
             metrics.rows_out = row_count
+            # Cache row count to avoid redundant counting in schema_capture phase
+            self._read_row_count = row_count
 
             ctx.info(
                 f"Read completed from {read_config.connection}",
@@ -1517,6 +1526,11 @@ class NodeExecutor:
                     delta_info, connection, write_config, deep_diag, diff_keys
                 )
 
+            # Store row count from write phase to avoid redundant counting in metadata
+            if self._delta_write_info is None:
+                self._delta_write_info = {}
+            self._delta_write_info["_cached_row_count"] = row_count
+
             if write_config.skip_if_unchanged and write_config.format == "delta":
                 self._store_content_hash_after_write(config, connection)
 
@@ -1938,7 +1952,13 @@ class NodeExecutor:
                     metadata["data_diff"] = self._delta_write_info["data_diff"]
 
         if df is not None:
-            metadata["rows"] = self._count_rows(df)
+            # Reuse row count from write phase if available (avoids redundant count)
+            cached_row_count = None
+            if self._delta_write_info:
+                cached_row_count = self._delta_write_info.get("_cached_row_count")
+            metadata["rows"] = (
+                cached_row_count if cached_row_count is not None else self._count_rows(df)
+            )
             metadata["schema"] = self._get_schema(df)
             metadata["source_files"] = self.engine.get_source_files(df)
             try:
