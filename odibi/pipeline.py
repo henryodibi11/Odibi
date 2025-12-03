@@ -787,7 +787,7 @@ class Pipeline:
                 duration=results.duration,
             )
             # Print phase timing breakdown for performance analysis
-            progress.print_phase_timing_report()
+            progress.print_phase_timing_report(pipeline_duration_s=results.duration)
 
         # Log pipeline completion summary
         status = "SUCCESS" if not results.failed else "FAILED"

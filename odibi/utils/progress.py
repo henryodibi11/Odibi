@@ -346,25 +346,34 @@ class PipelineProgress:
         }
 
     def get_aggregate_phase_timings(self) -> Dict[str, float]:
-        """Get aggregate phase timings across all nodes.
+        """Get max phase timings across all nodes (bottleneck per phase).
 
         Returns:
-            Dict mapping phase names to total time spent (in ms).
+            Dict mapping phase names to max time spent by any node (in ms).
         """
-        aggregate: Dict[str, float] = {}
+        max_timings: Dict[str, float] = {}
         for info in self._node_statuses.values():
             phase_timings = info.get("phase_timings", {})
             for phase, duration_ms in phase_timings.items():
-                aggregate[phase] = aggregate.get(phase, 0) + duration_ms
-        return {k: round(v, 2) for k, v in aggregate.items()}
+                max_timings[phase] = max(max_timings.get(phase, 0), duration_ms)
+        return {k: round(v, 2) for k, v in max_timings.items()}
 
-    def print_phase_timing_report(self) -> None:
-        """Print a detailed phase timing report."""
+    def print_phase_timing_report(self, pipeline_duration_s: Optional[float] = None) -> None:
+        """Print a detailed phase timing report.
+
+        Args:
+            pipeline_duration_s: Actual pipeline wall-clock duration in seconds.
+                Used for percentage calculations. Falls back to sum of max phases.
+        """
         aggregate = self.get_aggregate_phase_timings()
         if not aggregate:
             return
 
-        total_ms = sum(aggregate.values())
+        # Use actual pipeline duration for percentage, or fall back to sum of max phases
+        if pipeline_duration_s is not None:
+            total_ms = pipeline_duration_s * 1000
+        else:
+            total_ms = sum(aggregate.values())
 
         if self.use_rich:
             self._print_phase_timing_rich(aggregate, total_ms)
@@ -385,8 +394,8 @@ class PipelineProgress:
             padding=(0, 1),
         )
         table.add_column("Phase", style="cyan")
-        table.add_column("Cumulative", justify="right")
-        table.add_column("% of Total", justify="right")
+        table.add_column("Slowest", justify="right")
+        table.add_column("% of Pipeline", justify="right")
 
         # Sort by time descending
         sorted_phases = sorted(aggregate.items(), key=lambda x: x[1], reverse=True)
@@ -400,7 +409,7 @@ class PipelineProgress:
 
         panel = Panel(
             table,
-            title="[bold]Phase Timing (summed across all nodes)[/bold]",
+            title="[bold]Phase Bottlenecks (slowest node per phase)[/bold]",
             border_style="dim",
             padding=(0, 1),
         )
@@ -408,7 +417,7 @@ class PipelineProgress:
 
     def _print_phase_timing_plain(self, aggregate: Dict[str, float], total_ms: float) -> None:
         """Print phase timing report in plain text."""
-        print("\n--- Phase Timing (summed across all nodes) ---")
+        print("\n--- Phase Bottlenecks (slowest node per phase) ---")
         sorted_phases = sorted(aggregate.items(), key=lambda x: x[1], reverse=True)
 
         for phase, duration_ms in sorted_phases:
@@ -416,5 +425,5 @@ class PipelineProgress:
             duration_str = (
                 f"{duration_ms:.0f}ms" if duration_ms < 1000 else f"{duration_ms/1000:.2f}s"
             )
-            print(f"  {phase}: {duration_str} ({pct:.1f}%)")
-        print("------------------------------\n")
+            print(f"  {phase}: {duration_str} ({pct:.1f}% of pipeline)")
+        print("-" * 48 + "\n")
