@@ -385,7 +385,7 @@ class PipelineProgress:
             padding=(0, 1),
         )
         table.add_column("Phase", style="cyan")
-        table.add_column("Total Time", justify="right")
+        table.add_column("Cumulative", justify="right")
         table.add_column("% of Total", justify="right")
 
         # Sort by time descending
@@ -400,7 +400,7 @@ class PipelineProgress:
 
         panel = Panel(
             table,
-            title="[bold]Phase Timing Breakdown[/bold]",
+            title="[bold]Phase Timing (summed across all nodes)[/bold]",
             border_style="dim",
             padding=(0, 1),
         )
@@ -408,7 +408,7 @@ class PipelineProgress:
 
     def _print_phase_timing_plain(self, aggregate: Dict[str, float], total_ms: float) -> None:
         """Print phase timing report in plain text."""
-        print("\n--- Phase Timing Breakdown ---")
+        print("\n--- Phase Timing (summed across all nodes) ---")
         sorted_phases = sorted(aggregate.items(), key=lambda x: x[1], reverse=True)
 
         for phase, duration_ms in sorted_phases:
