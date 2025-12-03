@@ -28,6 +28,7 @@ from odibi.utils.logging_context import (
     create_logging_context,
     set_logging_context,
 )
+from odibi.utils.progress import NodeStatus, PipelineProgress
 
 
 @dataclass
@@ -219,6 +220,7 @@ class Pipeline:
         on_error: Optional[str] = None,
         tag: Optional[str] = None,
         node: Optional[str] = None,
+        console: bool = False,
     ) -> PipelineResults:
         """Execute the pipeline.
 
@@ -230,6 +232,7 @@ class Pipeline:
             on_error: Override error handling strategy
             tag: Filter nodes by tag (only nodes with this tag will run)
             node: Run only the specific node by name
+            console: Whether to show rich console output with progress
 
         Returns:
             PipelineResults with execution details
@@ -284,6 +287,16 @@ class Pipeline:
                 f"Serial execution order: {len(execution_order)} nodes",
                 order=execution_order,
             )
+
+        # Initialize progress tracker for console output
+        progress: Optional[PipelineProgress] = None
+        if console:
+            progress = PipelineProgress(
+                pipeline_name=self.config.pipeline,
+                node_names=execution_order,
+                engine=self.engine_type,
+            )
+            progress.start()
 
         # Alert: on_start
         self._send_alerts("on_start", results)
@@ -561,17 +574,52 @@ class Pipeline:
                                     if result.metadata.get("reason") == "dependency_failed":
                                         results.skipped.append(node_name)
                                         results.failed.append(node_name)
+                                        if progress:
+                                            progress.update_node(
+                                                node_name,
+                                                NodeStatus.SKIPPED,
+                                                result.duration,
+                                                result.rows_processed,
+                                            )
                                     else:
                                         results.completed.append(node_name)
+                                        if progress:
+                                            progress.update_node(
+                                                node_name,
+                                                NodeStatus.SKIPPED,
+                                                result.duration,
+                                                result.rows_processed,
+                                            )
                                 else:
                                     results.completed.append(node_name)
+                                    if progress:
+                                        progress.update_node(
+                                            node_name,
+                                            NodeStatus.SUCCESS,
+                                            result.duration,
+                                            result.rows_processed,
+                                        )
                             else:
                                 if result.metadata.get("skipped"):
                                     results.skipped.append(node_name)
                                     results.failed.append(node_name)
+                                    if progress:
+                                        progress.update_node(
+                                            node_name,
+                                            NodeStatus.SKIPPED,
+                                            result.duration,
+                                            result.rows_processed,
+                                        )
                                 else:
                                     results.failed.append(node_name)
                                     layer_failed = True
+                                    if progress:
+                                        progress.update_node(
+                                            node_name,
+                                            NodeStatus.FAILED,
+                                            result.duration,
+                                            result.rows_processed,
+                                        )
 
                                     node_config = self.graph.nodes[node_name]
                                     strategy = (
@@ -599,6 +647,8 @@ class Pipeline:
                             )
                             results.failed.append(node_name)
                             layer_failed = True
+                            if progress:
+                                progress.update_node(node_name, NodeStatus.FAILED)
 
                             node_config = self.graph.nodes[node_name]
                             strategy = ErrorStrategy(on_error) if on_error else node_config.on_error
@@ -644,14 +694,47 @@ class Pipeline:
                     ):
                         results.skipped.append(node_name)
                         results.failed.append(node_name)
+                        if progress:
+                            progress.update_node(
+                                node_name,
+                                NodeStatus.SKIPPED,
+                                result.duration,
+                                result.rows_processed,
+                            )
                     else:
                         results.completed.append(node_name)
+                        if progress:
+                            status = (
+                                NodeStatus.SKIPPED
+                                if result.metadata.get("skipped")
+                                else NodeStatus.SUCCESS
+                            )
+                            progress.update_node(
+                                node_name,
+                                status,
+                                result.duration,
+                                result.rows_processed,
+                            )
                 else:
                     if result.metadata.get("skipped"):
                         results.skipped.append(node_name)
                         results.failed.append(node_name)
+                        if progress:
+                            progress.update_node(
+                                node_name,
+                                NodeStatus.SKIPPED,
+                                result.duration,
+                                result.rows_processed,
+                            )
                     else:
                         results.failed.append(node_name)
+                        if progress:
+                            progress.update_node(
+                                node_name,
+                                NodeStatus.FAILED,
+                                result.duration,
+                                result.rows_processed,
+                            )
 
                         node_config = self.graph.nodes[node_name]
                         strategy = ErrorStrategy(on_error) if on_error else node_config.on_error
@@ -668,6 +751,15 @@ class Pipeline:
         # Calculate duration
         results.duration = time.time() - start_time
         results.end_time = datetime.now().isoformat()
+
+        # Finish progress display
+        if progress:
+            progress.finish(
+                completed=len(results.completed),
+                failed=len(results.failed),
+                skipped=len(results.skipped),
+                duration=results.duration,
+            )
 
         # Log pipeline completion summary
         status = "SUCCESS" if not results.failed else "FAILED"
@@ -1205,6 +1297,7 @@ class PipelineManager:
         on_error: Optional[str] = None,
         tag: Optional[str] = None,
         node: Optional[str] = None,
+        console: bool = False,
     ) -> Union[PipelineResults, Dict[str, PipelineResults]]:
         """Run one, multiple, or all pipelines.
 
@@ -1217,6 +1310,7 @@ class PipelineManager:
             on_error: Override error handling strategy (fail_fast, fail_later, ignore).
             tag: Filter nodes by tag (only nodes with this tag will run).
             node: Run only the specific node by name.
+            console: Whether to show rich console output with progress.
 
         Returns:
             PipelineResults or Dict of results
@@ -1264,6 +1358,7 @@ class PipelineManager:
                 on_error=on_error,
                 tag=tag,
                 node=node,
+                console=console,
             )
 
             result = results[name]

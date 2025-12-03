@@ -36,11 +36,14 @@ dependencies = [
     "pyarrow>=10.0.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
-    "rich>=13.0.0",
     "deltalake>=0.13.0",
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
+cli = [
+    "rich>=13.0.0",
+]
 lineage = [
     "openlineage-python>=1.0.0",
 ]
@@ -90,6 +93,7 @@ all = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
     "openlineage-python>=1.0.0",
+    "rich>=13.0.0",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -108,6 +112,7 @@ dev = [
     "pandasql>=0.7.3",
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.20.0",
+    "rich>=13.0.0",
 ]
 
 [project.scripts]
