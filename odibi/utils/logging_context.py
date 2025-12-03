@@ -510,15 +510,10 @@ class LoggingContext:
         delta = after - before
         pct_change = ((after - before) / before * 100) if before > 0 else 0
 
-        level = "info" if delta >= 0 else "warning"
         msg = (
             f"Row count change in {operation}: {before} -> {after} ({delta:+d}, {pct_change:+.1f}%)"
         )
-
-        if level == "warning" and abs(pct_change) > 50:
-            self.warning(msg, operation=operation, rows_before=before, rows_after=after)
-        else:
-            self.debug(msg, operation=operation, rows_before=before, rows_after=after)
+        self.debug(msg, operation=operation, rows_before=before, rows_after=after)
 
     def log_spark_metrics(
         self,
