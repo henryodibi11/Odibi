@@ -428,6 +428,7 @@ class Pipeline:
                                 engine=self.engine,
                                 connections=self.connections,
                                 performance_config=self.performance_config,
+                                pipeline_name=self.config.pipeline,
                             )
                             if temp_node.restore():
                                 node_ctx.info(
@@ -490,6 +491,7 @@ class Pipeline:
                     retry_config=self.retry_config,
                     catalog_manager=self.catalog_manager,
                     performance_config=self.performance_config,
+                    pipeline_name=self.config.pipeline,
                 )
                 result = node.execute()
 
@@ -558,6 +560,7 @@ class Pipeline:
                                 if result.metadata.get("skipped"):
                                     if result.metadata.get("reason") == "dependency_failed":
                                         results.skipped.append(node_name)
+                                        results.failed.append(node_name)
                                     else:
                                         results.completed.append(node_name)
                                 else:
@@ -598,7 +601,12 @@ class Pipeline:
                             layer_failed = True
 
                             node_config = self.graph.nodes[node_name]
-                            if node_config.on_error == ErrorStrategy.FAIL_FAST:
+                            strategy = (
+                                ErrorStrategy(on_error)
+                                if on_error
+                                else node_config.on_error
+                            )
+                            if strategy == ErrorStrategy.FAIL_FAST:
                                 self._ctx.error(
                                     "FAIL_FAST triggered: Stopping pipeline",
                                     failed_node=node_name,
@@ -803,6 +811,7 @@ class Pipeline:
             engine=self.engine,
             connections=self.connections,
             performance_config=self.performance_config,
+            pipeline_name=self.config.pipeline,
         )
 
         return node.execute()
@@ -1539,7 +1548,7 @@ class PipelineManager:
             return None
 
         try:
-            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_state"])
+            df = self.catalog_manager._read_table(self.catalog_manager.tables["meta_state"])
             if df.empty or "key" not in df.columns:
                 return None
 
@@ -1566,7 +1575,7 @@ class PipelineManager:
             return pd.DataFrame()
 
         try:
-            df = self.catalog_manager._read_local_table(self.catalog_manager.tables["meta_state"])
+            df = self.catalog_manager._read_table(self.catalog_manager.tables["meta_state"])
             if not df.empty and prefix and "key" in df.columns:
                 df = df[df["key"].str.startswith(prefix)]
             return df

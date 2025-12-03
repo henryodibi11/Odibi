@@ -1111,6 +1111,25 @@ class CatalogManager:
 
         return None
 
+    def _read_table(self, path: str):
+        """
+        Read system table using Spark (for remote paths) or local methods.
+        Returns pandas DataFrame. Empty DataFrame on failure.
+        """
+        import pandas as pd
+
+        # Use Spark for remote paths (ADLS, S3, etc.) or when Spark is available
+        if self.spark:
+            try:
+                spark_df = self.spark.read.format("delta").load(path)
+                return spark_df.toPandas()
+            except Exception as e:
+                logger.debug(f"Could not read table via Spark at {path}: {e}")
+                return pd.DataFrame()
+
+        # Fallback to local reading for non-Spark environments
+        return self._read_local_table(path)
+
     def _read_local_table(self, path: str):
         """
         Helper to read local system tables (Delta or Parquet).

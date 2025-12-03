@@ -77,6 +77,7 @@ class NodeExecutor:
         max_sample_rows: int = 10,
         performance_config: Optional[Any] = None,
         state_manager: Optional[Any] = None,
+        pipeline_name: Optional[str] = None,
     ):
         self.context = context
         self.engine = engine
@@ -86,6 +87,7 @@ class NodeExecutor:
         self.max_sample_rows = max_sample_rows
         self.performance_config = performance_config
         self.state_manager = state_manager
+        self.pipeline_name = pipeline_name
 
         # Ephemeral state per execution
         self._execution_steps: List[str] = []
@@ -1503,7 +1505,7 @@ class NodeExecutor:
             if df is not None and table_path:
                 schema = self._get_schema(df)
                 if isinstance(schema, dict):
-                    pipeline_name = config.tags[0] if config.tags else "unknown"
+                    pipeline_name = self.pipeline_name or (config.tags[0] if config.tags else "unknown")
                     self.catalog_manager.track_schema(
                         table_path=table_path,
                         schema=schema,
@@ -1550,7 +1552,7 @@ class NodeExecutor:
                     source_path = read_config.path or read_config.table
 
                 if source_path:
-                    pipeline_name = config.tags[0] if config.tags else "unknown"
+                    pipeline_name = self.pipeline_name or (config.tags[0] if config.tags else "unknown")
                     self.catalog_manager.record_lineage(
                         source_table=source_path,
                         target_table=table_path,
@@ -2068,6 +2070,7 @@ class Node:
         retry_config: Optional[RetryConfig] = None,
         catalog_manager: Optional[Any] = None,
         performance_config: Optional[Any] = None,
+        pipeline_name: Optional[str] = None,
     ):
         """Initialize node."""
         self.config = config
@@ -2080,6 +2083,7 @@ class Node:
         self.retry_config = retry_config or RetryConfig(enabled=False)
         self.catalog_manager = catalog_manager
         self.performance_config = performance_config
+        self.pipeline_name = pipeline_name
 
         self._cached_result: Optional[Any] = None
 
@@ -2114,6 +2118,7 @@ class Node:
             max_sample_rows=max_sample_rows,
             performance_config=performance_config,
             state_manager=self.state_manager,
+            pipeline_name=pipeline_name,
         )
 
     def restore(self) -> bool:
@@ -2295,7 +2300,7 @@ class Node:
 
                     self.catalog_manager.log_run(
                         run_id=str(uuid.uuid4()),
-                        pipeline_name=self.config.tags[0] if self.config.tags else "unknown",
+                        pipeline_name=self.pipeline_name or (self.config.tags[0] if self.config.tags else "unknown"),
                         node_name=self.config.name,
                         status="SUCCESS" if result_for_log.success else "FAILURE",
                         rows_processed=result_for_log.rows_processed or 0,
