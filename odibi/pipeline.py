@@ -1417,6 +1417,10 @@ class PipelineManager:
                 failed=len(result.failed),
             )
 
+            # Invalidate catalog cache so next pipeline sees updated outputs
+            if self.catalog_manager:
+                self.catalog_manager.invalidate_cache()
+
             if result.story_path:
                 self._ctx.debug(f"Story generated: {result.story_path}")
 
