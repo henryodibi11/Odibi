@@ -965,7 +965,7 @@ class CatalogManager:
                         key = f"{row['pipeline_name']}.{row['node_name']}"
                         self._outputs_cache[key] = row.to_dict()
         except Exception as e:
-            logger.debug(f"Could not cache outputs: {e}")
+            logger.warning(f"Could not cache outputs from {self.tables.get('meta_outputs')}: {e}")
             self._outputs_cache = {}
 
         return self._outputs_cache

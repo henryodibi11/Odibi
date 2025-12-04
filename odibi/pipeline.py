@@ -1393,6 +1393,12 @@ class PipelineManager:
             # Invalidate cache before each pipeline so it sees latest outputs
             if self.catalog_manager:
                 self.catalog_manager.invalidate_cache()
+                # Force reload and log what's available
+                outputs = self.catalog_manager._get_all_outputs_cached()
+                self._ctx.info(
+                    f"Catalog outputs available for {name}",
+                    output_keys=list(outputs.keys()),
+                )
 
             self._ctx.info(
                 f"Executing pipeline {idx + 1}/{len(pipeline_names)}: {name}",
