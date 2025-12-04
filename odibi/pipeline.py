@@ -1390,6 +1390,10 @@ class PipelineManager:
 
         results = {}
         for idx, name in enumerate(pipeline_names):
+            # Invalidate cache before each pipeline so it sees latest outputs
+            if self.catalog_manager:
+                self.catalog_manager.invalidate_cache()
+
             self._ctx.info(
                 f"Executing pipeline {idx + 1}/{len(pipeline_names)}: {name}",
                 pipeline=name,
@@ -1416,10 +1420,6 @@ class PipelineManager:
                 completed=len(result.completed),
                 failed=len(result.failed),
             )
-
-            # Invalidate catalog cache so next pipeline sees updated outputs
-            if self.catalog_manager:
-                self.catalog_manager.invalidate_cache()
 
             if result.story_path:
                 self._ctx.debug(f"Story generated: {result.story_path}")
