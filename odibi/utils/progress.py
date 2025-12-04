@@ -353,7 +353,7 @@ class PipelineProgress:
         """
         max_timings: Dict[str, float] = {}
         for info in self._node_statuses.values():
-            phase_timings = info.get("phase_timings", {})
+            phase_timings = info.get("phase_timings") or {}
             for phase, duration_ms in phase_timings.items():
                 max_timings[phase] = max(max_timings.get(phase, 0), duration_ms)
         return {k: round(v, 2) for k, v in max_timings.items()}

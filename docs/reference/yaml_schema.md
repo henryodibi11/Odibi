@@ -378,11 +378,8 @@ These are the built-in functions you can use in two ways:
 | **description** | Optional[str] | No | - | Human-readable description |
 | **enabled** | bool | No | `True` | If False, node is skipped during execution |
 | **tags** | List[str] | No | `PydanticUndefined` | Operational tags for selective execution (e.g., 'daily', 'critical'). Use with `odibi run --tag`. |
-| **depends_on** | List[str] | No | `PydanticUndefined` | List of parent nodes that must complete before this node runs. The output of these nodes is available for reading. |
-| **columns** | Dict[str, [ColumnMetadata](#columnmetadata)] | No | `PydanticUndefined` | Data Dictionary defining the output schema. Used for documentation, PII tagging, and validation. |
-| **read** | Optional[[ReadConfig](#readconfig)] | No | - | Input operation (Load). If missing, data is taken from the first dependency. |
-| **inputs** | Optional[Dict[str, str | Dict[str, Any]]] | No | - | Multi-input support for cross-pipeline dependencies. Map input names to either: 1) $pipeline.node reference (e.g., '$read_bronze.shift_events') 2) Explicit read config dict. Cannot be used with 'read'. Example: inputs: {events: '$read_bronze.events', calendar: {connection: 'goat', path: 'cal'}} |
-| **transform** | Optional[[TransformConfig](#transformconfig)] | No | - | Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present. |
+| **depends_on** | List[str] | No | `PydanticUndefined` | List of parent nodes that must complete before this node runs. Th| **inputs** | Optional[Dict[str, str | Dict[str, Any]]] | No | - | Multi-input support for cross-pipeline dependencies. Map input names to either: 1) $pipeline.node reference (e.g., '$read_bronze.shift_events') 2) Explicit read config dict. Cannot be used with 'read'. Example: inputs: {events: '$read_bronze.events', calendar: {connection: 'goat', path: 'cal'}} |
+e output of th| **transform** | Optional[[TransformConfig](#transformconfig)] | No | - | Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present. |
 | **write** | Optional[[WriteConfig](#writeconfig)] | No | - | Output operation (Save to file/table). |
 | **streaming** | bool | No | `False` | Enable streaming execution for this node (Spark only) |
 | **transformer** | Optional[str] | No | - | Name of the 'App' logic to run (e.g., 'deduplicate', 'scd2'). See Transformer Catalog for options. |
@@ -2747,93 +2744,4 @@ regex_replace:
 
 ---
 
-#### `sessionize` (SessionizeParams)
-Assigns session IDs based on inactivity threshold.
-
-Configuration for sessionization.
-
-Example:
-```yaml
-sessionize:
-  timestamp_col: "event_time"
-  user_col: "user_id"
-  threshold_seconds: 1800
-```
-
-[Back to Catalog](#nodeconfig)
-
-| Field | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| **timestamp_col** | str | Yes | - | Timestamp column to calculate session duration from |
-| **user_col** | str | Yes | - | User identifier to partition sessions by |
-| **threshold_seconds** | int | No | `1800` | Inactivity threshold in seconds (default: 30 minutes). If gap > threshold, new session starts. |
-| **session_col** | str | No | `session_id` | Output column name for the generated session ID |
-
----
-
-#### `unpack_struct` (UnpackStructParams)
-Flattens a struct/dict column into top-level columns.
-
-Configuration for unpacking structs.
-
-Example:
-```yaml
-unpack_struct:
-  column: "user_info"
-```
-
-[Back to Catalog](#nodeconfig)
-
-| Field | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| **column** | str | Yes | - | Struct/Dictionary column to unpack/flatten into individual columns |
-
----
-
-#### `validate_and_flag` (ValidateAndFlagParams)
-Validates rules and appends a column with a list/string of failed rule names.
-
-Configuration for validation flagging.
-
-Example:
-```yaml
-validate_and_flag:
-  flag_col: "data_issues"
-  rules:
-    age_check: "age >= 0"
-    email_format: "email LIKE '%@%'"
-```
-
-[Back to Catalog](#nodeconfig)
-
-| Field | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| **rules** | Dict[str, str] | Yes | - | Map of rule name to SQL condition (must be TRUE) |
-| **flag_col** | str | No | `_issues` | Name of the column to store failed rules |
-
----
-
-#### `window_calculation` (WindowCalculationParams)
-Generic wrapper for Window functions.
-
-Configuration for window functions.
-
-Example:
-```yaml
-window_calculation:
-  target_col: "cumulative_sales"
-  function: "sum(sales)"
-  partition_by: ["region"]
-  order_by: "date ASC"
-```
-
-[Back to Catalog](#nodeconfig)
-
-| Field | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| **target_col** | str | Yes | - | - |
-| **function** | str | Yes | - | Window function e.g. 'sum(amount)', 'rank()' |
-| **partition_by** | List[str] | No | `PydanticUndefined` | - |
-| **order_by** | Optional[str] | No | - | - |
-
----
+#### `sessionize` (SessionizePara
