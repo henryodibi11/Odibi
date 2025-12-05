@@ -1487,6 +1487,12 @@ class SparkEngine(Engine):
             from odibi.context import EngineContext
             from odibi.registry import FunctionRegistry
 
+            ctx.debug(
+                f"Checking registry for operation: {operation}",
+                registered_functions=list(FunctionRegistry._functions.keys())[:10],
+                has_function=FunctionRegistry.has_function(operation),
+            )
+
             if FunctionRegistry.has_function(operation):
                 ctx.debug(f"Executing registered transformer as operation: {operation}")
                 func = FunctionRegistry.get_function(operation)
