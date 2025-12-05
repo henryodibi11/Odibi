@@ -943,11 +943,14 @@ class CatalogManager:
         Returns:
             Dict mapping "{pipeline_name}.{node_name}" -> output record
         """
+        # Thread-safe check: if cache exists and is populated, return it
         if self._outputs_cache is not None:
             return self._outputs_cache
 
-        self._outputs_cache = {}
+        # Build cache in a local variable first to avoid race conditions
+        cache: Dict[str, Dict[str, Any]] = {}
         if not self.spark and not self.engine:
+            self._outputs_cache = cache
             return self._outputs_cache
 
         try:
@@ -957,17 +960,18 @@ class CatalogManager:
                 for row in rows:
                     row_dict = row.asDict()
                     key = f"{row_dict['pipeline_name']}.{row_dict['node_name']}"
-                    self._outputs_cache[key] = row_dict
+                    cache[key] = row_dict
             elif self.engine:
                 df = self._read_local_table(self.tables["meta_outputs"])
                 if not df.empty and "pipeline_name" in df.columns:
                     for _, row in df.iterrows():
                         key = f"{row['pipeline_name']}.{row['node_name']}"
-                        self._outputs_cache[key] = row.to_dict()
+                        cache[key] = row.to_dict()
         except Exception as e:
             logger.warning(f"Could not cache outputs from {self.tables.get('meta_outputs')}: {e}")
-            self._outputs_cache = {}
 
+        # Atomic assignment after building complete cache
+        self._outputs_cache = cache
         return self._outputs_cache
 
     def get_node_output(
