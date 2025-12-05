@@ -16,12 +16,14 @@ except ImportError:
 
 from odibi.context import Context
 from odibi.engine.base import Engine
+from odibi.enums import EngineType
 
 
 class PolarsEngine(Engine):
     """Polars-based execution engine (High Performance)."""
 
     name = "polars"
+    engine_type = EngineType.POLARS
 
     def __init__(
         self,

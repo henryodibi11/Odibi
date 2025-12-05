@@ -6,6 +6,7 @@ Status: Phase 2B implemented - Delta Lake read/write, VACUUM, history, restore
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from odibi.enums import EngineType
 from odibi.exceptions import TransformError
 from odibi.utils.logging_context import get_logging_context
 
@@ -20,6 +21,7 @@ class SparkEngine(Engine):
     """
 
     name = "spark"
+    engine_type = EngineType.SPARK
 
     def __init__(
         self,

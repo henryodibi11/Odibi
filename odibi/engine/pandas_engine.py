@@ -15,6 +15,7 @@ import pandas as pd
 
 from odibi.context import Context, PandasContext
 from odibi.engine.base import Engine
+from odibi.enums import EngineType
 from odibi.exceptions import TransformError
 from odibi.utils.logging_context import get_logging_context
 
@@ -38,6 +39,7 @@ class PandasEngine(Engine):
     """Pandas-based execution engine."""
 
     name = "pandas"
+    engine_type = EngineType.PANDAS
 
     def __init__(
         self,
