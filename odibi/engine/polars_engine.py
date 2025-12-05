@@ -328,15 +328,20 @@ class PolarsEngine(Engine):
 
         else:
             # Fallback: check if operation is a registered transformer
-            from odibi.context import EngineContext
+            from odibi.context import EngineContext, PandasContext
             from odibi.registry import FunctionRegistry
 
             if FunctionRegistry.has_function(operation):
                 func = FunctionRegistry.get_function(operation)
                 param_model = FunctionRegistry.get_param_model(operation)
 
-                # Create EngineContext from current df
-                engine_ctx = EngineContext(df=df, engine=self, engine_type=self.engine_type)
+                # Create EngineContext from current df (use PandasContext as placeholder)
+                engine_ctx = EngineContext(
+                    context=PandasContext(),
+                    df=df,
+                    engine=self,
+                    engine_type=self.engine_type,
+                )
 
                 # Validate and instantiate params
                 if param_model:

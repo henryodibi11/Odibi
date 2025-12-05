@@ -1501,7 +1501,14 @@ class SparkEngine(Engine):
                 param_model = FunctionRegistry.get_param_model(operation)
 
                 # Create EngineContext from current df
-                engine_ctx = EngineContext(df=df, engine=self, engine_type=self.engine_type)
+                from odibi.context import SparkContext
+
+                engine_ctx = EngineContext(
+                    context=SparkContext(self.spark),
+                    df=df,
+                    engine=self,
+                    engine_type=self.engine_type,
+                )
 
                 # Validate and instantiate params
                 if param_model:
