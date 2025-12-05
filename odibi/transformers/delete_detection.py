@@ -404,8 +404,8 @@ def _get_jdbc_url(conn: Any) -> str:
         return conn.get_jdbc_url()
     if hasattr(conn, "url"):
         return conn.url
-    if hasattr(conn, "get_spark_jdbc_options"):
-        opts = conn.get_spark_jdbc_options()
+    if hasattr(conn, "get_spark_options"):
+        opts = conn.get_spark_options()
         if isinstance(opts, dict) and "url" in opts:
             return opts["url"]
 
@@ -416,8 +416,8 @@ def _get_jdbc_properties(conn: Any) -> Dict[str, str]:
     """Extract JDBC properties from connection object."""
     props = {}
 
-    if hasattr(conn, "get_spark_jdbc_options"):
-        opts = conn.get_spark_jdbc_options()
+    if hasattr(conn, "get_spark_options"):
+        opts = conn.get_spark_options()
         if isinstance(opts, dict):
             if "user" in opts:
                 props["user"] = opts["user"]
