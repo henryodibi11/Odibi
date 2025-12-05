@@ -425,13 +425,14 @@ def _get_jdbc_properties(conn: Any) -> Dict[str, str]:
                 props["password"] = opts["password"]
             if "driver" in opts:
                 props["driver"] = opts["driver"]
+            return props
 
     if hasattr(conn, "user"):
         props["user"] = conn.user
     if hasattr(conn, "password"):
         props["password"] = conn.password
-    if hasattr(conn, "driver"):
-        props["driver"] = conn.driver
+    if hasattr(conn, "jdbc_driver"):
+        props["driver"] = conn.jdbc_driver
     if hasattr(conn, "jdbc_properties"):
         props.update(conn.jdbc_properties)
 
