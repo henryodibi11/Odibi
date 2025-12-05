@@ -1,6 +1,8 @@
 import hashlib
 import json
 import logging
+import random
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -137,6 +139,19 @@ class CatalogManager:
         self._pipelines_cache = None
         self._nodes_cache = None
         self._outputs_cache = None
+
+    def _retry_with_backoff(self, func, max_retries: int = 5, base_delay: float = 0.1):
+        """Retry a function with exponential backoff and jitter for concurrent writes."""
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except Exception as e:
+                error_str = str(e).lower()
+                is_conflict = "conflict" in error_str or "concurrent" in error_str
+                if attempt == max_retries - 1 or not is_conflict:
+                    raise
+                delay = base_delay * (2**attempt) + random.uniform(0, 0.1)
+                time.sleep(delay)
 
     def _get_all_pipelines_cached(self) -> Dict[str, Dict[str, Any]]:
         """Get all pipelines with caching."""
@@ -765,14 +780,17 @@ class CatalogManager:
                 }
                 df = pd.DataFrame(data)
 
-                self.engine.write(
-                    df,
-                    connection=self.connection,
-                    format="delta",
-                    path=self.tables["meta_pipelines"],
-                    mode="upsert",
-                    options={"keys": ["pipeline_name"]},
-                )
+                def do_write():
+                    self.engine.write(
+                        df,
+                        connection=self.connection,
+                        format="delta",
+                        path=self.tables["meta_pipelines"],
+                        mode="upsert",
+                        options={"keys": ["pipeline_name"]},
+                    )
+
+                self._retry_with_backoff(do_write)
 
             self._pipelines_cache = None
             logger.debug(f"Batch registered {len(records)} pipeline(s)")
@@ -852,14 +870,17 @@ class CatalogManager:
                 }
                 df = pd.DataFrame(data)
 
-                self.engine.write(
-                    df,
-                    connection=self.connection,
-                    format="delta",
-                    path=self.tables["meta_nodes"],
-                    mode="upsert",
-                    options={"keys": ["pipeline_name", "node_name"]},
-                )
+                def do_write():
+                    self.engine.write(
+                        df,
+                        connection=self.connection,
+                        format="delta",
+                        path=self.tables["meta_nodes"],
+                        mode="upsert",
+                        options={"keys": ["pipeline_name", "node_name"]},
+                    )
+
+                self._retry_with_backoff(do_write)
 
             self._nodes_cache = None
             logger.debug(f"Batch registered {len(records)} node(s)")
@@ -961,14 +982,17 @@ class CatalogManager:
                 }
                 df = pd.DataFrame(data)
 
-                self.engine.write(
-                    df,
-                    connection=self.connection,
-                    format="delta",
-                    path=self.tables["meta_outputs"],
-                    mode="upsert",
-                    options={"keys": ["pipeline_name", "node_name"]},
-                )
+                def do_write():
+                    self.engine.write(
+                        df,
+                        connection=self.connection,
+                        format="delta",
+                        path=self.tables["meta_outputs"],
+                        mode="upsert",
+                        options={"keys": ["pipeline_name", "node_name"]},
+                    )
+
+                self._retry_with_backoff(do_write)
 
             self._outputs_cache = None
             logger.debug(f"Batch registered {len(records)} output(s)")
