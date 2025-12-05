@@ -55,6 +55,11 @@ class PandasEngine(Engine):
         """
         self.connections = connections or {}
         self.config = config or {}
+
+        # Suppress noisy delta-rs transaction conflict warnings (handled by retry)
+        if "RUST_LOG" not in os.environ:
+            os.environ["RUST_LOG"] = "deltalake_core::kernel::transaction=error"
+
         # Check for performance flags
         performance = self.config.get("performance", {})
 
