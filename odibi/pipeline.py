@@ -1130,6 +1130,7 @@ class PipelineManager:
                         config=project_config.system,
                         base_path=base_path,
                         engine=engine_instance,
+                        connection=sys_conn,
                     )
                     self.catalog_manager.bootstrap()
                     self._ctx.info("System Catalog initialized", path=base_path)

@@ -69,6 +69,7 @@ class CatalogManager:
         config: SystemConfig,
         base_path: str,
         engine: Optional[Any] = None,
+        connection: Optional[Any] = None,
     ):
         """
         Initialize the Catalog Manager.
@@ -79,11 +80,13 @@ class CatalogManager:
             base_path: Absolute path to the system catalog directory (resolved from connection).
                        Example: "abfss://container@account.dfs.core.windows.net/_odibi_system"
             engine: Execution engine (optional, for Pandas mode)
+            connection: Connection object for storage credentials (optional, for Pandas mode)
         """
         self.spark = spark
         self.config = config
         self.base_path = base_path.rstrip("/")
         self.engine = engine
+        self.connection = connection
 
         # Table Paths
         self.tables = {
@@ -113,6 +116,16 @@ class CatalogManager:
     def is_pandas_mode(self) -> bool:
         """Check if running in Pandas mode."""
         return self.engine is not None and self.engine.name == "pandas"
+
+    def _get_storage_options(self) -> Dict[str, Any]:
+        """Get storage options for pandas/delta-rs operations.
+
+        Returns:
+            Dict with storage credentials if connection supports it, else empty dict.
+        """
+        if self.connection and hasattr(self.connection, "pandas_storage_options"):
+            return self.connection.pandas_storage_options()
+        return {}
 
     @property
     def has_backend(self) -> bool:
@@ -272,7 +285,14 @@ class CatalogManager:
                     data = {f.name: [] for f in schema.fields}
                     table = pa.Table.from_pydict(data, schema=arrow_schema)
 
-                    write_deltalake(path, table, mode="overwrite", partition_by=partition_cols)
+                    storage_opts = self._get_storage_options()
+                    write_deltalake(
+                        path,
+                        table,
+                        mode="overwrite",
+                        partition_by=partition_cols,
+                        storage_options=storage_opts if storage_opts else None,
+                    )
                     logger.info(f"Initialized Delta table: {name}")
 
                 except ImportError:
@@ -312,7 +332,8 @@ class CatalogManager:
                 try:
                     from deltalake import DeltaTable, write_deltalake
 
-                    _ = DeltaTable(path)
+                    storage_opts = self._get_storage_options()
+                    _ = DeltaTable(path, storage_options=storage_opts if storage_opts else None)
                     # Basic schema evolution: overwrite schema if we are appending?
                     # For now, let's just log. True evolution is complex.
                     # A simple fix for "fields mismatch" is to allow schema merge.
@@ -369,7 +390,8 @@ class CatalogManager:
             elif self.engine and self.engine.name == "pandas":
                 from deltalake import DeltaTable
 
-                dt = DeltaTable(path)
+                storage_opts = self._get_storage_options()
+                dt = DeltaTable(path, storage_options=storage_opts if storage_opts else None)
                 existing_schema = dt.schema()
                 existing_fields = {f.name: f.type for f in existing_schema.fields}
 
@@ -397,7 +419,14 @@ class CatalogManager:
 
                     from deltalake import write_deltalake
 
-                    write_deltalake(path, df, mode="overwrite", overwrite_schema=True)
+                    storage_opts = self._get_storage_options()
+                    write_deltalake(
+                        path,
+                        df,
+                        mode="overwrite",
+                        overwrite_schema=True,
+                        storage_options=storage_opts if storage_opts else None,
+                    )
                     logger.info(f"Schema migration completed for {name}")
 
         except Exception as e:
@@ -424,7 +453,18 @@ class CatalogManager:
         elif self.engine:
             import os
 
-            # Check if directory exists and has content
+            # For cloud paths, try to load with delta-rs
+            if path.startswith(("abfss://", "az://", "s3://", "gs://", "https://")):
+                try:
+                    from deltalake import DeltaTable
+
+                    storage_opts = self._get_storage_options()
+                    DeltaTable(path, storage_options=storage_opts if storage_opts else None)
+                    return True
+                except Exception:
+                    return False
+
+            # For local paths, check if directory exists and has content
             if not os.path.exists(path):
                 return False
             if os.path.isdir(path):
@@ -1649,14 +1689,15 @@ class CatalogManager:
         """
         import pandas as pd
 
-        # Suppress verbose internal logs if necessary
+        storage_opts = self._get_storage_options()
 
         try:
             # Try Delta first if library available
             try:
                 from deltalake import DeltaTable
 
-                return DeltaTable(path).to_pandas()
+                dt = DeltaTable(path, storage_options=storage_opts if storage_opts else None)
+                return dt.to_pandas()
             except ImportError:
                 # Delta library not installed, proceed to parquet fallback
                 pass
@@ -1665,7 +1706,7 @@ class CatalogManager:
                 pass
 
             # Fallback: Read as Parquet (directory or file)
-            return pd.read_parquet(path)
+            return pd.read_parquet(path, storage_options=storage_opts if storage_opts else None)
 
         except Exception as e:
             # Only log debug to avoid noise if table just doesn't exist or is empty yet

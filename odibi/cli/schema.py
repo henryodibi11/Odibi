@@ -75,6 +75,7 @@ def _get_catalog_manager(config_path: Optional[str]):
             config=project_config.system,
             base_path=base_path,
             engine=engine,
+            connection=system_conn,
         )
 
         return catalog
