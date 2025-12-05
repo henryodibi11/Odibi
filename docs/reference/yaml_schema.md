@@ -2263,7 +2263,7 @@ join:
 | --- | --- | --- | --- | --- |
 | **right_dataset** | str | Yes | - | Name of the node/dataset to join with |
 | **on** | str | List[str] | Yes | - | Column(s) to join on |
-| **how** | Literal['inner', 'left', 'right', 'full', 'cross'] | No | `left` | Join type |
+| **how** | Literal['inner', 'left', 'right', 'full', 'cross', 'anti', 'semi'] | No | `left` | Join type |
 | **prefix** | Optional[str] | No | - | Prefix for columns from right dataset to avoid collisions |
 
 ---
