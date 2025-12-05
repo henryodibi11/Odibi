@@ -47,14 +47,14 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
         order_by=params.order_by,
     )
 
-    # Get row count before transformation
+    # Get row count before transformation (optional, for logging only)
     rows_before = None
     try:
         rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
         if rows_before is None and hasattr(context.df, "count"):
             rows_before = context.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count before transform: {type(e).__name__}")
 
     partition_clause = ", ".join(params.keys)
     order_clause = params.order_by if params.order_by else "(SELECT NULL)"
@@ -74,14 +74,14 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
     """
     result = context.sql(sql_query)
 
-    # Log completion
+    # Get row count after transformation (optional, for logging only)
     rows_after = None
     try:
         rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
         if rows_after is None and hasattr(result.df, "count"):
             rows_after = result.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count after transform: {type(e).__name__}")
 
     elapsed_ms = (time.time() - start_time) * 1000
     duplicates_removed = rows_before - rows_after if rows_before and rows_after else None

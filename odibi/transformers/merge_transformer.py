@@ -177,8 +177,8 @@ def merge(context, current, **params):
         rows_before = current.shape[0] if hasattr(current, "shape") else None
         if rows_before is None and hasattr(current, "count"):
             rows_before = current.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     ctx.debug("Merge source loaded", source_rows=rows_before)
 
@@ -438,8 +438,10 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
             if conn_name in context.engine.connections:
                 try:
                     path = context.engine.connections[conn_name].get_path(rel_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    get_logging_context().debug(
+                        f"Could not resolve connection path: {type(e).__name__}"
+                    )
 
     if not ("/" in path or "\\" in path or ":" in path or path.startswith(".")):
         # If it looks like a table name, try to treat as local path under data/
@@ -559,9 +561,8 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
         try:
             # Try reading as parquet
             target_df = pd.read_parquet(path)
-        except Exception:
-            # Try deltalake if installed?
-            pass
+        except Exception as e:
+            get_logging_context().debug(f"Could not read target file: {type(e).__name__}")
 
     if target_df.empty:
         if strategy == MergeStrategy.DELETE_MATCH:

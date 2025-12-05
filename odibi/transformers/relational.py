@@ -74,8 +74,8 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
         rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
         if rows_before is None and hasattr(context.df, "count"):
             rows_before = context.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     # Get Right DF
     right_df = context.get(params.right_dataset)
@@ -97,8 +97,8 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
         right_rows = right_df.shape[0] if hasattr(right_df, "shape") else None
         if right_rows is None and hasattr(right_df, "count"):
             right_rows = right_df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     ctx.debug(
         "Join datasets loaded",
@@ -203,8 +203,8 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
         rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
         if rows_after is None and hasattr(result.df, "count"):
             rows_after = result.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     elapsed_ms = (time.time() - start_time) * 1000
     ctx.debug(
@@ -267,8 +267,8 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
         rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
         if rows_before is None and hasattr(context.df, "count"):
             rows_before = context.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     union_sqls = []
     dataset_row_counts = {"current": rows_before}
@@ -293,8 +293,8 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
             if other_rows is None and hasattr(other_df, "count"):
                 other_rows = other_df.count()
             dataset_row_counts[ds_name] = other_rows
-        except Exception:
-            pass
+        except Exception as e:
+            ctx.debug(f"Could not get row count: {type(e).__name__}")
 
         view_name = f"union_{ds_name}"
         context.register_temp_view(view_name, other_df)
@@ -321,8 +321,8 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
         rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
         if rows_after is None and hasattr(result.df, "count"):
             rows_after = result.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     elapsed_ms = (time.time() - start_time) * 1000
     ctx.debug(
@@ -394,8 +394,8 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
         rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
         if rows_before is None and hasattr(context.df, "count"):
             rows_before = context.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     if context.engine_type == EngineType.SPARK:
         df = context.df.groupBy(*params.group_by)
@@ -501,8 +501,8 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
         rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
         if rows_before is None and hasattr(context.df, "count"):
             rows_before = context.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     if context.engine_type == EngineType.PANDAS:
         res = context.df.melt(
@@ -617,8 +617,8 @@ def aggregate(context: EngineContext, params: AggregateParams) -> EngineContext:
         rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
         if rows_before is None and hasattr(context.df, "count"):
             rows_before = context.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     group_cols = ", ".join(params.group_by)
     agg_exprs = []
@@ -641,8 +641,8 @@ def aggregate(context: EngineContext, params: AggregateParams) -> EngineContext:
         rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
         if rows_after is None and hasattr(result.df, "count"):
             rows_after = result.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     elapsed_ms = (time.time() - start_time) * 1000
     ctx.debug(

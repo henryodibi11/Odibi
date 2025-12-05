@@ -13,6 +13,18 @@ except ImportError:
 
 from odibi.enums import EngineType
 
+# Thread-local storage for unique temp view names
+_thread_local = threading.local()
+
+
+def _get_unique_view_name() -> str:
+    """Generate a unique temp view name for thread-safe parallel execution."""
+    if not hasattr(_thread_local, "view_counter"):
+        _thread_local.view_counter = 0
+    _thread_local.view_counter += 1
+    thread_id = threading.current_thread().ident or 0
+    return f"_df_{thread_id}_{_thread_local.view_counter}"
+
 
 class EngineContext:
     """
@@ -91,21 +103,21 @@ class EngineContext:
 
     def sql(self, query: str) -> "EngineContext":
         """Execute SQL on the current DataFrame (aliased as 'df')."""
-        # Track SQL
         self._sql_history.append(query)
 
         if self.sql_executor:
-            # Workaround: Register current df as 'df' in the context
-            # Note: We might be overwriting a 'df' if it existed, but 'df' is reserved for current.
-            # Context implementations usually allow overwriting.
-            self.context.register("df", self.df)
+            # Use unique temp view name for thread-safe parallel execution
+            view_name = _get_unique_view_name()
+            self.context.register(view_name, self.df)
             try:
-                res = self.sql_executor(query, self.context)
+                # Replace 'df' references with our unique view name in the query
+                # Use word boundary matching to avoid replacing 'df' inside column names
+                safe_query = re.sub(r"\bdf\b", view_name, query)
+                res = self.sql_executor(safe_query, self.context)
                 return self.with_df(res)
             finally:
-                # Optional: Cleanup 'df' from context to avoid pollution?
-                # For now, keep it simple.
-                pass
+                # Cleanup temp view to avoid memory leaks
+                self.context.unregister(view_name)
 
         raise NotImplementedError("EngineContext.sql requires sql_executor to be set.")
 
@@ -175,6 +187,17 @@ class Context(ABC):
     @abstractmethod
     def clear(self) -> None:
         """Clear all registered DataFrames."""
+        pass
+
+    def unregister(self, name: str) -> None:
+        """Unregister a DataFrame from the context.
+
+        Default implementation does nothing (optional cleanup).
+        Subclasses can override for cleanup (e.g., dropping temp views).
+
+        Args:
+            name: Identifier to unregister
+        """
         pass
 
 
@@ -259,6 +282,11 @@ class PandasContext(Context):
         """Clear all registered DataFrames."""
         self._data.clear()
 
+    def unregister(self, name: str) -> None:
+        """Unregister a DataFrame from the context."""
+        self._data.pop(name, None)
+        self._metadata.pop(name, None)
+
 
 class PolarsContext(Context):
     """Context implementation for Polars engine."""
@@ -322,6 +350,11 @@ class PolarsContext(Context):
     def clear(self) -> None:
         """Clear all registered DataFrames."""
         self._data.clear()
+
+    def unregister(self, name: str) -> None:
+        """Unregister a DataFrame from the context."""
+        self._data.pop(name, None)
+        self._metadata.pop(name, None)
 
 
 class SparkContext(Context):
@@ -453,6 +486,21 @@ class SparkContext(Context):
                 self.spark.catalog.dropTempView(name)
             except Exception:
                 pass
+
+    def unregister(self, name: str) -> None:
+        """Unregister a temp view from Spark.
+
+        Args:
+            name: View name to drop
+        """
+        with self._lock:
+            self._registered_views.discard(name)
+            self._metadata.pop(name, None)
+
+        try:
+            self.spark.catalog.dropTempView(name)
+        except Exception:
+            pass
 
 
 def create_context(engine: str, spark_session: Optional[Any] = None) -> Context:

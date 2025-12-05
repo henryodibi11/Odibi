@@ -79,8 +79,8 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
         rows_before = source_df.shape[0] if hasattr(source_df, "shape") else None
         if rows_before is None and hasattr(source_df, "count"):
             rows_before = source_df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     ctx.debug(
         "SCD2 source loaded",
@@ -100,8 +100,8 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
         rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
         if rows_after is None and hasattr(result.df, "count"):
             rows_after = result.df.count()
-    except Exception:
-        pass
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     elapsed_ms = (time.time() - start_time) * 1000
     ctx.debug(
@@ -281,8 +281,10 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
             if conn_name in context.engine.connections:
                 try:
                     path = context.engine.connections[conn_name].get_path(rel_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    get_logging_context().debug(
+                        f"Could not resolve connection path: {type(e).__name__}"
+                    )
 
     # Define Cols
     keys = params.keys
@@ -381,8 +383,8 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
                 target_df = pd.read_parquet(path)
             elif str(path).endswith(".csv"):
                 target_df = pd.read_csv(path)
-        except Exception:
-            pass
+        except Exception as e:
+            get_logging_context().debug(f"Could not read target file: {type(e).__name__}")
 
     # Prepare Source
     source_df = source_df.copy()

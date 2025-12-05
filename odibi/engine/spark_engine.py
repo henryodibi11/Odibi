@@ -3,6 +3,7 @@
 Status: Phase 2B implemented - Delta Lake read/write, VACUUM, history, restore
 """
 
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -11,6 +12,52 @@ from odibi.exceptions import TransformError
 from odibi.utils.logging_context import get_logging_context
 
 from .base import Engine
+
+
+def _extract_spark_error_message(error: Exception) -> str:
+    """Extract a clean, user-friendly error message from Spark/Py4J exceptions.
+
+    Removes Java stack traces and Py4J noise, keeping only the useful error info.
+
+    Args:
+        error: The exception to clean
+
+    Returns:
+        Clean error message without Java stack traces
+    """
+    error_str = str(error)
+
+    # For AnalysisException, extract the error class and message up to SQLSTATE or line info
+    # Format: [ERROR_CLASS] message. Did you mean...? SQLSTATE: xxx; line X pos Y;\n'Plan...
+    match = re.match(
+        r"(\[[\w._]+\])\s*(.+?)(?:\s*SQLSTATE|\s*;\s*line|\n'|\n\tat|$)",
+        error_str,
+        re.DOTALL,
+    )
+    if match:
+        error_class = match.group(1)
+        message = match.group(2).strip().rstrip(".")
+        return f"{error_class} {message}"
+
+    # For other Spark errors, try to extract the first meaningful line
+    lines = error_str.split("\n")
+    for line in lines:
+        line = line.strip()
+        # Skip Java stack trace lines
+        if re.match(r"at (org\.|java\.|scala\.|py4j\.)", line):
+            continue
+        # Skip empty or noise lines
+        if not line or line.startswith("Py4JJavaError") or line == ":":
+            continue
+        # Return first meaningful line
+        if len(line) > 10:
+            # Truncate very long messages
+            if len(line) > 200:
+                return line[:200] + "..."
+            return line
+
+    # Fallback: return first 200 chars
+    return error_str[:200] + "..." if len(error_str) > 200 else error_str
 
 
 class SparkEngine(Engine):
@@ -1371,34 +1418,35 @@ class SparkEngine(Engine):
         except Exception as e:
             elapsed = (time.time() - start_time) * 1000
             error_type = type(e).__name__
+            clean_message = _extract_spark_error_message(e)
 
             if "AnalysisException" in error_type:
                 ctx.error(
                     "Spark SQL Analysis Error",
                     error_type=error_type,
-                    error_message=str(e),
+                    error_message=clean_message,
                     query_preview=sql[:200] if len(sql) > 200 else sql,
                     elapsed_ms=round(elapsed, 2),
                 )
-                raise TransformError(f"Spark SQL Analysis Error: {e}") from e
+                raise TransformError(f"Spark SQL Analysis Error: {clean_message}")
 
             if "ParseException" in error_type:
                 ctx.error(
                     "Spark SQL Parse Error",
                     error_type=error_type,
-                    error_message=str(e),
+                    error_message=clean_message,
                     query_preview=sql[:200] if len(sql) > 200 else sql,
                     elapsed_ms=round(elapsed, 2),
                 )
-                raise TransformError(f"Spark SQL Parse Error: {e}") from e
+                raise TransformError(f"Spark SQL Parse Error: {clean_message}")
 
             ctx.error(
                 "Spark SQL execution failed",
                 error_type=error_type,
-                error_message=str(e),
+                error_message=clean_message,
                 elapsed_ms=round(elapsed, 2),
             )
-            raise e
+            raise TransformError(f"Spark SQL Error: {clean_message}")
 
     def execute_transform(self, *args, **kwargs):
         raise NotImplementedError(
