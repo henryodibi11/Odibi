@@ -82,10 +82,10 @@ def create_azure_blob_connection(name: str, config: Dict[str, Any]) -> Any:
     client_id = auth_config.get("client_id") or config.get("client_id")
     client_secret = auth_config.get("client_secret") or config.get("client_secret")
 
-    auth_mode = config.get("auth_mode", "key_vault")
+    auth_mode = auth_config.get("mode") or config.get("auth_mode", "key_vault")
 
-    # Auto-detect auth_mode
-    if "auth_mode" not in config:
+    # Auto-detect auth_mode if not explicitly set
+    if "auth_mode" not in config and "mode" not in auth_config:
         if sas_token:
             auth_mode = "sas_token"
         elif key_vault_name and secret_name:
