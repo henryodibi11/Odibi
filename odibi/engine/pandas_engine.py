@@ -128,6 +128,26 @@ class PandasEngine(Engine):
                     logger.warning(f"Failed to apply query '{query}': {e}")
         return df
 
+    _CLOUD_URI_PREFIXES = ("abfss://", "s3://", "gs://", "az://", "https://")
+
+    def _resolve_path(self, path: Optional[str], connection: Any) -> str:
+        """Resolve path to full URI, avoiding double-prefixing for cloud URIs.
+
+        Args:
+            path: Relative or absolute path
+            connection: Connection object (may have get_path method)
+
+        Returns:
+            Full resolved path
+        """
+        if not path:
+            raise ValueError("Path must be provided")
+        if path.startswith(self._CLOUD_URI_PREFIXES):
+            return path
+        if connection:
+            return connection.get_path(path)
+        return path
+
     def _merge_storage_options(
         self, connection: Any, options: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -215,22 +235,13 @@ class PandasEngine(Engine):
 
         options = options or {}
 
-        # Get full path from connection
-        if path:
-            if connection:
-                full_path = connection.get_path(path)
-            else:
-                full_path = path
-        elif table:
-            if connection:
-                full_path = connection.get_path(table)
-            else:
-                ctx.error(
-                    "Connection required when specifying 'table'",
-                    table=table,
-                )
+        # Resolve full path from connection
+        try:
+            full_path = self._resolve_path(path or table, connection)
+        except ValueError:
+            if table and not connection:
+                ctx.error("Connection required when specifying 'table'", table=table)
                 raise ValueError("Connection is required when specifying 'table'.")
-        else:
             ctx.error("Neither path nor table provided for read operation")
             raise ValueError("Either path or table must be provided")
 
@@ -589,19 +600,13 @@ class PandasEngine(Engine):
             ctx.debug("Writing to SQL", table=table, mode=mode)
             return self._write_sql(df, connection, table, mode, options)
 
-        # Get full path from connection
-        if path:
-            if connection:
-                full_path = connection.get_path(path)
-            else:
-                full_path = path
-        elif table:
-            if connection:
-                full_path = connection.get_path(table)
-            else:
+        # Resolve full path from connection
+        try:
+            full_path = self._resolve_path(path or table, connection)
+        except ValueError:
+            if table and not connection:
                 ctx.error("Connection required when specifying 'table'", table=table)
                 raise ValueError("Connection is required when specifying 'table'.")
-        else:
             ctx.error("Neither path nor table provided for write operation")
             raise ValueError("Either path or table must be provided")
 
