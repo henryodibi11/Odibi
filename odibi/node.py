@@ -2376,10 +2376,12 @@ class Node:
             spark_session = self.engine.spark
 
         if self.catalog_manager and self.catalog_manager.tables:
+            storage_opts = self.catalog_manager._get_storage_options()
             backend = CatalogStateBackend(
                 spark_session=spark_session,
                 meta_state_path=self.catalog_manager.tables.get("meta_state"),
                 meta_runs_path=self.catalog_manager.tables.get("meta_runs"),
+                storage_options=storage_opts if storage_opts else None,
             )
         else:
             # Fallback to default local paths (Unified Catalog default)
