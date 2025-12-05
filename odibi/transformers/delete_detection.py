@@ -404,6 +404,10 @@ def _get_jdbc_url(conn: Any) -> str:
         return conn.get_jdbc_url()
     if hasattr(conn, "url"):
         return conn.url
+    if hasattr(conn, "get_spark_jdbc_options"):
+        opts = conn.get_spark_jdbc_options()
+        if isinstance(opts, dict) and "url" in opts:
+            return opts["url"]
 
     raise ValueError(f"Cannot determine JDBC URL from connection type {type(conn).__name__}")
 
@@ -411,6 +415,16 @@ def _get_jdbc_url(conn: Any) -> str:
 def _get_jdbc_properties(conn: Any) -> Dict[str, str]:
     """Extract JDBC properties from connection object."""
     props = {}
+
+    if hasattr(conn, "get_spark_jdbc_options"):
+        opts = conn.get_spark_jdbc_options()
+        if isinstance(opts, dict):
+            if "user" in opts:
+                props["user"] = opts["user"]
+            if "password" in opts:
+                props["password"] = opts["password"]
+            if "driver" in opts:
+                props["driver"] = opts["driver"]
 
     if hasattr(conn, "user"):
         props["user"] = conn.user
