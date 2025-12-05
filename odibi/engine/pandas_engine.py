@@ -1215,6 +1215,26 @@ class PandasEngine(Engine):
         elif operation == "sample":
             return df.sample(**params)
         else:
+            # Fallback: check if operation is a registered transformer
+            from odibi.context import EngineContext
+            from odibi.registry import FunctionRegistry
+
+            if FunctionRegistry.has_function(operation):
+                func = FunctionRegistry.get_function(operation)
+                param_model = FunctionRegistry.get_param_model(operation)
+
+                # Create EngineContext from current df
+                engine_ctx = EngineContext(df=df, engine=self, engine_type=self.engine_type)
+
+                # Validate and instantiate params
+                if param_model:
+                    validated_params = param_model(**params)
+                    result_ctx = func(engine_ctx, validated_params)
+                else:
+                    result_ctx = func(engine_ctx, **params)
+
+                return result_ctx.df
+
             raise ValueError(f"Unsupported operation: {operation}")
 
     def _pivot(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:

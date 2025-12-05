@@ -1483,6 +1483,27 @@ class SparkEngine(Engine):
             return df.sample(withReplacement=with_replacement, fraction=fraction, seed=seed)
 
         else:
+            # Fallback: check if operation is a registered transformer
+            from odibi.context import EngineContext
+            from odibi.registry import FunctionRegistry
+
+            if FunctionRegistry.has_function(operation):
+                ctx.debug(f"Executing registered transformer as operation: {operation}")
+                func = FunctionRegistry.get_function(operation)
+                param_model = FunctionRegistry.get_param_model(operation)
+
+                # Create EngineContext from current df
+                engine_ctx = EngineContext(df=df, engine=self, engine_type=self.engine_type)
+
+                # Validate and instantiate params
+                if param_model:
+                    validated_params = param_model(**params)
+                    result_ctx = func(engine_ctx, validated_params)
+                else:
+                    result_ctx = func(engine_ctx, **params)
+
+                return result_ctx.df
+
             ctx.error(f"Unsupported operation for Spark engine: {operation}")
             raise ValueError(f"Unsupported operation for Spark engine: {operation}")
 

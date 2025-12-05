@@ -55,6 +55,16 @@ class FunctionRegistry:
         return cls._functions[name]
 
     @classmethod
+    def has_function(cls, name: str) -> bool:
+        """Check if a function is registered."""
+        return name in cls._functions
+
+    @classmethod
+    def get_function(cls, name: str) -> Optional[Callable]:
+        """Get a function without raising if not found."""
+        return cls._functions.get(name)
+
+    @classmethod
     def get_param_model(cls, name: str) -> Optional[Any]:
         """Get the Pydantic model for a function's parameters."""
         return cls._param_models.get(name)
