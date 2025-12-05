@@ -4,6 +4,7 @@ from odibi.registry import FunctionRegistry
 from odibi.transformers import (
     advanced,
     delete_detection,
+    merge_transformer,
     relational,
     scd,
     sql_core,
@@ -75,6 +76,9 @@ def register_standard_library():
 
     # SCD
     registry.register(scd.scd2, "scd2", scd.SCD2Params)
+
+    # Merge
+    registry.register(merge_transformer.merge, "merge", merge_transformer.MergeParams)
 
     # Validation
     registry.register(validation.cross_check, "cross_check", validation.CrossCheckParams)
