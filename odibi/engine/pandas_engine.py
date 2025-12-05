@@ -517,7 +517,7 @@ class PandasEngine(Engine):
                     reader = fastavro.reader(f)
                     records = [record for record in reader]
                 return self._process_df(pd.DataFrame(records), post_read_query)
-        elif format in ["sql_server", "azure_sql"]:
+        elif format in ["sql", "sql_server", "azure_sql"]:
             ctx.debug("Reading SQL table", table=str(full_path), format=format)
             if not hasattr(connection, "read_table"):
                 ctx.error(
@@ -585,7 +585,7 @@ class PandasEngine(Engine):
         )
 
         # SQL Server / Azure SQL Support
-        if format in ["sql_server", "azure_sql"]:
+        if format in ["sql", "sql_server", "azure_sql"]:
             ctx.debug("Writing to SQL", table=table, mode=mode)
             return self._write_sql(df, connection, table, mode, options)
 
@@ -1669,7 +1669,7 @@ class PandasEngine(Engine):
     ) -> Optional[Dict[str, str]]:
         """Get schema of an existing table/file."""
         try:
-            if table and format in ["sql_server", "azure_sql"]:
+            if table and format in ["sql", "sql_server", "azure_sql"]:
                 # SQL Server: Read empty result
                 query = f"SELECT TOP 0 * FROM {table}"
                 df = connection.read_sql(query)
