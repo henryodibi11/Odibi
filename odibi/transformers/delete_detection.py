@@ -28,7 +28,9 @@ class DeleteThresholdExceeded(Exception):
 
 
 @transform("detect_deletes", category="transformer", param_model=DeleteDetectionConfig)
-def detect_deletes(context: EngineContext, **params) -> EngineContext:
+def detect_deletes(
+    context: EngineContext, config: DeleteDetectionConfig = None, **params
+) -> EngineContext:
     """
     Detects deleted records based on configured mode.
 
@@ -36,7 +38,8 @@ def detect_deletes(context: EngineContext, **params) -> EngineContext:
     - soft_delete_col set: Adds boolean column (True = deleted)
     - soft_delete_col = None: Removes deleted rows (hard delete)
     """
-    config = DeleteDetectionConfig(**params)
+    if config is None:
+        config = DeleteDetectionConfig(**params)
 
     if config.mode == DeleteDetectionMode.NONE:
         return context
