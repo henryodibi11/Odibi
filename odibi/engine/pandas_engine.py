@@ -3,6 +3,7 @@
 import glob
 import hashlib
 import os
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -129,6 +130,19 @@ class PandasEngine(Engine):
         return df
 
     _CLOUD_URI_PREFIXES = ("abfss://", "s3://", "gs://", "az://", "https://")
+
+    def _retry_delta_operation(self, func, max_retries: int = 5, base_delay: float = 0.2):
+        """Retry Delta operations with exponential backoff for concurrent conflicts."""
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except Exception as e:
+                error_str = str(e).lower()
+                is_conflict = "conflict" in error_str or "concurrent" in error_str
+                if attempt == max_retries - 1 or not is_conflict:
+                    raise
+                delay = base_delay * (2**attempt) + random.uniform(0, 0.1)
+                time.sleep(delay)
 
     def _resolve_path(self, path: Optional[str], connection: Any) -> str:
         """Resolve path to full URI, avoiding double-prefixing for cloud URIs.
@@ -811,18 +825,21 @@ class PandasEngine(Engine):
             if isinstance(keys, str):
                 keys = [keys]
 
-            dt = DeltaTable(full_path, storage_options=storage_opts)
-            (
-                dt.merge(
-                    source=df,
-                    predicate=" AND ".join([f"s.{k} = t.{k}" for k in keys]),
-                    source_alias="s",
-                    target_alias="t",
+            def do_upsert():
+                dt = DeltaTable(full_path, storage_options=storage_opts)
+                (
+                    dt.merge(
+                        source=df,
+                        predicate=" AND ".join([f"s.{k} = t.{k}" for k in keys]),
+                        source_alias="s",
+                        target_alias="t",
+                    )
+                    .when_matched_update_all()
+                    .when_not_matched_insert_all()
+                    .execute()
                 )
-                .when_matched_update_all()
-                .when_not_matched_insert_all()
-                .execute()
-            )
+
+            self._retry_delta_operation(do_upsert)
         elif mode == "append_once":
             keys = merged_options.get("keys")
             if not keys:
@@ -831,17 +848,20 @@ class PandasEngine(Engine):
             if isinstance(keys, str):
                 keys = [keys]
 
-            dt = DeltaTable(full_path, storage_options=storage_opts)
-            (
-                dt.merge(
-                    source=df,
-                    predicate=" AND ".join([f"s.{k} = t.{k}" for k in keys]),
-                    source_alias="s",
-                    target_alias="t",
+            def do_append_once():
+                dt = DeltaTable(full_path, storage_options=storage_opts)
+                (
+                    dt.merge(
+                        source=df,
+                        predicate=" AND ".join([f"s.{k} = t.{k}" for k in keys]),
+                        source_alias="s",
+                        target_alias="t",
+                    )
+                    .when_not_matched_insert_all()
+                    .execute()
                 )
-                .when_not_matched_insert_all()
-                .execute()
-            )
+
+            self._retry_delta_operation(do_append_once)
         else:
             # Filter options supported by write_deltalake
             write_kwargs = {
@@ -859,9 +879,12 @@ class PandasEngine(Engine):
                 ]
             }
 
-            write_deltalake(
-                full_path, df, mode=delta_mode, storage_options=storage_opts, **write_kwargs
-            )
+            def do_write():
+                write_deltalake(
+                    full_path, df, mode=delta_mode, storage_options=storage_opts, **write_kwargs
+                )
+
+            self._retry_delta_operation(do_write)
 
         # Return commit info
         dt = DeltaTable(full_path, storage_options=storage_opts)
