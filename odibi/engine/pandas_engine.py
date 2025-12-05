@@ -787,6 +787,12 @@ class PandasEngine(Engine):
 
         storage_opts = merged_options.get("storage_options", {})
 
+        # Handle null-only columns: Delta Lake doesn't support Null dtype
+        # Cast columns with all-null values to string to avoid schema errors
+        for col in df.columns:
+            if df[col].isna().all():
+                df[col] = df[col].astype("string")
+
         # Map modes
         delta_mode = "overwrite"
         if mode == "append":
