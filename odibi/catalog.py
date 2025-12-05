@@ -767,7 +767,7 @@ class CatalogManager:
 
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_pipelines"],
                     mode="upsert",
@@ -854,7 +854,7 @@ class CatalogManager:
 
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_nodes"],
                     mode="upsert",
@@ -963,7 +963,7 @@ class CatalogManager:
 
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_outputs"],
                     mode="upsert",
@@ -1246,7 +1246,7 @@ class CatalogManager:
 
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_runs"],
                     mode="append",
@@ -1324,7 +1324,7 @@ class CatalogManager:
 
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_runs"],
                     mode="append",
@@ -1378,7 +1378,7 @@ class CatalogManager:
 
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_patterns"],
                     mode="append",
@@ -1472,7 +1472,7 @@ class CatalogManager:
 
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=target_path,
                     mode="upsert",
@@ -1838,7 +1838,7 @@ class CatalogManager:
                 df = pd.DataFrame([record])
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_schemas"],
                     mode="append",
@@ -1985,7 +1985,7 @@ class CatalogManager:
                 df = pd.DataFrame([record])
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_lineage"],
                     mode="upsert",
@@ -2181,7 +2181,7 @@ class CatalogManager:
 
                 self.engine.write(
                     df,
-                    connection=None,
+                    connection=self.connection,
                     format="delta",
                     path=self.tables["meta_metrics"],
                     mode="append",
@@ -2244,7 +2244,7 @@ class CatalogManager:
                     df = df[df["pipeline_name"] != pipeline_name]
                     self.engine.write(
                         df,
-                        connection=None,
+                        connection=self.connection,
                         format="delta",
                         path=self.tables["meta_pipelines"],
                         mode="overwrite",
@@ -2258,7 +2258,7 @@ class CatalogManager:
                     df_nodes = df_nodes[df_nodes["pipeline_name"] != pipeline_name]
                     self.engine.write(
                         df_nodes,
-                        connection=None,
+                        connection=self.connection,
                         format="delta",
                         path=self.tables["meta_nodes"],
                         mode="overwrite",
@@ -2312,7 +2312,7 @@ class CatalogManager:
                     ]
                     self.engine.write(
                         df,
-                        connection=None,
+                        connection=self.connection,
                         format="delta",
                         path=self.tables["meta_nodes"],
                         mode="overwrite",
@@ -2406,7 +2406,7 @@ class CatalogManager:
                     ]
                     self.engine.write(
                         df_pipelines,
-                        connection=None,
+                        connection=self.connection,
                         format="delta",
                         path=self.tables["meta_pipelines"],
                         mode="overwrite",
@@ -2431,7 +2431,7 @@ class CatalogManager:
 
                     self.engine.write(
                         df_nodes,
-                        connection=None,
+                        connection=self.connection,
                         format="delta",
                         path=self.tables["meta_nodes"],
                         mode="overwrite",
@@ -2482,7 +2482,7 @@ class CatalogManager:
                 if len(df) < initial_count:
                     self.engine.write(
                         df,
-                        connection=None,
+                        connection=self.connection,
                         format="delta",
                         path=self.tables["meta_state"],
                         mode="overwrite",
@@ -2538,7 +2538,7 @@ class CatalogManager:
                 if len(df) < initial_count:
                     self.engine.write(
                         df,
-                        connection=None,
+                        connection=self.connection,
                         format="delta",
                         path=self.tables["meta_state"],
                         mode="overwrite",
