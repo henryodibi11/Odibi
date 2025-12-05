@@ -37,7 +37,9 @@ class JoinParams(BaseModel):
 
     right_dataset: str = Field(..., description="Name of the node/dataset to join with")
     on: Union[str, List[str]] = Field(..., description="Column(s) to join on")
-    how: Literal["inner", "left", "right", "full", "cross"] = Field("left", description="Join type")
+    how: Literal["inner", "left", "right", "full", "cross", "anti", "semi"] = Field(
+        "left", description="Join type"
+    )
     prefix: Optional[str] = Field(
         None, description="Prefix for columns from right dataset to avoid collisions"
     )
@@ -127,7 +129,18 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
     if context.engine_type == EngineType.PANDAS:
         # Pandas defaults to ('_x', '_y'). We want ('', '_{prefix or right_dataset}')
         suffix = f"_{params.prefix}" if params.prefix else f"_{params.right_dataset}"
-        res = context.df.merge(right_df, on=params.on, how=params.how, suffixes=("", suffix))
+
+        # Handle anti and semi joins for pandas
+        if params.how == "anti":
+            # Anti join: rows in left that don't match right
+            merged = context.df.merge(right_df[params.on], on=params.on, how="left", indicator=True)
+            res = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
+        elif params.how == "semi":
+            # Semi join: rows in left that match right (no columns from right)
+            merged = context.df.merge(right_df[params.on], on=params.on, how="inner")
+            res = merged.drop_duplicates(subset=params.on)
+        else:
+            res = context.df.merge(right_df, on=params.on, how=params.how, suffixes=("", suffix))
 
         rows_after = res.shape[0] if hasattr(res, "shape") else None
         elapsed_ms = (time.time() - start_time) * 1000
@@ -168,10 +181,18 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
             projection.append(f"{right_view_name}.{col}")
 
     select_clause = ", ".join(projection)
+
+    # Map join types to SQL syntax
+    join_type_sql = params.how.upper()
+    if params.how == "anti":
+        join_type_sql = "LEFT ANTI"
+    elif params.how == "semi":
+        join_type_sql = "LEFT SEMI"
+
     sql_query = f"""
         SELECT {select_clause}
         FROM df
-        {params.how.upper()} JOIN {right_view_name}
+        {join_type_sql} JOIN {right_view_name}
         ON {join_condition}
     """
     result = context.sql(sql_query)
