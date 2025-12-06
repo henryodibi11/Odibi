@@ -7,6 +7,11 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+# Suppress noisy delta-rs transaction conflict warnings (handled by retry)
+# Must be set before deltalake is imported
+if "RUST_LOG" not in os.environ:
+    os.environ["RUST_LOG"] = "deltalake_core::kernel::transaction=error"
+
 # Try to import deltalake, but don't fail yet (it might be a Spark run)
 try:
     import pandas as pd
