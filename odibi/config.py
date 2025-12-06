@@ -2247,8 +2247,8 @@ class NodeConfig(BaseModel):
         description=(
             "Multi-input support for cross-pipeline dependencies. "
             "Map input names to either: "
-            "1) $pipeline.node reference (e.g., '$read_bronze.shift_events') "
-            "2) Explicit read config dict. "
+            "(a) $pipeline.node reference (e.g., '$read_bronze.shift_events') "
+            "(b) Explicit read config dict. "
             "Cannot be used with 'read'. "
             "Example: inputs: {events: '$read_bronze.events', calendar: {connection: 'goat', path: 'cal'}}"
         ),

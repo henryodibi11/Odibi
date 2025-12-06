@@ -42,7 +42,7 @@ alerts:
 | --- | --- | --- | --- | --- |
 | **project** | str | Yes | - | Project name |
 | **engine** | EngineType | No | `EngineType.PANDAS` | Execution engine |
-| **connections** | Dict[str, [LocalConnectionConfig](#localconnectionconfig) | [AzureBlobConnectionConfig](#azureblobconnectionconfig) | [DeltaConnectionConfig](#deltaconnectionconfig) | [SQLServerConnectionConfig](#sqlserverconnectionconfig) | [HttpConnectionConfig](#httpconnectionconfig) | [CustomConnectionConfig](#customconnectionconfig)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig) |
+| **connections** | Dict[str, [LocalConnectionConfig](#localconnectionconfig) \| [AzureBlobConnectionConfig](#azureblobconnectionconfig) \| [DeltaConnectionConfig](#deltaconnectionconfig) \| [SQLServerConnectionConfig](#sqlserverconnectionconfig) \| [HttpConnectionConfig](#httpconnectionconfig) \| [CustomConnectionConfig](#customconnectionconfig)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig) |
 | **pipelines** | List[[PipelineConfig](#pipelineconfig)] | Yes | - | Pipeline definitions (at least one required) |
 | **story** | [StoryConfig](#storyconfig) | Yes | - | Story generation configuration (mandatory) |
 | **system** | [SystemConfig](#systemconfig) | Yes | - | System Catalog configuration (mandatory) |
@@ -381,7 +381,7 @@ These are the built-in functions you can use in two ways:
 | **depends_on** | List[str] | No | `PydanticUndefined` | List of parent nodes that must complete before this node runs. The output of these nodes is available for reading. |
 | **columns** | Dict[str, [ColumnMetadata](#columnmetadata)] | No | `PydanticUndefined` | Data Dictionary defining the output schema. Used for documentation, PII tagging, and validation. |
 | **read** | Optional[[ReadConfig](#readconfig)] | No | - | Input operation (Load). If missing, data is taken from the first dependency. |
-| **inputs** | Optional[Dict[str, str | Dict[str, Any]]] | No | - | Multi-input support for cross-pipeline dependencies. Map input names to either: 1) $pipeline.node reference (e.g., '$read_bronze.shift_events') 2) Explicit read config dict. Cannot be used with 'read'. Example: inputs: {events: '$read_bronze.events', calendar: {connection: 'goat', path: 'cal'}} |
+| **inputs** | Optional[Dict[str, str \| Dict[str, Any]]] | No | - | Multi-input support for cross-pipeline dependencies. Map input names to either: (a) $pipeline.node reference (e.g., '$read_bronze.shift_events') (b) Explicit read config dict. Cannot be used with 'read'. Example: inputs: {events: '$read_bronze.events', calendar: {connection: 'goat', path: 'cal'}} |
 | **transform** | Optional[[TransformConfig](#transformconfig)] | No | - | Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present. |
 | **write** | Optional[[WriteConfig](#writeconfig)] | No | - | Output operation (Save to file/table). |
 | **streaming** | bool | No | `False` | Enable streaming execution for this node (Spark only) |
@@ -397,7 +397,7 @@ These are the built-in functions you can use in two ways:
 | **contracts** | List[[TestConfig](#contracts-data-quality-gates)] | No | `PydanticUndefined` | Pre-condition contracts (Circuit Breakers). Runs on input data before transformation.<br>**Options:** [NotNullTest](#notnulltest), [UniqueTest](#uniquetest), [AcceptedValuesTest](#acceptedvaluestest), [RowCountTest](#rowcounttest), [CustomSQLTest](#customsqltest), [RangeTest](#rangetest), [RegexMatchTest](#regexmatchtest), [VolumeDropTest](#volumedroptest), [SchemaContract](#schemacontract), [DistributionContract](#distributioncontract), [FreshnessContract](#freshnesscontract) |
 | **schema_policy** | Optional[[SchemaPolicyConfig](#schemapolicyconfig)] | No | - | Schema drift handling policy |
 | **privacy** | Optional[[PrivacyConfig](#privacyconfig)] | No | - | Privacy Suite: PII anonymization settings |
-| **sensitive** | bool | List[str] | No | `False` | If true or list of columns, masks sample data in stories |
+| **sensitive** | bool \| List[str] | No | `False` | If true or list of columns, masks sample data in stories |
 
 ---
 
@@ -672,7 +672,7 @@ to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name from project.yaml |
-| **format** | ReadFormat | str | Yes | - | Data format (csv, parquet, delta, etc.) |
+| **format** | ReadFormat \| str | Yes | - | Data format (csv, parquet, delta, etc.) |
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based sources |
 | **streaming** | bool | No | `False` | Enable streaming read (Spark only) |
@@ -798,7 +798,7 @@ transform:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **steps** | List[str | [TransformStep](#transformstep)] | Yes | - | List of transformation steps (SQL strings or TransformStep configs) |
+| **steps** | List[str \| [TransformStep](#transformstep)] | Yes | - | List of transformation steps (SQL strings or TransformStep configs) |
 
 ---
 
@@ -1131,7 +1131,7 @@ write:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name from project.yaml |
-| **format** | ReadFormat | str | Yes | - | Output format (csv, parquet, delta, etc.) |
+| **format** | ReadFormat \| str | Yes | - | Output format (csv, parquet, delta, etc.) |
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based outputs |
 | **register_table** | Optional[str] | No | - | Register file output as external table (Spark/Delta only) |
@@ -1142,8 +1142,8 @@ write:
 | **merge_schema** | bool | No | `False` | Allow schema evolution (mergeSchema option in Delta) |
 | **first_run_query** | Optional[str] | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
-| **auto_optimize** | bool | [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
-| **add_metadata** | bool | [WriteMetadataConfig](#writemetadataconfig) | No | - | Add metadata columns for Bronze layer lineage. Set to `true` to add all applicable columns, or provide a WriteMetadataConfig for selective columns. Columns: _extracted_at, _source_file (file sources), _source_connection, _source_table (SQL sources). |
+| **auto_optimize** | bool \| [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
+| **add_metadata** | bool \| [WriteMetadataConfig](#writemetadataconfig) | No | - | Add metadata columns for Bronze layer lineage. Set to `true` to add all applicable columns, or provide a WriteMetadataConfig for selective columns. Columns: _extracted_at, _source_file (file sources), _source_connection, _source_table (SQL sources). |
 | **skip_if_unchanged** | bool | No | `False` | Skip write if DataFrame content is identical to previous write. Computes SHA256 hash of entire DataFrame and compares to stored hash in Delta table metadata. Useful for snapshot tables without timestamps to avoid redundant appends. Only supported for Delta format. |
 | **skip_hash_columns** | Optional[List[str]] | No | - | Columns to include in hash computation for skip_if_unchanged. If None, all columns are used. Specify a subset to ignore volatile columns like timestamps. |
 | **skip_hash_sort_columns** | Optional[List[str]] | No | - | Columns to sort by before hashing for deterministic comparison. Required if row order may vary between runs. Typically your business key columns. |
@@ -1464,8 +1464,8 @@ contracts:
 | **name** | Optional[str] | No | - | Optional name for the check |
 | **on_fail** | ContractSeverity | No | `ContractSeverity.FAIL` | Action on failure |
 | **column** | str | Yes | - | Column to check |
-| **min** | int | float | str | No | - | Minimum value (inclusive) |
-| **max** | int | float | str | No | - | Maximum value (inclusive) |
+| **min** | int \| float \| str | No | - | Minimum value (inclusive) |
+| **max** | int \| float \| str | No | - | Maximum value (inclusive) |
 
 ---
 
@@ -1832,7 +1832,7 @@ cast_columns:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **casts** | Dict[str, SimpleType | str] | Yes | - | Map of column to target SQL type |
+| **casts** | Dict[str, SimpleType \| str] | Yes | - | Map of column to target SQL type |
 
 ---
 
@@ -2063,7 +2063,7 @@ fill_nulls:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **values** | Dict[str, str | int | float | bool] | Yes | - | Map of column to fill value |
+| **values** | Dict[str, str \| int \| float \| bool] | Yes | - | Map of column to fill value |
 
 ---
 
@@ -2181,7 +2181,7 @@ sort:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **by** | str | List[str] | Yes | - | Column(s) to sort by |
+| **by** | str \| List[str] | Yes | - | Column(s) to sort by |
 | **ascending** | bool | No | `True` | Sort order |
 
 ---
@@ -2262,7 +2262,7 @@ join:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **right_dataset** | str | Yes | - | Name of the node/dataset to join with |
-| **on** | str | List[str] | Yes | - | Column(s) to join on |
+| **on** | str \| List[str] | Yes | - | Column(s) to join on |
 | **how** | Literal['inner', 'left', 'right', 'full', 'cross', 'anti', 'semi'] | No | `left` | Join type |
 | **prefix** | Optional[str] | No | - | Prefix for columns from right dataset to avoid collisions |
 
@@ -2589,8 +2589,8 @@ dict_based_mapping:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **column** | str | Yes | - | Column to map values from |
-| **mapping** | Dict[str, str | int | float | bool] | Yes | - | Dictionary of source value -> target value |
-| **default** | str | int | float | bool | No | - | Default value if source value is not found in mapping |
+| **mapping** | Dict[str, str \| int \| float \| bool] | Yes | - | Dictionary of source value -> target value |
+| **default** | str \| int \| float \| bool | No | - | Default value if source value is not found in mapping |
 | **output_column** | Optional[str] | No | - | Name of output column. If not provided, overwrites source column. |
 
 ---

@@ -694,7 +694,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                             desc = desc.replace("|", "\\|").replace("\n", " ")
 
                             # Cross Linking
-                            th_display = field.type_hint
+                            th_display = field.type_hint.replace("|", "\\|")
                             for target in sorted(list(model_names), key=len, reverse=True):
                                 pattern = r"\b" + re.escape(target) + r"\b"
                                 if re.search(pattern, th_display):
@@ -775,7 +775,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                     desc = desc.replace("|", "\\|").replace("\n", " ")
 
                     # Cross Linking
-                    th_display = field.type_hint
+                    th_display = field.type_hint.replace("|", "\\|")
                     # Find all model names in the type hint and link them
                     # Sort by length desc to replace longest first (avoid replacing substring)
                     for target in sorted(list(model_names), key=len, reverse=True):
