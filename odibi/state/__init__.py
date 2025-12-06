@@ -447,12 +447,20 @@ def create_state_backend(
     if not conn_config:
         raise ValueError(f"System connection '{system_conn_name}' not found.")
 
+    # Helper to get attribute from dict or object
+    def _get(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
     base_uri = ""
     storage_options = {}
 
+    conn_type = _get(conn_config, "type")
+
     # Determine Base URI based on connection type
-    if conn_config.type == "local":
-        base_path = conn_config.base_path
+    if conn_type == "local":
+        base_path = _get(conn_config, "base_path")
         if not os.path.isabs(base_path):
             base_path = os.path.join(project_root, base_path)
 
@@ -464,23 +472,25 @@ def create_state_backend(
 
         base_uri = os.path.join(base_path, config.system.path)
 
-    elif conn_config.type == "azure_blob":
+    elif conn_type == "azure_blob":
         # Construct abfss://
-        account = conn_config.account_name
-        container = conn_config.container
+        account = _get(conn_config, "account_name")
+        container = _get(conn_config, "container")
         base_uri = f"abfss://{container}@{account}.dfs.core.windows.net/{config.system.path}"
 
         # Set up storage options
         # Depends on auth mode
-        if conn_config.auth.mode == "account_key":
+        auth = _get(conn_config, "auth", {})
+        auth_mode = _get(auth, "mode")
+        if auth_mode == "account_key":
             storage_options = {
-                "account_name": conn_config.account_name,
-                "account_key": conn_config.auth.account_key,
+                "account_name": account,
+                "account_key": _get(auth, "account_key"),
             }
-        elif conn_config.auth.mode == "sas":
+        elif auth_mode == "sas":
             storage_options = {
-                "account_name": conn_config.account_name,
-                "sas_token": conn_config.auth.sas_token,
+                "account_name": account,
+                "sas_token": _get(auth, "sas_token"),
             }
         # For MSI/KeyVault, it's more complex for deltalake-python without extra config
         # But Spark handles it if configured in environment
@@ -491,7 +501,7 @@ def create_state_backend(
         # Or raise error
         # Assuming local or azure blob for now as they are main supported backends
         # If delta connection?
-        if conn_config.type == "delta":
+        if conn_type == "delta":
             # If the connection itself is delta, it might point to a catalog/schema
             # But system catalog needs specific path structure.
             # For now assume system connection is a storage connection.
