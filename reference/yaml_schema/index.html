@@ -1,0 +1,6914 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/reference/yaml_schema/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Odibi Configuration Reference - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#odibi-configuration-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Odibi Configuration Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/guides/dogfooding.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/patterns/README.md" class="md-tabs__link">
+          
+  
+  
+  Patterns
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/dogfooding.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dogfooding (Meta)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/python_api_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/environments.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/secrets.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/setup_azure.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/performance_tuning.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/yaml_schema.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Patterns
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/README.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/append_only_raw.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Append-Only Raw
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/hwm_pattern_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    High Water Mark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/merge_upsert.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge/Upsert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/windowed_reprocess.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windowed Reprocess
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="odibi-configuration-reference">Odibi Configuration Reference</h1>
+<p>This manual details the YAML configuration schema for Odibi projects.
+<em>Auto-generated from Pydantic models.</em></p>
+<h2 id="project-structure">Project Structure</h2>
+<h3 id="projectconfig"><code>ProjectConfig</code></h3>
+<p>Complete project configuration from YAML.</p>
+<h3 id="enterprise-setup-guide">🏢 "Enterprise Setup" Guide</h3>
+<p><strong>Business Problem:</strong>
+"We need a robust production environment with alerts, retries, and proper logging."</p>
+<p><strong>Recipe: Production Ready</strong></p>
+<pre><code class="language-yaml">project: &quot;Customer360&quot;
+engine: &quot;spark&quot;
+
+# 1. Resilience
+retry:
+    enabled: true
+    max_attempts: 3
+    backoff: &quot;exponential&quot;
+
+# 2. Observability
+logging:
+    level: &quot;INFO&quot;
+    structured: true  # JSON logs for Splunk/Datadog
+
+# 3. Alerting
+alerts:
+    - type: &quot;slack&quot;
+    url: &quot;${SLACK_WEBHOOK_URL}&quot;
+    on_events: [&quot;on_failure&quot;]
+
+# ... connections and pipelines ...
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>project</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Project name</td>
+</tr>
+<tr>
+<td><strong>engine</strong></td>
+<td>EngineType</td>
+<td>No</td>
+<td><code>EngineType.PANDAS</code></td>
+<td>Execution engine</td>
+</tr>
+<tr>
+<td><strong>connections</strong></td>
+<td>Dict[str, <a href="#localconnectionconfig">LocalConnectionConfig</a> | <a href="#azureblobconnectionconfig">AzureBlobConnectionConfig</a> | <a href="#deltaconnectionconfig">DeltaConnectionConfig</a> | <a href="#sqlserverconnectionconfig">SQLServerConnectionConfig</a> | <a href="#httpconnectionconfig">HttpConnectionConfig</a> | <a href="#customconnectionconfig">CustomConnectionConfig</a>]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Named connections (at least one required)<br><strong>Options:</strong> <a href="#localconnectionconfig">LocalConnectionConfig</a>, <a href="#azureblobconnectionconfig">AzureBlobConnectionConfig</a>, <a href="#deltaconnectionconfig">DeltaConnectionConfig</a>, <a href="#sqlserverconnectionconfig">SQLServerConnectionConfig</a>, <a href="#httpconnectionconfig">HttpConnectionConfig</a></td>
+</tr>
+<tr>
+<td><strong>pipelines</strong></td>
+<td>List[<a href="#pipelineconfig">PipelineConfig</a>]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Pipeline definitions (at least one required)</td>
+</tr>
+<tr>
+<td><strong>story</strong></td>
+<td><a href="#storyconfig">StoryConfig</a></td>
+<td>Yes</td>
+<td>-</td>
+<td>Story generation configuration (mandatory)</td>
+</tr>
+<tr>
+<td><strong>system</strong></td>
+<td><a href="#systemconfig">SystemConfig</a></td>
+<td>Yes</td>
+<td>-</td>
+<td>System Catalog configuration (mandatory)</td>
+</tr>
+<tr>
+<td><strong>lineage</strong></td>
+<td>Optional[<a href="#lineageconfig">LineageConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>OpenLineage configuration</td>
+</tr>
+<tr>
+<td><strong>description</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Project description</td>
+</tr>
+<tr>
+<td><strong>version</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>1.0.0</code></td>
+<td>Project version</td>
+</tr>
+<tr>
+<td><strong>owner</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Project owner/contact</td>
+</tr>
+<tr>
+<td><strong>vars</strong></td>
+<td>Dict[str, Any]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Global variables for substitution (e.g. ${vars.env})</td>
+</tr>
+<tr>
+<td><strong>retry</strong></td>
+<td><a href="#retryconfig">RetryConfig</a></td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>logging</strong></td>
+<td><a href="#loggingconfig">LoggingConfig</a></td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>alerts</strong></td>
+<td>List[<a href="#alertconfig">AlertConfig</a>]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Alert configurations</td>
+</tr>
+<tr>
+<td><strong>performance</strong></td>
+<td><a href="#performanceconfig">PerformanceConfig</a></td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Performance tuning</td>
+</tr>
+<tr>
+<td><strong>environments</strong></td>
+<td>Optional[Dict[str, Dict[str, Any]]]</td>
+<td>No</td>
+<td>-</td>
+<td>Structure: same as ProjectConfig but with only overridden fields. Not yet validated strictly.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="pipelineconfig"><code>PipelineConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Configuration for a pipeline.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">pipelines:
+  - pipeline: &quot;user_onboarding&quot;
+    description: &quot;Ingest and process new users&quot;
+    layer: &quot;silver&quot;
+    nodes:
+      - name: &quot;node1&quot;
+        ...
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>pipeline</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Pipeline name</td>
+</tr>
+<tr>
+<td><strong>description</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Pipeline description</td>
+</tr>
+<tr>
+<td><strong>layer</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Logical layer (bronze/silver/gold)</td>
+</tr>
+<tr>
+<td><strong>nodes</strong></td>
+<td>List[<a href="#nodeconfig">NodeConfig</a>]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of nodes in this pipeline</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="nodeconfig"><code>NodeConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#pipelineconfig">PipelineConfig</a></em></p>
+</blockquote>
+<p>Configuration for a single node.</p>
+<h3 id="the-smart-node-pattern">🧠 "The Smart Node" Pattern</h3>
+<p><strong>Business Problem:</strong>
+"We need complex dependencies, caching for heavy computations, and the ability to run only specific parts of the pipeline."</p>
+<p><strong>The Solution:</strong>
+Nodes are the building blocks. They handle dependencies (<code>depends_on</code>), execution control (<code>tags</code>, <code>enabled</code>), and performance (<code>cache</code>).</p>
+<h3 id="dag-dependencies">🕸️ DAG &amp; Dependencies</h3>
+<p><strong>The Glue of the Pipeline.</strong>
+Nodes don't run in isolation. They form a Directed Acyclic Graph (DAG).</p>
+<ul>
+<li><strong><code>depends_on</code></strong>: Critical! If Node B reads from Node A (in memory), you MUST list <code>["Node A"]</code>.<ul>
+<li><em>Implicit Data Flow</em>: If a node has no <code>read</code> block, it automatically picks up the DataFrame from its first dependency.</li>
+</ul>
+</li>
+</ul>
+<h3 id="smart-read-incremental-loading">🧠 Smart Read &amp; Incremental Loading</h3>
+<p><strong>Automated History Management.</strong></p>
+<p>Odibi intelligently determines whether to perform a <strong>Full Load</strong> or an <strong>Incremental Load</strong> based on the state of the target.</p>
+<p><strong>The "Smart Read" Logic:</strong>
+1.  <strong>First Run (Full Load):</strong> If the target table (defined in <code>write</code>) does <strong>not exist</strong>:
+    *   Incremental filtering rules are <strong>ignored</strong>.
+    *   The entire source dataset is read.
+    *   Use <code>write.first_run_query</code> (optional) to override the read query for this initial bootstrap (e.g., to backfill only 1 year of history instead of all time).</p>
+<ol>
+<li><strong>Subsequent Runs (Incremental Load):</strong> If the target table <strong>exists</strong>:<ul>
+<li><strong>Rolling Window:</strong> Filters source data where <code>column &gt;= NOW() - lookback</code>.</li>
+<li><strong>Stateful:</strong> Filters source data where <code>column &gt; last_high_water_mark</code>.</li>
+</ul>
+</li>
+</ol>
+<p>This ensures you don't need separate "init" and "update" pipelines. One config handles both lifecycle states.</p>
+<h3 id="orchestration-tags">🏷️ Orchestration Tags</h3>
+<p><strong>Run What You Need.</strong>
+Tags allow you to execute slices of your pipeline.
+*   <code>odibi run --tag daily</code> -&gt; Runs all nodes with "daily" tag.
+*   <code>odibi run --tag critical</code> -&gt; Runs high-priority nodes.</p>
+<h3 id="choosing-your-logic-transformer-vs-transform">🤖 Choosing Your Logic: Transformer vs. Transform</h3>
+<p><strong>1. The "Transformer" (Top-Level)</strong>
+*   <strong>What it is:</strong> A pre-packaged, heavy-duty operation that defines the <em>entire purpose</em> of the node.
+*   <strong>When to use:</strong> When applying a standard Data Engineering pattern (e.g., SCD2, Merge, Deduplicate).
+*   <strong>Analogy:</strong> "Run this App."
+*   <strong>Syntax:</strong> <code>transformer: "scd2"</code> + <code>params: {...}</code></p>
+<p><strong>2. The "Transform Steps" (Process Chain)</strong>
+*   <strong>What it is:</strong> A sequence of smaller steps (SQL, functions, operations) executed in order.
+*   <strong>When to use:</strong> For custom business logic, data cleaning, or feature engineering pipelines.
+*   <strong>Analogy:</strong> "Run this Script."
+*   <strong>Syntax:</strong> <code>transform: { steps: [...] }</code></p>
+<p><em>Note: You can use both! The <code>transformer</code> runs first, then <code>transform</code> steps refine the result.</em></p>
+<h3 id="chaining-operations">🔗 Chaining Operations</h3>
+<p><strong>You can mix and match!</strong>
+The execution order is always:
+1.  <strong>Read</strong> (or Dependency Injection)
+2.  <strong>Transformer</strong> (The "App" logic, e.g., Deduplicate)
+3.  <strong>Transform Steps</strong> (The "Script" logic, e.g., cleanup)
+4.  <strong>Validation</strong>
+5.  <strong>Write</strong></p>
+<p><em>Constraint:</em> You must define <strong>at least one</strong> of <code>read</code>, <code>transformer</code>, <code>transform</code>, or <code>write</code>.</p>
+<h3 id="example-app-vs-script">⚡ Example: App vs. Script</h3>
+<p><strong>Scenario 1: The Full ETL Flow (Chained)</strong>
+<em>Shows explicit Read, Transform Chain, and Write.</em></p>
+<pre><code class="language-yaml"># 1. Ingest (The Dependency)
+- name: &quot;load_raw_users&quot;
+  read: { connection: &quot;s3_landing&quot;, format: &quot;json&quot;, path: &quot;users/*.json&quot; }
+  write: { connection: &quot;bronze&quot;, format: &quot;parquet&quot;, path: &quot;users_raw&quot; }
+
+# 2. Process (The Consumer)
+- name: &quot;clean_users&quot;
+  depends_on: [&quot;load_raw_users&quot;]
+
+  # &quot;clean_text&quot; is a registered function from the Transformer Catalog
+  transform:
+    steps:
+      - sql: &quot;SELECT * FROM df WHERE email IS NOT NULL&quot;
+      - function: &quot;clean_text&quot;
+        params: { columns: [&quot;email&quot;], case: &quot;lower&quot; }
+
+  write: { connection: &quot;silver&quot;, format: &quot;delta&quot;, table: &quot;dim_users&quot; }
+</code></pre>
+<p><strong>Scenario 2: The "App" Node (Top-Level Transformer)</strong>
+<em>Shows a node that applies a pattern (Deduplicate) to incoming data.</em></p>
+<pre><code class="language-yaml">- name: &quot;deduped_users&quot;
+  depends_on: [&quot;clean_users&quot;]
+
+  # The &quot;App&quot;: Deduplication (From Transformer Catalog)
+  transformer: &quot;deduplicate&quot;
+  params:
+    keys: [&quot;user_id&quot;]
+    order_by: &quot;updated_at DESC&quot;
+
+  write: { connection: &quot;gold&quot;, format: &quot;delta&quot;, table: &quot;users_unique&quot; }
+</code></pre>
+<p><strong>Scenario 3: The Tagged Runner (Reporting)</strong>
+<em>Shows how tags allow running specific slices (e.g., <code>odibi run --tag daily</code>).</em></p>
+<pre><code class="language-yaml">- name: &quot;daily_report&quot;
+  tags: [&quot;daily&quot;, &quot;reporting&quot;]
+  depends_on: [&quot;deduped_users&quot;]
+
+  # Ad-hoc aggregation script
+  transform:
+    steps:
+      - sql: &quot;SELECT date_trunc('day', updated_at) as day, count(*) as total FROM df GROUP BY 1&quot;
+
+  write: { connection: &quot;local_data&quot;, format: &quot;csv&quot;, path: &quot;reports/daily_stats.csv&quot; }
+</code></pre>
+<p><strong>Scenario 4: The "Kitchen Sink" (All Operations)</strong>
+<em>Shows Read -&gt; Transformer -&gt; Transform -&gt; Write execution order.</em></p>
+<p><strong>Why this works:</strong>
+1.  <strong>Internal Chaining (<code>df</code>):</strong> In every step (Transformer or SQL), <code>df</code> refers to the output of the <em>previous</em> step.
+2.  <strong>External Access (<code>depends_on</code>):</strong> If you added <code>depends_on: ["other_node"]</code>, you could also run <code>SELECT * FROM other_node</code> in your SQL steps!</p>
+<pre><code class="language-yaml">- name: &quot;complex_flow&quot;
+  # 1. Read -&gt; Creates initial 'df'
+  read: { connection: &quot;bronze&quot;, format: &quot;parquet&quot;, path: &quot;users&quot; }
+
+  # 2. Transformer (The &quot;App&quot;: Deduplicate first)
+  # Takes 'df' (from Read), dedups it, returns new 'df'
+  transformer: &quot;deduplicate&quot;
+  params: { keys: [&quot;user_id&quot;], order_by: &quot;updated_at DESC&quot; }
+
+  # 3. Transform Steps (The &quot;Script&quot;: Filter AFTER deduplication)
+  # SQL sees the deduped data as 'df'
+  transform:
+    steps:
+      - sql: &quot;SELECT * FROM df WHERE status = 'active'&quot;
+
+  # 4. Write -&gt; Saves the final filtered 'df'
+  write: { connection: &quot;silver&quot;, format: &quot;delta&quot;, table: &quot;active_unique_users&quot; }
+</code></pre>
+<h3 id="transformer-catalog">📚 Transformer Catalog</h3>
+<p>These are the built-in functions you can use in two ways:</p>
+<ol>
+<li><strong>As a Top-Level Transformer:</strong> <code>transformer: "name"</code> (Defines the node's main logic)</li>
+<li><strong>As a Step in a Chain:</strong> <code>transform: { steps: [{ function: "name" }] }</code> (Part of a sequence)</li>
+</ol>
+<p><em>Note: <code>merge</code> and <code>scd2</code> are special "Heavy Lifters" and should generally be used as Top-Level Transformers.</em></p>
+<p><strong>Data Engineering Patterns</strong>
+*   <code>merge</code>: Upsert/Merge into target (Delta/SQL). <em>(<a href="#mergeparams">Params</a>)</em>
+*   <code>scd2</code>: Slowly Changing Dimensions Type 2. <em>(<a href="#scd2params">Params</a>)</em>
+*   <code>deduplicate</code>: Remove duplicates using window functions. <em>(<a href="#deduplicateparams">Params</a>)</em></p>
+<p><strong>Relational Algebra</strong>
+*   <code>join</code>: Join two datasets. <em>(<a href="#joinparams">Params</a>)</em>
+*   <code>union</code>: Stack datasets vertically. <em>(<a href="#unionparams">Params</a>)</em>
+*   <code>pivot</code>: Rotate rows to columns. <em>(<a href="#pivotparams">Params</a>)</em>
+*   <code>unpivot</code>: Rotate columns to rows (melt). <em>(<a href="#unpivotparams">Params</a>)</em>
+*   <code>aggregate</code>: Group by and sum/count/avg. <em>(<a href="#aggregateparams">Params</a>)</em></p>
+<p><strong>Data Quality &amp; Cleaning</strong>
+*   <code>validate_and_flag</code>: Check rules and flag invalid rows. <em>(<a href="#validateandflagparams">Params</a>)</em>
+*   <code>clean_text</code>: Trim and normalize case. <em>(<a href="#cleantextparams">Params</a>)</em>
+*   <code>filter_rows</code>: SQL-based filtering. <em>(<a href="#filterrowsparams">Params</a>)</em>
+*   <code>fill_nulls</code>: Replace NULLs with defaults. <em>(<a href="#fillnullsparams">Params</a>)</em></p>
+<p><strong>Feature Engineering</strong>
+*   <code>derive_columns</code>: Create new cols via SQL expressions. <em>(<a href="#derivecolumnsparams">Params</a>)</em>
+*   <code>case_when</code>: Conditional logic (if-else). <em>(<a href="#casewhenparams">Params</a>)</em>
+*   <code>generate_surrogate_key</code>: Create MD5 keys from columns. <em>(<a href="#surrogatekeyparams">Params</a>)</em>
+*   <code>date_diff</code>, <code>date_add</code>, <code>date_trunc</code>: Date arithmetic.</p>
+<p><strong>Scenario 1: The Full ETL Flow</strong>
+<em>(Show two nodes: one loader, one processor)</em></p>
+<pre><code class="language-yaml"># 1. Ingest (The Dependency)
+- name: &quot;load_raw_users&quot;
+  read: { connection: &quot;s3_landing&quot;, format: &quot;json&quot;, path: &quot;users/*.json&quot; }
+  write: { connection: &quot;bronze&quot;, format: &quot;parquet&quot;, path: &quot;users_raw&quot; }
+
+# 2. Process (The Consumer)
+- name: &quot;clean_users&quot;
+  depends_on: [&quot;load_raw_users&quot;]  # &lt;--- Explicit dependency
+
+  # Explicit Transformation Steps
+  transform:
+    steps:
+      - sql: &quot;SELECT * FROM df WHERE email IS NOT NULL&quot;
+      - function: &quot;clean_text&quot;
+        params: { columns: [&quot;email&quot;], case: &quot;lower&quot; }
+
+  write: { connection: &quot;silver&quot;, format: &quot;delta&quot;, table: &quot;dim_users&quot; }
+</code></pre>
+<p><strong>Scenario 2: The "App" Node (Transformer)</strong>
+<em>(Show a node that is a Transformer, no read needed if it picks up from dependency)</em></p>
+<pre><code class="language-yaml">- name: &quot;deduped_users&quot;
+  depends_on: [&quot;clean_users&quot;]
+
+  # The &quot;App&quot;: Deduplication
+  transformer: &quot;deduplicate&quot;
+  params:
+    keys: [&quot;user_id&quot;]
+    order_by: &quot;updated_at DESC&quot;
+
+  write: { connection: &quot;gold&quot;, format: &quot;delta&quot;, table: &quot;users_unique&quot; }
+</code></pre>
+<p><strong>Scenario 3: The Tagged Runner</strong>
+<em>Run only this with <code>odibi run --tag daily</code></em></p>
+<pre><code class="language-yaml">- name: &quot;daily_report&quot;
+  tags: [&quot;daily&quot;, &quot;reporting&quot;]
+  # ...
+</code></pre>
+<p><strong>Scenario 4: Pre/Post SQL Hooks</strong>
+<em>Setup and cleanup with SQL statements.</em></p>
+<pre><code class="language-yaml">- name: &quot;optimize_sales&quot;
+  depends_on: [&quot;load_sales&quot;]
+  pre_sql:
+    - &quot;SET spark.sql.shuffle.partitions = 200&quot;
+    - &quot;CREATE TEMP VIEW staging AS SELECT * FROM bronze.raw_sales&quot;
+  transform:
+    steps:
+      - sql: &quot;SELECT * FROM staging WHERE amount &gt; 0&quot;
+  post_sql:
+    - &quot;OPTIMIZE gold.fact_sales ZORDER BY (customer_id)&quot;
+    - &quot;VACUUM gold.fact_sales RETAIN 168 HOURS&quot;
+  write:
+    connection: &quot;gold&quot;
+    format: &quot;delta&quot;
+    table: &quot;fact_sales&quot;
+</code></pre>
+<p><strong>Scenario 5: Materialization Strategies</strong>
+<em>Choose how output is persisted.</em></p>
+<pre><code class="language-yaml"># Option 1: View (no physical storage, logical model)
+- name: &quot;vw_active_customers&quot;
+  materialized: &quot;view&quot;  # Creates SQL view instead of table
+  transform:
+    steps:
+      - sql: &quot;SELECT * FROM customers WHERE status = 'active'&quot;
+  write:
+    connection: &quot;gold&quot;
+    table: &quot;vw_active_customers&quot;
+
+# Option 2: Incremental (append to existing Delta table)
+- name: &quot;fact_events&quot;
+  materialized: &quot;incremental&quot;  # Uses APPEND mode
+  read:
+    connection: &quot;bronze&quot;
+    table: &quot;raw_events&quot;
+    incremental:
+      mode: &quot;stateful&quot;
+      column: &quot;event_time&quot;
+  write:
+    connection: &quot;silver&quot;
+    format: &quot;delta&quot;
+    table: &quot;fact_events&quot;
+
+# Option 3: Table (default - full overwrite)
+- name: &quot;dim_products&quot;
+  materialized: &quot;table&quot;  # Default behavior
+  # ...
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>name</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Unique node name</td>
+</tr>
+<tr>
+<td><strong>description</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Human-readable description</td>
+</tr>
+<tr>
+<td><strong>enabled</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>If False, node is skipped during execution</td>
+</tr>
+<tr>
+<td><strong>tags</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Operational tags for selective execution (e.g., 'daily', 'critical'). Use with <code>odibi run --tag</code>.</td>
+</tr>
+<tr>
+<td><strong>depends_on</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>List of parent nodes that must complete before this node runs. The output of these nodes is available for reading.</td>
+</tr>
+<tr>
+<td><strong>columns</strong></td>
+<td>Dict[str, <a href="#columnmetadata">ColumnMetadata</a>]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Data Dictionary defining the output schema. Used for documentation, PII tagging, and validation.</td>
+</tr>
+<tr>
+<td><strong>read</strong></td>
+<td>Optional[<a href="#readconfig">ReadConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Input operation (Load). If missing, data is taken from the first dependency.</td>
+</tr>
+<tr>
+<td><strong>inputs</strong></td>
+<td>Optional[Dict[str, str | Dict[str, Any]]]</td>
+<td>No</td>
+<td>-</td>
+<td>Multi-input support for cross-pipeline dependencies. Map input names to either: (a) $pipeline.node reference (e.g., '$read_bronze.shift_events') (b) Explicit read config dict. Cannot be used with 'read'. Example: inputs: {events: '$read_bronze.events', calendar: {connection: 'goat', path: 'cal'}}</td>
+</tr>
+<tr>
+<td><strong>transform</strong></td>
+<td>Optional[<a href="#transformconfig">TransformConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present.</td>
+</tr>
+<tr>
+<td><strong>write</strong></td>
+<td>Optional[<a href="#writeconfig">WriteConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Output operation (Save to file/table).</td>
+</tr>
+<tr>
+<td><strong>streaming</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Enable streaming execution for this node (Spark only)</td>
+</tr>
+<tr>
+<td><strong>transformer</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Name of the 'App' logic to run (e.g., 'deduplicate', 'scd2'). See Transformer Catalog for options.</td>
+</tr>
+<tr>
+<td><strong>params</strong></td>
+<td>Dict[str, Any]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Parameters for transformer</td>
+</tr>
+<tr>
+<td><strong>pre_sql</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>List of SQL statements to execute before node runs. Use for setup: temp tables, variable initialization, grants. Example: ['SET spark.sql.shuffle.partitions=200', 'CREATE TEMP VIEW src AS SELECT * FROM raw']</td>
+</tr>
+<tr>
+<td><strong>post_sql</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>List of SQL statements to execute after node completes. Use for cleanup, optimization, or audit logging. Example: ['OPTIMIZE gold.fact_sales', 'VACUUM gold.fact_sales RETAIN 168 HOURS']</td>
+</tr>
+<tr>
+<td><strong>materialized</strong></td>
+<td>Optional[Literal['table', 'view', 'incremental']]</td>
+<td>No</td>
+<td>-</td>
+<td>Materialization strategy. Options: 'table' (default physical write), 'view' (creates SQL view instead of table), 'incremental' (uses append mode for Delta tables). Views are useful for Gold layer logical models.</td>
+</tr>
+<tr>
+<td><strong>cache</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Cache result for reuse</td>
+</tr>
+<tr>
+<td><strong>log_level</strong></td>
+<td>Optional[LogLevel]</td>
+<td>No</td>
+<td>-</td>
+<td>Override log level for this node</td>
+</tr>
+<tr>
+<td><strong>on_error</strong></td>
+<td>ErrorStrategy</td>
+<td>No</td>
+<td><code>ErrorStrategy.FAIL_LATER</code></td>
+<td>Failure handling strategy</td>
+</tr>
+<tr>
+<td><strong>validation</strong></td>
+<td>Optional[<a href="#validationconfig">ValidationConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>contracts</strong></td>
+<td>List[<a href="#contracts-data-quality-gates">TestConfig</a>]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Pre-condition contracts (Circuit Breakers). Runs on input data before transformation.<br><strong>Options:</strong> <a href="#notnulltest">NotNullTest</a>, <a href="#uniquetest">UniqueTest</a>, <a href="#acceptedvaluestest">AcceptedValuesTest</a>, <a href="#rowcounttest">RowCountTest</a>, <a href="#customsqltest">CustomSQLTest</a>, <a href="#rangetest">RangeTest</a>, <a href="#regexmatchtest">RegexMatchTest</a>, <a href="#volumedroptest">VolumeDropTest</a>, <a href="#schemacontract">SchemaContract</a>, <a href="#distributioncontract">DistributionContract</a>, <a href="#freshnesscontract">FreshnessContract</a></td>
+</tr>
+<tr>
+<td><strong>schema_policy</strong></td>
+<td>Optional[<a href="#schemapolicyconfig">SchemaPolicyConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Schema drift handling policy</td>
+</tr>
+<tr>
+<td><strong>privacy</strong></td>
+<td>Optional[<a href="#privacyconfig">PrivacyConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Privacy Suite: PII anonymization settings</td>
+</tr>
+<tr>
+<td><strong>sensitive</strong></td>
+<td>bool | List[str]</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>If true or list of columns, masks sample data in stories</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="columnmetadata"><code>ColumnMetadata</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a></em></p>
+</blockquote>
+<p>Metadata for a column in the data dictionary.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>description</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Column description</td>
+</tr>
+<tr>
+<td><strong>pii</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Contains PII?</td>
+</tr>
+<tr>
+<td><strong>tags</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Tags (e.g. 'business_key', 'measure')</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="systemconfig"><code>SystemConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Configuration for the Odibi System Catalog (The Brain).</p>
+<p>Stores metadata, state, and pattern configurations.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>connection</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Connection to store system tables (e.g., 'adls_bronze')</td>
+</tr>
+<tr>
+<td><strong>path</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>_odibi_system</code></td>
+<td>Path relative to connection root</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="connections">Connections</h2>
+<h3 id="localconnectionconfig"><code>LocalConnectionConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Local filesystem connection.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">local_data:
+  type: &quot;local&quot;
+  base_path: &quot;./data&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['local']</td>
+<td>No</td>
+<td><code>ConnectionType.LOCAL</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>validation_mode</strong></td>
+<td>ValidationMode</td>
+<td>No</td>
+<td><code>ValidationMode.LAZY</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>base_path</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>./data</code></td>
+<td>Base directory path</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="deltaconnectionconfig"><code>DeltaConnectionConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Delta Lake connection.</p>
+<p>Scenario 1: Delta via metastore</p>
+<pre><code class="language-yaml">delta_silver:
+  type: &quot;delta&quot;
+  catalog: &quot;spark_catalog&quot;
+  schema: &quot;silver_db&quot;
+</code></pre>
+<p>Scenario 2: Direct path + Node usage</p>
+<pre><code class="language-yaml">delta_local:
+  type: &quot;local&quot;
+  base_path: &quot;dbfs:/mnt/delta&quot;
+
+# In pipeline:
+# read:
+#   connection: &quot;delta_local&quot;
+#   format: &quot;delta&quot;
+#   path: &quot;bronze/orders&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['delta']</td>
+<td>No</td>
+<td><code>ConnectionType.DELTA</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>validation_mode</strong></td>
+<td>ValidationMode</td>
+<td>No</td>
+<td><code>ValidationMode.LAZY</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>catalog</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Spark catalog name (e.g. 'spark_catalog')</td>
+</tr>
+<tr>
+<td><strong>schema_name</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Database/schema name</td>
+</tr>
+<tr>
+<td><strong>table</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional default table name for this connection (used by story/pipeline helpers)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="azureblobconnectionconfig"><code>AzureBlobConnectionConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Azure Blob Storage connection.</p>
+<p>Scenario 1: Prod with Key Vault-managed key</p>
+<pre><code class="language-yaml">adls_bronze:
+  type: &quot;azure_blob&quot;
+  account_name: &quot;myaccount&quot;
+  container: &quot;bronze&quot;
+  auth:
+    mode: &quot;key_vault&quot;
+    key_vault: &quot;kv-data&quot;
+    secret: &quot;adls-account-key&quot;
+</code></pre>
+<p>Scenario 2: Local dev with inline account key</p>
+<pre><code class="language-yaml">adls_dev:
+  type: &quot;azure_blob&quot;
+  account_name: &quot;devaccount&quot;
+  container: &quot;sandbox&quot;
+  auth:
+    mode: &quot;account_key&quot;
+    account_key: &quot;${ADLS_ACCOUNT_KEY}&quot;
+</code></pre>
+<p>Scenario 3: MSI (no secrets)</p>
+<pre><code class="language-yaml">adls_msi:
+  type: &quot;azure_blob&quot;
+  account_name: &quot;myaccount&quot;
+  container: &quot;bronze&quot;
+  auth:
+    mode: &quot;aad_msi&quot;
+    # optional: client_id for user-assigned identity
+    client_id: &quot;00000000-0000-0000-0000-000000000000&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['azure_blob']</td>
+<td>No</td>
+<td><code>ConnectionType.AZURE_BLOB</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>validation_mode</strong></td>
+<td>ValidationMode</td>
+<td>No</td>
+<td><code>ValidationMode.LAZY</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>account_name</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>container</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>auth</strong></td>
+<td>AzureBlobAuthConfig</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td><strong>Options:</strong> <a href="#azureblobkeyvaultauth">AzureBlobKeyVaultAuth</a>, <a href="#azureblobaccountkeyauth">AzureBlobAccountKeyAuth</a>, <a href="#azureblobsasauth">AzureBlobSasAuth</a>, <a href="#azureblobconnectionstringauth">AzureBlobConnectionStringAuth</a>, <a href="#azureblobmsiauth">AzureBlobMsiAuth</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="sqlserverconnectionconfig"><code>SQLServerConnectionConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>SQL Server connection.</p>
+<p>Scenario 1: Managed identity (AAD MSI)</p>
+<pre><code class="language-yaml">sql_dw_msi:
+  type: &quot;sql_server&quot;
+  host: &quot;server.database.windows.net&quot;
+  database: &quot;dw&quot;
+  auth:
+    mode: &quot;aad_msi&quot;
+</code></pre>
+<p>Scenario 2: SQL login</p>
+<pre><code class="language-yaml">sql_dw_login:
+  type: &quot;sql_server&quot;
+  host: &quot;server.database.windows.net&quot;
+  database: &quot;dw&quot;
+  auth:
+    mode: &quot;sql_login&quot;
+    username: &quot;dw_writer&quot;
+    password: &quot;${DW_PASSWORD}&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['sql_server']</td>
+<td>No</td>
+<td><code>ConnectionType.SQL_SERVER</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>validation_mode</strong></td>
+<td>ValidationMode</td>
+<td>No</td>
+<td><code>ValidationMode.LAZY</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>host</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>database</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>port</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>1433</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>auth</strong></td>
+<td>SQLServerAuthConfig</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td><strong>Options:</strong> <a href="#sqlloginauth">SQLLoginAuth</a>, <a href="#sqlaadpasswordauth">SQLAadPasswordAuth</a>, <a href="#sqlmsiauth">SQLMsiAuth</a>, <a href="#sqlconnectionstringauth">SQLConnectionStringAuth</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="httpconnectionconfig"><code>HttpConnectionConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>HTTP connection.</p>
+<p>Scenario: Bearer token via env var</p>
+<pre><code class="language-yaml">api_source:
+  type: &quot;http&quot;
+  base_url: &quot;https://api.example.com&quot;
+  headers:
+    User-Agent: &quot;odibi-pipeline&quot;
+  auth:
+    mode: &quot;bearer&quot;
+    token: &quot;${API_TOKEN}&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['http']</td>
+<td>No</td>
+<td><code>ConnectionType.HTTP</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>validation_mode</strong></td>
+<td>ValidationMode</td>
+<td>No</td>
+<td><code>ValidationMode.LAZY</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>base_url</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>headers</strong></td>
+<td>Dict[str, str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>auth</strong></td>
+<td>HttpAuthConfig</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td><strong>Options:</strong> <a href="#httpnoauth">HttpNoAuth</a>, <a href="#httpbasicauth">HttpBasicAuth</a>, <a href="#httpbearerauth">HttpBearerAuth</a>, <a href="#httpapikeyauth">HttpApiKeyAuth</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="node-operations">Node Operations</h2>
+<h3 id="readconfig"><code>ReadConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a></em></p>
+</blockquote>
+<p>Configuration for reading data.</p>
+<h3 id="universal-reader-guide">📖 "Universal Reader" Guide</h3>
+<p><strong>Business Problem:</strong>
+"I need to read from files, databases, streams, and even travel back in time to see how data looked yesterday."</p>
+<p><strong>Recipe 1: The Time Traveler (Delta/Iceberg)</strong>
+<em>Reproduce a bug by seeing the data exactly as it was.</em></p>
+<pre><code class="language-yaml">read:
+  connection: &quot;silver_lake&quot;
+  format: &quot;delta&quot;
+  table: &quot;fact_sales&quot;
+  time_travel:
+    as_of_timestamp: &quot;2023-10-25T14:00:00Z&quot;
+</code></pre>
+<p><strong>Recipe 2: The Streamer</strong>
+<em>Process data in real-time.</em></p>
+<pre><code class="language-yaml">read:
+  connection: &quot;event_hub&quot;
+  format: &quot;json&quot;
+  streaming: true
+</code></pre>
+<p><strong>Recipe 3: The SQL Query</strong>
+<em>Push down filtering to the source database.</em></p>
+<pre><code class="language-yaml">read:
+  connection: &quot;enterprise_dw&quot;
+  format: &quot;sql&quot;
+  # Use the query option to filter at source!
+  query: &quot;SELECT * FROM huge_table WHERE date &gt;= '2024-01-01'&quot;
+</code></pre>
+<p><strong>Recipe 4: Archive Bad Records (Spark)</strong>
+<em>Capture malformed records for later inspection.</em></p>
+<pre><code class="language-yaml">read:
+  connection: &quot;landing&quot;
+  format: &quot;json&quot;
+  path: &quot;events/*.json&quot;
+  archive_options:
+    badRecordsPath: &quot;/mnt/quarantine/bad_records&quot;
+</code></pre>
+<p><strong>Recipe 5: Optimize JDBC Parallelism (Spark)</strong>
+<em>Control partition count for SQL sources to reduce task overhead.</em></p>
+<pre><code class="language-yaml">read:
+  connection: &quot;enterprise_dw&quot;
+  format: &quot;sql&quot;
+  table: &quot;small_lookup_table&quot;
+  options:
+    numPartitions: 1  # Single partition for small tables
+</code></pre>
+<p><strong>Performance Tip:</strong> For small tables (&lt;100K rows), use <code>numPartitions: 1</code> to avoid
+excessive Spark task scheduling overhead. For large tables, increase partitions
+to enable parallel reads (requires partitionColumn, lowerBound, upperBound).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>connection</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Connection name from project.yaml</td>
+</tr>
+<tr>
+<td><strong>format</strong></td>
+<td>ReadFormat | str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Data format (csv, parquet, delta, etc.)</td>
+</tr>
+<tr>
+<td><strong>table</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Table name for SQL/Delta</td>
+</tr>
+<tr>
+<td><strong>path</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Path for file-based sources</td>
+</tr>
+<tr>
+<td><strong>streaming</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Enable streaming read (Spark only)</td>
+</tr>
+<tr>
+<td><strong>schema_ddl</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Schema for streaming reads from file sources (required for Avro, JSON, CSV). Use Spark DDL format: 'col1 STRING, col2 INT, col3 TIMESTAMP'. Not required for Delta (schema is inferred from table metadata).</td>
+</tr>
+<tr>
+<td><strong>query</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector.</td>
+</tr>
+<tr>
+<td><strong>incremental</strong></td>
+<td>Optional[<a href="#incrementalconfig">IncrementalConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Automatic incremental loading strategy (CDC-like). If set, generates query based on target state (HWM).</td>
+</tr>
+<tr>
+<td><strong>time_travel</strong></td>
+<td>Optional[<a href="#timetravelconfig">TimeTravelConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Time travel options (Delta only)</td>
+</tr>
+<tr>
+<td><strong>archive_options</strong></td>
+<td>Dict[str, Any]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Options for archiving bad records (e.g. badRecordsPath for Spark)</td>
+</tr>
+<tr>
+<td><strong>options</strong></td>
+<td>Dict[str, Any]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Format-specific options</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="incrementalconfig"><code>IncrementalConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#readconfig">ReadConfig</a></em></p>
+</blockquote>
+<p>Configuration for automatic incremental loading.</p>
+<p>Modes:
+1. <strong>Rolling Window</strong> (Default): Uses a time-based lookback from NOW().
+   Good for: Stateless loading where you just want "recent" data.
+   Args: <code>lookback</code>, <code>unit</code></p>
+<ol>
+<li><strong>Stateful</strong>: Tracks the High-Water Mark (HWM) of the key column.
+   Good for: Exact incremental ingestion (e.g. CDC-like).
+   Args: <code>state_key</code> (optional), <code>watermark_lag</code> (optional)</li>
+</ol>
+<p>Generates SQL:
+- Rolling: <code>WHERE column &gt;= NOW() - lookback</code>
+- Stateful: <code>WHERE column &gt; :last_hwm</code></p>
+<p>Example (Rolling Window):</p>
+<pre><code class="language-yaml">incremental:
+  mode: &quot;rolling_window&quot;
+  column: &quot;updated_at&quot;
+  lookback: 3
+  unit: &quot;day&quot;
+</code></pre>
+<p>Example (Stateful HWM):</p>
+<pre><code class="language-yaml">incremental:
+  mode: &quot;stateful&quot;
+  column: &quot;id&quot;
+  # Optional: track separate column for HWM state
+  state_key: &quot;last_processed_id&quot;
+</code></pre>
+<p>Example (Stateful with Watermark Lag):</p>
+<pre><code class="language-yaml">incremental:
+  mode: &quot;stateful&quot;
+  column: &quot;updated_at&quot;
+  # Handle late-arriving data: look back 2 hours from HWM
+  watermark_lag: &quot;2h&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>mode</strong></td>
+<td>IncrementalMode</td>
+<td>No</td>
+<td><code>IncrementalMode.ROLLING_WINDOW</code></td>
+<td>Incremental strategy: 'rolling_window' or 'stateful'</td>
+</tr>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Primary column to filter on (e.g., updated_at)</td>
+</tr>
+<tr>
+<td><strong>fallback_column</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Backup column if primary is NULL (e.g., created_at). Generates COALESCE(col, fallback) &gt;= ...</td>
+</tr>
+<tr>
+<td><strong>lookback</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td>-</td>
+<td>Time units to look back (Rolling Window only)</td>
+</tr>
+<tr>
+<td><strong>unit</strong></td>
+<td>Optional[IncrementalUnit]</td>
+<td>No</td>
+<td>-</td>
+<td>Time unit for lookback (Rolling Window only). Options: 'hour', 'day', 'month', 'year'</td>
+</tr>
+<tr>
+<td><strong>state_key</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Unique ID for state tracking. Defaults to node name if not provided.</td>
+</tr>
+<tr>
+<td><strong>watermark_lag</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="timetravelconfig"><code>TimeTravelConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#readconfig">ReadConfig</a></em></p>
+</blockquote>
+<p>Configuration for time travel reading (Delta/Iceberg).</p>
+<p>Example:</p>
+<pre><code class="language-yaml">time_travel:
+  as_of_version: 10
+  # OR
+  as_of_timestamp: &quot;2023-10-01T12:00:00Z&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>as_of_version</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td>-</td>
+<td>Version number to time travel to</td>
+</tr>
+<tr>
+<td><strong>as_of_timestamp</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Timestamp string to time travel to</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="transformconfig"><code>TransformConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a></em></p>
+</blockquote>
+<p>Configuration for transforming data.</p>
+<h3 id="transformation-pipeline-guide">🔧 "Transformation Pipeline" Guide</h3>
+<p><strong>Business Problem:</strong>
+"I have complex logic that mixes SQL for speed and Python for complex calculations."</p>
+<p><strong>The Solution:</strong>
+Chain multiple steps together. Output of Step 1 becomes input of Step 2.</p>
+<p><strong>Function Registry:</strong>
+The <code>function</code> step type looks up functions registered with <code>@transform</code> (or <code>@register</code>).
+This allows you to use the <em>same</em> registered functions as both top-level Transformers and steps in a chain.</p>
+<p><strong>Recipe: The Mix-and-Match</strong></p>
+<pre><code class="language-yaml">transform:
+  steps:
+    # Step 1: SQL Filter (Fast)
+    - sql: &quot;SELECT * FROM df WHERE status = 'ACTIVE'&quot;
+
+    # Step 2: Custom Python Function (Complex Logic)
+    # Looks up 'calculate_lifetime_value' in the registry
+    - function: &quot;calculate_lifetime_value&quot;
+      params: { discount_rate: 0.05 }
+
+    # Step 3: Built-in Operation (Standard)
+    - operation: &quot;drop_duplicates&quot;
+      params: { subset: [&quot;user_id&quot;] }
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>steps</strong></td>
+<td>List[str | <a href="#transformstep">TransformStep</a>]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of transformation steps (SQL strings or TransformStep configs)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="deletedetectionconfig"><code>DeleteDetectionConfig</code></h3>
+<p>Configuration for delete detection in Silver layer.</p>
+<h3 id="cdc-without-cdc-guide">🔍 "CDC Without CDC" Guide</h3>
+<p><strong>Business Problem:</strong>
+"Records are deleted in our Azure SQL source, but our Silver tables still show them."</p>
+<p><strong>The Solution:</strong>
+Use delete detection to identify and flag records that no longer exist in the source.</p>
+<p><strong>Recipe 1: SQL Compare (Recommended for HWM)</strong></p>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: azure_sql
+        source_table: dbo.Customers
+</code></pre>
+<p><strong>Recipe 2: Snapshot Diff (For Full Snapshot Sources)</strong>
+Use ONLY with full snapshot ingestion, NOT with HWM incremental.</p>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: snapshot_diff
+        keys: [customer_id]
+</code></pre>
+<p><strong>Recipe 3: Conservative Threshold</strong></p>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: erp
+        source_table: dbo.Customers
+        max_delete_percent: 20.0
+        on_threshold_breach: error
+</code></pre>
+<p><strong>Recipe 4: Hard Delete (Remove Rows)</strong></p>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: azure_sql
+        source_table: dbo.Customers
+        soft_delete_col: null  # removes rows instead of flagging
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>mode</strong></td>
+<td>DeleteDetectionMode</td>
+<td>No</td>
+<td><code>DeleteDetectionMode.NONE</code></td>
+<td>Delete detection strategy: none, snapshot_diff, sql_compare</td>
+</tr>
+<tr>
+<td><strong>keys</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Business key columns for comparison</td>
+</tr>
+<tr>
+<td><strong>soft_delete_col</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td><code>_is_deleted</code></td>
+<td>Column to flag deletes (True = deleted). Set to null for hard-delete (removes rows).</td>
+</tr>
+<tr>
+<td><strong>source_connection</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>For sql_compare: connection name to query live source</td>
+</tr>
+<tr>
+<td><strong>source_table</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>For sql_compare: table to query for current keys</td>
+</tr>
+<tr>
+<td><strong>source_query</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>For sql_compare: custom SQL query for keys (overrides source_table)</td>
+</tr>
+<tr>
+<td><strong>snapshot_column</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>For snapshot_diff on non-Delta: column to identify snapshots. If None, uses Delta time travel (default).</td>
+</tr>
+<tr>
+<td><strong>on_first_run</strong></td>
+<td>FirstRunBehavior</td>
+<td>No</td>
+<td><code>FirstRunBehavior.SKIP</code></td>
+<td>Behavior when no previous version exists for snapshot_diff</td>
+</tr>
+<tr>
+<td><strong>max_delete_percent</strong></td>
+<td>Optional[float]</td>
+<td>No</td>
+<td><code>50.0</code></td>
+<td>Safety threshold: warn/error if more than X% of rows would be deleted</td>
+</tr>
+<tr>
+<td><strong>on_threshold_breach</strong></td>
+<td>ThresholdBreachAction</td>
+<td>No</td>
+<td><code>ThresholdBreachAction.WARN</code></td>
+<td>Behavior when delete percentage exceeds max_delete_percent</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="validationconfig"><code>ValidationConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a></em></p>
+</blockquote>
+<p>Configuration for data validation (Quality Gate).</p>
+<h3 id="the-indestructible-pipeline-pattern">🛡️ "The Indestructible Pipeline" Pattern</h3>
+<p><strong>Business Problem:</strong>
+"Bad data polluted our Gold reports, causing executives to make wrong decisions. We need to stop it <em>before</em> it lands."</p>
+<p><strong>The Solution:</strong>
+A Quality Gate that runs <em>after</em> transformation but <em>before</em> writing.</p>
+<p><strong>Recipe: The Quality Gate</strong></p>
+<pre><code class="language-yaml">validation:
+  mode: &quot;fail&quot;          # fail (stop pipeline) or warn (log only)
+  on_fail: &quot;alert&quot;      # alert or ignore
+
+  tests:
+    # 1. Completeness
+    - type: &quot;not_null&quot;
+      columns: [&quot;transaction_id&quot;, &quot;customer_id&quot;]
+
+    # 2. Integrity
+    - type: &quot;unique&quot;
+      columns: [&quot;transaction_id&quot;]
+
+    - type: &quot;accepted_values&quot;
+      column: &quot;status&quot;
+      values: [&quot;PENDING&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;]
+
+    # 3. Ranges &amp; Patterns
+    - type: &quot;range&quot;
+      column: &quot;age&quot;
+      min: 18
+      max: 120
+
+    - type: &quot;regex_match&quot;
+      column: &quot;email&quot;
+      pattern: &quot;^[\w\.-]+@[\w\.-]+\.\w+$&quot;
+
+    # 4. Business Logic (SQL)
+    - type: &quot;custom_sql&quot;
+      name: &quot;dates_ordered&quot;
+      condition: &quot;created_at &lt;= completed_at&quot;
+      threshold: 0.01   # Allow 1% failure
+</code></pre>
+<p><strong>Recipe: Quarantine + Gate</strong></p>
+<pre><code class="language-yaml">validation:
+  tests:
+    - type: not_null
+      columns: [customer_id]
+      on_fail: quarantine
+  quarantine:
+    connection: silver
+    path: customers_quarantine
+  gate:
+    require_pass_rate: 0.95
+    on_fail: abort
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>mode</strong></td>
+<td>ValidationAction</td>
+<td>No</td>
+<td><code>ValidationAction.FAIL</code></td>
+<td>Execution mode: 'fail' (stop pipeline) or 'warn' (log only)</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>OnFailAction</td>
+<td>No</td>
+<td><code>OnFailAction.ALERT</code></td>
+<td>Action on failure: 'alert' (send notification) or 'ignore'</td>
+</tr>
+<tr>
+<td><strong>tests</strong></td>
+<td>List[<a href="#contracts-data-quality-gates">TestConfig</a>]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>List of validation tests<br><strong>Options:</strong> <a href="#notnulltest">NotNullTest</a>, <a href="#uniquetest">UniqueTest</a>, <a href="#acceptedvaluestest">AcceptedValuesTest</a>, <a href="#rowcounttest">RowCountTest</a>, <a href="#customsqltest">CustomSQLTest</a>, <a href="#rangetest">RangeTest</a>, <a href="#regexmatchtest">RegexMatchTest</a>, <a href="#volumedroptest">VolumeDropTest</a>, <a href="#schemacontract">SchemaContract</a>, <a href="#distributioncontract">DistributionContract</a>, <a href="#freshnesscontract">FreshnessContract</a></td>
+</tr>
+<tr>
+<td><strong>quarantine</strong></td>
+<td>Optional[<a href="#quarantineconfig">QuarantineConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Quarantine configuration for failed rows</td>
+</tr>
+<tr>
+<td><strong>gate</strong></td>
+<td>Optional[<a href="#gateconfig">GateConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Quality gate configuration for batch-level validation</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="quarantineconfig"><code>QuarantineConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Configuration for quarantine table routing.</p>
+<p>Routes rows that fail validation tests to a quarantine table
+with rejection metadata for later analysis/reprocessing.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">validation:
+  tests:
+    - type: not_null
+      columns: [customer_id]
+      on_fail: quarantine
+  quarantine:
+    connection: silver
+    path: customers_quarantine
+    add_columns:
+      _rejection_reason: true
+      _rejected_at: true
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>connection</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Connection for quarantine writes</td>
+</tr>
+<tr>
+<td><strong>path</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Path for quarantine data</td>
+</tr>
+<tr>
+<td><strong>table</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Table name for quarantine</td>
+</tr>
+<tr>
+<td><strong>add_columns</strong></td>
+<td><a href="#quarantinecolumnsconfig">QuarantineColumnsConfig</a></td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Metadata columns to add to quarantined rows</td>
+</tr>
+<tr>
+<td><strong>retention_days</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td><code>90</code></td>
+<td>Days to retain quarantined data (auto-cleanup)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="quarantinecolumnsconfig"><code>QuarantineColumnsConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#quarantineconfig">QuarantineConfig</a></em></p>
+</blockquote>
+<p>Columns added to quarantined rows for debugging and reprocessing.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">quarantine:
+  connection: silver
+  path: customers_quarantine
+  add_columns:
+    _rejection_reason: true
+    _rejected_at: true
+    _source_batch_id: true
+    _failed_tests: true
+    _original_node: false
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>rejection_reason</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Add _rejection_reason column with test failure description</td>
+</tr>
+<tr>
+<td><strong>rejected_at</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Add _rejected_at column with UTC timestamp</td>
+</tr>
+<tr>
+<td><strong>source_batch_id</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Add _source_batch_id column with run ID for traceability</td>
+</tr>
+<tr>
+<td><strong>failed_tests</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Add _failed_tests column with comma-separated list of failed test names</td>
+</tr>
+<tr>
+<td><strong>original_node</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Add _original_node column with source node name</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="gateconfig"><code>GateConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Quality gate configuration for batch-level validation.</p>
+<p>Gates evaluate the entire batch before writing, ensuring
+data quality thresholds are met.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">gate:
+  require_pass_rate: 0.95
+  on_fail: abort
+  thresholds:
+    - test: not_null
+      min_pass_rate: 0.99
+  row_count:
+    min: 100
+    change_threshold: 0.5
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>require_pass_rate</strong></td>
+<td>float</td>
+<td>No</td>
+<td><code>0.95</code></td>
+<td>Minimum percentage of rows passing ALL tests</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>GateOnFail</td>
+<td>No</td>
+<td><code>GateOnFail.ABORT</code></td>
+<td>Action when gate fails</td>
+</tr>
+<tr>
+<td><strong>thresholds</strong></td>
+<td>List[<a href="#gatethreshold">GateThreshold</a>]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Per-test thresholds (overrides global require_pass_rate)</td>
+</tr>
+<tr>
+<td><strong>row_count</strong></td>
+<td>Optional[<a href="#rowcountgate">RowCountGate</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Row count anomaly detection</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="gatethreshold"><code>GateThreshold</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#gateconfig">GateConfig</a></em></p>
+</blockquote>
+<p>Per-test threshold configuration for quality gates.</p>
+<p>Allows setting different pass rate requirements for specific tests.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">gate:
+  thresholds:
+    - test: not_null
+      min_pass_rate: 0.99
+    - test: unique
+      min_pass_rate: 1.0
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>test</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Test name or type to apply threshold to</td>
+</tr>
+<tr>
+<td><strong>min_pass_rate</strong></td>
+<td>float</td>
+<td>Yes</td>
+<td>-</td>
+<td>Minimum pass rate required (0.0-1.0, e.g., 0.99 = 99%)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="rowcountgate"><code>RowCountGate</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#gateconfig">GateConfig</a></em></p>
+</blockquote>
+<p>Row count anomaly detection for quality gates.</p>
+<p>Validates that batch size falls within expected bounds and
+detects significant changes from previous runs.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">gate:
+  row_count:
+    min: 100
+    max: 1000000
+    change_threshold: 0.5
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>min</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td>-</td>
+<td>Minimum expected row count</td>
+</tr>
+<tr>
+<td><strong>max</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td>-</td>
+<td>Maximum expected row count</td>
+</tr>
+<tr>
+<td><strong>change_threshold</strong></td>
+<td>Optional[float]</td>
+<td>No</td>
+<td>-</td>
+<td>Max allowed change vs previous run (e.g., 0.5 = 50% change triggers failure)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="writeconfig"><code>WriteConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a></em></p>
+</blockquote>
+<p>Configuration for writing data.</p>
+<h3 id="big-data-performance-guide">🚀 "Big Data Performance" Guide</h3>
+<p><strong>Business Problem:</strong>
+"My dashboards are slow because the query scans terabytes of data just to find one day's sales."</p>
+<p><strong>The Solution:</strong>
+Use <strong>Partitioning</strong> for coarse filtering (skipping huge chunks) and <strong>Z-Ordering</strong> for fine-grained skipping (colocating related data).</p>
+<p><strong>Recipe: Lakehouse Optimized</strong></p>
+<pre><code class="language-yaml">write:
+  connection: &quot;gold_lake&quot;
+  format: &quot;delta&quot;
+  table: &quot;fact_sales&quot;
+  mode: &quot;append&quot;
+
+  # 1. Partitioning: Physical folders.
+  # Use for low-cardinality columns often used in WHERE clauses.
+  # WARNING: Do NOT partition by high-cardinality cols like ID or Timestamp!
+  partition_by: [&quot;country_code&quot;, &quot;txn_year_month&quot;]
+
+  # 2. Z-Ordering: Data clustering.
+  # Use for high-cardinality columns often used in JOINs or predicates.
+  zorder_by: [&quot;customer_id&quot;, &quot;product_id&quot;]
+
+  # 3. Table Properties: Engine tuning.
+  table_properties:
+    &quot;delta.autoOptimize.optimizeWrite&quot;: &quot;true&quot;
+    &quot;delta.autoOptimize.autoCompact&quot;: &quot;true&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>connection</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Connection name from project.yaml</td>
+</tr>
+<tr>
+<td><strong>format</strong></td>
+<td>ReadFormat | str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Output format (csv, parquet, delta, etc.)</td>
+</tr>
+<tr>
+<td><strong>table</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Table name for SQL/Delta</td>
+</tr>
+<tr>
+<td><strong>path</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Path for file-based outputs</td>
+</tr>
+<tr>
+<td><strong>register_table</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Register file output as external table (Spark/Delta only)</td>
+</tr>
+<tr>
+<td><strong>mode</strong></td>
+<td>WriteMode</td>
+<td>No</td>
+<td><code>WriteMode.OVERWRITE</code></td>
+<td>Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once'</td>
+</tr>
+<tr>
+<td><strong>partition_by</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>List of columns to physically partition the output by (folder structure). Use for low-cardinality columns (e.g. date, country).</td>
+</tr>
+<tr>
+<td><strong>zorder_by</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>List of columns to Z-Order by. Improves read performance for high-cardinality columns used in filters/joins (Delta only).</td>
+</tr>
+<tr>
+<td><strong>table_properties</strong></td>
+<td>Dict[str, str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Delta table properties. Overrides global performance.delta_table_properties. Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names.</td>
+</tr>
+<tr>
+<td><strong>merge_schema</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Allow schema evolution (mergeSchema option in Delta)</td>
+</tr>
+<tr>
+<td><strong>first_run_query</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads.</td>
+</tr>
+<tr>
+<td><strong>options</strong></td>
+<td>Dict[str, Any]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Format-specific options</td>
+</tr>
+<tr>
+<td><strong>auto_optimize</strong></td>
+<td>bool | <a href="#autooptimizeconfig">AutoOptimizeConfig</a></td>
+<td>No</td>
+<td>-</td>
+<td>Auto-run OPTIMIZE and VACUUM after write (Delta only)</td>
+</tr>
+<tr>
+<td><strong>add_metadata</strong></td>
+<td>bool | <a href="#writemetadataconfig">WriteMetadataConfig</a></td>
+<td>No</td>
+<td>-</td>
+<td>Add metadata columns for Bronze layer lineage. Set to <code>true</code> to add all applicable columns, or provide a WriteMetadataConfig for selective columns. Columns: _extracted_at, _source_file (file sources), _source_connection, _source_table (SQL sources).</td>
+</tr>
+<tr>
+<td><strong>skip_if_unchanged</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Skip write if DataFrame content is identical to previous write. Computes SHA256 hash of entire DataFrame and compares to stored hash in Delta table metadata. Useful for snapshot tables without timestamps to avoid redundant appends. Only supported for Delta format.</td>
+</tr>
+<tr>
+<td><strong>skip_hash_columns</strong></td>
+<td>Optional[List[str]]</td>
+<td>No</td>
+<td>-</td>
+<td>Columns to include in hash computation for skip_if_unchanged. If None, all columns are used. Specify a subset to ignore volatile columns like timestamps.</td>
+</tr>
+<tr>
+<td><strong>skip_hash_sort_columns</strong></td>
+<td>Optional[List[str]]</td>
+<td>No</td>
+<td>-</td>
+<td>Columns to sort by before hashing for deterministic comparison. Required if row order may vary between runs. Typically your business key columns.</td>
+</tr>
+<tr>
+<td><strong>streaming</strong></td>
+<td>Optional[<a href="#streamingwriteconfig">StreamingWriteConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Streaming write configuration for Spark Structured Streaming. When set, uses writeStream instead of batch write. Requires a streaming DataFrame from a streaming read source.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="writemetadataconfig"><code>WriteMetadataConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#writeconfig">WriteConfig</a></em></p>
+</blockquote>
+<p>Configuration for metadata columns added during Bronze writes.</p>
+<h3 id="bronze-metadata-guide">📋 Bronze Metadata Guide</h3>
+<p><strong>Business Problem:</strong>
+"We need lineage tracking and debugging info for our Bronze layer data."</p>
+<p><strong>The Solution:</strong>
+Add metadata columns during ingestion for traceability.</p>
+<p><strong>Recipe 1: Add All Metadata (Recommended)</strong></p>
+<pre><code class="language-yaml">write:
+  connection: bronze
+  table: customers
+  mode: append
+  add_metadata: true  # adds all applicable columns
+</code></pre>
+<p><strong>Recipe 2: Selective Metadata</strong></p>
+<pre><code class="language-yaml">write:
+  connection: bronze
+  table: customers
+  mode: append
+  add_metadata:
+    extracted_at: true
+    source_file: true
+    source_connection: false
+    source_table: false
+</code></pre>
+<p><strong>Available Columns:</strong>
+- <code>_extracted_at</code>: Pipeline execution timestamp (all sources)
+- <code>_source_file</code>: Source filename/path (file sources only)
+- <code>_source_connection</code>: Connection name used (all sources)
+- <code>_source_table</code>: Table or query name (SQL sources only)</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>extracted_at</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Add _extracted_at column with pipeline execution timestamp</td>
+</tr>
+<tr>
+<td><strong>source_file</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Add _source_file column with source filename (file sources only)</td>
+</tr>
+<tr>
+<td><strong>source_connection</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Add _source_connection column with connection name</td>
+</tr>
+<tr>
+<td><strong>source_table</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Add _source_table column with table/query name (SQL sources only)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="streamingwriteconfig"><code>StreamingWriteConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#writeconfig">WriteConfig</a></em></p>
+</blockquote>
+<p>Configuration for Spark Structured Streaming writes.</p>
+<h3 id="real-time-pipeline-guide">🚀 "Real-Time Pipeline" Guide</h3>
+<p><strong>Business Problem:</strong>
+"I need to process data continuously as it arrives from Kafka/Event Hubs
+and write it to Delta Lake in near real-time."</p>
+<p><strong>The Solution:</strong>
+Configure streaming write with checkpoint location for fault tolerance
+and trigger interval for processing frequency.</p>
+<p><strong>Recipe: Streaming Ingestion</strong></p>
+<pre><code class="language-yaml">write:
+  connection: &quot;silver_lake&quot;
+  format: &quot;delta&quot;
+  table: &quot;events_stream&quot;
+  streaming:
+    output_mode: append
+    checkpoint_location: &quot;/checkpoints/events_stream&quot;
+    trigger:
+      processing_time: &quot;10 seconds&quot;
+</code></pre>
+<p><strong>Recipe: One-Time Streaming (Batch-like)</strong></p>
+<pre><code class="language-yaml">write:
+  connection: &quot;silver_lake&quot;
+  format: &quot;delta&quot;
+  table: &quot;events_batch&quot;
+  streaming:
+    output_mode: append
+    checkpoint_location: &quot;/checkpoints/events_batch&quot;
+    trigger:
+      available_now: true
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>output_mode</strong></td>
+<td>Literal['append', 'update', 'complete']</td>
+<td>No</td>
+<td><code>append</code></td>
+<td>Output mode for streaming writes. 'append' - Only new rows. 'update' - Updated rows only. 'complete' - Entire result table (requires aggregation).</td>
+</tr>
+<tr>
+<td><strong>checkpoint_location</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Path for streaming checkpoints. Required for fault tolerance. Must be a reliable storage location (e.g., cloud storage, DBFS).</td>
+</tr>
+<tr>
+<td><strong>trigger</strong></td>
+<td>Optional[<a href="#triggerconfig">TriggerConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>Trigger configuration. If not specified, processes data as fast as possible. Use 'processing_time' for micro-batch intervals, 'once' for single batch, 'available_now' for processing all available data then stopping.</td>
+</tr>
+<tr>
+<td><strong>query_name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Name for the streaming query (useful for monitoring and debugging)</td>
+</tr>
+<tr>
+<td><strong>await_termination</strong></td>
+<td>Optional[bool]</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Wait for the streaming query to terminate. Set to True for batch-like streaming with 'once' or 'available_now' triggers.</td>
+</tr>
+<tr>
+<td><strong>timeout_seconds</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td>-</td>
+<td>Timeout in seconds when await_termination is True. If None, waits indefinitely.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="triggerconfig"><code>TriggerConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#streamingwriteconfig">StreamingWriteConfig</a></em></p>
+</blockquote>
+<p>Configuration for streaming trigger intervals.</p>
+<p>Specify exactly one of the trigger options.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">trigger:
+  processing_time: &quot;10 seconds&quot;
+</code></pre>
+<p>Or for one-time processing:</p>
+<pre><code class="language-yaml">trigger:
+  once: true
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>processing_time</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Trigger interval as duration string (e.g., '10 seconds', '1 minute')</td>
+</tr>
+<tr>
+<td><strong>once</strong></td>
+<td>Optional[bool]</td>
+<td>No</td>
+<td>-</td>
+<td>Process all available data once and stop</td>
+</tr>
+<tr>
+<td><strong>available_now</strong></td>
+<td>Optional[bool]</td>
+<td>No</td>
+<td>-</td>
+<td>Process all available data in multiple batches, then stop</td>
+</tr>
+<tr>
+<td><strong>continuous</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Continuous processing with checkpoint interval (e.g., '1 second')</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="autooptimizeconfig"><code>AutoOptimizeConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#writeconfig">WriteConfig</a></em></p>
+</blockquote>
+<p>Configuration for Delta Lake automatic optimization.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">auto_optimize:
+  enabled: true
+  vacuum_retention_hours: 168
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>enabled</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Enable auto optimization</td>
+</tr>
+<tr>
+<td><strong>vacuum_retention_hours</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>168</code></td>
+<td>Hours to retain history for VACUUM (default 7 days). Set to 0 to disable VACUUM.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="contracts-data-quality-gates">Contracts (Data Quality Gates)</h2>
+<h3 id="pre-condition-circuit-breakers">Pre-Condition Circuit Breakers</h3>
+<p>Contracts are <strong>fail-fast data quality checks</strong> that run on input data <strong>before</strong> transformation.
+Unlike validation (which runs after transforms and can warn), contracts always halt execution on failure.</p>
+<p><strong>Use Cases:</strong>
+- Ensure source data meets minimum quality standards before processing
+- Prevent bad data from propagating through the pipeline
+- Fail early to save compute resources</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-yaml">- name: &quot;process_orders&quot;
+  contracts:
+    - type: not_null
+      columns: [order_id, customer_id]
+    - type: row_count
+      min: 100
+    - type: freshness
+      column: created_at
+      max_age: &quot;24h&quot;
+  read:
+    source: raw_orders
+  transform:
+    steps:
+      - function: filter
+        params:
+          condition: &quot;status != 'cancelled'&quot;
+</code></pre>
+<hr />
+<h3 id="acceptedvaluestest"><code>AcceptedValuesTest</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Ensures a column only contains values from an allowed list.</p>
+<pre><code class="language-yaml">contracts:
+  - type: accepted_values
+    column: status
+    values: [pending, approved, rejected]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['accepted_values']</td>
+<td>No</td>
+<td><code>TestType.ACCEPTED_VALUES</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>Action on failure</td>
+</tr>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column to check</td>
+</tr>
+<tr>
+<td><strong>values</strong></td>
+<td>List[Any]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Allowed values</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="customsqltest"><code>CustomSQLTest</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Runs a custom SQL condition and fails if too many rows violate it.</p>
+<pre><code class="language-yaml">contracts:
+  - type: custom_sql
+    condition: &quot;amount &gt; 0&quot;
+    threshold: 0.01  # Allow up to 1% failures
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['custom_sql']</td>
+<td>No</td>
+<td><code>TestType.CUSTOM_SQL</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>Action on failure</td>
+</tr>
+<tr>
+<td><strong>condition</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>SQL condition that should be true for valid rows</td>
+</tr>
+<tr>
+<td><strong>threshold</strong></td>
+<td>float</td>
+<td>No</td>
+<td><code>0.0</code></td>
+<td>Failure rate threshold (0.0 = strictly no failures allowed)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="distributioncontract"><code>DistributionContract</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Checks if a column's statistical distribution is within expected bounds.</p>
+<pre><code class="language-yaml">contracts:
+  - type: distribution
+    column: price
+    metric: mean
+    threshold: &quot;&gt;100&quot;  # Mean must be &gt; 100
+    on_fail: warn
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['distribution']</td>
+<td>No</td>
+<td><code>TestType.DISTRIBUTION</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.WARN</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column to analyze</td>
+</tr>
+<tr>
+<td><strong>metric</strong></td>
+<td>Literal['mean', 'min', 'max', 'null_percentage']</td>
+<td>Yes</td>
+<td>-</td>
+<td>Statistical metric to check</td>
+</tr>
+<tr>
+<td><strong>threshold</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Threshold expression (e.g., '&gt;100', '&lt;0.05')</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="freshnesscontract"><code>FreshnessContract</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Ensures data is not stale by checking a timestamp column.</p>
+<pre><code class="language-yaml">contracts:
+  - type: freshness
+    column: updated_at
+    max_age: &quot;24h&quot;  # Data must be less than 24 hours old
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['freshness']</td>
+<td>No</td>
+<td><code>TestType.FRESHNESS</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>updated_at</code></td>
+<td>Timestamp column to check</td>
+</tr>
+<tr>
+<td><strong>max_age</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Maximum allowed age (e.g., '24h', '7d')</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="notnulltest"><code>NotNullTest</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Ensures specified columns contain no null values.</p>
+<pre><code class="language-yaml">contracts:
+  - type: not_null
+    columns: [customer_id, order_date]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['not_null']</td>
+<td>No</td>
+<td><code>TestType.NOT_NULL</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>Action on failure</td>
+</tr>
+<tr>
+<td><strong>columns</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Columns that must not contain nulls</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="rangetest"><code>RangeTest</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Ensures column values fall within a specified range.</p>
+<pre><code class="language-yaml">contracts:
+  - type: range
+    column: age
+    min: 0
+    max: 150
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['range']</td>
+<td>No</td>
+<td><code>TestType.RANGE</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>Action on failure</td>
+</tr>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column to check</td>
+</tr>
+<tr>
+<td><strong>min</strong></td>
+<td>int | float | str</td>
+<td>No</td>
+<td>-</td>
+<td>Minimum value (inclusive)</td>
+</tr>
+<tr>
+<td><strong>max</strong></td>
+<td>int | float | str</td>
+<td>No</td>
+<td>-</td>
+<td>Maximum value (inclusive)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="regexmatchtest"><code>RegexMatchTest</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Ensures column values match a regex pattern.</p>
+<pre><code class="language-yaml">contracts:
+  - type: regex_match
+    column: email
+    pattern: &quot;^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['regex_match']</td>
+<td>No</td>
+<td><code>TestType.REGEX_MATCH</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>Action on failure</td>
+</tr>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column to check</td>
+</tr>
+<tr>
+<td><strong>pattern</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Regex pattern to match</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="rowcounttest"><code>RowCountTest</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Validates that row count falls within expected bounds.</p>
+<pre><code class="language-yaml">contracts:
+  - type: row_count
+    min: 1000
+    max: 100000
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['row_count']</td>
+<td>No</td>
+<td><code>TestType.ROW_COUNT</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>Action on failure</td>
+</tr>
+<tr>
+<td><strong>min</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td>-</td>
+<td>Minimum row count</td>
+</tr>
+<tr>
+<td><strong>max</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td>-</td>
+<td>Maximum row count</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="schemacontract"><code>SchemaContract</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Validates that the DataFrame schema matches expected columns.</p>
+<p>Uses the <code>columns</code> metadata from NodeConfig to verify schema.</p>
+<pre><code class="language-yaml">contracts:
+  - type: schema
+    strict: true  # Fail if extra columns present
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['schema']</td>
+<td>No</td>
+<td><code>TestType.SCHEMA</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>strict</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>If true, fail on unexpected columns</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="uniquetest"><code>UniqueTest</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Ensures specified columns (or combination) contain unique values.</p>
+<pre><code class="language-yaml">contracts:
+  - type: unique
+    columns: [order_id]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['unique']</td>
+<td>No</td>
+<td><code>TestType.UNIQUE</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>Action on failure</td>
+</tr>
+<tr>
+<td><strong>columns</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Columns that must be unique (composite key if multiple)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="volumedroptest"><code>VolumeDropTest</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#nodeconfig">NodeConfig</a>, <a href="#validationconfig">ValidationConfig</a></em></p>
+</blockquote>
+<p>Checks if row count dropped significantly compared to history.
+Formula: (current - avg) / avg &lt; -threshold</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>Literal['volume_drop']</td>
+<td>No</td>
+<td><code>TestType.VOLUME_DROP</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>name</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Optional name for the check</td>
+</tr>
+<tr>
+<td><strong>on_fail</strong></td>
+<td>ContractSeverity</td>
+<td>No</td>
+<td><code>ContractSeverity.FAIL</code></td>
+<td>Action on failure</td>
+</tr>
+<tr>
+<td><strong>threshold</strong></td>
+<td>float</td>
+<td>No</td>
+<td><code>0.5</code></td>
+<td>Max allowed drop (0.5 = 50% drop)</td>
+</tr>
+<tr>
+<td><strong>lookback_days</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>7</code></td>
+<td>Days of history to average</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="global-settings">Global Settings</h2>
+<h3 id="lineageconfig"><code>LineageConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Configuration for OpenLineage integration.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">lineage:
+  url: &quot;http://localhost:5000&quot;
+  namespace: &quot;my_project&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>url</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>OpenLineage API URL</td>
+</tr>
+<tr>
+<td><strong>namespace</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>odibi</code></td>
+<td>Namespace for jobs</td>
+</tr>
+<tr>
+<td><strong>api_key</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>API Key</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="alertconfig"><code>AlertConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Configuration for alerts with throttling support.</p>
+<p>Supports Slack, Teams, and generic webhooks with event-specific payloads.</p>
+<p><strong>Available Events:</strong>
+- <code>on_start</code> - Pipeline started
+- <code>on_success</code> - Pipeline completed successfully
+- <code>on_failure</code> - Pipeline failed
+- <code>on_quarantine</code> - Rows were quarantined
+- <code>on_gate_block</code> - Quality gate blocked the pipeline
+- <code>on_threshold_breach</code> - A threshold was exceeded</p>
+<p>Example:</p>
+<pre><code class="language-yaml">alerts:
+  - type: slack
+    url: &quot;${SLACK_WEBHOOK_URL}&quot;
+    on_events:
+      - on_failure
+      - on_quarantine
+      - on_gate_block
+    metadata:
+      throttle_minutes: 15
+      max_per_hour: 10
+      channel: &quot;#data-alerts&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>AlertType</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>url</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Webhook URL</td>
+</tr>
+<tr>
+<td><strong>on_events</strong></td>
+<td>List[AlertEvent]</td>
+<td>No</td>
+<td><code>[&lt;AlertEvent.ON_FAILURE: 'on_failure'&gt;]</code></td>
+<td>Events to trigger alert: on_start, on_success, on_failure, on_quarantine, on_gate_block, on_threshold_breach</td>
+</tr>
+<tr>
+<td><strong>metadata</strong></td>
+<td>Dict[str, Any]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Extra metadata: throttle_minutes, max_per_hour, channel, etc.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="loggingconfig"><code>LoggingConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Logging configuration.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">logging:
+  level: &quot;INFO&quot;
+  structured: true
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>level</strong></td>
+<td>LogLevel</td>
+<td>No</td>
+<td><code>LogLevel.INFO</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>structured</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Output JSON logs</td>
+</tr>
+<tr>
+<td><strong>metadata</strong></td>
+<td>Dict[str, Any]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Extra metadata in logs</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="performanceconfig"><code>PerformanceConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Performance tuning configuration.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">performance:
+  use_arrow: true
+  spark_config:
+    &quot;spark.sql.shuffle.partitions&quot;: &quot;200&quot;
+    &quot;spark.sql.adaptive.enabled&quot;: &quot;true&quot;
+    &quot;spark.databricks.delta.optimizeWrite.enabled&quot;: &quot;true&quot;
+  delta_table_properties:
+    &quot;delta.columnMapping.mode&quot;: &quot;name&quot;
+</code></pre>
+<p><strong>Spark Config Notes:</strong>
+- Configs are applied via <code>spark.conf.set()</code> at runtime
+- For existing sessions (e.g., Databricks), only runtime-settable configs will take effect
+- Session-level configs (e.g., <code>spark.executor.memory</code>) require session restart
+- Common runtime-safe configs: shuffle partitions, adaptive query execution, Delta optimizations</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>use_arrow</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Use Apache Arrow-backed DataFrames (Pandas only). Reduces memory and speeds up I/O.</td>
+</tr>
+<tr>
+<td><strong>spark_config</strong></td>
+<td>Dict[str, str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Spark configuration settings applied at runtime via spark.conf.set(). Example: {'spark.sql.shuffle.partitions': '200', 'spark.sql.adaptive.enabled': 'true'}. Note: Some configs require session restart and cannot be set at runtime.</td>
+</tr>
+<tr>
+<td><strong>delta_table_properties</strong></td>
+<td>Dict[str, str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Default table properties applied to all Delta writes. Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names.</td>
+</tr>
+<tr>
+<td><strong>skip_null_profiling</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Skip null profiling in metadata collection phase. Reduces execution time for large DataFrames by avoiding an additional Spark job.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="retryconfig"><code>RetryConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Retry configuration.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">retry:
+  enabled: true
+  max_attempts: 3
+  backoff: &quot;exponential&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>enabled</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>max_attempts</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>3</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>backoff</strong></td>
+<td>BackoffStrategy</td>
+<td>No</td>
+<td><code>BackoffStrategy.EXPONENTIAL</code></td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="storyconfig"><code>StoryConfig</code></h3>
+<blockquote>
+<p><em>Used in: <a href="#projectconfig">ProjectConfig</a></em></p>
+</blockquote>
+<p>Story generation configuration.</p>
+<p>Stories are ODIBI's core value - execution reports with lineage.
+They must use a connection for consistent, traceable output.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">story:
+  connection: &quot;local_data&quot;
+  path: &quot;stories/&quot;
+  retention_days: 30
+  failure_sample_size: 100
+  max_failure_samples: 500
+  max_sampled_validations: 5
+</code></pre>
+<p><strong>Failure Sample Settings:</strong>
+- <code>failure_sample_size</code>: Number of failed rows to capture per validation (default: 100)
+- <code>max_failure_samples</code>: Total failed rows across all validations (default: 500)
+- <code>max_sampled_validations</code>: After this many validations, show only counts (default: 5)</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>connection</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Connection name for story output (uses connection's path resolution)</td>
+</tr>
+<tr>
+<td><strong>path</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Path for stories (relative to connection base_path)</td>
+</tr>
+<tr>
+<td><strong>max_sample_rows</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>10</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>auto_generate</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>retention_days</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td><code>30</code></td>
+<td>Days to keep stories</td>
+</tr>
+<tr>
+<td><strong>retention_count</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td><code>100</code></td>
+<td>Max number of stories to keep</td>
+</tr>
+<tr>
+<td><strong>failure_sample_size</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>100</code></td>
+<td>Number of failed rows to capture per validation rule</td>
+</tr>
+<tr>
+<td><strong>max_failure_samples</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>500</code></td>
+<td>Maximum total failed rows across all validations</td>
+</tr>
+<tr>
+<td><strong>max_sampled_validations</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>5</code></td>
+<td>After this many validations, show only counts (no samples)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="transformation-reference">Transformation Reference</h2>
+<h3 id="how-to-use-transformers">How to Use Transformers</h3>
+<p>You can use any transformer in two ways:</p>
+<p><strong>1. As a Top-Level Transformer ("The App")</strong>
+Use this for major operations that define the node's purpose (e.g. Merge, SCD2).</p>
+<pre><code class="language-yaml">- name: &quot;my_node&quot;
+  transformer: &quot;&lt;transformer_name&gt;&quot;
+  params:
+    &lt;param_name&gt;: &lt;value&gt;
+</code></pre>
+<p><strong>2. As a Step in a Chain ("The Script")</strong>
+Use this for smaller operations within a <code>transform</code> block (e.g. clean_text, filter).</p>
+<pre><code class="language-yaml">- name: &quot;my_node&quot;
+  transform:
+    steps:
+      - function: &quot;&lt;transformer_name&gt;&quot;
+         params:
+           &lt;param_name&gt;: &lt;value&gt;
+</code></pre>
+<p><strong>Available Transformers:</strong>
+The models below describe the <code>params</code> required for each transformer.</p>
+<hr />
+<h3 id="common-operations">📂 Common Operations</h3>
+<h4 id="casewhencase">CaseWhenCase</h4>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>condition</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>value</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="case_when-casewhenparams"><code>case_when</code> (CaseWhenParams)</h4>
+<p>Implements structured CASE WHEN logic.</p>
+<p>Configuration for conditional logic.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">case_when:
+  output_col: &quot;age_group&quot;
+  default: &quot;'Adult'&quot;
+  cases:
+    - condition: &quot;age &lt; 18&quot;
+      value: &quot;'Minor'&quot;
+    - condition: &quot;age &gt; 65&quot;
+      value: &quot;'Senior'&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>cases</strong></td>
+<td>List[<a href="#casewhencase">CaseWhenCase</a>]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of conditional branches</td>
+</tr>
+<tr>
+<td><strong>default</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>NULL</code></td>
+<td>Default value if no condition met</td>
+</tr>
+<tr>
+<td><strong>output_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Name of the resulting column</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="cast_columns-castcolumnsparams"><code>cast_columns</code> (CastColumnsParams)</h4>
+<p>Casts specific columns to new types while keeping others intact.</p>
+<p>Configuration for column type casting.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">cast_columns:
+  casts:
+    age: &quot;int&quot;
+    salary: &quot;DOUBLE&quot;
+    created_at: &quot;TIMESTAMP&quot;
+    tags: &quot;ARRAY&lt;STRING&gt;&quot;  # Raw SQL types allowed
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>casts</strong></td>
+<td>Dict[str, SimpleType | str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Map of column to target SQL type</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="clean_text-cleantextparams"><code>clean_text</code> (CleanTextParams)</h4>
+<p>Applies string cleaning operations (Trim/Case) via SQL.</p>
+<p>Configuration for text cleaning.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">clean_text:
+  columns: [&quot;email&quot;, &quot;username&quot;]
+  trim: true
+  case: &quot;lower&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>columns</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of columns to clean</td>
+</tr>
+<tr>
+<td><strong>trim</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Apply TRIM()</td>
+</tr>
+<tr>
+<td><strong>case</strong></td>
+<td>Literal['lower', 'upper', 'preserve']</td>
+<td>No</td>
+<td><code>preserve</code></td>
+<td>Case conversion</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="concat_columns-concatcolumnsparams"><code>concat_columns</code> (ConcatColumnsParams)</h4>
+<p>Concatenates multiple columns into one string.
+NULLs are skipped (treated as empty string) using CONCAT_WS behavior.</p>
+<p>Configuration for string concatenation.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">concat_columns:
+  columns: [&quot;first_name&quot;, &quot;last_name&quot;]
+  separator: &quot; &quot;
+  output_col: &quot;full_name&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>columns</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Columns to concatenate</td>
+</tr>
+<tr>
+<td><strong>separator</strong></td>
+<td>str</td>
+<td>No</td>
+<td>-</td>
+<td>Separator string</td>
+</tr>
+<tr>
+<td><strong>output_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Resulting column name</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="convert_timezone-converttimezoneparams"><code>convert_timezone</code> (ConvertTimezoneParams)</h4>
+<p>Converts a timestamp from one timezone to another.
+Assumes the input column is a naive timestamp representing time in source_tz,
+or a timestamp with timezone.</p>
+<p>Configuration for timezone conversion.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">convert_timezone:
+  col: &quot;utc_time&quot;
+  source_tz: &quot;UTC&quot;
+  target_tz: &quot;America/New_York&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Timestamp column to convert</td>
+</tr>
+<tr>
+<td><strong>source_tz</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>UTC</code></td>
+<td>Source timezone (e.g., 'UTC', 'America/New_York')</td>
+</tr>
+<tr>
+<td><strong>target_tz</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Target timezone (e.g., 'America/Los_Angeles')</td>
+</tr>
+<tr>
+<td><strong>output_col</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Name of the result column (default: {col}_{target_tz})</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="date_add-dateaddparams"><code>date_add</code> (DateAddParams)</h4>
+<p>Adds an interval to a date/timestamp column.</p>
+<p>Configuration for date addition.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">date_add:
+  col: &quot;created_at&quot;
+  value: 1
+  unit: &quot;day&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>value</strong></td>
+<td>int</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>unit</strong></td>
+<td>Literal['day', 'month', 'year', 'hour', 'minute', 'second']</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="date_diff-datediffparams"><code>date_diff</code> (DateDiffParams)</h4>
+<p>Calculates difference between two dates/timestamps.
+Returns the elapsed time in the specified unit (as float for sub-day units).</p>
+<p>Configuration for date difference.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">date_diff:
+  start_col: &quot;created_at&quot;
+  end_col: &quot;updated_at&quot;
+  unit: &quot;day&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>start_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>end_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>unit</strong></td>
+<td>Literal['day', 'hour', 'minute', 'second']</td>
+<td>No</td>
+<td><code>day</code></td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="date_trunc-datetruncparams"><code>date_trunc</code> (DateTruncParams)</h4>
+<p>Truncates a date/timestamp to the specified precision.</p>
+<p>Configuration for date truncation.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">date_trunc:
+  col: &quot;created_at&quot;
+  unit: &quot;month&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>unit</strong></td>
+<td>Literal['year', 'month', 'day', 'hour', 'minute', 'second']</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="derive_columns-derivecolumnsparams"><code>derive_columns</code> (DeriveColumnsParams)</h4>
+<p>Appends new columns based on SQL expressions.</p>
+<p>Design:
+- Uses projection to add fields.
+- Keeps all existing columns via <code>*</code>.</p>
+<p>Configuration for derived columns.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">derive_columns:
+  derivations:
+    total_price: &quot;quantity * unit_price&quot;
+    full_name: &quot;concat(first_name, ' ', last_name)&quot;
+</code></pre>
+<p>Note: Engine will fail if expressions reference non-existent columns.</p>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>derivations</strong></td>
+<td>Dict[str, str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Map of column name to SQL expression</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="distinct-distinctparams"><code>distinct</code> (DistinctParams)</h4>
+<p>Returns unique rows (SELECT DISTINCT).</p>
+<p>Configuration for distinct rows.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">distinct:
+  columns: [&quot;category&quot;, &quot;status&quot;]
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>columns</strong></td>
+<td>Optional[List[str]]</td>
+<td>No</td>
+<td>-</td>
+<td>Columns to project (if None, keeps all columns unique)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="extract_date_parts-extractdateparams"><code>extract_date_parts</code> (ExtractDateParams)</h4>
+<p>Extracts date parts using ANSI SQL extract/functions.</p>
+<p>Configuration for extracting date parts.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">extract_date_parts:
+  source_col: &quot;created_at&quot;
+  prefix: &quot;created&quot;
+  parts: [&quot;year&quot;, &quot;month&quot;]
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>source_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>prefix</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>parts</strong></td>
+<td>Literal[typing.Literal['year', 'month', 'day', 'hour']]</td>
+<td>No</td>
+<td><code>['year', 'month', 'day']</code></td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="fill_nulls-fillnullsparams"><code>fill_nulls</code> (FillNullsParams)</h4>
+<p>Replaces null values with specified defaults using COALESCE.</p>
+<p>Configuration for filling null values.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">fill_nulls:
+  values:
+    count: 0
+    description: &quot;N/A&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>values</strong></td>
+<td>Dict[str, str | int | float | bool]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Map of column to fill value</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="filter_rows-filterrowsparams"><code>filter_rows</code> (FilterRowsParams)</h4>
+<p>Filters rows using a standard SQL WHERE clause.</p>
+<p>Design:
+- SQL-First: Pushes filtering to the engine's optimizer.
+- Zero-Copy: No data movement to Python.</p>
+<p>Configuration for filtering rows.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">filter_rows:
+  condition: &quot;age &gt; 18 AND status = 'active'&quot;
+</code></pre>
+<p>Example (Null Check):</p>
+<pre><code class="language-yaml">filter_rows:
+  condition: &quot;email IS NOT NULL AND email != ''&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>condition</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>SQL WHERE clause (e.g., 'age &gt; 18 AND status = "active"')</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="limit-limitparams"><code>limit</code> (LimitParams)</h4>
+<p>Limits result size.</p>
+<p>Configuration for result limiting.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">limit:
+  n: 100
+  offset: 0
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>n</strong></td>
+<td>int</td>
+<td>Yes</td>
+<td>-</td>
+<td>Number of rows to return</td>
+</tr>
+<tr>
+<td><strong>offset</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>0</code></td>
+<td>Number of rows to skip</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="normalize_schema-normalizeschemaparams"><code>normalize_schema</code> (NormalizeSchemaParams)</h4>
+<p>Structural transformation to rename, drop, and reorder columns.</p>
+<p>Note: This is one of the few that might behave better with native API in some cases,
+but SQL projection handles it perfectly and is consistent.</p>
+<p>Configuration for schema normalization.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">normalize_schema:
+  rename:
+    old_col: &quot;new_col&quot;
+  drop: [&quot;unused_col&quot;]
+  select_order: [&quot;id&quot;, &quot;new_col&quot;, &quot;created_at&quot;]
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>rename</strong></td>
+<td>Optional[Dict[str, str]]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>old_name -&gt; new_name</td>
+</tr>
+<tr>
+<td><strong>drop</strong></td>
+<td>Optional[List[str]]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>Columns to remove; ignored if not present</td>
+</tr>
+<tr>
+<td><strong>select_order</strong></td>
+<td>Optional[List[str]]</td>
+<td>No</td>
+<td>-</td>
+<td>Final column order; any missing columns appended after</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="sample-sampleparams"><code>sample</code> (SampleParams)</h4>
+<p>Samples data using random filtering.</p>
+<p>Configuration for random sampling.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">sample:
+  fraction: 0.1
+  seed: 42
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>fraction</strong></td>
+<td>float</td>
+<td>Yes</td>
+<td>-</td>
+<td>Fraction of rows to return (0.0 to 1.0)</td>
+</tr>
+<tr>
+<td><strong>seed</strong></td>
+<td>Optional[int]</td>
+<td>No</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="sort-sortparams"><code>sort</code> (SortParams)</h4>
+<p>Sorts the dataset.</p>
+<p>Configuration for sorting.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">sort:
+  by: [&quot;created_at&quot;, &quot;id&quot;]
+  ascending: false
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>by</strong></td>
+<td>str | List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column(s) to sort by</td>
+</tr>
+<tr>
+<td><strong>ascending</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Sort order</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="split_part-splitpartparams"><code>split_part</code> (SplitPartParams)</h4>
+<p>Extracts the Nth part of a string after splitting by a delimiter.</p>
+<p>Configuration for splitting strings.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">split_part:
+  col: &quot;email&quot;
+  delimiter: &quot;@&quot;
+  index: 2  # Extracts domain
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column to split</td>
+</tr>
+<tr>
+<td><strong>delimiter</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Delimiter to split by</td>
+</tr>
+<tr>
+<td><strong>index</strong></td>
+<td>int</td>
+<td>Yes</td>
+<td>-</td>
+<td>1-based index of the token to extract</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="relational-algebra">📂 Relational Algebra</h3>
+<h4 id="aggregate-aggregateparams"><code>aggregate</code> (AggregateParams)</h4>
+<p>Performs grouping and aggregation via SQL.</p>
+<p>Configuration for aggregation.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">aggregate:
+  group_by: [&quot;department&quot;, &quot;region&quot;]
+  aggregations:
+    salary: &quot;sum&quot;
+    employee_id: &quot;count&quot;
+    age: &quot;avg&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>group_by</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Columns to group by</td>
+</tr>
+<tr>
+<td><strong>aggregations</strong></td>
+<td>Dict[str, AggFunc]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Map of column to aggregation function (sum, avg, min, max, count)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="join-joinparams"><code>join</code> (JoinParams)</h4>
+<p>Joins the current dataset with another dataset from the context.</p>
+<p>Configuration for joining datasets.</p>
+<p>Scenario 1: Simple Left Join</p>
+<pre><code class="language-yaml">join:
+  right_dataset: &quot;customers&quot;
+  on: &quot;customer_id&quot;
+  how: &quot;left&quot;
+</code></pre>
+<p>Scenario 2: Join with Prefix (avoid collisions)</p>
+<pre><code class="language-yaml">join:
+  right_dataset: &quot;orders&quot;
+  on: [&quot;user_id&quot;]
+  how: &quot;inner&quot;
+  prefix: &quot;ord&quot;  # Result cols: ord_date, ord_amount...
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>right_dataset</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Name of the node/dataset to join with</td>
+</tr>
+<tr>
+<td><strong>on</strong></td>
+<td>str | List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column(s) to join on</td>
+</tr>
+<tr>
+<td><strong>how</strong></td>
+<td>Literal['inner', 'left', 'right', 'full', 'cross', 'anti', 'semi']</td>
+<td>No</td>
+<td><code>left</code></td>
+<td>Join type</td>
+</tr>
+<tr>
+<td><strong>prefix</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Prefix for columns from right dataset to avoid collisions</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="pivot-pivotparams"><code>pivot</code> (PivotParams)</h4>
+<p>Pivots row values into columns.</p>
+<p>Configuration for pivoting data.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">pivot:
+  group_by: [&quot;product_id&quot;, &quot;region&quot;]
+  pivot_col: &quot;month&quot;
+  agg_col: &quot;sales&quot;
+  agg_func: &quot;sum&quot;
+</code></pre>
+<p>Example (Optimized for Spark):</p>
+<pre><code class="language-yaml">pivot:
+  group_by: [&quot;id&quot;]
+  pivot_col: &quot;category&quot;
+  values: [&quot;A&quot;, &quot;B&quot;, &quot;C&quot;]  # Explicit values avoid extra pass
+  agg_col: &quot;amount&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>group_by</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>pivot_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>agg_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>agg_func</strong></td>
+<td>Literal['sum', 'count', 'avg', 'max', 'min', 'first']</td>
+<td>No</td>
+<td><code>sum</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>values</strong></td>
+<td>Optional[List[str]]</td>
+<td>No</td>
+<td>-</td>
+<td>Specific values to pivot (for Spark optimization)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="union-unionparams"><code>union</code> (UnionParams)</h4>
+<p>Unions current dataset with others.</p>
+<p>Configuration for unioning datasets.</p>
+<p>Example (By Name - Default):</p>
+<pre><code class="language-yaml">union:
+  datasets: [&quot;sales_2023&quot;, &quot;sales_2024&quot;]
+  by_name: true
+</code></pre>
+<p>Example (By Position):</p>
+<pre><code class="language-yaml">union:
+  datasets: [&quot;legacy_data&quot;]
+  by_name: false
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>datasets</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of node names to union with current</td>
+</tr>
+<tr>
+<td><strong>by_name</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>True</code></td>
+<td>Match columns by name (UNION ALL BY NAME)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="unpivot-unpivotparams"><code>unpivot</code> (UnpivotParams)</h4>
+<p>Unpivots columns into rows (Melt/Stack).</p>
+<p>Configuration for unpivoting (melting) data.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">unpivot:
+  id_cols: [&quot;product_id&quot;]
+  value_vars: [&quot;jan_sales&quot;, &quot;feb_sales&quot;, &quot;mar_sales&quot;]
+  var_name: &quot;month&quot;
+  value_name: &quot;sales&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>id_cols</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>value_vars</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>var_name</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>variable</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>value_name</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>value</code></td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="data-quality">📂 Data Quality</h3>
+<h4 id="cross_check-crosscheckparams"><code>cross_check</code> (CrossCheckParams)</h4>
+<p>Perform cross-node validation checks.</p>
+<p>Does not return a DataFrame (returns None).
+Raises ValidationError on failure.</p>
+<p>Configuration for cross-node validation checks.</p>
+<p>Example (Row Count Mismatch):</p>
+<pre><code class="language-yaml">transformer: &quot;cross_check&quot;
+params:
+  type: &quot;row_count_diff&quot;
+  inputs: [&quot;node_a&quot;, &quot;node_b&quot;]
+  threshold: 0.05  # Allow 5% difference
+</code></pre>
+<p>Example (Schema Match):</p>
+<pre><code class="language-yaml">transformer: &quot;cross_check&quot;
+params:
+  type: &quot;schema_match&quot;
+  inputs: [&quot;staging_orders&quot;, &quot;prod_orders&quot;]
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Check type: 'row_count_diff', 'schema_match'</td>
+</tr>
+<tr>
+<td><strong>inputs</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of node names to compare</td>
+</tr>
+<tr>
+<td><strong>threshold</strong></td>
+<td>float</td>
+<td>No</td>
+<td><code>0.0</code></td>
+<td>Threshold for diff (0.0-1.0)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="warehousing-patterns">📂 Warehousing Patterns</h3>
+<h4 id="auditcolumnsconfig">AuditColumnsConfig</h4>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>created_col</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Column to set only on first insert</td>
+</tr>
+<tr>
+<td><strong>updated_col</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Column to update on every merge</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="merge-mergeparams"><code>merge</code> (MergeParams)</h4>
+<p>Merge transformer implementation.
+Handles Upsert, Append-Only, and Delete-Match strategies.</p>
+<p>Configuration for Merge transformer (Upsert/Append).</p>
+<h3 id="gdpr-compliance-guide">⚖️ "GDPR &amp; Compliance" Guide</h3>
+<p><strong>Business Problem:</strong>
+"A user exercised their 'Right to be Forgotten'. We need to remove them from our Silver tables immediately."</p>
+<p><strong>The Solution:</strong>
+Use the <code>delete_match</code> strategy. The source dataframe contains the IDs to be deleted, and the transformer removes them from the target.</p>
+<p><strong>Recipe 1: Right to be Forgotten (Delete)</strong></p>
+<pre><code class="language-yaml">transformer: &quot;merge&quot;
+params:
+  target: &quot;silver.customers&quot;
+  keys: [&quot;customer_id&quot;]
+  strategy: &quot;delete_match&quot;
+</code></pre>
+<p><strong>Recipe 2: Conditional Update (SCD Type 1)</strong>
+"Only update if the source record is newer than the target record."</p>
+<pre><code class="language-yaml">transformer: &quot;merge&quot;
+params:
+  target: &quot;silver.products&quot;
+  keys: [&quot;product_id&quot;]
+  strategy: &quot;upsert&quot;
+  update_condition: &quot;source.updated_at &gt; target.updated_at&quot;
+</code></pre>
+<p><strong>Recipe 3: Safe Insert (Filter Bad Records)</strong>
+"Only insert records that are not marked as deleted."</p>
+<pre><code class="language-yaml">transformer: &quot;merge&quot;
+params:
+  target: &quot;silver.orders&quot;
+  keys: [&quot;order_id&quot;]
+  strategy: &quot;append_only&quot;
+  insert_condition: &quot;source.is_deleted = false&quot;
+</code></pre>
+<p><strong>Recipe 4: Audit Columns</strong>
+"Track when records were created or updated."</p>
+<pre><code class="language-yaml">transformer: &quot;merge&quot;
+params:
+  target: &quot;silver.users&quot;
+  keys: [&quot;user_id&quot;]
+  audit_cols:
+    created_col: &quot;dw_created_at&quot;
+    updated_col: &quot;dw_updated_at&quot;
+</code></pre>
+<p><strong>Recipe 5: Full Sync (Insert + Update + Delete)</strong>
+"Sync target with source: insert new, update changed, and remove soft-deleted."</p>
+<pre><code class="language-yaml">transformer: &quot;merge&quot;
+params:
+  target: &quot;silver.customers&quot;
+  keys: [&quot;id&quot;]
+  strategy: &quot;upsert&quot;
+  # 1. Delete if source says so
+  delete_condition: &quot;source.is_deleted = true&quot;
+  # 2. Update if changed (and not deleted)
+  update_condition: &quot;source.hash != target.hash&quot;
+  # 3. Insert new (and not deleted)
+  insert_condition: &quot;source.is_deleted = false&quot;
+</code></pre>
+<p><strong>Strategies:</strong>
+*   <strong>upsert</strong> (Default): Update existing records, insert new ones.
+*   <strong>append_only</strong>: Ignore duplicates, only insert new keys.
+*   <strong>delete_match</strong>: Delete records in target that match keys in source.</p>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>target</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Target table name or path</td>
+</tr>
+<tr>
+<td><strong>keys</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of join keys</td>
+</tr>
+<tr>
+<td><strong>strategy</strong></td>
+<td>MergeStrategy</td>
+<td>No</td>
+<td><code>MergeStrategy.UPSERT</code></td>
+<td>Merge behavior: 'upsert', 'append_only', 'delete_match'</td>
+</tr>
+<tr>
+<td><strong>audit_cols</strong></td>
+<td>Optional[<a href="#auditcolumnsconfig">AuditColumnsConfig</a>]</td>
+<td>No</td>
+<td>-</td>
+<td>{'created_col': '...', 'updated_col': '...'}</td>
+</tr>
+<tr>
+<td><strong>optimize_write</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>Run OPTIMIZE after write (Spark)</td>
+</tr>
+<tr>
+<td><strong>zorder_by</strong></td>
+<td>Optional[List[str]]</td>
+<td>No</td>
+<td>-</td>
+<td>Columns to Z-Order by</td>
+</tr>
+<tr>
+<td><strong>cluster_by</strong></td>
+<td>Optional[List[str]]</td>
+<td>No</td>
+<td>-</td>
+<td>Columns to Liquid Cluster by (Delta)</td>
+</tr>
+<tr>
+<td><strong>update_condition</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>SQL condition for update clause (e.g. 'source.ver &gt; target.ver')</td>
+</tr>
+<tr>
+<td><strong>insert_condition</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>SQL condition for insert clause (e.g. 'source.status != "deleted"')</td>
+</tr>
+<tr>
+<td><strong>delete_condition</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>SQL condition for delete clause (e.g. 'source.status = "deleted"')</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="scd2-scd2params"><code>scd2</code> (SCD2Params)</h4>
+<p>Implements SCD Type 2 Logic.</p>
+<p>Returns the FULL history dataset (to be written via Overwrite).</p>
+<p>Parameters for SCD Type 2 (Slowly Changing Dimensions) transformer.</p>
+<h3 id="the-time-machine-pattern">🕰️ The "Time Machine" Pattern</h3>
+<p><strong>Business Problem:</strong>
+"I need to know what the customer's address was <em>last month</em>, not just where they live now."</p>
+<p><strong>The Solution:</strong>
+SCD Type 2 tracks the full history of changes. Each record has an "effective window" (start/end dates) and a flag indicating if it is the current version.</p>
+<p><strong>Recipe:</strong></p>
+<pre><code class="language-yaml">transformer: &quot;scd2&quot;
+params:
+  target: &quot;gold/customers&quot;         # Path to existing history
+  keys: [&quot;customer_id&quot;]            # How we identify the entity
+  track_cols: [&quot;address&quot;, &quot;tier&quot;]  # What changes we care about
+  effective_time_col: &quot;txn_date&quot;   # When the change actually happened
+  end_time_col: &quot;valid_to&quot;         # (Optional) Name of closing timestamp
+  current_flag_col: &quot;is_active&quot;    # (Optional) Name of current flag
+</code></pre>
+<p><strong>How it works:</strong>
+1. <strong>Match</strong>: Finds existing records using <code>keys</code>.
+2. <strong>Compare</strong>: Checks <code>track_cols</code> to see if data changed.
+3. <strong>Close</strong>: If changed, updates the old record's <code>end_time_col</code> to the new <code>effective_time_col</code>.
+4. <strong>Insert</strong>: Adds a new record with <code>effective_time_col</code> as start and open-ended end date.</p>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>target</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Target table name or path containing history</td>
+</tr>
+<tr>
+<td><strong>keys</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Natural keys to identify unique entities</td>
+</tr>
+<tr>
+<td><strong>track_cols</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Columns to monitor for changes</td>
+</tr>
+<tr>
+<td><strong>effective_time_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Source column indicating when the change occurred.</td>
+</tr>
+<tr>
+<td><strong>end_time_col</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>valid_to</code></td>
+<td>Name of the end timestamp column</td>
+</tr>
+<tr>
+<td><strong>current_flag_col</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>is_current</code></td>
+<td>Name of the current record flag column</td>
+</tr>
+<tr>
+<td><strong>delete_col</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Column indicating soft deletion (boolean)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="advanced-feature-engineering">📂 Advanced &amp; Feature Engineering</h3>
+<h4 id="deduplicate-deduplicateparams"><code>deduplicate</code> (DeduplicateParams)</h4>
+<p>Deduplicates data using Window functions.</p>
+<p>Configuration for deduplication.</p>
+<p>Scenario: Keep latest record</p>
+<pre><code class="language-yaml">deduplicate:
+  keys: [&quot;id&quot;]
+  order_by: &quot;updated_at DESC&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>keys</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of columns to partition by (columns that define uniqueness)</td>
+</tr>
+<tr>
+<td><strong>order_by</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>SQL Order by clause (e.g. 'updated_at DESC') to determine which record to keep (first one is kept)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="dict_based_mapping-dictmappingparams"><code>dict_based_mapping</code> (DictMappingParams)</h4>
+<p>Configuration for dictionary mapping.</p>
+<p>Scenario: Map status codes to labels</p>
+<pre><code class="language-yaml">dict_based_mapping:
+  column: &quot;status_code&quot;
+  mapping:
+    &quot;1&quot;: &quot;Active&quot;
+    &quot;0&quot;: &quot;Inactive&quot;
+  default: &quot;Unknown&quot;
+  output_column: &quot;status_desc&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column to map values from</td>
+</tr>
+<tr>
+<td><strong>mapping</strong></td>
+<td>Dict[str, str | int | float | bool]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Dictionary of source value -&gt; target value</td>
+</tr>
+<tr>
+<td><strong>default</strong></td>
+<td>str | int | float | bool</td>
+<td>No</td>
+<td>-</td>
+<td>Default value if source value is not found in mapping</td>
+</tr>
+<tr>
+<td><strong>output_column</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>Name of output column. If not provided, overwrites source column.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="explode_list_column-explodeparams"><code>explode_list_column</code> (ExplodeParams)</h4>
+<p>Configuration for exploding lists.</p>
+<p>Scenario: Flatten list of items per order</p>
+<pre><code class="language-yaml">explode_list_column:
+  column: &quot;items&quot;
+  outer: true  # Keep orders with empty items list
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column containing the list/array to explode</td>
+</tr>
+<tr>
+<td><strong>outer</strong></td>
+<td>bool</td>
+<td>No</td>
+<td><code>False</code></td>
+<td>If True, keep rows with empty lists (explode_outer behavior). If False, drops them.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="generate_surrogate_key-surrogatekeyparams"><code>generate_surrogate_key</code> (SurrogateKeyParams)</h4>
+<p>Generates a deterministic surrogate key (MD5) from a combination of columns.
+Handles NULLs by treating them as empty strings to ensure consistency.</p>
+<p>Configuration for surrogate key generation.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">generate_surrogate_key:
+  columns: [&quot;region&quot;, &quot;product_id&quot;]
+  separator: &quot;-&quot;
+  output_col: &quot;unique_id&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>columns</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Columns to combine for the key</td>
+</tr>
+<tr>
+<td><strong>separator</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>-</code></td>
+<td>Separator between values</td>
+</tr>
+<tr>
+<td><strong>output_col</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>surrogate_key</code></td>
+<td>Name of the output column</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="geocode-geocodeparams"><code>geocode</code> (GeocodeParams)</h4>
+<p>Geocoding Stub.</p>
+<p>Configuration for geocoding.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">geocode:
+  address_col: &quot;full_address&quot;
+  output_col: &quot;lat_long&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>address_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column containing the address to geocode</td>
+</tr>
+<tr>
+<td><strong>output_col</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>lat_long</code></td>
+<td>Name of the output column for coordinates</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="hash_columns-hashparams"><code>hash_columns</code> (HashParams)</h4>
+<p>Hashes columns for PII/Anonymization.</p>
+<p>Configuration for column hashing.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">hash_columns:
+  columns: [&quot;email&quot;, &quot;ssn&quot;]
+  algorithm: &quot;sha256&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>columns</strong></td>
+<td>List[str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>List of columns to hash</td>
+</tr>
+<tr>
+<td><strong>algorithm</strong></td>
+<td>HashAlgorithm</td>
+<td>No</td>
+<td><code>HashAlgorithm.SHA256</code></td>
+<td>Hashing algorithm. Options: 'sha256', 'md5'</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="normalize_json-normalizejsonparams"><code>normalize_json</code> (NormalizeJsonParams)</h4>
+<p>Flattens a nested JSON/Struct column.</p>
+<p>Configuration for JSON normalization.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">normalize_json:
+  column: &quot;json_data&quot;
+  sep: &quot;_&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column containing nested JSON/Struct</td>
+</tr>
+<tr>
+<td><strong>sep</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>_</code></td>
+<td>Separator for nested fields (e.g., 'parent_child')</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="parse_json-parsejsonparams"><code>parse_json</code> (ParseJsonParams)</h4>
+<p>Parses a JSON string column into a Struct/Map column.</p>
+<p>Configuration for JSON parsing.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">parse_json:
+  column: &quot;raw_json&quot;
+  json_schema: &quot;id INT, name STRING&quot;
+  output_col: &quot;parsed_struct&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>String column containing JSON</td>
+</tr>
+<tr>
+<td><strong>json_schema</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>DDL schema string (e.g. 'a INT, b STRING') or Spark StructType DDL</td>
+</tr>
+<tr>
+<td><strong>output_col</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="regex_replace-regexreplaceparams"><code>regex_replace</code> (RegexReplaceParams)</h4>
+<p>SQL-based Regex replacement.</p>
+<p>Configuration for regex replacement.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">regex_replace:
+  column: &quot;phone&quot;
+  pattern: &quot;[^0-9]&quot;
+  replacement: &quot;&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Column to apply regex replacement on</td>
+</tr>
+<tr>
+<td><strong>pattern</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Regex pattern to match</td>
+</tr>
+<tr>
+<td><strong>replacement</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>String to replace matches with</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="sessionize-sessionizeparams"><code>sessionize</code> (SessionizeParams)</h4>
+<p>Assigns session IDs based on inactivity threshold.</p>
+<p>Configuration for sessionization.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">sessionize:
+  timestamp_col: &quot;event_time&quot;
+  user_col: &quot;user_id&quot;
+  threshold_seconds: 1800
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>timestamp_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Timestamp column to calculate session duration from</td>
+</tr>
+<tr>
+<td><strong>user_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>User identifier to partition sessions by</td>
+</tr>
+<tr>
+<td><strong>threshold_seconds</strong></td>
+<td>int</td>
+<td>No</td>
+<td><code>1800</code></td>
+<td>Inactivity threshold in seconds (default: 30 minutes). If gap &gt; threshold, new session starts.</td>
+</tr>
+<tr>
+<td><strong>session_col</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>session_id</code></td>
+<td>Output column name for the generated session ID</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="unpack_struct-unpackstructparams"><code>unpack_struct</code> (UnpackStructParams)</h4>
+<p>Flattens a struct/dict column into top-level columns.</p>
+<p>Configuration for unpacking structs.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">unpack_struct:
+  column: &quot;user_info&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>column</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Struct/Dictionary column to unpack/flatten into individual columns</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="validate_and_flag-validateandflagparams"><code>validate_and_flag</code> (ValidateAndFlagParams)</h4>
+<p>Validates rules and appends a column with a list/string of failed rule names.</p>
+<p>Configuration for validation flagging.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">validate_and_flag:
+  flag_col: &quot;data_issues&quot;
+  rules:
+    age_check: &quot;age &gt;= 0&quot;
+    email_format: &quot;email LIKE '%@%'&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>rules</strong></td>
+<td>Dict[str, str]</td>
+<td>Yes</td>
+<td>-</td>
+<td>Map of rule name to SQL condition (must be TRUE)</td>
+</tr>
+<tr>
+<td><strong>flag_col</strong></td>
+<td>str</td>
+<td>No</td>
+<td><code>_issues</code></td>
+<td>Name of the column to store failed rules</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="window_calculation-windowcalculationparams"><code>window_calculation</code> (WindowCalculationParams)</h4>
+<p>Generic wrapper for Window functions.</p>
+<p>Configuration for window functions.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">window_calculation:
+  target_col: &quot;cumulative_sales&quot;
+  function: &quot;sum(sales)&quot;
+  partition_by: [&quot;region&quot;]
+  order_by: &quot;date ASC&quot;
+</code></pre>
+<p><a href="#nodeconfig">Back to Catalog</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>target_col</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>function</strong></td>
+<td>str</td>
+<td>Yes</td>
+<td>-</td>
+<td>Window function e.g. 'sum(amount)', 'rank()'</td>
+</tr>
+<tr>
+<td><strong>partition_by</strong></td>
+<td>List[str]</td>
+<td>No</td>
+<td><code>PydanticUndefined</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td><strong>order_by</strong></td>
+<td>Optional[str]</td>
+<td>No</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr />
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

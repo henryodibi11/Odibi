@@ -1,0 +1,2479 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/architecture/delete-detection-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Delete Detection Implementation Design - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#delete-detection-implementation-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Delete Detection Implementation Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/guides/dogfooding.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/patterns/README.md" class="md-tabs__link">
+          
+  
+  
+  Patterns
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/dogfooding.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dogfooding (Meta)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/python_api_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/environments.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/secrets.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/setup_azure.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/performance_tuning.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/yaml_schema.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Patterns
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/README.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/append_only_raw.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Append-Only Raw
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/hwm_pattern_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    High Water Mark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/merge_upsert.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge/Upsert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/windowed_reprocess.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windowed Reprocess
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="delete-detection-implementation-design">Delete Detection Implementation Design</h1>
+<blockquote>
+<p><strong>Status:</strong> Design Complete<br />
+<strong>Target:</strong> Silver layer CDC-like correctness for non-CDC sources</p>
+</blockquote>
+<hr />
+<h2 id="1-overview">1. Overview</h2>
+<p>Delete detection identifies records that existed in a previous extraction but no longer exist, enabling CDC-like behavior for sources without native Change Data Capture.</p>
+<pre><code>Bronze (append-only) → Silver (dedupe + delete detection) → Gold (clean KPIs)
+</code></pre>
+<hr />
+<h2 id="2-delete-detection-modes">2. Delete Detection Modes</h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>How it works</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code></td>
+<td>Pass-through (no detection)</td>
+<td>Immutable facts (logs, events, sensors)</td>
+</tr>
+<tr>
+<td><code>snapshot_diff</code></td>
+<td>Compare Delta version N vs N-1 keys</td>
+<td>Dimensions, staging tables, RPA sources</td>
+</tr>
+<tr>
+<td><code>sql_compare</code></td>
+<td>LEFT ANTI JOIN Silver keys against live source</td>
+<td>SQL is authoritative &amp; always reachable</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mode-none-default">Mode: <code>none</code> (Default)</h3>
+<p>No delete detection. Use for append-only facts.</p>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: deduplicate
+      params:
+        keys: [event_id]
+        order_by: _extracted_at DESC
+    # detect_deletes omitted = none
+</code></pre>
+<h3 id="mode-snapshot_diff">Mode: <code>snapshot_diff</code></h3>
+<p>Compares current Delta version to previous version. Keys missing = deleted.</p>
+<p><strong>Important:</strong> This mode only works correctly with full snapshot extracts, not HWM incremental. Use <code>sql_compare</code> if you're doing HWM ingestion.</p>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: deduplicate
+      params:
+        keys: [customer_id]
+        order_by: _extracted_at DESC
+    - operation: detect_deletes
+      params:
+        mode: snapshot_diff
+        keys: [customer_id]
+</code></pre>
+<p><strong>Logic:</strong></p>
+<pre><code>prev_keys = Delta version N-1, SELECT DISTINCT keys
+curr_keys = Delta version N, SELECT DISTINCT keys
+deleted   = prev_keys EXCEPT curr_keys
+→ Flag with _is_deleted = true (soft) or remove rows (hard)
+</code></pre>
+<p><strong>Implementation:</strong> Uses Delta time travel (works in both Spark and Pandas via <code>deltalake</code> library).</p>
+<h3 id="mode-sql_compare">Mode: <code>sql_compare</code></h3>
+<p>Queries live source to find keys that no longer exist. <strong>Recommended for HWM ingestion</strong> when source is authoritative and reachable.</p>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: deduplicate
+      params:
+        keys: [customer_id]
+        order_by: _extracted_at DESC
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: azure_sql
+        source_table: dbo.Customers
+</code></pre>
+<p><strong>Logic:</strong></p>
+<pre><code>silver_keys = SELECT DISTINCT keys FROM silver
+source_keys = SELECT DISTINCT keys FROM live_source
+deleted     = silver_keys EXCEPT source_keys
+→ Flag with _is_deleted = true (soft) or remove rows (hard)
+</code></pre>
+<p><strong>Warning:</strong> Never use <code>sql_compare</code> on staging tables - they may be empty between loads, causing false deletes.</p>
+<hr />
+<h2 id="3-config-model">3. Config Model</h2>
+<pre><code class="language-python">from enum import Enum
+from typing import List, Optional
+from pydantic import BaseModel, Field, model_validator
+
+
+class DeleteDetectionMode(str, Enum):
+    NONE = &quot;none&quot;
+    SNAPSHOT_DIFF = &quot;snapshot_diff&quot;
+    SQL_COMPARE = &quot;sql_compare&quot;
+
+
+class DeleteDetectionConfig(BaseModel):
+    &quot;&quot;&quot;
+    Configuration for delete detection in Silver layer.
+
+    Example (snapshot_diff):
+    ```yaml
+    detect_deletes:
+      mode: snapshot_diff
+      keys: [customer_id]
+      soft_delete_col: _is_deleted
+    ```
+
+    Example (sql_compare):
+    ```yaml
+    detect_deletes:
+      mode: sql_compare
+      keys: [customer_id]
+      source_connection: azure_sql
+      source_table: dbo.Customers
+    ```
+    &quot;&quot;&quot;
+
+    mode: DeleteDetectionMode = Field(
+        default=DeleteDetectionMode.NONE,
+        description=&quot;Delete detection strategy: none, snapshot_diff, sql_compare&quot;
+    )
+
+    keys: List[str] = Field(
+        default_factory=list,
+        description=&quot;Business key columns for comparison&quot;
+    )
+
+    # Soft vs Hard delete
+    soft_delete_col: Optional[str] = Field(
+        default=&quot;_is_deleted&quot;,
+        description=&quot;Column to flag deletes. Set to null for hard-delete.&quot;
+    )
+
+    # sql_compare mode options
+    source_connection: Optional[str] = Field(
+        default=None,
+        description=&quot;For sql_compare: connection name to query source&quot;
+    )
+    source_table: Optional[str] = Field(
+        default=None,
+        description=&quot;For sql_compare: table to query&quot;
+    )
+    source_query: Optional[str] = Field(
+        default=None,
+        description=&quot;For sql_compare: custom SQL query (overrides source_table)&quot;
+    )
+
+    # Fallback for non-Delta sources (rare)
+    snapshot_column: Optional[str] = Field(
+        default=None,
+        description=&quot;For snapshot_diff on non-Delta: column to identify snapshots. &quot;
+                    &quot;If None, uses Delta version (default).&quot;
+    )
+
+    # Edge case handling
+    on_first_run: Literal[&quot;skip&quot;, &quot;error&quot;] = Field(
+        default=&quot;skip&quot;,
+        description=&quot;Behavior when no previous version exists for snapshot_diff&quot;
+    )
+
+    max_delete_percent: Optional[float] = Field(
+        default=50.0,
+        description=&quot;Safety threshold: warn/error if more than X% of rows would be deleted&quot;
+    )
+
+    on_threshold_breach: Literal[&quot;warn&quot;, &quot;error&quot;, &quot;skip&quot;] = Field(
+        default=&quot;warn&quot;,
+        description=&quot;Behavior when delete percentage exceeds max_delete_percent&quot;
+    )
+
+    @model_validator(mode=&quot;after&quot;)
+    def validate_mode_requirements(self):
+        if self.mode == DeleteDetectionMode.NONE:
+            return self
+
+        if not self.keys:
+            raise ValueError(
+                f&quot;delete_detection: 'keys' required for mode='{self.mode}'&quot;
+            )
+
+        if self.mode == DeleteDetectionMode.SQL_COMPARE:
+            if not self.source_connection:
+                raise ValueError(
+                    &quot;delete_detection: 'source_connection' required for sql_compare&quot;
+                )
+            if not self.source_table and not self.source_query:
+                raise ValueError(
+                    &quot;delete_detection: 'source_table' or 'source_query' required&quot;
+                )
+
+        return self
+</code></pre>
+<hr />
+<h2 id="4-transformer-interface">4. Transformer Interface</h2>
+<pre><code class="language-python">@transform(&quot;detect_deletes&quot;, category=&quot;transformer&quot;, param_model=DeleteDetectionConfig)
+def detect_deletes(context: EngineContext, params: DeleteDetectionConfig) -&gt; EngineContext:
+    &quot;&quot;&quot;
+    Detects deleted records based on configured mode.
+
+    Returns:
+    - soft_delete_col set: Adds boolean column (True = deleted)
+    - soft_delete_col = None: Removes deleted rows (hard delete)
+    &quot;&quot;&quot;
+    if params.mode == DeleteDetectionMode.NONE:
+        return context  # Pass-through
+
+    if params.mode == DeleteDetectionMode.SNAPSHOT_DIFF:
+        return _detect_deletes_snapshot_diff(context, params)
+
+    if params.mode == DeleteDetectionMode.SQL_COMPARE:
+        return _detect_deletes_sql_compare(context, params)
+
+    raise ValueError(f&quot;Unknown delete detection mode: {params.mode}&quot;)
+</code></pre>
+<h3 id="snapshot_diff-implementation">snapshot_diff Implementation</h3>
+<pre><code class="language-python">def _detect_deletes_snapshot_diff(
+    context: EngineContext,
+    params: DeleteDetectionConfig
+) -&gt; EngineContext:
+    &quot;&quot;&quot;
+    Compare current Delta version to previous version.
+    Keys in previous but not in current = deleted.
+    &quot;&quot;&quot;
+    keys = params.keys
+
+    if context.engine_type == EngineType.SPARK:
+        # Spark: Delta time travel
+        current_version = context.delta_version
+        prev_version = current_version - 1
+
+        curr_keys = context.df.select(keys).distinct()
+        prev_keys = (
+            context.spark.read
+            .format(&quot;delta&quot;)
+            .option(&quot;versionAsOf&quot;, prev_version)
+            .load(context.table_path)
+            .select(keys)
+            .distinct()
+        )
+
+        deleted_keys = prev_keys.exceptAll(curr_keys)
+
+    else:
+        # Pandas: deltalake time travel
+        from deltalake import DeltaTable
+
+        dt = DeltaTable(context.table_path)
+        current_version = dt.version()
+        prev_version = current_version - 1
+
+        curr_keys = context.df[keys].drop_duplicates()
+        prev_df = DeltaTable(context.table_path, version=prev_version).to_pandas()
+        prev_keys = prev_df[keys].drop_duplicates()
+
+        # Use merge with indicator to find deleted
+        merged = prev_keys.merge(curr_keys, on=keys, how=&quot;left&quot;, indicator=True)
+        deleted_keys = merged[merged[&quot;_merge&quot;] == &quot;left_only&quot;][keys]
+
+    return _apply_deletes(context, deleted_keys, params)
+
+
+def _apply_deletes(
+    context: EngineContext,
+    deleted_keys,
+    params: DeleteDetectionConfig
+) -&gt; EngineContext:
+    &quot;&quot;&quot;Apply soft or hard delete based on config.&quot;&quot;&quot;
+    keys = params.keys
+
+    if params.soft_delete_col:
+        # Soft delete: add flag column
+        if context.engine_type == EngineType.SPARK:
+            from pyspark.sql.functions import lit, col, when
+
+            deleted_keys_flagged = deleted_keys.withColumn(
+                params.soft_delete_col, lit(True)
+            )
+            result = context.df.join(
+                deleted_keys_flagged,
+                on=keys,
+                how=&quot;left&quot;
+            ).withColumn(
+                params.soft_delete_col,
+                when(col(params.soft_delete_col).isNull(), False)
+                .otherwise(True)
+            )
+        else:
+            # Pandas
+            df = context.df.copy()
+            deleted_keys[params.soft_delete_col] = True
+            df = df.merge(deleted_keys, on=keys, how=&quot;left&quot;)
+            df[params.soft_delete_col] = df[params.soft_delete_col].fillna(False)
+            result = df
+
+        return context.with_df(result)
+
+    else:
+        # Hard delete: remove rows
+        if context.engine_type == EngineType.SPARK:
+            result = context.df.join(deleted_keys, on=keys, how=&quot;left_anti&quot;)
+        else:
+            df = context.df.copy()
+            merged = df.merge(deleted_keys, on=keys, how=&quot;left&quot;, indicator=True)
+            result = merged[merged[&quot;_merge&quot;] == &quot;left_only&quot;].drop(columns=[&quot;_merge&quot;])
+
+        return context.with_df(result)
+</code></pre>
+<h3 id="sql_compare-implementation">sql_compare Implementation</h3>
+<pre><code class="language-python">def _detect_deletes_sql_compare(
+    context: EngineContext,
+    params: DeleteDetectionConfig
+) -&gt; EngineContext:
+    &quot;&quot;&quot;
+    Compare Silver keys against live source.
+    Keys in Silver but not in source = deleted.
+    &quot;&quot;&quot;
+    from odibi.connections import get_connection
+
+    keys = params.keys
+    conn = get_connection(params.source_connection)
+
+    # Build source keys query
+    if params.source_query:
+        source_keys_query = params.source_query
+    else:
+        key_cols = &quot;, &quot;.join(keys)
+        source_keys_query = f&quot;SELECT DISTINCT {key_cols} FROM {params.source_table}&quot;
+
+    if context.engine_type == EngineType.SPARK:
+        source_keys = (
+            context.spark.read
+            .format(&quot;jdbc&quot;)
+            .option(&quot;url&quot;, conn.jdbc_url)
+            .option(&quot;query&quot;, source_keys_query)
+            .load()
+        )
+        silver_keys = context.df.select(keys).distinct()
+        deleted_keys = silver_keys.exceptAll(source_keys)
+
+    else:
+        # Pandas
+        import pandas as pd
+
+        source_keys = pd.read_sql(source_keys_query, conn.engine)
+        silver_keys = context.df[keys].drop_duplicates()
+
+        merged = silver_keys.merge(source_keys, on=keys, how=&quot;left&quot;, indicator=True)
+        deleted_keys = merged[merged[&quot;_merge&quot;] == &quot;left_only&quot;][keys]
+
+    return _apply_deletes(context, deleted_keys, params)
+</code></pre>
+<hr />
+<h2 id="5-engine-parity">5. Engine Parity</h2>
+<p>Both Pandas and Spark support all operations:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Spark</th>
+<th>Pandas</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Delta time travel</td>
+<td><code>versionAsOf</code> option</td>
+<td><code>DeltaTable(..., version=N)</code></td>
+</tr>
+<tr>
+<td>EXCEPT ALL</td>
+<td>Native DataFrame</td>
+<td><code>merge</code> + indicator</td>
+</tr>
+<tr>
+<td>LEFT ANTI JOIN</td>
+<td>Native DataFrame</td>
+<td><code>merge</code> + filter</td>
+</tr>
+<tr>
+<td>JDBC read</td>
+<td>Native</td>
+<td>SQLAlchemy <code>pd.read_sql</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-bronze-metadata-columns">6. Bronze Metadata Columns</h2>
+<p>Bronze writes should include metadata for lineage and debugging. Use <code>add_metadata: true</code> for all applicable columns, or specify individual ones.</p>
+<h3 id="available-metadata-columns">Available Metadata Columns</h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+<th>Applies to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_extracted_at</code></td>
+<td>Pipeline execution timestamp</td>
+<td>All sources</td>
+</tr>
+<tr>
+<td><code>_source_file</code></td>
+<td>Source filename/path</td>
+<td>File sources (CSV, Parquet, JSON)</td>
+</tr>
+<tr>
+<td><code>_source_connection</code></td>
+<td>Connection name used</td>
+<td>All sources</td>
+</tr>
+<tr>
+<td><code>_source_table</code></td>
+<td>Table or query name</td>
+<td>SQL sources</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metadata-config-model">Metadata Config Model</h3>
+<pre><code class="language-python">class WriteMetadataConfig(BaseModel):
+    &quot;&quot;&quot;Metadata columns to add during Bronze writes.&quot;&quot;&quot;
+
+    extracted_at: bool = Field(default=True)
+    source_file: bool = Field(default=True)
+    source_connection: bool = Field(default=False)
+    source_table: bool = Field(default=False)
+</code></pre>
+<h3 id="yaml-examples">YAML Examples</h3>
+<p><strong>Add all applicable metadata (recommended):</strong></p>
+<pre><code class="language-yaml">write:
+  connection: bronze
+  table: customers
+  mode: append
+  add_metadata: true  # adds all applicable columns
+</code></pre>
+<p><strong>Specify individual columns:</strong></p>
+<pre><code class="language-yaml">write:
+  connection: bronze
+  table: customers
+  mode: append
+  add_metadata:
+    extracted_at: true
+    source_file: true
+    source_connection: true
+</code></pre>
+<h3 id="implementation-notes">Implementation Notes</h3>
+<p><strong>Spark:</strong></p>
+<pre><code class="language-python">from pyspark.sql.functions import input_file_name, current_timestamp, lit
+
+df = df.withColumn(&quot;_extracted_at&quot;, current_timestamp())
+df = df.withColumn(&quot;_source_file&quot;, input_file_name())  # file sources only
+df = df.withColumn(&quot;_source_connection&quot;, lit(connection_name))
+</code></pre>
+<p><strong>Pandas:</strong></p>
+<pre><code class="language-python">df[&quot;_extracted_at&quot;] = pd.Timestamp.now()
+df[&quot;_source_file&quot;] = source_path  # tracked during file read
+df[&quot;_source_connection&quot;] = connection_name
+</code></pre>
+<hr />
+<h2 id="7-hash-optimization-for-merge">7. Hash Optimization for Merge</h2>
+<p>For large tables, use hashes to optimize change detection. Use the existing <code>generate_surrogate_key</code> transformer twice:</p>
+<pre><code class="language-yaml">transform:
+  steps:
+    # REQUIRED: Deduplication
+    - operation: deduplicate
+      params:
+        keys: [customer_id]
+        order_by: _extracted_at DESC
+
+    # Hash for join key (optional - useful for composite keys)
+    - operation: generate_surrogate_key
+      params:
+        columns: [customer_id]
+        output_col: _hash_key
+
+    # Hash for change detection
+    - operation: generate_surrogate_key
+      params:
+        columns: [name, email, address, phone, status]  # non-key columns
+        output_col: _hash_diff
+
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: azure_sql
+        source_table: dbo.Customers
+
+write:
+  connection: silver
+  table: customers
+  mode: upsert
+  keys: [customer_id]
+  update_condition: &quot;source._hash_diff != target._hash_diff&quot;  # skip unchanged rows
+</code></pre>
+<p><strong>Benefits:</strong>
+- Skip unchanged rows during merge (performance)
+- Single-column comparison vs N columns
+- Deterministic across runs</p>
+<hr />
+<h2 id="8-full-yaml-examples">8. Full YAML Examples</h2>
+<h3 id="example-1-dimension-with-snapshot_diff-full-snapshot-only">Example 1: Dimension with snapshot_diff (Full Snapshot Only)</h3>
+<p><strong>Note:</strong> Only use <code>snapshot_diff</code> with full snapshot ingestion, not HWM.</p>
+<pre><code class="language-yaml">nodes:
+  - name: bronze_customers
+    read:
+      connection: azure_sql
+      format: sql
+      table: dbo.Customers
+      # No incremental = full snapshot
+    write:
+      connection: bronze
+      table: customers
+      mode: append
+      add_metadata: true
+
+  - name: silver_customers
+    read:
+      connection: bronze
+      table: customers
+    transform:
+      steps:
+        - operation: deduplicate
+          params:
+            keys: [customer_id]
+            order_by: _extracted_at DESC
+        - operation: detect_deletes
+          params:
+            mode: snapshot_diff
+            keys: [customer_id]
+            soft_delete_col: _is_deleted
+    write:
+      connection: silver
+      table: customers
+      mode: upsert
+      keys: [customer_id]
+</code></pre>
+<h3 id="example-2-dimension-with-sql_compare-recommended-for-hwm">Example 2: Dimension with sql_compare (Recommended for HWM)</h3>
+<p><strong>Recommended:</strong> Use <code>sql_compare</code> when source is authoritative and reachable.</p>
+<pre><code class="language-yaml">nodes:
+  - name: bronze_products
+    read:
+      connection: erp_sql
+      format: sql
+      table: dbo.Products
+      incremental:
+        mode: stateful
+        column: updated_at
+        watermark_lag: 2h
+    write:
+      connection: bronze
+      table: products
+      mode: append
+      add_metadata: true
+
+  - name: silver_products
+    read:
+      connection: bronze
+      table: products
+    transform:
+      steps:
+        - operation: deduplicate
+          params:
+            keys: [product_id]
+            order_by: _extracted_at DESC
+        - operation: detect_deletes
+          params:
+            mode: sql_compare
+            keys: [product_id]
+            source_connection: erp_sql
+            source_table: dbo.Products
+            soft_delete_col: _is_deleted
+    write:
+      connection: silver
+      table: products
+      mode: upsert
+      keys: [product_id]
+</code></pre>
+<h3 id="example-3-fact-table-no-delete-detection">Example 3: Fact table (no delete detection)</h3>
+<pre><code class="language-yaml">nodes:
+  - name: silver_orders
+    read:
+      connection: bronze
+      table: orders
+    transform:
+      steps:
+        - operation: deduplicate
+          params:
+            keys: [order_id]
+            order_by: _extracted_at DESC
+        # No detect_deletes - facts are immutable
+    write:
+      connection: silver
+      table: orders
+      mode: upsert
+      keys: [order_id]
+</code></pre>
+<h3 id="example-4-hard-delete-instead-of-soft-delete">Example 4: Hard delete instead of soft delete</h3>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: azure_sql
+        source_table: dbo.Customers
+        soft_delete_col: null  # removes rows instead of flagging
+</code></pre>
+<h3 id="example-5-conservative-threshold-for-critical-dimension">Example 5: Conservative threshold for critical dimension</h3>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: sql_compare
+        keys: [customer_id]
+        source_connection: erp
+        source_table: dbo.Customers
+        max_delete_percent: 20.0    # fail if &gt;20% would be deleted
+        on_threshold_breach: error  # stop pipeline
+</code></pre>
+<h3 id="example-6-first-run-handling">Example 6: First run handling</h3>
+<pre><code class="language-yaml">transform:
+  steps:
+    - operation: detect_deletes
+      params:
+        mode: snapshot_diff
+        keys: [product_id]
+        on_first_run: skip  # default: no deletes on initial load
+</code></pre>
+<hr />
+<h2 id="9-edge-case-handling">9. Edge Case Handling</h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Default Behavior</th>
+<th>Config Override</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>First run</strong> (no previous version)</td>
+<td>Skip detection</td>
+<td><code>on_first_run: error</code></td>
+</tr>
+<tr>
+<td><strong>&gt;50% rows deleted</strong></td>
+<td>Warn and continue</td>
+<td><code>max_delete_percent</code>, <code>on_threshold_breach</code></td>
+</tr>
+<tr>
+<td><strong>Source returns 0 rows</strong></td>
+<td>Triggers threshold warning</td>
+<td>Set <code>max_delete_percent: 0</code> to disable</td>
+</tr>
+<tr>
+<td><strong>Connection failure</strong></td>
+<td>Pipeline fails</td>
+<td>Handle via standard error handling</td>
+</tr>
+</tbody>
+</table>
+<h3 id="threshold-calculation">Threshold Calculation</h3>
+<pre><code class="language-python">delete_percent = (deleted_count / total_silver_rows) * 100
+
+if delete_percent &gt; params.max_delete_percent:
+    if params.on_threshold_breach == &quot;error&quot;:
+        raise DeleteThresholdExceeded(f&quot;{delete_percent:.1f}% exceeds {params.max_delete_percent}%&quot;)
+    elif params.on_threshold_breach == &quot;warn&quot;:
+        logger.warning(f&quot;Delete detection: {delete_percent:.1f}% of rows flagged for deletion&quot;)
+    elif params.on_threshold_breach == &quot;skip&quot;:
+        logger.info(&quot;Delete threshold exceeded, skipping delete detection&quot;)
+        return context  # no changes
+</code></pre>
+<hr />
+<h2 id="10-design-decisions-summary">10. Design Decisions Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Choice</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default delete behavior</td>
+<td>Soft delete (<code>_is_deleted</code>)</td>
+<td>Audit trail, undo capability</td>
+</tr>
+<tr>
+<td>State for snapshot_diff</td>
+<td>Delta time travel</td>
+<td>No extra columns needed, works in Pandas + Spark</td>
+</tr>
+<tr>
+<td>batch_id column</td>
+<td>Not needed</td>
+<td>Delta versioning handles this</td>
+</tr>
+<tr>
+<td>_snapshot_date column</td>
+<td>Not needed</td>
+<td>Over-engineering for edge cases</td>
+</tr>
+<tr>
+<td>Version picker for snapshot_diff</td>
+<td>Not supported</td>
+<td>Always compare N to N-1, correct semantics</td>
+</tr>
+<tr>
+<td>Bundled SilverTransformConfig</td>
+<td>Not implemented</td>
+<td>Keep transformers separate for flexibility</td>
+</tr>
+<tr>
+<td>source_flagged mode</td>
+<td>Not implemented</td>
+<td>Use existing filter/rename transforms</td>
+</tr>
+<tr>
+<td>Hash for merge</td>
+<td>Use <code>generate_surrogate_key</code> twice</td>
+<td>No new transformer needed</td>
+</tr>
+<tr>
+<td>First run behavior</td>
+<td>Skip by default</td>
+<td>No deletes to detect on initial load</td>
+</tr>
+<tr>
+<td>Delete threshold</td>
+<td>50% default, warn</td>
+<td>Safety net for staging table accidents</td>
+</tr>
+<tr>
+<td>Bronze metadata</td>
+<td>Flexible config</td>
+<td><code>true</code> for all, or specify individual columns</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-implementation-checklist">11. Implementation Checklist</h2>
+<h3 id="phase-1-config-models">Phase 1: Config Models</h3>
+<ul>
+<li>[ ] Add <code>DeleteDetectionMode</code> enum to <code>odibi/config.py</code></li>
+<li>[ ] Add <code>DeleteDetectionConfig</code> model to <code>odibi/config.py</code></li>
+<li>[ ] Add <code>WriteMetadataConfig</code> model to <code>odibi/config.py</code></li>
+<li>[ ] Update <code>WriteConfig</code> to accept <code>add_metadata: bool | WriteMetadataConfig</code></li>
+</ul>
+<h3 id="phase-2-delete-detection-transformer">Phase 2: Delete Detection Transformer</h3>
+<ul>
+<li>[ ] Create <code>odibi/transformers/delete_detection.py</code></li>
+<li>[ ] Implement <code>detect_deletes</code> transformer function</li>
+<li>[ ] Implement <code>_detect_deletes_snapshot_diff</code> for Spark</li>
+<li>[ ] Implement <code>_detect_deletes_snapshot_diff</code> for Pandas</li>
+<li>[ ] Implement <code>_detect_deletes_sql_compare</code> for Spark</li>
+<li>[ ] Implement <code>_detect_deletes_sql_compare</code> for Pandas</li>
+<li>[ ] Implement <code>_apply_deletes</code> helper (soft/hard delete logic)</li>
+<li>[ ] Implement threshold check logic</li>
+<li>[ ] Implement first-run detection (no previous version)</li>
+<li>[ ] Register transformer in <code>odibi/transformers/__init__.py</code></li>
+</ul>
+<h3 id="phase-3-bronze-metadata">Phase 3: Bronze Metadata</h3>
+<ul>
+<li>[ ] Add <code>add_metadata</code> support to write path (Spark engine)</li>
+<li>[ ] Add <code>add_metadata</code> support to write path (Pandas engine)</li>
+<li>[ ] Implement <code>_extracted_at</code> column addition</li>
+<li>[ ] Implement <code>_source_file</code> column addition (file sources)</li>
+<li>[ ] Implement <code>_source_connection</code> column addition</li>
+<li>[ ] Implement <code>_source_table</code> column addition (SQL sources)</li>
+</ul>
+<h3 id="phase-4-testing">Phase 4: Testing</h3>
+<ul>
+<li>[ ] Write unit tests for <code>DeleteDetectionConfig</code> validation</li>
+<li>[ ] Write unit tests for <code>detect_deletes</code> - mode: none</li>
+<li>[ ] Write unit tests for <code>detect_deletes</code> - mode: snapshot_diff (Spark)</li>
+<li>[ ] Write unit tests for <code>detect_deletes</code> - mode: snapshot_diff (Pandas)</li>
+<li>[ ] Write unit tests for <code>detect_deletes</code> - mode: sql_compare (Spark)</li>
+<li>[ ] Write unit tests for <code>detect_deletes</code> - mode: sql_compare (Pandas)</li>
+<li>[ ] Write unit tests for edge cases (first run, threshold breach)</li>
+<li>[ ] Write unit tests for soft delete vs hard delete</li>
+<li>[ ] Write unit tests for metadata columns</li>
+</ul>
+<h3 id="phase-5-introspect-documentation">Phase 5: Introspect &amp; Documentation</h3>
+<ul>
+<li>[ ] Update <code>odibi/introspect.py</code> GROUP_MAPPING with new configs</li>
+<li>[ ] Update <code>odibi/introspect.py</code> TRANSFORM_CATEGORY_MAP for delete_detection</li>
+<li>[ ] Update <code>odibi/introspect.py</code> CUSTOM_ORDER for new configs</li>
+<li>[ ] Ensure <code>DeleteDetectionConfig</code> has top-tier docstrings with examples (like MergeParams)</li>
+<li>[ ] Ensure <code>WriteMetadataConfig</code> has comprehensive docstrings</li>
+<li>[ ] Add YAML examples in docstrings following existing patterns</li>
+<li>[ ] Update <code>docs/reference/yaml_schema.md</code></li>
+<li>[ ] Update <code>docs/architecture/ingestion-correctness.md</code> (done)</li>
+<li>[ ] Add cookbook examples</li>
+</ul>
+<hr />
+<h2 id="12-docstring-standards-for-introspect">12. Docstring Standards (for Introspect)</h2>
+<p>All new config models must follow the existing docstring pattern for auto-generated docs:</p>
+<pre><code class="language-python">class DeleteDetectionConfig(BaseModel):
+    &quot;&quot;&quot;
+    Configuration for delete detection in Silver layer.
+
+    ### 🔍 &quot;CDC Without CDC&quot; Guide
+
+    **Business Problem:**
+    &quot;Records are deleted in our Azure SQL source, but our Silver tables still show them.&quot;
+
+    **The Solution:**
+    Use delete detection to identify and flag records that no longer exist in the source.
+
+    **Recipe 1: SQL Compare (Recommended for HWM)**
+    ```yaml
+    transform:
+      steps:
+        - operation: detect_deletes
+          params:
+            mode: sql_compare
+            keys: [customer_id]
+            source_connection: azure_sql
+            source_table: dbo.Customers
+    ```
+
+    **Recipe 2: Snapshot Diff (For Staging Tables)**
+    ```yaml
+    transform:
+      steps:
+        - operation: detect_deletes
+          params:
+            mode: snapshot_diff
+            keys: [customer_id]
+    ```
+
+    **Recipe 3: Conservative Threshold**
+    ```yaml
+    transform:
+      steps:
+        - operation: detect_deletes
+          params:
+            mode: sql_compare
+            keys: [customer_id]
+            source_connection: erp
+            source_table: dbo.Customers
+            max_delete_percent: 20.0
+            on_threshold_breach: error
+    ```
+    &quot;&quot;&quot;
+</code></pre>
+<p>This ensures the introspect tool generates high-quality, example-rich documentation.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2185 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/roadmap/STREAMING_SUPPORT_PLAN/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Spark Structured Streaming Support Plan - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#spark-structured-streaming-support-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Spark Structured Streaming Support Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/guides/dogfooding.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/patterns/README.md" class="md-tabs__link">
+          
+  
+  
+  Patterns
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/dogfooding.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dogfooding (Meta)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/python_api_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/environments.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/secrets.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/setup_azure.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/performance_tuning.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/yaml_schema.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Patterns
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/README.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/append_only_raw.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Append-Only Raw
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/hwm_pattern_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    High Water Mark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/merge_upsert.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge/Upsert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/patterns/windowed_reprocess.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windowed Reprocess
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="spark-structured-streaming-support-plan">Spark Structured Streaming Support Plan</h1>
+<h2 id="overview">Overview</h2>
+<p>This document outlines the plan to fully support Spark Structured Streaming in Odibi. Currently, the <code>streaming</code> config flag creates a streaming DataFrame but the rest of the pipeline isn't designed to handle it.</p>
+<h2 id="current-state">Current State</h2>
+<h3 id="what-works">What Works</h3>
+<ul>
+<li><code>SparkEngine.read()</code> uses <code>spark.readStream</code> when <code>streaming=True</code></li>
+<li>Merge transformer has <code>foreachBatch</code> support for streaming sources</li>
+</ul>
+<h3 id="whats-broken">What's Broken</h3>
+<ol>
+<li><strong>Row counting fails</strong> - <code>df.count()</code> doesn't work on streaming DataFrames</li>
+<li><strong>No streaming write</strong> - <code>engine.write()</code> doesn't handle streaming DataFrames</li>
+<li><strong>No checkpoint configuration</strong> - Streaming requires checkpoint locations</li>
+<li><strong>No trigger configuration</strong> - No way to specify processing intervals</li>
+<li><strong>No output mode configuration</strong> - append/update/complete modes not exposed</li>
+<li><strong>Validation/contracts fail</strong> - Can't run validations on streaming data</li>
+<li><strong>Sample collection fails</strong> - Can't get samples from streaming DataFrames</li>
+</ol>
+<hr />
+<h2 id="phase-1-core-infrastructure">Phase 1: Core Infrastructure</h2>
+<h3 id="11-add-streamingconfig-to-configpy">1.1 Add StreamingConfig to config.py</h3>
+<pre><code class="language-python">class StreamingConfig(BaseModel):
+    &quot;&quot;&quot;Configuration for Spark Structured Streaming.&quot;&quot;&quot;
+
+    enabled: bool = Field(
+        default=False,
+        description=&quot;Enable streaming mode for this node&quot;
+    )
+    checkpoint_location: Optional[str] = Field(
+        default=None,
+        description=&quot;Path for streaming checkpoints. Required for fault tolerance.&quot;
+    )
+    trigger: Optional[str] = Field(
+        default=None,
+        description=&quot;Trigger interval. Options: 'once', '10 seconds', '1 minute', 'availableNow'&quot;
+    )
+    output_mode: Literal[&quot;append&quot;, &quot;update&quot;, &quot;complete&quot;] = Field(
+        default=&quot;append&quot;,
+        description=&quot;Output mode for streaming writes&quot;
+    )
+    watermark: Optional[str] = Field(
+        default=None,
+        description=&quot;Watermark column and delay, e.g., 'event_time, 10 minutes'&quot;
+    )
+    processing_time: Optional[str] = Field(
+        default=None,
+        description=&quot;Processing time trigger, e.g., '10 seconds'&quot;
+    )
+</code></pre>
+<h3 id="12-move-streaming-from-readconfig-to-nodeconfig">1.2 Move streaming from ReadConfig to NodeConfig</h3>
+<p>The <code>streaming</code> flag should be at the node level since it affects the entire execution flow:</p>
+<pre><code class="language-yaml">nodes:
+  - name: ingest_events
+    streaming:
+      enabled: true
+      checkpoint_location: &quot;/checkpoints/ingest_events&quot;
+      trigger: &quot;10 seconds&quot;
+      output_mode: append
+    read:
+      connection: kafka
+      format: kafka
+      options:
+        subscribe: events_topic
+    write:
+      connection: silver
+      format: delta
+      table: events_stream
+</code></pre>
+<h3 id="13-update-nodeexecutor-to-detect-streaming-mode">1.3 Update NodeExecutor to detect streaming mode</h3>
+<pre><code class="language-python">def execute(self, config: NodeConfig, ...):
+    is_streaming = config.streaming and config.streaming.enabled
+
+    if is_streaming:
+        return self._execute_streaming(config, ...)
+    else:
+        return self._execute_batch(config, ...)
+</code></pre>
+<hr />
+<h2 id="phase-2-streaming-aware-execution">Phase 2: Streaming-Aware Execution</h2>
+<h3 id="21-skip-incompatible-operations-for-streaming">2.1 Skip incompatible operations for streaming</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Streaming Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Row counting</td>
+<td>Skip (return None)</td>
+</tr>
+<tr>
+<td>Sample collection</td>
+<td>Skip</td>
+</tr>
+<tr>
+<td>Contracts/validation</td>
+<td>Skip or use foreachBatch</td>
+</tr>
+<tr>
+<td>Schema capture</td>
+<td>Use schema from DataFrame</td>
+</tr>
+<tr>
+<td>HWM updates</td>
+<td>Not applicable (Kafka offsets managed by checkpoints)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-add-streaming-write-to-sparkengine">2.2 Add streaming write to SparkEngine</h3>
+<pre><code class="language-python">def write(self, df, connection, format, ..., streaming_config=None):
+    if df.isStreaming:
+        if not streaming_config:
+            raise ValueError(&quot;Streaming DataFrame requires streaming_config&quot;)
+
+        writer = df.writeStream \
+            .format(format) \
+            .outputMode(streaming_config.output_mode) \
+            .option(&quot;checkpointLocation&quot;, streaming_config.checkpoint_location)
+
+        if streaming_config.trigger == &quot;once&quot;:
+            writer = writer.trigger(once=True)
+        elif streaming_config.trigger == &quot;availableNow&quot;:
+            writer = writer.trigger(availableNow=True)
+        elif streaming_config.trigger:
+            writer = writer.trigger(processingTime=streaming_config.trigger)
+
+        if table:
+            query = writer.toTable(table)
+        else:
+            query = writer.start(path)
+
+        return {&quot;streaming_query&quot;: query}
+    else:
+        # existing batch logic
+        ...
+</code></pre>
+<h3 id="23-handle-streaming-query-lifecycle">2.3 Handle streaming query lifecycle</h3>
+<pre><code class="language-python">def _execute_streaming(self, config, ...):
+    # Read (returns streaming DataFrame)
+    df = self._execute_read_phase(config, ...)
+
+    # Transform (must be streaming-compatible)
+    df = self._execute_transform_phase(config, df, ...)
+
+    # Write (starts streaming query)
+    query_info = self._execute_write_phase(config, df, ...)
+
+    # Return query handle for management
+    return NodeResult(
+        node_name=config.name,
+        success=True,
+        metadata={
+            &quot;streaming&quot;: True,
+            &quot;query_id&quot;: query_info[&quot;streaming_query&quot;].id,
+            &quot;query_name&quot;: query_info[&quot;streaming_query&quot;].name,
+        }
+    )
+</code></pre>
+<hr />
+<h2 id="phase-3-streaming-sources-sinks">Phase 3: Streaming Sources &amp; Sinks</h2>
+<h3 id="31-kafka-connection-type">3.1 Kafka Connection Type</h3>
+<pre><code class="language-python">class KafkaConnection(BaseConnection):
+    &quot;&quot;&quot;Kafka connection for streaming.&quot;&quot;&quot;
+
+    bootstrap_servers: str
+    security_protocol: str = &quot;PLAINTEXT&quot;
+    sasl_mechanism: Optional[str] = None
+    sasl_username: Optional[str] = None
+    sasl_password: Optional[str] = None
+
+    def get_spark_options(self) -&gt; Dict[str, str]:
+        return {
+            &quot;kafka.bootstrap.servers&quot;: self.bootstrap_servers,
+            &quot;kafka.security.protocol&quot;: self.security_protocol,
+            ...
+        }
+</code></pre>
+<h3 id="32-event-hubs-connection-type">3.2 Event Hubs Connection Type</h3>
+<pre><code class="language-python">class EventHubsConnection(BaseConnection):
+    &quot;&quot;&quot;Azure Event Hubs connection for streaming.&quot;&quot;&quot;
+
+    connection_string: str
+    consumer_group: str = &quot;$Default&quot;
+
+    def get_spark_options(self) -&gt; Dict[str, str]:
+        return {
+            &quot;eventhubs.connectionString&quot;: self.connection_string,
+            &quot;eventhubs.consumerGroup&quot;: self.consumer_group,
+        }
+</code></pre>
+<h3 id="33-supported-streaming-formats">3.3 Supported Streaming Formats</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Read</th>
+<th>Write</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kafka</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Event Hubs</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Delta</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Rate (testing)</td>
+<td>✓</td>
+<td>-</td>
+</tr>
+<tr>
+<td>File (continuous)</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="phase-4-streaming-transforms">Phase 4: Streaming Transforms</h2>
+<h3 id="41-watermarking-support">4.1 Watermarking Support</h3>
+<pre><code class="language-yaml">nodes:
+  - name: windowed_aggregation
+    streaming:
+      enabled: true
+      watermark: &quot;event_time, 10 minutes&quot;
+    transform:
+      steps:
+        - type: sql
+          query: |
+            SELECT 
+              window(event_time, '5 minutes') as window,
+              COUNT(*) as event_count
+            FROM {input}
+            GROUP BY window(event_time, '5 minutes')
+</code></pre>
+<h3 id="42-streaming-compatible-transforms">4.2 Streaming-Compatible Transforms</h3>
+<table>
+<thead>
+<tr>
+<th>Transform</th>
+<th>Streaming Support</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SQL (stateless)</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>SQL (windowed aggregation)</td>
+<td>✓ with watermark</td>
+</tr>
+<tr>
+<td>filter_rows</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>derive_columns</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>join (stream-static)</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>join (stream-stream)</td>
+<td>✓ with watermark</td>
+</tr>
+<tr>
+<td>deduplicate</td>
+<td>✓ with watermark</td>
+</tr>
+<tr>
+<td>aggregate</td>
+<td>✓ with watermark</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-incompatible-transforms-fail-fast">4.3 Incompatible Transforms (Fail Fast)</h3>
+<ul>
+<li><code>sort</code> (requires complete data)</li>
+<li><code>limit</code> (requires complete data)</li>
+<li><code>distinct</code> without watermark</li>
+<li>Any transform requiring <code>.collect()</code></li>
+</ul>
+<hr />
+<h2 id="phase-5-monitoring-management">Phase 5: Monitoring &amp; Management</h2>
+<h3 id="51-query-status-tracking">5.1 Query Status Tracking</h3>
+<pre><code class="language-python">class StreamingQueryManager:
+    &quot;&quot;&quot;Manage active streaming queries.&quot;&quot;&quot;
+
+    def __init__(self, spark):
+        self.spark = spark
+
+    def list_queries(self) -&gt; List[Dict]:
+        return [
+            {
+                &quot;id&quot;: q.id,
+                &quot;name&quot;: q.name,
+                &quot;status&quot;: q.status,
+                &quot;recent_progress&quot;: q.recentProgress,
+            }
+            for q in self.spark.streams.active
+        ]
+
+    def stop_query(self, query_id: str):
+        for q in self.spark.streams.active:
+            if q.id == query_id:
+                q.stop()
+                return True
+        return False
+
+    def await_termination(self, query_id: str, timeout: Optional[int] = None):
+        for q in self.spark.streams.active:
+            if q.id == query_id:
+                q.awaitTermination(timeout)
+                return
+</code></pre>
+<h3 id="52-cli-commands">5.2 CLI Commands</h3>
+<pre><code class="language-bash"># List active streaming queries
+odibi streaming list
+
+# Stop a streaming query
+odibi streaming stop &lt;query-id&gt;
+
+# Show query progress
+odibi streaming status &lt;query-id&gt;
+</code></pre>
+<h3 id="53-metrics-integration">5.3 Metrics Integration</h3>
+<pre><code class="language-python"># OpenTelemetry metrics for streaming
+streaming_records_processed = meter.create_counter(
+    &quot;odibi.streaming.records_processed&quot;,
+    description=&quot;Records processed by streaming query&quot;
+)
+
+streaming_batch_duration = meter.create_histogram(
+    &quot;odibi.streaming.batch_duration_ms&quot;,
+    description=&quot;Duration of each micro-batch&quot;
+)
+</code></pre>
+<hr />
+<h2 id="phase-6-testing">Phase 6: Testing</h2>
+<h3 id="61-unit-tests">6.1 Unit Tests</h3>
+<ul>
+<li>Test streaming config validation</li>
+<li>Test checkpoint path generation</li>
+<li>Test trigger parsing</li>
+<li>Mock streaming DataFrame handling</li>
+</ul>
+<h3 id="62-integration-tests-spark-required">6.2 Integration Tests (Spark Required)</h3>
+<ul>
+<li>Rate source → Delta sink</li>
+<li>File source → File sink (continuous)</li>
+<li>Watermark and windowed aggregation</li>
+<li>Stream-static join</li>
+</ul>
+<h3 id="63-e2e-tests-kafka-required">6.3 E2E Tests (Kafka Required)</h3>
+<ul>
+<li>Kafka → Delta pipeline</li>
+<li>Event Hubs → Delta pipeline</li>
+<li>Exactly-once semantics verification</li>
+</ul>
+<hr />
+<h2 id="implementation-order">Implementation Order</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Effort</th>
+<th>Priority</th>
+<th>Dependencies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.1 StreamingConfig</td>
+<td>2h</td>
+<td>P0</td>
+<td>None</td>
+</tr>
+<tr>
+<td>1.2 Move to NodeConfig</td>
+<td>1h</td>
+<td>P0</td>
+<td>1.1</td>
+</tr>
+<tr>
+<td>1.3 Detect streaming mode</td>
+<td>2h</td>
+<td>P0</td>
+<td>1.2</td>
+</tr>
+<tr>
+<td>2.1 Skip incompatible ops</td>
+<td>2h</td>
+<td>P0</td>
+<td>1.3</td>
+</tr>
+<tr>
+<td>2.2 Streaming write</td>
+<td>4h</td>
+<td>P0</td>
+<td>2.1</td>
+</tr>
+<tr>
+<td>2.3 Query lifecycle</td>
+<td>3h</td>
+<td>P0</td>
+<td>2.2</td>
+</tr>
+<tr>
+<td>3.1 Kafka connection</td>
+<td>3h</td>
+<td>P1</td>
+<td>2.3</td>
+</tr>
+<tr>
+<td>3.2 Event Hubs connection</td>
+<td>2h</td>
+<td>P1</td>
+<td>2.3</td>
+</tr>
+<tr>
+<td>4.1 Watermarking</td>
+<td>2h</td>
+<td>P1</td>
+<td>2.3</td>
+</tr>
+<tr>
+<td>4.2 Transform compatibility</td>
+<td>4h</td>
+<td>P1</td>
+<td>4.1</td>
+</tr>
+<tr>
+<td>5.1 Query manager</td>
+<td>3h</td>
+<td>P2</td>
+<td>2.3</td>
+</tr>
+<tr>
+<td>5.2 CLI commands</td>
+<td>2h</td>
+<td>P2</td>
+<td>5.1</td>
+</tr>
+<tr>
+<td>5.3 Metrics</td>
+<td>2h</td>
+<td>P2</td>
+<td>5.1</td>
+</tr>
+<tr>
+<td>6.x Testing</td>
+<td>8h</td>
+<td>P1</td>
+<td>All</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total Estimate: ~40 hours</strong></p>
+<hr />
+<h2 id="example-complete-streaming-pipeline">Example: Complete Streaming Pipeline</h2>
+<pre><code class="language-yaml"># project.yaml
+connections:
+  kafka:
+    type: kafka
+    bootstrap_servers: &quot;localhost:9092&quot;
+
+  silver:
+    type: databricks
+    catalog: main
+    schema: silver
+
+# pipeline.yaml
+pipelines:
+  - pipeline: realtime_events
+    description: &quot;Process events in real-time from Kafka to Delta&quot;
+
+    nodes:
+      - name: ingest_events
+        description: &quot;Ingest raw events from Kafka&quot;
+        streaming:
+          enabled: true
+          checkpoint_location: &quot;abfss://checkpoints/ingest_events&quot;
+          trigger: &quot;10 seconds&quot;
+          output_mode: append
+          watermark: &quot;event_time, 5 minutes&quot;
+
+        read:
+          connection: kafka
+          format: kafka
+          options:
+            subscribe: raw_events
+            startingOffsets: earliest
+
+        transform:
+          steps:
+            - type: sql
+              query: |
+                SELECT 
+                  CAST(key AS STRING) as event_key,
+                  CAST(value AS STRING) as event_json,
+                  timestamp as kafka_timestamp,
+                  from_json(CAST(value AS STRING), 'event_type STRING, event_time TIMESTAMP, payload STRING') as parsed
+                FROM {input}
+
+            - type: derive
+              columns:
+                event_type: &quot;parsed.event_type&quot;
+                event_time: &quot;parsed.event_time&quot;
+                payload: &quot;parsed.payload&quot;
+
+        write:
+          connection: silver
+          format: delta
+          table: events_stream
+          partition_by: [&quot;event_type&quot;]
+</code></pre>
+<hr />
+<h2 id="open-questions">Open Questions</h2>
+<ol>
+<li><strong>Should streaming nodes run indefinitely or support batch-like "run once"?</strong></li>
+<li>Spark supports <code>trigger(once=True)</code> for processing all available data then stopping</li>
+<li>
+<p>Useful for testing and scheduled streaming jobs</p>
+</li>
+<li>
+<p><strong>How to handle streaming in the Pipeline orchestrator?</strong></p>
+</li>
+<li>Streaming nodes don't "complete" in the traditional sense</li>
+<li>
+<p>May need separate <code>run_streaming()</code> method</p>
+</li>
+<li>
+<p><strong>Should we support foreachBatch for custom sinks?</strong></p>
+</li>
+<li>Enables writing to non-streaming sinks (JDBC, etc.)</li>
+<li>
+<p>More complex but more flexible</p>
+</li>
+<li>
+<p><strong>How to expose streaming metrics in Stories?</strong></p>
+</li>
+<li>Streaming runs continuously, no single "run" to report on</li>
+<li>May need real-time dashboard integration</li>
+</ol>
+<hr />
+<h2 id="references">References</h2>
+<ul>
+<li><a href="https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html">Spark Structured Streaming Guide</a></li>
+<li><a href="https://docs.delta.io/latest/delta-streaming.html">Delta Lake Streaming</a></li>
+<li><a href="https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html">Kafka + Spark Integration</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

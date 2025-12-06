@@ -1,0 +1,2319 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/AUDIT_FINDINGS/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Implementation Quality Audit - Odibi Pipeline Framework - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#implementation-quality-audit-odibi-pipeline-framework" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Implementation Quality Audit - Odibi Pipeline Framework
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/guides/dogfooding.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/patterns/README.md" class="md-tabs__link">
+          
+  
+  
+  Patterns
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/dogfooding.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dogfooding (Meta)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/python_api_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/environments.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/secrets.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/setup_azure.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/performance_tuning.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/yaml_schema.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Patterns
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/README.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/append_only_raw.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Append-Only Raw
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/hwm_pattern_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    High Water Mark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/merge_upsert.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge/Upsert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/windowed_reprocess.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windowed Reprocess
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="implementation-quality-audit-odibi-pipeline-framework">Implementation Quality Audit - Odibi Pipeline Framework</h1>
+<p><strong>Date:</strong> December 3, 2025<br />
+<strong>Audit Thread:</strong> https://ampcode.com/threads/T-e994f339-852c-4546-a642-5b02a984b896</p>
+<h2 id="summary">Summary</h2>
+<p>Found <strong>17 implementation issues</strong> across the Odibi codebase. These are categorized by priority and include specific file locations, problem descriptions, impact assessments, and suggested fixes.</p>
+<hr />
+<h2 id="high-priority-performance-critical">🔴 HIGH PRIORITY (Performance Critical)</h2>
+<h3 id="issue-1-redundant-dataframe-count-operations">Issue #1: Redundant DataFrame Count Operations</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/catalog.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>2098-2108, 2167-2172, 2228-2256</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Multiple <code>.count()</code> calls on same DataFrame trigger redundant Spark jobs</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Performance - each <code>.count()</code> is an expensive distributed action</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Current Code:</strong></p>
+<pre><code class="language-python">initial_count = df.count()
+df = df.filter(...)
+deleted_count += initial_count - df.count()  # Second count on filtered df
+</code></pre>
+<p><strong>Suggested Fix:</strong>
+Cache DataFrame before counting, or use single aggregation to get both values:</p>
+<pre><code class="language-python">df.cache()
+initial_count = df.count()
+# ... filter operations
+final_count = df.count()
+df.unpersist()
+</code></pre>
+<hr />
+<h3 id="issue-2-repeated-delta-table-reads-in-catalog-methods">Issue #2: Repeated Delta Table Reads in Catalog Methods</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/catalog.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>507-634</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Methods <code>get_registered_pipeline</code>, <code>get_registered_nodes</code>, <code>get_all_registered_pipelines</code>, <code>get_all_registered_nodes</code> each read the same Delta table separately</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Performance - redundant I/O when called in sequence during auto-registration</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Affected Methods:</strong>
+- <code>get_registered_pipeline()</code> - reads <code>meta_pipelines</code>
+- <code>get_registered_nodes()</code> - reads <code>meta_nodes</code>
+- <code>get_all_registered_pipelines()</code> - reads <code>meta_pipelines</code>
+- <code>get_all_registered_nodes()</code> - reads <code>meta_nodes</code></p>
+<p><strong>Suggested Fix:</strong>
+Add caching layer or batch read method that fetches all needed data in one read:</p>
+<pre><code class="language-python">def _get_cached_pipelines(self) -&gt; Dict[str, Dict]:
+    if self._pipeline_cache is None:
+        self._pipeline_cache = self._read_all_pipelines()
+    return self._pipeline_cache
+</code></pre>
+<hr />
+<h3 id="issue-3-expensive-count-in-validation-loop">Issue #3: Expensive .count() in Validation Loop</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/validation/engine.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>250, 269, 282, 305, 323, 337</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Individual <code>.count()</code> for each column validation rule</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>O(n) Spark jobs where n = number of validation columns/rules</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Current Pattern:</strong></p>
+<pre><code class="language-python">for col in validation_config.no_nulls:
+    null_count = df.filter(F.col(col).isNull()).count()  # One job per column
+</code></pre>
+<p><strong>Suggested Fix:</strong>
+Aggregate all null counts in single <code>.agg()</code> call:</p>
+<pre><code class="language-python">null_counts = df.select([
+    F.sum(F.when(F.col(c).isNull(), 1).otherwise(0)).alias(c)
+    for c in validation_config.no_nulls
+]).collect()[0].asDict()
+</code></pre>
+<hr />
+<h3 id="issue-4-individual-register_pipelineregister_node-methods-still-perform-single-writes">Issue #4: Individual register_pipeline/register_node Methods Still Perform Single Writes</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/catalog.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>816-1063</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>While <code>register_pipelines_batch</code> and <code>register_nodes_batch</code> exist, the individual methods still perform single writes</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Callers using individual methods still suffer N individual Delta writes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Suggested Fix:</strong>
+Deprecate individual methods or have them delegate to batch internally:</p>
+<pre><code class="language-python">def register_pipeline(self, pipeline_config, ...):
+    &quot;&quot;&quot;Deprecated: Use register_pipelines_batch for better performance.&quot;&quot;&quot;
+    warnings.warn(&quot;Use register_pipelines_batch instead&quot;, DeprecationWarning)
+    return self.register_pipelines_batch([self._prepare_pipeline_record(pipeline_config)])
+</code></pre>
+<hr />
+<h2 id="medium-priority-reliability-maintainability">🟡 MEDIUM PRIORITY (Reliability &amp; Maintainability)</h2>
+<h3 id="issue-5-silent-exception-handling-suppresses-failures">Issue #5: Silent Exception Handling Suppresses Failures</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Files</strong></td>
+<td>Multiple (see below)</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Exception handlers log warnings but don't re-raise, hiding failures</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Reliability - failures go unnoticed, debugging is harder</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Locations:</strong>
+| File | Lines | Pattern |
+|------|-------|---------|
+| <code>odibi/story/generator.py</code> | 186-188 | <code>except Exception: pass</code> |
+| <code>odibi/lineage.py</code> | 66-68 | Silently disables OpenLineage |
+| <code>odibi/lineage.py</code> | 118-120 | Returns fake UUID on failure |
+| <code>odibi/lineage.py</code> | 157-158 | Silently ignores emit failure |
+| <code>odibi/utils/extensions.py</code> | 27-28 | Only logs warning |
+| <code>odibi/plugins.py</code> | 64-65, 67-68 | Only logs error |</p>
+<p><strong>Suggested Fix:</strong>
+At minimum, log at ERROR level with stack trace. Consider raising wrapped exceptions:</p>
+<pre><code class="language-python">except Exception as e:
+    logger.error(f&quot;Operation failed: {e}&quot;, exc_info=True)
+    # Either re-raise or set a flag for caller to check
+    self._last_error = e
+</code></pre>
+<hr />
+<h3 id="issue-6-inconsistent-selfspark-vs-selfengine-checks">Issue #6: Inconsistent self.spark vs self.engine Checks</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/catalog.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>Throughout (139, 145, 244, 282, 320, 337, 507, 516, 544, 555, etc.)</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Code uses two patterns interchangeably without clear reasoning</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Maintainability - inconsistent control flow makes code hard to understand</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Current Patterns:</strong></p>
+<pre><code class="language-python"># Pattern 1
+if self.spark:
+    # Spark logic
+elif self.engine:
+    # Engine logic
+
+# Pattern 2
+if self.spark:
+    # Spark logic
+elif self.engine and self.engine.name == &quot;pandas&quot;:
+    # Pandas-specific logic
+</code></pre>
+<p><strong>Suggested Fix:</strong>
+Standardize on single pattern using computed properties:</p>
+<pre><code class="language-python">@property
+def is_spark_mode(self) -&gt; bool:
+    return self.spark is not None
+
+@property
+def is_pandas_mode(self) -&gt; bool:
+    return self.engine is not None and self.engine.name == &quot;pandas&quot;
+</code></pre>
+<hr />
+<h3 id="issue-7-missing-connection-closecleanup">Issue #7: Missing Connection Close/Cleanup</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/connections/azure_sql.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>573-589 (close method exists but never called)</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td><code>AzureSQL.close()</code> method exists but is never called in Pipeline/PipelineManager lifecycle</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Resource leak - SQLAlchemy connection pools may not be properly disposed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Suggested Fix:</strong>
+Add cleanup in Pipeline/PipelineManager using context manager pattern:</p>
+<pre><code class="language-python">class Pipeline:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._cleanup_connections()
+
+    def _cleanup_connections(self):
+        for conn in self.connections.values():
+            if hasattr(conn, 'close'):
+                conn.close()
+</code></pre>
+<hr />
+<h3 id="issue-8-uncached-row-count-fallback-in-schema-capture-phase">Issue #8: Uncached Row Count Fallback in Schema Capture Phase</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/node.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>227-231</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>When read phase is skipped, row count is computed via expensive fallback</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Performance - unnecessary Spark action</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Current Code:</strong></p>
+<pre><code class="language-python">rows_in = (
+    self._read_row_count
+    if self._read_row_count is not None
+    else self._count_rows(input_df)  # Expensive fallback
+)
+</code></pre>
+<p><strong>Suggested Fix:</strong>
+Make counting optional or ensure <code>_read_row_count</code> is always populated:</p>
+<pre><code class="language-python">rows_in = self._read_row_count  # May be None, and that's OK
+if rows_in is None and self.performance_config.track_row_counts:
+    rows_in = self._count_rows(input_df)
+</code></pre>
+<hr />
+<h3 id="issue-9-dict-access-without-consistent-get-fallback">Issue #9: Dict Access Without Consistent .get() Fallback</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/node.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>Various (inconsistent pattern)</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Some connection lookups use <code>.get()</code>, others use direct access</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Inconsistent - some missing connections raise KeyError, others return None</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Inconsistent Patterns:</strong></p>
+<pre><code class="language-python"># Safe pattern (used sometimes)
+connection = self.connections.get(read_config.connection)
+
+# Unsafe pattern (used elsewhere)
+connection = self.connections[write_config.connection]  # KeyError if missing
+</code></pre>
+<p><strong>Suggested Fix:</strong>
+Use <code>.get()</code> consistently and check for None explicitly:</p>
+<pre><code class="language-python">connection = self.connections.get(write_config.connection)
+if connection is None:
+    raise ValueError(f&quot;Connection '{write_config.connection}' not found&quot;)
+</code></pre>
+<hr />
+<h3 id="issue-10-repeated-hash-calculation-pattern">Issue #10: Repeated Hash Calculation Pattern</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Files</strong></td>
+<td><code>odibi/pipeline.py</code>, <code>odibi/catalog.py</code>, <code>odibi/node.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>pipeline.py:400-413, catalog.py:840-848, node.py:737-745</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Same hash calculation pattern duplicated in multiple places</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Code duplication, inconsistency risk</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Duplicated Pattern:</strong></p>
+<pre><code class="language-python">if hasattr(config, &quot;model_dump&quot;):
+    dump = config.model_dump(mode=&quot;json&quot;, exclude={&quot;description&quot;, &quot;tags&quot;, &quot;log_level&quot;})
+else:
+    dump = config.dict(exclude={&quot;description&quot;, &quot;tags&quot;, &quot;log_level&quot;})
+dump_str = json.dumps(dump, sort_keys=True)
+version_hash = hashlib.md5(dump_str.encode(&quot;utf-8&quot;)).hexdigest()
+</code></pre>
+<p><strong>Suggested Fix:</strong>
+Extract to shared utility function:</p>
+<pre><code class="language-python"># odibi/utils/hashing.py
+def calculate_config_hash(config, exclude: Set[str] = None) -&gt; str:
+    exclude = exclude or {&quot;description&quot;, &quot;tags&quot;, &quot;log_level&quot;}
+    dump = config.model_dump(mode=&quot;json&quot;, exclude=exclude) if hasattr(config, &quot;model_dump&quot;) else config.dict(exclude=exclude)
+    return hashlib.md5(json.dumps(dump, sort_keys=True).encode()).hexdigest()
+</code></pre>
+<hr />
+<h2 id="low-priority-minor-improvements">🟢 LOW PRIORITY (Minor Improvements)</h2>
+<h3 id="issue-11-import-inside-loopmethod">Issue #11: Import Inside Loop/Method</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/catalog.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>268, 508, 545, 662, 751, 871, 1000, 1085, 1160, etc.</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td><code>from pyspark.sql import functions as F</code> imported inside methods repeatedly</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Minor performance overhead from repeated imports</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Suggested Fix:</strong>
+Import once at module level with try/except guard:</p>
+<pre><code class="language-python">try:
+    from pyspark.sql import functions as F
+    from pyspark.sql import SparkSession
+    SPARK_AVAILABLE = True
+except ImportError:
+    F = None
+    SparkSession = None
+    SPARK_AVAILABLE = False
+</code></pre>
+<hr />
+<h3 id="issue-12-duplicate-logging-context-creation">Issue #12: Duplicate Logging Context Creation</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/node.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>170-174 and 761-764</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td><code>create_logging_context()</code> called in both <code>NodeExecutor.execute()</code> and <code>Node.execute()</code></td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Creates redundant context objects</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Suggested Fix:</strong>
+Pass context from outer to inner method:</p>
+<pre><code class="language-python">def execute(self, ctx: Optional[LoggingContext] = None) -&gt; NodeResult:
+    ctx = ctx or create_logging_context(...)
+    result = self.executor.execute(self.config, ctx=ctx)
+</code></pre>
+<hr />
+<h3 id="issue-13-get_delta_history-collects-all-history">Issue #13: get_delta_history Collects All History</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/engine/spark_engine.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>806</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>When limit is None, <code>delta_table.history()</code> returns all versions then <code>.collect()</code> brings everything to driver</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Memory issue for tables with long history</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Current Code:</strong></p>
+<pre><code class="language-python">history_df = delta_table.history(limit) if limit else delta_table.history()
+history = [row.asDict() for row in history_df.collect()]
+</code></pre>
+<p><strong>Suggested Fix:</strong>
+Always require/default a reasonable limit:</p>
+<pre><code class="language-python">DEFAULT_HISTORY_LIMIT = 100
+
+def get_delta_history(self, connection, path, limit: int = DEFAULT_HISTORY_LIMIT):
+    history_df = delta_table.history(limit)
+</code></pre>
+<hr />
+<h3 id="issue-14-optional-get-without-default">Issue #14: Optional .get() Without Default</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Files</strong></td>
+<td>Various</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Some <code>.get()</code> calls use proper defaults, others don't</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Potential NoneType errors</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-python"># Good
+r.get(&quot;rows_processed&quot;, 0)
+r.get(&quot;duration_ms&quot;, 0)
+
+# Potentially problematic
+config.get(&quot;some_key&quot;)  # Returns None if missing
+</code></pre>
+<p><strong>Suggested Fix:</strong>
+Audit all <code>.get()</code> calls to ensure appropriate defaults are provided.</p>
+<hr />
+<h3 id="issue-15-thread-unsafe-caching-pattern">Issue #15: Thread-Unsafe Caching Pattern</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/connections/azure_adls.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>77, 200-314</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td><code>self._cached_key</code> used without locking in <code>get_storage_key()</code></td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Potential race condition in parallel execution</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Suggested Fix:</strong>
+Use <code>threading.Lock</code> or <code>functools.lru_cache</code>:</p>
+<pre><code class="language-python">import threading
+
+class AzureADLS:
+    def __init__(self, ...):
+        self._cache_lock = threading.Lock()
+        self._cached_key = None
+
+    def get_storage_key(self):
+        with self._cache_lock:
+            if self._cached_key is None:
+                self._cached_key = self._fetch_key()
+            return self._cached_key
+</code></pre>
+<hr />
+<h3 id="issue-16-hardcoded-magic-numbers">Issue #16: Hardcoded Magic Numbers</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Files</strong></td>
+<td>Various</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td>Hardcoded values like <code>168</code> (hours), <code>1000</code> (chunk size), <code>30</code> (timeout)</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Maintainability - hard to adjust settings</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong>
+- <code>168</code> hours vacuum retention
+- <code>1000</code> chunk size for SQL writes
+- <code>30</code> second timeout
+- <code>10</code> max sample rows</p>
+<p><strong>Suggested Fix:</strong>
+Move to configuration or named constants:</p>
+<pre><code class="language-python"># odibi/constants.py
+DEFAULT_VACUUM_RETENTION_HOURS = 168
+DEFAULT_SQL_CHUNK_SIZE = 1000
+DEFAULT_CONNECTION_TIMEOUT = 30
+DEFAULT_MAX_SAMPLE_ROWS = 10
+</code></pre>
+<hr />
+<h3 id="issue-17-empty-dataframe-check-uses-isempty">Issue #17: Empty DataFrame Check Uses .isEmpty()</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>File</strong></td>
+<td><code>odibi/engine/spark_engine.py</code></td>
+</tr>
+<tr>
+<td><strong>Lines</strong></td>
+<td>597</td>
+</tr>
+<tr>
+<td><strong>Problem</strong></td>
+<td><code>df.isEmpty()</code> triggers Spark action</td>
+</tr>
+<tr>
+<td><strong>Impact</strong></td>
+<td>Performance cost for simple empty check</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Suggested Fix:</strong>
+Use more efficient check:</p>
+<pre><code class="language-python"># Instead of
+if df.isEmpty():
+
+# Use
+if df.limit(1).count() == 0:
+# Or
+if len(df.head(1)) == 0:
+</code></pre>
+<hr />
+<h2 id="recommended-priority-order">Recommended Priority Order</h2>
+<ol>
+<li><strong>Issues #1, #2, #3</strong> (batching/performance) - Highest ROI</li>
+<li><strong>Issue #7</strong> (connection cleanup) - Reliability</li>
+<li><strong>Issues #5, #6</strong> (consistency) - Maintainability</li>
+<li><strong>Issue #10</strong> (DRY principle) - Code quality</li>
+<li>Other issues as time permits</li>
+</ol>
+<hr />
+<h2 id="related-previous-fixes">Related Previous Fixes</h2>
+<p>The audit found that some issues were already addressed:
+- ✅ 19 individual Delta writes → batched (fixed)
+- ✅ 18 individual log_run writes → <code>log_runs_batch()</code> (fixed)
+- ✅ Row count caching in read phase (partially fixed)</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

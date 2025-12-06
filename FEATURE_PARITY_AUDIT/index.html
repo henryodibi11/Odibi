@@ -1,0 +1,1922 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/FEATURE_PARITY_AUDIT/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Odibi Feature Parity Audit Report - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#odibi-feature-parity-audit-report" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Odibi Feature Parity Audit Report
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/guides/dogfooding.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/patterns/README.md" class="md-tabs__link">
+          
+  
+  
+  Patterns
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/dogfooding.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dogfooding (Meta)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/python_api_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/environments.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/secrets.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/setup_azure.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/performance_tuning.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/yaml_schema.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Patterns
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/README.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/append_only_raw.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Append-Only Raw
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/hwm_pattern_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    High Water Mark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/merge_upsert.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge/Upsert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/patterns/windowed_reprocess.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windowed Reprocess
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="odibi-feature-parity-audit-report">Odibi Feature Parity Audit Report</h1>
+<p><strong>Generated:</strong> 2024<br />
+<strong>Scope:</strong> Config vs Implementation, Engine Parity, CLI vs API, Docs vs Code</p>
+<hr />
+<h2 id="executive-summary">Executive Summary</h2>
+<p>This audit identifies feature parity gaps across the Odibi framework. Issues are categorized by severity:</p>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Count</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🔴 <strong>Critical</strong></td>
+<td>3</td>
+<td>Documented but not implemented, or silently ignored</td>
+</tr>
+<tr>
+<td>🟡 <strong>Medium</strong></td>
+<td>8</td>
+<td>Missing in one engine/mode but present in another</td>
+</tr>
+<tr>
+<td>🟢 <strong>Low</strong></td>
+<td>4</td>
+<td>Minor inconsistencies or missing documentation</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="critical-issues">🔴 Critical Issues</h2>
+<h3 id="1-cli-missing-tag-flag-documented-but-not-implemented">1. CLI Missing <code>--tag</code> Flag (Documented but Not Implemented)</h3>
+<p><strong>Location:</strong> <code>odibi/cli/main.py</code> (run command)</p>
+<p><strong>Issue:</strong> The documentation and config reference describe tag-based execution (<code>odibi run --tag daily</code>), but the <code>--tag</code> flag is <strong>not implemented</strong> in the CLI.</p>
+<p><strong>Evidence:</strong>
+- Config: <code>NodeConfig.tags</code> field exists (<a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/config.py#L2030">config.py#L2030</a>)
+- Docs: "Run only this with <code>odibi run --tag daily</code>" (<a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/docs/reference/yaml_schema.md#L127">yaml_schema.md#L127</a>)
+- CLI: No <code>--tag</code> argument in <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/cli/main.py#L52-L77">cli/main.py</a></p>
+<p><strong>Impact:</strong> Users cannot run pipelines by tag despite documentation saying they can.</p>
+<p><strong>Fix:</strong> Add <code>--tag</code> argument to the run parser and filter nodes in <code>Pipeline.run()</code>.</p>
+<hr />
+<h3 id="2-cli-missing-node-and-pipeline-flags-for-run-command">2. CLI Missing <code>--node</code> and <code>--pipeline</code> Flags for Run Command</h3>
+<p><strong>Location:</strong> <code>odibi/cli/main.py</code> (run command)</p>
+<p><strong>Issue:</strong> Orchestration templates (<code>odibi/orchestration/airflow.py</code>, <code>odibi/orchestration/dagster.py</code>) generate commands like:</p>
+<pre><code class="language-bash">odibi run --pipeline {{ pipeline_name }} --node {{ node.name }}
+</code></pre>
+<p>But these flags <strong>do not exist</strong> in the CLI.</p>
+<p><strong>Evidence:</strong>
+- <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/orchestration/airflow.py#L39">airflow.py#L39</a>: <code>--pipeline</code> and <code>--node</code> usage
+- <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/orchestration/dagster.py#L61">dagster.py#L61</a>: <code>--pipeline</code> and <code>--node</code> usage
+- CLI main.py: No such flags exist</p>
+<p><strong>Impact:</strong> Generated Airflow/Dagster DAGs will fail to execute.</p>
+<p><strong>Fix:</strong> Add <code>--pipeline</code> and <code>--node</code> arguments to the run command.</p>
+<hr />
+<h3 id="3-materialized-config-option-has-no-effect">3. <code>materialized</code> Config Option Has No Effect</h3>
+<p><strong>Location:</strong> <code>odibi/config.py</code> (NodeConfig), <code>odibi/node.py</code></p>
+<p><strong>Issue:</strong> The <code>materialized</code> field (<code>table</code>, <code>view</code>, <code>incremental</code>) is defined in config but <strong>never read or used</strong> in node execution.</p>
+<p><strong>Evidence:</strong>
+- Config: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/config.py#L2018">config.py#L2018</a> defines <code>materialized</code> field
+- Node.py: No references to <code>config.materialized</code> in execution logic
+- Docs: Referenced in <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/docs/reference/yaml_schema.md#L338">yaml_schema.md#L338</a></p>
+<p><strong>Impact:</strong> Users can set this option but it's silently ignored.</p>
+<p><strong>Fix:</strong> Either implement materialization strategies or remove/deprecate the field.</p>
+<hr />
+<h2 id="medium-issues">🟡 Medium Issues</h2>
+<h3 id="4-polars-engine-not-exposed-in-config-enum">4. Polars Engine Not Exposed in Config Enum</h3>
+<p><strong>Location:</strong> <code>odibi/config.py</code>, <code>odibi/enums.py</code></p>
+<p><strong>Issue:</strong> <code>PolarsEngine</code> exists and is registered, but <code>EngineType</code> enum only has <code>SPARK</code> and <code>PANDAS</code>.</p>
+<p><strong>Evidence:</strong>
+- <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/engine/polars_engine.py">polars_engine.py</a>: Full implementation exists
+- <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/engine/registry.py#L25">engine/registry.py#L25</a>: Registered as "polars"
+- <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/config.py#L14-L18">config.py#L14-L18</a>: Only SPARK/PANDAS</p>
+<p><strong>Impact:</strong> Users cannot set <code>engine: polars</code> in YAML config.</p>
+<p><strong>Fix:</strong> Add <code>POLARS = "polars"</code> to <code>EngineType</code> enum.</p>
+<hr />
+<h3 id="5-streaming-write-not-implemented-read-only-fixed">5. ~~Streaming Write Not Implemented (Read Only)~~ ✅ FIXED</h3>
+<p><strong>Location:</strong> <code>odibi/engine/spark_engine.py</code>, <code>odibi/config.py</code></p>
+<p><strong>Status:</strong> ✅ Implemented</p>
+<p><strong>Implementation:</strong>
+- Added <code>StreamingWriteConfig</code> and <code>TriggerConfig</code> models in <code>config.py</code>
+- Added <code>streaming</code> field to <code>WriteConfig</code>
+- Implemented <code>_write_streaming()</code> method in <code>SparkEngine</code>
+- Supports all trigger types: <code>processing_time</code>, <code>once</code>, <code>available_now</code>, <code>continuous</code>
+- Supports all output modes: <code>append</code>, <code>update</code>, <code>complete</code></p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-yaml">write:
+  connection: delta_lake
+  format: delta
+  table: events_stream
+  streaming:
+    output_mode: append
+    checkpoint_location: &quot;/checkpoints/events&quot;
+    trigger:
+      processing_time: &quot;10 seconds&quot;
+</code></pre>
+<hr />
+<h3 id="6-partition_by-not-applied-for-delta-merge-operations">6. <code>partition_by</code> Not Applied for Delta Merge Operations</h3>
+<p><strong>Location:</strong> <code>odibi/engine/pandas_engine.py</code>, <code>odibi/engine/spark_engine.py</code></p>
+<p><strong>Issue:</strong> For <code>upsert</code>/<code>append_once</code> modes with Delta tables, <code>partition_by</code> is extracted but applied <strong>after</strong> the merge logic completes. The merge itself doesn't partition-optimize.</p>
+<p><strong>Evidence:</strong>
+- Spark: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/engine/spark_engine.py#L800-L805">spark_engine.py#L800-L805</a> - partition_by applied post-merge
+- Pandas: Delta merge at <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/engine/pandas_engine.py#L773-L810">pandas_engine.py#L773-L810</a> doesn't use partition_by</p>
+<p><strong>Impact:</strong> Performance not optimal for partitioned upsert operations.</p>
+<hr />
+<h3 id="7-pandasengine-missing-as_of_timestamp-time-travel">7. PandasEngine Missing <code>as_of_timestamp</code> Time Travel</h3>
+<p><strong>Location:</strong> <code>odibi/engine/pandas_engine.py</code></p>
+<p><strong>Issue:</strong> <code>as_of_timestamp</code> is accepted but only <code>as_of_version</code> (versionAsOf) is implemented for Delta time travel.</p>
+<p><strong>Evidence:</strong>
+- Method signature accepts both: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/engine/pandas_engine.py#L187">pandas_engine.py#L187</a>
+- Only version is used: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/engine/pandas_engine.py#L246-L247">pandas_engine.py#L246-L247</a>
+- SparkEngine supports both: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/engine/spark_engine.py#L443-L448">spark_engine.py#L443-L448</a></p>
+<p><strong>Impact:</strong> Timestamp-based time travel silently ignored in Pandas engine.</p>
+<hr />
+<h3 id="8-polarsengine-missing-several-abstract-methods">8. PolarsEngine Missing Several Abstract Methods</h3>
+<p><strong>Location:</strong> <code>odibi/engine/polars_engine.py</code></p>
+<p><strong>Issue:</strong> PolarsEngine doesn't implement all abstract methods from <code>Engine</code> base class:
+- <code>harmonize_schema()</code> - Not implemented
+- <code>anonymize()</code> - Not implemented
+- <code>add_write_metadata()</code> - Not implemented
+- <code>table_exists()</code> - Partial (file only)
+- <code>maintain_table()</code> - Not implemented</p>
+<p><strong>Impact:</strong> Polars pipelines will fail if these features are used.</p>
+<hr />
+<h3 id="9-first_run_query-only-works-with-target-table-check">9. <code>first_run_query</code> Only Works with Target Table Check</h3>
+<p><strong>Location:</strong> <code>odibi/node.py</code> (NodeExecutor._execute_read_phase)</p>
+<p><strong>Issue:</strong> <code>first_run_query</code> is only applied when <code>write</code> config exists and target table doesn't exist. If a node has <code>read</code> + <code>transform</code> but no <code>write</code>, the query is never used.</p>
+<p><strong>Evidence:</strong> <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/node.py#L344-L352">node.py#L344-L352</a></p>
+<hr />
+<h3 id="10-delete_detection-config-never-read">10. <code>delete_detection</code> Config Never Read</h3>
+<p><strong>Location:</strong> <code>odibi/config.py</code>, <code>odibi/node.py</code></p>
+<p><strong>Issue:</strong> <code>DeleteDetectionConfig</code> is fully defined with validation, but the node executor never reads or applies delete detection logic.</p>
+<p><strong>Evidence:</strong>
+- Config: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/config.py#L160-L293">config.py#L160-L293</a> - full implementation
+- Transformer exists: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/transformers/delete_detection.py">transformers/delete_detection.py</a>
+- Not wired: Must be used as explicit transform step, not automatic</p>
+<p><strong>Clarification:</strong> This works if user explicitly adds <code>operation: detect_deletes</code> in transform steps. The config examples show this is the intended pattern.</p>
+<hr />
+<h3 id="11-environments-config-not-validated-or-applied">11. <code>environments</code> Config Not Validated or Applied</h3>
+<p><strong>Location:</strong> <code>odibi/config.py</code> (ProjectConfig)</p>
+<p><strong>Issue:</strong> The <code>environments</code> field is defined but has a validator that does nothing:</p>
+<pre><code class="language-python">@model_validator(mode=&quot;after&quot;)
+def check_environments_not_implemented(self):
+    # Implemented in Phase 3
+    return self
+</code></pre>
+<p><strong>Evidence:</strong> <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/config.py#L980-L984">config.py#L980-L984</a></p>
+<p><strong>Impact:</strong> Users can define environments but they're silently ignored.</p>
+<hr />
+<h2 id="low-issues">🟢 Low Issues</h2>
+<h3 id="12-docs-reference-non-existent-commands">12. Docs Reference Non-Existent Commands</h3>
+<p><strong>Location:</strong> <code>docs/guides/cli_master_guide.md</code></p>
+<p><strong>Issue:</strong> Docs reference <code>odibi init-vscode</code> but this command doesn't exist in CLI.</p>
+<p><strong>Evidence:</strong> <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/docs/guides/cli_master_guide.md#L56-L59">cli_master_guide.md#L56-L59</a></p>
+<hr />
+<h3 id="13-retrybackoff-types-inconsistent">13. <code>retry.backoff</code> Types Inconsistent</h3>
+<p><strong>Location:</strong> <code>odibi/config.py</code>, <code>odibi/node.py</code></p>
+<p><strong>Issue:</strong> Config defines <code>BackoffStrategy</code> enum with values <code>exponential</code>, <code>linear</code>, <code>constant</code>, but node retry logic only handles <code>exponential</code> and <code>linear</code>.</p>
+<p><strong>Evidence:</strong>
+- Config: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/config.py#L730-L733">config.py#L730-L733</a> - includes <code>CONSTANT</code>
+- Node: <a href="file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/node.py#L963-L968">node.py#L963-L968</a> - no <code>constant</code> handling</p>
+<hr />
+<h3 id="14-prepost-sql-not-documented-in-cli-docs">14. Pre/Post SQL Not Documented in CLI Docs</h3>
+<p><strong>Location:</strong> <code>docs/features/cli.md</code></p>
+<p><strong>Issue:</strong> <code>pre_sql</code> and <code>post_sql</code> node options are implemented but not mentioned in CLI documentation.</p>
+<hr />
+<h3 id="15-validation_mode-on-connections-never-used">15. <code>validation_mode</code> on Connections Never Used</h3>
+<p><strong>Location:</strong> <code>odibi/config.py</code> (BaseConnectionConfig)</p>
+<p><strong>Issue:</strong> All connection configs inherit <code>validation_mode: ValidationMode</code> but this field is never read during pipeline execution.</p>
+<hr />
+<h2 id="write-mode-support-matrix">Write Mode Support Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>PandasEngine</th>
+<th>SparkEngine</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>overwrite</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>Both support all formats</td>
+</tr>
+<tr>
+<td><code>append</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>Both support all formats</td>
+</tr>
+<tr>
+<td><code>upsert</code></td>
+<td>✅ Delta</td>
+<td>✅ Delta</td>
+<td>Both require <code>keys</code> option</td>
+</tr>
+<tr>
+<td><code>append_once</code></td>
+<td>✅ Delta</td>
+<td>✅ Delta</td>
+<td>Both require <code>keys</code> option</td>
+</tr>
+<tr>
+<td><code>partition_by</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>Applied via options dict</td>
+</tr>
+<tr>
+<td><code>merge_keys</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>Use <code>keys</code> in options instead</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="cli-vs-api-feature-matrix">CLI vs API Feature Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>CLI</th>
+<th>Python API</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Run pipeline</td>
+<td>✅</td>
+<td>✅</td>
+<td></td>
+</tr>
+<tr>
+<td>Dry run</td>
+<td>✅</td>
+<td>✅</td>
+<td></td>
+</tr>
+<tr>
+<td>Resume</td>
+<td>✅</td>
+<td>✅</td>
+<td></td>
+</tr>
+<tr>
+<td>Parallel</td>
+<td>✅</td>
+<td>✅</td>
+<td></td>
+</tr>
+<tr>
+<td>Filter by tag</td>
+<td>❌</td>
+<td>❌</td>
+<td><strong>Not implemented</strong></td>
+</tr>
+<tr>
+<td>Filter by node</td>
+<td>❌</td>
+<td>❌</td>
+<td><strong>Not implemented</strong></td>
+</tr>
+<tr>
+<td>Filter by pipeline</td>
+<td>❌</td>
+<td>✅</td>
+<td>CLI doesn't support</td>
+</tr>
+<tr>
+<td>On-error override</td>
+<td>✅</td>
+<td>✅</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="recommendations">Recommendations</h2>
+<h3 id="high-priority">High Priority</h3>
+<ol>
+<li><strong>Add <code>--tag</code>, <code>--node</code>, <code>--pipeline</code> to CLI run command</strong> - Breaks orchestration exports</li>
+<li><strong>Implement or remove <code>materialized</code> config</strong> - Silent no-op confuses users</li>
+<li><strong>Add POLARS to EngineType enum</strong> - Blocks Polars adoption</li>
+</ol>
+<h3 id="medium-priority">Medium Priority</h3>
+<ol>
+<li>Implement streaming write support in SparkEngine</li>
+<li>Add <code>as_of_timestamp</code> support to PandasEngine</li>
+<li>Complete PolarsEngine abstract method implementations</li>
+</ol>
+<h3 id="low-priority">Low Priority</h3>
+<ol>
+<li>Add <code>constant</code> backoff handling</li>
+<li>Document pre_sql/post_sql in CLI docs</li>
+<li>Remove or implement <code>validation_mode</code> on connections</li>
+<li>Remove or implement <code>environments</code> config</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
