@@ -1,6 +1,6 @@
 # Loading Patterns
 
-Pre-built execution patterns for common data warehouse loading scenarios including SCD2, Fact, Snapshot, and Merge operations.
+Pre-built execution patterns for common data warehouse loading scenarios including SCD2 and Merge operations.
 
 ## Overview
 
@@ -15,9 +15,9 @@ Odibi's pattern system provides:
 | Pattern | Description | Use Case |
 |---------|-------------|----------|
 | `scd2` | Slowly Changing Dimension Type 2 | Historical tracking of dimension changes |
-| `fact` | Immutable event log (insert-only) | Transaction/event data |
-| `snapshot` | Full overwrite of state | Small dimensions, full refreshes |
 | `merge` | Upsert/merge operations | Incremental updates, CDC |
+
+> **Note:** For simple append or overwrite operations, use `write.mode: append` or `write.mode: overwrite` directly—no pattern needed.
 
 ## Configuration
 
@@ -38,7 +38,7 @@ nodes:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `transformer` | string | Yes | Pattern name: `scd2`, `fact`, `snapshot`, `merge` |
+| `transformer` | string | Yes | Pattern name: `scd2`, `merge` |
 | `params` | object | Yes | Pattern-specific parameters |
 
 ## Pattern Parameters
@@ -56,23 +56,6 @@ Tracks history by creating new rows for updates. When a tracked column changes, 
 | `end_time_col` | string | No | `valid_to` | Name of the end timestamp column |
 | `current_flag_col` | string | No | `is_current` | Name of the current record flag column |
 | `delete_col` | string | No | `null` | Column indicating soft deletion (boolean) |
-
-### Fact Pattern
-
-Immutable event log for insert-only data. Optionally deduplicates before insert.
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `deduplicate` | bool | No | `false` | If true, removes duplicates before insert |
-| `keys` | list | Conditional | - | Keys for deduplication (required if `deduplicate: true`) |
-
-### Snapshot Pattern
-
-Full overwrite of state. No parameters required - relies on `WriteMode.OVERWRITE` in the node's write configuration.
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| - | - | - | - | No parameters required |
 
 ### Merge Pattern
 
@@ -192,47 +175,6 @@ pipelines:
           current_flag_col: "is_active"
 ```
 
-### Fact: Order Events
-
-Insert-only fact table with deduplication:
-
-```yaml
-pipelines:
-  - pipeline: load_order_facts
-    nodes:
-      - name: orders_fact
-        read:
-          connection: bronze
-          path: orders
-        transformer: fact
-        params:
-          deduplicate: true
-          keys: ["order_id", "order_line_id"]
-        write:
-          connection: gold
-          path: orders_fact
-          mode: append
-```
-
-### Snapshot: Product Catalog
-
-Full refresh of small dimension:
-
-```yaml
-pipelines:
-  - pipeline: refresh_products
-    nodes:
-      - name: products_snapshot
-        read:
-          connection: bronze
-          path: products
-        transformer: snapshot
-        write:
-          connection: gold
-          path: products
-          mode: overwrite
-```
-
 ### Merge: Incremental Customer Updates
 
 Upsert with audit columns:
@@ -295,13 +237,50 @@ pipelines:
           insert_condition: "source.is_deleted = false"
 ```
 
+### Simple Append (No Pattern Needed)
+
+For event/fact data, just use write mode:
+
+```yaml
+pipelines:
+  - pipeline: load_events
+    nodes:
+      - name: events
+        read:
+          connection: bronze
+          path: events
+        write:
+          connection: gold
+          path: events
+          mode: append
+```
+
+### Simple Overwrite (No Pattern Needed)
+
+For full refresh of small tables:
+
+```yaml
+pipelines:
+  - pipeline: refresh_products
+    nodes:
+      - name: products
+        read:
+          connection: bronze
+          path: products
+        write:
+          connection: gold
+          path: products
+          mode: overwrite
+```
+
 ## Best Practices
 
-1. **Choose the right pattern** - Use SCD2 for dimensions needing history, Fact for events, Merge for incremental CDC
-2. **Define business keys** - Ensure `keys` uniquely identify records in your domain
-3. **Monitor tracked columns** - For SCD2, only track columns that represent meaningful business changes
-4. **Use audit columns** - Track `created_at` and `updated_at` for debugging and lineage
-5. **Optimize large tables** - Use `zorder_by` or `cluster_by` for frequently queried columns
+1. **Choose the right pattern** - Use SCD2 for dimensions needing history, Merge for incremental CDC
+2. **Use write.mode for simple cases** - `append` for events, `overwrite` for full refresh
+3. **Define business keys** - Ensure `keys` uniquely identify records in your domain
+4. **Monitor tracked columns** - For SCD2, only track columns that represent meaningful business changes
+5. **Use audit columns** - Track `created_at` and `updated_at` for debugging and lineage
+6. **Optimize large tables** - Use `zorder_by` or `cluster_by` for frequently queried columns
 
 ## Related
 

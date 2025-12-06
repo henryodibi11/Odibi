@@ -32,7 +32,7 @@ A set of Delta Tables auto-bootstrapped in `_odibi_system/`.
 *   `table_name`: STRING (Logical Name, e.g., "gold.orders")
 *   `path`: STRING (Physical Location)
 *   `format`: STRING
-*   **`pattern_type`**: STRING (e.g., "fact", "scd2", "snapshot")
+*   **`pattern_type`**: STRING (e.g., "scd2", "merge")
 *   `schema_hash`: STRING (Drift Detection)
 *   `updated_at`: TIMESTAMP
 
@@ -74,12 +74,11 @@ A set of Delta Tables auto-bootstrapped in `_odibi_system/`.
 
 Users declare the **Pattern**, and Odibi configures the implementation.
 
-### Supported Patterns (Initial Set)
-1.  **`snapshot`**: Full overwrite of state.
-2.  **`incremental`**: Append-only with High-Water Mark tracking.
-3.  **`scd2`**: Slowly Changing Dimension (History tracking).
-4.  **`fact`**: Immutable event log (Insert-only).
-5.  **`merge`**: Smart Upsert (Conditional updates).
+### Supported Patterns
+1.  **`scd2`**: Slowly Changing Dimension (History tracking).
+2.  **`merge`**: Smart Upsert (Conditional updates).
+
+> **Note:** For simple append or overwrite operations, use `write.mode: append` or `write.mode: overwrite` directly—no pattern needed.
 
 ### YAML Example
 ```yaml

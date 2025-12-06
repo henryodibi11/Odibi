@@ -180,16 +180,6 @@ A new module providing context-based logging with automatic correlation:
 - **Added:** Match condition logging
 - **Added:** Update/insert clause logging
 
-#### `odibi/patterns/fact.py`
-- **Added:** Fact table loading logging
-- **Added:** Dimension key lookup logging
-- **Added:** Grain validation logging
-
-#### `odibi/patterns/snapshot.py`
-- **Added:** Snapshot creation logging
-- **Added:** Timestamp column handling
-- **Added:** Partition pruning logging
-
 ### Story/Documentation Layer
 
 #### `odibi/story/generator.py`
@@ -286,8 +276,6 @@ odibi/transformers/sql_core.py
 odibi/patterns/base.py
 odibi/patterns/scd2.py
 odibi/patterns/merge.py
-odibi/patterns/fact.py
-odibi/patterns/snapshot.py
 odibi/story/generator.py
 odibi/story/renderers.py
 odibi/story/metadata.py
