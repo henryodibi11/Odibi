@@ -210,7 +210,7 @@ previous_run = manager.get_previous_run("process_orders", failed_run.run_id)
 
 if previous_run:
     diff = diff_runs(previous_run, failed_run)
-    
+
     # Find what changed
     print("Changes that may have caused failure:")
     for node in diff.drift_source_nodes:
@@ -247,10 +247,10 @@ if drift_warning:
         spark=spark,
         deep=True,
     )
-    
+
     print(f"Warning: {drift_warning}")
     print(f"Details: +{diff.rows_added} / -{diff.rows_removed} rows")
-    
+
     if diff.schema_added:
         print(f"New columns: {diff.schema_added}")
 ```

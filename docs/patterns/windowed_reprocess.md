@@ -56,7 +56,7 @@ order_id | order_date | amount | created_at
 **Run 1 (Calculate last 7 days: 2025-10-25 to 2025-11-01):**
 
 ```sql
-SELECT 
+SELECT
   DATE(order_date) as order_date,
   SUM(amount) as total_sales,
   COUNT(*) as order_count
@@ -92,7 +92,7 @@ order_id | order_date | amount | created_at
 **Run 2 (Recalculate last 7 days: 2025-10-25 to 2025-11-02):**
 
 ```sql
-SELECT 
+SELECT
   DATE(order_date) as order_date,
   SUM(amount) as total_sales,
   COUNT(*) as order_count
@@ -138,7 +138,7 @@ WHERE order_date = '2025-11-01'
 
 ```sql
 -- Recalculate the entire 7-day window
-SELECT 
+SELECT
   DATE(order_date),
   SUM(amount),
   COUNT(*)
@@ -172,7 +172,7 @@ GROUP BY DATE(order_date)
   transform:
     steps:
       - sql: |
-          SELECT 
+          SELECT
             DATE(order_date) as order_date,
             SUM(amount) as total_sales,
             COUNT(*) as order_count,
@@ -203,7 +203,7 @@ GROUP BY DATE(order_date)
   transform:
     steps:
       - sql: |
-          SELECT 
+          SELECT
             DATE_TRUNC('month', order_date) as month,
             SUM(amount) as total_sales,
             COUNT(*) as order_count,
@@ -233,7 +233,7 @@ GROUP BY DATE(order_date)
   transform:
     steps:
       - sql: |
-          SELECT 
+          SELECT
             region,
             DATE(order_date) as order_date,
             SUM(amount) as total_sales,
@@ -321,7 +321,7 @@ This is **automatically enabled** by Odibi's safe defaults (per Architecture Man
 **Debug:**
 ```sql
 -- Check what's in Silver for the window
-SELECT DATE(order_date), COUNT(*) 
+SELECT DATE(order_date), COUNT(*)
 FROM silver.orders
 WHERE DATE(order_date) >= DATE_SUB(CURRENT_DATE(), 7)
 GROUP BY DATE(order_date)

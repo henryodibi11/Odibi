@@ -194,14 +194,14 @@ read:
   path: "customers/"
   # OR for SQL
   query: "SELECT * FROM customers WHERE active = 1"
-  
+
   # Incremental loading
   incremental:
     mode: "rolling_window"    # or "stateful"
     column: "updated_at"
     lookback: 3
     unit: "day"
-  
+
   # Time travel (Delta)
   time_travel:
     as_of_version: 10
@@ -215,13 +215,13 @@ transform:
   steps:
     # SQL step
     - sql: "SELECT * FROM df WHERE status = 'active'"
-    
+
     # Function step
     - function: "clean_text"
       params:
         columns: ["email"]
         case: "lower"
-    
+
     # Operation step
     - operation: "detect_deletes"
       params:
@@ -237,7 +237,7 @@ write:
   format: "delta"
   table: "customers"
   mode: "upsert"              # overwrite, append, upsert, append_once
-  
+
   # Metadata columns
   add_metadata: true          # or selective: {extracted_at: true, source_file: false}
 ```
@@ -250,22 +250,22 @@ validation:
     - type: not_null
       columns: [customer_id, email]
       on_fail: quarantine     # fail, warn, quarantine
-    
+
     - type: unique
       columns: [customer_id]
-    
+
     - type: accepted_values
       column: status
       values: ["active", "inactive", "pending"]
-    
+
     - type: custom_sql
       sql: "COUNT(*) FILTER (WHERE age < 0) = 0"
       message: "Negative ages found"
-  
+
   quarantine:
     connection: "silver"
     path: "quarantine/customers"
-  
+
   gate:
     require_pass_rate: 0.95   # Block if < 95% pass
 ```
@@ -277,11 +277,11 @@ contracts:
   - type: row_count
     min: 1000
     on_fail: fail
-  
+
   - type: freshness
     column: "updated_at"
     max_age_hours: 24
-  
+
   - type: schema
     columns:
       id: "int"
@@ -321,16 +321,16 @@ on_error: "fail_later"        # fail_fast, fail_later, ignore
   description: "Clean and deduplicate orders"
   tags: ["daily", "critical"]
   depends_on: ["load_orders"]
-  
+
   transformer: "deduplicate"
   params:
     keys: ["order_id"]
     order_by: "updated_at DESC"
-  
+
   transform:
     steps:
       - sql: "SELECT * FROM df WHERE status != 'cancelled'"
-  
+
   validation:
     tests:
       - type: not_null
@@ -341,13 +341,13 @@ on_error: "fail_later"        # fail_fast, fail_later, ignore
       path: "quarantine/orders"
     gate:
       require_pass_rate: 0.98
-  
+
   write:
     connection: "gold"
     format: "delta"
     table: "orders_clean"
     mode: "upsert"
-  
+
   on_error: "fail_fast"
   cache: true
   log_level: "DEBUG"
@@ -409,7 +409,7 @@ environments:
       database:
         host: "staging-server.database.windows.net"
         database: "staging_db"
-  
+
   production:
     engine: "spark"
     connections:
@@ -539,17 +539,17 @@ connections:
     container: "landing"
     auth:
       mode: "aad_msi"
-  
+
   bronze:
     type: "delta"
     catalog: "spark_catalog"
     schema: "bronze"
-  
+
   silver:
     type: "delta"
     catalog: "spark_catalog"
     schema: "silver"
-  
+
   gold:
     type: "delta"
     catalog: "spark_catalog"
@@ -591,12 +591,12 @@ pipelines:
     nodes:
       - name: "clean_orders"
         depends_on: ["ingest_orders"]
-        
+
         transformer: "deduplicate"
         params:
           keys: ["order_id"]
           order_by: "updated_at DESC"
-        
+
         transform:
           steps:
             - sql: "SELECT * FROM df WHERE order_total > 0"
@@ -604,7 +604,7 @@ pipelines:
               params:
                 columns: ["customer_email"]
                 case: "lower"
-        
+
         validation:
           tests:
             - type: not_null
@@ -618,7 +618,7 @@ pipelines:
             path: "quarantine/orders"
           gate:
             require_pass_rate: 0.95
-        
+
         write:
           connection: "silver"
           table: "orders"

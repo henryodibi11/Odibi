@@ -28,7 +28,7 @@ This document outlines the plan to fully support Spark Structured Streaming in O
 ```python
 class StreamingConfig(BaseModel):
     """Configuration for Spark Structured Streaming."""
-    
+
     enabled: bool = Field(
         default=False,
         description="Enable streaming mode for this node"
@@ -83,7 +83,7 @@ nodes:
 ```python
 def execute(self, config: NodeConfig, ...):
     is_streaming = config.streaming and config.streaming.enabled
-    
+
     if is_streaming:
         return self._execute_streaming(config, ...)
     else:
@@ -111,24 +111,24 @@ def write(self, df, connection, format, ..., streaming_config=None):
     if df.isStreaming:
         if not streaming_config:
             raise ValueError("Streaming DataFrame requires streaming_config")
-        
+
         writer = df.writeStream \
             .format(format) \
             .outputMode(streaming_config.output_mode) \
             .option("checkpointLocation", streaming_config.checkpoint_location)
-        
+
         if streaming_config.trigger == "once":
             writer = writer.trigger(once=True)
         elif streaming_config.trigger == "availableNow":
             writer = writer.trigger(availableNow=True)
         elif streaming_config.trigger:
             writer = writer.trigger(processingTime=streaming_config.trigger)
-        
+
         if table:
             query = writer.toTable(table)
         else:
             query = writer.start(path)
-        
+
         return {"streaming_query": query}
     else:
         # existing batch logic
@@ -141,13 +141,13 @@ def write(self, df, connection, format, ..., streaming_config=None):
 def _execute_streaming(self, config, ...):
     # Read (returns streaming DataFrame)
     df = self._execute_read_phase(config, ...)
-    
+
     # Transform (must be streaming-compatible)
     df = self._execute_transform_phase(config, df, ...)
-    
+
     # Write (starts streaming query)
     query_info = self._execute_write_phase(config, df, ...)
-    
+
     # Return query handle for management
     return NodeResult(
         node_name=config.name,
@@ -169,13 +169,13 @@ def _execute_streaming(self, config, ...):
 ```python
 class KafkaConnection(BaseConnection):
     """Kafka connection for streaming."""
-    
+
     bootstrap_servers: str
     security_protocol: str = "PLAINTEXT"
     sasl_mechanism: Optional[str] = None
     sasl_username: Optional[str] = None
     sasl_password: Optional[str] = None
-    
+
     def get_spark_options(self) -> Dict[str, str]:
         return {
             "kafka.bootstrap.servers": self.bootstrap_servers,
@@ -189,10 +189,10 @@ class KafkaConnection(BaseConnection):
 ```python
 class EventHubsConnection(BaseConnection):
     """Azure Event Hubs connection for streaming."""
-    
+
     connection_string: str
     consumer_group: str = "$Default"
-    
+
     def get_spark_options(self) -> Dict[str, str]:
         return {
             "eventhubs.connectionString": self.connection_string,
@@ -226,7 +226,7 @@ nodes:
       steps:
         - type: sql
           query: |
-            SELECT 
+            SELECT
               window(event_time, '5 minutes') as window,
               COUNT(*) as event_count
             FROM {input}
@@ -262,10 +262,10 @@ nodes:
 ```python
 class StreamingQueryManager:
     """Manage active streaming queries."""
-    
+
     def __init__(self, spark):
         self.spark = spark
-    
+
     def list_queries(self) -> List[Dict]:
         return [
             {
@@ -276,14 +276,14 @@ class StreamingQueryManager:
             }
             for q in self.spark.streams.active
         ]
-    
+
     def stop_query(self, query_id: str):
         for q in self.spark.streams.active:
             if q.id == query_id:
                 q.stop()
                 return True
         return False
-    
+
     def await_termination(self, query_id: str, timeout: Optional[int] = None):
         for q in self.spark.streams.active:
             if q.id == query_id:
@@ -376,7 +376,7 @@ connections:
   kafka:
     type: kafka
     bootstrap_servers: "localhost:9092"
-  
+
   silver:
     type: databricks
     catalog: main
@@ -386,7 +386,7 @@ connections:
 pipelines:
   - pipeline: realtime_events
     description: "Process events in real-time from Kafka to Delta"
-    
+
     nodes:
       - name: ingest_events
         description: "Ingest raw events from Kafka"
@@ -396,31 +396,31 @@ pipelines:
           trigger: "10 seconds"
           output_mode: append
           watermark: "event_time, 5 minutes"
-        
+
         read:
           connection: kafka
           format: kafka
           options:
             subscribe: raw_events
             startingOffsets: earliest
-        
+
         transform:
           steps:
             - type: sql
               query: |
-                SELECT 
+                SELECT
                   CAST(key AS STRING) as event_key,
                   CAST(value AS STRING) as event_json,
                   timestamp as kafka_timestamp,
                   from_json(CAST(value AS STRING), 'event_type STRING, event_time TIMESTAMP, payload STRING') as parsed
                 FROM {input}
-            
+
             - type: derive
               columns:
                 event_type: "parsed.event_type"
                 event_time: "parsed.event_time"
                 payload: "parsed.payload"
-        
+
         write:
           connection: silver
           format: delta

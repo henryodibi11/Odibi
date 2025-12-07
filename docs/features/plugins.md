@@ -156,7 +156,7 @@ from odibi.plugins import register_connection_factory, get_connection_factory
 def create_postgres_connection(name: str, config: dict):
     """Create a PostgreSQL connection."""
     from my_connections import PostgresConnection
-    
+
     return PostgresConnection(
         host=config["host"],
         port=config.get("port", 5432),
@@ -329,7 +329,7 @@ def deduplicate(context, current, key_columns: list, order_by: str = None):
     if order_by:
         from pyspark.sql import Window
         from pyspark.sql.functions import row_number
-        
+
         window = Window.partitionBy(*key_columns).orderBy(order_by)
         return current.withColumn("_rn", row_number().over(window)) \
                       .filter("_rn = 1") \
@@ -347,7 +347,7 @@ from odibi.plugins import register_connection_factory
 def create_redis_connection(name: str, config: dict):
     """Redis cache connection."""
     import redis
-    
+
     return redis.Redis(
         host=config.get("host", "localhost"),
         port=config.get("port", 6379),
@@ -369,7 +369,7 @@ connections:
     type: azure_adls
     account_name: mystorageaccount
     container: raw
-  
+
   cache:
     type: redis
     host: localhost

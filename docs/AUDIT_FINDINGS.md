@@ -195,10 +195,10 @@ Add cleanup in Pipeline/PipelineManager using context manager pattern:
 class Pipeline:
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._cleanup_connections()
-    
+
     def _cleanup_connections(self):
         for conn in self.connections.values():
             if hasattr(conn, 'close'):
@@ -406,7 +406,7 @@ class AzureADLS:
     def __init__(self, ...):
         self._cache_lock = threading.Lock()
         self._cached_key = None
-    
+
     def get_storage_key(self):
         with self._cache_lock:
             if self._cached_key is None:

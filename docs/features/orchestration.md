@@ -155,12 +155,12 @@ pipelines:
     nodes:
       - name: ingest_orders
         # ...
-      
+
       - name: validate_orders
         depends_on:
           - ingest_orders
         # ...
-      
+
       - name: transform_orders
         depends_on:
           - validate_orders
@@ -191,7 +191,7 @@ def generate_all_dags(config_path: str, output_dir: str):
     config = load_config(config_path)
     exporter = AirflowExporter(config)
     output = Path(output_dir)
-    
+
     for pipeline in config.pipelines:
         dag_code = exporter.generate_code(pipeline.pipeline)
         dag_file = output / f"odibi_{pipeline.pipeline}.py"
@@ -233,7 +233,7 @@ pipelines:
         source:
           connection: raw_db
           path: customers
-      
+
       - name: ingest_orders
         source:
           connection: raw_db
@@ -247,13 +247,13 @@ pipelines:
         source:
           connection: bronze
           path: customers
-      
+
       - name: clean_orders
         depends_on: []
         source:
           connection: bronze
           path: orders
-      
+
       - name: join_customer_orders
         depends_on:
           - clean_customers

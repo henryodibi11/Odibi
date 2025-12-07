@@ -1731,8 +1731,9 @@ class SparkEngine(Engine):
                 return True
             except Exception as e:
                 # Table exists in catalog but underlying data is gone (orphan entry)
-                ctx.warning(
-                    f"Table {table} exists in catalog but is not accessible",
+                # This is expected during first-run detection - log at debug level
+                ctx.debug(
+                    f"Table {table} exists in catalog but is not accessible (treating as first run)",
                     error_message=str(e),
                 )
                 return False
