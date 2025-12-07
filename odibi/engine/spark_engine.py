@@ -525,9 +525,9 @@ class SparkEngine(Engine):
                     if "WHERE" in existing_query.upper():
                         merged_options["query"] = f"({existing_query}) AND ({sql_filter})"
                     else:
-                        merged_options["query"] = (
-                            f"SELECT * FROM ({existing_query}) AS _subq WHERE {sql_filter}"
-                        )
+                        merged_options[
+                            "query"
+                        ] = f"SELECT * FROM ({existing_query}) AS _subq WHERE {sql_filter}"
                     ctx.debug(f"Applied SQL pushdown filter to query: {sql_filter}")
             elif table:
                 # Build query with filter pushdown instead of using dbtable
@@ -1713,13 +1713,30 @@ class SparkEngine(Engine):
     def table_exists(
         self, connection: Any, table: Optional[str] = None, path: Optional[str] = None
     ) -> bool:
-        """Check if table or location exists."""
+        """Check if table or location exists.
+
+        Handles orphan catalog entries where the table is registered but
+        the underlying Delta path no longer exists.
+        """
         ctx = get_logging_context().with_context(engine="spark")
 
         if table:
-            exists = self.spark.catalog.tableExists(table)
-            ctx.debug(f"Table existence check: {table}", exists=exists)
-            return exists
+            try:
+                if not self.spark.catalog.tableExists(table):
+                    ctx.debug(f"Table does not exist: {table}")
+                    return False
+                # Table exists in catalog - verify it's actually readable
+                # This catches orphan entries where path was deleted
+                self.spark.table(table).limit(0).collect()
+                ctx.debug(f"Table existence check: {table}", exists=True)
+                return True
+            except Exception as e:
+                # Table exists in catalog but underlying data is gone (orphan entry)
+                ctx.warning(
+                    f"Table {table} exists in catalog but is not accessible",
+                    error_message=str(e),
+                )
+                return False
         elif path:
             try:
                 from delta.tables import DeltaTable
