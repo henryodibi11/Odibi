@@ -77,9 +77,13 @@ def _snapshot_diff_spark(
     keys = config.keys
     spark = context.spark
 
-    table_path = _get_target_path(context)
+    table_path = config.target_path or _get_target_path(context)
     if not table_path:
-        logger.warning("detect_deletes: Could not determine target table path. Skipping.")
+        logger.warning(
+            "detect_deletes: Could not determine target table path. Skipping. "
+            "Ensure the node has a 'write' block with 'path' or 'table' configured, "
+            "or set 'target_path' in params."
+        )
         return context
 
     if not DeltaTable.isDeltaTable(spark, table_path):
@@ -125,10 +129,14 @@ def _snapshot_diff_pandas(
         )
 
     keys = config.keys
-    table_path = _get_target_path(context)
+    table_path = config.target_path or _get_target_path(context)
 
     if not table_path:
-        logger.warning("detect_deletes: Could not determine target table path. Skipping.")
+        logger.warning(
+            "detect_deletes: Could not determine target table path. Skipping. "
+            "Ensure the node has a 'write' block with 'path' or 'table' configured, "
+            "or set 'target_path' in params."
+        )
         return context
 
     try:
