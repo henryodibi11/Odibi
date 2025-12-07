@@ -532,6 +532,7 @@ class SparkEngine(Engine):
             elif table:
                 # Build query with filter pushdown instead of using dbtable
                 if sql_filter:
+                    merged_options.pop("dbtable", None)
                     merged_options["query"] = f"SELECT * FROM {table} WHERE {sql_filter}"
                     ctx.debug(f"Applied SQL pushdown filter: {sql_filter}")
                 else:

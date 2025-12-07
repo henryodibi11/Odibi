@@ -379,8 +379,8 @@ def test_spark_smart_read_fallback_column(mock_context, mock_engine, mock_connec
 def test_spark_smart_read_sql_jdbc(mock_context, mock_engine, mock_connections, frozen_time):
     """
     Test Smart Read with Spark JDBC (format='sql').
-    Critically, this must verify that 'query' is generated and passed,
-    and 'dbtable' is NOT passed to the reader (regression test).
+    For SQL sources with incremental config, the filter is pushed down at read time
+    via the 'query' option (SQL pushdown) rather than calling df.filter() afterward.
     """
     mock_engine.table_exists.return_value = True
 
@@ -416,93 +416,16 @@ def test_spark_smart_read_sql_jdbc(mock_context, mock_engine, mock_connections, 
     # Verify options passed to options()
     call_args = mock_reader.options.call_args
     assert call_args is not None
-    opts = call_args[1]  # kwargs or args[0] if passed as dict
-    if not opts:
-        # Maybe passed as kwargs
-        opts = call_args[1]
-
-    # It seems spark.read.options(**merged_options) is called
-    # merged_options should contain 'query' and NOT 'dbtable'
     passed_options = call_args.kwargs
-    # The assertion error "assert 'query' in {'url': 'jdbc:...', 'dbtable': 'schema.orders', 'user': 'u'}"
-    # indicates that 'query' is MISSING and 'dbtable' is PRESENT.
-    # This means my logic to pop 'dbtable' inside SparkEngine.read() failed or was bypassed?
 
-    # In SparkEngine.read():
-    # jdbc_options = connection.get_spark_options() -> {url, dbtable, user}
-    # merged_options = {**jdbc_options, **options} -> {url, dbtable, user} because options was {query: ...}?
-    # Wait, where is 'query' coming from?
-    # In the test config:
-    # incremental=IncrementalConfig(column="updated_at", lookback=1, unit="day")
-    # NodeExecutor generates 'query' option for SQL sources during _apply_incremental_filtering?
-    # NO. _apply_incremental_filtering runs AFTER read.
-    # So how does 'query' get into options?
-
-    # Ah, the test says "Smart Read with Spark JDBC".
-    # "SQL query for full-load... If set, uses this query when target table doesn't exist".
-    # But here target table DOES exist (mock_engine.table_exists=True).
-    # So it's incremental run.
-
-    # Incremental Config is rolling window.
-    # For SQL sources, does Odibi push down the filter?
-    # The `read` block has `format="sql"`.
-    # `Node._execute_read_phase`:
-    #   df = engine.read(..., options=read_options)
-    #   if incremental:
-    #       df, hwm = self._apply_incremental_filtering(df, ...)
-
-    # It does NOT inject 'query' into read options automatically for incremental filtering unless "Smart Read" logic does it?
-    # I see `Node._execute_read_phase` logic:
-    # "Legacy HWM: First Run Query Logic" -> sets read_options["query"] if target missing.
-    # But here target EXISTS.
-
-    # So `engine.read` is called with default options (empty).
-    # And `_apply_incremental_filtering` is called later.
-    # It calls `engine.filter_greater_than`.
-    # SparkEngine.filter_greater_than returns `df.filter(...)`.
-    # This adds a WHERE clause to the DF plan, which Spark pushes down to JDBC.
-
-    # So `engine.read` should be called with `dbtable`.
-    # And the resulting DF should have `.filter()` called on it.
-
-    # BUT the test expects `engine.read` to be called with `query` and NOT `dbtable`?
-    # "Critically, this must verify that 'query' is generated and passed".
-    # Why?
-    # Maybe the test assumes that Incremental config generates a SQL query string passed to read?
-    # This happens for `format="sql"` usually if we want pushdown *at read time*?
-    # But Odibi's current Node implementation seems to do read -> filter.
-
-    # The test author (me/us) might have assumed older behavior or future behavior.
-    # "Smart Read" usually implies modifying the read query.
-    # But `_execute_read_phase` doesn't modify read options based on incremental config for *rolling window* unless specifically implemented.
-    # It DOES for `first_run_query`.
-
-    # If the test fails because 'query' is missing, it confirms `query` wasn't passed to read.
-    # If the test is correct (that we WANT query pushdown at read time), then Node logic is missing something.
-    # But Spark handles `df.filter(...)` pushdown automatically for JDBC.
-    # So `read(dbtable="...")` followed by `.filter(...)` is equivalent to `read(query="SELECT ... WHERE ...")`.
-
-    # The test expectation `assert "query" in passed_options` seems to enforce explicit query construction.
-    # If so, we need to fix the test expectation to match reality (dbtable + filter), OR fix Node to generate query.
-    # Given Spark's lazy evaluation, dbtable + filter is preferred as it's simpler.
-
-    # I will update the test to expect 'dbtable' in read options, AND verify .filter() was called on the result.
-
-    assert "dbtable" in passed_options
-    assert passed_options["dbtable"] == "schema.orders"
-
-    # And verify filter was applied subsequently (which is what applies the incremental logic)
-    # Note: Node.execute calls _apply_incremental_filtering -> engine.filter_greater_than -> df.filter()
-    # So the result of node.execute() (which is ignored here) would have the filter.
-    # But we need to check if `mock_reader.options` called `load` returns a DF that gets filtered.
-    # We mocked `mock_reader.options.return_value.load.return_value`.
-    # Let's capture that mock DF.
-
-    mock_df = mock_reader.options.return_value.load.return_value
-
+    # With SQL pushdown, SparkEngine.read receives 'filter' option and converts it to 'query'
+    # The filter should be "updated_at >= '2023-10-24 12:00:00'" (rolling window uses >=)
+    # SparkEngine builds query: "SELECT * FROM schema.orders WHERE <filter>"
     expected_date = "2023-10-24 12:00:00"
-    # Expect filter call
-    mock_df.filter.assert_called_with(f"updated_at > '{expected_date}'")
+    assert "query" in passed_options, f"Expected 'query' in options but got: {passed_options}"
+    assert f"updated_at >= '{expected_date}'" in passed_options["query"]
+    # dbtable should NOT be present when query is used
+    assert "dbtable" not in passed_options
 
 
 def test_spark_hwm_legacy(mock_context, mock_engine, mock_connections):
