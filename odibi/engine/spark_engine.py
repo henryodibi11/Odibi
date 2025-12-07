@@ -525,9 +525,9 @@ class SparkEngine(Engine):
                     if "WHERE" in existing_query.upper():
                         merged_options["query"] = f"({existing_query}) AND ({sql_filter})"
                     else:
-                        merged_options[
-                            "query"
-                        ] = f"SELECT * FROM ({existing_query}) AS _subq WHERE {sql_filter}"
+                        merged_options["query"] = (
+                            f"SELECT * FROM ({existing_query}) AS _subq WHERE {sql_filter}"
+                        )
                     ctx.debug(f"Applied SQL pushdown filter to query: {sql_filter}")
             elif table:
                 # Build query with filter pushdown instead of using dbtable
