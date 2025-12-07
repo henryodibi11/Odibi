@@ -596,6 +596,11 @@ class NodeExecutor:
                     path=read_config.get("path"),
                 )
 
+                # Store input source path for transforms that need it (e.g., detect_deletes)
+                input_path = read_config.get("path") or read_config.get("table")
+                if input_path:
+                    self.engine._current_input_path = input_path
+
             elif isinstance(ref, dict):
                 conn_name = ref.get("connection")
                 connection = self.connections.get(conn_name) if conn_name else None

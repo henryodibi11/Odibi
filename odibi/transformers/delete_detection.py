@@ -380,11 +380,18 @@ def _get_target_path(context: EngineContext) -> Optional[str]:
     """
     Get target table path from context.
     This is used for snapshot_diff to access Delta time travel.
+
+    Priority:
+    1. _current_write_path (from node's write block)
+    2. _current_input_path (from node's inputs - for cross-pipeline references)
+    3. current_table_path (legacy)
     """
     if hasattr(context, "engine") and context.engine:
         engine = context.engine
-        if hasattr(engine, "_current_write_path"):
+        if hasattr(engine, "_current_write_path") and engine._current_write_path:
             return engine._current_write_path
+        if hasattr(engine, "_current_input_path") and engine._current_input_path:
+            return engine._current_input_path
         if hasattr(engine, "current_table_path"):
             return engine.current_table_path
 
