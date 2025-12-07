@@ -694,8 +694,8 @@ class NodeExecutor:
             # For stateful, we need to get the HWM from state
             state_key = inc.state_key or f"{config.name}_hwm"
 
-            if self.catalog_manager:
-                last_hwm = self.catalog_manager.get_hwm(state_key)
+            if self.state_manager:
+                last_hwm = self.state_manager.get_hwm(state_key)
                 if last_hwm is not None:
                     # Apply watermark_lag if configured
                     if inc.watermark_lag:
