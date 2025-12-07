@@ -2812,6 +2812,8 @@ class Node:
                         "success": False,
                         "error": str(last_error) if last_error else "Unknown error",
                         "error_type": type(last_error).__name__ if last_error else "Unknown",
+                        "error_traceback": result.metadata.get("error_traceback_cleaned")
+                        or result.metadata.get("error_traceback"),
                         "duration": round(attempt_duration, 3),
                     }
                 )
@@ -2825,6 +2827,7 @@ class Node:
                         "success": False,
                         "error": str(e),
                         "error_type": type(e).__name__,
+                        "error_traceback": traceback.format_exc(),
                         "duration": round(attempt_duration, 3),
                     }
                 )
