@@ -597,8 +597,11 @@ class NodeExecutor:
                 )
 
                 # Store input source path for transforms that need it (e.g., detect_deletes)
+                # Resolve to absolute path using connection if available
                 input_path = read_config.get("path") or read_config.get("table")
                 if input_path:
+                    if connection and hasattr(connection, "get_path"):
+                        input_path = connection.get_path(input_path)
                     self.engine._current_input_path = input_path
 
             elif isinstance(ref, dict):
