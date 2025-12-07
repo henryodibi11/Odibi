@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
-from odibi.config import IncrementalMode, NodeConfig, RetryConfig, WriteMode
+from odibi.config import IncrementalConfig, IncrementalMode, NodeConfig, RetryConfig, WriteMode
 from odibi.context import Context, EngineContext
 from odibi.enums import EngineType
 from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
@@ -479,6 +479,28 @@ class NodeExecutor:
                     f"Applied archive_options: {list(read_config.archive_options.keys())}"
                 )
 
+            # Incremental SQL Pushdown: Generate filter for SQL sources
+            if read_config.incremental and read_config.format in [
+                "sql",
+                "sql_server",
+                "azure_sql",
+            ]:
+                incremental_filter = self._generate_incremental_sql_filter(
+                    read_config.incremental, config, ctx
+                )
+                if incremental_filter:
+                    # Combine with existing filter if present
+                    existing_filter = read_options.get("filter")
+                    if existing_filter:
+                        read_options["filter"] = f"({existing_filter}) AND ({incremental_filter})"
+                    else:
+                        read_options["filter"] = incremental_filter
+                    ctx.debug(
+                        "Added incremental SQL pushdown filter",
+                        filter=read_options["filter"],
+                    )
+                    self._execution_steps.append(f"Incremental SQL pushdown: {incremental_filter}")
+
             # Execute Read
             df = self.engine.read(
                 connection=connection,
@@ -608,12 +630,101 @@ class NodeExecutor:
 
         return dataframes
 
+    def _generate_incremental_sql_filter(
+        self,
+        inc: IncrementalConfig,
+        config: NodeConfig,
+        ctx: Optional["LoggingContext"] = None,
+    ) -> Optional[str]:
+        """Generate SQL WHERE clause for incremental filtering (pushdown to SQL source).
+
+        Returns a SQL filter string or None if no filter should be applied.
+        """
+        if ctx is None:
+            ctx = get_logging_context()
+
+        # Check if target table exists - if not, this is first run (full load)
+        if config.write:
+            target_conn = self.connections.get(config.write.connection)
+            if target_conn and not self.engine.table_exists(
+                target_conn, config.write.table, config.write.path
+            ):
+                ctx.debug("First run detected - skipping incremental SQL pushdown")
+                return None
+
+        if inc.mode == IncrementalMode.ROLLING_WINDOW:
+            if not inc.lookback or not inc.unit:
+                return None
+
+            # Calculate cutoff
+            now = datetime.now()
+
+            delta = None
+            if inc.unit == "hour":
+                delta = timedelta(hours=inc.lookback)
+            elif inc.unit == "day":
+                delta = timedelta(days=inc.lookback)
+            elif inc.unit == "month":
+                delta = timedelta(days=inc.lookback * 30)
+            elif inc.unit == "year":
+                delta = timedelta(days=inc.lookback * 365)
+
+            if delta:
+                cutoff = now - delta
+                # Format for SQL Server: 'YYYY-MM-DD HH:MM:SS'
+                cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+                if inc.fallback_column:
+                    return f"COALESCE({inc.column}, {inc.fallback_column}) >= '{cutoff_str}'"
+                else:
+                    return f"{inc.column} >= '{cutoff_str}'"
+
+        elif inc.mode == IncrementalMode.STATEFUL:
+            # For stateful, we need to get the HWM from state
+            state_key = inc.state_key or f"{config.name}_hwm"
+
+            if self.catalog_manager:
+                last_hwm = self.catalog_manager.get_hwm(state_key)
+                if last_hwm is not None:
+                    # Apply watermark_lag if configured
+                    if inc.watermark_lag:
+                        from odibi.utils.duration import parse_duration
+
+                        lag_delta = parse_duration(inc.watermark_lag)
+                        if lag_delta and isinstance(last_hwm, str):
+                            try:
+                                hwm_dt = datetime.fromisoformat(last_hwm)
+                                last_hwm = (hwm_dt - lag_delta).isoformat()
+                            except ValueError:
+                                pass
+
+                    if inc.fallback_column:
+                        return f"COALESCE({inc.column}, {inc.fallback_column}) > '{last_hwm}'"
+                    else:
+                        return f"{inc.column} > '{last_hwm}'"
+
+        return None
+
     def _apply_incremental_filtering(
         self, df: Any, config: NodeConfig, hwm_state: Optional[Tuple[str, Any]]
     ) -> Tuple[Any, Optional[Tuple[str, Any]]]:
-        """Apply incremental filtering and capture new HWM."""
+        """Apply incremental filtering and capture new HWM.
+
+        Note: For SQL sources, filtering is done via SQL pushdown in _generate_incremental_sql_filter.
+        This method handles non-SQL sources and HWM capture for stateful mode.
+        """
         inc = config.read.incremental
         if not inc:
+            return df, None
+
+        # Skip in-memory filtering for SQL sources (already pushed down)
+        if config.read.format in ["sql", "sql_server", "azure_sql"]:
+            # Still need to capture HWM for stateful mode
+            if inc.mode == IncrementalMode.STATEFUL:
+                state_key = inc.state_key or f"{config.name}_hwm"
+                new_max = self._get_column_max(df, inc.column)
+                if new_max is not None:
+                    return df, (state_key, new_max)
             return df, None
 
         # Smart Read Pattern: If target table doesn't exist, skip filtering (Full Load)
