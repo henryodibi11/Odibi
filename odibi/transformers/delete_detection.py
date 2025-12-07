@@ -77,12 +77,11 @@ def _snapshot_diff_spark(
     keys = config.keys
     spark = context.spark
 
-    table_path = config.target_path or _get_target_path(context)
+    table_path = _get_target_path(context)
     if not table_path:
         logger.warning(
             "detect_deletes: Could not determine target table path. Skipping. "
-            "Ensure the node has a 'write' block with 'path' or 'table' configured, "
-            "or set 'target_path' in params."
+            "Ensure the node has a 'write' block or 'inputs' with a pipeline reference."
         )
         return context
 
@@ -129,13 +128,12 @@ def _snapshot_diff_pandas(
         )
 
     keys = config.keys
-    table_path = config.target_path or _get_target_path(context)
+    table_path = _get_target_path(context)
 
     if not table_path:
         logger.warning(
             "detect_deletes: Could not determine target table path. Skipping. "
-            "Ensure the node has a 'write' block with 'path' or 'table' configured, "
-            "or set 'target_path' in params."
+            "Ensure the node has a 'write' block or 'inputs' with a pipeline reference."
         )
         return context
 

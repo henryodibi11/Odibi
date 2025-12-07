@@ -873,7 +873,6 @@ transform:
 | **source_table** | Optional[str] | No | - | For sql_compare: table to query for current keys |
 | **source_query** | Optional[str] | No | - | For sql_compare: custom SQL query for keys (overrides source_table) |
 | **snapshot_column** | Optional[str] | No | - | For snapshot_diff on non-Delta: column to identify snapshots. If None, uses Delta time travel (default). |
-| **target_path** | Optional[str] | No | - | For snapshot_diff: explicit path to target Delta table. If not set, inferred from node's write.path/write.table. |
 | **on_first_run** | FirstRunBehavior | No | `FirstRunBehavior.SKIP` | Behavior when no previous version exists for snapshot_diff |
 | **max_delete_percent** | Optional[float] | No | `50.0` | Safety threshold: warn/error if more than X% of rows would be deleted |
 | **on_threshold_breach** | ThresholdBreachAction | No | `ThresholdBreachAction.WARN` | Behavior when delete percentage exceeds max_delete_percent |

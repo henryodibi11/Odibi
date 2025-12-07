@@ -255,12 +255,6 @@ class DeleteDetectionConfig(BaseModel):
         "If None, uses Delta time travel (default).",
     )
 
-    target_path: Optional[str] = Field(
-        default=None,
-        description="For snapshot_diff: explicit path to target Delta table. "
-        "If not set, inferred from node's write.path/write.table.",
-    )
-
     on_first_run: FirstRunBehavior = Field(
         default=FirstRunBehavior.SKIP,
         description="Behavior when no previous version exists for snapshot_diff",
