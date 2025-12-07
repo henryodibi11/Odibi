@@ -404,7 +404,12 @@
                                             </td>
                                             <td style="padding: 8px; border-bottom: 1px solid #eee;">{{ attempt.duration }}s</td>
                                             <td style="padding: 8px; border-bottom: 1px solid #eee; font-family: var(--mono-font); font-size: 0.85em; color: #c92a2a;">
-                                                {% if attempt.error %}{{ attempt.error|truncate(100) }}{% else %}-{% endif %}
+                                                {% if attempt.error %}
+                                                <details>
+                                                    <summary style="cursor: pointer;">{{ attempt.error|truncate(80) }}</summary>
+                                                    <div style="margin-top: 8px; padding: 10px; background: #fff5f5; border-radius: 4px; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{{ attempt.error_traceback or attempt.error }}</div>
+                                                </details>
+                                                {% else %}-{% endif %}
                                             </td>
                                         </tr>
                                         {% endfor %}
