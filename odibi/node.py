@@ -146,6 +146,7 @@ class NodeExecutor:
         input_df: Optional[Any] = None,
         dry_run: bool = False,
         hwm_state: Optional[Tuple[str, Any]] = None,
+        suppress_error_log: bool = False,
     ) -> NodeResult:
         """Execute the node logic.
 
@@ -154,6 +155,7 @@ class NodeExecutor:
             input_df: Optional input dataframe (e.g. from dependencies)
             dry_run: Whether to simulate execution
             hwm_state: Current High Water Mark state (key, value)
+            suppress_error_log: If True, suppress error logging (used during retries)
 
         Returns:
             NodeResult
@@ -354,14 +356,15 @@ class NodeExecutor:
                 raw_traceback = traceback.format_exc()
                 cleaned_traceback = self._clean_spark_traceback(raw_traceback)
 
-                # Log error with full context before re-raising
-                ctx.error(
-                    f"Node execution failed: {type(e).__name__}: {e}",
-                    elapsed_ms=round(duration * 1000, 2),
-                    steps_completed=self._execution_steps.copy(),
-                )
-                if suggestions:
-                    ctx.info(f"Suggestions: {'; '.join(suggestions)}")
+                # Log error with full context (suppress during retries)
+                if not suppress_error_log:
+                    ctx.error(
+                        f"Node execution failed: {type(e).__name__}: {e}",
+                        elapsed_ms=round(duration * 1000, 2),
+                        steps_completed=self._execution_steps.copy(),
+                    )
+                    if suggestions:
+                        ctx.info(f"Suggestions: {'; '.join(suggestions)}")
 
                 # Wrap error
                 if not isinstance(e, NodeExecutionError):
@@ -2760,8 +2763,13 @@ class Node:
                     val = self.state_manager.get_hwm(key)
                     hwm_state = (key, val)
 
+                # Suppress error logs on non-final attempts
+                is_last_attempt = attempts >= max_attempts
                 result = self.executor.execute(
-                    self.config, dry_run=self.dry_run, hwm_state=hwm_state
+                    self.config,
+                    dry_run=self.dry_run,
+                    hwm_state=hwm_state,
+                    suppress_error_log=not is_last_attempt,
                 )
 
                 attempt_duration = time.time() - attempt_start
