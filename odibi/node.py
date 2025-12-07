@@ -709,10 +709,19 @@ class NodeExecutor:
                             except ValueError:
                                 pass
 
+                    # Format HWM for SQL compatibility (SQL Server doesn't like ISO 'T')
+                    hwm_str = str(last_hwm)
+                    if isinstance(last_hwm, str) and "T" in last_hwm:
+                        try:
+                            hwm_dt = datetime.fromisoformat(last_hwm)
+                            hwm_str = hwm_dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                        except ValueError:
+                            hwm_str = last_hwm.replace("T", " ")
+
                     if inc.fallback_column:
-                        return f"COALESCE({inc.column}, {inc.fallback_column}) > '{last_hwm}'"
+                        return f"COALESCE({inc.column}, {inc.fallback_column}) > '{hwm_str}'"
                     else:
-                        return f"{inc.column} > '{last_hwm}'"
+                        return f"{inc.column} > '{hwm_str}'"
 
         return None
 
