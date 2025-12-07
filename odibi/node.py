@@ -1072,6 +1072,12 @@ class NodeExecutor:
             step_count = len(config.transform.steps)
             ctx.debug(f"Executing {step_count} transform steps")
 
+            # Set current write path on engine for transforms that need it (e.g., detect_deletes)
+            if config.write and config.write.path:
+                self.engine._current_write_path = config.write.path
+            elif config.write and config.write.table:
+                self.engine._current_write_path = config.write.table
+
             result_df = self._execute_transform(config, result_df, pii_meta, ctx)
             self._execution_steps.append(f"Applied {step_count} transform steps")
 
