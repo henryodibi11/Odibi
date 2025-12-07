@@ -657,8 +657,10 @@ class NodeExecutor:
         # Check if target table exists - if not, this is first run (full load)
         if config.write:
             target_conn = self.connections.get(config.write.connection)
+            # Use register_table if table is not set (path-based Delta with registration)
+            table_to_check = config.write.table or config.write.register_table
             if target_conn and not self.engine.table_exists(
-                target_conn, config.write.table, config.write.path
+                target_conn, table_to_check, config.write.path
             ):
                 ctx.debug("First run detected - skipping incremental SQL pushdown")
                 return None
@@ -750,8 +752,10 @@ class NodeExecutor:
         # Smart Read Pattern: If target table doesn't exist, skip filtering (Full Load)
         if config.write:
             target_conn = self.connections.get(config.write.connection)
+            # Use register_table if table is not set (path-based Delta with registration)
+            table_to_check = config.write.table or config.write.register_table
             if target_conn and not self.engine.table_exists(
-                target_conn, config.write.table, config.write.path
+                target_conn, table_to_check, config.write.path
             ):
                 # First Run detected -> Full Load
                 # We still need to capture HWM if stateful!
