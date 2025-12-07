@@ -100,14 +100,29 @@ def _snapshot_diff_spark(
 
     prev_version = current_version - 1
 
+    # Validate keys exist in current DataFrame
+    curr_columns = [c.lower() for c in context.df.columns]
+    missing_curr_keys = [k for k in keys if k.lower() not in curr_columns]
+    if missing_curr_keys:
+        logger.warning(
+            f"detect_deletes: Keys {missing_curr_keys} not found in current DataFrame. "
+            f"Available columns: {context.df.columns}. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+
+    # Load previous version and validate schema
+    prev_df = spark.read.format("delta").option("versionAsOf", prev_version).load(table_path)
+    prev_columns = [c.lower() for c in prev_df.columns]
+    missing_prev_keys = [k for k in keys if k.lower() not in prev_columns]
+    if missing_prev_keys:
+        logger.warning(
+            f"detect_deletes: Keys {missing_prev_keys} not found in previous version (v{prev_version}). "
+            f"Schema may have changed. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+
     curr_keys = context.df.select(keys).distinct()
-    prev_keys = (
-        spark.read.format("delta")
-        .option("versionAsOf", prev_version)
-        .load(table_path)
-        .select(keys)
-        .distinct()
-    )
+    prev_keys = prev_df.select(keys).distinct()
 
     deleted_keys = prev_keys.exceptAll(curr_keys)
 
@@ -153,8 +168,28 @@ def _snapshot_diff_pandas(
 
     prev_version = current_version - 1
 
-    curr_keys = context.df[keys].drop_duplicates()
+    # Validate keys exist in current DataFrame
+    curr_columns = [c.lower() for c in context.df.columns]
+    missing_curr_keys = [k for k in keys if k.lower() not in curr_columns]
+    if missing_curr_keys:
+        logger.warning(
+            f"detect_deletes: Keys {missing_curr_keys} not found in current DataFrame. "
+            f"Available columns: {list(context.df.columns)}. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+
+    # Load previous version and validate schema
     prev_df = DeltaTable(table_path, version=prev_version).to_pandas()
+    prev_columns = [c.lower() for c in prev_df.columns]
+    missing_prev_keys = [k for k in keys if k.lower() not in prev_columns]
+    if missing_prev_keys:
+        logger.warning(
+            f"detect_deletes: Keys {missing_prev_keys} not found in previous version (v{prev_version}). "
+            f"Schema may have changed. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+
+    curr_keys = context.df[keys].drop_duplicates()
     prev_keys = prev_df[keys].drop_duplicates()
 
     merged = prev_keys.merge(curr_keys, on=keys, how="left", indicator=True)
