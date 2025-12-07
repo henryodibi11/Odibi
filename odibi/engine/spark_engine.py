@@ -645,12 +645,27 @@ class SparkEngine(Engine):
                 if schema:
                     reader = reader.schema(schema)
                     ctx.debug(f"Applied schema for streaming read: {schema[:100]}...")
-                elif format not in ["delta", "parquet"]:
-                    ctx.warning(
-                        f"Streaming read from '{format}' format without schema. "
-                        "Schema inference is not supported for streaming sources. "
-                        "Consider adding 'schema' to your read config."
-                    )
+                else:
+                    # Determine if we should warn about missing schema
+                    # Formats that can infer schema: delta, parquet, avro (embedded schema)
+                    # cloudFiles with schemaLocation or self-describing formats (avro, parquet) are fine
+                    should_warn = True
+
+                    if format in ["delta", "parquet"]:
+                        should_warn = False
+                    elif format == "cloudFiles":
+                        cloud_format = options.get("cloudFiles.format", "")
+                        has_schema_location = "cloudFiles.schemaLocation" in options
+                        # avro and parquet have embedded schemas
+                        if cloud_format in ["avro", "parquet"] or has_schema_location:
+                            should_warn = False
+
+                    if should_warn:
+                        ctx.warning(
+                            f"Streaming read from '{format}' format without schema. "
+                            "Schema inference is not supported for streaming sources. "
+                            "Consider adding 'schema' to your read config."
+                        )
             else:
                 reader = self.spark.read.format(format)
                 if schema:
