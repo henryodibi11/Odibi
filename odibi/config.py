@@ -920,6 +920,10 @@ class ReadConfig(BaseModel):
         default=None,
         description="SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector.",
     )
+    filter: Optional[str] = Field(
+        default=None,
+        description="SQL WHERE clause filter (pushed down to source for SQL formats). Example: \"DAY > '2022-12-31'\"",
+    )
     incremental: Optional[IncrementalConfig] = Field(
         default=None,
         description="Automatic incremental loading strategy (CDC-like). If set, generates query based on target state (HWM).",
@@ -940,6 +944,15 @@ class ReadConfig(BaseModel):
             if "query" in self.options and self.options["query"] != self.query:
                 raise ValueError("Cannot specify 'query' in both top-level and options")
             self.options["query"] = self.query
+        return self
+
+    @model_validator(mode="after")
+    def move_filter_to_options(self):
+        """Move top-level filter to options for SQL pushdown."""
+        if self.filter:
+            if "filter" in self.options and self.options["filter"] != self.filter:
+                raise ValueError("Cannot specify 'filter' in both top-level and options")
+            self.options["filter"] = self.filter
         return self
 
     @model_validator(mode="after")

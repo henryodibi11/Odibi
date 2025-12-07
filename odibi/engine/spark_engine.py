@@ -513,10 +513,29 @@ class SparkEngine(Engine):
             jdbc_options = connection.get_spark_options()
             merged_options = {**jdbc_options, **options}
 
+            # Extract filter for SQL pushdown
+            sql_filter = merged_options.pop("filter", None)
+
             if "query" in merged_options:
                 merged_options.pop("dbtable", None)
+                # If filter provided with query, append to WHERE clause
+                if sql_filter:
+                    existing_query = merged_options["query"]
+                    # Wrap existing query and add filter
+                    if "WHERE" in existing_query.upper():
+                        merged_options["query"] = f"({existing_query}) AND ({sql_filter})"
+                    else:
+                        merged_options[
+                            "query"
+                        ] = f"SELECT * FROM ({existing_query}) AS _subq WHERE {sql_filter}"
+                    ctx.debug(f"Applied SQL pushdown filter to query: {sql_filter}")
             elif table:
-                merged_options["dbtable"] = table
+                # Build query with filter pushdown instead of using dbtable
+                if sql_filter:
+                    merged_options["query"] = f"SELECT * FROM {table} WHERE {sql_filter}"
+                    ctx.debug(f"Applied SQL pushdown filter: {sql_filter}")
+                else:
+                    merged_options["dbtable"] = table
             elif "dbtable" not in merged_options:
                 ctx.error("SQL format requires 'table' config or 'query' option")
                 raise ValueError("SQL format requires 'table' config or 'query' option")
