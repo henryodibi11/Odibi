@@ -65,6 +65,17 @@ nav:
       - High Water Mark: docs/patterns/hwm_pattern_guide.md
       - Merge/Upsert: docs/patterns/merge_upsert.md
       - Windowed Reprocess: docs/patterns/windowed_reprocess.md
+      - Dimension Pattern: docs/patterns/dimension.md
+      - Date Dimension Pattern: docs/patterns/date_dimension.md
+      - Fact Pattern: docs/patterns/fact.md
+      - Aggregation Pattern: docs/patterns/aggregation.md
+  - Semantic Layer:
+      - Overview: docs/semantics/index.md
+      - Defining Metrics: docs/semantics/metrics.md
+      - Querying: docs/semantics/query.md
+      - Materializing: docs/semantics/materialize.md
+  - Validation:
+      - FK Validation: docs/validation/fk.md
   - Explanation:
       - Architecture: docs/explanation/architecture.md
       - Case Studies: docs/explanation/case_studies.md

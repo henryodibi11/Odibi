@@ -1,0 +1,219 @@
+"""
+Metric Definition Models
+========================
+
+Pydantic models for semantic layer configuration including:
+- Metric definitions (expressions, filters, derived metrics)
+- Dimension definitions with hierarchies
+- Materialization configurations
+"""
+
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class MetricType(str, Enum):
+    """Type of metric calculation."""
+
+    SIMPLE = "simple"
+    DERIVED = "derived"
+
+
+class MetricDefinition(BaseModel):
+    """
+    Definition of a semantic metric.
+
+    A metric represents a measurable value that can be aggregated
+    across dimensions (e.g., revenue, order_count, avg_order_value).
+
+    Attributes:
+        name: Unique metric identifier
+        description: Human-readable description
+        expr: SQL aggregation expression (e.g., "SUM(total_amount)")
+        source: Source table name (required for simple metrics)
+        filters: Optional WHERE conditions to apply
+        type: "simple" (direct aggregation) or "derived" (references other metrics)
+    """
+
+    name: str = Field(..., description="Unique metric identifier")
+    description: Optional[str] = Field(None, description="Human-readable description")
+    expr: str = Field(..., description="SQL aggregation expression")
+    source: Optional[str] = Field(None, description="Source table name")
+    filters: List[str] = Field(default_factory=list, description="WHERE conditions")
+    type: MetricType = Field(default=MetricType.SIMPLE, description="Metric type")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Metric name cannot be empty")
+        if not v.replace("_", "").isalnum():
+            raise ValueError(
+                f"Metric name '{v}' must contain only alphanumeric characters and underscores"
+            )
+        return v.strip().lower()
+
+    @field_validator("expr")
+    @classmethod
+    def validate_expr(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Metric expression cannot be empty")
+        return v.strip()
+
+
+class DimensionDefinition(BaseModel):
+    """
+    Definition of a semantic dimension.
+
+    A dimension represents an attribute for grouping and filtering
+    metrics (e.g., date, product, region).
+
+    Attributes:
+        name: Unique dimension identifier
+        source: Source table name
+        column: Column name in source (defaults to name)
+        hierarchy: Optional ordered list of columns for drill-down
+        description: Human-readable description
+    """
+
+    name: str = Field(..., description="Unique dimension identifier")
+    source: str = Field(..., description="Source table name")
+    column: Optional[str] = Field(None, description="Column name (defaults to name)")
+    hierarchy: List[str] = Field(default_factory=list, description="Drill-down hierarchy")
+    description: Optional[str] = Field(None, description="Human-readable description")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Dimension name cannot be empty")
+        return v.strip().lower()
+
+    def get_column(self) -> str:
+        """Get the actual column name to use."""
+        return self.column if self.column else self.name
+
+
+class MaterializationConfig(BaseModel):
+    """
+    Configuration for materializing metrics to a table.
+
+    Materialization pre-computes aggregated metrics at a specific
+    grain and persists them for faster querying.
+
+    Attributes:
+        name: Unique materialization identifier
+        metrics: List of metric names to include
+        dimensions: List of dimension names (determines grain)
+        output: Output table path
+        schedule: Optional cron schedule for refresh
+        incremental: Configuration for incremental refresh
+    """
+
+    name: str = Field(..., description="Unique materialization identifier")
+    metrics: List[str] = Field(..., description="Metrics to materialize")
+    dimensions: List[str] = Field(..., description="Dimensions for grouping")
+    output: str = Field(..., description="Output table path")
+    schedule: Optional[str] = Field(None, description="Cron schedule")
+    incremental: Optional[Dict[str, Any]] = Field(None, description="Incremental refresh config")
+
+    @field_validator("metrics")
+    @classmethod
+    def validate_metrics(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("At least one metric is required")
+        return v
+
+    @field_validator("dimensions")
+    @classmethod
+    def validate_dimensions(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("At least one dimension is required")
+        return v
+
+
+class SemanticLayerConfig(BaseModel):
+    """
+    Complete semantic layer configuration.
+
+    Contains all metrics, dimensions, and materializations
+    for a semantic layer deployment.
+
+    Attributes:
+        metrics: List of metric definitions
+        dimensions: List of dimension definitions
+        materializations: List of materialization configurations
+    """
+
+    metrics: List[MetricDefinition] = Field(default_factory=list, description="Metric definitions")
+    dimensions: List[DimensionDefinition] = Field(
+        default_factory=list, description="Dimension definitions"
+    )
+    materializations: List[MaterializationConfig] = Field(
+        default_factory=list, description="Materialization configs"
+    )
+
+    def get_metric(self, name: str) -> Optional[MetricDefinition]:
+        """Get a metric by name."""
+        name_lower = name.lower()
+        for metric in self.metrics:
+            if metric.name == name_lower:
+                return metric
+        return None
+
+    def get_dimension(self, name: str) -> Optional[DimensionDefinition]:
+        """Get a dimension by name."""
+        name_lower = name.lower()
+        for dim in self.dimensions:
+            if dim.name == name_lower:
+                return dim
+        return None
+
+    def get_materialization(self, name: str) -> Optional[MaterializationConfig]:
+        """Get a materialization config by name."""
+        name_lower = name.lower()
+        for mat in self.materializations:
+            if mat.name.lower() == name_lower:
+                return mat
+        return None
+
+    def validate_references(self) -> List[str]:
+        """
+        Validate that all references are valid.
+
+        Returns:
+            List of validation error messages (empty if valid)
+        """
+        errors = []
+        metric_names = {m.name for m in self.metrics}
+        dimension_names = {d.name for d in self.dimensions}
+
+        for mat in self.materializations:
+            for metric_name in mat.metrics:
+                if metric_name.lower() not in metric_names:
+                    errors.append(
+                        f"Materialization '{mat.name}' references unknown metric '{metric_name}'"
+                    )
+
+            for dim_name in mat.dimensions:
+                if dim_name.lower() not in dimension_names:
+                    errors.append(
+                        f"Materialization '{mat.name}' references unknown dimension '{dim_name}'"
+                    )
+
+        return errors
+
+
+def parse_semantic_config(config_dict: Dict[str, Any]) -> SemanticLayerConfig:
+    """
+    Parse a semantic layer configuration from a dictionary.
+
+    Args:
+        config_dict: Configuration dictionary (from YAML)
+
+    Returns:
+        SemanticLayerConfig instance
+    """
+    return SemanticLayerConfig(**config_dict)

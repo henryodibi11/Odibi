@@ -403,7 +403,7 @@ class PipelineProgress:
         for phase, duration_ms in sorted_phases:
             pct = (duration_ms / total_ms * 100) if total_ms > 0 else 0
             duration_str = (
-                f"{duration_ms:.0f}ms" if duration_ms < 1000 else f"{duration_ms/1000:.2f}s"
+                f"{duration_ms:.0f}ms" if duration_ms < 1000 else f"{duration_ms / 1000:.2f}s"
             )
             table.add_row(phase, duration_str, f"{pct:.1f}%")
 
@@ -423,7 +423,7 @@ class PipelineProgress:
         for phase, duration_ms in sorted_phases:
             pct = (duration_ms / total_ms * 100) if total_ms > 0 else 0
             duration_str = (
-                f"{duration_ms:.0f}ms" if duration_ms < 1000 else f"{duration_ms/1000:.2f}s"
+                f"{duration_ms:.0f}ms" if duration_ms < 1000 else f"{duration_ms / 1000:.2f}s"
             )
             print(f"  {phase}: {duration_str} ({pct:.1f}% of pipeline)")
         print("-" * 48 + "\n")

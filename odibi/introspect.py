@@ -103,6 +103,20 @@ GROUP_MAPPING = {
     "RowCountGate": "Operation",
     # Cross-Pipeline Dependencies
     "ReferenceResolutionError": "Core",
+    # Semantic Layer
+    "MetricDefinition": "Semantic",
+    "DimensionDefinition": "Semantic",
+    "MaterializationConfig": "Semantic",
+    "SemanticLayerConfig": "Semantic",
+    # FK Validation
+    "RelationshipConfig": "Validation",
+    "RelationshipRegistry": "Validation",
+    # Patterns
+    "DimensionPattern": "Pattern",
+    "DateDimensionPattern": "Pattern",
+    "FactPattern": "Pattern",
+    "AggregationPattern": "Pattern",
+    "AuditConfig": "Pattern",
 }
 
 # Map modules to readable Categories
@@ -224,6 +238,84 @@ Unlike validation (which runs after transforms and can warn), contracts always h
       - function: filter
         params:
           condition: "status != 'cancelled'"
+```
+""",
+    "Semantic": """
+### Semantic Layer
+
+The semantic layer provides a unified interface for defining and querying business metrics.
+Define metrics once, query them by name across dimensions.
+
+**Core Components:**
+- **MetricDefinition**: Define aggregation expressions (SUM, COUNT, AVG)
+- **DimensionDefinition**: Define grouping attributes with hierarchies
+- **MaterializationConfig**: Pre-compute metrics at specific grain
+- **SemanticQuery**: Execute queries like "revenue BY region, month"
+
+**Example:**
+```yaml
+metrics:
+  - name: revenue
+    expr: "SUM(total_amount)"
+    source: fact_orders
+    filters:
+      - "status = 'completed'"
+
+dimensions:
+  - name: region
+    source: dim_customer
+    column: region
+
+materializations:
+  - name: monthly_revenue
+    metrics: [revenue]
+    dimensions: [region, month]
+    output: gold/agg_monthly_revenue
+```
+""",
+    "Validation": """
+### FK Validation
+
+Declare and validate referential integrity between fact and dimension tables.
+
+**Features:**
+- Declare relationships in YAML
+- Validate FK constraints on fact load
+- Detect orphan records
+- Generate lineage from relationships
+
+**Example:**
+```yaml
+relationships:
+  - name: orders_to_customers
+    fact: fact_orders
+    dimension: dim_customer
+    fact_key: customer_sk
+    dimension_key: customer_sk
+    on_violation: error
+```
+""",
+    "Pattern": """
+### Data Patterns
+
+Declarative patterns for common data warehouse building blocks.
+
+**Available Patterns:**
+- **DimensionPattern**: Build dimensions with SCD Type 0/1/2 and surrogate keys
+- **DateDimensionPattern**: Generate date dimensions with fiscal calendar support
+- **FactPattern**: Build fact tables with automatic SK lookups and orphan handling
+- **AggregationPattern**: Declarative GROUP BY with incremental merge strategies
+
+**Example:**
+```yaml
+pattern:
+  type: dimension
+  params:
+    natural_key: customer_id
+    surrogate_key: customer_sk
+    scd_type: 2
+    track_columns: [name, email, address]
+    unknown_member: true
 ```
 """,
     "Transformation": """
@@ -579,6 +671,9 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
         "Contract": [],
         "Setting": [],
         "Transformation": [],
+        "Semantic": [],
+        "Validation": [],
+        "Pattern": [],
         "Other": [],
     }
 
@@ -605,6 +700,9 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
         ("Contract", "Contracts (Data Quality Gates)"),
         ("Setting", "Global Settings"),
         ("Transformation", "Transformation Reference"),
+        ("Semantic", "Semantic Layer"),
+        ("Validation", "FK Validation"),
+        ("Pattern", "Data Patterns"),
     ]
 
     model_names = {m.name for m in all_models}
