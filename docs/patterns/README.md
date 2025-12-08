@@ -60,6 +60,87 @@ This directory contains documentation for common data pipeline patterns used in 
 
 ---
 
+## Dimensional Modeling Patterns
+
+These patterns are designed for building star schemas and data warehouses. Use them via `transformer: pattern_name` in your node config.
+
+### [7. Dimension Pattern](./dimension.md)
+**Problem:** How do I build dimension tables with surrogate keys and SCD support?
+
+**Pattern:** Use `transformer: dimension` to auto-generate surrogate keys and handle SCD Type 0/1/2 with optional unknown member rows.
+
+**When to use:** Building any dimension table (dim_customer, dim_product, etc.)
+
+```yaml
+transformer: dimension
+params:
+  natural_key: customer_id
+  surrogate_key: customer_sk
+  scd_type: 2
+  track_columns: [name, email, address]
+```
+
+---
+
+### [8. Date Dimension Pattern](./date_dimension.md)
+**Problem:** How do I generate a complete date dimension with fiscal calendars?
+
+**Pattern:** Use `transformer: date_dimension` to generate dates with 19 pre-calculated columns including fiscal year/quarter.
+
+**When to use:** Every data warehouse needs a date dimension. Generate once with a wide range (2015-2035).
+
+```yaml
+transformer: date_dimension
+params:
+  start_date: "2020-01-01"
+  end_date: "2030-12-31"
+  fiscal_year_start_month: 7
+  unknown_member: true
+```
+
+---
+
+### [9. Fact Pattern](./fact.md)
+**Problem:** How do I build fact tables with automatic surrogate key lookups?
+
+**Pattern:** Use `transformer: fact` to join source data to dimensions, retrieve SKs, handle orphans, and validate grain.
+
+**When to use:** Building any fact table that references dimensions.
+
+```yaml
+transformer: fact
+params:
+  grain: [order_id, line_item_id]
+  dimensions:
+    - source_column: customer_id
+      dimension_table: dim_customer
+      dimension_key: customer_id
+      surrogate_key: customer_sk
+  orphan_handling: unknown
+```
+
+---
+
+### [10. Aggregation Pattern](./aggregation.md)
+**Problem:** How do I build aggregate tables with declarative GROUP BY and incremental refresh?
+
+**Pattern:** Use `transformer: aggregation` with grain (GROUP BY) and measure expressions.
+
+**When to use:** Building aggregate/summary tables, KPI tables, or materializing metrics.
+
+```yaml
+transformer: aggregation
+params:
+  grain: [date_sk, product_sk]
+  measures:
+    - name: total_revenue
+      expr: "SUM(line_total)"
+    - name: order_count
+      expr: "COUNT(*)"
+```
+
+---
+
 ## Design Principles
 
 These patterns are built on the **Odibi Architecture Manifesto**:
@@ -83,6 +164,10 @@ These patterns are built on the **Odibi Architecture Manifesto**:
 | SCD Type 2 | Raw (micro-batch) | Silver/Gold | `overwrite` | Yes (full history) |
 | Windowed Reprocess | Silver (window) | Gold | `overwrite` (partition) | Yes (recalculated) |
 | Skip If Unchanged | Snapshot Source | Raw | `append` (conditional) | Yes (hash-based) |
+| **Dimension** | Staging | Gold (dim_*) | `overwrite` | Yes (SK-based) |
+| **Date Dimension** | Generated | Gold (dim_date) | `overwrite` | Yes (no input) |
+| **Fact** | Staging + Dims | Gold (fact_*) | `overwrite` | Yes (grain-based) |
+| **Aggregation** | Fact | Gold (agg_*) | `overwrite` | Yes (grain-based) |
 
 ---
 

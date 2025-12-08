@@ -1,6 +1,43 @@
 # Date Dimension Pattern
 
-The `DateDimensionPattern` generates a complete date dimension table with pre-calculated attributes useful for BI/reporting.
+The `date_dimension` pattern generates a complete date dimension table with pre-calculated attributes useful for BI/reporting.
+
+## Integration with Odibi YAML
+
+The date dimension pattern is unique - it **generates** data rather than transforming it. No `read:` block is needed.
+
+```yaml
+project: my_warehouse
+engine: spark
+
+connections:
+  warehouse:
+    type: delta
+    path: /mnt/warehouse
+
+story:
+  connection: warehouse
+  path: stories
+
+pipelines:
+  - pipeline: build_date_dimension
+    nodes:
+      - name: dim_date
+        # No read block - pattern generates data
+        transformer: date_dimension
+        params:
+          start_date: "2020-01-01"
+          end_date: "2030-12-31"
+          fiscal_year_start_month: 7  # July fiscal year
+          unknown_member: true
+        write:
+          connection: warehouse
+          path: dim_date
+          format: delta
+          mode: overwrite
+```
+
+---
 
 ## Features
 
@@ -9,23 +46,6 @@ The `DateDimensionPattern` generates a complete date dimension table with pre-ca
 - **19 pre-calculated columns** for flexible analysis
 - **Unknown member row** (date_sk=0) for orphan FK handling
 - **Works with both Spark and Pandas**
-
-## Quick Start
-
-```yaml
-nodes:
-  - name: dim_date
-    pattern:
-      type: date_dimension
-      params:
-        start_date: "2020-01-01"
-        end_date: "2030-12-31"
-        fiscal_year_start_month: 7  # July fiscal year
-        unknown_member: true
-    write:
-      target: gold.dim_date
-      mode: overwrite
-```
 
 ---
 
@@ -73,12 +93,17 @@ The pattern generates 19 columns automatically:
 Configure fiscal year start month for companies with non-calendar fiscal years:
 
 ```yaml
-pattern:
-  type: date_dimension
-  params:
-    start_date: "2020-01-01"
-    end_date: "2030-12-31"
-    fiscal_year_start_month: 7  # July 1st = FY start
+nodes:
+  - name: dim_date
+    transformer: date_dimension
+    params:
+      start_date: "2020-01-01"
+      end_date: "2030-12-31"
+      fiscal_year_start_month: 7  # July 1st = FY start
+    write:
+      connection: warehouse
+      path: dim_date
+      mode: overwrite
 ```
 
 **Fiscal Year Calculation:**
@@ -98,17 +123,6 @@ pattern:
 
 Enable `unknown_member: true` to add a special row for orphan FK handling:
 
-```yaml
-pattern:
-  type: date_dimension
-  params:
-    start_date: "2020-01-01"
-    end_date: "2030-12-31"
-    unknown_member: true
-```
-
-**Unknown Member Values:**
-
 | Column | Value |
 |--------|-------|
 | date_sk | 0 |
@@ -118,83 +132,53 @@ pattern:
 | month_name | Unknown |
 | quarter_name | Unknown |
 | year | 0 |
-| All other numerics | 0 |
-| All booleans | false |
 
 ---
 
 ## Full YAML Example
 
-Complete date dimension for a data warehouse:
+Complete date dimension in a warehouse pipeline:
 
 ```yaml
-project:
-  name: date_dimension_pipeline
+project: sales_warehouse
+engine: spark
 
 connections:
   warehouse:
     type: delta
     path: /mnt/warehouse
 
-nodes:
-  - name: dim_date
-    description: "Standard date dimension with fiscal calendar"
-    pattern:
-      type: date_dimension
-      params:
-        start_date: "2015-01-01"
-        end_date: "2035-12-31"
-        fiscal_year_start_month: 10  # October fiscal year (common for retail)
-        unknown_member: true
-    write:
-      connection: warehouse
-      path: dim_date
-      mode: overwrite
-      partition_by: [year]  # Optional: partition by year for performance
+story:
+  connection: warehouse
+  path: stories
+
+system:
+  connection: warehouse
+  path: _system_catalog
+
+pipelines:
+  - pipeline: build_reference_dimensions
+    description: "Build date and other reference dimensions"
+    nodes:
+      - name: dim_date
+        description: "Standard date dimension with fiscal calendar"
+        transformer: date_dimension
+        params:
+          start_date: "2015-01-01"
+          end_date: "2035-12-31"
+          fiscal_year_start_month: 10  # October fiscal year (retail)
+          unknown_member: true
+        write:
+          connection: warehouse
+          path: dim_date
+          format: delta
+          mode: overwrite
+          partition_by: [year]  # Optional: partition by year
 ```
 
 ---
 
-## Python API
-
-```python
-from odibi.patterns.date_dimension import DateDimensionPattern
-from odibi.context import EngineContext
-from odibi.enums import EngineType
-
-# Create pattern instance
-pattern = DateDimensionPattern(params={
-    "start_date": "2020-01-01",
-    "end_date": "2030-12-31",
-    "fiscal_year_start_month": 7,
-    "unknown_member": True
-})
-
-# Validate configuration
-pattern.validate()
-
-# Execute pattern (no source data needed - generates dates)
-context = EngineContext(df=None, engine_type=EngineType.SPARK, spark=spark)
-result_df = pattern.execute(context)
-
-# Result: DataFrame with 4018 rows (11 years * 365.25 days + unknown member)
-result_df.show()
-```
-
-**Output:**
-```
-+--------+----------+-----------+---------------+------------+-----------+----------+------------+-----+----------+-------+------------+----+-----------+--------------+--------------+------------+--------------+------------+
-|date_sk |full_date |day_of_week|day_of_week_num|day_of_month|day_of_year|is_weekend|week_of_year|month|month_name|quarter|quarter_name|year|fiscal_year|fiscal_quarter|is_month_start|is_month_end|is_year_start|is_year_end|
-+--------+----------+-----------+---------------+------------+-----------+----------+------------+-----+----------+-------+------------+----+-----------+--------------+--------------+------------+--------------+------------+
-|       0|1900-01-01|    Unknown|              0|           0|          0|     false|           0|    0|   Unknown|      0|     Unknown|   0|          0|             0|         false|       false|         false|       false|
-|20200101|2020-01-01|  Wednesday|              3|           1|          1|     false|           1|    1|   January|      1|          Q1|2020|       2020|             3|          true|       false|          true|       false|
-|20200102|2020-01-02|   Thursday|              4|           2|          2|     false|           1|    1|   January|      1|          Q1|2020|       2020|             3|         false|       false|         false|       false|
-+--------+----------+-----------+---------------+------------+-----------+----------+------------+-----+----------+-------+------------+----+-----------+--------------+--------------+------------+--------------+------------+
-```
-
----
-
-## Common Use Cases
+## Common Fiscal Year Configurations
 
 ### Retail Calendar (October FY)
 ```yaml
@@ -218,15 +202,8 @@ fiscal_year_start_month: 1  # Default
 
 ---
 
-## Performance Tips
-
-1. **Generate once, use forever**: Date dimensions are static - generate with a wide range (e.g., 2015-2035)
-2. **Partition by year**: For very large date ranges, partition the output
-3. **Unknown member**: Always enable for FK integrity
-
----
-
 ## See Also
 
 - [Dimension Pattern](./dimension.md) - Build regular dimensions
 - [Fact Pattern](./fact.md) - Build fact tables with SK lookups
+- [YAML Schema Reference](../reference/yaml_schema.md) - Full configuration reference

@@ -2,55 +2,140 @@
 
 The Odibi Semantic Layer provides a unified interface for defining and querying business metrics. Define metrics once, query them across any dimension combination.
 
-## Overview
+## How It Fits Into Odibi
+
+The semantic layer is a **separate module** from the core pipeline YAML. It's designed for:
+
+1. **Ad-hoc metric queries** via Python API
+2. **Scheduled metric materialization** to pre-compute aggregates
+3. **Self-service analytics** where business users query by metric name
+
+**It does NOT replace the pipeline YAML** - instead, it works alongside it:
+- Pipelines build your **fact and dimension tables**
+- The semantic layer **queries those tables** using metric definitions
 
 ```mermaid
 flowchart TB
-    subgraph Sources["Data Sources"]
-        F[Fact Tables]
-        D[Dimension Tables]
+    subgraph Pipeline["Odibi Pipelines (YAML)"]
+        R[Read Sources]
+        D[Build Dimensions]
+        F[Build Facts]
+        A[Build Aggregates]
     end
     
-    subgraph Semantic["Semantic Layer"]
+    subgraph Data["Data Layer"]
+        DIM[(dim_customer<br>dim_product<br>dim_date)]
+        FACT[(fact_orders)]
+        AGG[(agg_daily_sales)]
+    end
+    
+    subgraph Semantic["Semantic Layer (Python API)"]
         M[Metric Definitions]
-        DIM[Dimension Definitions]
-        MAT[Materializations]
-    end
-    
-    subgraph Query["Query Interface"]
-        Q["SemanticQuery"]
-        SQL["Generated SQL"]
+        Q[SemanticQuery]
+        MAT[Materializer]
     end
     
     subgraph Output["Output"]
-        DF[DataFrame Result]
-        TABLE[Materialized Table]
+        DF[DataFrame Results]
+        TABLE[Materialized Tables]
     end
     
-    F --> M
-    D --> DIM
-    M --> Q
-    DIM --> Q
-    Q --> SQL
-    SQL --> DF
-    M --> MAT
-    DIM --> MAT
-    MAT --> TABLE
+    R --> D --> DIM
+    R --> F --> FACT
+    FACT --> A --> AGG
     
+    DIM --> M
+    FACT --> M
+    M --> Q --> DF
+    M --> MAT --> TABLE
+    
+    style Pipeline fill:#1a1a2e,stroke:#4a90d9,color:#fff
     style Semantic fill:#1a1a2e,stroke:#4a90d9,color:#fff
-    style Query fill:#1a1a2e,stroke:#4a90d9,color:#fff
 ```
+
+---
+
+## When to Use What
+
+| Use Case | Solution |
+|----------|----------|
+| Build dimension tables | Use `transformer: dimension` in pipeline YAML |
+| Build fact tables | Use `transformer: fact` in pipeline YAML |
+| Build scheduled aggregates | Use `transformer: aggregation` in pipeline YAML |
+| Ad-hoc metric queries | Use Semantic Layer Python API |
+| Self-service BI metrics | Use Semantic Layer with materialization |
+
+---
+
+## Configuration
+
+The semantic layer is configured via Python, not YAML. You can load config from a YAML file if desired:
+
+```python
+from odibi.semantics import SemanticQuery, Materializer, parse_semantic_config
+import yaml
+
+# Load from YAML (optional - can also build programmatically)
+with open("semantic_config.yaml") as f:
+    config = parse_semantic_config(yaml.safe_load(f))
+
+# Query interface
+query = SemanticQuery(config)
+result = query.execute("revenue BY region", context)
+
+# Materialization
+materializer = Materializer(config)
+materializer.execute("monthly_revenue", context)
+```
+
+### Example semantic_config.yaml
+
+```yaml
+metrics:
+  - name: revenue
+    description: "Total revenue from completed orders"
+    expr: "SUM(total_amount)"
+    source: fact_orders
+    filters:
+      - "status = 'completed'"
+  
+  - name: order_count
+    expr: "COUNT(*)"
+    source: fact_orders
+  
+  - name: avg_order_value
+    expr: "AVG(total_amount)"
+    source: fact_orders
+
+dimensions:
+  - name: region
+    source: fact_orders
+    column: region
+  
+  - name: month
+    source: dim_date
+    column: month_name
+    hierarchy: [year, quarter, month_name]
+  
+  - name: category
+    source: dim_product
+    column: category
+
+materializations:
+  - name: monthly_revenue_by_region
+    metrics: [revenue, order_count]
+    dimensions: [region, month]
+    output: gold/agg_monthly_revenue
+    schedule: "0 2 1 * *"  # 2am on 1st of month
+```
+
+---
 
 ## Core Concepts
 
 ### Metrics
 
-Metrics are measurable values that can be aggregated across dimensions. Examples:
-- **revenue**: `SUM(total_amount)`
-- **order_count**: `COUNT(*)`
-- **avg_order_value**: `AVG(total_amount)`
-
-Metrics are defined once and can be queried in any combination:
+Metrics are measurable values that can be aggregated across dimensions:
 
 ```yaml
 metrics:
@@ -61,16 +146,9 @@ metrics:
       - "status = 'completed'"
 ```
 
-See [Defining Metrics](./metrics.md) for full documentation.
-
 ### Dimensions
 
-Dimensions are attributes for grouping and filtering metrics. Examples:
-- **region**: Geographic region
-- **order_date**: Date hierarchy (year > quarter > month > day)
-- **category**: Product category
-
-Dimensions support hierarchies for drill-down:
+Dimensions are attributes for grouping and filtering:
 
 ```yaml
 dimensions:
@@ -78,8 +156,6 @@ dimensions:
     source: dim_date
     hierarchy: [year, quarter, month, full_date]
 ```
-
-See [Defining Metrics](./metrics.md#dimensions) for full documentation.
 
 ### Queries
 
@@ -89,113 +165,121 @@ Query the semantic layer with a simple string syntax:
 result = query.execute("revenue, order_count BY region, month", context)
 ```
 
-The query interface:
-1. Parses the query string
-2. Validates metrics and dimensions exist
-3. Generates SQL aggregation
-4. Executes against source data
-5. Returns DataFrame result
-
-See [Querying](./query.md) for full documentation.
-
 ### Materializations
 
-Pre-compute aggregated metrics at specific grain for faster querying:
+Pre-compute metrics at specific grain:
 
 ```yaml
 materializations:
-  - name: monthly_revenue_by_region
+  - name: monthly_revenue
     metrics: [revenue, order_count]
     dimensions: [region, month]
     output: gold/agg_monthly_revenue
-    schedule: "0 2 1 * *"  # 2am on 1st of month
 ```
-
-See [Materializing Metrics](./materialize.md) for full documentation.
 
 ---
 
 ## Quick Start
 
-### 1. Define Your Semantic Layer
+### 1. Build Your Data with Pipelines
+
+First, use standard Odibi pipelines to build your star schema:
 
 ```yaml
-# In odibi.yaml or separate semantic_layer.yaml
-semantic_layer:
-  metrics:
-    - name: revenue
-      description: "Total revenue from completed orders"
-      expr: "SUM(total_amount)"
-      source: fact_orders
-      filters:
-        - "status = 'completed'"
-    
-    - name: order_count
-      expr: "COUNT(*)"
-      source: fact_orders
-    
-    - name: avg_order_value
-      expr: "AVG(total_amount)"
-      source: fact_orders
+# odibi.yaml - Build the data layer
+project: my_warehouse
+engine: spark
 
-  dimensions:
-    - name: region
-      source: fact_orders
-      column: region
-    
-    - name: month
-      source: dim_date
-      column: month_name
-      hierarchy: [year, quarter, month_name]
-    
-    - name: category
-      source: dim_product
-      column: category
+connections:
+  warehouse:
+    type: delta
+    path: /mnt/warehouse
 
-  materializations:
-    - name: monthly_revenue
-      metrics: [revenue, order_count]
-      dimensions: [region, month]
-      output: gold/agg_monthly_revenue
+story:
+  connection: warehouse
+  path: stories
+
+pipelines:
+  - pipeline: build_star_schema
+    nodes:
+      - name: dim_customer
+        read:
+          connection: staging
+          path: customers
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_columns: [name, region]
+        write:
+          connection: warehouse
+          path: dim_customer
+
+      - name: fact_orders
+        depends_on: [dim_customer]
+        read:
+          connection: staging
+          path: orders
+        transformer: fact
+        params:
+          grain: [order_id]
+          dimensions:
+            - source_column: customer_id
+              dimension_table: dim_customer
+              dimension_key: customer_id
+              surrogate_key: customer_sk
+        write:
+          connection: warehouse
+          path: fact_orders
 ```
 
-### 2. Query Interactively
+### 2. Define Semantic Layer
+
+Create a semantic config (Python or YAML):
 
 ```python
-from odibi.semantics import SemanticQuery, parse_semantic_config
+from odibi.semantics import SemanticLayerConfig, MetricDefinition, DimensionDefinition
 
-# Load configuration
-config = parse_semantic_config(yaml.safe_load(open("semantic_layer.yaml")))
-
-# Create query interface
-query = SemanticQuery(config)
-
-# Execute queries
-result = query.execute("revenue BY region", context)
-print(result.df)
-
-result = query.execute("revenue, order_count BY region, month", context)
-print(result.df)
-
-result = query.execute(
-    "revenue BY category WHERE region = 'North'", 
-    context
+config = SemanticLayerConfig(
+    metrics=[
+        MetricDefinition(
+            name="revenue",
+            expr="SUM(total_amount)",
+            source="fact_orders",
+            filters=["status = 'completed'"]
+        ),
+        MetricDefinition(
+            name="order_count",
+            expr="COUNT(*)",
+            source="fact_orders"
+        )
+    ],
+    dimensions=[
+        DimensionDefinition(
+            name="region",
+            source="dim_customer",
+            column="region"
+        )
+    ]
 )
-print(result.df)
 ```
 
-### 3. Materialize for Performance
+### 3. Query Metrics
 
 ```python
-from odibi.semantics import Materializer
+from odibi.semantics import SemanticQuery
+from odibi.context import EngineContext
 
-materializer = Materializer(config)
+# Setup context with your data
+context = EngineContext(df=None, engine_type=EngineType.SPARK, spark=spark)
+context.register("fact_orders", spark.table("warehouse.fact_orders"))
+context.register("dim_customer", spark.table("warehouse.dim_customer"))
 
-# Execute single materialization
-result = materializer.execute("monthly_revenue", context)
-
-# Execute all materializations
-results = materializer.execute_all(context)
+# Query
+query = SemanticQuery(config)
+result = query.execute("revenue BY region", context)
+print(result.df.show())
 ```
 
 ---
@@ -208,9 +292,6 @@ classDiagram
         +metrics: List[MetricDefinition]
         +dimensions: List[DimensionDefinition]
         +materializations: List[MaterializationConfig]
-        +get_metric(name)
-        +get_dimension(name)
-        +validate_references()
     }
     
     class MetricDefinition {
@@ -218,7 +299,6 @@ classDiagram
         +expr: str
         +source: str
         +filters: List[str]
-        +type: MetricType
     }
     
     class DimensionDefinition {
@@ -228,50 +308,20 @@ classDiagram
         +hierarchy: List[str]
     }
     
-    class MaterializationConfig {
-        +name: str
-        +metrics: List[str]
-        +dimensions: List[str]
-        +output: str
-        +schedule: str
-    }
-    
     class SemanticQuery {
-        +parse(query_string)
-        +validate(parsed)
-        +generate_sql(parsed)
         +execute(query_string, context)
     }
     
     class Materializer {
         +execute(name, context)
         +execute_all(context)
-        +get_schedule(name)
     }
     
     SemanticLayerConfig --> MetricDefinition
     SemanticLayerConfig --> DimensionDefinition
-    SemanticLayerConfig --> MaterializationConfig
     SemanticQuery --> SemanticLayerConfig
     Materializer --> SemanticLayerConfig
-    Materializer --> SemanticQuery
 ```
-
----
-
-## Benefits
-
-### Single Source of Truth
-Define metrics once, use everywhere. No more scattered aggregation logic.
-
-### Self-Service Analytics
-Business users can query metrics by name without knowing SQL.
-
-### Performance
-Materialize frequently-queried metric combinations for sub-second response.
-
-### Governance
-All metric definitions in version control with clear lineage.
 
 ---
 
@@ -280,3 +330,4 @@ All metric definitions in version control with clear lineage.
 - [Defining Metrics](./metrics.md) - Create metric and dimension definitions
 - [Querying](./query.md) - Query syntax and examples
 - [Materializing](./materialize.md) - Pre-compute and schedule metrics
+- [Pattern Docs](../patterns/README.md) - Build your data layer with patterns
