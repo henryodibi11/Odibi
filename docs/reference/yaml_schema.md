@@ -3040,13 +3040,38 @@ Attributes:
 
 ### Data Patterns
 
-Declarative patterns for common data warehouse building blocks.
+Declarative patterns for common data warehouse building blocks. Patterns encapsulate
+best practices for dimensional modeling, ensuring consistent implementation across
+your data warehouse.
 
-**Available Patterns:**
-- **DimensionPattern**: Build dimensions with SCD Type 0/1/2 and surrogate keys
-- **DateDimensionPattern**: Generate date dimensions with fiscal calendar support
-- **FactPattern**: Build fact tables with automatic SK lookups and orphan handling
-- **AggregationPattern**: Declarative GROUP BY with incremental merge strategies
+---
+
+## DimensionPattern
+
+Build complete dimension tables with surrogate keys and SCD (Slowly Changing Dimension) support.
+
+**Features:**
+- Auto-generate integer surrogate keys (MAX(existing) + ROW_NUMBER)
+- SCD Type 0 (static), 1 (overwrite), 2 (history tracking)
+- Optional unknown member row (SK=0) for orphan FK handling
+- Audit columns (load_timestamp, source_system)
+
+**Params:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `natural_key` | str | Yes | Natural/business key column name |
+| `surrogate_key` | str | Yes | Surrogate key column name to generate |
+| `scd_type` | int | No | 0=static, 1=overwrite, 2=history (default: 1) |
+| `track_columns` | list | SCD1/2 | Columns to track for change detection |
+| `target` | str | SCD2 | Target table path to read existing history |
+| `unknown_member` | bool | No | Insert row with SK=0 for orphan handling |
+| `audit.load_timestamp` | bool | No | Add load_timestamp column |
+| `audit.source_system` | str | No | Add source_system column with value |
+
+**Supported Target Formats:**
+- Spark: catalog.table, Delta paths, .parquet, .csv, .json, .orc
+- Pandas: .parquet, .csv, .json, .xlsx, .feather, .pickle
 
 **Example:**
 ```yaml
@@ -3056,8 +3081,166 @@ pattern:
     natural_key: customer_id
     surrogate_key: customer_sk
     scd_type: 2
-    track_columns: [name, email, address]
+    track_columns: [name, email, address, city]
+    target: warehouse.dim_customer
     unknown_member: true
+    audit:
+      load_timestamp: true
+      source_system: "crm"
+```
+
+---
+
+## DateDimensionPattern
+
+Generate a complete date dimension table with pre-calculated attributes for BI/reporting.
+
+**Features:**
+- Generates all dates in a range with rich attributes
+- Calendar and fiscal year support
+- ISO week numbering
+- Weekend/month-end flags
+
+**Params:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `start_date` | str | Yes | Start date (YYYY-MM-DD) |
+| `end_date` | str | Yes | End date (YYYY-MM-DD) |
+| `date_key_format` | str | No | Format for date_sk (default: yyyyMMdd) |
+| `fiscal_year_start_month` | int | No | Month fiscal year starts (1-12, default: 1) |
+| `unknown_member` | bool | No | Add unknown date row with date_sk=0 |
+
+**Generated Columns:**
+`date_sk`, `full_date`, `day_of_week`, `day_of_week_num`, `day_of_month`,
+`day_of_year`, `is_weekend`, `week_of_year`, `month`, `month_name`, `quarter`,
+`quarter_name`, `year`, `fiscal_year`, `fiscal_quarter`, `is_month_start`,
+`is_month_end`, `is_year_start`, `is_year_end`
+
+**Example:**
+```yaml
+pattern:
+  type: date_dimension
+  params:
+    start_date: "2020-01-01"
+    end_date: "2030-12-31"
+    fiscal_year_start_month: 7
+    unknown_member: true
+```
+
+---
+
+## FactPattern
+
+Build fact tables with automatic surrogate key lookups from dimensions.
+
+**Features:**
+- Automatic SK lookups from dimension tables (with SCD2 current-record filtering)
+- Orphan handling: unknown (SK=0), reject (error), quarantine (route to table)
+- Grain validation (detect duplicates)
+- Calculated measures and column renaming
+- Audit columns
+
+**Params:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `grain` | list | No | Columns defining uniqueness (validates no duplicates) |
+| `dimensions` | list | No | Dimension lookup configurations (see below) |
+| `orphan_handling` | str | No | "unknown" \| "reject" \| "quarantine" (default: unknown) |
+| `quarantine` | dict | quarantine | Quarantine config (see below) |
+| `measures` | list | No | Measure definitions (passthrough, rename, or calculated) |
+| `deduplicate` | bool | No | Remove duplicates before processing |
+| `keys` | list | dedupe | Keys for deduplication |
+| `audit.load_timestamp` | bool | No | Add load_timestamp column |
+| `audit.source_system` | str | No | Add source_system column |
+
+**Dimension Lookup Config:**
+```yaml
+dimensions:
+  - source_column: customer_id      # Column in source fact
+    dimension_table: dim_customer   # Dimension in context
+    dimension_key: customer_id      # Natural key in dimension
+    surrogate_key: customer_sk      # SK to retrieve
+    scd2: true                      # Filter is_current=true
+```
+
+**Quarantine Config (for orphan_handling: quarantine):**
+```yaml
+quarantine:
+  connection: silver                # Required: connection name
+  path: fact_orders_orphans         # OR table: quarantine_table
+  add_columns:
+    _rejection_reason: true         # Add rejection reason
+    _rejected_at: true              # Add rejection timestamp
+    _source_dimension: true         # Add dimension name
+```
+
+**Example:**
+```yaml
+pattern:
+  type: fact
+  params:
+    grain: [order_id]
+    dimensions:
+      - source_column: customer_id
+        dimension_table: dim_customer
+        dimension_key: customer_id
+        surrogate_key: customer_sk
+        scd2: true
+      - source_column: product_id
+        dimension_table: dim_product
+        dimension_key: product_id
+        surrogate_key: product_sk
+    orphan_handling: unknown
+    measures:
+      - quantity
+      - revenue: "quantity * unit_price"
+    audit:
+      load_timestamp: true
+      source_system: "pos"
+```
+
+---
+
+## AggregationPattern
+
+Declarative aggregation with GROUP BY and optional incremental merge.
+
+**Features:**
+- Declare grain (GROUP BY columns)
+- Define measures with SQL aggregation expressions
+- Optional HAVING filter
+- Audit columns
+
+**Params:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `grain` | list | Yes | Columns to GROUP BY (defines uniqueness) |
+| `measures` | list | Yes | Measure definitions with name and expr |
+| `having` | str | No | HAVING clause for filtering aggregates |
+| `incremental.timestamp_column` | str | No | Column to identify new data |
+| `incremental.merge_strategy` | str | No | "replace" or "sum" |
+| `audit.load_timestamp` | bool | No | Add load_timestamp column |
+| `audit.source_system` | str | No | Add source_system column |
+
+**Example:**
+```yaml
+pattern:
+  type: aggregation
+  params:
+    grain: [date_sk, product_sk, region]
+    measures:
+      - name: total_revenue
+        expr: "SUM(total_amount)"
+      - name: order_count
+        expr: "COUNT(*)"
+      - name: avg_order_value
+        expr: "AVG(total_amount)"
+    having: "COUNT(*) > 0"
+    audit:
+      load_timestamp: true
 ```
 
 ---
