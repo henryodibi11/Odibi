@@ -1,0 +1,13 @@
+customer_id,name,email,region,city,state
+C001,Alice Johnson,alice@example.com,North,Chicago,IL
+C002,Bob Smith,bob@example.com,South,Houston,TX
+C003,Carol White,carol@example.com,North,Detroit,MI
+C004,David Brown,david@example.com,East,New York,NY
+C005,Emma Davis,emma@example.com,West,Seattle,WA
+C006,Frank Miller,frank@example.com,South,Miami,FL
+C007,Grace Lee,grace@example.com,East,Boston,MA
+C008,Henry Wilson,henry@example.com,West,Portland,OR
+C009,Ivy Chen,ivy@example.com,North,Minneapolis,MN
+C010,Jack Taylor,jack@example.com,South,Dallas,TX
+C011,Karen Martinez,karen@example.com,East,Philadelphia,PA
+C012,Leo Anderson,leo@example.com,West,Denver,CO

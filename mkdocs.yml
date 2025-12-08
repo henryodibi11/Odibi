@@ -38,6 +38,20 @@ nav:
   - Home: README.md
   - Tutorials:
       - Getting Started: docs/tutorials/getting_started.md
+      - Dimensional Modeling:
+          - Introduction: docs/tutorials/dimensional_modeling/01_introduction.md
+          - Dimension Pattern: docs/tutorials/dimensional_modeling/02_dimension_pattern.md
+          - Date Dimension: docs/tutorials/dimensional_modeling/03_date_dimension_pattern.md
+          - Fact Pattern: docs/tutorials/dimensional_modeling/04_fact_pattern.md
+          - Aggregation Pattern: docs/tutorials/dimensional_modeling/05_aggregation_pattern.md
+          - Full Star Schema: docs/tutorials/dimensional_modeling/06_full_star_schema.md
+          - Semantic Layer Intro: docs/tutorials/dimensional_modeling/07_semantic_layer_intro.md
+          - Defining Metrics: docs/tutorials/dimensional_modeling/08_defining_metrics.md
+          - Defining Dimensions: docs/tutorials/dimensional_modeling/09_defining_dimensions.md
+          - Querying Metrics: docs/tutorials/dimensional_modeling/10_querying_metrics.md
+          - Materializing Metrics: docs/tutorials/dimensional_modeling/11_materializing_metrics.md
+          - Semantic Full Example: docs/tutorials/dimensional_modeling/12_semantic_full_example.md
+          - FK Validation: docs/tutorials/dimensional_modeling/13_fk_validation.md
   - Guides:
       - Dogfooding (Meta): docs/guides/dogfooding.md
       - Writing Transformations: docs/guides/writing_transformations.md
