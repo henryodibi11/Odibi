@@ -26,7 +26,11 @@ class AggregationPattern(Pattern):
             - expr: SQL aggregation expression (e.g., "SUM(amount)")
         incremental (dict): Incremental merge configuration (optional)
             - timestamp_column: Column to identify new data
-            - merge_strategy: "replace" (overwrite) or "sum" (add to existing)
+            - merge_strategy: "replace", "sum", "min", or "max"
+                - replace: Overwrite existing values for matching grain
+                - sum: Add new values to existing
+                - min: Keep minimum value between existing and new
+                - max: Keep maximum value between existing and new
         having (str): Optional HAVING clause for filtering aggregates
         audit (dict): Audit column configuration
             - load_timestamp (bool)
@@ -108,13 +112,13 @@ class AggregationPattern(Pattern):
                     "AggregationPattern: incremental config requires 'timestamp_column'."
                 )
             merge_strategy = incremental.get("merge_strategy", "replace")
-            if merge_strategy not in ("replace", "sum"):
+            if merge_strategy not in ("replace", "sum", "min", "max"):
                 ctx.error(
                     f"AggregationPattern validation failed: invalid merge_strategy '{merge_strategy}'",
                     pattern="AggregationPattern",
                 )
                 raise ValueError(
-                    f"AggregationPattern: 'merge_strategy' must be 'replace' or 'sum'. "
+                    f"AggregationPattern: 'merge_strategy' must be 'replace', 'sum', 'min', or 'max'. "
                     f"Got: {merge_strategy}"
                 )
 
@@ -278,8 +282,12 @@ class AggregationPattern(Pattern):
 
         if merge_strategy == "replace":
             return self._merge_replace(context, existing_df, new_agg_df, grain)
-        else:
+        elif merge_strategy == "sum":
             return self._merge_sum(context, existing_df, new_agg_df, grain, measures)
+        elif merge_strategy == "min":
+            return self._merge_min(context, existing_df, new_agg_df, grain, measures)
+        else:  # max
+            return self._merge_max(context, existing_df, new_agg_df, grain, measures)
 
     def _load_existing_target(self, context: EngineContext, target: str):
         """Load existing target table if it exists."""
@@ -404,6 +412,142 @@ class AggregationPattern(Pattern):
                     result[name] = merged[n_col].fillna(0)
                 else:
                     result[name] = 0
+
+            other_cols = [
+                c for c in existing_df.columns if c not in grain and c not in measure_names
+            ]
+            for col in other_cols:
+                e_col = f"{col}_e" if f"{col}_e" in merged.columns else col
+                n_col = f"{col}_n" if f"{col}_n" in merged.columns else col
+                if e_col in merged.columns:
+                    result[col] = merged[e_col]
+                elif n_col in merged.columns:
+                    result[col] = merged[n_col]
+
+            return result
+
+    def _merge_min(
+        self,
+        context: EngineContext,
+        existing_df,
+        new_df,
+        grain: List[str],
+        measures: List[Dict],
+    ):
+        """
+        Min strategy: Keep the minimum value for each measure across existing and new.
+        """
+        measure_names = [m["name"] for m in measures]
+
+        if context.engine_type == EngineType.SPARK:
+            from pyspark.sql import functions as F
+
+            joined = existing_df.alias("e").join(new_df.alias("n"), on=grain, how="full_outer")
+
+            select_cols = []
+            for col in grain:
+                select_cols.append(F.coalesce(F.col(f"e.{col}"), F.col(f"n.{col}")).alias(col))
+
+            for name in measure_names:
+                select_cols.append(
+                    F.least(
+                        F.coalesce(F.col(f"e.{name}"), F.col(f"n.{name}")),
+                        F.coalesce(F.col(f"n.{name}"), F.col(f"e.{name}")),
+                    ).alias(name)
+                )
+
+            other_cols = [
+                c for c in existing_df.columns if c not in grain and c not in measure_names
+            ]
+            for col in other_cols:
+                select_cols.append(F.coalesce(F.col(f"e.{col}"), F.col(f"n.{col}")).alias(col))
+
+            return joined.select(select_cols)
+        else:
+            import pandas as pd
+
+            merged = pd.merge(existing_df, new_df, on=grain, how="outer", suffixes=("_e", "_n"))
+
+            result = merged[grain].copy()
+
+            for name in measure_names:
+                e_col = f"{name}_e" if f"{name}_e" in merged.columns else name
+                n_col = f"{name}_n" if f"{name}_n" in merged.columns else name
+
+                if e_col in merged.columns and n_col in merged.columns:
+                    result[name] = merged[[e_col, n_col]].min(axis=1)
+                elif e_col in merged.columns:
+                    result[name] = merged[e_col]
+                elif n_col in merged.columns:
+                    result[name] = merged[n_col]
+
+            other_cols = [
+                c for c in existing_df.columns if c not in grain and c not in measure_names
+            ]
+            for col in other_cols:
+                e_col = f"{col}_e" if f"{col}_e" in merged.columns else col
+                n_col = f"{col}_n" if f"{col}_n" in merged.columns else col
+                if e_col in merged.columns:
+                    result[col] = merged[e_col]
+                elif n_col in merged.columns:
+                    result[col] = merged[n_col]
+
+            return result
+
+    def _merge_max(
+        self,
+        context: EngineContext,
+        existing_df,
+        new_df,
+        grain: List[str],
+        measures: List[Dict],
+    ):
+        """
+        Max strategy: Keep the maximum value for each measure across existing and new.
+        """
+        measure_names = [m["name"] for m in measures]
+
+        if context.engine_type == EngineType.SPARK:
+            from pyspark.sql import functions as F
+
+            joined = existing_df.alias("e").join(new_df.alias("n"), on=grain, how="full_outer")
+
+            select_cols = []
+            for col in grain:
+                select_cols.append(F.coalesce(F.col(f"e.{col}"), F.col(f"n.{col}")).alias(col))
+
+            for name in measure_names:
+                select_cols.append(
+                    F.greatest(
+                        F.coalesce(F.col(f"e.{name}"), F.col(f"n.{name}")),
+                        F.coalesce(F.col(f"n.{name}"), F.col(f"e.{name}")),
+                    ).alias(name)
+                )
+
+            other_cols = [
+                c for c in existing_df.columns if c not in grain and c not in measure_names
+            ]
+            for col in other_cols:
+                select_cols.append(F.coalesce(F.col(f"e.{col}"), F.col(f"n.{col}")).alias(col))
+
+            return joined.select(select_cols)
+        else:
+            import pandas as pd
+
+            merged = pd.merge(existing_df, new_df, on=grain, how="outer", suffixes=("_e", "_n"))
+
+            result = merged[grain].copy()
+
+            for name in measure_names:
+                e_col = f"{name}_e" if f"{name}_e" in merged.columns else name
+                n_col = f"{name}_n" if f"{name}_n" in merged.columns else name
+
+                if e_col in merged.columns and n_col in merged.columns:
+                    result[name] = merged[[e_col, n_col]].max(axis=1)
+                elif e_col in merged.columns:
+                    result[name] = merged[e_col]
+                elif n_col in merged.columns:
+                    result[name] = merged[n_col]
 
             other_cols = [
                 c for c in existing_df.columns if c not in grain and c not in measure_names

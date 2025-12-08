@@ -3221,7 +3221,7 @@ Declarative aggregation with GROUP BY and optional incremental merge.
 | `measures` | list | Yes | Measure definitions with name and expr |
 | `having` | str | No | HAVING clause for filtering aggregates |
 | `incremental.timestamp_column` | str | No | Column to identify new data |
-| `incremental.merge_strategy` | str | No | "replace" or "sum" |
+| `incremental.merge_strategy` | str | No | "replace", "sum", "min", or "max" |
 | `audit.load_timestamp` | bool | No | Add load_timestamp column |
 | `audit.source_system` | str | No | Add source_system column |
 
