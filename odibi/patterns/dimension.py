@@ -38,6 +38,23 @@ class DimensionPattern(Pattern):
         target (str): Target table path (required for SCD2 to read existing history)
         unknown_member (bool): If true, insert a row with SK=0 for orphan FK handling
         audit (dict): Audit configuration with load_timestamp and source_system
+
+    Supported target formats:
+        Spark:
+            - Catalog tables: catalog.schema.table, warehouse.dim_customer
+            - Delta paths: /path/to/delta (no extension)
+            - Parquet: /path/to/file.parquet
+            - CSV: /path/to/file.csv
+            - JSON: /path/to/file.json
+            - ORC: /path/to/file.orc
+        Pandas:
+            - Parquet: path/to/file.parquet (or directory)
+            - CSV: path/to/file.csv
+            - JSON: path/to/file.json
+            - Excel: path/to/file.xlsx, path/to/file.xls
+            - Feather/Arrow: path/to/file.feather, path/to/file.arrow
+            - Pickle: path/to/file.pickle, path/to/file.pkl
+            - Connection-prefixed: warehouse.dim_customer
     """
 
     def validate(self) -> None:
@@ -177,21 +194,49 @@ class DimensionPattern(Pattern):
             return self._load_existing_pandas(context, target)
 
     def _load_existing_spark(self, context: EngineContext, target: str):
+        """Load existing target table from Spark with multi-format support."""
+        ctx = get_logging_context()
         spark = context.spark
+
+        # Try catalog table first
         try:
             return spark.table(target)
         except Exception:
-            try:
+            pass
+
+        # Check file extension for format detection
+        target_lower = target.lower()
+
+        try:
+            if target_lower.endswith(".parquet"):
+                return spark.read.parquet(target)
+            elif target_lower.endswith(".csv"):
+                return spark.read.option("header", "true").option("inferSchema", "true").csv(target)
+            elif target_lower.endswith(".json"):
+                return spark.read.json(target)
+            elif target_lower.endswith(".orc"):
+                return spark.read.orc(target)
+            else:
+                # Try Delta format as fallback (for paths without extension)
                 return spark.read.format("delta").load(target)
-            except Exception:
-                return None
+        except Exception as e:
+            ctx.warning(
+                f"Could not load existing target '{target}': {e}. " "Treating as initial load.",
+                pattern="DimensionPattern",
+                target=target,
+            )
+            return None
 
     def _load_existing_pandas(self, context: EngineContext, target: str):
+        """Load existing target table from Pandas with multi-format support."""
         import os
 
         import pandas as pd
 
+        ctx = get_logging_context()
         path = target
+
+        # Handle connection-prefixed paths
         if hasattr(context, "engine") and context.engine:
             if "." in path:
                 parts = path.split(".", 1)
@@ -206,15 +251,43 @@ class DimensionPattern(Pattern):
         if not os.path.exists(path):
             return None
 
-        try:
-            if str(path).endswith(".parquet") or os.path.isdir(path):
-                return pd.read_parquet(path)
-            elif str(path).endswith(".csv"):
-                return pd.read_csv(path)
-        except Exception:
-            return None
+        path_lower = str(path).lower()
 
-        return None
+        try:
+            # Parquet (file or directory)
+            if path_lower.endswith(".parquet") or os.path.isdir(path):
+                return pd.read_parquet(path)
+            # CSV
+            elif path_lower.endswith(".csv"):
+                return pd.read_csv(path)
+            # JSON
+            elif path_lower.endswith(".json"):
+                return pd.read_json(path)
+            # Excel
+            elif path_lower.endswith(".xlsx") or path_lower.endswith(".xls"):
+                return pd.read_excel(path)
+            # Feather / Arrow IPC
+            elif path_lower.endswith(".feather") or path_lower.endswith(".arrow"):
+                return pd.read_feather(path)
+            # Pickle
+            elif path_lower.endswith(".pickle") or path_lower.endswith(".pkl"):
+                return pd.read_pickle(path)
+            else:
+                ctx.warning(
+                    f"Unrecognized file format for target '{target}'. "
+                    "Supported formats: parquet, csv, json, xlsx, xls, feather, arrow, pickle. "
+                    "Treating as initial load.",
+                    pattern="DimensionPattern",
+                    target=target,
+                )
+                return None
+        except Exception as e:
+            ctx.warning(
+                f"Could not load existing target '{target}': {e}. " "Treating as initial load.",
+                pattern="DimensionPattern",
+                target=target,
+            )
+            return None
 
     def _get_max_sk(self, df, surrogate_key: str, engine_type) -> int:
         """Get the maximum surrogate key value from existing data."""
