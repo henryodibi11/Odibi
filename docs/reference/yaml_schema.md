@@ -2838,3 +2838,236 @@ window_calculation:
 | **order_by** | Optional[str] | No | - | - |
 
 ---
+
+## Semantic Layer
+
+### Semantic Layer
+
+The semantic layer provides a unified interface for defining and querying business metrics.
+Define metrics once, query them by name across dimensions.
+
+**Core Components:**
+- **MetricDefinition**: Define aggregation expressions (SUM, COUNT, AVG)
+- **DimensionDefinition**: Define grouping attributes with hierarchies
+- **MaterializationConfig**: Pre-compute metrics at specific grain
+- **SemanticQuery**: Execute queries like "revenue BY region, month"
+
+**Example:**
+```yaml
+metrics:
+  - name: revenue
+    expr: "SUM(total_amount)"
+    source: fact_orders
+    filters:
+      - "status = 'completed'"
+
+dimensions:
+  - name: region
+    source: dim_customer
+    column: region
+
+materializations:
+  - name: monthly_revenue
+    metrics: [revenue]
+    dimensions: [region, month]
+    output: gold/agg_monthly_revenue
+```
+
+---
+
+### `DimensionDefinition`
+> *Used in: [SemanticLayerConfig](#semanticlayerconfig)*
+
+Definition of a semantic dimension.
+
+A dimension represents an attribute for grouping and filtering
+metrics (e.g., date, product, region).
+
+Attributes:
+    name: Unique dimension identifier
+    source: Source table name
+    column: Column name in source (defaults to name)
+    hierarchy: Optional ordered list of columns for drill-down
+    description: Human-readable description
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | str | Yes | - | Unique dimension identifier |
+| **source** | str | Yes | - | Source table name |
+| **column** | Optional[str] | No | - | Column name (defaults to name) |
+| **hierarchy** | List[str] | No | `PydanticUndefined` | Drill-down hierarchy |
+| **description** | Optional[str] | No | - | Human-readable description |
+
+---
+
+### `MaterializationConfig`
+> *Used in: [SemanticLayerConfig](#semanticlayerconfig)*
+
+Configuration for materializing metrics to a table.
+
+Materialization pre-computes aggregated metrics at a specific
+grain and persists them for faster querying.
+
+Attributes:
+    name: Unique materialization identifier
+    metrics: List of metric names to include
+    dimensions: List of dimension names (determines grain)
+    output: Output table path
+    schedule: Optional cron schedule for refresh
+    incremental: Configuration for incremental refresh
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | str | Yes | - | Unique materialization identifier |
+| **metrics** | List[str] | Yes | - | Metrics to materialize |
+| **dimensions** | List[str] | Yes | - | Dimensions for grouping |
+| **output** | str | Yes | - | Output table path |
+| **schedule** | Optional[str] | No | - | Cron schedule |
+| **incremental** | Optional[Dict[str, Any]] | No | - | Incremental refresh config |
+
+---
+
+### `MetricDefinition`
+> *Used in: [SemanticLayerConfig](#semanticlayerconfig)*
+
+Definition of a semantic metric.
+
+A metric represents a measurable value that can be aggregated
+across dimensions (e.g., revenue, order_count, avg_order_value).
+
+Attributes:
+    name: Unique metric identifier
+    description: Human-readable description
+    expr: SQL aggregation expression (e.g., "SUM(total_amount)")
+    source: Source table name (required for simple metrics)
+    filters: Optional WHERE conditions to apply
+    type: "simple" (direct aggregation) or "derived" (references other metrics)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | str | Yes | - | Unique metric identifier |
+| **description** | Optional[str] | No | - | Human-readable description |
+| **expr** | str | Yes | - | SQL aggregation expression |
+| **source** | Optional[str] | No | - | Source table name |
+| **filters** | List[str] | No | `PydanticUndefined` | WHERE conditions |
+| **type** | MetricType | No | `MetricType.SIMPLE` | Metric type |
+
+---
+
+### `SemanticLayerConfig`
+Complete semantic layer configuration.
+
+Contains all metrics, dimensions, and materializations
+for a semantic layer deployment.
+
+Attributes:
+    metrics: List of metric definitions
+    dimensions: List of dimension definitions
+    materializations: List of materialization configurations
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **metrics** | List[[MetricDefinition](#metricdefinition)] | No | `PydanticUndefined` | Metric definitions |
+| **dimensions** | List[[DimensionDefinition](#dimensiondefinition)] | No | `PydanticUndefined` | Dimension definitions |
+| **materializations** | List[[MaterializationConfig](#materializationconfig)] | No | `PydanticUndefined` | Materialization configs |
+
+---
+
+## FK Validation
+
+### FK Validation
+
+Declare and validate referential integrity between fact and dimension tables.
+
+**Features:**
+- Declare relationships in YAML
+- Validate FK constraints on fact load
+- Detect orphan records
+- Generate lineage from relationships
+
+**Example:**
+```yaml
+relationships:
+  - name: orders_to_customers
+    fact: fact_orders
+    dimension: dim_customer
+    fact_key: customer_sk
+    dimension_key: customer_sk
+    on_violation: error
+```
+
+---
+
+### `RelationshipConfig`
+> *Used in: [RelationshipRegistry](#relationshipregistry)*
+
+Configuration for a foreign key relationship.
+
+Attributes:
+    name: Unique relationship identifier
+    fact: Fact table name
+    dimension: Dimension table name
+    fact_key: Foreign key column in fact table
+    dimension_key: Primary/surrogate key column in dimension
+    nullable: Whether nulls are allowed in fact_key
+    on_violation: Action on violation ("warn", "error", "quarantine")
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | str | Yes | - | Unique relationship identifier |
+| **fact** | str | Yes | - | Fact table name |
+| **dimension** | str | Yes | - | Dimension table name |
+| **fact_key** | str | Yes | - | FK column in fact table |
+| **dimension_key** | str | Yes | - | PK/SK column in dimension |
+| **nullable** | bool | No | `False` | Allow nulls in fact_key |
+| **on_violation** | str | No | `error` | Action on violation |
+
+---
+
+### `RelationshipRegistry`
+Registry of all declared relationships.
+
+Attributes:
+    relationships: List of relationship configurations
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **relationships** | List[[RelationshipConfig](#relationshipconfig)] | No | `PydanticUndefined` | Relationship definitions |
+
+---
+
+## Data Patterns
+
+### Data Patterns
+
+Declarative patterns for common data warehouse building blocks.
+
+**Available Patterns:**
+- **DimensionPattern**: Build dimensions with SCD Type 0/1/2 and surrogate keys
+- **DateDimensionPattern**: Generate date dimensions with fiscal calendar support
+- **FactPattern**: Build fact tables with automatic SK lookups and orphan handling
+- **AggregationPattern**: Declarative GROUP BY with incremental merge strategies
+
+**Example:**
+```yaml
+pattern:
+  type: dimension
+  params:
+    natural_key: customer_id
+    surrogate_key: customer_sk
+    scd_type: 2
+    track_columns: [name, email, address]
+    unknown_member: true
+```
+
+---
+
+### `AuditConfig`
+Configuration for audit columns.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **load_timestamp** | bool | No | `True` | Add load_timestamp column |
+| **source_system** | Optional[str] | No | - | Source system name for source_system column |
+
+---
