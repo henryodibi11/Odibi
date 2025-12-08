@@ -33,6 +33,14 @@ class FactPattern(Pattern):
             - surrogate_key: Surrogate key to retrieve
             - scd2 (bool): If true, filter is_current=true
         orphan_handling (str): "unknown" | "reject" | "quarantine"
+        quarantine (dict): Quarantine configuration (required if orphan_handling=quarantine)
+            - connection: Connection name for quarantine writes
+            - path: Path for quarantine data (or use 'table')
+            - table: Table name for quarantine (or use 'path')
+            - add_columns (dict): Metadata columns to add
+                - _rejection_reason (bool): Add rejection reason column
+                - _rejected_at (bool): Add rejection timestamp column
+                - _source_dimension (bool): Add source dimension name column
         measures (list): Measure definitions (passthrough, rename, or calculated)
         audit (dict): Audit column configuration
             - load_timestamp (bool)
@@ -56,6 +64,24 @@ class FactPattern(Pattern):
             audit:
               load_timestamp: true
               source_system: "pos"
+
+    Example with Quarantine:
+        pattern:
+          type: fact
+          params:
+            dimensions:
+              - source_column: customer_id
+                dimension_table: dim_customer
+                dimension_key: customer_id
+                surrogate_key: customer_sk
+            orphan_handling: quarantine
+            quarantine:
+              connection: silver
+              path: fact_orders_orphans
+              add_columns:
+                _rejection_reason: true
+                _rejected_at: true
+                _source_dimension: true
     """
 
     def validate(self) -> None:
@@ -92,6 +118,31 @@ class FactPattern(Pattern):
                 f"Got: {orphan_handling}"
             )
 
+        if orphan_handling == "quarantine":
+            quarantine_config = self.params.get("quarantine")
+            if not quarantine_config:
+                ctx.error(
+                    "FactPattern validation failed: 'quarantine' config required "
+                    "when orphan_handling='quarantine'",
+                    pattern="FactPattern",
+                )
+                raise ValueError(
+                    "FactPattern: 'quarantine' configuration is required when "
+                    "orphan_handling='quarantine'."
+                )
+            if not quarantine_config.get("connection"):
+                ctx.error(
+                    "FactPattern validation failed: quarantine.connection is required",
+                    pattern="FactPattern",
+                )
+                raise ValueError("FactPattern: 'quarantine.connection' is required.")
+            if not quarantine_config.get("path") and not quarantine_config.get("table"):
+                ctx.error(
+                    "FactPattern validation failed: quarantine requires 'path' or 'table'",
+                    pattern="FactPattern",
+                )
+                raise ValueError("FactPattern: 'quarantine' requires either 'path' or 'table'.")
+
         for i, dim in enumerate(dimensions):
             required_keys = ["source_column", "dimension_table", "dimension_key", "surrogate_key"]
             for key in required_keys:
@@ -116,6 +167,7 @@ class FactPattern(Pattern):
         grain = self.params.get("grain")
         dimensions = self.params.get("dimensions", [])
         orphan_handling = self.params.get("orphan_handling", "unknown")
+        quarantine_config = self.params.get("quarantine", {})
         measures = self.params.get("measures", [])
         audit_config = self.params.get("audit", {})
 
@@ -143,12 +195,23 @@ class FactPattern(Pattern):
                 )
 
             if dimensions:
-                df, orphan_count = self._lookup_dimensions(context, df, dimensions, orphan_handling)
+                df, orphan_count, quarantined_df = self._lookup_dimensions(
+                    context, df, dimensions, orphan_handling, quarantine_config
+                )
                 ctx.debug(
                     "Fact dimension lookups complete",
                     pattern="FactPattern",
                     orphan_count=orphan_count,
                 )
+
+                if orphan_handling == "quarantine" and quarantined_df is not None:
+                    self._write_quarantine(context, quarantined_df, quarantine_config)
+                    ctx.info(
+                        f"Quarantined {orphan_count} orphan records",
+                        pattern="FactPattern",
+                        quarantine_path=quarantine_config.get("path")
+                        or quarantine_config.get("table"),
+                    )
 
             if measures:
                 df = self._apply_measures(context, df, measures)
@@ -203,14 +266,16 @@ class FactPattern(Pattern):
         df,
         dimensions: List[Dict],
         orphan_handling: str,
+        quarantine_config: Dict,
     ):
         """
         Perform surrogate key lookups from dimension tables.
 
         Returns:
-            Tuple of (result_df, orphan_count)
+            Tuple of (result_df, orphan_count, quarantined_df)
         """
         total_orphans = 0
+        all_quarantined = []
 
         for dim_config in dimensions:
             source_col = dim_config["source_column"]
@@ -225,12 +290,40 @@ class FactPattern(Pattern):
                     f"FactPattern: Dimension table '{dim_table}' not found in context."
                 )
 
-            df, orphan_count = self._join_dimension(
-                context, df, dim_df, source_col, dim_key, sk_col, orphan_handling
+            df, orphan_count, quarantined = self._join_dimension(
+                context,
+                df,
+                dim_df,
+                source_col,
+                dim_key,
+                sk_col,
+                orphan_handling,
+                dim_table,
+                quarantine_config,
             )
             total_orphans += orphan_count
+            if quarantined is not None:
+                all_quarantined.append(quarantined)
 
-        return df, total_orphans
+        quarantined_df = None
+        if all_quarantined:
+            quarantined_df = self._union_dataframes(context, all_quarantined)
+
+        return df, total_orphans, quarantined_df
+
+    def _union_dataframes(self, context: EngineContext, dfs: List):
+        """Union multiple DataFrames together."""
+        if not dfs:
+            return None
+        if context.engine_type == EngineType.SPARK:
+            result = dfs[0]
+            for df in dfs[1:]:
+                result = result.unionByName(df, allowMissingColumns=True)
+            return result
+        else:
+            import pandas as pd
+
+            return pd.concat(dfs, ignore_index=True)
 
     def _get_dimension_df(self, context: EngineContext, dim_table: str, is_scd2: bool):
         """Get dimension DataFrame from context, optionally filtering for current records."""
@@ -261,20 +354,37 @@ class FactPattern(Pattern):
         dim_key: str,
         sk_col: str,
         orphan_handling: str,
+        dim_table: str,
+        quarantine_config: Dict,
     ):
         """
         Join fact to dimension and retrieve surrogate key.
 
         Returns:
-            Tuple of (result_df, orphan_count)
+            Tuple of (result_df, orphan_count, quarantined_df)
         """
         if context.engine_type == EngineType.SPARK:
             return self._join_dimension_spark(
-                context, fact_df, dim_df, source_col, dim_key, sk_col, orphan_handling
+                context,
+                fact_df,
+                dim_df,
+                source_col,
+                dim_key,
+                sk_col,
+                orphan_handling,
+                dim_table,
+                quarantine_config,
             )
         else:
             return self._join_dimension_pandas(
-                fact_df, dim_df, source_col, dim_key, sk_col, orphan_handling
+                fact_df,
+                dim_df,
+                source_col,
+                dim_key,
+                sk_col,
+                orphan_handling,
+                dim_table,
+                quarantine_config,
             )
 
     def _join_dimension_spark(
@@ -286,6 +396,8 @@ class FactPattern(Pattern):
         dim_key: str,
         sk_col: str,
         orphan_handling: str,
+        dim_table: str,
+        quarantine_config: Dict,
     ):
         from pyspark.sql import functions as F
 
@@ -300,7 +412,9 @@ class FactPattern(Pattern):
             "left",
         )
 
-        orphan_count = joined.filter(F.col(sk_col).isNull()).count()
+        orphan_mask = F.col(sk_col).isNull()
+        orphan_count = joined.filter(orphan_mask).count()
+        quarantined_df = None
 
         if orphan_handling == "reject" and orphan_count > 0:
             raise ValueError(
@@ -311,9 +425,17 @@ class FactPattern(Pattern):
         if orphan_handling == "unknown":
             joined = joined.withColumn(sk_col, F.coalesce(F.col(sk_col), F.lit(0)))
 
+        if orphan_handling == "quarantine" and orphan_count > 0:
+            orphan_rows = joined.filter(orphan_mask).drop(f"_dim_{dim_key}")
+            orphan_rows = self._add_quarantine_metadata_spark(
+                orphan_rows, dim_table, source_col, quarantine_config
+            )
+            quarantined_df = orphan_rows
+            joined = joined.filter(~orphan_mask)
+
         result = joined.drop(f"_dim_{dim_key}")
 
-        return result, orphan_count
+        return result, orphan_count, quarantined_df
 
     def _join_dimension_pandas(
         self,
@@ -323,6 +445,8 @@ class FactPattern(Pattern):
         dim_key: str,
         sk_col: str,
         orphan_handling: str,
+        dim_table: str,
+        quarantine_config: Dict,
     ):
         import pandas as pd
 
@@ -337,7 +461,9 @@ class FactPattern(Pattern):
             how="left",
         )
 
-        orphan_count = merged[sk_col].isna().sum()
+        orphan_mask = merged[sk_col].isna()
+        orphan_count = orphan_mask.sum()
+        quarantined_df = None
 
         if orphan_handling == "reject" and orphan_count > 0:
             raise ValueError(
@@ -348,9 +474,17 @@ class FactPattern(Pattern):
         if orphan_handling == "unknown":
             merged[sk_col] = merged[sk_col].fillna(0).astype(int)
 
+        if orphan_handling == "quarantine" and orphan_count > 0:
+            orphan_rows = merged[orphan_mask].drop(columns=[f"_dim_{dim_key}"]).copy()
+            orphan_rows = self._add_quarantine_metadata_pandas(
+                orphan_rows, dim_table, source_col, quarantine_config
+            )
+            quarantined_df = orphan_rows
+            merged = merged[~orphan_mask].copy()
+
         result = merged.drop(columns=[f"_dim_{dim_key}"])
 
-        return result, int(orphan_count)
+        return result, int(orphan_count), quarantined_df
 
     def _apply_measures(self, context: EngineContext, df, measures: List):
         """
@@ -455,3 +589,142 @@ class FactPattern(Pattern):
                 df["source_system"] = source_system
 
         return df
+
+    def _add_quarantine_metadata_spark(
+        self,
+        df,
+        dim_table: str,
+        source_col: str,
+        quarantine_config: Dict,
+    ):
+        """Add metadata columns to quarantined Spark DataFrame."""
+        from pyspark.sql import functions as F
+
+        add_columns = quarantine_config.get("add_columns", {})
+
+        if add_columns.get("_rejection_reason", False):
+            reason = f"Orphan record: no match in dimension '{dim_table}' on column '{source_col}'"
+            df = df.withColumn("_rejection_reason", F.lit(reason))
+
+        if add_columns.get("_rejected_at", False):
+            df = df.withColumn("_rejected_at", F.current_timestamp())
+
+        if add_columns.get("_source_dimension", False):
+            df = df.withColumn("_source_dimension", F.lit(dim_table))
+
+        return df
+
+    def _add_quarantine_metadata_pandas(
+        self,
+        df,
+        dim_table: str,
+        source_col: str,
+        quarantine_config: Dict,
+    ):
+        """Add metadata columns to quarantined Pandas DataFrame."""
+        add_columns = quarantine_config.get("add_columns", {})
+
+        if add_columns.get("_rejection_reason", False):
+            reason = f"Orphan record: no match in dimension '{dim_table}' on column '{source_col}'"
+            df["_rejection_reason"] = reason
+
+        if add_columns.get("_rejected_at", False):
+            df["_rejected_at"] = datetime.now()
+
+        if add_columns.get("_source_dimension", False):
+            df["_source_dimension"] = dim_table
+
+        return df
+
+    def _write_quarantine(
+        self,
+        context: EngineContext,
+        quarantined_df,
+        quarantine_config: Dict,
+    ):
+        """Write quarantined records to the configured destination."""
+        ctx = get_logging_context()
+        connection = quarantine_config.get("connection")
+        path = quarantine_config.get("path")
+        table = quarantine_config.get("table")
+
+        if context.engine_type == EngineType.SPARK:
+            self._write_quarantine_spark(context, quarantined_df, connection, path, table)
+        else:
+            self._write_quarantine_pandas(context, quarantined_df, connection, path, table)
+
+        ctx.debug(
+            "Quarantine data written",
+            pattern="FactPattern",
+            connection=connection,
+            destination=path or table,
+        )
+
+    def _write_quarantine_spark(
+        self,
+        context: EngineContext,
+        df,
+        connection: str,
+        path: Optional[str],
+        table: Optional[str],
+    ):
+        """Write quarantine data using Spark."""
+        if table:
+            full_table = f"{connection}.{table}" if connection else table
+            df.write.format("delta").mode("append").saveAsTable(full_table)
+        elif path:
+            full_path = path
+            if hasattr(context, "engine") and context.engine:
+                if connection in getattr(context.engine, "connections", {}):
+                    try:
+                        full_path = context.engine.connections[connection].get_path(path)
+                    except Exception:
+                        pass
+            df.write.format("delta").mode("append").save(full_path)
+
+    def _write_quarantine_pandas(
+        self,
+        context: EngineContext,
+        df,
+        connection: str,
+        path: Optional[str],
+        table: Optional[str],
+    ):
+        """Write quarantine data using Pandas."""
+        import os
+
+        destination = path or table
+        full_path = destination
+
+        if hasattr(context, "engine") and context.engine:
+            if connection in getattr(context.engine, "connections", {}):
+                try:
+                    full_path = context.engine.connections[connection].get_path(destination)
+                except Exception:
+                    pass
+
+        path_lower = str(full_path).lower()
+
+        if path_lower.endswith(".csv"):
+            if os.path.exists(full_path):
+                df.to_csv(full_path, mode="a", header=False, index=False)
+            else:
+                df.to_csv(full_path, index=False)
+        elif path_lower.endswith(".json"):
+            if os.path.exists(full_path):
+                import pandas as pd
+
+                existing = pd.read_json(full_path)
+                combined = pd.concat([existing, df], ignore_index=True)
+                combined.to_json(full_path, orient="records")
+            else:
+                df.to_json(full_path, orient="records")
+        else:
+            if os.path.exists(full_path):
+                import pandas as pd
+
+                existing = pd.read_parquet(full_path)
+                combined = pd.concat([existing, df], ignore_index=True)
+                combined.to_parquet(full_path, index=False)
+            else:
+                df.to_parquet(full_path, index=False)
