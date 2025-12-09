@@ -961,9 +961,17 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
     end_col = params.end_col
 
     if context.engine_type == EngineType.SPARK:
+        duration_col_exists = params.duration_col and params.duration_col.lower() in [
+            c.lower() for c in context.df.columns
+        ]
+
         duration_expr = ""
         if params.duration_col:
             duration_expr = f", (unix_timestamp(adj_{end_col}) - unix_timestamp(adj_{start_col})) / 60.0 AS {params.duration_col}"
+
+        single_day_except = "_event_days"
+        if duration_col_exists:
+            single_day_except = f"_event_days, {params.duration_col}"
 
         single_day_sql = f"""
         WITH events_with_days AS (
@@ -971,10 +979,14 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
                 datediff(to_date({end_col}), to_date({start_col})) + 1 AS _event_days
             FROM df
         )
-        SELECT * EXCEPT(_event_days){f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}" if params.duration_col else ""}
+        SELECT * EXCEPT({single_day_except}){f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}" if params.duration_col else ""}
         FROM events_with_days
         WHERE _event_days = 1
         """
+
+        multi_day_except_adjusted = "_exploded_day, _event_days"
+        if duration_col_exists:
+            multi_day_except_adjusted = f"_exploded_day, _event_days, {params.duration_col}"
 
         multi_day_sql = f"""
         WITH events_with_days AS (
@@ -989,7 +1001,7 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
             WHERE _event_days > 1
         ),
         multi_day_adjusted AS (
-            SELECT * EXCEPT(_exploded_day, _event_days),
+            SELECT * EXCEPT({multi_day_except_adjusted}),
                 CASE
                     WHEN to_date(_exploded_day) = to_date({start_col}) THEN {start_col}
                     ELSE to_timestamp(concat(cast(_exploded_day as string), ' 00:00:00'))
