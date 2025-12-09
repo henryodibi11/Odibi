@@ -990,17 +990,11 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
             FROM multi_day
         ),
         multi_day_final AS (
-            SELECT * EXCEPT(adj_{start_col}, adj_{end_col}),
+            SELECT * EXCEPT({start_col}, {end_col}, adj_{start_col}, adj_{end_col}),
                 adj_{start_col} AS {start_col},
                 adj_{end_col} AS {end_col}
-                {duration_expr.replace(f"adj_{start_col}", start_col).replace(f"adj_{end_col}", end_col) if duration_expr else ""}
-            FROM (
-                SELECT * EXCEPT({start_col}, {end_col}),
-                    adj_{start_col},
-                    adj_{end_col}
-                    {duration_expr}
-                FROM multi_day_adjusted
-            )
+                {duration_expr}
+            FROM multi_day_adjusted
         ),
         single_day AS (
             SELECT *{f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}" if params.duration_col else ""}
