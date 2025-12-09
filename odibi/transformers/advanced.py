@@ -1012,11 +1012,7 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
         )
         SELECT * FROM single_day_clean
         UNION ALL
-        SELECT * EXCEPT(adj_{start_col}, adj_{end_col}),
-            adj_{start_col} AS {start_col},
-            adj_{end_col} AS {end_col}
-            {duration_expr}
-        FROM multi_day_adjusted
+        SELECT * FROM multi_day_final
         """
         return context.sql(sql)
 
