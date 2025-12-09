@@ -965,7 +965,18 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
         if params.duration_col:
             duration_expr = f", (unix_timestamp(adj_{end_col}) - unix_timestamp(adj_{start_col})) / 60.0 AS {params.duration_col}"
 
-        sql = f"""
+        single_day_sql = f"""
+        WITH events_with_days AS (
+            SELECT *,
+                datediff(to_date({end_col}), to_date({start_col})) + 1 AS _event_days
+            FROM df
+        )
+        SELECT * EXCEPT(_event_days){f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}" if params.duration_col else ""}
+        FROM events_with_days
+        WHERE _event_days = 1
+        """
+
+        multi_day_sql = f"""
         WITH events_with_days AS (
             SELECT *,
                 datediff(to_date({end_col}), to_date({start_col})) + 1 AS _event_days
@@ -988,27 +999,18 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
                     ELSE to_timestamp(concat(cast(date_add(_exploded_day, 1) as string), ' 00:00:00'))
                 END AS adj_{end_col}
             FROM multi_day
-        ),
-        multi_day_final AS (
-            SELECT * EXCEPT({start_col}, {end_col}, adj_{start_col}, adj_{end_col}),
-                adj_{start_col} AS {start_col},
-                adj_{end_col} AS {end_col}
-                {duration_expr}
-            FROM multi_day_adjusted
-        ),
-        single_day AS (
-            SELECT *{f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}" if params.duration_col else ""}
-            FROM events_with_days
-            WHERE _event_days = 1
-        ),
-        single_day_clean AS (
-            SELECT * EXCEPT(_event_days) FROM single_day
         )
-        SELECT * FROM single_day_clean
-        UNION ALL BY NAME
-        SELECT * FROM multi_day_final
+        SELECT * EXCEPT({start_col}, {end_col}, adj_{start_col}, adj_{end_col}),
+            adj_{start_col} AS {start_col},
+            adj_{end_col} AS {end_col}
+            {duration_expr}
+        FROM multi_day_adjusted
         """
-        return context.sql(sql)
+
+        single_day_df = context.sql(single_day_sql).df
+        multi_day_df = context.sql(multi_day_sql).df
+        result_df = single_day_df.unionByName(multi_day_df, allowMissingColumns=True)
+        return context.with_df(result_df)
 
     elif context.engine_type == EngineType.PANDAS:
         import pandas as pd
