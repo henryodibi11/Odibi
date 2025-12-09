@@ -73,6 +73,11 @@ def register_standard_library():
     registry.register(advanced.normalize_json, "normalize_json", advanced.NormalizeJsonParams)
     registry.register(advanced.sessionize, "sessionize", advanced.SessionizeParams)
     registry.register(advanced.geocode, "geocode", advanced.GeocodeParams)
+    registry.register(
+        advanced.split_events_by_period,
+        "split_events_by_period",
+        advanced.SplitEventsByPeriodParams,
+    )
 
     # SCD
     registry.register(scd.scd2, "scd2", scd.SCD2Params)

@@ -858,3 +858,453 @@ def geocode(context: EngineContext, params: GeocodeParams) -> EngineContext:
 
     # Pass-through
     return context.with_df(context.df)
+
+
+# -------------------------------------------------------------------------
+# 14. Split Events by Period
+# -------------------------------------------------------------------------
+
+
+class ShiftDefinition(BaseModel):
+    """Definition of a single shift."""
+
+    name: str = Field(..., description="Name of the shift (e.g., 'Day', 'Night')")
+    start: str = Field(..., description="Start time in HH:MM format (e.g., '06:00')")
+    end: str = Field(..., description="End time in HH:MM format (e.g., '14:00')")
+
+
+class SplitEventsByPeriodParams(BaseModel):
+    """
+    Configuration for splitting events that span multiple time periods.
+
+    Splits events that span multiple days, hours, or shifts into individual
+    segments per period. Useful for OEE/downtime analysis, billing, and
+    time-based aggregations.
+
+    Example - Split by day:
+    ```yaml
+    split_events_by_period:
+      start_col: "Shutdown_Start_Time"
+      end_col: "Shutdown_End_Time"
+      period: "day"
+      duration_col: "Shutdown_Duration_Min"
+    ```
+
+    Example - Split by shift:
+    ```yaml
+    split_events_by_period:
+      start_col: "event_start"
+      end_col: "event_end"
+      period: "shift"
+      duration_col: "duration_minutes"
+      shifts:
+        - name: "Day"
+          start: "06:00"
+          end: "14:00"
+        - name: "Swing"
+          start: "14:00"
+          end: "22:00"
+        - name: "Night"
+          start: "22:00"
+          end: "06:00"
+    ```
+    """
+
+    start_col: str = Field(..., description="Column containing the event start timestamp")
+    end_col: str = Field(..., description="Column containing the event end timestamp")
+    period: str = Field(
+        "day",
+        description="Period type to split by: 'day', 'hour', or 'shift'",
+    )
+    duration_col: Optional[str] = Field(
+        None,
+        description="Output column name for duration in minutes. If not set, no duration column is added.",
+    )
+    shifts: Optional[List[ShiftDefinition]] = Field(
+        None,
+        description="List of shift definitions (required when period='shift')",
+    )
+    shift_col: Optional[str] = Field(
+        "shift_name",
+        description="Output column name for shift name (only used when period='shift')",
+    )
+
+    def model_post_init(self, __context):
+        if self.period == "shift" and not self.shifts:
+            raise ValueError("shifts must be provided when period='shift'")
+        if self.period not in ("day", "hour", "shift"):
+            raise ValueError(f"Invalid period: {self.period}. Must be 'day', 'hour', or 'shift'")
+
+
+def split_events_by_period(
+    context: EngineContext, params: SplitEventsByPeriodParams
+) -> EngineContext:
+    """
+    Splits events that span multiple time periods into individual segments.
+
+    For events spanning multiple days/hours/shifts, this creates separate rows
+    for each period with adjusted start/end times and recalculated durations.
+    """
+    if params.period == "day":
+        return _split_by_day(context, params)
+    elif params.period == "hour":
+        return _split_by_hour(context, params)
+    elif params.period == "shift":
+        return _split_by_shift(context, params)
+    else:
+        raise ValueError(f"Unsupported period: {params.period}")
+
+
+def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> EngineContext:
+    """Split events by day boundaries."""
+    start_col = params.start_col
+    end_col = params.end_col
+
+    if context.engine_type == EngineType.SPARK:
+        duration_expr = ""
+        if params.duration_col:
+            duration_expr = f", (unix_timestamp(adj_{end_col}) - unix_timestamp(adj_{start_col})) / 60.0 AS {params.duration_col}"
+
+        sql = f"""
+        WITH events_with_days AS (
+            SELECT *,
+                datediff(to_date({end_col}), to_date({start_col})) + 1 AS _event_days
+            FROM df
+        ),
+        multi_day AS (
+            SELECT *,
+                explode(sequence(to_date({start_col}), to_date({end_col}), interval 1 day)) AS _exploded_day
+            FROM events_with_days
+            WHERE _event_days > 1
+        ),
+        multi_day_adjusted AS (
+            SELECT * EXCEPT(_exploded_day, _event_days),
+                CASE
+                    WHEN to_date(_exploded_day) = to_date({start_col}) THEN {start_col}
+                    ELSE to_timestamp(concat(cast(_exploded_day as string), ' 00:00:00'))
+                END AS adj_{start_col},
+                CASE
+                    WHEN to_date(_exploded_day) = to_date({end_col}) THEN {end_col}
+                    ELSE to_timestamp(concat(cast(date_add(_exploded_day, 1) as string), ' 00:00:00'))
+                END AS adj_{end_col}
+            FROM multi_day
+        ),
+        multi_day_final AS (
+            SELECT * EXCEPT(adj_{start_col}, adj_{end_col}),
+                adj_{start_col} AS {start_col},
+                adj_{end_col} AS {end_col}
+                {duration_expr.replace(f"adj_{start_col}", start_col).replace(f"adj_{end_col}", end_col) if duration_expr else ""}
+            FROM (
+                SELECT * EXCEPT({start_col}, {end_col}),
+                    adj_{start_col},
+                    adj_{end_col}
+                    {duration_expr}
+                FROM multi_day_adjusted
+            )
+        ),
+        single_day AS (
+            SELECT *{f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}" if params.duration_col else ""}
+            FROM events_with_days
+            WHERE _event_days = 1
+        ),
+        single_day_clean AS (
+            SELECT * EXCEPT(_event_days) FROM single_day
+        )
+        SELECT * FROM single_day_clean
+        UNION ALL
+        SELECT * EXCEPT(adj_{start_col}, adj_{end_col}),
+            adj_{start_col} AS {start_col},
+            adj_{end_col} AS {end_col}
+            {duration_expr}
+        FROM multi_day_adjusted
+        """
+        return context.sql(sql)
+
+    elif context.engine_type == EngineType.PANDAS:
+        import pandas as pd
+
+        df = context.df.copy()
+
+        df[start_col] = pd.to_datetime(df[start_col])
+        df[end_col] = pd.to_datetime(df[end_col])
+
+        df["_event_days"] = (df[end_col].dt.normalize() - df[start_col].dt.normalize()).dt.days + 1
+
+        single_day = df[df["_event_days"] == 1].copy()
+        multi_day = df[df["_event_days"] > 1].copy()
+
+        if params.duration_col and not single_day.empty:
+            single_day[params.duration_col] = (
+                single_day[end_col] - single_day[start_col]
+            ).dt.total_seconds() / 60.0
+
+        if not multi_day.empty:
+            rows = []
+            for _, row in multi_day.iterrows():
+                start = row[start_col]
+                end = row[end_col]
+                current_day = start.normalize()
+
+                while current_day <= end.normalize():
+                    new_row = row.copy()
+
+                    if current_day == start.normalize():
+                        new_start = start
+                    else:
+                        new_start = current_day
+
+                    next_day = current_day + pd.Timedelta(days=1)
+                    if next_day > end:
+                        new_end = end
+                    else:
+                        new_end = next_day
+
+                    new_row[start_col] = new_start
+                    new_row[end_col] = new_end
+
+                    if params.duration_col:
+                        new_row[params.duration_col] = (new_end - new_start).total_seconds() / 60.0
+
+                    rows.append(new_row)
+                    current_day = next_day
+
+            multi_day_exploded = pd.DataFrame(rows)
+            result = pd.concat([single_day, multi_day_exploded], ignore_index=True)
+        else:
+            result = single_day
+
+        result = result.drop(columns=["_event_days"], errors="ignore")
+        return context.with_df(result)
+
+    else:
+        raise ValueError(f"Unsupported engine: {context.engine_type}")
+
+
+def _split_by_hour(context: EngineContext, params: SplitEventsByPeriodParams) -> EngineContext:
+    """Split events by hour boundaries."""
+    start_col = params.start_col
+    end_col = params.end_col
+
+    if context.engine_type == EngineType.SPARK:
+        duration_expr = ""
+        if params.duration_col:
+            duration_expr = f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}"
+
+        sql = f"""
+        WITH events_with_hours AS (
+            SELECT *,
+                CAST((unix_timestamp({end_col}) - unix_timestamp({start_col})) / 3600 AS INT) + 1 AS _event_hours
+            FROM df
+        ),
+        multi_hour AS (
+            SELECT *,
+                explode(sequence(
+                    date_trunc('hour', {start_col}),
+                    date_trunc('hour', {end_col}),
+                    interval 1 hour
+                )) AS _exploded_hour
+            FROM events_with_hours
+            WHERE _event_hours > 1
+        ),
+        multi_hour_adjusted AS (
+            SELECT * EXCEPT(_exploded_hour, _event_hours),
+                CASE
+                    WHEN date_trunc('hour', {start_col}) = _exploded_hour THEN {start_col}
+                    ELSE _exploded_hour
+                END AS {start_col},
+                CASE
+                    WHEN date_trunc('hour', {end_col}) = _exploded_hour THEN {end_col}
+                    ELSE _exploded_hour + interval 1 hour
+                END AS {end_col}
+            FROM multi_hour
+        ),
+        single_hour AS (
+            SELECT * EXCEPT(_event_hours){duration_expr}
+            FROM events_with_hours
+            WHERE _event_hours = 1
+        )
+        SELECT *{duration_expr} FROM multi_hour_adjusted
+        UNION ALL
+        SELECT * FROM single_hour
+        """
+        return context.sql(sql)
+
+    elif context.engine_type == EngineType.PANDAS:
+        import pandas as pd
+
+        df = context.df.copy()
+
+        df[start_col] = pd.to_datetime(df[start_col])
+        df[end_col] = pd.to_datetime(df[end_col])
+
+        df["_event_hours"] = ((df[end_col] - df[start_col]).dt.total_seconds() / 3600).astype(
+            int
+        ) + 1
+
+        single_hour = df[df["_event_hours"] == 1].copy()
+        multi_hour = df[df["_event_hours"] > 1].copy()
+
+        if params.duration_col and not single_hour.empty:
+            single_hour[params.duration_col] = (
+                single_hour[end_col] - single_hour[start_col]
+            ).dt.total_seconds() / 60.0
+
+        if not multi_hour.empty:
+            rows = []
+            for _, row in multi_hour.iterrows():
+                start = row[start_col]
+                end = row[end_col]
+                current_hour = start.floor("h")
+
+                while current_hour <= end.floor("h"):
+                    new_row = row.copy()
+
+                    if current_hour == start.floor("h"):
+                        new_start = start
+                    else:
+                        new_start = current_hour
+
+                    next_hour = current_hour + pd.Timedelta(hours=1)
+                    if next_hour > end:
+                        new_end = end
+                    else:
+                        new_end = next_hour
+
+                    new_row[start_col] = new_start
+                    new_row[end_col] = new_end
+
+                    if params.duration_col:
+                        new_row[params.duration_col] = (new_end - new_start).total_seconds() / 60.0
+
+                    rows.append(new_row)
+                    current_hour = next_hour
+
+            multi_hour_exploded = pd.DataFrame(rows)
+            result = pd.concat([single_hour, multi_hour_exploded], ignore_index=True)
+        else:
+            result = single_hour
+
+        result = result.drop(columns=["_event_hours"], errors="ignore")
+        return context.with_df(result)
+
+    else:
+        raise ValueError(f"Unsupported engine: {context.engine_type}")
+
+
+def _split_by_shift(context: EngineContext, params: SplitEventsByPeriodParams) -> EngineContext:
+    """Split events by shift boundaries."""
+    start_col = params.start_col
+    end_col = params.end_col
+    shift_col = params.shift_col or "shift_name"
+    shifts = params.shifts
+
+    if context.engine_type == EngineType.SPARK:
+        duration_expr = ""
+        if params.duration_col:
+            duration_expr = f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}"
+
+        sql = f"""
+        WITH base AS (
+            SELECT *,
+                datediff(to_date({end_col}), to_date({start_col})) + 1 AS _span_days
+            FROM df
+        ),
+        day_exploded AS (
+            SELECT *,
+                explode(sequence(to_date({start_col}), to_date({end_col}), interval 1 day)) AS _day
+            FROM base
+        ),
+        with_shift_times AS (
+            SELECT *,
+                {
+            ", ".join(
+                [
+                    f"to_timestamp(concat(cast(_day as string), ' {s.start}:00')) AS _shift_{i}_start, "
+                    + f"to_timestamp(concat(cast(date_add(_day, {1 if int(s.end.split(':')[0]) < int(s.start.split(':')[0]) else 0}) as string), ' {s.end}:00')) AS _shift_{i}_end"
+                    for i, s in enumerate(shifts)
+                ]
+            )
+        }
+            FROM day_exploded
+        ),
+        shift_segments AS (
+            {
+            " UNION ALL ".join(
+                [
+                    f"SELECT * EXCEPT({', '.join([f'_shift_{j}_start, _shift_{j}_end' for j in range(len(shifts))])}), "
+                    f"GREATEST({start_col}, _shift_{i}_start) AS {start_col}, "
+                    f"LEAST({end_col}, _shift_{i}_end) AS {end_col}, "
+                    f"'{s.name}' AS {shift_col} "
+                    f"FROM with_shift_times "
+                    f"WHERE {start_col} < _shift_{i}_end AND {end_col} > _shift_{i}_start"
+                    for i, s in enumerate(shifts)
+                ]
+            )
+        }
+        )
+        SELECT * EXCEPT(_span_days, _day){duration_expr}
+        FROM shift_segments
+        WHERE {start_col} < {end_col}
+        """
+        return context.sql(sql)
+
+    elif context.engine_type == EngineType.PANDAS:
+        import pandas as pd
+        from datetime import timedelta
+
+        df = context.df.copy()
+        df[start_col] = pd.to_datetime(df[start_col])
+        df[end_col] = pd.to_datetime(df[end_col])
+
+        def parse_time(t_str):
+            h, m = map(int, t_str.split(":"))
+            return timedelta(hours=h, minutes=m)
+
+        rows = []
+        for _, row in df.iterrows():
+            event_start = row[start_col]
+            event_end = row[end_col]
+
+            current_day = event_start.normalize()
+            while current_day <= event_end.normalize():
+                for shift in shifts:
+                    shift_start_delta = parse_time(shift.start)
+                    shift_end_delta = parse_time(shift.end)
+
+                    if shift_end_delta <= shift_start_delta:
+                        shift_start_dt = current_day + shift_start_delta
+                        shift_end_dt = current_day + timedelta(days=1) + shift_end_delta
+                    else:
+                        shift_start_dt = current_day + shift_start_delta
+                        shift_end_dt = current_day + shift_end_delta
+
+                    seg_start = max(event_start, shift_start_dt)
+                    seg_end = min(event_end, shift_end_dt)
+
+                    if seg_start < seg_end:
+                        new_row = row.copy()
+                        new_row[start_col] = seg_start
+                        new_row[end_col] = seg_end
+                        new_row[shift_col] = shift.name
+
+                        if params.duration_col:
+                            new_row[params.duration_col] = (
+                                seg_end - seg_start
+                            ).total_seconds() / 60.0
+
+                        rows.append(new_row)
+
+                current_day += timedelta(days=1)
+
+        if rows:
+            result = pd.DataFrame(rows)
+        else:
+            result = df.copy()
+            result[shift_col] = None
+            if params.duration_col:
+                result[params.duration_col] = 0.0
+
+        return context.with_df(result)
+
+    else:
+        raise ValueError(f"Unsupported engine: {context.engine_type}")

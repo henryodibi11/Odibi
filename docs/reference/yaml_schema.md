@@ -2551,6 +2551,19 @@ params:
 
 ### 📂 Advanced & Feature Engineering
 
+#### ShiftDefinition
+Definition of a single shift.
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | str | Yes | - | Name of the shift (e.g., 'Day', 'Night') |
+| **start** | str | Yes | - | Start time in HH:MM format (e.g., '06:00') |
+| **end** | str | Yes | - | End time in HH:MM format (e.g., '14:00') |
+
+---
+
 #### `deduplicate` (DeduplicateParams)
 Deduplicates data using Window functions.
 
@@ -2770,6 +2783,59 @@ sessionize:
 | **user_col** | str | Yes | - | User identifier to partition sessions by |
 | **threshold_seconds** | int | No | `1800` | Inactivity threshold in seconds (default: 30 minutes). If gap > threshold, new session starts. |
 | **session_col** | str | No | `session_id` | Output column name for the generated session ID |
+
+---
+
+#### `split_events_by_period` (SplitEventsByPeriodParams)
+Splits events that span multiple time periods into individual segments.
+
+For events spanning multiple days/hours/shifts, this creates separate rows
+for each period with adjusted start/end times and recalculated durations.
+
+Configuration for splitting events that span multiple time periods.
+
+Splits events that span multiple days, hours, or shifts into individual
+segments per period. Useful for OEE/downtime analysis, billing, and
+time-based aggregations.
+
+Example - Split by day:
+```yaml
+split_events_by_period:
+  start_col: "Shutdown_Start_Time"
+  end_col: "Shutdown_End_Time"
+  period: "day"
+  duration_col: "Shutdown_Duration_Min"
+```
+
+Example - Split by shift:
+```yaml
+split_events_by_period:
+  start_col: "event_start"
+  end_col: "event_end"
+  period: "shift"
+  duration_col: "duration_minutes"
+  shifts:
+    - name: "Day"
+      start: "06:00"
+      end: "14:00"
+    - name: "Swing"
+      start: "14:00"
+      end: "22:00"
+    - name: "Night"
+      start: "22:00"
+      end: "06:00"
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **start_col** | str | Yes | - | Column containing the event start timestamp |
+| **end_col** | str | Yes | - | Column containing the event end timestamp |
+| **period** | str | No | `day` | Period type to split by: 'day', 'hour', or 'shift' |
+| **duration_col** | Optional[str] | No | - | Output column name for duration in minutes. If not set, no duration column is added. |
+| **shifts** | Optional[List[[ShiftDefinition](#shiftdefinition)]] | No | - | List of shift definitions (required when period='shift') |
+| **shift_col** | Optional[str] | No | `shift_name` | Output column name for shift name (only used when period='shift') |
 
 ---
 
