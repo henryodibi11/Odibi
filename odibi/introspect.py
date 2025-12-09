@@ -280,7 +280,7 @@ semantic:
       source: gold.fact_orders    # connection.table notation
       filters:
         - "status = 'completed'"
-  
+
   dimensions:
     - name: region
       source: gold.dim_customer
@@ -1119,7 +1119,13 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
 
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines), encoding="utf-8")
+    # Strip trailing whitespace from each line to match pre-commit hook behavior
+    cleaned_lines = [line.rstrip() for line in lines]
+    # Ensure file ends with newline (pre-commit end-of-file-fixer requirement)
+    content = "\n".join(cleaned_lines)
+    if not content.endswith("\n"):
+        content += "\n"
+    path.write_text(content, encoding="utf-8")
     print(f"Configuration Manual saved to {output_path}")
 
 

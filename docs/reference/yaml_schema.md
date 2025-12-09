@@ -37,7 +37,6 @@ alerts:
 
 # ... connections and pipelines ...
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **project** | str | Yes | - | Project name |
@@ -59,7 +58,6 @@ alerts:
 | **semantic** | Optional[Dict[str, Any]] | No | - | Semantic layer configuration. Can be inline or reference external file. Contains metrics, dimensions, and materializations for self-service analytics. Example: semantic: { config: 'semantic_config.yaml' } or inline definitions. |
 
 ---
-
 ### `PipelineConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -75,7 +73,6 @@ pipelines:
       - name: "node1"
         ...
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **pipeline** | str | Yes | - | Pipeline name |
@@ -84,7 +81,6 @@ pipelines:
 | **nodes** | List[[NodeConfig](#nodeconfig)] | Yes | - | List of nodes in this pipeline |
 
 ---
-
 ### `NodeConfig`
 > *Used in: [PipelineConfig](#pipelineconfig)*
 
@@ -372,7 +368,6 @@ These are the built-in functions you can use in two ways:
   materialized: "table"  # Default behavior
   # ...
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique node name |
@@ -401,12 +396,10 @@ These are the built-in functions you can use in two ways:
 | **sensitive** | bool \| List[str] | No | `False` | If true or list of columns, masks sample data in stories |
 
 ---
-
 ### `ColumnMetadata`
 > *Used in: [NodeConfig](#nodeconfig)*
 
 Metadata for a column in the data dictionary.
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **description** | Optional[str] | No | - | Column description |
@@ -414,21 +407,18 @@ Metadata for a column in the data dictionary.
 | **tags** | List[str] | No | `PydanticUndefined` | Tags (e.g. 'business_key', 'measure') |
 
 ---
-
 ### `SystemConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
 Configuration for the Odibi System Catalog (The Brain).
 
 Stores metadata, state, and pattern configurations.
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection to store system tables (e.g., 'adls_bronze') |
 | **path** | str | No | `_odibi_system` | Path relative to connection root |
 
 ---
-
 ## Connections
 
 ### `LocalConnectionConfig`
@@ -442,7 +432,6 @@ local_data:
   type: "local"
   base_path: "./data"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['local'] | No | `ConnectionType.LOCAL` | - |
@@ -450,7 +439,6 @@ local_data:
 | **base_path** | str | No | `./data` | Base directory path |
 
 ---
-
 ### `DeltaConnectionConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -476,7 +464,6 @@ delta_local:
 #   format: "delta"
 #   path: "bronze/orders"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['delta'] | No | `ConnectionType.DELTA` | - |
@@ -486,7 +473,6 @@ delta_local:
 | **table** | Optional[str] | No | - | Optional default table name for this connection (used by story/pipeline helpers) |
 
 ---
-
 ### `AzureBlobConnectionConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -526,7 +512,6 @@ adls_msi:
     # optional: client_id for user-assigned identity
     client_id: "00000000-0000-0000-0000-000000000000"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['azure_blob'] | No | `ConnectionType.AZURE_BLOB` | - |
@@ -536,7 +521,6 @@ adls_msi:
 | **auth** | AzureBlobAuthConfig | No | `PydanticUndefined` | **Options:** [AzureBlobKeyVaultAuth](#azureblobkeyvaultauth), [AzureBlobAccountKeyAuth](#azureblobaccountkeyauth), [AzureBlobSasAuth](#azureblobsasauth), [AzureBlobConnectionStringAuth](#azureblobconnectionstringauth), [AzureBlobMsiAuth](#azureblobmsiauth) |
 
 ---
-
 ### `SQLServerConnectionConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -563,7 +547,6 @@ sql_dw_login:
     username: "dw_writer"
     password: "${DW_PASSWORD}"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['sql_server'] | No | `ConnectionType.SQL_SERVER` | - |
@@ -574,7 +557,6 @@ sql_dw_login:
 | **auth** | SQLServerAuthConfig | No | `PydanticUndefined` | **Options:** [SQLLoginAuth](#sqlloginauth), [SQLAadPasswordAuth](#sqlaadpasswordauth), [SQLMsiAuth](#sqlmsiauth), [SQLConnectionStringAuth](#sqlconnectionstringauth) |
 
 ---
-
 ### `HttpConnectionConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -591,7 +573,6 @@ api_source:
     mode: "bearer"
     token: "${API_TOKEN}"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['http'] | No | `ConnectionType.HTTP` | - |
@@ -601,7 +582,6 @@ api_source:
 | **auth** | HttpAuthConfig | No | `PydanticUndefined` | **Options:** [HttpNoAuth](#httpnoauth), [HttpBasicAuth](#httpbasicauth), [HttpBearerAuth](#httpbearerauth), [HttpApiKeyAuth](#httpapikeyauth) |
 
 ---
-
 ## Node Operations
 
 ### `ReadConfig`
@@ -669,7 +649,6 @@ read:
 **Performance Tip:** For small tables (<100K rows), use `numPartitions: 1` to avoid
 excessive Spark task scheduling overhead. For large tables, increase partitions
 to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name from project.yaml |
@@ -686,7 +665,6 @@ to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
 
 ---
-
 ### `IncrementalConfig`
 > *Used in: [ReadConfig](#readconfig)*
 
@@ -731,7 +709,6 @@ incremental:
   # Handle late-arriving data: look back 2 hours from HWM
   watermark_lag: "2h"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **mode** | IncrementalMode | No | `IncrementalMode.ROLLING_WINDOW` | Incremental strategy: 'rolling_window' or 'stateful' |
@@ -743,7 +720,6 @@ incremental:
 | **watermark_lag** | Optional[str] | No | - | Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency. |
 
 ---
-
 ### `TimeTravelConfig`
 > *Used in: [ReadConfig](#readconfig)*
 
@@ -756,14 +732,12 @@ time_travel:
   # OR
   as_of_timestamp: "2023-10-01T12:00:00Z"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **as_of_version** | Optional[int] | No | - | Version number to time travel to |
 | **as_of_timestamp** | Optional[str] | No | - | Timestamp string to time travel to |
 
 ---
-
 ### `TransformConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
@@ -797,13 +771,11 @@ transform:
     - operation: "drop_duplicates"
       params: { subset: ["user_id"] }
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **steps** | List[str \| [TransformStep](#transformstep)] | Yes | - | List of transformation steps (SQL strings or TransformStep configs) |
 
 ---
-
 ### `DeleteDetectionConfig`
 Configuration for delete detection in Silver layer.
 
@@ -864,7 +836,6 @@ transform:
         source_table: dbo.Customers
         soft_delete_col: null  # removes rows instead of flagging
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **mode** | DeleteDetectionMode | No | `DeleteDetectionMode.NONE` | Delete detection strategy: none, snapshot_diff, sql_compare |
@@ -879,7 +850,6 @@ transform:
 | **on_threshold_breach** | ThresholdBreachAction | No | `ThresholdBreachAction.WARN` | Behavior when delete percentage exceeds max_delete_percent |
 
 ---
-
 ### `ValidationConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
@@ -943,7 +913,6 @@ validation:
     require_pass_rate: 0.95
     on_fail: abort
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **mode** | ValidationAction | No | `ValidationAction.FAIL` | Execution mode: 'fail' (stop pipeline) or 'warn' (log only) |
@@ -953,7 +922,6 @@ validation:
 | **gate** | Optional[[GateConfig](#gateconfig)] | No | - | Quality gate configuration for batch-level validation |
 
 ---
-
 ### `QuarantineConfig`
 > *Used in: [ValidationConfig](#validationconfig)*
 
@@ -976,7 +944,6 @@ validation:
       _rejection_reason: true
       _rejected_at: true
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection for quarantine writes |
@@ -986,7 +953,6 @@ validation:
 | **retention_days** | Optional[int] | No | `90` | Days to retain quarantined data (auto-cleanup) |
 
 ---
-
 ### `QuarantineColumnsConfig`
 > *Used in: [QuarantineConfig](#quarantineconfig)*
 
@@ -1004,7 +970,6 @@ quarantine:
     _failed_tests: true
     _original_node: false
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **rejection_reason** | bool | No | `True` | Add _rejection_reason column with test failure description |
@@ -1014,7 +979,6 @@ quarantine:
 | **original_node** | bool | No | `False` | Add _original_node column with source node name |
 
 ---
-
 ### `GateConfig`
 > *Used in: [ValidationConfig](#validationconfig)*
 
@@ -1035,7 +999,6 @@ gate:
     min: 100
     change_threshold: 0.5
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **require_pass_rate** | float | No | `0.95` | Minimum percentage of rows passing ALL tests |
@@ -1044,7 +1007,6 @@ gate:
 | **row_count** | Optional[[RowCountGate](#rowcountgate)] | No | - | Row count anomaly detection |
 
 ---
-
 ### `GateThreshold`
 > *Used in: [GateConfig](#gateconfig)*
 
@@ -1061,14 +1023,12 @@ gate:
     - test: unique
       min_pass_rate: 1.0
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **test** | str | Yes | - | Test name or type to apply threshold to |
 | **min_pass_rate** | float | Yes | - | Minimum pass rate required (0.0-1.0, e.g., 0.99 = 99%) |
 
 ---
-
 ### `RowCountGate`
 > *Used in: [GateConfig](#gateconfig)*
 
@@ -1085,7 +1045,6 @@ gate:
     max: 1000000
     change_threshold: 0.5
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **min** | Optional[int] | No | - | Minimum expected row count |
@@ -1093,7 +1052,6 @@ gate:
 | **change_threshold** | Optional[float] | No | - | Max allowed change vs previous run (e.g., 0.5 = 50% change triggers failure) |
 
 ---
-
 ### `WriteConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
@@ -1129,7 +1087,6 @@ write:
     "delta.autoOptimize.optimizeWrite": "true"
     "delta.autoOptimize.autoCompact": "true"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name from project.yaml |
@@ -1152,7 +1109,6 @@ write:
 | **streaming** | Optional[[StreamingWriteConfig](#streamingwriteconfig)] | No | - | Streaming write configuration for Spark Structured Streaming. When set, uses writeStream instead of batch write. Requires a streaming DataFrame from a streaming read source. |
 
 ---
-
 ### `WriteMetadataConfig`
 > *Used in: [WriteConfig](#writeconfig)*
 
@@ -1193,7 +1149,6 @@ write:
 - `_source_file`: Source filename/path (file sources only)
 - `_source_connection`: Connection name used (all sources)
 - `_source_table`: Table or query name (SQL sources only)
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **extracted_at** | bool | No | `True` | Add _extracted_at column with pipeline execution timestamp |
@@ -1202,7 +1157,6 @@ write:
 | **source_table** | bool | No | `False` | Add _source_table column with table/query name (SQL sources only) |
 
 ---
-
 ### `StreamingWriteConfig`
 > *Used in: [WriteConfig](#writeconfig)*
 
@@ -1243,7 +1197,6 @@ write:
     trigger:
       available_now: true
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **output_mode** | Literal['append', 'update', 'complete'] | No | `append` | Output mode for streaming writes. 'append' - Only new rows. 'update' - Updated rows only. 'complete' - Entire result table (requires aggregation). |
@@ -1254,7 +1207,6 @@ write:
 | **timeout_seconds** | Optional[int] | No | - | Timeout in seconds when await_termination is True. If None, waits indefinitely. |
 
 ---
-
 ### `TriggerConfig`
 > *Used in: [StreamingWriteConfig](#streamingwriteconfig)*
 
@@ -1273,7 +1225,6 @@ Or for one-time processing:
 trigger:
   once: true
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **processing_time** | Optional[str] | No | - | Trigger interval as duration string (e.g., '10 seconds', '1 minute') |
@@ -1282,7 +1233,6 @@ trigger:
 | **continuous** | Optional[str] | No | - | Continuous processing with checkpoint interval (e.g., '1 second') |
 
 ---
-
 ### `AutoOptimizeConfig`
 > *Used in: [WriteConfig](#writeconfig)*
 
@@ -1294,14 +1244,12 @@ auto_optimize:
   enabled: true
   vacuum_retention_hours: 168
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **enabled** | bool | No | `True` | Enable auto optimization |
 | **vacuum_retention_hours** | int | No | `168` | Hours to retain history for VACUUM (default 7 days). Set to 0 to disable VACUUM. |
 
 ---
-
 ## Contracts (Data Quality Gates)
 
 ### Pre-Condition Circuit Breakers
@@ -1347,7 +1295,6 @@ contracts:
     column: status
     values: [pending, approved, rejected]
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['accepted_values'] | No | `TestType.ACCEPTED_VALUES` | - |
@@ -1357,7 +1304,6 @@ contracts:
 | **values** | List[Any] | Yes | - | Allowed values |
 
 ---
-
 ### `CustomSQLTest`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1369,7 +1315,6 @@ contracts:
     condition: "amount > 0"
     threshold: 0.01  # Allow up to 1% failures
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['custom_sql'] | No | `TestType.CUSTOM_SQL` | - |
@@ -1379,7 +1324,6 @@ contracts:
 | **threshold** | float | No | `0.0` | Failure rate threshold (0.0 = strictly no failures allowed) |
 
 ---
-
 ### `DistributionContract`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1393,7 +1337,6 @@ contracts:
     threshold: ">100"  # Mean must be > 100
     on_fail: warn
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['distribution'] | No | `TestType.DISTRIBUTION` | - |
@@ -1404,7 +1347,6 @@ contracts:
 | **threshold** | str | Yes | - | Threshold expression (e.g., '>100', '<0.05') |
 
 ---
-
 ### `FreshnessContract`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1416,7 +1358,6 @@ contracts:
     column: updated_at
     max_age: "24h"  # Data must be less than 24 hours old
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['freshness'] | No | `TestType.FRESHNESS` | - |
@@ -1426,7 +1367,6 @@ contracts:
 | **max_age** | str | Yes | - | Maximum allowed age (e.g., '24h', '7d') |
 
 ---
-
 ### `NotNullTest`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1437,7 +1377,6 @@ contracts:
   - type: not_null
     columns: [customer_id, order_date]
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['not_null'] | No | `TestType.NOT_NULL` | - |
@@ -1446,7 +1385,6 @@ contracts:
 | **columns** | List[str] | Yes | - | Columns that must not contain nulls |
 
 ---
-
 ### `RangeTest`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1459,7 +1397,6 @@ contracts:
     min: 0
     max: 150
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['range'] | No | `TestType.RANGE` | - |
@@ -1470,7 +1407,6 @@ contracts:
 | **max** | int \| float \| str | No | - | Maximum value (inclusive) |
 
 ---
-
 ### `RegexMatchTest`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1482,7 +1418,6 @@ contracts:
     column: email
     pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['regex_match'] | No | `TestType.REGEX_MATCH` | - |
@@ -1492,7 +1427,6 @@ contracts:
 | **pattern** | str | Yes | - | Regex pattern to match |
 
 ---
-
 ### `RowCountTest`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1504,7 +1438,6 @@ contracts:
     min: 1000
     max: 100000
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['row_count'] | No | `TestType.ROW_COUNT` | - |
@@ -1514,7 +1447,6 @@ contracts:
 | **max** | Optional[int] | No | - | Maximum row count |
 
 ---
-
 ### `SchemaContract`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1527,7 +1459,6 @@ contracts:
   - type: schema
     strict: true  # Fail if extra columns present
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['schema'] | No | `TestType.SCHEMA` | - |
@@ -1536,7 +1467,6 @@ contracts:
 | **strict** | bool | No | `True` | If true, fail on unexpected columns |
 
 ---
-
 ### `UniqueTest`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
@@ -1547,7 +1477,6 @@ contracts:
   - type: unique
     columns: [order_id]
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['unique'] | No | `TestType.UNIQUE` | - |
@@ -1556,13 +1485,11 @@ contracts:
 | **columns** | List[str] | Yes | - | Columns that must be unique (composite key if multiple) |
 
 ---
-
 ### `VolumeDropTest`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
 Checks if row count dropped significantly compared to history.
 Formula: (current - avg) / avg < -threshold
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['volume_drop'] | No | `TestType.VOLUME_DROP` | - |
@@ -1572,7 +1499,6 @@ Formula: (current - avg) / avg < -threshold
 | **lookback_days** | int | No | `7` | Days of history to average |
 
 ---
-
 ## Global Settings
 
 ### `LineageConfig`
@@ -1586,7 +1512,6 @@ lineage:
   url: "http://localhost:5000"
   namespace: "my_project"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **url** | Optional[str] | No | - | OpenLineage API URL |
@@ -1594,7 +1519,6 @@ lineage:
 | **api_key** | Optional[str] | No | - | API Key |
 
 ---
-
 ### `AlertConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -1624,7 +1548,6 @@ alerts:
       max_per_hour: 10
       channel: "#data-alerts"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | AlertType | Yes | - | - |
@@ -1633,7 +1556,6 @@ alerts:
 | **metadata** | Dict[str, Any] | No | `PydanticUndefined` | Extra metadata: throttle_minutes, max_per_hour, channel, etc. |
 
 ---
-
 ### `LoggingConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -1645,7 +1567,6 @@ logging:
   level: "INFO"
   structured: true
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **level** | LogLevel | No | `LogLevel.INFO` | - |
@@ -1653,7 +1574,6 @@ logging:
 | **metadata** | Dict[str, Any] | No | `PydanticUndefined` | Extra metadata in logs |
 
 ---
-
 ### `PerformanceConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -1676,7 +1596,6 @@ performance:
 - For existing sessions (e.g., Databricks), only runtime-settable configs will take effect
 - Session-level configs (e.g., `spark.executor.memory`) require session restart
 - Common runtime-safe configs: shuffle partitions, adaptive query execution, Delta optimizations
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **use_arrow** | bool | No | `True` | Use Apache Arrow-backed DataFrames (Pandas only). Reduces memory and speeds up I/O. |
@@ -1685,7 +1604,6 @@ performance:
 | **skip_null_profiling** | bool | No | `False` | Skip null profiling in metadata collection phase. Reduces execution time for large DataFrames by avoiding an additional Spark job. |
 
 ---
-
 ### `RetryConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -1698,7 +1616,6 @@ retry:
   max_attempts: 3
   backoff: "exponential"
 ```
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **enabled** | bool | No | `True` | - |
@@ -1706,7 +1623,6 @@ retry:
 | **backoff** | BackoffStrategy | No | `BackoffStrategy.EXPONENTIAL` | - |
 
 ---
-
 ### `StoryConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
@@ -1730,7 +1646,6 @@ story:
 - `failure_sample_size`: Number of failed rows to capture per validation (default: 100)
 - `max_failure_samples`: Total failed rows across all validations (default: 500)
 - `max_sampled_validations`: After this many validations, show only counts (default: 5)
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name for story output (uses connection's path resolution) |
@@ -1744,7 +1659,6 @@ story:
 | **max_sampled_validations** | int | No | `5` | After this many validations, show only counts (no samples) |
 
 ---
-
 ## Transformation Reference
 
 ### How to Use Transformers
@@ -1787,7 +1701,6 @@ The models below describe the `params` required for each transformer.
 | **value** | str | Yes | - | - |
 
 ---
-
 #### `add_prefix` (AddPrefixParams)
 Adds a prefix to column names.
 
@@ -1805,7 +1718,6 @@ add_prefix:
   prefix: "raw_"
   columns: ["id", "name", "value"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -1815,7 +1727,6 @@ add_prefix:
 | **exclude** | Optional[List[str]] | No | - | Columns to exclude from prefixing |
 
 ---
-
 #### `add_suffix` (AddSuffixParams)
 Adds a suffix to column names.
 
@@ -1833,7 +1744,6 @@ add_suffix:
   suffix: "_v2"
   columns: ["id", "name", "value"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -1843,7 +1753,6 @@ add_suffix:
 | **exclude** | Optional[List[str]] | No | - | Columns to exclude from suffixing |
 
 ---
-
 #### `case_when` (CaseWhenParams)
 Implements structured CASE WHEN logic.
 
@@ -1860,7 +1769,6 @@ case_when:
     - condition: "age > 65"
       value: "'Senior'"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -1870,7 +1778,6 @@ case_when:
 | **output_col** | str | Yes | - | Name of the resulting column |
 
 ---
-
 #### `cast_columns` (CastColumnsParams)
 Casts specific columns to new types while keeping others intact.
 
@@ -1885,7 +1792,6 @@ cast_columns:
     created_at: "TIMESTAMP"
     tags: "ARRAY<STRING>"  # Raw SQL types allowed
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -1893,7 +1799,6 @@ cast_columns:
 | **casts** | Dict[str, SimpleType \| str] | Yes | - | Map of column to target SQL type |
 
 ---
-
 #### `clean_text` (CleanTextParams)
 Applies string cleaning operations (Trim/Case) via SQL.
 
@@ -1906,7 +1811,6 @@ clean_text:
   trim: true
   case: "lower"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -1916,7 +1820,6 @@ clean_text:
 | **case** | Literal['lower', 'upper', 'preserve'] | No | `preserve` | Case conversion |
 
 ---
-
 #### `coalesce_columns` (CoalesceColumnsParams)
 Returns the first non-null value from a list of columns.
 Useful for fallback/priority scenarios.
@@ -1936,7 +1839,6 @@ coalesce_columns:
   columns: ["updated_at", "modified_at", "created_at"]
   output_col: "last_change_at"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -1946,7 +1848,6 @@ coalesce_columns:
 | **drop_source** | bool | No | `False` | Drop the source columns after coalescing |
 
 ---
-
 #### `concat_columns` (ConcatColumnsParams)
 Concatenates multiple columns into one string.
 NULLs are skipped (treated as empty string) using CONCAT_WS behavior.
@@ -1960,7 +1861,6 @@ concat_columns:
   separator: " "
   output_col: "full_name"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -1970,7 +1870,6 @@ concat_columns:
 | **output_col** | str | Yes | - | Resulting column name |
 
 ---
-
 #### `convert_timezone` (ConvertTimezoneParams)
 Converts a timestamp from one timezone to another.
 Assumes the input column is a naive timestamp representing time in source_tz,
@@ -1985,7 +1884,6 @@ convert_timezone:
   source_tz: "UTC"
   target_tz: "America/New_York"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -1996,7 +1894,6 @@ convert_timezone:
 | **output_col** | Optional[str] | No | - | Name of the result column (default: {col}_{target_tz}) |
 
 ---
-
 #### `date_add` (DateAddParams)
 Adds an interval to a date/timestamp column.
 
@@ -2009,7 +1906,6 @@ date_add:
   value: 1
   unit: "day"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2019,7 +1915,6 @@ date_add:
 | **unit** | Literal['day', 'month', 'year', 'hour', 'minute', 'second'] | Yes | - | - |
 
 ---
-
 #### `date_diff` (DateDiffParams)
 Calculates difference between two dates/timestamps.
 Returns the elapsed time in the specified unit (as float for sub-day units).
@@ -2033,7 +1928,6 @@ date_diff:
   end_col: "updated_at"
   unit: "day"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2043,7 +1937,6 @@ date_diff:
 | **unit** | Literal['day', 'hour', 'minute', 'second'] | No | `day` | - |
 
 ---
-
 #### `date_trunc` (DateTruncParams)
 Truncates a date/timestamp to the specified precision.
 
@@ -2055,7 +1948,6 @@ date_trunc:
   col: "created_at"
   unit: "month"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2064,7 +1956,6 @@ date_trunc:
 | **unit** | Literal['year', 'month', 'day', 'hour', 'minute', 'second'] | Yes | - | - |
 
 ---
-
 #### `derive_columns` (DeriveColumnsParams)
 Appends new columns based on SQL expressions.
 
@@ -2083,7 +1974,6 @@ derive_columns:
 ```
 
 Note: Engine will fail if expressions reference non-existent columns.
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2091,7 +1981,6 @@ Note: Engine will fail if expressions reference non-existent columns.
 | **derivations** | Dict[str, str] | Yes | - | Map of column name to SQL expression |
 
 ---
-
 #### `distinct` (DistinctParams)
 Returns unique rows (SELECT DISTINCT).
 
@@ -2102,7 +1991,6 @@ Example:
 distinct:
   columns: ["category", "status"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2110,7 +1998,6 @@ distinct:
 | **columns** | Optional[List[str]] | No | - | Columns to project (if None, keeps all columns unique) |
 
 ---
-
 #### `drop_columns` (DropColumnsParams)
 Removes the specified columns from the DataFrame.
 
@@ -2121,7 +2008,6 @@ Example:
 drop_columns:
   columns: ["_internal_id", "_temp_flag", "_processing_date"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2129,7 +2015,6 @@ drop_columns:
 | **columns** | List[str] | Yes | - | List of column names to drop |
 
 ---
-
 #### `extract_date_parts` (ExtractDateParams)
 Extracts date parts using ANSI SQL extract/functions.
 
@@ -2142,7 +2027,6 @@ extract_date_parts:
   prefix: "created"
   parts: ["year", "month"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2152,7 +2036,6 @@ extract_date_parts:
 | **parts** | Literal[typing.Literal['year', 'month', 'day', 'hour']] | No | `['year', 'month', 'day']` | - |
 
 ---
-
 #### `fill_nulls` (FillNullsParams)
 Replaces null values with specified defaults using COALESCE.
 
@@ -2165,7 +2048,6 @@ fill_nulls:
     count: 0
     description: "N/A"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2173,7 +2055,6 @@ fill_nulls:
 | **values** | Dict[str, str \| int \| float \| bool] | Yes | - | Map of column to fill value |
 
 ---
-
 #### `filter_rows` (FilterRowsParams)
 Filters rows using a standard SQL WHERE clause.
 
@@ -2194,7 +2075,6 @@ Example (Null Check):
 filter_rows:
   condition: "email IS NOT NULL AND email != ''"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2202,7 +2082,6 @@ filter_rows:
 | **condition** | str | Yes | - | SQL WHERE clause (e.g., 'age > 18 AND status = "active"') |
 
 ---
-
 #### `limit` (LimitParams)
 Limits result size.
 
@@ -2214,7 +2093,6 @@ limit:
   n: 100
   offset: 0
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2223,7 +2101,6 @@ limit:
 | **offset** | int | No | `0` | Number of rows to skip |
 
 ---
-
 #### `normalize_column_names` (NormalizeColumnNamesParams)
 Normalizes column names to a consistent style.
 Useful for cleaning up messy source data with spaces, mixed case, or special characters.
@@ -2236,7 +2113,6 @@ normalize_column_names:
   style: "snake_case"
   lowercase: true
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2246,7 +2122,6 @@ normalize_column_names:
 | **remove_special** | bool | No | `True` | Remove special characters except underscores |
 
 ---
-
 #### `normalize_schema` (NormalizeSchemaParams)
 Structural transformation to rename, drop, and reorder columns.
 
@@ -2263,7 +2138,6 @@ normalize_schema:
   drop: ["unused_col"]
   select_order: ["id", "new_col", "created_at"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2273,7 +2147,6 @@ normalize_schema:
 | **select_order** | Optional[List[str]] | No | - | Final column order; any missing columns appended after |
 
 ---
-
 #### `rename_columns` (RenameColumnsParams)
 Renames columns according to the provided mapping.
 Columns not in the mapping are kept unchanged.
@@ -2288,7 +2161,6 @@ rename_columns:
     order_date: date
     total_amount: amount
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2296,7 +2168,6 @@ rename_columns:
 | **mapping** | Dict[str, str] | Yes | - | Map of old column name to new column name |
 
 ---
-
 #### `replace_values` (ReplaceValuesParams)
 Replaces values in specified columns according to the mapping.
 Supports replacing to NULL.
@@ -2321,7 +2192,6 @@ replace_values:
     "US": "USA"
     "UK": "GBR"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2330,7 +2200,6 @@ replace_values:
 | **mapping** | Dict[str, Optional[str]] | Yes | - | Map of old value to new value (use null for NULL) |
 
 ---
-
 #### `sample` (SampleParams)
 Samples data using random filtering.
 
@@ -2342,7 +2211,6 @@ sample:
   fraction: 0.1
   seed: 42
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2351,7 +2219,6 @@ sample:
 | **seed** | Optional[int] | No | - | - |
 
 ---
-
 #### `select_columns` (SelectColumnsParams)
 Keeps only the specified columns, dropping all others.
 
@@ -2362,7 +2229,6 @@ Example:
 select_columns:
   columns: ["id", "name", "created_at"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2370,7 +2236,6 @@ select_columns:
 | **columns** | List[str] | Yes | - | List of column names to keep |
 
 ---
-
 #### `sort` (SortParams)
 Sorts the dataset.
 
@@ -2382,7 +2247,6 @@ sort:
   by: ["created_at", "id"]
   ascending: false
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2391,7 +2255,6 @@ sort:
 | **ascending** | bool | No | `True` | Sort order |
 
 ---
-
 #### `split_part` (SplitPartParams)
 Extracts the Nth part of a string after splitting by a delimiter.
 
@@ -2404,7 +2267,6 @@ split_part:
   delimiter: "@"
   index: 2  # Extracts domain
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2414,7 +2276,6 @@ split_part:
 | **index** | int | Yes | - | 1-based index of the token to extract |
 
 ---
-
 #### `trim_whitespace` (TrimWhitespaceParams)
 Trims leading and trailing whitespace from string columns.
 
@@ -2430,7 +2291,6 @@ Example - Specific columns:
 trim_whitespace:
   columns: ["name", "address", "city"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2438,7 +2298,6 @@ trim_whitespace:
 | **columns** | Optional[List[str]] | No | - | Columns to trim (default: all string columns detected at runtime) |
 
 ---
-
 ### 📂 Relational Algebra
 
 #### `aggregate` (AggregateParams)
@@ -2455,7 +2314,6 @@ aggregate:
     employee_id: "count"
     age: "avg"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2464,7 +2322,6 @@ aggregate:
 | **aggregations** | Dict[str, AggFunc] | Yes | - | Map of column to aggregation function (sum, avg, min, max, count) |
 
 ---
-
 #### `join` (JoinParams)
 Joins the current dataset with another dataset from the context.
 
@@ -2486,7 +2343,6 @@ join:
   how: "inner"
   prefix: "ord"  # Result cols: ord_date, ord_amount...
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2497,7 +2353,6 @@ join:
 | **prefix** | Optional[str] | No | - | Prefix for columns from right dataset to avoid collisions |
 
 ---
-
 #### `pivot` (PivotParams)
 Pivots row values into columns.
 
@@ -2520,7 +2375,6 @@ pivot:
   values: ["A", "B", "C"]  # Explicit values avoid extra pass
   agg_col: "amount"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2532,7 +2386,6 @@ pivot:
 | **values** | Optional[List[str]] | No | - | Specific values to pivot (for Spark optimization) |
 
 ---
-
 #### `union` (UnionParams)
 Unions current dataset with others.
 
@@ -2551,7 +2404,6 @@ union:
   datasets: ["legacy_data"]
   by_name: false
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2560,7 +2412,6 @@ union:
 | **by_name** | bool | No | `True` | Match columns by name (UNION ALL BY NAME) |
 
 ---
-
 #### `unpivot` (UnpivotParams)
 Unpivots columns into rows (Melt/Stack).
 
@@ -2574,7 +2425,6 @@ unpivot:
   var_name: "month"
   value_name: "sales"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2585,7 +2435,6 @@ unpivot:
 | **value_name** | str | No | `value` | - |
 
 ---
-
 ### 📂 Data Quality
 
 #### `cross_check` (CrossCheckParams)
@@ -2612,7 +2461,6 @@ params:
   type: "schema_match"
   inputs: ["staging_orders", "prod_orders"]
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2622,7 +2470,6 @@ params:
 | **threshold** | float | No | `0.0` | Threshold for diff (0.0-1.0) |
 
 ---
-
 ### 📂 Warehousing Patterns
 
 #### AuditColumnsConfig
@@ -2634,7 +2481,6 @@ params:
 | **updated_col** | Optional[str] | No | - | Column to update on every merge |
 
 ---
-
 #### `merge` (MergeParams)
 Merge transformer implementation.
 Handles Upsert, Append-Only, and Delete-Match strategies.
@@ -2712,7 +2558,6 @@ params:
 *   **upsert** (Default): Update existing records, insert new ones.
 *   **append_only**: Ignore duplicates, only insert new keys.
 *   **delete_match**: Delete records in target that match keys in source.
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2729,7 +2574,6 @@ params:
 | **delete_condition** | Optional[str] | No | - | SQL condition for delete clause (e.g. 'source.status = "deleted"') |
 
 ---
-
 #### `scd2` (SCD2Params)
 Implements SCD Type 2 Logic.
 
@@ -2762,7 +2606,6 @@ params:
 2. **Compare**: Checks `track_cols` to see if data changed.
 3. **Close**: If changed, updates the old record's `end_time_col` to the new `effective_time_col`.
 4. **Insert**: Adds a new record with `effective_time_col` as start and open-ended end date.
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2776,12 +2619,10 @@ params:
 | **delete_col** | Optional[str] | No | - | Column indicating soft deletion (boolean) |
 
 ---
-
 ### 📂 Advanced & Feature Engineering
 
 #### ShiftDefinition
 Definition of a single shift.
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2791,7 +2632,6 @@ Definition of a single shift.
 | **end** | str | Yes | - | End time in HH:MM format (e.g., '14:00') |
 
 ---
-
 #### `deduplicate` (DeduplicateParams)
 Deduplicates data using Window functions.
 
@@ -2803,7 +2643,6 @@ deduplicate:
   keys: ["id"]
   order_by: "updated_at DESC"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2812,7 +2651,6 @@ deduplicate:
 | **order_by** | Optional[str] | No | - | SQL Order by clause (e.g. 'updated_at DESC') to determine which record to keep (first one is kept) |
 
 ---
-
 #### `dict_based_mapping` (DictMappingParams)
 Configuration for dictionary mapping.
 
@@ -2826,7 +2664,6 @@ dict_based_mapping:
   default: "Unknown"
   output_column: "status_desc"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2837,7 +2674,6 @@ dict_based_mapping:
 | **output_column** | Optional[str] | No | - | Name of output column. If not provided, overwrites source column. |
 
 ---
-
 #### `explode_list_column` (ExplodeParams)
 Configuration for exploding lists.
 
@@ -2847,7 +2683,6 @@ explode_list_column:
   column: "items"
   outer: true  # Keep orders with empty items list
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2856,7 +2691,6 @@ explode_list_column:
 | **outer** | bool | No | `False` | If True, keep rows with empty lists (explode_outer behavior). If False, drops them. |
 
 ---
-
 #### `generate_surrogate_key` (SurrogateKeyParams)
 Generates a deterministic surrogate key (MD5) from a combination of columns.
 Handles NULLs by treating them as empty strings to ensure consistency.
@@ -2870,7 +2704,6 @@ generate_surrogate_key:
   separator: "-"
   output_col: "unique_id"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2880,7 +2713,6 @@ generate_surrogate_key:
 | **output_col** | str | No | `surrogate_key` | Name of the output column |
 
 ---
-
 #### `geocode` (GeocodeParams)
 Geocoding Stub.
 
@@ -2892,7 +2724,6 @@ geocode:
   address_col: "full_address"
   output_col: "lat_long"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2901,7 +2732,6 @@ geocode:
 | **output_col** | str | No | `lat_long` | Name of the output column for coordinates |
 
 ---
-
 #### `hash_columns` (HashParams)
 Hashes columns for PII/Anonymization.
 
@@ -2913,7 +2743,6 @@ hash_columns:
   columns: ["email", "ssn"]
   algorithm: "sha256"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2922,7 +2751,6 @@ hash_columns:
 | **algorithm** | HashAlgorithm | No | `HashAlgorithm.SHA256` | Hashing algorithm. Options: 'sha256', 'md5' |
 
 ---
-
 #### `normalize_json` (NormalizeJsonParams)
 Flattens a nested JSON/Struct column.
 
@@ -2934,7 +2762,6 @@ normalize_json:
   column: "json_data"
   sep: "_"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2943,7 +2770,6 @@ normalize_json:
 | **sep** | str | No | `_` | Separator for nested fields (e.g., 'parent_child') |
 
 ---
-
 #### `parse_json` (ParseJsonParams)
 Parses a JSON string column into a Struct/Map column.
 
@@ -2956,7 +2782,6 @@ parse_json:
   json_schema: "id INT, name STRING"
   output_col: "parsed_struct"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2966,7 +2791,6 @@ parse_json:
 | **output_col** | Optional[str] | No | - | - |
 
 ---
-
 #### `regex_replace` (RegexReplaceParams)
 SQL-based Regex replacement.
 
@@ -2979,7 +2803,6 @@ regex_replace:
   pattern: "[^0-9]"
   replacement: ""
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2989,7 +2812,6 @@ regex_replace:
 | **replacement** | str | Yes | - | String to replace matches with |
 
 ---
-
 #### `sessionize` (SessionizeParams)
 Assigns session IDs based on inactivity threshold.
 
@@ -3002,7 +2824,6 @@ sessionize:
   user_col: "user_id"
   threshold_seconds: 1800
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3013,7 +2834,6 @@ sessionize:
 | **session_col** | str | No | `session_id` | Output column name for the generated session ID |
 
 ---
-
 #### `split_events_by_period` (SplitEventsByPeriodParams)
 Splits events that span multiple time periods into individual segments.
 
@@ -3053,7 +2873,6 @@ split_events_by_period:
       start: "22:00"
       end: "06:00"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3066,7 +2885,6 @@ split_events_by_period:
 | **shift_col** | Optional[str] | No | `shift_name` | Output column name for shift name (only used when period='shift') |
 
 ---
-
 #### `unpack_struct` (UnpackStructParams)
 Flattens a struct/dict column into top-level columns.
 
@@ -3077,7 +2895,6 @@ Example:
 unpack_struct:
   column: "user_info"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3085,7 +2902,6 @@ unpack_struct:
 | **column** | str | Yes | - | Struct/Dictionary column to unpack/flatten into individual columns |
 
 ---
-
 #### `validate_and_flag` (ValidateAndFlagParams)
 Validates rules and appends a column with a list/string of failed rule names.
 
@@ -3099,7 +2915,6 @@ validate_and_flag:
     age_check: "age >= 0"
     email_format: "email LIKE '%@%'"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3108,7 +2923,6 @@ validate_and_flag:
 | **flag_col** | str | No | `_issues` | Name of the column to store failed rules |
 
 ---
-
 #### `window_calculation` (WindowCalculationParams)
 Generic wrapper for Window functions.
 
@@ -3122,7 +2936,6 @@ window_calculation:
   partition_by: ["region"]
   order_by: "date ASC"
 ```
-
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3133,7 +2946,6 @@ window_calculation:
 | **order_by** | Optional[str] | No | - | - |
 
 ---
-
 ## Semantic Layer
 
 ### Semantic Layer
@@ -3209,7 +3021,6 @@ Attributes:
     column: Column name in source (defaults to name)
     hierarchy: Optional ordered list of columns for drill-down
     description: Human-readable description
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique dimension identifier |
@@ -3219,7 +3030,6 @@ Attributes:
 | **description** | Optional[str] | No | - | Human-readable description |
 
 ---
-
 ### `MaterializationConfig`
 > *Used in: [SemanticLayerConfig](#semanticlayerconfig)*
 
@@ -3235,7 +3045,6 @@ Attributes:
     output: Output table path
     schedule: Optional cron schedule for refresh
     incremental: Configuration for incremental refresh
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique materialization identifier |
@@ -3246,7 +3055,6 @@ Attributes:
 | **incremental** | Optional[Dict[str, Any]] | No | - | Incremental refresh config |
 
 ---
-
 ### `MetricDefinition`
 > *Used in: [SemanticLayerConfig](#semanticlayerconfig)*
 
@@ -3265,7 +3073,6 @@ Attributes:
         - `table_name`: Uses default connection
     filters: Optional WHERE conditions to apply
     type: "simple" (direct aggregation) or "derived" (references other metrics)
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique metric identifier |
@@ -3276,7 +3083,6 @@ Attributes:
 | **type** | MetricType | No | `MetricType.SIMPLE` | Metric type |
 
 ---
-
 ### `SemanticLayerConfig`
 Complete semantic layer configuration.
 
@@ -3287,7 +3093,6 @@ Attributes:
     metrics: List of metric definitions
     dimensions: List of dimension definitions
     materializations: List of materialization configurations
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **metrics** | List[[MetricDefinition](#metricdefinition)] | No | `PydanticUndefined` | Metric definitions |
@@ -3295,7 +3100,6 @@ Attributes:
 | **materializations** | List[[MaterializationConfig](#materializationconfig)] | No | `PydanticUndefined` | Materialization configs |
 
 ---
-
 ## FK Validation
 
 ### FK Validation
@@ -3334,7 +3138,6 @@ Attributes:
     dimension_key: Primary/surrogate key column in dimension
     nullable: Whether nulls are allowed in fact_key
     on_violation: Action on violation ("warn", "error", "quarantine")
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique relationship identifier |
@@ -3346,19 +3149,16 @@ Attributes:
 | **on_violation** | str | No | `error` | Action on violation |
 
 ---
-
 ### `RelationshipRegistry`
 Registry of all declared relationships.
 
 Attributes:
     relationships: List of relationship configurations
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **relationships** | List[[RelationshipConfig](#relationshipconfig)] | No | `PydanticUndefined` | Relationship definitions |
 
 ---
-
 ## Data Patterns
 
 ### Data Patterns
@@ -3570,7 +3370,6 @@ pattern:
 
 ### `AuditConfig`
 Configuration for audit columns.
-
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **load_timestamp** | bool | No | `True` | Add load_timestamp column |
