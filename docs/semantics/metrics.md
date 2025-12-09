@@ -2,6 +2,8 @@
 
 This guide covers how to define metrics and dimensions in the Odibi semantic layer.
 
+> **Source Notation:** The `source` field supports three formats: `$pipeline.node` (recommended), `connection.path`, or bare table names. See [Source Notation](../tutorials/dimensional_modeling/08_defining_metrics.md#source-notation) for details.
+
 ## MetricDefinition
 
 A metric represents a measurable value that can be aggregated across dimensions.

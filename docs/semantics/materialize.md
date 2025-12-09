@@ -2,6 +2,8 @@
 
 This guide covers how to pre-compute and persist metrics using the `Materializer` class.
 
+> **Source Notation:** Metrics and dimensions use `source` to reference tables. Supports `$pipeline.node` (recommended), `connection.path`, or bare names. See [Source Notation](../tutorials/dimensional_modeling/08_defining_metrics.md#source-notation) for details.
+
 ## Overview
 
 Materialization pre-computes aggregated metrics at a specific grain and persists them to an output table. This enables:
