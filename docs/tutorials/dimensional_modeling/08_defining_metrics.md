@@ -78,11 +78,13 @@ metrics:
 
 The `source` field supports three formats:
 
-| Format | Example | Description |
+| Format | Example | When to Use |
 |--------|---------|-------------|
-| **$pipeline.node** | `$build_warehouse.fact_orders` | References a pipeline node's write target |
-| **connection.path** | `gold.fact_orders` | Explicit connection + path (supports nested paths) |
-| **bare name** | `fact_orders` | Uses default connection (manual setup) |
+| **$pipeline.node** | `$build_warehouse.fact_orders` | With `Project` API (recommended) |
+| **connection.path** | `gold.fact_orders` | External tables not in pipelines |
+| **bare name** | `fact_orders` | Manual setup with `context.register()` |
+
+> **Note:** This tutorial shows both the `Project` API (recommended) and manual setup approaches. The manual sections use bare names like `source: fact_orders` because they match what you register with `context.register("fact_orders", df)`.
 
 #### Option 1: Node Reference (Recommended)
 
