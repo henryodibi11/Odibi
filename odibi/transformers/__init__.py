@@ -45,6 +45,19 @@ def register_standard_library():
     registry.register(sql_core.case_when, "case_when", sql_core.CaseWhenParams)
     registry.register(sql_core.convert_timezone, "convert_timezone", sql_core.ConvertTimezoneParams)
     registry.register(sql_core.concat_columns, "concat_columns", sql_core.ConcatColumnsParams)
+    registry.register(sql_core.select_columns, "select_columns", sql_core.SelectColumnsParams)
+    registry.register(sql_core.drop_columns, "drop_columns", sql_core.DropColumnsParams)
+    registry.register(sql_core.rename_columns, "rename_columns", sql_core.RenameColumnsParams)
+    registry.register(sql_core.add_prefix, "add_prefix", sql_core.AddPrefixParams)
+    registry.register(sql_core.add_suffix, "add_suffix", sql_core.AddSuffixParams)
+    registry.register(
+        sql_core.normalize_column_names,
+        "normalize_column_names",
+        sql_core.NormalizeColumnNamesParams,
+    )
+    registry.register(sql_core.coalesce_columns, "coalesce_columns", sql_core.CoalesceColumnsParams)
+    registry.register(sql_core.replace_values, "replace_values", sql_core.ReplaceValuesParams)
+    registry.register(sql_core.trim_whitespace, "trim_whitespace", sql_core.TrimWhitespaceParams)
 
     # Relational
     registry.register(relational.join, "join", relational.JoinParams)

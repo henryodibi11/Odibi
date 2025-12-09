@@ -903,3 +903,454 @@ def concat_columns(context: EngineContext, params: ConcatColumnsParams) -> Engin
 
     sql_query = f"SELECT *, {expr} AS {params.output_col} FROM df"
     return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 18. Select Columns
+# -------------------------------------------------------------------------
+
+
+class SelectColumnsParams(BaseModel):
+    """
+    Configuration for selecting specific columns (whitelist).
+
+    Example:
+    ```yaml
+    select_columns:
+      columns: ["id", "name", "created_at"]
+    ```
+    """
+
+    columns: List[str] = Field(..., description="List of column names to keep")
+
+
+def select_columns(context: EngineContext, params: SelectColumnsParams) -> EngineContext:
+    """
+    Keeps only the specified columns, dropping all others.
+    """
+    cols_str = ", ".join(params.columns)
+    sql_query = f"SELECT {cols_str} FROM df"
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 19. Drop Columns
+# -------------------------------------------------------------------------
+
+
+class DropColumnsParams(BaseModel):
+    """
+    Configuration for dropping specific columns (blacklist).
+
+    Example:
+    ```yaml
+    drop_columns:
+      columns: ["_internal_id", "_temp_flag", "_processing_date"]
+    ```
+    """
+
+    columns: List[str] = Field(..., description="List of column names to drop")
+
+
+def drop_columns(context: EngineContext, params: DropColumnsParams) -> EngineContext:
+    """
+    Removes the specified columns from the DataFrame.
+    """
+    # Use EXCEPT syntax (Spark) or EXCLUDE (DuckDB)
+    from odibi.enums import EngineType
+
+    drop_cols = ", ".join(params.columns)
+
+    if context.engine_type == EngineType.PANDAS:
+        # DuckDB uses EXCLUDE
+        sql_query = f"SELECT * EXCLUDE ({drop_cols}) FROM df"
+    else:
+        # Spark uses EXCEPT
+        sql_query = f"SELECT * EXCEPT ({drop_cols}) FROM df"
+
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 20. Rename Columns
+# -------------------------------------------------------------------------
+
+
+class RenameColumnsParams(BaseModel):
+    """
+    Configuration for bulk column renaming.
+
+    Example:
+    ```yaml
+    rename_columns:
+      mapping:
+        customer_id: cust_id
+        order_date: date
+        total_amount: amount
+    ```
+    """
+
+    mapping: Dict[str, str] = Field(..., description="Map of old column name to new column name")
+
+
+def rename_columns(context: EngineContext, params: RenameColumnsParams) -> EngineContext:
+    """
+    Renames columns according to the provided mapping.
+    Columns not in the mapping are kept unchanged.
+    """
+    # Build SELECT with aliases for renamed columns
+    current_cols = context.columns
+    select_parts = []
+
+    for col in current_cols:
+        if col in params.mapping:
+            select_parts.append(f"{col} AS {params.mapping[col]}")
+        else:
+            select_parts.append(col)
+
+    cols_str = ", ".join(select_parts)
+    sql_query = f"SELECT {cols_str} FROM df"
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 21. Add Prefix
+# -------------------------------------------------------------------------
+
+
+class AddPrefixParams(BaseModel):
+    """
+    Configuration for adding a prefix to column names.
+
+    Example - All columns:
+    ```yaml
+    add_prefix:
+      prefix: "src_"
+    ```
+
+    Example - Specific columns:
+    ```yaml
+    add_prefix:
+      prefix: "raw_"
+      columns: ["id", "name", "value"]
+    ```
+    """
+
+    prefix: str = Field(..., description="Prefix to add to column names")
+    columns: Optional[List[str]] = Field(
+        None, description="Columns to prefix (default: all columns)"
+    )
+    exclude: Optional[List[str]] = Field(None, description="Columns to exclude from prefixing")
+
+
+def add_prefix(context: EngineContext, params: AddPrefixParams) -> EngineContext:
+    """
+    Adds a prefix to column names.
+    """
+    current_cols = context.columns
+    target_cols = params.columns or current_cols
+    exclude_cols = set(params.exclude or [])
+
+    select_parts = []
+    for col in current_cols:
+        if col in target_cols and col not in exclude_cols:
+            select_parts.append(f"{col} AS {params.prefix}{col}")
+        else:
+            select_parts.append(col)
+
+    cols_str = ", ".join(select_parts)
+    sql_query = f"SELECT {cols_str} FROM df"
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 22. Add Suffix
+# -------------------------------------------------------------------------
+
+
+class AddSuffixParams(BaseModel):
+    """
+    Configuration for adding a suffix to column names.
+
+    Example - All columns:
+    ```yaml
+    add_suffix:
+      suffix: "_raw"
+    ```
+
+    Example - Specific columns:
+    ```yaml
+    add_suffix:
+      suffix: "_v2"
+      columns: ["id", "name", "value"]
+    ```
+    """
+
+    suffix: str = Field(..., description="Suffix to add to column names")
+    columns: Optional[List[str]] = Field(
+        None, description="Columns to suffix (default: all columns)"
+    )
+    exclude: Optional[List[str]] = Field(None, description="Columns to exclude from suffixing")
+
+
+def add_suffix(context: EngineContext, params: AddSuffixParams) -> EngineContext:
+    """
+    Adds a suffix to column names.
+    """
+    current_cols = context.columns
+    target_cols = params.columns or current_cols
+    exclude_cols = set(params.exclude or [])
+
+    select_parts = []
+    for col in current_cols:
+        if col in target_cols and col not in exclude_cols:
+            select_parts.append(f"{col} AS {col}{params.suffix}")
+        else:
+            select_parts.append(col)
+
+    cols_str = ", ".join(select_parts)
+    sql_query = f"SELECT {cols_str} FROM df"
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 23. Normalize Column Names
+# -------------------------------------------------------------------------
+
+
+class NormalizeColumnNamesParams(BaseModel):
+    """
+    Configuration for normalizing column names.
+
+    Example:
+    ```yaml
+    normalize_column_names:
+      style: "snake_case"
+      lowercase: true
+    ```
+    """
+
+    style: Literal["snake_case", "none"] = Field(
+        "snake_case",
+        description="Naming style: 'snake_case' converts spaces/special chars to underscores",
+    )
+    lowercase: bool = Field(True, description="Convert names to lowercase")
+    remove_special: bool = Field(True, description="Remove special characters except underscores")
+
+
+def normalize_column_names(
+    context: EngineContext, params: NormalizeColumnNamesParams
+) -> EngineContext:
+    """
+    Normalizes column names to a consistent style.
+    Useful for cleaning up messy source data with spaces, mixed case, or special characters.
+    """
+    import re
+
+    current_cols = context.columns
+    select_parts = []
+
+    for col in current_cols:
+        new_name = col
+
+        # Apply lowercase
+        if params.lowercase:
+            new_name = new_name.lower()
+
+        # Apply snake_case (replace spaces and special chars with underscores)
+        if params.style == "snake_case":
+            # Replace spaces, dashes, dots with underscores
+            new_name = re.sub(r"[\s\-\.]+", "_", new_name)
+            # Insert underscore before uppercase letters (camelCase to snake_case)
+            new_name = re.sub(r"([a-z])([A-Z])", r"\1_\2", new_name).lower()
+
+        # Remove special characters
+        if params.remove_special:
+            new_name = re.sub(r"[^a-zA-Z0-9_]", "", new_name)
+            # Remove consecutive underscores
+            new_name = re.sub(r"_+", "_", new_name)
+            # Remove leading/trailing underscores
+            new_name = new_name.strip("_")
+
+        if new_name != col:
+            select_parts.append(f'"{col}" AS {new_name}')
+        else:
+            select_parts.append(f'"{col}"')
+
+    cols_str = ", ".join(select_parts)
+    sql_query = f"SELECT {cols_str} FROM df"
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 24. Coalesce Columns
+# -------------------------------------------------------------------------
+
+
+class CoalesceColumnsParams(BaseModel):
+    """
+    Configuration for coalescing columns (first non-null value).
+
+    Example - Phone number fallback:
+    ```yaml
+    coalesce_columns:
+      columns: ["mobile_phone", "work_phone", "home_phone"]
+      output_col: "primary_phone"
+    ```
+
+    Example - Timestamp fallback:
+    ```yaml
+    coalesce_columns:
+      columns: ["updated_at", "modified_at", "created_at"]
+      output_col: "last_change_at"
+    ```
+    """
+
+    columns: List[str] = Field(..., description="List of columns to coalesce (in priority order)")
+    output_col: str = Field(..., description="Name of the output column")
+    drop_source: bool = Field(False, description="Drop the source columns after coalescing")
+
+
+def coalesce_columns(context: EngineContext, params: CoalesceColumnsParams) -> EngineContext:
+    """
+    Returns the first non-null value from a list of columns.
+    Useful for fallback/priority scenarios.
+    """
+    from odibi.enums import EngineType
+
+    cols_str = ", ".join(params.columns)
+    expr = f"COALESCE({cols_str}) AS {params.output_col}"
+
+    if params.drop_source:
+        drop_cols = ", ".join(params.columns)
+        if context.engine_type == EngineType.PANDAS:
+            sql_query = f"SELECT * EXCLUDE ({drop_cols}), {expr} FROM df"
+        else:
+            sql_query = f"SELECT * EXCEPT ({drop_cols}), {expr} FROM df"
+    else:
+        sql_query = f"SELECT *, {expr} FROM df"
+
+    return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 25. Replace Values
+# -------------------------------------------------------------------------
+
+
+class ReplaceValuesParams(BaseModel):
+    """
+    Configuration for bulk value replacement.
+
+    Example - Standardize nulls:
+    ```yaml
+    replace_values:
+      columns: ["status", "category"]
+      mapping:
+        "N/A": null
+        "": null
+        "Unknown": null
+    ```
+
+    Example - Code replacement:
+    ```yaml
+    replace_values:
+      columns: ["country_code"]
+      mapping:
+        "US": "USA"
+        "UK": "GBR"
+    ```
+    """
+
+    columns: List[str] = Field(..., description="Columns to apply replacements to")
+    mapping: Dict[str, Optional[str]] = Field(
+        ..., description="Map of old value to new value (use null for NULL)"
+    )
+
+
+def replace_values(context: EngineContext, params: ReplaceValuesParams) -> EngineContext:
+    """
+    Replaces values in specified columns according to the mapping.
+    Supports replacing to NULL.
+    """
+    current_cols = context.columns
+    select_parts = []
+
+    for col in current_cols:
+        if col in params.columns:
+            # Build nested CASE WHEN for replacements
+            case_parts = []
+            for old_val, new_val in params.mapping.items():
+                if old_val == "":
+                    case_parts.append(f"WHEN {col} = '' THEN {_sql_value(new_val)}")
+                else:
+                    case_parts.append(f"WHEN {col} = '{old_val}' THEN {_sql_value(new_val)}")
+
+            if case_parts:
+                case_expr = f"CASE {' '.join(case_parts)} ELSE {col} END AS {col}"
+                select_parts.append(case_expr)
+            else:
+                select_parts.append(col)
+        else:
+            select_parts.append(col)
+
+    cols_str = ", ".join(select_parts)
+    sql_query = f"SELECT {cols_str} FROM df"
+    return context.sql(sql_query)
+
+
+def _sql_value(val: Optional[str]) -> str:
+    """Convert Python value to SQL literal."""
+    if val is None:
+        return "NULL"
+    return f"'{val}'"
+
+
+# -------------------------------------------------------------------------
+# 26. Trim Whitespace
+# -------------------------------------------------------------------------
+
+
+class TrimWhitespaceParams(BaseModel):
+    """
+    Configuration for trimming whitespace from string columns.
+
+    Example - All string columns:
+    ```yaml
+    trim_whitespace: {}
+    ```
+
+    Example - Specific columns:
+    ```yaml
+    trim_whitespace:
+      columns: ["name", "address", "city"]
+    ```
+    """
+
+    columns: Optional[List[str]] = Field(
+        None,
+        description="Columns to trim (default: all string columns detected at runtime)",
+    )
+
+
+def trim_whitespace(context: EngineContext, params: TrimWhitespaceParams) -> EngineContext:
+    """
+    Trims leading and trailing whitespace from string columns.
+    """
+    current_cols = context.columns
+    target_cols = params.columns
+
+    # If no columns specified, we trim all columns (SQL TRIM handles non-strings gracefully in most cases)
+    if target_cols is None:
+        target_cols = current_cols
+
+    select_parts = []
+    for col in current_cols:
+        if col in target_cols:
+            select_parts.append(f"TRIM({col}) AS {col}")
+        else:
+            select_parts.append(col)
+
+    cols_str = ", ".join(select_parts)
+    sql_query = f"SELECT {cols_str} FROM df"
+    return context.sql(sql_query)

@@ -1788,6 +1788,62 @@ The models below describe the `params` required for each transformer.
 
 ---
 
+#### `add_prefix` (AddPrefixParams)
+Adds a prefix to column names.
+
+Configuration for adding a prefix to column names.
+
+Example - All columns:
+```yaml
+add_prefix:
+  prefix: "src_"
+```
+
+Example - Specific columns:
+```yaml
+add_prefix:
+  prefix: "raw_"
+  columns: ["id", "name", "value"]
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **prefix** | str | Yes | - | Prefix to add to column names |
+| **columns** | Optional[List[str]] | No | - | Columns to prefix (default: all columns) |
+| **exclude** | Optional[List[str]] | No | - | Columns to exclude from prefixing |
+
+---
+
+#### `add_suffix` (AddSuffixParams)
+Adds a suffix to column names.
+
+Configuration for adding a suffix to column names.
+
+Example - All columns:
+```yaml
+add_suffix:
+  suffix: "_raw"
+```
+
+Example - Specific columns:
+```yaml
+add_suffix:
+  suffix: "_v2"
+  columns: ["id", "name", "value"]
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **suffix** | str | Yes | - | Suffix to add to column names |
+| **columns** | Optional[List[str]] | No | - | Columns to suffix (default: all columns) |
+| **exclude** | Optional[List[str]] | No | - | Columns to exclude from suffixing |
+
+---
+
 #### `case_when` (CaseWhenParams)
 Implements structured CASE WHEN logic.
 
@@ -1858,6 +1914,36 @@ clean_text:
 | **columns** | List[str] | Yes | - | List of columns to clean |
 | **trim** | bool | No | `True` | Apply TRIM() |
 | **case** | Literal['lower', 'upper', 'preserve'] | No | `preserve` | Case conversion |
+
+---
+
+#### `coalesce_columns` (CoalesceColumnsParams)
+Returns the first non-null value from a list of columns.
+Useful for fallback/priority scenarios.
+
+Configuration for coalescing columns (first non-null value).
+
+Example - Phone number fallback:
+```yaml
+coalesce_columns:
+  columns: ["mobile_phone", "work_phone", "home_phone"]
+  output_col: "primary_phone"
+```
+
+Example - Timestamp fallback:
+```yaml
+coalesce_columns:
+  columns: ["updated_at", "modified_at", "created_at"]
+  output_col: "last_change_at"
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | List[str] | Yes | - | List of columns to coalesce (in priority order) |
+| **output_col** | str | Yes | - | Name of the output column |
+| **drop_source** | bool | No | `False` | Drop the source columns after coalescing |
 
 ---
 
@@ -2025,6 +2111,25 @@ distinct:
 
 ---
 
+#### `drop_columns` (DropColumnsParams)
+Removes the specified columns from the DataFrame.
+
+Configuration for dropping specific columns (blacklist).
+
+Example:
+```yaml
+drop_columns:
+  columns: ["_internal_id", "_temp_flag", "_processing_date"]
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | List[str] | Yes | - | List of column names to drop |
+
+---
+
 #### `extract_date_parts` (ExtractDateParams)
 Extracts date parts using ANSI SQL extract/functions.
 
@@ -2119,6 +2224,29 @@ limit:
 
 ---
 
+#### `normalize_column_names` (NormalizeColumnNamesParams)
+Normalizes column names to a consistent style.
+Useful for cleaning up messy source data with spaces, mixed case, or special characters.
+
+Configuration for normalizing column names.
+
+Example:
+```yaml
+normalize_column_names:
+  style: "snake_case"
+  lowercase: true
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **style** | Literal['snake_case', 'none'] | No | `snake_case` | Naming style: 'snake_case' converts spaces/special chars to underscores |
+| **lowercase** | bool | No | `True` | Convert names to lowercase |
+| **remove_special** | bool | No | `True` | Remove special characters except underscores |
+
+---
+
 #### `normalize_schema` (NormalizeSchemaParams)
 Structural transformation to rename, drop, and reorder columns.
 
@@ -2146,6 +2274,63 @@ normalize_schema:
 
 ---
 
+#### `rename_columns` (RenameColumnsParams)
+Renames columns according to the provided mapping.
+Columns not in the mapping are kept unchanged.
+
+Configuration for bulk column renaming.
+
+Example:
+```yaml
+rename_columns:
+  mapping:
+    customer_id: cust_id
+    order_date: date
+    total_amount: amount
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **mapping** | Dict[str, str] | Yes | - | Map of old column name to new column name |
+
+---
+
+#### `replace_values` (ReplaceValuesParams)
+Replaces values in specified columns according to the mapping.
+Supports replacing to NULL.
+
+Configuration for bulk value replacement.
+
+Example - Standardize nulls:
+```yaml
+replace_values:
+  columns: ["status", "category"]
+  mapping:
+    "N/A": null
+    "": null
+    "Unknown": null
+```
+
+Example - Code replacement:
+```yaml
+replace_values:
+  columns: ["country_code"]
+  mapping:
+    "US": "USA"
+    "UK": "GBR"
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | List[str] | Yes | - | Columns to apply replacements to |
+| **mapping** | Dict[str, Optional[str]] | Yes | - | Map of old value to new value (use null for NULL) |
+
+---
+
 #### `sample` (SampleParams)
 Samples data using random filtering.
 
@@ -2164,6 +2349,25 @@ sample:
 | --- | --- | --- | --- | --- |
 | **fraction** | float | Yes | - | Fraction of rows to return (0.0 to 1.0) |
 | **seed** | Optional[int] | No | - | - |
+
+---
+
+#### `select_columns` (SelectColumnsParams)
+Keeps only the specified columns, dropping all others.
+
+Configuration for selecting specific columns (whitelist).
+
+Example:
+```yaml
+select_columns:
+  columns: ["id", "name", "created_at"]
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | List[str] | Yes | - | List of column names to keep |
 
 ---
 
@@ -2208,6 +2412,30 @@ split_part:
 | **col** | str | Yes | - | Column to split |
 | **delimiter** | str | Yes | - | Delimiter to split by |
 | **index** | int | Yes | - | 1-based index of the token to extract |
+
+---
+
+#### `trim_whitespace` (TrimWhitespaceParams)
+Trims leading and trailing whitespace from string columns.
+
+Configuration for trimming whitespace from string columns.
+
+Example - All string columns:
+```yaml
+trim_whitespace: {}
+```
+
+Example - Specific columns:
+```yaml
+trim_whitespace:
+  columns: ["name", "address", "city"]
+```
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **columns** | Optional[List[str]] | No | - | Columns to trim (default: all string columns detected at runtime) |
 
 ---
 
@@ -2947,7 +3175,7 @@ semantic:
       source: gold.fact_orders    # connection.table notation
       filters:
         - "status = 'completed'"
-  
+
   dimensions:
     - name: region
       source: gold.dim_customer
