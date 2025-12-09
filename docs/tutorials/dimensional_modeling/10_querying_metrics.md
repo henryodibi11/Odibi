@@ -1,13 +1,58 @@
 # Querying Metrics Tutorial
 
-In this tutorial, you'll learn how to execute queries against the semantic layer using the `SemanticQuery` interface.
+In this tutorial, you'll learn how to execute queries against the semantic layer using both the unified `Project` API and the `SemanticQuery` interface.
 
 **What You'll Learn:**
+- **Unified Project API** (recommended) - simplest approach
 - Simple queries (total, no grouping)
 - Queries with one dimension
 - Queries with multiple dimensions
 - Filtered queries
 - Multiple metrics together
+
+---
+
+## Option A: Unified Project API (Recommended)
+
+The simplest way to query metrics is through the `Project` class:
+
+```python
+from odibi import Project
+
+# Load project - semantic layer inherits connections
+project = Project.load("odibi.yaml")
+
+# Query metrics - tables auto-loaded from connections
+result = project.query("revenue BY region")
+print(result.df)
+```
+
+The Project API:
+- Reads connections from your `odibi.yaml`
+- Resolves `source: $pipeline.node` or `connection.path` to full paths
+- Auto-loads Delta tables when queried
+- No manual `context.register()` calls needed
+
+**Example queries:**
+```python
+# Total revenue
+result = project.query("revenue")
+
+# Revenue by region
+result = project.query("revenue BY region")
+
+# Multiple metrics and dimensions
+result = project.query("revenue, order_count BY region, month")
+
+# With filter
+result = project.query("revenue BY category WHERE region = 'North'")
+```
+
+---
+
+## Option B: Manual SemanticQuery Interface
+
+For more control, use the `SemanticQuery` class directly.
 
 ---
 

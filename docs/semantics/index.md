@@ -181,6 +181,83 @@ materializations:
 
 ## Quick Start
 
+### Option A: Unified Project API (Recommended)
+
+The simplest way to use the semantic layer is through the unified `Project` API, which automatically resolves table paths from your connections:
+
+```python
+from odibi import Project
+
+# Load project - semantic layer inherits connections from odibi.yaml
+project = Project.load("odibi.yaml")
+
+# Query metrics - tables are auto-loaded from connections
+result = project.query("revenue BY region")
+print(result.df)
+
+# Multiple metrics and dimensions
+result = project.query("revenue, order_count BY region, month")
+
+# With filters
+result = project.query("revenue BY category WHERE region = 'North'")
+```
+
+**odibi.yaml with semantic layer:**
+
+```yaml
+project: my_warehouse
+engine: pandas
+
+connections:
+  gold:
+    type: delta
+    path: /mnt/data/gold
+
+pipelines:
+  - pipeline: build_warehouse
+    nodes:
+      - name: fact_orders
+        write:
+          connection: gold
+          table: fact_orders
+      - name: dim_customer
+        write:
+          connection: gold
+          table: dim_customer
+
+# Semantic layer at project level
+semantic:
+  metrics:
+    - name: revenue
+      expr: "SUM(total_amount)"
+      source: $build_warehouse.fact_orders    # References node's write target
+      filters:
+        - "status = 'completed'"
+  
+  dimensions:
+    - name: region
+      source: $build_warehouse.dim_customer   # No path duplication!
+      column: region
+```
+
+The `source: $build_warehouse.fact_orders` notation tells the semantic layer to:
+1. Look up the `fact_orders` node in the `build_warehouse` pipeline
+2. Read its `write.connection` and `write.table` config
+3. Auto-load the Delta table when queried
+
+**Alternative: connection.path notation**
+
+For external tables not managed by pipelines, use `connection.path`:
+
+```yaml
+source: gold.fact_orders              # → /mnt/data/gold/fact_orders
+source: gold.oee/plant_a/metrics      # → /mnt/data/gold/oee/plant_a/metrics (nested paths work!)
+```
+
+The split happens on the **first dot only**, so subdirectories are supported.
+
+### Option B: Manual Setup
+
 ### 1. Build Your Data with Pipelines
 
 First, use standard Odibi pipelines to build your star schema:

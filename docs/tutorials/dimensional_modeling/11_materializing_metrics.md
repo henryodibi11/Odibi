@@ -11,6 +11,57 @@ In this tutorial, you'll learn how to pre-compute and persist metrics using the 
 
 ---
 
+## Unified Project API Note
+
+When using the unified `Project` API, materializations are defined in the `semantic` section of your `odibi.yaml`. Sources can reference pipeline nodes directly:
+
+```yaml
+# odibi.yaml
+project: retail_warehouse
+engine: pandas
+
+connections:
+  gold:
+    type: delta
+    path: /mnt/data/gold
+
+pipelines:
+  - pipeline: build_warehouse
+    nodes:
+      - name: fact_orders
+        write: { connection: gold, table: fact_orders }
+      - name: dim_customer
+        write: { connection: gold, table: dim_customer }
+      - name: dim_date
+        write: { connection: gold, table: dim_date }
+
+semantic:
+  metrics:
+    - name: revenue
+      expr: "SUM(line_total)"
+      source: $build_warehouse.fact_orders    # References node's write target
+      filters: ["status = 'completed'"]
+  
+  dimensions:
+    - name: region
+      source: $build_warehouse.dim_customer   # No path duplication!
+      column: region
+    - name: month
+      source: $build_warehouse.dim_date
+      column: month_name
+  
+  materializations:
+    - name: monthly_revenue_by_region
+      metrics: [revenue]
+      dimensions: [region, month]
+      output: gold/agg_monthly_revenue
+      schedule: "0 2 1 * *"
+```
+
+The `$pipeline.node` notation automatically reads from wherever the node writes. For full control over materialization execution, continue with the `Materializer` class below.
+
+---
+
 ## Why Materialize?
 
 Ad-hoc queries are powerful but slow for dashboards:

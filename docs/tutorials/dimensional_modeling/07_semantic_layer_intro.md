@@ -238,6 +238,67 @@ materializations:
 
 ---
 
+## Unified Project API (Recommended)
+
+The simplest way to use the semantic layer is through the unified `Project` API. This connects your pipelines and semantic layer seamlessly:
+
+### 1. Add Semantic Config to odibi.yaml
+
+```yaml
+# odibi.yaml
+project: my_warehouse
+engine: pandas
+
+connections:
+  gold:
+    type: delta
+    path: /mnt/data/gold
+
+pipelines:
+  - pipeline: build_warehouse
+    nodes:
+      - name: fact_orders
+        write: { connection: gold, table: fact_orders }
+      - name: dim_customer
+        write: { connection: gold, table: dim_customer }
+
+# Semantic layer at project level
+semantic:
+  metrics:
+    - name: revenue
+      expr: "SUM(line_total)"
+      source: $build_warehouse.fact_orders    # References node's write target
+      filters:
+        - "status = 'completed'"
+  
+  dimensions:
+    - name: region
+      source: $build_warehouse.dim_customer   # No path duplication!
+      column: region
+```
+
+### 2. Query with Two Lines of Code
+
+```python
+from odibi import Project
+
+project = Project.load("odibi.yaml")
+result = project.query("revenue BY region")
+print(result.df)
+```
+
+That's it! The `Project` class:
+- Reads connections and pipelines from your YAML
+- Resolves `$build_warehouse.fact_orders` → node's write path
+- Auto-loads Delta tables when queried
+- No manual `context.register()` calls needed
+
+---
+
+## Manual Approach
+
+If you prefer more control, you can use the semantic layer components directly.
+
 ## Example: Revenue Metric
 
 Let's see how a simple metric works:

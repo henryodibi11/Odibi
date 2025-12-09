@@ -32,7 +32,10 @@ class MetricDefinition(BaseModel):
         name: Unique metric identifier
         description: Human-readable description
         expr: SQL aggregation expression (e.g., "SUM(total_amount)")
-        source: Source table name (required for simple metrics)
+        source: Source table reference. Supports three formats:
+            - `$pipeline.node` (recommended): e.g., `$build_warehouse.fact_orders`
+            - `connection.path`: e.g., `gold.fact_orders` or `gold.oee/plant_a/metrics`
+            - `table_name`: Uses default connection
         filters: Optional WHERE conditions to apply
         type: "simple" (direct aggregation) or "derived" (references other metrics)
     """
@@ -40,7 +43,15 @@ class MetricDefinition(BaseModel):
     name: str = Field(..., description="Unique metric identifier")
     description: Optional[str] = Field(None, description="Human-readable description")
     expr: str = Field(..., description="SQL aggregation expression")
-    source: Optional[str] = Field(None, description="Source table name")
+    source: Optional[str] = Field(
+        None,
+        description=(
+            "Source table reference. Formats: "
+            "$pipeline.node (e.g., $build_warehouse.fact_orders), "
+            "connection.path (e.g., gold.fact_orders or gold.oee/plant_a/table), "
+            "or bare table_name"
+        ),
+    )
     filters: List[str] = Field(default_factory=list, description="WHERE conditions")
     type: MetricType = Field(default=MetricType.SIMPLE, description="Metric type")
 
@@ -72,14 +83,25 @@ class DimensionDefinition(BaseModel):
 
     Attributes:
         name: Unique dimension identifier
-        source: Source table name
+        source: Source table reference. Supports three formats:
+            - `$pipeline.node` (recommended): e.g., `$build_warehouse.dim_customer`
+            - `connection.path`: e.g., `gold.dim_customer` or `gold.dims/customer`
+            - `table_name`: Uses default connection
         column: Column name in source (defaults to name)
         hierarchy: Optional ordered list of columns for drill-down
         description: Human-readable description
     """
 
     name: str = Field(..., description="Unique dimension identifier")
-    source: str = Field(..., description="Source table name")
+    source: str = Field(
+        ...,
+        description=(
+            "Source table reference. Formats: "
+            "$pipeline.node (e.g., $build_warehouse.dim_customer), "
+            "connection.path (e.g., gold.dim_customer or gold.dims/customer), "
+            "or bare table_name"
+        ),
+    )
     column: Optional[str] = Field(None, description="Column name (defaults to name)")
     hierarchy: List[str] = Field(default_factory=list, description="Drill-down hierarchy")
     description: Optional[str] = Field(None, description="Human-readable description")

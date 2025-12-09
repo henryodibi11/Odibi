@@ -25,4 +25,8 @@ def __getattr__(name):
         from odibi.pipeline import PipelineManager
 
         return PipelineManager
+    if name == "Project":
+        from odibi.project import Project
+
+        return Project
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

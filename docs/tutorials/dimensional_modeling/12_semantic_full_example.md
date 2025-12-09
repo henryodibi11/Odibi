@@ -4,10 +4,100 @@ This tutorial brings together everything you've learned about the semantic layer
 
 **What You'll See:**
 - Complete semantic config (5 metrics, 5 dimensions, 3 materializations)
+- **Unified Project API** (simplest approach)
 - Full Python script that loads data, queries metrics, and materializes results
 - All output tables with sample data
 
 ---
+
+## Option A: Unified Project API (Recommended)
+
+The simplest way to use the semantic layer is with the unified `Project` API:
+
+### odibi.yaml with Semantic Layer
+
+```yaml
+# odibi.yaml
+project: retail_warehouse
+engine: pandas
+
+connections:
+  gold:
+    type: delta
+    path: /mnt/data/gold
+
+pipelines:
+  - pipeline: build_warehouse
+    nodes:
+      - name: fact_orders
+        write: { connection: gold, table: fact_orders }
+      - name: dim_customer
+        write: { connection: gold, table: dim_customer }
+      - name: dim_product
+        write: { connection: gold, table: dim_product }
+      - name: dim_date
+        write: { connection: gold, table: dim_date }
+
+# Semantic layer at project level
+semantic:
+  metrics:
+    - name: revenue
+      description: "Total revenue from completed orders"
+      expr: "SUM(line_total)"
+      source: $build_warehouse.fact_orders    # References node's write target
+      filters:
+        - "status = 'completed'"
+    
+    - name: order_count
+      expr: "COUNT(*)"
+      source: $build_warehouse.fact_orders
+      filters:
+        - "status = 'completed'"
+    
+    - name: avg_order_value
+      expr: "AVG(line_total)"
+      source: $build_warehouse.fact_orders
+      filters:
+        - "status = 'completed'"
+  
+  dimensions:
+    - name: region
+      source: $build_warehouse.dim_customer   # No path duplication!
+      column: region
+    
+    - name: category
+      source: $build_warehouse.dim_product
+      column: category
+    
+    - name: month
+      source: $build_warehouse.dim_date
+      column: month_name
+```
+
+### Query with Two Lines
+
+```python
+from odibi import Project
+
+# Load project - tables auto-resolved from connections
+project = Project.load("odibi.yaml")
+
+# Query metrics
+result = project.query("revenue BY region")
+print(result.df)
+
+# Multiple metrics and dimensions
+result = project.query("revenue, order_count, avg_order_value BY region, category")
+print(result.df)
+```
+
+That's it! No manual table loading or context registration required.
+
+---
+
+## Option B: Manual Approach
+
+For more control, use the semantic layer components directly.
 
 ## The Complete Semantic Configuration
 

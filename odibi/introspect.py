@@ -251,20 +251,40 @@ Define metrics once, query them by name across dimensions.
 - **DimensionDefinition**: Define grouping attributes with hierarchies
 - **MaterializationConfig**: Pre-compute metrics at specific grain
 - **SemanticQuery**: Execute queries like "revenue BY region, month"
+- **Project**: Unified API that connects pipelines and semantic layer
 
-**Example:**
+**Unified Project API (Recommended):**
+```python
+from odibi import Project
+
+project = Project.load("odibi.yaml")
+result = project.query("revenue BY region")
+print(result.df)
+```
+
+**YAML Configuration:**
 ```yaml
-metrics:
-  - name: revenue
-    expr: "SUM(total_amount)"
-    source: fact_orders
-    filters:
-      - "status = 'completed'"
+project: my_warehouse
+engine: pandas
 
-dimensions:
-  - name: region
-    source: dim_customer
-    column: region
+connections:
+  gold:
+    type: delta
+    path: /mnt/data/gold
+
+# Semantic layer at project level
+semantic:
+  metrics:
+    - name: revenue
+      expr: "SUM(total_amount)"
+      source: gold.fact_orders    # connection.table notation
+      filters:
+        - "status = 'completed'"
+  
+  dimensions:
+    - name: region
+      source: gold.dim_customer
+      column: region
 
 materializations:
   - name: monthly_revenue
@@ -272,6 +292,8 @@ materializations:
     dimensions: [region, month]
     output: gold/agg_monthly_revenue
 ```
+
+The `source: gold.fact_orders` notation resolves paths automatically from connections.
 """,
     "Validation": """
 ### FK Validation

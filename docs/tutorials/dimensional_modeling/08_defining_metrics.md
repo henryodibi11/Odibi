@@ -74,6 +74,81 @@ metrics:
 | `expr` | `"SUM(line_total)"` | SQL aggregation expression |
 | `source` | `"fact_orders"` | Table to aggregate from |
 
+### Source Notation
+
+The `source` field supports three formats:
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| **$pipeline.node** | `$build_warehouse.fact_orders` | References a pipeline node's write target |
+| **connection.path** | `gold.fact_orders` | Explicit connection + path (supports nested paths) |
+| **bare name** | `fact_orders` | Uses default connection (manual setup) |
+
+#### Option 1: Node Reference (Recommended)
+
+Reference the pipeline node that produces the table. The semantic layer automatically reads from wherever that node writes:
+
+```yaml
+# odibi.yaml
+pipelines:
+  - pipeline: build_warehouse
+    nodes:
+      - name: fact_orders
+        write:
+          connection: gold
+          table: fact_orders
+
+semantic:
+  metrics:
+    - name: revenue
+      expr: "SUM(line_total)"
+      source: $build_warehouse.fact_orders    # References the node above
+```
+
+This approach:
+- **DRY** - No duplication; the node already knows its write location
+- **Auto-synced** - If you change the node's write config, the semantic layer follows
+- Uses the same `$pipeline.node` pattern as cross-pipeline `inputs`
+
+#### Option 2: Connection.Path (Explicit)
+
+For tables that exist outside pipelines or when you want explicit control:
+
+```yaml
+semantic:
+  metrics:
+    - name: revenue
+      expr: "SUM(line_total)"
+      source: gold.fact_orders    # Resolves to /mnt/data/gold/fact_orders
+```
+
+**Nested paths are supported.** The split happens on the **first dot only**, so everything after becomes the path:
+
+```yaml
+# Given connection:
+connections:
+  gold:
+    type: delta
+    path: /mnt/data/gold
+
+# These all work:
+source: gold.fact_orders              # → /mnt/data/gold/fact_orders
+source: gold.oee/plant_a/metrics      # → /mnt/data/gold/oee/plant_a/metrics
+source: gold.domain/v2/fact_sales     # → /mnt/data/gold/domain/v2/fact_sales
+```
+
+For Unity Catalog connections with `catalog` + `schema_name`:
+
+```yaml
+connections:
+  gold:
+    type: delta
+    catalog: main
+    schema_name: gold_db
+
+source: gold.fact_orders    # → main.gold_db.fact_orders
+```
+
 ### Query Result
 
 ```python

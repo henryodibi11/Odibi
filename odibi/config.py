@@ -2660,6 +2660,16 @@ class ProjectConfig(BaseModel):
         description="Structure: same as ProjectConfig but with only overridden fields. Not yet validated strictly.",
     )
 
+    # === SEMANTIC LAYER ===
+    semantic: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Semantic layer configuration. Can be inline or reference external file. "
+            "Contains metrics, dimensions, and materializations for self-service analytics. "
+            "Example: semantic: { config: 'semantic_config.yaml' } or inline definitions."
+        ),
+    )
+
     @model_validator(mode="after")
     def validate_story_connection_exists(self):
         """Ensure story.connection is defined in connections."""

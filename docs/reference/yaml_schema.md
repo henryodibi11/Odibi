@@ -56,6 +56,7 @@ alerts:
 | **alerts** | List[[AlertConfig](#alertconfig)] | No | `PydanticUndefined` | Alert configurations |
 | **performance** | [PerformanceConfig](#performanceconfig) | No | `PydanticUndefined` | Performance tuning |
 | **environments** | Optional[Dict[str, Dict[str, Any]]] | No | - | Structure: same as ProjectConfig but with only overridden fields. Not yet validated strictly. |
+| **semantic** | Optional[Dict[str, Any]] | No | - | Semantic layer configuration. Can be inline or reference external file. Contains metrics, dimensions, and materializations for self-service analytics. Example: semantic: { config: 'semantic_config.yaml' } or inline definitions. |
 
 ---
 
@@ -2851,20 +2852,40 @@ Define metrics once, query them by name across dimensions.
 - **DimensionDefinition**: Define grouping attributes with hierarchies
 - **MaterializationConfig**: Pre-compute metrics at specific grain
 - **SemanticQuery**: Execute queries like "revenue BY region, month"
+- **Project**: Unified API that connects pipelines and semantic layer
 
-**Example:**
+**Unified Project API (Recommended):**
+```python
+from odibi import Project
+
+project = Project.load("odibi.yaml")
+result = project.query("revenue BY region")
+print(result.df)
+```
+
+**YAML Configuration:**
 ```yaml
-metrics:
-  - name: revenue
-    expr: "SUM(total_amount)"
-    source: fact_orders
-    filters:
-      - "status = 'completed'"
+project: my_warehouse
+engine: pandas
 
-dimensions:
-  - name: region
-    source: dim_customer
-    column: region
+connections:
+  gold:
+    type: delta
+    path: /mnt/data/gold
+
+# Semantic layer at project level
+semantic:
+  metrics:
+    - name: revenue
+      expr: "SUM(total_amount)"
+      source: gold.fact_orders    # connection.table notation
+      filters:
+        - "status = 'completed'"
+  
+  dimensions:
+    - name: region
+      source: gold.dim_customer
+      column: region
 
 materializations:
   - name: monthly_revenue
@@ -2872,6 +2893,8 @@ materializations:
     dimensions: [region, month]
     output: gold/agg_monthly_revenue
 ```
+
+The `source: gold.fact_orders` notation resolves paths automatically from connections.
 
 ---
 
@@ -2885,7 +2908,10 @@ metrics (e.g., date, product, region).
 
 Attributes:
     name: Unique dimension identifier
-    source: Source table name
+    source: Source table reference. Supports three formats:
+        - `$pipeline.node` (recommended): e.g., `$build_warehouse.dim_customer`
+        - `connection.path`: e.g., `gold.dim_customer` or `gold.dims/customer`
+        - `table_name`: Uses default connection
     column: Column name in source (defaults to name)
     hierarchy: Optional ordered list of columns for drill-down
     description: Human-readable description
@@ -2893,7 +2919,7 @@ Attributes:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique dimension identifier |
-| **source** | str | Yes | - | Source table name |
+| **source** | str | Yes | - | Source table reference. Formats: $pipeline.node (e.g., $build_warehouse.dim_customer), connection.path (e.g., gold.dim_customer or gold.dims/customer), or bare table_name |
 | **column** | Optional[str] | No | - | Column name (defaults to name) |
 | **hierarchy** | List[str] | No | `PydanticUndefined` | Drill-down hierarchy |
 | **description** | Optional[str] | No | - | Human-readable description |
@@ -2939,7 +2965,10 @@ Attributes:
     name: Unique metric identifier
     description: Human-readable description
     expr: SQL aggregation expression (e.g., "SUM(total_amount)")
-    source: Source table name (required for simple metrics)
+    source: Source table reference. Supports three formats:
+        - `$pipeline.node` (recommended): e.g., `$build_warehouse.fact_orders`
+        - `connection.path`: e.g., `gold.fact_orders` or `gold.oee/plant_a/metrics`
+        - `table_name`: Uses default connection
     filters: Optional WHERE conditions to apply
     type: "simple" (direct aggregation) or "derived" (references other metrics)
 
@@ -2948,7 +2977,7 @@ Attributes:
 | **name** | str | Yes | - | Unique metric identifier |
 | **description** | Optional[str] | No | - | Human-readable description |
 | **expr** | str | Yes | - | SQL aggregation expression |
-| **source** | Optional[str] | No | - | Source table name |
+| **source** | Optional[str] | No | - | Source table reference. Formats: $pipeline.node (e.g., $build_warehouse.fact_orders), connection.path (e.g., gold.fact_orders or gold.oee/plant_a/table), or bare table_name |
 | **filters** | List[str] | No | `PydanticUndefined` | WHERE conditions |
 | **type** | MetricType | No | `MetricType.SIMPLE` | Metric type |
 

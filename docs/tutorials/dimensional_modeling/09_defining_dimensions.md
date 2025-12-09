@@ -63,6 +63,69 @@ We'll use the star schema from Tutorial 06:
 
 ---
 
+## Unified Project API (Recommended)
+
+When using the unified `Project` API, dimensions can reference pipeline nodes directly using the `$pipeline.node` notation:
+
+```yaml
+# odibi.yaml
+project: my_warehouse
+engine: pandas
+
+connections:
+  gold:
+    type: delta
+    path: /mnt/data/gold
+
+pipelines:
+  - pipeline: build_warehouse
+    nodes:
+      - name: dim_customer
+        write:
+          connection: gold
+          table: dim_customer
+      - name: dim_product
+        write:
+          connection: gold
+          table: dim_product
+      - name: fact_orders
+        write:
+          connection: gold
+          table: fact_orders
+
+semantic:
+  metrics:
+    - name: revenue
+      expr: "SUM(line_total)"
+      source: $build_warehouse.fact_orders    # References node's write target
+
+  dimensions:
+    - name: region
+      source: $build_warehouse.dim_customer   # References node's write target
+      column: region
+    
+    - name: category
+      source: $build_warehouse.dim_product    # No path duplication!
+      column: category
+```
+
+The `source: $build_warehouse.dim_customer` notation:
+1. Looks up the `dim_customer` node in the `build_warehouse` pipeline
+2. Reads its `write.connection` and `write.table` config
+3. Resolves the full path automatically
+
+**Alternative:** You can also use `source: gold.dim_customer` (connection.table) for tables not managed by pipelines.
+
+```python
+from odibi import Project
+
+project = Project.load("odibi.yaml")
+result = project.query("revenue BY region, category")  # Tables auto-loaded
+print(result.df)
+```
+
+---
+
 ## Step 1: Define a Simple Dimension
 
 The simplest dimension maps a column directly:
