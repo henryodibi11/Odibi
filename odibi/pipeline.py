@@ -893,12 +893,14 @@ class Pipeline:
         else:
             self._send_alerts("on_success", results)
 
-            if self.catalog_manager:
-                self.catalog_manager.optimize()
-                self._ctx.debug("Catalog optimized")
-
         print(f"[DEBUG] Section: alerts: {time.time() - _t0:.2f}s")
         _t0 = time.time()  # DEBUG
+
+        # Catalog optimization (optional - can be slow, ~15-20s)
+        # Only run if explicitly enabled via optimize_catalog flag
+        if self.catalog_manager and getattr(self, "optimize_catalog", False):
+            self.catalog_manager.optimize()
+            self._ctx.debug("Catalog optimized")
 
         # Lineage: Complete
         if self.lineage:
