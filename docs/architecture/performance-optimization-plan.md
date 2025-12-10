@@ -48,26 +48,27 @@ read:
 
 **Solutions**:
 
-#### a) Auto-Coalesce Small DataFrames
+#### a) Coalesce DataFrames (Opt-in)
 
-**Status**: ✅ IMPLEMENTED (Default behavior)
+**Status**: ✅ AVAILABLE (Opt-in via config)
 
-Small DataFrames (< 10K rows) are now automatically coalesced to 1 partition before
-Delta writes. This reduces file coordination overhead for incremental loads.
+Coalesce DataFrames to fewer partitions before writing to reduce file overhead.
 
-**How it works**:
-- Default threshold: 10,000 rows
-- Only applies to Delta format writes
-- Reduces multiple small files → single file per write
+**Why opt-in instead of automatic**: Automatic coalescing required `df.count()` which
+triggers double-evaluation of lazy DataFrames, causing severe performance regression.
 
-**Override threshold**:
+**How to use**:
 ```yaml
 write:
   format: delta
   path: bronze/table
   options:
-    coalesce_threshold: 5000  # Custom threshold (set to 0 to disable)
+    coalesce_partitions: 1  # Coalesce to 1 partition before write
 ```
+
+**When to use**:
+- Small incremental loads (< 1000 rows)
+- Tables that accumulate many small files
 
 #### b) Enable Optimized Write
 ```yaml
@@ -168,7 +169,7 @@ transform:
 | Priority | Fix | Impact | Effort | Status |
 |----------|-----|--------|--------|--------|
 | 🔴 High | Distributed hash for skip_if_unchanged | Avoid driver OOM, faster | Medium | ✅ Done |
-| 🔴 High | Auto-coalesce small DataFrames | Reduce write overhead | Low | ✅ Done |
+| 🔴 High | Coalesce option for writes | Reduce write overhead | Low | ✅ Available (opt-in) |
 | 🔴 High | Add incremental to slow SQL sources | 40-50s savings | Low | ✅ Done |
 | 🟡 Medium | Fix detect_deletes key configuration | Clean logs, correct behavior | Low | 🔄 Ongoing |
 | 🟢 Low | Enable parallel execution | Overlap I/O | Low | ✅ Done |
@@ -192,5 +193,11 @@ Delta Lake protocol on cloud storage. Each append requires:
 1. ✅ **Parallel execution**: `manager.run(pipeline="bronze", parallel=True, max_workers=16)`
 2. ✅ **Rolling window incremental** added to slow SQL views
 3. ✅ **Distributed hash** now default for skip_if_unchanged
-4. ✅ **Auto-coalesce** now default for small DataFrames (< 10K rows)
+4. ✅ **Coalesce option** available via `coalesce_partitions` write option
 5. 🔄 **Set on_threshold_breach: warn** for detect_deletes
+
+## Lessons Learned
+
+⚠️ **Never call `df.count()` before write** - This triggers double-evaluation of lazy
+DataFrames, causing SQL sources to be read twice. An attempted auto-coalesce feature
+caused 2.5x performance regression (55s → 138s) due to this issue.

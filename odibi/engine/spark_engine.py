@@ -765,28 +765,21 @@ class SparkEngine(Engine):
         except Exception:
             partition_count = 1  # Fallback for mocks or unsupported DataFrames
 
-        # Auto-coalesce small DataFrames for Delta writes to reduce file overhead
-        coalesce_threshold = options.pop("coalesce_threshold", None)
-        if coalesce_threshold is None and format == "delta":
-            # Default: coalesce to 1 partition if < 10K rows
-            coalesce_threshold = 10000
-
-        if coalesce_threshold and isinstance(partition_count, int) and partition_count > 1:
-            # Use cached count if available, otherwise estimate from partitions
-            try:
-                row_count = df.count()
-                if isinstance(row_count, int) and row_count < coalesce_threshold:
-                    df = df.coalesce(1)
-                    ctx.debug(
-                        "Auto-coalesced small DataFrame to 1 partition",
-                        row_count=row_count,
-                        original_partitions=partition_count,
-                        threshold=coalesce_threshold,
-                    )
-                    partition_count = 1
-            except Exception:
-                # If count fails, skip coalescing
-                pass
+        # Auto-coalesce DataFrames for Delta writes to reduce file overhead
+        # Use coalesce_partitions option to explicitly set target partitions
+        # NOTE: We avoid df.count() here as it would trigger double-evaluation of lazy DataFrames
+        coalesce_partitions = options.pop("coalesce_partitions", None)
+        if (
+            coalesce_partitions
+            and isinstance(partition_count, int)
+            and partition_count > coalesce_partitions
+        ):
+            df = df.coalesce(coalesce_partitions)
+            ctx.debug(
+                f"Coalesced DataFrame to {coalesce_partitions} partition(s)",
+                original_partitions=partition_count,
+            )
+            partition_count = coalesce_partitions
 
         ctx.debug(
             "Starting Spark write",
