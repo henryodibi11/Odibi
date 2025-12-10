@@ -130,6 +130,7 @@ class Pipeline:
 
         # Initialize story generator
         story_config = story_config or {}
+        self.story_config = story_config  # Store for async_generation check
 
         self.story_generator = StoryGenerator(
             pipeline_name=pipeline_config.pipeline,
@@ -828,6 +829,9 @@ class Pipeline:
         # Start story generation in background thread (pure Python/file I/O, safe to parallelize)
         # This runs concurrently with state saving below
         story_future = None
+        story_executor = None
+        async_story = self.story_config.get("async_generation", False)
+
         if self.generate_story:
             from concurrent.futures import ThreadPoolExecutor
 
@@ -847,20 +851,24 @@ class Pipeline:
                         config_dump[field] = project_dump[field]
 
             def generate_story():
-                return self.story_generator.generate(
-                    node_results=results.node_results,
-                    completed=results.completed,
-                    failed=results.failed,
-                    skipped=results.skipped,
-                    duration=results.duration,
-                    start_time=results.start_time,
-                    end_time=results.end_time,
-                    context=self.context,
-                    config=config_dump,
-                )
+                try:
+                    return self.story_generator.generate(
+                        node_results=results.node_results,
+                        completed=results.completed,
+                        failed=results.failed,
+                        skipped=results.skipped,
+                        duration=results.duration,
+                        start_time=results.start_time,
+                        end_time=results.end_time,
+                        context=self.context,
+                        config=config_dump,
+                    )
+                except Exception as e:
+                    self._ctx.warning(f"Story generation failed: {e}")
+                    return None
 
-            executor = ThreadPoolExecutor(max_workers=1)
-            story_future = executor.submit(generate_story)
+            story_executor = ThreadPoolExecutor(max_workers=1)
+            story_future = story_executor.submit(generate_story)
 
         # Save state if running normally (not dry run)
         # This runs while story generation happens in background
@@ -883,16 +891,24 @@ class Pipeline:
                 state_manager.save_pipeline_run(self.config.pipeline, results)
                 self._ctx.debug("Pipeline run state saved")
 
-        # Wait for story generation to complete
+        # Handle story completion based on async_generation setting
         if story_future:
-            try:
-                story_path = story_future.result(timeout=60)
-                results.story_path = story_path
-                self._ctx.info("Story generated", story_path=story_path)
-            except Exception as e:
-                self._ctx.warning(f"Story generation failed: {e}")
-            finally:
-                executor.shutdown(wait=False)
+            if async_story:
+                # Fire-and-forget: don't wait, let it complete in background
+                self._ctx.debug("Story generation running async (fire-and-forget)")
+                # Don't shutdown executor - let thread complete on its own
+            else:
+                # Wait for story generation to complete
+                try:
+                    story_path = story_future.result(timeout=60)
+                    if story_path:
+                        results.story_path = story_path
+                        self._ctx.info("Story generated", story_path=story_path)
+                except Exception as e:
+                    self._ctx.warning(f"Story generation failed: {e}")
+                finally:
+                    if story_executor:
+                        story_executor.shutdown(wait=False)
 
         # Alert: on_success / on_failure
         if results.failed:
@@ -1220,6 +1236,7 @@ class PipelineManager:
             "max_sample_rows": story_cfg.max_sample_rows,
             "output_path": output_path,
             "storage_options": storage_options,
+            "async_generation": story_cfg.async_generation,
         }
 
     @classmethod

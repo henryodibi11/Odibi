@@ -2567,6 +2567,16 @@ class StoryConfig(BaseModel):
         description="After this many validations, show only counts (no samples)",
     )
 
+    # Performance settings
+    async_generation: bool = Field(
+        default=False,
+        description=(
+            "Generate stories asynchronously (fire-and-forget). "
+            "Pipeline returns immediately while story writes in background. "
+            "Improves multi-pipeline performance by ~5-10s per pipeline."
+        ),
+    )
+
     @model_validator(mode="after")
     def check_retention_policy(self):
         if self.retention_days is None and self.retention_count is None:

@@ -1659,6 +1659,7 @@ story:
 | **failure_sample_size** | int | No | `100` | Number of failed rows to capture per validation rule |
 | **max_failure_samples** | int | No | `500` | Maximum total failed rows across all validations |
 | **max_sampled_validations** | int | No | `5` | After this many validations, show only counts (no samples) |
+| **async_generation** | bool | No | `False` | Generate stories asynchronously (fire-and-forget). Pipeline returns immediately while story writes in background. Improves multi-pipeline performance by ~5-10s per pipeline. |
 
 ---
 ## Transformation Reference
