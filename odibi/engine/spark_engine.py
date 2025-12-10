@@ -1053,18 +1053,33 @@ class SparkEngine(Engine):
 
                     if register_table:
                         try:
-                            if not self.spark.catalog.tableExists(register_table):
+                            table_in_catalog = self.spark.catalog.tableExists(register_table)
+                            needs_registration = not table_in_catalog
+
+                            # Handle orphan catalog entries
+                            if table_in_catalog:
+                                try:
+                                    self.spark.table(register_table).limit(0).collect()
+                                    ctx.debug(
+                                        f"Table '{register_table}' already registered and valid"
+                                    )
+                                except Exception:
+                                    ctx.warning(
+                                        f"Table '{register_table}' is orphan, re-registering"
+                                    )
+                                    try:
+                                        self.spark.sql(f"DROP TABLE IF EXISTS {register_table}")
+                                    except Exception:
+                                        pass
+                                    needs_registration = True
+
+                            if needs_registration:
                                 create_sql = (
                                     f"CREATE TABLE IF NOT EXISTS {register_table} "
                                     f"USING DELTA LOCATION '{full_path}'"
                                 )
                                 self.spark.sql(create_sql)
                                 ctx.info(f"Registered table: {register_table}", path=full_path)
-                            else:
-                                ctx.debug(
-                                    f"Table '{register_table}' already registered, "
-                                    "skipping registration"
-                                )
                         except Exception as e:
                             ctx.error(
                                 f"Failed to register external table '{register_table}'",
@@ -1249,7 +1264,31 @@ class SparkEngine(Engine):
 
         if register_table and format == "delta":
             try:
-                if not self.spark.catalog.tableExists(register_table):
+                table_in_catalog = self.spark.catalog.tableExists(register_table)
+                needs_registration = not table_in_catalog
+
+                # Handle orphan catalog entries: table exists but points to deleted path
+                if table_in_catalog:
+                    try:
+                        self.spark.table(register_table).limit(0).collect()
+                        ctx.debug(
+                            f"Table '{register_table}' already registered and valid, "
+                            "skipping registration"
+                        )
+                    except Exception as orphan_err:
+                        # Orphan entry - table in catalog but path doesn't exist
+                        ctx.warning(
+                            f"Table '{register_table}' is orphan (path deleted), "
+                            "dropping and re-registering",
+                            error_message=str(orphan_err)[:200],
+                        )
+                        try:
+                            self.spark.sql(f"DROP TABLE IF EXISTS {register_table}")
+                        except Exception:
+                            pass  # Best effort cleanup
+                        needs_registration = True
+
+                if needs_registration:
                     ctx.debug(f"Registering table '{register_table}' at '{full_path}'")
                     reg_sql = (
                         f"CREATE TABLE IF NOT EXISTS {register_table} "
@@ -1257,8 +1296,6 @@ class SparkEngine(Engine):
                     )
                     self.spark.sql(reg_sql)
                     ctx.info(f"Registered table: {register_table}", path=full_path)
-                else:
-                    ctx.debug(f"Table '{register_table}' already registered, skipping registration")
             except Exception as e:
                 ctx.error(
                     f"Failed to register table '{register_table}'",
