@@ -765,6 +765,7 @@ class Pipeline:
         results.duration = time.time() - start_time
         results.end_time = datetime.now().isoformat()
         _t_post_start = time.time()  # DEBUG TIMING
+        _t0 = time.time()  # DEBUG
 
         # Batch write run records to catalog (much faster than per-node writes)
         if self.catalog_manager:
@@ -797,6 +798,9 @@ class Pipeline:
                         error_type=type(e).__name__,
                     )
 
+        print(f"[DEBUG] Section: catalog writes: {time.time() - _t0:.2f}s")
+        _t0 = time.time()  # DEBUG
+
         # Finish progress display
         if progress:
             progress.finish(
@@ -807,6 +811,9 @@ class Pipeline:
             )
             # Print phase timing breakdown for performance analysis
             progress.print_phase_timing_report(pipeline_duration_s=results.duration)
+
+        print(f"[DEBUG] Section: progress display: {time.time() - _t0:.2f}s")
+        _t0 = time.time()  # DEBUG
 
         # Log pipeline completion summary
         status = "SUCCESS" if not results.failed else "FAILED"
@@ -819,6 +826,9 @@ class Pipeline:
             skipped=len(results.skipped),
             total_nodes=len(self.graph.nodes),
         )
+
+        print(f"[DEBUG] Section: logging: {time.time() - _t0:.2f}s")
+        _t0 = time.time()  # DEBUG
 
         # Save state if running normally (not dry run)
         if not dry_run:
@@ -839,6 +849,9 @@ class Pipeline:
             if state_manager:
                 state_manager.save_pipeline_run(self.config.pipeline, results)
                 self._ctx.debug("Pipeline run state saved")
+
+        print(f"[DEBUG] Section: state save: {time.time() - _t0:.2f}s")
+        _t0 = time.time()  # DEBUG
 
         # Generate story
         if self.generate_story:
@@ -871,6 +884,9 @@ class Pipeline:
             results.story_path = story_path
             self._ctx.info("Story generated", story_path=story_path)
 
+        print(f"[DEBUG] Section: story gen: {time.time() - _t0:.2f}s")
+        _t0 = time.time()  # DEBUG
+
         # Alert: on_success / on_failure
         if results.failed:
             self._send_alerts("on_failure", results)
@@ -881,9 +897,14 @@ class Pipeline:
                 self.catalog_manager.optimize()
                 self._ctx.debug("Catalog optimized")
 
+        print(f"[DEBUG] Section: alerts: {time.time() - _t0:.2f}s")
+        _t0 = time.time()  # DEBUG
+
         # Lineage: Complete
         if self.lineage:
             self.lineage.emit_pipeline_complete(self.config, results)
+
+        print(f"[DEBUG] Section: lineage: {time.time() - _t0:.2f}s")  # DEBUG
 
         # DEBUG TIMING
         _t_post_end = time.time()
