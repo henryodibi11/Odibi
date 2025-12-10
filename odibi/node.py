@@ -1820,7 +1820,14 @@ class NodeExecutor:
                 self._store_content_hash_after_write(config, connection)
 
             # Phase 3: Catalog integration after successful write
-            self._register_catalog_entries(config, df, connection, write_config, ctx)
+            # Skip if performance config disables catalog writes
+            skip_catalog = self.performance_config and getattr(
+                self.performance_config, "skip_catalog_writes", False
+            )
+            if not skip_catalog:
+                self._register_catalog_entries(config, df, connection, write_config, ctx)
+            else:
+                ctx.debug("Skipping catalog writes (skip_catalog_writes=true)")
 
     def _register_catalog_entries(
         self,

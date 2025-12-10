@@ -2494,6 +2494,14 @@ class PerformanceConfig(BaseModel):
             "Reduces execution time for large DataFrames by avoiding an additional Spark job."
         ),
     )
+    skip_catalog_writes: bool = Field(
+        default=False,
+        description=(
+            "Skip catalog metadata writes (register_asset, track_schema, log_pattern, record_lineage) "
+            "after each node write. Significantly improves performance for high-throughput pipelines "
+            "like Bronze layer ingestion. Set to true when catalog tracking is not needed."
+        ),
+    )
 
 
 class StoryConfig(BaseModel):
