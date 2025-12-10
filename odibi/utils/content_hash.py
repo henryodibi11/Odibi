@@ -58,19 +58,30 @@ def compute_spark_dataframe_hash(
     df,
     columns: Optional[List[str]] = None,
     sort_columns: Optional[List[str]] = None,
+    distributed: bool = True,
 ) -> str:
     """Compute a deterministic SHA256 hash of a Spark DataFrame's content.
-
-    Note: This collects the DataFrame to driver, so use with caution on large datasets.
-    For very large DataFrames, consider sampling or using a distributed hash.
 
     Args:
         df: Spark DataFrame to hash
         columns: Subset of columns to include in hash. If None, all columns are used.
         sort_columns: Columns to sort by for deterministic ordering.
+            (Only used in legacy mode when distributed=False)
+        distributed: If True (default), use distributed hash computation.
+            If False, use legacy collect-to-driver approach.
 
     Returns:
         SHA256 hex digest string (64 characters)
+
+    Note:
+        The distributed mode (default) computes hash without collecting data to driver,
+        making it safe for large datasets. The hash is computed as:
+        1. Per-row xxhash64 of all column values
+        2. Sum of all row hashes (order-independent)
+        3. Combined with row count for final SHA256
+
+        Since the sum is commutative, this produces consistent hashes regardless of
+        partition ordering, without requiring a full sort operation.
     """
     if df.isEmpty():
         return hashlib.sha256(b"EMPTY_DATAFRAME").hexdigest()
@@ -79,6 +90,45 @@ def compute_spark_dataframe_hash(
 
     if columns:
         work_df = work_df.select(columns)
+
+    if distributed:
+        return _compute_spark_hash_distributed(work_df)
+    else:
+        return _compute_spark_hash_legacy(work_df, sort_columns)
+
+
+def _compute_spark_hash_distributed(df) -> str:
+    """Compute hash distributedly using Spark's xxhash64.
+
+    This approach:
+    - Never collects data to driver (except 2 scalar values)
+    - Uses xxhash64 for fast row-level hashing
+    - Uses commutative sum for order-independent aggregation
+    - Is safe for arbitrarily large DataFrames
+    """
+    from pyspark.sql import functions as F
+
+    hash_cols = [F.coalesce(F.col(c).cast("string"), F.lit("__NULL__")) for c in df.columns]
+    work_df = df.withColumn("_row_hash", F.xxhash64(*hash_cols))
+
+    result = work_df.agg(
+        F.count("*").alias("row_count"),
+        F.sum("_row_hash").alias("hash_sum"),
+    ).collect()[0]
+
+    row_count = result["row_count"] or 0
+    hash_sum = result["hash_sum"] or 0
+    combined = f"v2:{row_count}:{hash_sum}:{','.join(sorted(df.columns))}"
+    return hashlib.sha256(combined.encode()).hexdigest()
+
+
+def _compute_spark_hash_legacy(df, sort_columns: Optional[List[str]] = None) -> str:
+    """Legacy hash computation that collects to driver.
+
+    Warning: This can cause OOM on large datasets.
+    Use distributed=True for production workloads.
+    """
+    work_df = df
 
     if sort_columns:
         work_df = work_df.orderBy(sort_columns)

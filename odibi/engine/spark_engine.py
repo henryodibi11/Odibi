@@ -760,7 +760,33 @@ class SparkEngine(Engine):
             )
 
         target_identifier = table or path or "unknown"
-        partition_count = df.rdd.getNumPartitions()
+        try:
+            partition_count = df.rdd.getNumPartitions()
+        except Exception:
+            partition_count = 1  # Fallback for mocks or unsupported DataFrames
+
+        # Auto-coalesce small DataFrames for Delta writes to reduce file overhead
+        coalesce_threshold = options.pop("coalesce_threshold", None)
+        if coalesce_threshold is None and format == "delta":
+            # Default: coalesce to 1 partition if < 10K rows
+            coalesce_threshold = 10000
+
+        if coalesce_threshold and isinstance(partition_count, int) and partition_count > 1:
+            # Use cached count if available, otherwise estimate from partitions
+            try:
+                row_count = df.count()
+                if isinstance(row_count, int) and row_count < coalesce_threshold:
+                    df = df.coalesce(1)
+                    ctx.debug(
+                        "Auto-coalesced small DataFrame to 1 partition",
+                        row_count=row_count,
+                        original_partitions=partition_count,
+                        threshold=coalesce_threshold,
+                    )
+                    partition_count = 1
+            except Exception:
+                # If count fails, skip coalescing
+                pass
 
         ctx.debug(
             "Starting Spark write",
