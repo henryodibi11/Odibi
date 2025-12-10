@@ -764,6 +764,7 @@ class Pipeline:
         # Calculate duration
         results.duration = time.time() - start_time
         results.end_time = datetime.now().isoformat()
+        _t_post_start = time.time()  # DEBUG TIMING
 
         # Batch write run records to catalog (much faster than per-node writes)
         if self.catalog_manager:
@@ -883,6 +884,10 @@ class Pipeline:
         # Lineage: Complete
         if self.lineage:
             self.lineage.emit_pipeline_complete(self.config, results)
+
+        # DEBUG TIMING
+        _t_post_end = time.time()
+        print(f"[DEBUG] Post-duration overhead (lines 765-887): {_t_post_end - _t_post_start:.2f}s")
 
         return results
 
