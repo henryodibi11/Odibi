@@ -225,7 +225,11 @@ class SparkEngine(Engine):
     def _apply_table_properties(
         self, target: str, properties: Dict[str, str], is_table: bool = False
     ) -> None:
-        """Apply table properties to a Delta table."""
+        """Apply table properties to a Delta table.
+
+        Performance: Batches all properties into a single ALTER TABLE statement
+        to avoid multiple round-trips to the catalog.
+        """
         if not properties:
             return
 
@@ -239,10 +243,11 @@ class SparkEngine(Engine):
                 is_table=is_table,
             )
 
-            for prop_name, prop_value in properties.items():
-                sql = f"ALTER TABLE {table_ref} SET TBLPROPERTIES ('{prop_name}' = '{prop_value}')"
-                self.spark.sql(sql)
-                ctx.debug(f"Set table property: {prop_name}={prop_value}")
+            props_list = [f"'{k}' = '{v}'" for k, v in properties.items()]
+            props_str = ", ".join(props_list)
+            sql = f"ALTER TABLE {table_ref} SET TBLPROPERTIES ({props_str})"
+            self.spark.sql(sql)
+            ctx.debug(f"Set {len(properties)} table properties in single statement")
 
         except Exception as e:
             ctx.warning(
@@ -1048,12 +1053,18 @@ class SparkEngine(Engine):
 
                     if register_table:
                         try:
-                            create_sql = (
-                                f"CREATE TABLE IF NOT EXISTS {register_table} "
-                                f"USING DELTA LOCATION '{full_path}'"
-                            )
-                            self.spark.sql(create_sql)
-                            ctx.info(f"Registered table: {register_table}", path=full_path)
+                            if not self.spark.catalog.tableExists(register_table):
+                                create_sql = (
+                                    f"CREATE TABLE IF NOT EXISTS {register_table} "
+                                    f"USING DELTA LOCATION '{full_path}'"
+                                )
+                                self.spark.sql(create_sql)
+                                ctx.info(f"Registered table: {register_table}", path=full_path)
+                            else:
+                                ctx.debug(
+                                    f"Table '{register_table}' already registered, "
+                                    "skipping registration"
+                                )
                         except Exception as e:
                             ctx.error(
                                 f"Failed to register external table '{register_table}'",
@@ -1238,13 +1249,16 @@ class SparkEngine(Engine):
 
         if register_table and format == "delta":
             try:
-                ctx.debug(f"Registering table '{register_table}' at '{full_path}'")
-                reg_sql = (
-                    f"CREATE TABLE IF NOT EXISTS {register_table} "
-                    f"USING DELTA LOCATION '{full_path}'"
-                )
-                self.spark.sql(reg_sql)
-                ctx.info(f"Registered table: {register_table}", path=full_path)
+                if not self.spark.catalog.tableExists(register_table):
+                    ctx.debug(f"Registering table '{register_table}' at '{full_path}'")
+                    reg_sql = (
+                        f"CREATE TABLE IF NOT EXISTS {register_table} "
+                        f"USING DELTA LOCATION '{full_path}'"
+                    )
+                    self.spark.sql(reg_sql)
+                    ctx.info(f"Registered table: {register_table}", path=full_path)
+                else:
+                    ctx.debug(f"Table '{register_table}' already registered, skipping registration")
             except Exception as e:
                 ctx.error(
                     f"Failed to register table '{register_table}'",

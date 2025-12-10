@@ -139,6 +139,24 @@ class NodeExecutor:
         self._delta_write_info: Optional[Dict[str, Any]] = None
         self._validation_warnings: List[str] = []
         self._read_row_count: Optional[int] = None  # Cache row count from read phase
+        self._table_exists_cache: Dict[str, bool] = {}  # Cache table existence checks
+
+    def _cached_table_exists(
+        self,
+        connection: Any,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+    ) -> bool:
+        """Check if table exists with caching to avoid repeated Delta operations.
+
+        Performance: Table existence checks involve Delta table open + limit(0).collect()
+        which can take 3-5s. Caching saves significant time for nodes that check
+        existence multiple times (incremental filter, write phase, etc.).
+        """
+        cache_key = f"{id(connection)}:{table}:{path}"
+        if cache_key not in self._table_exists_cache:
+            self._table_exists_cache[cache_key] = self.engine.table_exists(connection, table, path)
+        return self._table_exists_cache[cache_key]
 
     def execute(
         self,
@@ -168,6 +186,7 @@ class NodeExecutor:
         self._delta_write_info = None
         self._validation_warnings = []
         self._read_row_count = None
+        self._table_exists_cache = {}  # Reset cache per execution
 
         ctx = create_logging_context(
             node_id=config.name,
@@ -465,7 +484,7 @@ class NodeExecutor:
                 write_config = config.write
                 target_conn = self.connections.get(write_config.connection)
                 if target_conn:
-                    if not self.engine.table_exists(
+                    if not self._cached_table_exists(
                         target_conn, write_config.table, write_config.path
                     ):
                         read_options["query"] = config.write.first_run_query
@@ -659,7 +678,7 @@ class NodeExecutor:
             target_conn = self.connections.get(config.write.connection)
             # Use register_table if table is not set (path-based Delta with registration)
             table_to_check = config.write.table or config.write.register_table
-            if target_conn and not self.engine.table_exists(
+            if target_conn and not self._cached_table_exists(
                 target_conn, table_to_check, config.write.path
             ):
                 ctx.debug("First run detected - skipping incremental SQL pushdown")
@@ -754,7 +773,7 @@ class NodeExecutor:
             target_conn = self.connections.get(config.write.connection)
             # Use register_table if table is not set (path-based Delta with registration)
             table_to_check = config.write.table or config.write.register_table
-            if target_conn and not self.engine.table_exists(
+            if target_conn and not self._cached_table_exists(
                 target_conn, table_to_check, config.write.path
             ):
                 # First Run detected -> Full Load
@@ -1573,7 +1592,7 @@ class NodeExecutor:
         if target_connection is None:
             return None
 
-        table_exists = self.engine.table_exists(
+        table_exists = self._cached_table_exists(
             target_connection, table=write_config.table, path=write_config.path
         )
 
