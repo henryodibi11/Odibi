@@ -2502,6 +2502,14 @@ class PerformanceConfig(BaseModel):
             "like Bronze layer ingestion. Set to true when catalog tracking is not needed."
         ),
     )
+    skip_run_logging: bool = Field(
+        default=False,
+        description=(
+            "Skip batch catalog writes at pipeline end (log_runs_batch, register_outputs_batch). "
+            "Saves 10-20s per pipeline run. Enable when you don't need run history in the catalog. "
+            "Stories are still generated and contain full execution details."
+        ),
+    )
 
 
 class StoryConfig(BaseModel):

@@ -1602,6 +1602,8 @@ performance:
 | **spark_config** | Dict[str, str] | No | `PydanticUndefined` | Spark configuration settings applied at runtime via spark.conf.set(). Example: {'spark.sql.shuffle.partitions': '200', 'spark.sql.adaptive.enabled': 'true'}. Note: Some configs require session restart and cannot be set at runtime. |
 | **delta_table_properties** | Dict[str, str] | No | `PydanticUndefined` | Default table properties applied to all Delta writes. Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names. |
 | **skip_null_profiling** | bool | No | `False` | Skip null profiling in metadata collection phase. Reduces execution time for large DataFrames by avoiding an additional Spark job. |
+| **skip_catalog_writes** | bool | No | `False` | Skip catalog metadata writes (register_asset, track_schema, log_pattern, record_lineage) after each node write. Significantly improves performance for high-throughput pipelines like Bronze layer ingestion. Set to true when catalog tracking is not needed. |
+| **skip_run_logging** | bool | No | `False` | Skip batch catalog writes at pipeline end (log_runs_batch, register_outputs_batch). Saves 10-20s per pipeline run. Enable when you don't need run history in the catalog. Stories are still generated and contain full execution details. |
 
 ---
 ### `RetryConfig`

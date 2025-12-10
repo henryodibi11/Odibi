@@ -766,7 +766,11 @@ class Pipeline:
         results.end_time = datetime.now().isoformat()
 
         # Batch write run records to catalog (much faster than per-node writes)
-        if self.catalog_manager:
+        # Skip if performance.skip_run_logging is enabled
+        skip_run_logging = self.performance_config and getattr(
+            self.performance_config, "skip_run_logging", False
+        )
+        if self.catalog_manager and not skip_run_logging:
             run_records = []
             for node_result in results.node_results.values():
                 if node_result.metadata and "_run_record" in node_result.metadata:
@@ -795,6 +799,8 @@ class Pipeline:
                         f"Failed to register outputs (non-fatal): {e}",
                         error_type=type(e).__name__,
                     )
+        elif skip_run_logging:
+            self._ctx.debug("Skipping run logging (skip_run_logging=true)")
 
         # Finish progress display
         if progress:
@@ -819,7 +825,45 @@ class Pipeline:
             total_nodes=len(self.graph.nodes),
         )
 
+        # Start story generation in background thread (pure Python/file I/O, safe to parallelize)
+        # This runs concurrently with state saving below
+        story_future = None
+        if self.generate_story:
+            from concurrent.futures import ThreadPoolExecutor
+
+            if hasattr(self.config, "model_dump"):
+                config_dump = self.config.model_dump(mode="json")
+            else:
+                config_dump = self.config.dict()
+
+            if self.project_config:
+                project_dump = (
+                    self.project_config.model_dump(mode="json")
+                    if hasattr(self.project_config, "model_dump")
+                    else self.project_config.dict()
+                )
+                for field in ["project", "plant", "asset", "business_unit", "layer"]:
+                    if field in project_dump and project_dump[field]:
+                        config_dump[field] = project_dump[field]
+
+            def generate_story():
+                return self.story_generator.generate(
+                    node_results=results.node_results,
+                    completed=results.completed,
+                    failed=results.failed,
+                    skipped=results.skipped,
+                    duration=results.duration,
+                    start_time=results.start_time,
+                    end_time=results.end_time,
+                    context=self.context,
+                    config=config_dump,
+                )
+
+            executor = ThreadPoolExecutor(max_workers=1)
+            story_future = executor.submit(generate_story)
+
         # Save state if running normally (not dry run)
+        # This runs while story generation happens in background
         if not dry_run:
             if not state_manager and self.project_config:
                 try:
@@ -839,36 +883,16 @@ class Pipeline:
                 state_manager.save_pipeline_run(self.config.pipeline, results)
                 self._ctx.debug("Pipeline run state saved")
 
-        # Generate story
-        if self.generate_story:
-            if hasattr(self.config, "model_dump"):
-                config_dump = self.config.model_dump(mode="json")
-            else:
-                config_dump = self.config.dict()
-
-            if self.project_config:
-                project_dump = (
-                    self.project_config.model_dump(mode="json")
-                    if hasattr(self.project_config, "model_dump")
-                    else self.project_config.dict()
-                )
-                for field in ["project", "plant", "asset", "business_unit", "layer"]:
-                    if field in project_dump and project_dump[field]:
-                        config_dump[field] = project_dump[field]
-
-            story_path = self.story_generator.generate(
-                node_results=results.node_results,
-                completed=results.completed,
-                failed=results.failed,
-                skipped=results.skipped,
-                duration=results.duration,
-                start_time=results.start_time,
-                end_time=results.end_time,
-                context=self.context,
-                config=config_dump,
-            )
-            results.story_path = story_path
-            self._ctx.info("Story generated", story_path=story_path)
+        # Wait for story generation to complete
+        if story_future:
+            try:
+                story_path = story_future.result(timeout=60)
+                results.story_path = story_path
+                self._ctx.info("Story generated", story_path=story_path)
+            except Exception as e:
+                self._ctx.warning(f"Story generation failed: {e}")
+            finally:
+                executor.shutdown(wait=False)
 
         # Alert: on_success / on_failure
         if results.failed:
