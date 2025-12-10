@@ -1056,22 +1056,34 @@ class SparkEngine(Engine):
                             table_in_catalog = self.spark.catalog.tableExists(register_table)
                             needs_registration = not table_in_catalog
 
-                            # Handle orphan catalog entries
+                            # Handle orphan catalog entries (only for path-not-found errors)
                             if table_in_catalog:
                                 try:
                                     self.spark.table(register_table).limit(0).collect()
                                     ctx.debug(
                                         f"Table '{register_table}' already registered and valid"
                                     )
-                                except Exception:
-                                    ctx.warning(
-                                        f"Table '{register_table}' is orphan, re-registering"
+                                except Exception as verify_err:
+                                    error_str = str(verify_err)
+                                    is_orphan = (
+                                        "DELTA_PATH_DOES_NOT_EXIST" in error_str
+                                        or "Path does not exist" in error_str
+                                        or "FileNotFoundException" in error_str
                                     )
-                                    try:
-                                        self.spark.sql(f"DROP TABLE IF EXISTS {register_table}")
-                                    except Exception:
-                                        pass
-                                    needs_registration = True
+                                    if is_orphan:
+                                        ctx.warning(
+                                            f"Table '{register_table}' is orphan, re-registering"
+                                        )
+                                        try:
+                                            self.spark.sql(f"DROP TABLE IF EXISTS {register_table}")
+                                        except Exception:
+                                            pass
+                                        needs_registration = True
+                                    else:
+                                        ctx.debug(
+                                            f"Table '{register_table}' verify failed, "
+                                            "skipping registration"
+                                        )
 
                             if needs_registration:
                                 create_sql = (
@@ -1268,6 +1280,7 @@ class SparkEngine(Engine):
                 needs_registration = not table_in_catalog
 
                 # Handle orphan catalog entries: table exists but points to deleted path
+                # Only treat as orphan if it's specifically a DELTA_PATH_DOES_NOT_EXIST error
                 if table_in_catalog:
                     try:
                         self.spark.table(register_table).limit(0).collect()
@@ -1275,18 +1288,33 @@ class SparkEngine(Engine):
                             f"Table '{register_table}' already registered and valid, "
                             "skipping registration"
                         )
-                    except Exception as orphan_err:
-                        # Orphan entry - table in catalog but path doesn't exist
-                        ctx.warning(
-                            f"Table '{register_table}' is orphan (path deleted), "
-                            "dropping and re-registering",
-                            error_message=str(orphan_err)[:200],
+                    except Exception as verify_err:
+                        error_str = str(verify_err)
+                        is_orphan = (
+                            "DELTA_PATH_DOES_NOT_EXIST" in error_str
+                            or "Path does not exist" in error_str
+                            or "FileNotFoundException" in error_str
                         )
-                        try:
-                            self.spark.sql(f"DROP TABLE IF EXISTS {register_table}")
-                        except Exception:
-                            pass  # Best effort cleanup
-                        needs_registration = True
+
+                        if is_orphan:
+                            # Orphan entry - table in catalog but path was deleted
+                            ctx.warning(
+                                f"Table '{register_table}' is orphan (path deleted), "
+                                "dropping and re-registering",
+                                error_message=error_str[:200],
+                            )
+                            try:
+                                self.spark.sql(f"DROP TABLE IF EXISTS {register_table}")
+                            except Exception:
+                                pass  # Best effort cleanup
+                            needs_registration = True
+                        else:
+                            # Other error (auth, network, etc.) - don't drop, just log
+                            ctx.debug(
+                                f"Table '{register_table}' exists but verify failed "
+                                "(not orphan), skipping registration",
+                                error_message=error_str[:200],
+                            )
 
                 if needs_registration:
                     ctx.debug(f"Registering table '{register_table}' at '{full_path}'")
