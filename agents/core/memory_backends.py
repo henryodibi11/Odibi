@@ -83,14 +83,14 @@ class LocalFileBackend(MemoryBackend):
     """Store memories as local JSON files."""
 
     def __init__(self, base_path: str = ".odibi/memories"):
-        self.base_path = Path(base_path)
-        self.base_path.mkdir(parents=True, exist_ok=True)
+        self.base_path = Path(base_path).resolve()
 
     def _file_path(self, memory_id: str) -> Path:
         return self.base_path / f"{memory_id}.json"
 
     def save(self, memory_id: str, data: dict[str, Any]) -> bool:
         try:
+            self.base_path.mkdir(parents=True, exist_ok=True)
             with open(self._file_path(memory_id), "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, default=str)
             return True

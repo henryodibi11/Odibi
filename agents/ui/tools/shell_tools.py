@@ -192,6 +192,85 @@ def run_odibi_pipeline(
     return run_command(command, working_dir=working_dir, timeout=300)
 
 
+def run_diagnostics(
+    path: str = ".",
+    working_dir: Optional[str] = None,
+    include_ruff: bool = True,
+    include_mypy: bool = False,
+    include_pytest: bool = False,
+) -> CommandResult:
+    """Run code diagnostics (linting, type checking, tests).
+
+    Args:
+        path: Path to check.
+        working_dir: Working directory.
+        include_ruff: Run ruff linter.
+        include_mypy: Run mypy type checker.
+        include_pytest: Run pytest.
+
+    Returns:
+        CommandResult with combined diagnostics.
+    """
+    results = []
+    all_success = True
+    cwd = working_dir or os.getcwd()
+
+    if include_ruff:
+        ruff_result = run_ruff(path=path, working_dir=cwd)
+        if not ruff_result.success:
+            all_success = False
+        results.append(("ruff", ruff_result))
+
+    if include_mypy:
+        mypy_cmd = f"{sys.executable} -m mypy {path} --ignore-missing-imports"
+        mypy_result = run_command(mypy_cmd, working_dir=cwd, timeout=120)
+        if not mypy_result.success:
+            all_success = False
+        results.append(("mypy", mypy_result))
+
+    if include_pytest:
+        pytest_result = run_pytest(test_path=path, working_dir=cwd)
+        if not pytest_result.success:
+            all_success = False
+        results.append(("pytest", pytest_result))
+
+    combined_stdout = []
+    combined_stderr = []
+
+    for name, result in results:
+        combined_stdout.append(f"=== {name.upper()} ===")
+        if result.stdout:
+            combined_stdout.append(result.stdout)
+        if result.stderr:
+            combined_stderr.append(f"[{name}] {result.stderr}")
+
+    return CommandResult(
+        success=all_success,
+        stdout="\n".join(combined_stdout),
+        stderr="\n".join(combined_stderr),
+        return_code=0 if all_success else 1,
+        command=f"diagnostics({path})",
+        working_dir=cwd,
+    )
+
+
+def run_typecheck(
+    path: str = ".",
+    working_dir: Optional[str] = None,
+) -> CommandResult:
+    """Run Python type checker (mypy).
+
+    Args:
+        path: Path to check.
+        working_dir: Working directory.
+
+    Returns:
+        CommandResult with type checking output.
+    """
+    cmd = f"{sys.executable} -m mypy {path} --ignore-missing-imports --no-error-summary"
+    return run_command(cmd, working_dir=working_dir, timeout=120)
+
+
 def format_command_result(result: CommandResult) -> str:
     """Format command result for display in chat.
 

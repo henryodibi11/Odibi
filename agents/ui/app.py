@@ -17,6 +17,11 @@ from .components.memories import (
     setup_memory_handlers,
 )
 from .components.settings import create_settings_panel
+from .components.todo_panel import create_todo_panel
+from .components.conversation import (
+    create_conversation_panel,
+    setup_conversation_handlers,
+)
 from .config import AgentUIConfig, load_config
 
 CSS = """
@@ -64,7 +69,7 @@ def create_app(
             """
             # 🧠 Odibi AI Assistant
 
-            A conversational AI assistant for the Odibi data engineering framework.
+            A conversational AI assistant that works with any codebase.
             """
         )
 
@@ -75,12 +80,18 @@ def create_app(
                     on_save=on_config_save,
                 )
 
+                todo_column, todo_components = create_todo_panel()
+
+                conv_column, conv_components = create_conversation_panel()
+
                 memory_column, memory_components = create_memory_panel(config=config)
 
             with gr.Column(scale=2):
                 chat_column, chat_components = create_chat_interface(config=config)
 
         setup_chat_handlers(chat_components, get_config)
+
+        setup_conversation_handlers(conv_components, chat_components, get_config)
 
         setup_memory_handlers(memory_components, get_config)
 

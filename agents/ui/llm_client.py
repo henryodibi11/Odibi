@@ -189,6 +189,74 @@ class LLMClient:
         except (KeyError, IndexError, json.JSONDecodeError) as e:
             raise LLMError(f"Invalid LLM API response: {e}")
 
+    def chat_stream(
+        self,
+        messages: list[dict[str, str]],
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: int = 4096,
+    ):
+        """Send a streaming chat completion request.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'.
+            system_prompt: Optional system message to prepend.
+            temperature: Sampling temperature (0.0 = deterministic).
+            max_tokens: Maximum tokens in response.
+
+        Yields:
+            Chunks of the assistant's response text.
+
+        Raises:
+            LLMError: If the API call fails.
+        """
+        url = self._get_url()
+        headers = self._get_headers()
+
+        full_messages = []
+        if system_prompt:
+            full_messages.append({"role": "system", "content": system_prompt})
+        full_messages.extend(messages)
+
+        payload = {
+            "messages": full_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+
+        if self.config.api_type != "azure":
+            payload["model"] = self.config.model
+
+        try:
+            response = self._session.post(
+                url, headers=headers, json=payload, timeout=120, stream=True
+            )
+
+            if response.status_code != 200:
+                raise LLMError(f"LLM API error: {response.status_code} - {response.text[:500]}")
+
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode("utf-8")
+                    if line.startswith("data: "):
+                        data = line[6:]
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            continue
+
+        except requests.exceptions.Timeout:
+            raise LLMError("LLM API request timed out")
+        except requests.exceptions.RequestException as e:
+            raise LLMError(f"LLM API connection error: {e}")
+
 
 class LLMError(Exception):
     """Error from LLM API call."""

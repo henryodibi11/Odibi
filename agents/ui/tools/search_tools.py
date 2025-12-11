@@ -252,9 +252,11 @@ class SemanticSearchResult:
 
 def semantic_search(
     query: str,
-    odibi_root: str,
+    odibi_root: Optional[str] = None,
     k: int = 5,
     chunk_type: Optional[str] = None,
+    *,
+    project_root: Optional[str] = None,
 ) -> SemanticSearchResult:
     """Search the codebase using semantic similarity.
 
@@ -263,13 +265,21 @@ def semantic_search(
 
     Args:
         query: Natural language query describing what you're looking for.
-        odibi_root: Root directory of the odibi codebase.
+        odibi_root: Root directory of the codebase (deprecated, use project_root).
         k: Number of results to return.
         chunk_type: Optional filter by chunk type (function, class, module).
+        project_root: Root directory of any codebase to search.
 
     Returns:
         SemanticSearchResult with matching code chunks.
     """
+    root = project_root or odibi_root
+    if not root:
+        return SemanticSearchResult(
+            success=False,
+            query=query,
+            error="No project root specified. Please select a project folder.",
+        )
     try:
         from agents.core.embeddings import LocalEmbedder
         from agents.core.index_manager import ensure_index
@@ -281,7 +291,7 @@ def semantic_search(
         )
 
     try:
-        store = ensure_index(odibi_root=odibi_root)
+        store = ensure_index(odibi_root=root)
 
         embedder = LocalEmbedder()
         query_vec = embedder.embed_query(query)

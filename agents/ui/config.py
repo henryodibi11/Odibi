@@ -65,10 +65,25 @@ class MemoryConfig:
 
 @dataclass
 class ProjectConfig:
-    """Odibi project configuration."""
+    """Project configuration.
+
+    Supports pointing to any codebase/folder, not just Odibi projects.
+    The `odibi_root` field is kept for backwards compatibility but
+    `project_root` is the preferred name.
+    """
 
     odibi_root: str = "d:/odibi"
     project_yaml_path: Optional[str] = None
+
+    @property
+    def project_root(self) -> str:
+        """Alias for odibi_root - the active project path."""
+        return self.odibi_root
+
+    @project_root.setter
+    def project_root(self, value: str) -> None:
+        """Set the project root path."""
+        self.odibi_root = value
 
     def __post_init__(self):
         if not self.project_yaml_path:
