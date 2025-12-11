@@ -138,19 +138,26 @@ def create_chat_interface(
             )
             components["clear_btn"] = gr.Button("🗑️ Clear", scale=1, size="sm")
 
-        chatbot_kwargs = {
-            "label": "Conversation",
-            "height": 500,
-            "type": "messages",
-        }
         try:
             components["chatbot"] = gr.Chatbot(
+                label="Conversation",
+                height=500,
+                type="messages",
                 show_copy_button=True,
                 render_markdown=True,
-                **chatbot_kwargs,
             )
         except TypeError:
-            components["chatbot"] = gr.Chatbot(**chatbot_kwargs)
+            try:
+                components["chatbot"] = gr.Chatbot(
+                    label="Conversation",
+                    height=500,
+                    type="messages",
+                )
+            except TypeError:
+                components["chatbot"] = gr.Chatbot(
+                    label="Conversation",
+                    height=500,
+                )
 
         with gr.Row():
             components["message_input"] = gr.Textbox(
