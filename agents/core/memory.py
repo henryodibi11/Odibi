@@ -125,7 +125,7 @@ class MemoryStore:
             engine: Odibi engine (if backend_type="odibi" or "delta").
             **backend_kwargs: Additional backend-specific arguments.
         """
-        from odibi.agents.core.memory_backends import create_memory_backend
+        from agents.core.memory_backends import create_memory_backend
 
         if backend_type == "local":
             self.backend = create_memory_backend(

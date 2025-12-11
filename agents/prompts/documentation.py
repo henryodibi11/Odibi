@@ -228,13 +228,13 @@ When generating documentation:
 5. **Examples** - Working code examples
 """
 
-from odibi.agents.core.agent_base import (  # noqa: E402
+from agents.core.agent_base import (  # noqa: E402
     AgentContext,
     AgentResponse,
     AgentRole,
     OdibiAgent,
 )
-from odibi.agents.core.azure_client import AzureConfig  # noqa: E402
+from agents.core.azure_client import AzureConfig  # noqa: E402
 
 
 class DocumentationAgent(OdibiAgent):

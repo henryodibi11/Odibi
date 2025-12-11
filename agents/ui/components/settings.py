@@ -119,20 +119,30 @@ def create_settings_panel(
                 visible=config.memory.backend_type == "delta",
             )
 
-        with gr.Accordion("📁 Project", open=False):
+        with gr.Accordion("📁 Project & Index", open=True):
             components["odibi_root"] = gr.Textbox(
-                label="Odibi Project Path",
+                label="Repository Path",
                 value=config.project.odibi_root,
-                placeholder="d:/odibi",
+                placeholder="Path to any Git repository to index",
+                info="The codebase to index for semantic search",
             )
             components["project_yaml"] = gr.Textbox(
-                label="project.yaml Path",
+                label="project.yaml Path (optional)",
                 value=config.project.project_yaml_path or "",
-                placeholder="d:/odibi/project.yaml",
+                placeholder="path/to/project.yaml",
             )
-            components["refresh_connections_btn"] = gr.Button(
-                "🔄 Refresh Connections",
-                size="sm",
+            with gr.Row():
+                components["index_btn"] = gr.Button(
+                    "🔍 Index Codebase",
+                    variant="primary",
+                    size="sm",
+                )
+                components["refresh_connections_btn"] = gr.Button(
+                    "🔄 Refresh Connections",
+                    size="sm",
+                )
+            components["index_status"] = gr.Markdown(
+                value="*Index status: Not checked*",
             )
 
         with gr.Row():
@@ -183,6 +193,38 @@ def create_settings_panel(
             fn=refresh_connections,
             inputs=[components["project_yaml"]],
             outputs=[components["connection_name"]],
+        )
+
+        def index_codebase(repo_path: str) -> str:
+            """Index the codebase at the given path."""
+            if not repo_path:
+                return "❌ Please enter a repository path"
+
+            from pathlib import Path
+
+            repo_path = Path(repo_path).resolve()
+            if not repo_path.exists():
+                return f"❌ Path does not exist: {repo_path}"
+
+            try:
+                from agents.core.index_manager import ensure_index, needs_reindex
+
+                needs, reason = needs_reindex(str(repo_path))
+                if not needs:
+                    return f"✅ Index is up to date\n\n*{reason}*"
+
+                store = ensure_index(odibi_root=str(repo_path), force_reindex=True)
+                count = store.count()
+                return f"✅ Indexed **{count}** code chunks from `{repo_path}`"
+            except ImportError as e:
+                return f"❌ Missing dependencies: {e}\n\nInstall with: `pip install chromadb sentence-transformers`"
+            except Exception as e:
+                return f"❌ Indexing failed: {e}"
+
+        components["index_btn"].click(
+            fn=index_codebase,
+            inputs=[components["odibi_root"]],
+            outputs=[components["index_status"]],
         )
 
         def save_settings(

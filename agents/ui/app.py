@@ -131,11 +131,11 @@ def launch(
     Example:
         ```python
         # Local - opens in browser
-        from odibi.agents.ui import launch
+        from agents.ui import launch
         launch()
 
         # Databricks - renders inline
-        from odibi.agents.ui import launch
+        from agents.ui import launch
         launch()
 
         # Custom port

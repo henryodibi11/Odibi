@@ -115,28 +115,50 @@ class AzureConfig:
         """
         return cls()
 
-    def validate(self) -> list[str]:
+    def validate(
+        self,
+        require_chat: bool = True,
+        require_embeddings: bool = False,
+        require_search: bool = False,
+    ) -> list[str]:
         """Validate the configuration.
+
+        Args:
+            require_chat: Require chat model configuration (default: True).
+            require_embeddings: Require embedding configuration (default: False).
+            require_search: Require Azure AI Search configuration (default: False).
 
         Returns:
             List of validation error messages (empty if valid).
         """
         errors = []
 
-        if not self.openai_api_key:
-            errors.append("AZURE_OPENAI_API_KEY is required")
+        if require_chat:
+            if not self.openai_api_key:
+                errors.append("AZURE_OPENAI_API_KEY is required for chat")
 
-        if not self.openai_endpoint:
-            errors.append("AZURE_OPENAI_ENDPOINT is required")
+            if not self.openai_endpoint:
+                errors.append("AZURE_OPENAI_ENDPOINT is required for chat")
 
-        if not self.chat_deployment:
-            errors.append("AZURE_OPENAI_CHAT_DEPLOYMENT is required")
+            if not self.chat_deployment:
+                errors.append("AZURE_OPENAI_CHAT_DEPLOYMENT is required for chat")
 
-        if not self.embedding_deployment:
-            errors.append("AZURE_OPENAI_EMBEDDING_DEPLOYMENT is required")
+        if require_embeddings:
+            if not self.openai_api_key:
+                errors.append("AZURE_OPENAI_API_KEY is required for embeddings")
 
-        if not self.search_api_key:
-            errors.append("AZURE_SEARCH_API_KEY is required (for RAG)")
+            if not self.openai_endpoint:
+                errors.append("AZURE_OPENAI_ENDPOINT is required for embeddings")
+
+            if not self.embedding_deployment:
+                errors.append("AZURE_OPENAI_EMBEDDING_DEPLOYMENT is required for embeddings")
+
+        if require_search:
+            if not self.search_api_key:
+                errors.append("AZURE_SEARCH_API_KEY is required for Azure AI Search")
+
+            if not self.search_endpoint:
+                errors.append("AZURE_SEARCH_ENDPOINT is required for Azure AI Search")
 
         return errors
 

@@ -19,8 +19,10 @@ from ..tools.file_tools import (
 )
 from ..tools.search_tools import (
     format_search_results,
+    format_semantic_results,
     glob_files,
     grep_search,
+    semantic_search,
 )
 from ..tools.shell_tools import (
     format_command_result,
@@ -54,6 +56,7 @@ You have access to the following tools to help users:
 ### Code Search
 - **grep(pattern, path, file_pattern?)** - Search for text/regex in files
 - **glob(pattern, path)** - Find files matching a glob pattern
+- **search(query, k?)** - Semantic search: find code by meaning/concept (uses AI embeddings)
 
 ### Shell Commands
 - **run_command(command)** - Execute a shell command (ALWAYS ask for confirmation first)
@@ -73,6 +76,11 @@ When you need to use a tool, output it in this exact format:
 For example:
 ```tool
 {"tool": "read_file", "args": {"path": "d:/odibi/src/node.py"}}
+```
+
+To find code by meaning (semantic search):
+```tool
+{"tool": "search", "args": {"query": "how does pipeline execution work"}}
 ```
 
 ## Guidelines
@@ -236,6 +244,15 @@ class ChatHandler:
                 path=args.get("path", "."),
             )
             return format_search_results(result)
+
+        elif tool_name == "search":
+            result = semantic_search(
+                query=args.get("query", ""),
+                odibi_root=self.config.project.odibi_root,
+                k=args.get("k", 5),
+                chunk_type=args.get("chunk_type"),
+            )
+            return format_semantic_results(result)
 
         elif tool_name == "run_command":
             result = run_command(

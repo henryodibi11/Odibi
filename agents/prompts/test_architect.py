@@ -219,13 +219,13 @@ Always include:
 - Negative tests (expected failures)
 """
 
-from odibi.agents.core.agent_base import (  # noqa: E402
+from agents.core.agent_base import (  # noqa: E402
     AgentContext,
     AgentResponse,
     AgentRole,
     OdibiAgent,
 )
-from odibi.agents.core.azure_client import AzureConfig  # noqa: E402
+from agents.core.azure_client import AzureConfig  # noqa: E402
 
 
 class TestArchitectAgent(OdibiAgent):

@@ -1,6 +1,6 @@
 """Example workflows for the Odibi AI Agent Suite."""
 
-from odibi.agents.examples.example_workflows import (
+from agents.examples.example_workflows import (
     audit_derive_columns_transformer,
     document_config_schema,
     explain_dependency_resolution,

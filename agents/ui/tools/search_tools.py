@@ -238,3 +238,119 @@ def format_search_results(result: SearchResult) -> str:
             lines.append(f"- {match.line_content}")
 
     return "\n".join(lines)
+
+
+@dataclass
+class SemanticSearchResult:
+    """Result of a semantic search operation."""
+
+    success: bool
+    results: list[dict] = field(default_factory=list)
+    query: str = ""
+    error: Optional[str] = None
+
+
+def semantic_search(
+    query: str,
+    odibi_root: str,
+    k: int = 5,
+    chunk_type: Optional[str] = None,
+) -> SemanticSearchResult:
+    """Search the codebase using semantic similarity.
+
+    Uses the local vector index (ChromaDB + sentence-transformers) to find
+    code chunks that are semantically similar to the query.
+
+    Args:
+        query: Natural language query describing what you're looking for.
+        odibi_root: Root directory of the odibi codebase.
+        k: Number of results to return.
+        chunk_type: Optional filter by chunk type (function, class, module).
+
+    Returns:
+        SemanticSearchResult with matching code chunks.
+    """
+    try:
+        from agents.core.embeddings import LocalEmbedder
+        from agents.core.index_manager import ensure_index
+    except ImportError as e:
+        return SemanticSearchResult(
+            success=False,
+            query=query,
+            error=f"Missing dependencies: {e}. Install with: pip install chromadb sentence-transformers",
+        )
+
+    try:
+        store = ensure_index(odibi_root=odibi_root)
+
+        embedder = LocalEmbedder()
+        query_vec = embedder.embed_query(query)
+
+        filters = None
+        if chunk_type:
+            filters = {"chunk_type": chunk_type}
+
+        results = store.similarity_search(query_vec, k=k, filters=filters)
+
+        return SemanticSearchResult(
+            success=True,
+            results=results,
+            query=query,
+        )
+    except Exception as e:
+        return SemanticSearchResult(
+            success=False,
+            query=query,
+            error=str(e),
+        )
+
+
+def format_semantic_results(result: SemanticSearchResult) -> str:
+    """Format semantic search results for display.
+
+    Args:
+        result: SemanticSearchResult to format.
+
+    Returns:
+        Formatted markdown string.
+    """
+    if not result.success:
+        return f"❌ Semantic search failed: {result.error}"
+
+    if not result.results:
+        return f"No results found for: *{result.query}*"
+
+    lines = [f"**🔍 Semantic Search:** *{result.query}*\n"]
+    lines.append(f"Found {len(result.results)} relevant code chunks:\n")
+
+    for i, chunk in enumerate(result.results, 1):
+        name = chunk.get("name", "unknown")
+        chunk_type = chunk.get("chunk_type", "code")
+        module = chunk.get("module_name", "")
+        file_path = chunk.get("file_path", "")
+        score = chunk.get("score", 0)
+        docstring = chunk.get("docstring", "")
+        content = chunk.get("content", "")[:200]
+
+        lines.append(f"### {i}. `{name}` ({chunk_type})")
+        if module:
+            lines.append(f"**Module:** `{module}`")
+        if file_path:
+            lines.append(f"**File:** `{file_path}`")
+        lines.append(f"**Relevance:** {score:.2%}")
+
+        if docstring:
+            doc_preview = docstring[:150].replace("\n", " ")
+            if len(docstring) > 150:
+                doc_preview += "..."
+            lines.append(f"\n> {doc_preview}")
+
+        if content:
+            content_preview = content.replace("\n", " ")[:150]
+            if len(content) > 150:
+                content_preview += "..."
+            lines.append(f"\n```python\n{content_preview}\n```")
+
+        lines.append("")
+
+    return "\n".join(lines)

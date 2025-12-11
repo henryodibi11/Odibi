@@ -155,14 +155,14 @@ If an agent fails:
 from dataclasses import dataclass, field  # noqa: E402
 from typing import Optional  # noqa: E402
 
-from odibi.agents.core.agent_base import (  # noqa: E402
+from agents.core.agent_base import (  # noqa: E402
     AgentContext,
     AgentRegistry,
     AgentResponse,
     AgentRole,
     OdibiAgent,
 )
-from odibi.agents.core.azure_client import AzureConfig  # noqa: E402
+from agents.core.azure_client import AzureConfig  # noqa: E402
 
 
 @dataclass
@@ -471,10 +471,10 @@ def create_agent_suite(config: AzureConfig) -> OrchestratorAgent:
     Returns:
         The orchestrator agent with all specialized agents registered.
     """
-    from odibi.agents.prompts.code_analyst import CodeAnalystAgent
-    from odibi.agents.prompts.documentation import DocumentationAgent
-    from odibi.agents.prompts.refactor_engineer import RefactorEngineerAgent
-    from odibi.agents.prompts.test_architect import TestArchitectAgent
+    from agents.prompts.code_analyst import CodeAnalystAgent
+    from agents.prompts.documentation import DocumentationAgent
+    from agents.prompts.refactor_engineer import RefactorEngineerAgent
+    from agents.prompts.test_architect import TestArchitectAgent
 
     AgentRegistry.clear()
 

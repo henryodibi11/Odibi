@@ -6,9 +6,9 @@ These examples show how to use the multi-agent system for common tasks.
 import os
 from typing import Optional
 
-from odibi.agents.core.azure_client import AzureConfig
-from odibi.agents.core.agent_base import AgentRole
-from odibi.agents.pipelines.agent_runner import AgentRunner
+from agents.core.azure_client import AzureConfig
+from agents.core.agent_base import AgentRole
+from agents.pipelines.agent_runner import AgentRunner
 
 
 def get_config() -> Optional[AzureConfig]:

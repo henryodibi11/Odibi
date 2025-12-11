@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
-from odibi.agents.core.azure_client import (
+from agents.core.azure_client import (
     AzureConfig,
     AzureOpenAIClient,
     AzureSearchClient,

@@ -10,10 +10,10 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-from odibi.agents.core.agent_base import AgentContext, AgentResponse, AgentRole
-from odibi.agents.core.azure_client import AzureConfig
-from odibi.agents.core.memory import Memory, MemoryManager, MemoryType
-from odibi.agents.prompts.orchestrator import create_agent_suite
+from agents.core.agent_base import AgentContext, AgentResponse, AgentRole
+from agents.core.azure_client import AzureConfig
+from agents.core.memory import Memory, MemoryManager, MemoryType
+from agents.prompts.orchestrator import create_agent_suite
 
 
 @dataclass
@@ -44,7 +44,7 @@ class AgentRunner:
         self.session_history: list[dict[str, str]] = []
 
         if self.runner_config.enable_memory:
-            from odibi.agents.core.azure_client import AzureOpenAIClient
+            from agents.core.azure_client import AzureOpenAIClient
 
             llm_client = None
             try:
@@ -84,7 +84,7 @@ class AgentRunner:
         )
 
         if agent_role and agent_role != AgentRole.ORCHESTRATOR:
-            from odibi.agents.core.agent_base import AgentRegistry
+            from agents.core.agent_base import AgentRegistry
 
             agent = AgentRegistry.get(agent_role)
             if agent:
@@ -495,7 +495,7 @@ def run_databricks_agent(
     Example:
         ```python
         # In Databricks notebook
-        from odibi.agents.pipelines.agent_runner import run_databricks_agent
+        from agents.pipelines.agent_runner import run_databricks_agent
 
         result = run_databricks_agent(
             "Explain how the NodeExecutor works",

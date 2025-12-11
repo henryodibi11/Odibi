@@ -6,7 +6,7 @@ View, search, and manage agent memories.
 from typing import Any, Optional
 
 import gradio as gr
-from odibi.agents.core.memory import Memory, MemoryManager, MemoryType
+from agents.core.memory import Memory, MemoryManager, MemoryType
 
 from ..config import AgentUIConfig
 
