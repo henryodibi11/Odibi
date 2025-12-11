@@ -59,14 +59,7 @@ def create_app(
     def on_config_save(new_config: AgentUIConfig):
         current_config[0] = new_config
 
-    blocks_kwargs = {"title": "🧠 Odibi Assistant"}
-    try:
-        blocks_kwargs["css"] = CSS
-        blocks_kwargs["theme"] = gr.themes.Soft()
-    except Exception:
-        pass
-
-    with gr.Blocks(**blocks_kwargs) as app:
+    with gr.Blocks(title="🧠 Odibi Assistant") as app:
         gr.Markdown(
             """
             # 🧠 Odibi AI Assistant
@@ -156,19 +149,29 @@ def launch(
         or os.path.exists("/databricks")
     )
 
+    launch_kwargs = {
+        "share": share,
+        "css": CSS,
+    }
+
+    try:
+        launch_kwargs["theme"] = gr.themes.Soft()
+    except Exception:
+        pass
+
     if is_databricks:
         return app.launch(
             inline=True,
-            share=share,
             quiet=True,
+            **launch_kwargs,
             **kwargs,
         )
     else:
         return app.launch(
-            share=share,
             server_name=server_name or "127.0.0.1",
             server_port=server_port,
             inbrowser=True,
+            **launch_kwargs,
             **kwargs,
         )
 
