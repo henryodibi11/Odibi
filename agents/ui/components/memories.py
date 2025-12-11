@@ -149,13 +149,46 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
     if config is None:
         return MemoryManager(backend_type="local")
 
-    if config.memory.backend_type == "local":
+    backend_type = config.memory.backend_type
+
+    if backend_type == "local":
         return MemoryManager(
             backend_type="local",
             local_path=f"{config.project.odibi_root}/.odibi/memories",
         )
 
-    return MemoryManager(backend_type="local")
+    if backend_type == "odibi" and config.memory.connection_name:
+        try:
+            from odibi.connections import load_connections
+            from odibi.engine.pandas_engine import PandasEngine
+
+            project_yaml = config.project.project_yaml_path
+            if project_yaml:
+                connections = load_connections(project_yaml)
+                connection = connections.get(config.memory.connection_name)
+                if connection:
+                    return MemoryManager(
+                        backend_type="odibi",
+                        connection=connection,
+                        engine=PandasEngine(),
+                        path_prefix=config.memory.path_prefix or "agent/memories",
+                    )
+        except Exception as e:
+            print(f"Failed to create odibi backend: {e}")
+
+    if backend_type == "delta":
+        try:
+            return MemoryManager(
+                backend_type="delta",
+                table_path=config.memory.table_path or "system.agent_memories",
+            )
+        except Exception as e:
+            print(f"Failed to create delta backend: {e}")
+
+    return MemoryManager(
+        backend_type="local",
+        local_path=f"{config.project.odibi_root}/.odibi/memories",
+    )
 
 
 def setup_memory_handlers(
