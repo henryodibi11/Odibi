@@ -74,6 +74,10 @@ sql = [
 polars = [
     "polars>=0.20.0",
 ]
+agents = [
+    "gradio>=4.0.0",
+    "requests>=2.28.0",
+]
 all = [
     "pyspark>=3.4.0",
     "delta-spark>=2.3.0",
@@ -94,6 +98,7 @@ all = [
     "opentelemetry-exporter-otlp>=1.20.0",
     "openlineage-python>=1.0.0",
     "rich>=13.0.0",
+    "gradio>=4.0.0",
 ]
 dev = [
     "pytest>=7.4.0",
