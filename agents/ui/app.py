@@ -59,11 +59,14 @@ def create_app(
     def on_config_save(new_config: AgentUIConfig):
         current_config[0] = new_config
 
-    with gr.Blocks(
-        title="🧠 Odibi Assistant",
-        css=CSS,
-        theme=gr.themes.Soft(),
-    ) as app:
+    blocks_kwargs = {"title": "🧠 Odibi Assistant"}
+    try:
+        blocks_kwargs["css"] = CSS
+        blocks_kwargs["theme"] = gr.themes.Soft()
+    except Exception:
+        pass
+
+    with gr.Blocks(**blocks_kwargs) as app:
         gr.Markdown(
             """
             # 🧠 Odibi AI Assistant
