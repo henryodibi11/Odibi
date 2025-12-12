@@ -52,6 +52,12 @@ from ..tools.git_tools import (
     git_log,
     git_status,
 )
+from ..tools.task_tools import (
+    run_task,
+    run_parallel_tasks,
+    format_task_result,
+    format_parallel_results,
+)
 from .todo_panel import todo_read, todo_write, update_todo_display
 
 AGENT_CHOICES = [
@@ -107,6 +113,15 @@ You have access to the following tools to help users:
 ### Odibi
 - **odibi_run(pipeline_path, dry_run?, engine?)** - Run an Odibi pipeline
 
+### Sub-Agents (for parallel work)
+- **task(prompt)** - Spawn a sub-agent to complete a focused task
+- **parallel_tasks(tasks)** - Run multiple sub-agents in parallel (array of task prompts)
+
+Use sub-agents when:
+- You need to search/read multiple unrelated things
+- Tasks can be done independently
+- You want to speed up complex analysis
+
 ## Tool Usage Format
 
 When you need to use a tool, output it in this exact format:
@@ -129,6 +144,14 @@ Examples:
 
 ```tool
 {"tool": "mermaid", "args": {"code": "flowchart TD\\n    A[Start] --> B[Process]\\n    B --> C[End]"}}
+```
+
+```tool
+{"tool": "task", "args": {"prompt": "Find all usages of the LLMClient class and summarize how it's used"}}
+```
+
+```tool
+{"tool": "parallel_tasks", "args": {"tasks": ["Find all test files and count them", "Search for TODO comments in the codebase", "List the main modules in the project"]}}
 ```
 
 ## Guidelines
@@ -445,6 +468,38 @@ class ChatHandler:
             )
             return format_git_result(result)
 
+        elif tool_name == "task":
+            llm_config = LLMConfig(
+                endpoint=self.config.llm.endpoint,
+                api_key=self.config.llm.api_key,
+                model=self.config.llm.model,
+                api_type=self.config.llm.api_type,
+                api_version=self.config.llm.api_version,
+            )
+            result = run_task(
+                task=args.get("prompt", ""),
+                llm_config=llm_config,
+                project_root=self.config.project.project_root,
+            )
+            return format_task_result(result)
+
+        elif tool_name == "parallel_tasks":
+            llm_config = LLMConfig(
+                endpoint=self.config.llm.endpoint,
+                api_key=self.config.llm.api_key,
+                model=self.config.llm.model,
+                api_type=self.config.llm.api_type,
+                api_version=self.config.llm.api_version,
+            )
+            tasks = args.get("tasks", [])
+            results = run_parallel_tasks(
+                tasks=tasks,
+                llm_config=llm_config,
+                project_root=self.config.project.project_root,
+                max_workers=min(3, len(tasks)),
+            )
+            return format_parallel_results(results)
+
         return f"❓ Unknown tool: {tool_name}"
 
     def requires_confirmation(self, tool_call: dict) -> bool:
@@ -602,6 +657,8 @@ class ChatHandler:
                                 "git_status": "📦",
                                 "git_diff": "📦",
                                 "git_log": "📦",
+                                "task": "🤖",
+                                "parallel_tasks": "🚀",
                             }.get(tool_call["tool"], "🔧")
                             
                             status_msg = f"{tool_emoji} Running `{tool_call['tool']}`..."
