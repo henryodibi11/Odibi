@@ -676,6 +676,24 @@ class ChatHandler:
                     tool_matches = list(self.TOOL_PATTERN_UNWRAPPED.finditer(response))
 
                 if not tool_matches:
+                    intent_phrases = [
+                        "let me", "i'll", "i will", "let's", "i can",
+                        "first,", "now i", "going to", "about to",
+                    ]
+                    response_lower = response.lower()
+                    seems_incomplete = any(phrase in response_lower for phrase in intent_phrases)
+                    
+                    if seems_incomplete and iteration < max_iterations - 1:
+                        history.append({"role": "assistant", "content": response})
+                        self.conversation_history.append(
+                            {"role": "assistant", "content": response}
+                        )
+                        self.conversation_history.append(
+                            {"role": "user", "content": "[SYSTEM] Do it now. Output the tool call immediately."}
+                        )
+                        yield history, "🔄 Continuing...", None, False
+                        continue
+                    
                     history.append({"role": "assistant", "content": response})
                     self.conversation_history.append(
                         {"role": "assistant", "content": response}
@@ -890,6 +908,22 @@ class ChatHandler:
                 tool_matches = list(self.TOOL_PATTERN_UNWRAPPED.finditer(response))
 
             if not tool_matches:
+                intent_phrases = [
+                    "let me", "i'll", "i will", "let's", "i can",
+                    "first,", "now i", "going to", "about to",
+                ]
+                response_lower = response.lower()
+                seems_incomplete = any(phrase in response_lower for phrase in intent_phrases)
+                
+                if seems_incomplete and iteration < max_iterations - 1:
+                    history.append({"role": "assistant", "content": response})
+                    self.conversation_history.append({"role": "assistant", "content": response})
+                    self.conversation_history.append(
+                        {"role": "user", "content": "[SYSTEM] Do it now. Output the tool call immediately."}
+                    )
+                    yield history, "🔄 Continuing...", None, False
+                    continue
+                
                 history.append({"role": "assistant", "content": response})
                 self.conversation_history.append({"role": "assistant", "content": response})
                 yield history, "", None, False
