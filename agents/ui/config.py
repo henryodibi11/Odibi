@@ -67,23 +67,24 @@ class MemoryConfig:
 class ProjectConfig:
     """Project configuration.
 
-    Supports pointing to any codebase/folder, not just Odibi projects.
-    The `odibi_root` field is kept for backwards compatibility but
-    `project_root` is the preferred name.
+    Supports two separate paths:
+    - odibi_root: Path to the Odibi library/repo (for connections, project.yaml)
+    - working_project: Any folder you want the assistant to analyze/index
     """
 
     odibi_root: str = "d:/odibi"
+    working_project: str = ""
     project_yaml_path: Optional[str] = None
 
     @property
     def project_root(self) -> str:
-        """Alias for odibi_root - the active project path."""
-        return self.odibi_root
+        """The active working project path (or odibi_root if not set)."""
+        return self.working_project or self.odibi_root
 
     @project_root.setter
     def project_root(self, value: str) -> None:
-        """Set the project root path."""
-        self.odibi_root = value
+        """Set the working project path."""
+        self.working_project = value
 
     def __post_init__(self):
         if not self.project_yaml_path:
@@ -119,6 +120,7 @@ class AgentUIConfig:
             },
             "project": {
                 "odibi_root": self.project.odibi_root,
+                "working_project": self.project.working_project,
                 "project_yaml_path": self.project.project_yaml_path,
             },
             "default_agent": self.default_agent,
@@ -149,6 +151,7 @@ class AgentUIConfig:
             ),
             project=ProjectConfig(
                 odibi_root=project_data.get("odibi_root", "d:/odibi"),
+                working_project=project_data.get("working_project", ""),
                 project_yaml_path=project_data.get("project_yaml_path"),
             ),
             default_agent=data.get("default_agent", "auto"),

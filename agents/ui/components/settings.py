@@ -119,18 +119,13 @@ def create_settings_panel(
                 visible=config.memory.backend_type == "delta",
             )
 
-        with gr.Accordion("📁 Project & Index", open=True):
-            from .folder_picker import create_folder_picker, ProjectState
-
-            project_state = ProjectState()
-            picker_column, picker_components = create_folder_picker(
-                initial_path=config.project.odibi_root,
-                project_state=project_state,
+        with gr.Accordion("📁 Odibi Library", open=False):
+            components["odibi_root"] = gr.Textbox(
+                label="Odibi Repo Path",
+                value=config.project.odibi_root,
+                placeholder="d:/odibi",
+                info="Path to Odibi library (for connections & project.yaml)",
             )
-            components["folder_picker"] = picker_components
-            components["project_state"] = project_state
-            components["odibi_root"] = picker_components["path_input"]
-
             components["project_yaml"] = gr.Textbox(
                 label="project.yaml Path (optional)",
                 value=config.project.project_yaml_path or "",
@@ -141,6 +136,18 @@ def create_settings_panel(
                     "🔄 Refresh Connections",
                     size="sm",
                 )
+
+        with gr.Accordion("📂 Working Project", open=True):
+            from .folder_picker import create_folder_picker, ProjectState
+
+            project_state = ProjectState()
+            picker_column, picker_components = create_folder_picker(
+                initial_path=config.project.working_project or config.project.odibi_root,
+                project_state=project_state,
+            )
+            components["folder_picker"] = picker_components
+            components["project_state"] = project_state
+            components["working_project"] = picker_components["path_input"]
 
         with gr.Row():
             components["save_btn"] = gr.Button(
@@ -203,6 +210,7 @@ def create_settings_panel(
             delta_table: str,
             odibi_root: str,
             project_yaml: str,
+            working_project: str,
         ) -> str:
             new_config = AgentUIConfig(
                 llm=LLMConfig(
@@ -221,6 +229,7 @@ def create_settings_panel(
                 ),
                 project=ProjectConfig(
                     odibi_root=odibi_root,
+                    working_project=working_project,
                     project_yaml_path=project_yaml if project_yaml else None,
                 ),
             )
@@ -247,6 +256,7 @@ def create_settings_panel(
                 components["delta_table"],
                 components["odibi_root"],
                 components["project_yaml"],
+                components["working_project"],
             ],
             outputs=[components["status"]],
         )

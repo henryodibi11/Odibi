@@ -337,14 +337,14 @@ class ChatHandler:
         elif tool_name == "run_command":
             result = run_command(
                 command=args.get("command", ""),
-                working_dir=args.get("working_dir", self.config.project.odibi_root),
+                working_dir=args.get("working_dir", self.config.project.project_root),
             )
             return format_command_result(result)
 
         elif tool_name == "pytest":
             result = run_pytest(
                 test_path=args.get("test_path"),
-                working_dir=args.get("working_dir", self.config.project.odibi_root),
+                working_dir=args.get("working_dir", self.config.project.project_root),
                 verbose=args.get("verbose", True),
                 markers=args.get("markers"),
             )
@@ -353,7 +353,7 @@ class ChatHandler:
         elif tool_name == "ruff":
             result = run_ruff(
                 path=args.get("path", "."),
-                working_dir=args.get("working_dir", self.config.project.odibi_root),
+                working_dir=args.get("working_dir", self.config.project.project_root),
                 fix=args.get("fix", False),
             )
             return format_command_result(result)
@@ -361,7 +361,7 @@ class ChatHandler:
         elif tool_name == "odibi_run":
             result = run_odibi_pipeline(
                 pipeline_path=args.get("pipeline_path", ""),
-                working_dir=args.get("working_dir", self.config.project.odibi_root),
+                working_dir=args.get("working_dir", self.config.project.project_root),
                 dry_run=args.get("dry_run", True),
                 engine=args.get("engine", "pandas"),
             )
