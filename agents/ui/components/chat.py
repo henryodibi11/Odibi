@@ -747,9 +747,6 @@ class ChatHandler:
         tool_call = self.pending_action
         self.pending_action = None
 
-        tool_name = tool_call["tool"]
-        args = tool_call["args"]
-        tool_call_id = tool_call.get("tool_call_id", "call_confirmed")
         original_tool_calls = tool_call.get("tool_calls", [])
         original_content = tool_call.get("content")
 
@@ -759,21 +756,35 @@ class ChatHandler:
             "tool_calls": original_tool_calls,
         })
 
-        tool_emoji = {
-            "write_file": "✏️", "run_command": "⚡", "execute_python": "🐍",
-            "sql": "🗃️", "odibi_run": "🔄",
-        }.get(tool_name, "🔧")
+        for tc in original_tool_calls:
+            tc_name = tc["function"]["name"]
+            tc_id = tc["id"]
+            try:
+                tc_args = json.loads(tc["function"]["arguments"])
+            except json.JSONDecodeError:
+                tc_args = {}
 
-        yield history, f"{tool_emoji} Executing `{tool_name}`...", None, False
+            tool_emoji = {
+                "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
+                "grep": "🔍", "glob": "🔍", "search": "🧠", "run_command": "⚡",
+                "pytest": "🧪", "ruff": "🔧", "diagnostics": "🩺", "typecheck": "📝",
+                "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
+                "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
+                "git_diff": "📦", "git_log": "📦", "task": "🤖",
+                "parallel_tasks": "🚀", "execute_python": "🐍", "sql": "🗃️",
+                "list_tables": "📋", "describe_table": "📊",
+            }.get(tc_name, "🔧")
 
-        result = self.execute_tool({"tool": tool_name, "args": args})
-        history.append({"role": "assistant", "content": f"**{tool_emoji} {tool_name}:**\n{result}"})
+            yield history, f"{tool_emoji} Executing `{tc_name}`...", None, False
 
-        self.conversation_history.append({
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": result,
-        })
+            result = self.execute_tool({"tool": tc_name, "args": tc_args})
+            history.append({"role": "assistant", "content": f"**{tool_emoji} {tc_name}:**\n{result}"})
+
+            self.conversation_history.append({
+                "role": "tool",
+                "tool_call_id": tc_id,
+                "content": result,
+            })
 
         yield history, "🔄 Continuing...", None, False
 
