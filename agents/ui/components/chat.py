@@ -605,6 +605,32 @@ class ChatHandler:
                     yield history, "", None, False
                     return
 
+                for tc in tool_calls:
+                    tool_name = tc["function"]["name"]
+                    tool_id = tc["id"]
+                    
+                    try:
+                        args = json.loads(tc["function"]["arguments"])
+                    except json.JSONDecodeError:
+                        args = {}
+
+                    if self.requires_confirmation(tool_name, args):
+                        self.pending_action = {
+                            "tool": tool_name,
+                            "args": args,
+                            "tool_call_id": tool_id,
+                            "tool_calls": tool_calls,
+                            "content": content,
+                        }
+                        args_json = json.dumps(args, indent=2)
+                        action_desc = (
+                            f"**Pending Action:** `{tool_name}`\n"
+                            f"```json\n{args_json}\n```"
+                        )
+                        history.append({"role": "assistant", "content": action_desc})
+                        yield history, "Awaiting confirmation...", self.pending_action, True
+                        return
+
                 self.conversation_history.append({
                     "role": "assistant",
                     "content": content,
@@ -621,21 +647,6 @@ class ChatHandler:
                         args = json.loads(tc["function"]["arguments"])
                     except json.JSONDecodeError:
                         args = {}
-
-                    if self.requires_confirmation(tool_name, args):
-                        self.pending_action = {
-                            "tool": tool_name,
-                            "args": args,
-                            "tool_call_id": tool_id,
-                        }
-                        args_json = json.dumps(args, indent=2)
-                        action_desc = (
-                            f"**Pending Action:** `{tool_name}`\n"
-                            f"```json\n{args_json}\n```"
-                        )
-                        history.append({"role": "assistant", "content": action_desc})
-                        yield history, "Awaiting confirmation...", self.pending_action, True
-                        return
 
                     tool_emoji = {
                         "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
@@ -701,6 +712,14 @@ class ChatHandler:
         tool_name = tool_call["tool"]
         args = tool_call["args"]
         tool_call_id = tool_call.get("tool_call_id", "call_confirmed")
+        original_tool_calls = tool_call.get("tool_calls", [])
+        original_content = tool_call.get("content")
+
+        self.conversation_history.append({
+            "role": "assistant",
+            "content": original_content,
+            "tool_calls": original_tool_calls,
+        })
 
         tool_emoji = {
             "write_file": "✏️", "run_command": "⚡", "execute_python": "🐍",
@@ -758,12 +777,6 @@ class ChatHandler:
                 yield history, "", None, False
                 return
 
-            self.conversation_history.append({
-                "role": "assistant",
-                "content": content,
-                "tool_calls": tool_calls,
-            })
-
             for tc in tool_calls:
                 tc_name = tc["function"]["name"]
                 tc_id = tc["id"]
@@ -777,12 +790,28 @@ class ChatHandler:
                         "tool": tc_name,
                         "args": tc_args,
                         "tool_call_id": tc_id,
+                        "tool_calls": tool_calls,
+                        "content": content,
                     }
                     args_json = json.dumps(tc_args, indent=2)
                     action_desc = f"**Pending Action:** `{tc_name}`\n```json\n{args_json}\n```"
                     history.append({"role": "assistant", "content": action_desc})
                     yield history, "Awaiting confirmation...", self.pending_action, True
                     return
+
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": content,
+                "tool_calls": tool_calls,
+            })
+
+            for tc in tool_calls:
+                tc_name = tc["function"]["name"]
+                tc_id = tc["id"]
+                try:
+                    tc_args = json.loads(tc["function"]["arguments"])
+                except json.JSONDecodeError:
+                    tc_args = {}
 
                 tc_emoji = {"write_file": "✏️", "run_command": "⚡"}.get(tc_name, "🔧")
                 yield history, f"{tc_emoji} Running `{tc_name}`...", None, False
