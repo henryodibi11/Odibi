@@ -487,7 +487,9 @@ class ChatHandler:
             client = self.get_llm_client()
 
             system_prompt = CHAT_SYSTEM_PROMPT
-            system_prompt += f"\n\n**Project Path:** {self.config.project.project_root}"
+            system_prompt += f"\n\n**Working Project:** {self.config.project.project_root}"
+            if self.config.project.odibi_root != self.config.project.project_root:
+                system_prompt += f"\n**Odibi Library:** {self.config.project.odibi_root} (available for grep/read when needed)"
 
             iteration = 0
             self.reset_stop()
