@@ -141,17 +141,19 @@ class LLMClient:
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 4096,
-    ) -> str:
-        """Send a chat completion request.
+        tools: Optional[list[dict]] = None,
+    ) -> dict:
+        """Send a chat completion request with optional function calling.
 
         Args:
             messages: List of message dicts with 'role' and 'content'.
             system_prompt: Optional system message to prepend.
             temperature: Sampling temperature (0.0 = deterministic).
             max_tokens: Maximum tokens in response.
+            tools: Optional list of tool definitions for function calling.
 
         Returns:
-            The assistant's response text.
+            Dict with 'content' (str or None) and 'tool_calls' (list or None).
 
         Raises:
             LLMError: If the API call fails.
@@ -177,17 +179,26 @@ class LLMClient:
             payload["temperature"] = temperature
             payload["max_tokens"] = max_tokens
 
+        if tools and not is_reasoning_model:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+
         if self.config.api_type != "azure":
             payload["model"] = self.config.model
 
         try:
-            response = self._session.post(url, headers=headers, json=payload, timeout=120)
+            response = self._session.post(url, headers=headers, json=payload, timeout=180)
 
             if response.status_code != 200:
                 raise LLMError(f"LLM API error: {response.status_code} - {response.text[:500]}")
 
             result = response.json()
-            return result["choices"][0]["message"]["content"]
+            message = result["choices"][0]["message"]
+            
+            return {
+                "content": message.get("content"),
+                "tool_calls": message.get("tool_calls"),
+            }
 
         except requests.exceptions.Timeout:
             raise LLMError("LLM API request timed out")

@@ -4,7 +4,6 @@ Conversational interface with tool execution and agent routing.
 """
 
 import json
-import re
 from typing import Any, Generator, Optional
 
 import gradio as gr
@@ -65,6 +64,7 @@ from ..tools.code_execution import (
     describe_table,
     format_execution_result,
 )
+from ..tools.tool_definitions import TOOL_DEFINITIONS, TOOLS_REQUIRING_CONFIRMATION
 from .todo_panel import todo_read, todo_write, update_todo_display
 
 AGENT_CHOICES = [
@@ -79,163 +79,41 @@ AGENT_CHOICES = [
 CHAT_SYSTEM_PROMPT = """
 You are a helpful AI coding assistant that can work with any codebase.
 
-You have access to the following tools to help users:
+You have access to tools for: file operations, code search, shell commands, web research,
+task management, diagrams, git, code execution (Databricks), and sub-agent spawning.
 
-## Available Tools
+## Behavior Guidelines
 
-### File Operations
-- **read_file(path, start_line?, end_line?)** - Read a file from the codebase
-- **write_file(path, content)** - Write content to a file (ALWAYS ask for confirmation first)
-- **list_directory(path, pattern?, recursive?)** - List directory contents
-- **undo_edit(path)** - Undo the last edit to a file
+1. **Be proactive** - Use tools immediately without asking permission for read-only operations
+2. **Use todo_write** to plan complex tasks and track progress
+3. **Use diagrams** when explaining architecture or flows
+4. **Run diagnostics** after making code changes
+5. **Ask confirmation ONLY for writes** - write_file, run_command, python, sql
 
-### Code Search
-- **grep(pattern, path, file_pattern?)** - Search for text/regex in files
-- **glob(pattern, path)** - Find files matching a glob pattern
-- **search(query, k?)** - Semantic search: find code by meaning/concept (uses AI embeddings)
+## Agentic Behavior - CRITICAL
 
-### Shell Commands
-- **run_command(command)** - Execute a shell command (ALWAYS ask for confirmation first)
-- **pytest(test_path?, verbose?, markers?)** - Run pytest tests
-- **ruff(path, fix?)** - Run ruff linter
-- **diagnostics(path, include_ruff?, include_mypy?, include_pytest?)** - Run code diagnostics
-- **typecheck(path)** - Run mypy type checker
+You operate in an AGENTIC LOOP. After each tool execution, you receive results and MUST:
+1. **Continue working** until the task is FULLY complete
+2. **Never ask** "would you like me to continue?" - just CONTINUE
+3. **Never give partial results** - COMPLETE the task
+4. **Call multiple tools** if needed to fully answer the question
 
-### Web & Research
-- **web_search(query, max_results?)** - Search the web for documentation, examples, etc.
-- **read_web_page(url)** - Read and extract content from a web page
-
-### Task Management
-- **todo_write(todos)** - Update the task list (array of {id, content, status})
-- **todo_read()** - Read current task list
-
-### Diagrams
-- **mermaid(code)** - Render a Mermaid diagram (flowchart, sequence, etc.)
-
-### Git
-- **git_status()** - Show repository status (modified, staged, untracked files)
-- **git_diff(path?, staged?)** - Show changes/diff for files
-- **git_log(max_count?, path?)** - Show recent commit history
-
-### Odibi
-- **odibi_run(pipeline_path, dry_run?, engine?)** - Run an Odibi pipeline
-
-### Sub-Agents (for parallel work)
-- **task(prompt)** - Spawn a sub-agent to complete a focused task
-- **parallel_tasks(tasks)** - Run multiple sub-agents in parallel (array of task prompts)
-
-Use sub-agents when:
-- You need to search/read multiple unrelated things
-- Tasks can be done independently
-- You want to speed up complex analysis
-
-### Code Execution (Databricks)
-- **python(code)** - Execute Python code (has access to spark, pd, np)
-- **sql(query, limit?, show_schema?)** - Execute SQL query via Spark
-- **list_tables(database?, pattern?)** - List available tables
-- **describe_table(table_name)** - Get schema and sample data
-
-Use code execution to:
-- Analyze data in tables
-- Run computations
-- Transform DataFrames
-- Test code snippets
-
-## Tool Usage Format
-
-IMPORTANT: When you need to use a tool, you MUST output it in this EXACT format with the ```tool code fence:
-```tool
-{"tool": "tool_name", "args": {"arg1": "value1", "arg2": "value2"}}
-```
-
-DO NOT say "I will use a tool" or "tool call coming up" or "Let me..." - just output the tool block directly.
-DO NOT describe what you're about to do - just DO IT.
-DO NOT wait for permission for READ-ONLY actions (read_file, list_directory, grep, glob, search, git_status, list_tables, describe_table).
-For read-only tools: OUTPUT THE TOOL IMMEDIATELY without any preamble.
-Only ask for confirmation for WRITE operations (write_file, run_command, python, sql).
-
-Examples:
-```tool
-{"tool": "read_file", "args": {"path": "src/main.py"}}
-```
-
-```tool
-{"tool": "web_search", "args": {"query": "pandas groupby aggregate examples"}}
-```
-
-```tool
-{"tool": "todo_write", "args": {"todos": [{"id": "1", "content": "Analyze code", "status": "completed"}, {"id": "2", "content": "Implement fix", "status": "in-progress"}]}}
-```
-
-```tool
-{"tool": "mermaid", "args": {"code": "flowchart TD\\n    A[Start] --> B[Process]\\n    B --> C[End]"}}
-```
-
-```tool
-{"tool": "task", "args": {"prompt": "Find all usages of the LLMClient class and summarize how it's used"}}
-```
-
-```tool
-{"tool": "parallel_tasks", "args": {"tasks": ["Find all test files and count them", "Search for TODO comments in the codebase", "List the main modules in the project"]}}
-```
-
-```tool
-{"tool": "python", "args": {"code": "import pandas as pd\\ndf = spark.table('my_table').toPandas()\\nprint(df.describe())"}}
-```
-
-```tool
-{"tool": "sql", "args": {"query": "SELECT * FROM my_database.my_table LIMIT 10", "show_schema": true}}
-```
-
-## Guidelines
-
-1. **Be proactive** - Just DO things, don't ask permission for read-only operations
-2. **Use tools immediately** - Don't say "Let me..." or "I'll..." - just output the tool block
-3. **Use todo_write** to plan complex tasks - break them into steps, mark progress
-4. **Use diagrams** when explaining architecture or flows
-5. **Search the web** when you need documentation or examples
-6. **Run diagnostics** after making code changes
-7. **Ask for confirmation ONLY for writes** - write_file, run_command, python, sql
-8. **Format code nicely** - Use markdown code blocks with language hints
-9. **Summarize tool output** - Don't just dump raw output; explain what it means
+For complex tasks:
+1. Use todo_write to plan steps
+2. Execute each step, marking todos as you go  
+3. Run diagnostics after code changes
+4. Summarize what you did when complete
 
 ## Response Format
 
 - Use markdown formatting
-- Code blocks with language: ```python, ```yaml, ```bash
+- Code blocks with language hints
 - Keep responses concise but informative
-- For long outputs, summarize key points
-
-## Agentic Behavior - IMPORTANT
-
-You operate in an AGENTIC LOOP. After each tool execution, you receive the results and MUST decide:
-1. **Continue working** - use more tools to gather info or complete the task
-2. **Finish** - provide a final response ONLY when the task is FULLY complete
-
-CRITICAL RULES:
-- KEEP WORKING until the user's request is FULLY addressed
-- Do NOT stop after one tool call if more work is needed
-- Do NOT ask "would you like me to continue?" - just CONTINUE
-- Do NOT give partial results and stop - COMPLETE the task
-- If you need to read multiple files, read them ALL before responding
-- If you need to search for something, search and then USE the results
-
-For complex tasks:
-1. First use todo_write to plan the steps
-2. Execute each step, marking todos as you go
-3. Run diagnostics after code changes
-4. Summarize what you did when complete
-
-NEVER stop in the middle of a task. If you listed files, read them. If you searched, analyze results.
 
 ## Project Context
 
-You are helping the user with their codebase located at the active project path.
-You can search, read, and analyze code in that directory.
-If the project appears to be an Odibi project (has project.yaml), you can also help with:
-- Pipeline configuration and execution
-- Transformers: derive, filter, SCD, join, aggregate
-- Connections: local, ADLS, Delta Lake
+You are helping the user with their codebase. If it's an Odibi project (has project.yaml), 
+you can also help with pipelines, transformers, and connections.
 """
 
 
@@ -305,13 +183,7 @@ def create_chat_interface(
 
 
 class ChatHandler:
-    """Handles chat interactions with tool execution."""
-
-    TOOL_PATTERN = re.compile(r"```tool\s*\n({.*?})\s*\n```", re.DOTALL)
-    TOOL_PATTERN_UNWRAPPED = re.compile(
-        r'(?:^|\n)\s*(\{"tool"\s*:\s*"[^"]+"\s*,\s*"args"\s*:\s*\{[^}]*\}\s*\})',
-        re.MULTILINE
-    )
+    """Handles chat interactions with tool execution using native function calling."""
 
     def __init__(self, config: AgentUIConfig):
         self.config = config
@@ -574,17 +446,12 @@ class ChatHandler:
 
         return f"❓ Unknown tool: {tool_name}"
 
-    def requires_confirmation(self, tool_call: dict) -> bool:
+    def requires_confirmation(self, tool_name: str, args: dict = None) -> bool:
         """Check if a tool call requires user confirmation."""
-        dangerous_tools = {"write_file", "run_command", "odibi_run", "python", "sql"}
-        tool_name = tool_call.get("tool", "")
-
-        if tool_name in dangerous_tools:
+        if tool_name in TOOLS_REQUIRING_CONFIRMATION:
+            if tool_name == "ruff":
+                return args.get("fix", False) if args else False
             return True
-
-        if tool_name == "ruff" and tool_call.get("args", {}).get("fix"):
-            return True
-
         return False
 
     def process_message(
@@ -594,11 +461,7 @@ class ChatHandler:
         agent: str,
         max_iterations: int = 25,
     ) -> Generator[tuple[list[dict], str, Any, bool], None, None]:
-        """Process a user message with an agentic loop.
-
-        The agent will automatically continue after tool execution,
-        feeding results back to the LLM until no more tools are needed
-        or max_iterations is reached.
+        """Process a user message with an agentic loop using native function calling.
 
         Args:
             message: User's message.
@@ -622,26 +485,19 @@ class ChatHandler:
             system_prompt = CHAT_SYSTEM_PROMPT
             system_prompt += "\n\n## Accessible Paths"
             system_prompt += f"\n**Working Project:** {self.config.project.project_root}"
-            system_prompt += "\n  - Primary codebase for all operations"
-            system_prompt += "\n  - Use this for grep, read, write, index, and run commands"
             if self.config.project.reference_repo:
                 system_prompt += f"\n**Reference Repo:** {self.config.project.reference_repo}"
-                system_prompt += "\n  - Secondary codebase available for grep/read"
-                system_prompt += "\n  - Use when user asks about code in this repo"
 
             iteration = 0
             self.reset_stop()
 
             while iteration < max_iterations:
                 if self.should_stop:
-                    history.append(
-                        {"role": "assistant", "content": "⏹️ Stopped by user."}
-                    )
+                    history.append({"role": "assistant", "content": "⏹️ Stopped by user."})
                     yield history, "", None, False
                     return
 
                 iteration += 1
-
                 yield history, f"🤔 Thinking... (step {iteration})", None, False
 
                 model_lower = self.config.llm.model.lower()
@@ -649,170 +505,89 @@ class ChatHandler:
 
                 if is_reasoning_model:
                     yield history, "🧠 Reasoning... (this may take a moment)", None, False
-                    response = client.chat(
-                        messages=self.conversation_history,
-                        system_prompt=system_prompt,
-                        temperature=0.1,
-                    )
-                else:
-                    response = ""
-                    streaming_history = history.copy()
-                    streaming_history.append({"role": "assistant", "content": ""})
-
-                    for chunk in client.chat_stream(
-                        messages=self.conversation_history,
-                        system_prompt=system_prompt,
-                        temperature=0.1,
-                    ):
-                        if self.should_stop:
-                            break
-                        response += chunk
-                        streaming_history[-1]["content"] = response
-                        yield streaming_history, "✍️ Writing...", None, False
-
-                tool_matches = list(self.TOOL_PATTERN.finditer(response))
                 
-                if not tool_matches:
-                    tool_matches = list(self.TOOL_PATTERN_UNWRAPPED.finditer(response))
+                response = client.chat(
+                    messages=self.conversation_history,
+                    system_prompt=system_prompt,
+                    temperature=0.1,
+                    tools=TOOL_DEFINITIONS if not is_reasoning_model else None,
+                )
 
-                if not tool_matches:
-                    intent_phrases = [
-                        "let me", "i'll", "i will", "let's", "i can",
-                        "first,", "now i", "going to", "about to",
-                    ]
-                    response_lower = response.lower()
-                    seems_incomplete = any(phrase in response_lower for phrase in intent_phrases)
-                    
-                    if seems_incomplete and iteration < max_iterations - 1:
-                        history.append({"role": "assistant", "content": response})
-                        self.conversation_history.append(
-                            {"role": "assistant", "content": response}
-                        )
-                        self.conversation_history.append(
-                            {"role": "user", "content": "[SYSTEM] Do it now. Output the tool call immediately."}
-                        )
-                        yield history, "🔄 Continuing...", None, False
-                        continue
-                    
-                    history.append({"role": "assistant", "content": response})
-                    self.conversation_history.append(
-                        {"role": "assistant", "content": response}
-                    )
+                content = response.get("content")
+                tool_calls = response.get("tool_calls")
+
+                if content:
+                    history.append({"role": "assistant", "content": content})
+
+                if not tool_calls:
+                    if content:
+                        self.conversation_history.append({"role": "assistant", "content": content})
                     yield history, "", None, False
                     return
 
+                self.conversation_history.append({
+                    "role": "assistant",
+                    "content": content,
+                    "tool_calls": tool_calls,
+                })
+
                 tool_results = []
 
-                for match in tool_matches:
-                    tool_json = match.group(1)
+                for tc in tool_calls:
+                    tool_name = tc["function"]["name"]
+                    tool_id = tc["id"]
+                    
                     try:
-                        tool_call = json.loads(tool_json)
-
-                        if self.requires_confirmation(tool_call):
-                            self.pending_action = tool_call
-                            response_before = response[: match.start()].strip()
-                            if response_before:
-                                history.append(
-                                    {"role": "assistant", "content": response_before}
-                                )
-
-                            args_json = json.dumps(tool_call["args"], indent=2)
-                            action_desc = (
-                                f"**Pending Action:** `{tool_call['tool']}`\n"
-                                f"```json\n{args_json}\n```"
-                            )
-                            history.append({"role": "assistant", "content": action_desc})
-
-                            self.conversation_history.append(
-                                {"role": "assistant", "content": response}
-                            )
-                            yield history, "Awaiting confirmation...", tool_call, True
-                            return
-
-                        else:
-                            tool_emoji = {
-                                "read_file": "📖",
-                                "write_file": "✏️",
-                                "list_directory": "📁",
-                                "grep": "🔍",
-                                "glob": "🔍",
-                                "search": "🧠",
-                                "run_command": "⚡",
-                                "pytest": "🧪",
-                                "ruff": "🔧",
-                                "diagnostics": "🩺",
-                                "typecheck": "📝",
-                                "web_search": "🌐",
-                                "read_web_page": "🌐",
-                                "todo_write": "📋",
-                                "todo_read": "📋",
-                                "mermaid": "📊",
-                                "git_status": "📦",
-                                "git_diff": "📦",
-                                "git_log": "📦",
-                                "task": "🤖",
-                                "parallel_tasks": "🚀",
-                                "python": "🐍",
-                                "sql": "🗃️",
-                                "list_tables": "📋",
-                                "describe_table": "📊",
-                            }.get(tool_call["tool"], "🔧")
-                            
-                            status_msg = f"{tool_emoji} Running `{tool_call['tool']}`..."
-                            yield (
-                                history,
-                                status_msg,
-                                None,
-                                False,
-                            )
-                            result = self.execute_tool(tool_call)
-                            tool_results.append(
-                                {
-                                    "tool": tool_call["tool"],
-                                    "args": tool_call.get("args", {}),
-                                    "result": result,
-                                }
-                            )
-
+                        args = json.loads(tc["function"]["arguments"])
                     except json.JSONDecodeError:
-                        tool_results.append(
-                            {
-                                "tool": "unknown",
-                                "args": {},
-                                "result": f"❌ Invalid tool format: {tool_json[:100]}...",
-                            }
+                        args = {}
+
+                    if self.requires_confirmation(tool_name, args):
+                        self.pending_action = {
+                            "tool": tool_name,
+                            "args": args,
+                            "tool_call_id": tool_id,
+                        }
+                        args_json = json.dumps(args, indent=2)
+                        action_desc = (
+                            f"**Pending Action:** `{tool_name}`\n"
+                            f"```json\n{args_json}\n```"
                         )
+                        history.append({"role": "assistant", "content": action_desc})
+                        yield history, "Awaiting confirmation...", self.pending_action, True
+                        return
 
-                response_text = response
-                for match in reversed(tool_matches):
-                    response_text = (
-                        response_text[: match.start()]
-                        + "[tool executed]"
-                        + response_text[match.end() :]
-                    )
+                    tool_emoji = {
+                        "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
+                        "grep": "🔍", "glob": "🔍", "search": "🧠", "run_command": "⚡",
+                        "pytest": "🧪", "ruff": "🔧", "diagnostics": "🩺", "typecheck": "📝",
+                        "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
+                        "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
+                        "git_diff": "📦", "git_log": "📦", "task": "🤖",
+                        "parallel_tasks": "🚀", "python": "🐍", "sql": "🗃️",
+                        "list_tables": "📋", "describe_table": "📊",
+                    }.get(tool_name, "🔧")
 
-                if response_text.strip() and response_text.strip() != "[tool executed]":
-                    cleaned = response_text.replace("[tool executed]", "").strip()
-                    if cleaned:
-                        history.append({"role": "assistant", "content": cleaned})
+                    yield history, f"{tool_emoji} Running `{tool_name}`...", None, False
 
-                self.conversation_history.append(
-                    {"role": "assistant", "content": response}
-                )
+                    result = self.execute_tool({"tool": tool_name, "args": args})
+                    tool_results.append({
+                        "tool_call_id": tool_id,
+                        "tool": tool_name,
+                        "result": result,
+                    })
 
-                tool_results_text = "\n\n".join(
-                    f"**Tool:** `{r['tool']}`\n{r['result']}" for r in tool_results
-                )
-                history.append(
-                    {"role": "assistant", "content": f"📋 **Results:**\n\n{tool_results_text}"}
-                )
+                    history.append({
+                        "role": "assistant",
+                        "content": f"**{tool_emoji} {tool_name}:**\n{result}"
+                    })
 
-                tool_result_msg = "Tool execution results:\n\n" + "\n\n".join(
-                    f"[{r['tool']}]: {r['result']}" for r in tool_results
-                )
-                self.conversation_history.append(
-                    {"role": "user", "content": f"[SYSTEM] {tool_result_msg}"}
-                )
+                for tr in tool_results:
+                    self.conversation_history.append({
+                        "role": "tool",
+                        "tool_call_id": tr["tool_call_id"],
+                        "content": tr["result"],
+                    })
 
                 yield history, "🔄 Processing results...", None, False
 
@@ -835,10 +610,7 @@ class ChatHandler:
         system_prompt: str,
         max_iterations: int = 25,
     ):
-        """Execute the pending action and continue the agent loop.
-
-        This is a generator that yields updates like process_message.
-        """
+        """Execute the pending action and continue the agent loop."""
         if not self.pending_action:
             yield history, "", None, False
             return
@@ -846,23 +618,25 @@ class ChatHandler:
         tool_call = self.pending_action
         self.pending_action = None
 
+        tool_name = tool_call["tool"]
+        args = tool_call["args"]
+        tool_call_id = tool_call.get("tool_call_id", "call_confirmed")
+
         tool_emoji = {
-            "write_file": "✏️",
-            "run_command": "⚡",
-            "python": "🐍",
-            "sql": "🗃️",
-            "odibi_run": "🔄",
-        }.get(tool_call["tool"], "🔧")
+            "write_file": "✏️", "run_command": "⚡", "python": "🐍",
+            "sql": "🗃️", "odibi_run": "🔄",
+        }.get(tool_name, "🔧")
 
-        yield history, f"{tool_emoji} Executing `{tool_call['tool']}`...", None, False
+        yield history, f"{tool_emoji} Executing `{tool_name}`...", None, False
 
-        result = self.execute_tool(tool_call)
-        history.append({"role": "assistant", "content": f"**Result:**\n{result}"})
+        result = self.execute_tool({"tool": tool_name, "args": args})
+        history.append({"role": "assistant", "content": f"**{tool_emoji} {tool_name}:**\n{result}"})
 
-        tool_result_msg = f"[{tool_call['tool']}]: {result}"
-        self.conversation_history.append(
-            {"role": "user", "content": f"[SYSTEM] Tool execution results:\n\n{tool_result_msg}"}
-        )
+        self.conversation_history.append({
+            "role": "tool",
+            "tool_call_id": tool_call_id,
+            "content": result,
+        })
 
         yield history, "🔄 Continuing...", None, False
 
@@ -881,75 +655,65 @@ class ChatHandler:
 
             if is_reasoning_model:
                 yield history, "🧠 Reasoning...", None, False
-                response = client.chat(
-                    messages=self.conversation_history,
-                    system_prompt=system_prompt,
-                    temperature=0.1,
-                )
-            else:
-                response = ""
-                streaming_history = history.copy()
-                streaming_history.append({"role": "assistant", "content": ""})
 
-                for chunk in client.chat_stream(
-                    messages=self.conversation_history,
-                    system_prompt=system_prompt,
-                    temperature=0.1,
-                ):
-                    if self.should_stop:
-                        break
-                    response += chunk
-                    streaming_history[-1]["content"] = response
-                    yield streaming_history, "✍️ Writing...", None, False
+            response = client.chat(
+                messages=self.conversation_history,
+                system_prompt=system_prompt,
+                temperature=0.1,
+                tools=TOOL_DEFINITIONS if not is_reasoning_model else None,
+            )
 
-            tool_matches = list(self.TOOL_PATTERN.finditer(response))
-            
-            if not tool_matches:
-                tool_matches = list(self.TOOL_PATTERN_UNWRAPPED.finditer(response))
+            content = response.get("content")
+            tool_calls = response.get("tool_calls")
 
-            if not tool_matches:
-                intent_phrases = [
-                    "let me", "i'll", "i will", "let's", "i can",
-                    "first,", "now i", "going to", "about to",
-                ]
-                response_lower = response.lower()
-                seems_incomplete = any(phrase in response_lower for phrase in intent_phrases)
-                
-                if seems_incomplete and iteration < max_iterations - 1:
-                    history.append({"role": "assistant", "content": response})
-                    self.conversation_history.append({"role": "assistant", "content": response})
-                    self.conversation_history.append(
-                        {"role": "user", "content": "[SYSTEM] Do it now. Output the tool call immediately."}
-                    )
-                    yield history, "🔄 Continuing...", None, False
-                    continue
-                
-                history.append({"role": "assistant", "content": response})
-                self.conversation_history.append({"role": "assistant", "content": response})
+            if content:
+                history.append({"role": "assistant", "content": content})
+
+            if not tool_calls:
+                if content:
+                    self.conversation_history.append({"role": "assistant", "content": content})
                 yield history, "", None, False
                 return
 
-            self.conversation_history.append({"role": "assistant", "content": response})
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": content,
+                "tool_calls": tool_calls,
+            })
 
-            for match in tool_matches:
+            for tc in tool_calls:
+                tc_name = tc["function"]["name"]
+                tc_id = tc["id"]
                 try:
-                    next_tool = json.loads(match.group(1))
-                    if self.requires_confirmation(next_tool):
-                        self.pending_action = next_tool
-                        response_before = response[: match.start()].strip()
-                        if response_before:
-                            history.append({"role": "assistant", "content": response_before})
-                        args_json = json.dumps(next_tool["args"], indent=2)
-                        action_desc = f"**Pending Action:** `{next_tool['tool']}`\n```json\n{args_json}\n```"
-                        history.append({"role": "assistant", "content": action_desc})
-                        yield history, "Awaiting confirmation...", next_tool, True
-                        return
+                    tc_args = json.loads(tc["function"]["arguments"])
                 except json.JSONDecodeError:
-                    continue
+                    tc_args = {}
 
-            history.append({"role": "assistant", "content": response})
-            yield history, "", None, False
-            return
+                if self.requires_confirmation(tc_name, tc_args):
+                    self.pending_action = {
+                        "tool": tc_name,
+                        "args": tc_args,
+                        "tool_call_id": tc_id,
+                    }
+                    args_json = json.dumps(tc_args, indent=2)
+                    action_desc = f"**Pending Action:** `{tc_name}`\n```json\n{args_json}\n```"
+                    history.append({"role": "assistant", "content": action_desc})
+                    yield history, "Awaiting confirmation...", self.pending_action, True
+                    return
+
+                tc_emoji = {"write_file": "✏️", "run_command": "⚡"}.get(tc_name, "🔧")
+                yield history, f"{tc_emoji} Running `{tc_name}`...", None, False
+
+                tc_result = self.execute_tool({"tool": tc_name, "args": tc_args})
+                history.append({"role": "assistant", "content": f"**{tc_emoji} {tc_name}:**\n{tc_result}"})
+
+                self.conversation_history.append({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "content": tc_result,
+                })
+
+            yield history, "🔄 Processing...", None, False
 
     def reject_action(self, history: list[dict]) -> tuple[list[dict], str, bool]:
         """Cancel the pending action."""
