@@ -103,7 +103,7 @@ class SubAgent:
 
         return f"Unknown tool: {tool_name}"
 
-    def run(self, task: str, max_iterations: int = 5) -> TaskResult:
+    def run(self, task: str, max_iterations: int = 10) -> TaskResult:
         """Run the sub-agent on a task.
 
         Args:

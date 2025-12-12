@@ -113,6 +113,27 @@ task management, diagrams, git, code execution (Databricks), and sub-agent spawn
 5. **mermaid** - Use to create diagrams when explaining architecture
 6. **diagnostics** - Run after making code changes
 
+## Sub-Agent Usage - USE ACTIVELY
+
+You have access to **task** and **parallel_tasks** tools for spawning sub-agents:
+
+- **task** - Spawn a focused sub-agent for a specific task
+- **parallel_tasks** - Run multiple sub-agents in parallel for independent tasks
+
+**WHEN TO USE SUB-AGENTS:**
+1. When you need to explore multiple files or directories independently
+2. When performing repetitive analysis across multiple components
+3. When the user's task can be broken into independent subtasks
+4. When you want to speed up work by parallelizing
+5. When working on complex multi-step implementations
+
+**Example usage:**
+- "Analyze all test files" → Use parallel_tasks to analyze each test file simultaneously
+- "Find all usages of X across the codebase" → Use task for focused search
+- "Review these 3 modules" → Use parallel_tasks with one task per module
+
+Be proactive about using sub-agents - they make you faster and more thorough!
+
 ## Response Format
 
 - Use markdown formatting
@@ -572,7 +593,7 @@ class ChatHandler:
         message: str,
         history: list[dict],
         agent: str,
-        max_iterations: int = 25,
+        max_iterations: int = 50,
     ) -> Generator[tuple[list[dict], str, Any, bool], None, None]:
         """Process a user message with an agentic loop using native function calling.
 
@@ -738,7 +759,7 @@ class ChatHandler:
         self,
         history: list[dict],
         system_prompt: str,
-        max_iterations: int = 25,
+        max_iterations: int = 50,
     ):
         """Execute the pending action and continue the agent loop."""
         if not self.pending_action:
