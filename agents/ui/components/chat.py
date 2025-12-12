@@ -729,6 +729,7 @@ class ChatHandler:
             yield history, "", None, False
 
         except Exception as e:
+            self._sanitize_conversation_history()
             error_msg = f"❌ Error: {str(e)}"
             history.append({"role": "assistant", "content": error_msg})
             yield history, "", None, False
@@ -744,119 +745,22 @@ class ChatHandler:
             yield history, "", None, False
             return
 
-        tool_call = self.pending_action
-        self.pending_action = None
+        try:
+            tool_call = self.pending_action
+            self.pending_action = None
 
-        original_tool_calls = tool_call.get("tool_calls", [])
-        original_content = tool_call.get("content")
-
-        self.conversation_history.append({
-            "role": "assistant",
-            "content": original_content,
-            "tool_calls": original_tool_calls,
-        })
-
-        for tc in original_tool_calls:
-            tc_name = tc["function"]["name"]
-            tc_id = tc["id"]
-            try:
-                tc_args = json.loads(tc["function"]["arguments"])
-            except json.JSONDecodeError:
-                tc_args = {}
-
-            tool_emoji = {
-                "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
-                "grep": "🔍", "glob": "🔍", "search": "🧠", "run_command": "⚡",
-                "pytest": "🧪", "ruff": "🔧", "diagnostics": "🩺", "typecheck": "📝",
-                "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
-                "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
-                "git_diff": "📦", "git_log": "📦", "task": "🤖",
-                "parallel_tasks": "🚀", "execute_python": "🐍", "sql": "🗃️",
-                "list_tables": "📋", "describe_table": "📊",
-            }.get(tc_name, "🔧")
-
-            yield history, f"{tool_emoji} Executing `{tc_name}`...", None, False
-
-            result = self.execute_tool({"tool": tc_name, "args": tc_args})
-            history.append({"role": "assistant", "content": f"**{tool_emoji} {tc_name}:**\n{result}"})
-
-            self.conversation_history.append({
-                "role": "tool",
-                "tool_call_id": tc_id,
-                "content": result,
-            })
-
-        yield history, "🔄 Continuing...", None, False
-
-        client = self.get_llm_client()
-
-        for iteration in range(max_iterations):
-            if self.should_stop:
-                history.append({"role": "assistant", "content": "⏹️ Stopped by user."})
-                yield history, "", None, False
-                return
-
-            yield history, f"🤔 Thinking... (step {iteration + 1})", None, False
-
-            self._sanitize_conversation_history()
-
-            model_lower = self.config.llm.model.lower()
-            no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
-
-            response = client.chat(
-                messages=self.conversation_history,
-                system_prompt=system_prompt,
-                temperature=0.1,
-                tools=TOOL_DEFINITIONS if not no_tools_support else None,
-            )
-
-            content = response.get("content")
-            tool_calls = response.get("tool_calls")
-
-            if content and not tool_calls:
-                extracted = self._extract_tool_call_from_text(content)
-                if extracted:
-                    tool_calls = extracted
-                    content = None
-
-            if content:
-                history.append({"role": "assistant", "content": content})
-
-            if not tool_calls:
-                if content:
-                    self.conversation_history.append({"role": "assistant", "content": content})
-                yield history, "", None, False
-                return
-
-            for tc in tool_calls:
-                tc_name = tc["function"]["name"]
-                tc_id = tc["id"]
-                try:
-                    tc_args = json.loads(tc["function"]["arguments"])
-                except json.JSONDecodeError:
-                    tc_args = {}
-
-                if self.requires_confirmation(tc_name, tc_args):
-                    self.pending_action = {
-                        "tool": tc_name,
-                        "args": tc_args,
-                        "tool_call_id": tc_id,
-                        "tool_calls": tool_calls,
-                        "content": content,
-                    }
-                    args_json = json.dumps(tc_args, indent=2)
-                    action_desc = f"**Pending Action:** `{tc_name}`\n```json\n{args_json}\n```"
-                    history.append({"role": "assistant", "content": action_desc})
-                    yield history, "Awaiting confirmation...", self.pending_action, True
-                    return
+            original_tool_calls = tool_call.get("tool_calls", [])
+            original_content = tool_call.get("content")
 
             self.conversation_history.append({
                 "role": "assistant",
-                "content": content,
-                "tool_calls": tool_calls,
+                "content": original_content,
+                "tool_calls": original_tool_calls,
             })
 
-            for tc in tool_calls:
+            tool_results = []
+
+            for tc in original_tool_calls:
                 tc_name = tc["function"]["name"]
                 tc_id = tc["id"]
                 try:
@@ -864,19 +768,148 @@ class ChatHandler:
                 except json.JSONDecodeError:
                     tc_args = {}
 
-                tc_emoji = {"write_file": "✏️", "run_command": "⚡"}.get(tc_name, "🔧")
-                yield history, f"{tc_emoji} Running `{tc_name}`...", None, False
+                tool_emoji = {
+                    "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
+                    "grep": "🔍", "glob": "🔍", "search": "🧠", "run_command": "⚡",
+                    "pytest": "🧪", "ruff": "🔧", "diagnostics": "🩺", "typecheck": "📝",
+                    "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
+                    "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
+                    "git_diff": "📦", "git_log": "📦", "task": "🤖",
+                    "parallel_tasks": "🚀", "execute_python": "🐍", "sql": "🗃️",
+                    "list_tables": "📋", "describe_table": "📊",
+                }.get(tc_name, "🔧")
 
-                tc_result = self.execute_tool({"tool": tc_name, "args": tc_args})
-                history.append({"role": "assistant", "content": f"**{tc_emoji} {tc_name}:**\n{tc_result}"})
+                yield history, f"{tool_emoji} Executing `{tc_name}`...", None, False
 
+                result = self.execute_tool({"tool": tc_name, "args": tc_args})
+                tool_results.append({
+                    "tool_call_id": tc_id,
+                    "tool": tc_name,
+                    "result": result,
+                })
+                history.append({"role": "assistant", "content": f"**{tool_emoji} {tc_name}:**\n{result}"})
+
+            for tr in tool_results:
                 self.conversation_history.append({
                     "role": "tool",
-                    "tool_call_id": tc_id,
-                    "content": tc_result,
+                    "tool_call_id": tr["tool_call_id"],
+                    "content": tr["result"],
                 })
 
-            yield history, "🔄 Processing...", None, False
+            yield history, "🔄 Continuing...", None, False
+
+            client = self.get_llm_client()
+
+            for iteration in range(max_iterations):
+                if self.should_stop:
+                    history.append({"role": "assistant", "content": "⏹️ Stopped by user."})
+                    yield history, "", None, False
+                    return
+
+                yield history, f"🤔 Thinking... (step {iteration + 1})", None, False
+
+                self._sanitize_conversation_history()
+
+                model_lower = self.config.llm.model.lower()
+                no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
+
+                response = client.chat(
+                    messages=self.conversation_history,
+                    system_prompt=system_prompt,
+                    temperature=0.1,
+                    tools=TOOL_DEFINITIONS if not no_tools_support else None,
+                )
+
+                content = response.get("content")
+                tool_calls = response.get("tool_calls")
+
+                if content and not tool_calls:
+                    extracted = self._extract_tool_call_from_text(content)
+                    if extracted:
+                        tool_calls = extracted
+                        content = None
+
+                if content:
+                    history.append({"role": "assistant", "content": content})
+
+                if not tool_calls:
+                    if content:
+                        self.conversation_history.append({"role": "assistant", "content": content})
+                    yield history, "", None, False
+                    return
+
+                for tc in tool_calls:
+                    tc_name = tc["function"]["name"]
+                    tc_id = tc["id"]
+                    try:
+                        tc_args = json.loads(tc["function"]["arguments"])
+                    except json.JSONDecodeError:
+                        tc_args = {}
+
+                    if self.requires_confirmation(tc_name, tc_args):
+                        self.pending_action = {
+                            "tool": tc_name,
+                            "args": tc_args,
+                            "tool_call_id": tc_id,
+                            "tool_calls": tool_calls,
+                            "content": content,
+                        }
+                        args_json = json.dumps(tc_args, indent=2)
+                        action_desc = f"**Pending Action:** `{tc_name}`\n```json\n{args_json}\n```"
+                        history.append({"role": "assistant", "content": action_desc})
+                        yield history, "Awaiting confirmation...", self.pending_action, True
+                        return
+
+                self.conversation_history.append({
+                    "role": "assistant",
+                    "content": content,
+                    "tool_calls": tool_calls,
+                })
+
+                tool_results = []
+
+                for tc in tool_calls:
+                    tc_name = tc["function"]["name"]
+                    tc_id = tc["id"]
+                    try:
+                        tc_args = json.loads(tc["function"]["arguments"])
+                    except json.JSONDecodeError:
+                        tc_args = {}
+
+                    tc_emoji = {
+                        "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
+                        "grep": "🔍", "glob": "🔍", "search": "🧠", "run_command": "⚡",
+                        "pytest": "🧪", "ruff": "🔧", "diagnostics": "🩺", "typecheck": "📝",
+                        "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
+                        "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
+                        "git_diff": "📦", "git_log": "📦", "task": "🤖",
+                        "parallel_tasks": "🚀", "execute_python": "🐍", "sql": "🗃️",
+                        "list_tables": "📋", "describe_table": "📊",
+                    }.get(tc_name, "🔧")
+                    yield history, f"{tc_emoji} Running `{tc_name}`...", None, False
+
+                    tc_result = self.execute_tool({"tool": tc_name, "args": tc_args})
+                    tool_results.append({
+                        "tool_call_id": tc_id,
+                        "tool": tc_name,
+                        "result": tc_result,
+                    })
+                    history.append({"role": "assistant", "content": f"**{tc_emoji} {tc_name}:**\n{tc_result}"})
+
+                for tr in tool_results:
+                    self.conversation_history.append({
+                        "role": "tool",
+                        "tool_call_id": tr["tool_call_id"],
+                        "content": tr["result"],
+                    })
+
+                yield history, "🔄 Processing...", None, False
+
+        except Exception as e:
+            self._sanitize_conversation_history()
+            error_msg = f"❌ Error: {str(e)}"
+            history.append({"role": "assistant", "content": error_msg})
+            yield history, "", None, False
 
     def reject_action(self, history: list[dict]) -> tuple[list[dict], str, bool]:
         """Cancel the pending action."""
