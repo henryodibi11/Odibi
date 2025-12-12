@@ -578,7 +578,7 @@ class ChatHandler:
                 yield history, f"🤔 Thinking... (step {iteration})", None, False
 
                 model_lower = self.config.llm.model.lower()
-                is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "o4" in model_lower
+                is_reasoning_model = model_lower in ("o1-preview", "o1-mini", "o1")
 
                 if is_reasoning_model:
                     yield history, "🧠 Reasoning... (this may take a moment)", None, False
@@ -734,7 +734,7 @@ class ChatHandler:
             yield history, f"🤔 Thinking... (step {iteration + 1})", None, False
 
             model_lower = self.config.llm.model.lower()
-            is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "o4" in model_lower
+            is_reasoning_model = model_lower in ("o1-preview", "o1-mini", "o1")
 
             if is_reasoning_model:
                 yield history, "🧠 Reasoning...", None, False

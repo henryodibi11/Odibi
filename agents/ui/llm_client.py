@@ -167,7 +167,7 @@ class LLMClient:
         full_messages.extend(messages)
 
         model_lower = self.config.model.lower()
-        is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "o4" in model_lower
+        is_reasoning_model = model_lower in ("o1-preview", "o1-mini", "o1")
 
         payload = {
             "messages": full_messages,
@@ -237,7 +237,7 @@ class LLMClient:
         full_messages.extend(messages)
 
         model_lower = self.config.model.lower()
-        is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "o4" in model_lower
+        is_reasoning_model = model_lower in ("o1-preview", "o1-mini", "o1")
 
         payload = {
             "messages": full_messages,
