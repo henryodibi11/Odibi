@@ -28,7 +28,7 @@ class LLMConfig:
     model: str = "gpt-4o"
     api_key: str = ""
     api_type: str = "openai"
-    api_version: str = "2024-02-15-preview"
+    api_version: str = "2024-12-01-preview"
 
     def __post_init__(self):
         if not self.endpoint:
@@ -141,7 +141,7 @@ class AgentUIConfig:
                 model=model,
                 api_key=llm_data.get("api_key", ""),
                 api_type=llm_data.get("api_type", "openai"),
-                api_version=llm_data.get("api_version", "2024-02-15-preview"),
+                api_version=llm_data.get("api_version", "2024-12-01-preview"),
             ),
             memory=MemoryConfig(
                 backend_type=memory_data.get("backend_type", "local"),

@@ -42,7 +42,7 @@ class LLMConfig:
             api_key="...",
             model="gpt-4o",  # deployment name
             api_type="azure",
-            api_version="2024-02-15-preview",
+            api_version="2024-12-01-preview",
         )
 
         # Ollama (local)
@@ -64,7 +64,7 @@ class LLMConfig:
     api_key: str = ""
     model: str = "gpt-4o"
     api_type: str = "openai"
-    api_version: str = "2024-02-15-preview"
+    api_version: str = "2024-12-01-preview"
 
     def __post_init__(self):
         import os
