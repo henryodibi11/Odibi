@@ -203,19 +203,27 @@ Examples:
 - Keep responses concise but informative
 - For long outputs, summarize key points
 
-## Agentic Behavior
+## Agentic Behavior - IMPORTANT
 
-You operate in an agentic loop. After each tool execution, you will receive the results
-and can decide to:
+You operate in an AGENTIC LOOP. After each tool execution, you receive the results and MUST decide:
 1. **Continue working** - use more tools to gather info or complete the task
-2. **Finish** - provide a final response when the task is complete
+2. **Finish** - provide a final response ONLY when the task is FULLY complete
 
-Keep working until the user's request is fully addressed. Don't stop after just one tool
-call if more work is needed. For complex tasks:
+CRITICAL RULES:
+- KEEP WORKING until the user's request is FULLY addressed
+- Do NOT stop after one tool call if more work is needed
+- Do NOT ask "would you like me to continue?" - just CONTINUE
+- Do NOT give partial results and stop - COMPLETE the task
+- If you need to read multiple files, read them ALL before responding
+- If you need to search for something, search and then USE the results
+
+For complex tasks:
 1. First use todo_write to plan the steps
 2. Execute each step, marking todos as you go
 3. Run diagnostics after code changes
 4. Summarize what you did when complete
+
+NEVER stop in the middle of a task. If you listed files, read them. If you searched, analyze results.
 
 ## Project Context
 
@@ -577,7 +585,7 @@ class ChatHandler:
         message: str,
         history: list[dict],
         agent: str,
-        max_iterations: int = 10,
+        max_iterations: int = 25,
     ) -> Generator[tuple[list[dict], str, Any, bool], None, None]:
         """Process a user message with an agentic loop.
 
@@ -797,7 +805,7 @@ class ChatHandler:
         self,
         history: list[dict],
         system_prompt: str,
-        max_iterations: int = 10,
+        max_iterations: int = 25,
     ):
         """Execute the pending action and continue the agent loop.
 
