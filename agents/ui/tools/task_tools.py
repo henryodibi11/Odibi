@@ -127,18 +127,19 @@ class SubAgent:
                     temperature=0.1,
                     max_tokens=2048,
                 )
+                content = response.get("content", "")
 
-                tool_matches = list(self.TOOL_PATTERN.finditer(response))
+                tool_matches = list(self.TOOL_PATTERN.finditer(content))
 
                 if not tool_matches:
                     return TaskResult(
                         success=True,
                         task_description=task,
-                        result=response,
+                        result=content,
                         steps_taken=steps,
                     )
 
-                messages.append({"role": "assistant", "content": response})
+                messages.append({"role": "assistant", "content": content})
 
                 tool_results = []
                 for match in tool_matches:
