@@ -5,7 +5,7 @@ import random
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,18 @@ class StateBackend(ABC):
     def set_hwm(self, key: str, value: Any) -> None:
         """Set High-Water Mark value for a key."""
         ...
+
+    def set_hwm_batch(self, updates: List[Dict[str, Any]]) -> None:
+        """Set multiple High-Water Mark values in a single operation.
+
+        Default implementation calls set_hwm() for each update.
+        Subclasses should override for efficient batch writes.
+
+        Args:
+            updates: List of dicts with keys: key, value
+        """
+        for update in updates:
+            self.set_hwm(update["key"], update["value"])
 
 
 class LocalJSONStateBackend(StateBackend):
@@ -405,6 +417,99 @@ class CatalogStateBackend(StateBackend):
             logger.debug(f"Table does not exist at {path}: {e}")
             return False
 
+    def set_hwm_batch(self, updates: List[Dict[str, Any]]) -> None:
+        """Set multiple High-Water Mark values in a single MERGE operation.
+
+        This is much more efficient than calling set_hwm() for each update
+        individually, especially when running parallel pipelines with many nodes.
+
+        Args:
+            updates: List of dicts with keys: key, value
+        """
+        if not updates:
+            return
+
+        timestamp = datetime.utcnow()
+        rows = [
+            {
+                "key": u["key"],
+                "value": json.dumps(u["value"], default=str),
+                "updated_at": timestamp,
+            }
+            for u in updates
+        ]
+
+        def _do_batch_set():
+            if self.spark:
+                self._set_hwm_batch_spark(rows)
+            else:
+                self._set_hwm_batch_local(rows)
+
+        _retry_delta_operation(_do_batch_set)
+
+    def _set_hwm_batch_spark(self, rows: List[Dict[str, Any]]) -> None:
+        from pyspark.sql.types import StringType, StructField, StructType, TimestampType
+
+        schema = StructType(
+            [
+                StructField("key", StringType(), False),
+                StructField("value", StringType(), True),
+                StructField("updated_at", TimestampType(), True),
+            ]
+        )
+
+        updates_df = self.spark.createDataFrame(rows, schema)
+
+        if not self._spark_table_exists(self.meta_state_path):
+            updates_df.write.format("delta").mode("overwrite").save(self.meta_state_path)
+            return
+
+        view_name = "_odibi_hwm_batch_updates"
+        updates_df.createOrReplaceTempView(view_name)
+
+        merge_sql = f"""
+          MERGE INTO delta.`{self.meta_state_path}` AS t
+          USING {view_name} AS s
+          ON t.key = s.key
+          WHEN MATCHED THEN UPDATE SET
+            t.value = s.value,
+            t.updated_at = s.updated_at
+          WHEN NOT MATCHED THEN INSERT *
+        """
+        self.spark.sql(merge_sql)
+        self.spark.catalog.dropTempView(view_name)
+        logger.debug(f"Batch set {len(rows)} HWM value(s) via Spark")
+
+    def _set_hwm_batch_local(self, rows: List[Dict[str, Any]]) -> None:
+        if not DeltaTable:
+            raise ImportError("deltalake library is required for local state backend.")
+
+        df = pd.DataFrame(rows)
+        df["updated_at"] = pd.to_datetime(df["updated_at"])
+
+        try:
+            dt = DeltaTable(self.meta_state_path, storage_options=self.storage_options)
+            (
+                dt.merge(
+                    source=df,
+                    predicate="target.key = source.key",
+                    source_alias="source",
+                    target_alias="target",
+                )
+                .when_matched_update_all()
+                .when_not_matched_insert_all()
+                .execute()
+            )
+        except (ValueError, Exception):
+            write_deltalake(
+                self.meta_state_path,
+                df,
+                mode="append",
+                storage_options=self.storage_options,
+                schema_mode="merge",
+            )
+        logger.debug(f"Batch set {len(rows)} HWM value(s) locally")
+
 
 class StateManager:
     """Manages execution state for checkpointing."""
@@ -457,6 +562,14 @@ class StateManager:
     def set_hwm(self, key: str, value: Any) -> None:
         """Set High-Water Mark value for a key."""
         self.backend.set_hwm(key, value)
+
+    def set_hwm_batch(self, updates: List[Dict[str, Any]]) -> None:
+        """Set multiple High-Water Mark values in a single operation.
+
+        Args:
+            updates: List of dicts with keys: key, value
+        """
+        self.backend.set_hwm_batch(updates)
 
 
 def create_state_backend(

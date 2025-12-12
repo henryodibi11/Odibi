@@ -122,6 +122,7 @@ class NodeExecutor:
         performance_config: Optional[Any] = None,
         state_manager: Optional[Any] = None,
         pipeline_name: Optional[str] = None,
+        batch_write_buffers: Optional[Dict[str, List]] = None,
     ):
         self.context = context
         self.engine = engine
@@ -132,6 +133,7 @@ class NodeExecutor:
         self.performance_config = performance_config
         self.state_manager = state_manager
         self.pipeline_name = pipeline_name
+        self.batch_write_buffers = batch_write_buffers
 
         # Ephemeral state per execution
         self._execution_steps: List[str] = []
@@ -1840,6 +1842,9 @@ class NodeExecutor:
         """Register catalog entries after successful write.
 
         Handles Phase 3.2-3.5: register_asset, track_schema, log_pattern, record_lineage
+
+        When batch_write_buffers is provided, records are buffered for batch write
+        at the end of pipeline execution to eliminate concurrency conflicts.
         """
         if not self.catalog_manager:
             return
@@ -1850,6 +1855,13 @@ class NodeExecutor:
         import uuid
 
         run_id = str(uuid.uuid4())
+
+        # Check if we should buffer writes for batch processing
+        use_batch_mode = (
+            self.batch_write_buffers is not None
+            and "lineage" in self.batch_write_buffers
+            and "assets" in self.batch_write_buffers
+        )
 
         # Determine table path
         table_path = None
@@ -1878,15 +1890,21 @@ class NodeExecutor:
                         json.dumps(schema, sort_keys=True).encode()
                     ).hexdigest()
 
-            self.catalog_manager.register_asset(
-                project_name=project_name,
-                table_name=table_name,
-                path=table_path or "",
-                format=write_config.format or "delta",
-                pattern_type=pattern_type,
-                schema_hash=schema_hash,
-            )
-            ctx.debug(f"Registered asset: {table_name}")
+            asset_record = {
+                "project_name": project_name,
+                "table_name": table_name,
+                "path": table_path or "",
+                "format": write_config.format or "delta",
+                "pattern_type": pattern_type,
+                "schema_hash": schema_hash,
+            }
+
+            if use_batch_mode:
+                self.batch_write_buffers["assets"].append(asset_record)
+                ctx.debug(f"Buffered asset for batch write: {table_name}")
+            else:
+                self.catalog_manager.register_asset(**asset_record)
+                ctx.debug(f"Registered asset: {table_name}")
 
         except Exception as e:
             ctx.debug(f"Failed to register asset: {e}")
@@ -1948,14 +1966,22 @@ class NodeExecutor:
                     pipeline_name = self.pipeline_name or (
                         config.tags[0] if config.tags else "unknown"
                     )
-                    self.catalog_manager.record_lineage(
-                        source_table=source_path,
-                        target_table=table_path,
-                        target_pipeline=pipeline_name,
-                        target_node=config.name,
-                        run_id=run_id,
-                    )
-                    ctx.debug(f"Recorded lineage: {source_path} -> {table_path}")
+                    lineage_record = {
+                        "source_table": source_path,
+                        "target_table": table_path,
+                        "target_pipeline": pipeline_name,
+                        "target_node": config.name,
+                        "run_id": run_id,
+                    }
+
+                    if use_batch_mode:
+                        self.batch_write_buffers["lineage"].append(lineage_record)
+                        ctx.debug(
+                            f"Buffered lineage for batch write: {source_path} -> {table_path}"
+                        )
+                    else:
+                        self.catalog_manager.record_lineage(**lineage_record)
+                        ctx.debug(f"Recorded lineage: {source_path} -> {table_path}")
 
         except Exception as e:
             ctx.debug(f"Failed to record lineage: {e}")
@@ -2521,6 +2547,7 @@ class Node:
         catalog_manager: Optional[Any] = None,
         performance_config: Optional[Any] = None,
         pipeline_name: Optional[str] = None,
+        batch_write_buffers: Optional[Dict[str, List]] = None,
     ):
         """Initialize node."""
         self.config = config
@@ -2534,6 +2561,7 @@ class Node:
         self.catalog_manager = catalog_manager
         self.performance_config = performance_config
         self.pipeline_name = pipeline_name
+        self.batch_write_buffers = batch_write_buffers
 
         self._cached_result: Optional[Any] = None
 
@@ -2571,6 +2599,7 @@ class Node:
             performance_config=performance_config,
             state_manager=self.state_manager,
             pipeline_name=pipeline_name,
+            batch_write_buffers=batch_write_buffers,
         )
 
     def restore(self) -> bool:

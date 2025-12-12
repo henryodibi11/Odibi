@@ -115,6 +115,13 @@ class Pipeline:
         self.catalog_manager = catalog_manager
         self.lineage = lineage_adapter
 
+        # Batch write buffers to collect catalog writes during execution
+        # These are flushed at pipeline end to eliminate concurrency conflicts
+        self._pending_lineage_records: List[Dict[str, Any]] = []
+        self._pending_asset_records: List[Dict[str, Any]] = []
+        self._pending_hwm_updates: List[Dict[str, Any]] = []
+        self._batch_mode_enabled: bool = True  # Enable batch mode by default
+
         # Create logging context for this pipeline
         self._ctx = create_logging_context(
             pipeline_id=pipeline_config.pipeline,
@@ -508,6 +515,15 @@ class Pipeline:
             )
 
             try:
+                # Prepare batch write buffers for eliminating concurrency conflicts
+                batch_buffers = None
+                if self._batch_mode_enabled:
+                    batch_buffers = {
+                        "lineage": self._pending_lineage_records,
+                        "assets": self._pending_asset_records,
+                        "hwm": self._pending_hwm_updates,
+                    }
+
                 node = Node(
                     config=node_config,
                     context=self.context,
@@ -518,6 +534,7 @@ class Pipeline:
                     catalog_manager=self.catalog_manager,
                     performance_config=self.performance_config,
                     pipeline_name=self.config.pipeline,
+                    batch_write_buffers=batch_buffers,
                 )
                 result = node.execute()
 
@@ -800,6 +817,10 @@ class Pipeline:
                         f"Failed to register outputs (non-fatal): {e}",
                         error_type=type(e).__name__,
                     )
+
+            # Flush buffered catalog writes (lineage, assets, HWM)
+            self._flush_batch_writes()
+
         elif skip_run_logging:
             self._ctx.debug("Skipping run logging (skip_run_logging=true)")
 
@@ -960,6 +981,97 @@ class Pipeline:
                     msg += f". Failed nodes: {', '.join(results.failed)}"
 
                 send_alert(alert_config, msg, context)
+
+    def buffer_lineage_record(self, record: Dict[str, Any]) -> None:
+        """Buffer a lineage record for batch write at pipeline end.
+
+        Args:
+            record: Dict with keys: source_table, target_table, target_pipeline,
+                    target_node, run_id, and optional source_pipeline, source_node
+        """
+        self._pending_lineage_records.append(record)
+
+    def buffer_asset_record(self, record: Dict[str, Any]) -> None:
+        """Buffer an asset registration record for batch write at pipeline end.
+
+        Args:
+            record: Dict with keys: project_name, table_name, path, format,
+                    pattern_type, and optional schema_hash
+        """
+        self._pending_asset_records.append(record)
+
+    def buffer_hwm_update(self, key: str, value: Any) -> None:
+        """Buffer a HWM update for batch write at pipeline end.
+
+        Args:
+            key: HWM state key
+            value: HWM value
+        """
+        self._pending_hwm_updates.append({"key": key, "value": value})
+
+    def _flush_batch_writes(self) -> None:
+        """Flush all buffered catalog writes in single batch operations.
+
+        This eliminates concurrency conflicts when running 35+ parallel nodes
+        by writing all lineage, assets, and HWM updates at once.
+        """
+        if not self.catalog_manager:
+            return
+
+        # Flush lineage records
+        if self._pending_lineage_records:
+            try:
+                self.catalog_manager.record_lineage_batch(self._pending_lineage_records)
+                self._ctx.debug(
+                    f"Batch recorded {len(self._pending_lineage_records)} lineage relationship(s)",
+                    lineage_count=len(self._pending_lineage_records),
+                )
+            except Exception as e:
+                self._ctx.warning(
+                    f"Failed to batch record lineage (non-fatal): {e}",
+                    error_type=type(e).__name__,
+                )
+            finally:
+                self._pending_lineage_records = []
+
+        # Flush asset records
+        if self._pending_asset_records:
+            try:
+                self.catalog_manager.register_assets_batch(self._pending_asset_records)
+                self._ctx.debug(
+                    f"Batch registered {len(self._pending_asset_records)} asset(s)",
+                    asset_count=len(self._pending_asset_records),
+                )
+            except Exception as e:
+                self._ctx.warning(
+                    f"Failed to batch register assets (non-fatal): {e}",
+                    error_type=type(e).__name__,
+                )
+            finally:
+                self._pending_asset_records = []
+
+        # Flush HWM updates
+        if self._pending_hwm_updates:
+            try:
+                if self.project_config:
+                    backend = create_state_backend(
+                        config=self.project_config,
+                        project_root=".",
+                        spark_session=getattr(self.engine, "spark", None),
+                    )
+                    state_manager = StateManager(backend=backend)
+                    state_manager.set_hwm_batch(self._pending_hwm_updates)
+                    self._ctx.debug(
+                        f"Batch updated {len(self._pending_hwm_updates)} HWM value(s)",
+                        hwm_count=len(self._pending_hwm_updates),
+                    )
+            except Exception as e:
+                self._ctx.warning(
+                    f"Failed to batch update HWM (non-fatal): {e}",
+                    error_type=type(e).__name__,
+                )
+            finally:
+                self._pending_hwm_updates = []
 
     def run_node(self, node_name: str, mock_data: Optional[Dict[str, Any]] = None) -> NodeResult:
         """Execute a single node (for testing/debugging).

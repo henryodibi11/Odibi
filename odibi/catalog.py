@@ -2062,6 +2062,197 @@ class CatalogManager:
         except Exception as e:
             logger.warning(f"Failed to record lineage: {e}")
 
+    def record_lineage_batch(
+        self,
+        records: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Batch records multiple lineage relationships to meta_lineage in a single MERGE.
+
+        This is much more efficient than calling record_lineage() for each relationship
+        individually, especially when running parallel pipelines with many nodes.
+
+        Args:
+            records: List of dicts with keys: source_table, target_table, target_pipeline,
+                     target_node, run_id, source_pipeline (optional), source_node (optional),
+                     relationship (optional, defaults to "feeds")
+        """
+        if not self.spark and not self.engine:
+            return
+
+        if not records:
+            return
+
+        def _do_batch_record():
+            timestamp = datetime.now(timezone.utc)
+
+            if self.spark:
+                rows = [
+                    (
+                        r["source_table"],
+                        r["target_table"],
+                        r.get("source_pipeline"),
+                        r.get("source_node"),
+                        r["target_pipeline"],
+                        r["target_node"],
+                        r.get("relationship", "feeds"),
+                        timestamp,
+                        r["run_id"],
+                    )
+                    for r in records
+                ]
+                schema = self._get_schema_meta_lineage()
+                df = self.spark.createDataFrame(rows, schema)
+
+                view_name = "_odibi_meta_lineage_batch_upsert"
+                df.createOrReplaceTempView(view_name)
+
+                target_path = self.tables["meta_lineage"]
+
+                merge_sql = f"""
+                    MERGE INTO delta.`{target_path}` AS target
+                    USING {view_name} AS source
+                    ON target.source_table = source.source_table
+                       AND target.target_table = source.target_table
+                    WHEN MATCHED THEN UPDATE SET
+                        target.source_pipeline = source.source_pipeline,
+                        target.source_node = source.source_node,
+                        target.target_pipeline = source.target_pipeline,
+                        target.target_node = source.target_node,
+                        target.relationship = source.relationship,
+                        target.last_observed = source.last_observed,
+                        target.run_id = source.run_id
+                    WHEN NOT MATCHED THEN INSERT *
+                """
+                self.spark.sql(merge_sql)
+                self.spark.catalog.dropTempView(view_name)
+
+            elif self.engine:
+                import pandas as pd
+
+                data = {
+                    "source_table": [r["source_table"] for r in records],
+                    "target_table": [r["target_table"] for r in records],
+                    "source_pipeline": [r.get("source_pipeline") for r in records],
+                    "source_node": [r.get("source_node") for r in records],
+                    "target_pipeline": [r["target_pipeline"] for r in records],
+                    "target_node": [r["target_node"] for r in records],
+                    "relationship": [r.get("relationship", "feeds") for r in records],
+                    "last_observed": [timestamp] * len(records),
+                    "run_id": [r["run_id"] for r in records],
+                }
+                df = pd.DataFrame(data)
+
+                self.engine.write(
+                    df,
+                    connection=self.connection,
+                    format="delta",
+                    path=self.tables["meta_lineage"],
+                    mode="upsert",
+                    options={"keys": ["source_table", "target_table"]},
+                )
+
+            logger.debug(f"Batch recorded {len(records)} lineage relationship(s)")
+
+        try:
+            self._retry_with_backoff(_do_batch_record)
+        except Exception as e:
+            logger.warning(f"Failed to batch record lineage: {e}")
+
+    def register_assets_batch(
+        self,
+        records: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Batch registers/upserts multiple physical assets to meta_tables in a single MERGE.
+
+        This is much more efficient than calling register_asset() for each asset
+        individually, especially when running parallel pipelines with many nodes.
+
+        Args:
+            records: List of dicts with keys: project_name, table_name, path, format,
+                     pattern_type, schema_hash (optional, defaults to "")
+        """
+        if not self.spark and not self.engine:
+            return
+
+        if not records:
+            return
+
+        def _do_batch_register():
+            timestamp = datetime.now(timezone.utc)
+
+            if self.spark:
+                from pyspark.sql import functions as F
+
+                schema = self._get_schema_meta_tables()
+                input_schema = StructType(schema.fields[:-1])  # Exclude updated_at
+
+                rows = [
+                    (
+                        r["project_name"],
+                        r["table_name"],
+                        r["path"],
+                        r["format"],
+                        r["pattern_type"],
+                        r.get("schema_hash", ""),
+                    )
+                    for r in records
+                ]
+                df = self.spark.createDataFrame(rows, input_schema)
+                df = df.withColumn("updated_at", F.current_timestamp())
+
+                view_name = "_odibi_meta_tables_batch_upsert"
+                df.createOrReplaceTempView(view_name)
+
+                target_path = self.tables["meta_tables"]
+
+                merge_sql = f"""
+                    MERGE INTO delta.`{target_path}` AS target
+                    USING {view_name} AS source
+                    ON target.project_name = source.project_name
+                       AND target.table_name = source.table_name
+                    WHEN MATCHED THEN UPDATE SET
+                        target.path = source.path,
+                        target.format = source.format,
+                        target.pattern_type = source.pattern_type,
+                        target.schema_hash = source.schema_hash,
+                        target.updated_at = source.updated_at
+                    WHEN NOT MATCHED THEN INSERT *
+                """
+                self.spark.sql(merge_sql)
+                self.spark.catalog.dropTempView(view_name)
+
+            elif self.engine:
+                import pandas as pd
+
+                data = {
+                    "project_name": [r["project_name"] for r in records],
+                    "table_name": [r["table_name"] for r in records],
+                    "path": [r["path"] for r in records],
+                    "format": [r["format"] for r in records],
+                    "pattern_type": [r["pattern_type"] for r in records],
+                    "schema_hash": [r.get("schema_hash", "") for r in records],
+                    "updated_at": [timestamp] * len(records),
+                }
+                df = pd.DataFrame(data)
+
+                self.engine.write(
+                    df,
+                    connection=self.connection,
+                    format="delta",
+                    path=self.tables["meta_tables"],
+                    mode="upsert",
+                    options={"keys": ["project_name", "table_name"]},
+                )
+
+            logger.debug(f"Batch registered {len(records)} asset(s)")
+
+        try:
+            self._retry_with_backoff(_do_batch_register)
+        except Exception as e:
+            logger.warning(f"Failed to batch register assets: {e}")
+
     def get_upstream(
         self,
         table_path: str,
