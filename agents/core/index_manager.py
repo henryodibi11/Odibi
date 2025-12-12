@@ -41,7 +41,7 @@ def _compute_code_mtime(odibi_root: Path) -> float:
     for py_file in odibi_src.rglob("*.py"):
         if "__pycache__" in str(py_file):
             continue
-        if ".odibi_index" in str(py_file):
+        if ".odibi/index" in str(py_file):
             continue
         try:
             mtime = py_file.stat().st_mtime
@@ -88,14 +88,14 @@ def needs_reindex(
 
     Args:
         odibi_root: Root directory of the odibi codebase.
-        index_dir: Directory for the index (default: <odibi_root>/.odibi_index).
+        index_dir: Directory for the index (default: <odibi_root>/.odibi/index).
         embedding_model: Embedding model name to check against.
 
     Returns:
         Tuple of (needs_reindex: bool, reason: str).
     """
     odibi_root_path = Path(odibi_root)
-    index_dir_path = Path(index_dir or (odibi_root_path / ".odibi_index"))
+    index_dir_path = Path(index_dir or (odibi_root_path / ".odibi/index"))
     meta_path = index_dir_path / META_FILE
 
     embedding_model = embedding_model or LocalEmbedder.DEFAULT_MODEL
@@ -138,7 +138,7 @@ def ensure_index(
 
     Args:
         odibi_root: Root directory of the odibi codebase.
-        index_dir: Directory for the index (default: <odibi_root>/.odibi_index).
+        index_dir: Directory for the index (default: <odibi_root>/.odibi/index).
         embedding_model: Embedding model name (default: all-MiniLM-L6-v2).
         embedder: Optional pre-configured embedder.
         force_reindex: Force a full reindex regardless of status.
@@ -149,7 +149,7 @@ def ensure_index(
     from agents.pipelines.indexer import LocalIndexer
 
     odibi_root_path = Path(odibi_root)
-    index_dir_path = Path(index_dir or (odibi_root_path / ".odibi_index"))
+    index_dir_path = Path(index_dir or (odibi_root_path / ".odibi/index"))
     index_dir_path.mkdir(parents=True, exist_ok=True)
 
     embedding_model = embedding_model or LocalEmbedder.DEFAULT_MODEL
@@ -217,7 +217,7 @@ def get_index(
         Vector store if index exists, None otherwise.
     """
     odibi_root_path = Path(odibi_root)
-    index_dir_path = Path(index_dir or (odibi_root_path / ".odibi_index"))
+    index_dir_path = Path(index_dir or (odibi_root_path / ".odibi/index"))
 
     if not index_dir_path.exists():
         return None

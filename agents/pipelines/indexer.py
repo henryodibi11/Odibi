@@ -43,7 +43,7 @@ class LocalIndexer:
             odibi_root: Path to the Odibi repository root.
             embedder: Embedder to use (default: LocalEmbedder).
             vector_store: Vector store to use (default: ChromaVectorStore).
-            index_dir: Directory for the index (default: <odibi_root>/.odibi_index).
+            index_dir: Directory for the index (default: <odibi_root>/.odibi/index).
         """
         self.odibi_root = Path(odibi_root)
 
@@ -52,7 +52,7 @@ class LocalIndexer:
         if vector_store is None:
             from agents.core.chroma_store import ChromaVectorStore
 
-            index_dir = index_dir or str(self.odibi_root / ".odibi_index")
+            index_dir = index_dir or str(self.odibi_root / ".odibi/index")
             self.vector_store = ChromaVectorStore(persist_dir=index_dir)
         else:
             self.vector_store = vector_store
@@ -368,7 +368,7 @@ def run_local_indexing_cli():
     parser.add_argument(
         "--index-dir",
         default=None,
-        help="Directory for the index (default: <odibi_root>/.odibi_index)",
+        help="Directory for the index (default: <odibi_root>/.odibi/index)",
     )
     parser.add_argument(
         "--embedding-model",
@@ -402,7 +402,7 @@ def run_local_indexing_cli():
 
     from agents.core.chroma_store import ChromaVectorStore
 
-    index_dir = args.index_dir or str(odibi_root / ".odibi_index")
+    index_dir = args.index_dir or str(odibi_root / ".odibi/index")
     vector_store = ChromaVectorStore(persist_dir=index_dir)
 
     if args.force_recreate:
