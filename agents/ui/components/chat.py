@@ -791,18 +791,108 @@ class ChatHandler:
             history.append({"role": "assistant", "content": error_msg})
             yield history, "", None, False
 
-    def confirm_action(self, history: list[dict]) -> tuple[list[dict], str, bool]:
-        """Execute the pending action after confirmation."""
+    def confirm_action(
+        self,
+        history: list[dict],
+        system_prompt: str,
+        max_iterations: int = 10,
+    ):
+        """Execute the pending action and continue the agent loop.
+
+        This is a generator that yields updates like process_message.
+        """
         if not self.pending_action:
-            return history, "", False
+            yield history, "", None, False
+            return
 
         tool_call = self.pending_action
         self.pending_action = None
 
+        tool_emoji = {
+            "write_file": "✏️",
+            "run_command": "⚡",
+            "python": "🐍",
+            "sql": "🗃️",
+            "odibi_run": "🔄",
+        }.get(tool_call["tool"], "🔧")
+
+        yield history, f"{tool_emoji} Executing `{tool_call['tool']}`...", None, False
+
         result = self.execute_tool(tool_call)
         history.append({"role": "assistant", "content": f"**Result:**\n{result}"})
 
-        return history, "", False
+        tool_result_msg = f"[{tool_call['tool']}]: {result}"
+        self.conversation_history.append(
+            {"role": "user", "content": f"[SYSTEM] Tool execution results:\n\n{tool_result_msg}"}
+        )
+
+        yield history, "🔄 Continuing...", None, False
+
+        client = self.get_llm_client()
+
+        for iteration in range(max_iterations):
+            if self.should_stop:
+                history.append({"role": "assistant", "content": "⏹️ Stopped by user."})
+                yield history, "", None, False
+                return
+
+            yield history, f"🤔 Thinking... (step {iteration + 1})", None, False
+
+            model_lower = self.config.llm.model.lower()
+            is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "o4" in model_lower
+
+            if is_reasoning_model:
+                yield history, "🧠 Reasoning...", None, False
+                response = client.chat(
+                    messages=self.conversation_history,
+                    system_prompt=system_prompt,
+                    temperature=0.1,
+                )
+            else:
+                response = ""
+                streaming_history = history.copy()
+                streaming_history.append({"role": "assistant", "content": ""})
+
+                for chunk in client.chat_stream(
+                    messages=self.conversation_history,
+                    system_prompt=system_prompt,
+                    temperature=0.1,
+                ):
+                    if self.should_stop:
+                        break
+                    response += chunk
+                    streaming_history[-1]["content"] = response
+                    yield streaming_history, "✍️ Writing...", None, False
+
+            tool_matches = list(self.TOOL_PATTERN.finditer(response))
+
+            if not tool_matches:
+                history.append({"role": "assistant", "content": response})
+                self.conversation_history.append({"role": "assistant", "content": response})
+                yield history, "", None, False
+                return
+
+            self.conversation_history.append({"role": "assistant", "content": response})
+
+            for match in tool_matches:
+                try:
+                    next_tool = json.loads(match.group(1))
+                    if self.requires_confirmation(next_tool):
+                        self.pending_action = next_tool
+                        response_before = response[: match.start()].strip()
+                        if response_before:
+                            history.append({"role": "assistant", "content": response_before})
+                        args_json = json.dumps(next_tool["args"], indent=2)
+                        action_desc = f"**Pending Action:** `{next_tool['tool']}`\n```json\n{args_json}\n```"
+                        history.append({"role": "assistant", "content": action_desc})
+                        yield history, "Awaiting confirmation...", next_tool, True
+                        return
+                except json.JSONDecodeError:
+                    continue
+
+            history.append({"role": "assistant", "content": response})
+            yield history, "", None, False
+            return
 
     def reject_action(self, history: list[dict]) -> tuple[list[dict], str, bool]:
         """Cancel the pending action."""
@@ -882,23 +972,45 @@ def setup_chat_handlers(
     )
 
     def on_confirm(history: list[dict]):
-        updated, status, visible = handler.confirm_action(history)
-        return updated, gr.update(visible=False)
+        handler.config = get_config()
+
+        system_prompt = CHAT_SYSTEM_PROMPT
+        system_prompt += "\n\n## Accessible Paths"
+        system_prompt += f"\n**Working Project:** {handler.config.project.project_root}"
+
+        for result in handler.confirm_action(history, system_prompt):
+            updated_history, status, pending, show_actions = result
+            yield (
+                updated_history,
+                f"**{status}**" if status else "",
+                pending,
+                gr.update(visible=show_actions),
+            )
 
     def on_reject(history: list[dict]):
         updated, status, visible = handler.reject_action(history)
-        return updated, gr.update(visible=False)
+        return updated, "", None, gr.update(visible=False)
 
     components["confirm_btn"].click(
         fn=on_confirm,
         inputs=[components["chatbot"]],
-        outputs=[components["chatbot"], components["actions_accordion"]],
+        outputs=[
+            components["chatbot"],
+            components["status_bar"],
+            components["pending_action"],
+            components["actions_accordion"],
+        ],
     )
 
     components["reject_btn"].click(
         fn=on_reject,
         inputs=[components["chatbot"]],
-        outputs=[components["chatbot"], components["actions_accordion"]],
+        outputs=[
+            components["chatbot"],
+            components["status_bar"],
+            components["pending_action"],
+            components["actions_accordion"],
+        ],
     )
 
     def on_clear():
