@@ -363,7 +363,14 @@ def create_folder_picker(
                 from agents.core.chroma_store import ChromaVectorStore
                 import shutil
 
-                index_dir = target_path / ".odibi" / "index"
+                path_str = str(target_path)
+                if path_str.startswith("/Workspace/") or path_str.startswith("/Repos/"):
+                    import hashlib
+                    path_hash = hashlib.md5(path_str.encode()).hexdigest()[:8]
+                    index_dir = Path(f"/tmp/.odibi_index/{path_hash}")
+                    debug_info.append("Using temp dir (Databricks read-only workspace)")
+                else:
+                    index_dir = target_path / ".odibi" / "index"
                 debug_info.append(f"Index dir: {index_dir}")
 
                 if index_dir.exists():
