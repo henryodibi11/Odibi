@@ -578,16 +578,13 @@ class ChatHandler:
                 yield history, f"🤔 Thinking... (step {iteration})", None, False
 
                 model_lower = self.config.llm.model.lower()
-                is_reasoning_model = model_lower in ("o1-preview", "o1-mini", "o1")
-
-                if is_reasoning_model:
-                    yield history, "🧠 Reasoning... (this may take a moment)", None, False
+                no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
                 
                 response = client.chat(
                     messages=self.conversation_history,
                     system_prompt=system_prompt,
                     temperature=0.1,
-                    tools=TOOL_DEFINITIONS if not is_reasoning_model else None,
+                    tools=TOOL_DEFINITIONS if not no_tools_support else None,
                 )
 
                 content = response.get("content")
@@ -734,16 +731,13 @@ class ChatHandler:
             yield history, f"🤔 Thinking... (step {iteration + 1})", None, False
 
             model_lower = self.config.llm.model.lower()
-            is_reasoning_model = model_lower in ("o1-preview", "o1-mini", "o1")
-
-            if is_reasoning_model:
-                yield history, "🧠 Reasoning...", None, False
+            no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
 
             response = client.chat(
                 messages=self.conversation_history,
                 system_prompt=system_prompt,
                 temperature=0.1,
-                tools=TOOL_DEFINITIONS if not is_reasoning_model else None,
+                tools=TOOL_DEFINITIONS if not no_tools_support else None,
             )
 
             content = response.get("content")

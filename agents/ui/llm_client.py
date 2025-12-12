@@ -167,19 +167,20 @@ class LLMClient:
         full_messages.extend(messages)
 
         model_lower = self.config.model.lower()
-        is_reasoning_model = model_lower in ("o1-preview", "o1-mini", "o1")
+        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4"))
+        no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
 
         payload = {
             "messages": full_messages,
         }
 
-        if is_reasoning_model:
+        if uses_completion_tokens:
             payload["max_completion_tokens"] = max_tokens
         else:
             payload["temperature"] = temperature
             payload["max_tokens"] = max_tokens
 
-        if tools and not is_reasoning_model:
+        if tools and not no_tools_support:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
 
@@ -237,14 +238,14 @@ class LLMClient:
         full_messages.extend(messages)
 
         model_lower = self.config.model.lower()
-        is_reasoning_model = model_lower in ("o1-preview", "o1-mini", "o1")
+        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4"))
 
         payload = {
             "messages": full_messages,
             "stream": True,
         }
 
-        if is_reasoning_model:
+        if uses_completion_tokens:
             payload["max_completion_tokens"] = max_tokens
         else:
             payload["temperature"] = temperature
