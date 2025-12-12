@@ -305,6 +305,10 @@ class ChatHandler:
     """Handles chat interactions with tool execution."""
 
     TOOL_PATTERN = re.compile(r"```tool\s*\n({.*?})\s*\n```", re.DOTALL)
+    TOOL_PATTERN_UNWRAPPED = re.compile(
+        r'(?:^|\n)\s*(\{"tool"\s*:\s*"[^"]+"\s*,\s*"args"\s*:\s*\{[^}]*\}\s*\})',
+        re.MULTILINE
+    )
 
     def __init__(self, config: AgentUIConfig):
         self.config = config
@@ -664,6 +668,9 @@ class ChatHandler:
                         yield streaming_history, "✍️ Writing...", None, False
 
                 tool_matches = list(self.TOOL_PATTERN.finditer(response))
+                
+                if not tool_matches:
+                    tool_matches = list(self.TOOL_PATTERN_UNWRAPPED.finditer(response))
 
                 if not tool_matches:
                     history.append({"role": "assistant", "content": response})
@@ -875,6 +882,9 @@ class ChatHandler:
                     yield streaming_history, "✍️ Writing...", None, False
 
             tool_matches = list(self.TOOL_PATTERN.finditer(response))
+            
+            if not tool_matches:
+                tool_matches = list(self.TOOL_PATTERN_UNWRAPPED.finditer(response))
 
             if not tool_matches:
                 history.append({"role": "assistant", "content": response})
