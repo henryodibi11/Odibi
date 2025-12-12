@@ -1411,6 +1411,55 @@ class CatalogManager:
         except Exception as e:
             logger.warning(f"Failed to log pattern to system catalog: {e}")
 
+    def _retry_on_concurrent_write(
+        self,
+        operation: callable,
+        max_retries: int = 3,
+        base_delay: float = 0.5,
+    ) -> Any:
+        """Retry an operation on Delta concurrent write conflicts.
+
+        Uses exponential backoff with jitter to handle ConcurrentAppendException.
+
+        Args:
+            operation: Callable to execute.
+            max_retries: Maximum number of retry attempts.
+            base_delay: Base delay in seconds (doubles each retry).
+
+        Returns:
+            Result of the operation.
+
+        Raises:
+            Exception: If all retries fail.
+        """
+        last_exception = None
+        for attempt in range(max_retries + 1):
+            try:
+                return operation()
+            except Exception as e:
+                error_str = str(e)
+                # Check for Delta concurrency exceptions
+                is_concurrent_error = any(
+                    msg in error_str
+                    for msg in [
+                        "ConcurrentAppendException",
+                        "ConcurrentDeleteReadException",
+                        "ConcurrentDeleteDeleteException",
+                        "DELTA_CONCURRENT",
+                    ]
+                )
+                if not is_concurrent_error or attempt >= max_retries:
+                    raise
+                last_exception = e
+                # Exponential backoff with jitter
+                delay = base_delay * (2**attempt) + random.uniform(0, 0.5)
+                logger.debug(
+                    f"Delta concurrent write conflict (attempt {attempt + 1}/{max_retries + 1}), "
+                    f"retrying in {delay:.2f}s..."
+                )
+                time.sleep(delay)
+        raise last_exception
+
     def register_asset(
         self,
         project_name: str,
@@ -1426,7 +1475,7 @@ class CatalogManager:
         if not self.spark and not self.engine:
             return
 
-        try:
+        def _do_register():
             if self.spark:
                 from pyspark.sql import functions as F
 
@@ -1503,6 +1552,8 @@ class CatalogManager:
                     options={"keys": ["project_name", "table_name"]},
                 )
 
+        try:
+            self._retry_on_concurrent_write(_do_register)
         except Exception as e:
             logger.warning(f"Failed to register asset in system catalog: {e}")
 
