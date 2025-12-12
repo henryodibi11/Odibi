@@ -331,17 +331,44 @@ def create_folder_picker(
 
             try:
                 from agents.core.index_manager import ensure_index
+                from agents.core.code_parser import OdibiCodeParser
+
+                target_path = Path(path)
+                odibi_subdir = target_path / "odibi"
+
+                debug_info = []
+                debug_info.append(f"Path: {path}")
+                debug_info.append(f"Path exists: {target_path.exists()}")
+                debug_info.append(f"odibi/ exists: {odibi_subdir.exists()}")
+
+                scan_dir = odibi_subdir if odibi_subdir.exists() else target_path
+                debug_info.append(f"Scanning: {scan_dir}")
+
+                try:
+                    py_files = list(scan_dir.rglob("*.py"))
+                    debug_info.append(f"rglob found: {len(py_files)} files")
+                    if py_files[:3]:
+                        debug_info.append(f"First 3: {[str(f.name) for f in py_files[:3]]}")
+                except Exception as e:
+                    debug_info.append(f"rglob error: {e}")
+
+                parser = OdibiCodeParser(str(target_path))
+                chunks = parser.parse_directory()
+                debug_info.append(f"Parser returned: {len(chunks)} chunks")
 
                 store = ensure_index(odibi_root=path, force_reindex=True)
                 count = store.count()
 
                 project_state.mark_indexed(path)
 
+                if count == 0:
+                    return f"⚠️ Indexed **{count}** chunks\n\nDebug:\n" + "\n".join(debug_info)
                 return f"✅ Indexed **{count}** code chunks from `{Path(path).name}`"
             except ImportError as e:
                 return f"❌ Missing dependencies: {e}\n\nInstall: `pip install chromadb sentence-transformers`"
             except Exception as e:
-                return f"❌ Indexing failed: {e}"
+                import traceback
+                return f"❌ Indexing failed: {e}\n\n{traceback.format_exc()}"
 
         components["index_btn"].click(
             fn=index_codebase,
