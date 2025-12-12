@@ -63,6 +63,26 @@ class ProjectState:
                 break
 
 
+def get_index_dir(project_path: str) -> Path:
+    """Get the appropriate index directory for a project.
+
+    On Databricks (/Workspace/ or /Repos/), uses /tmp/ since the
+    workspace is read-only for SQLite operations.
+
+    Args:
+        project_path: The project root path.
+
+    Returns:
+        Path to the index directory.
+    """
+    import hashlib
+
+    if project_path.startswith("/Workspace/") or project_path.startswith("/Repos/"):
+        path_hash = hashlib.md5(project_path.encode()).hexdigest()[:8]
+        return Path(f"/tmp/.odibi_index/{path_hash}")
+    return Path(project_path) / ".odibi" / "index"
+
+
 def validate_project_path(path: str) -> tuple[bool, str]:
     """Validate a project path.
 
@@ -307,7 +327,8 @@ def create_folder_picker(
             try:
                 from agents.core.index_manager import needs_reindex
 
-                needs, reason = needs_reindex(path)
+                index_dir = get_index_dir(path)
+                needs, reason = needs_reindex(path, index_dir=str(index_dir))
                 if needs:
                     return f"⚠️ **Index needed:** {reason}"
                 else:
@@ -363,14 +384,9 @@ def create_folder_picker(
                 from agents.core.chroma_store import ChromaVectorStore
                 import shutil
 
-                path_str = str(target_path)
-                if path_str.startswith("/Workspace/") or path_str.startswith("/Repos/"):
-                    import hashlib
-                    path_hash = hashlib.md5(path_str.encode()).hexdigest()[:8]
-                    index_dir = Path(f"/tmp/.odibi_index/{path_hash}")
+                index_dir = get_index_dir(path)
+                if str(index_dir).startswith("/tmp/"):
                     debug_info.append("Using temp dir (Databricks read-only workspace)")
-                else:
-                    index_dir = target_path / ".odibi" / "index"
                 debug_info.append(f"Index dir: {index_dir}")
 
                 if index_dir.exists():
