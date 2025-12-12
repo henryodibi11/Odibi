@@ -25,17 +25,57 @@ from .components.conversation import (
 from .config import AgentUIConfig, load_config
 
 CSS = """
-.memory-list {
-    max-height: 400px;
-    overflow-y: auto;
-}
-
+/* Optimized for Databricks notebook inline */
 .gradio-container {
-    max-width: 1400px !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 12px !important;
 }
 
 footer {
     display: none !important;
+}
+
+/* Large chat area for notebook */
+.chatbot {
+    height: 700px !important;
+    min-height: 500px !important;
+}
+
+/* Compact side panels */
+.memory-list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+/* Tighter spacing */
+.gr-accordion {
+    margin-bottom: 8px !important;
+}
+
+.gr-block {
+    padding: 8px !important;
+}
+
+.status-bar {
+    min-height: 24px;
+    padding: 8px 12px;
+    background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 6px;
+    color: #00d4ff;
+    font-size: 14px;
+    margin: 8px 0;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-bar:empty {
+    display: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 """
 

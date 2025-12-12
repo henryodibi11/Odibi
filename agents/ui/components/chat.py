@@ -209,7 +209,13 @@ def create_chat_interface(
 
         components["chatbot"] = gr.Chatbot(
             label="Conversation",
-            height=500,
+            elem_classes=["chatbot"],
+        )
+
+        components["status_bar"] = gr.Markdown(
+            value="",
+            visible=True,
+            elem_classes=["status-bar"],
         )
 
         with gr.Row():
@@ -509,13 +515,22 @@ class ChatHandler:
 
                 iteration += 1
 
-                yield history, f"Thinking... (step {iteration})", None, False
+                yield history, f"🤔 Thinking... (step {iteration})", None, False
 
-                response = client.chat(
+                response = ""
+                streaming_history = history.copy()
+                streaming_history.append({"role": "assistant", "content": ""})
+
+                for chunk in client.chat_stream(
                     messages=self.conversation_history,
                     system_prompt=system_prompt,
                     temperature=0.1,
-                )
+                ):
+                    if self.should_stop:
+                        break
+                    response += chunk
+                    streaming_history[-1]["content"] = response
+                    yield streaming_history, "✍️ Writing...", None, False
 
                 tool_matches = list(self.TOOL_PATTERN.finditer(response))
 
@@ -556,9 +571,32 @@ class ChatHandler:
                             return
 
                         else:
+                            tool_emoji = {
+                                "read_file": "📖",
+                                "write_file": "✏️",
+                                "list_directory": "📁",
+                                "grep": "🔍",
+                                "glob": "🔍",
+                                "search": "🧠",
+                                "run_command": "⚡",
+                                "pytest": "🧪",
+                                "ruff": "🔧",
+                                "diagnostics": "🩺",
+                                "typecheck": "📝",
+                                "web_search": "🌐",
+                                "read_web_page": "🌐",
+                                "todo_write": "📋",
+                                "todo_read": "📋",
+                                "mermaid": "📊",
+                                "git_status": "📦",
+                                "git_diff": "📦",
+                                "git_log": "📦",
+                            }.get(tool_call["tool"], "🔧")
+                            
+                            status_msg = f"{tool_emoji} Running `{tool_call['tool']}`..."
                             yield (
                                 history,
-                                f"Executing {tool_call['tool']}...",
+                                status_msg,
                                 None,
                                 False,
                             )
@@ -611,7 +649,7 @@ class ChatHandler:
                     {"role": "user", "content": f"[SYSTEM] {tool_result_msg}"}
                 )
 
-                yield history, "Continuing...", None, False
+                yield history, "🔄 Processing results...", None, False
 
             history.append(
                 {
@@ -669,7 +707,7 @@ def setup_chat_handlers(
 
     def on_send(message: str, history: list[dict], agent: str):
         if not message.strip():
-            yield history, "", None, gr.update(visible=False)
+            yield history, "", "", None, gr.update(visible=False)
             return
 
         handler.config = get_config()
@@ -679,6 +717,7 @@ def setup_chat_handlers(
             yield (
                 updated_history,
                 "",
+                f"**{status}**" if status else "",
                 pending,
                 gr.update(visible=show_actions),
             )
@@ -693,6 +732,7 @@ def setup_chat_handlers(
         outputs=[
             components["chatbot"],
             components["message_input"],
+            components["status_bar"],
             components["pending_action"],
             components["actions_accordion"],
         ],
@@ -708,6 +748,7 @@ def setup_chat_handlers(
         outputs=[
             components["chatbot"],
             components["message_input"],
+            components["status_bar"],
             components["pending_action"],
             components["actions_accordion"],
         ],
