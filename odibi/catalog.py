@@ -140,17 +140,48 @@ class CatalogManager:
         self._nodes_cache = None
         self._outputs_cache = None
 
-    def _retry_with_backoff(self, func, max_retries: int = 5, base_delay: float = 0.1):
-        """Retry a function with exponential backoff and jitter for concurrent writes."""
-        for attempt in range(max_retries):
+    def _retry_with_backoff(self, func, max_retries: int = 3, base_delay: float = 0.5):
+        """Retry a function with exponential backoff and jitter for concurrent writes.
+
+        Only retries on Delta Lake concurrency exceptions. Other exceptions are
+        raised immediately. Warnings are only logged after all retries fail.
+
+        Args:
+            func: Callable to execute.
+            max_retries: Maximum retry attempts (default 3).
+            base_delay: Base delay in seconds (doubles each retry).
+
+        Returns:
+            Result of the function.
+
+        Raises:
+            Exception: If all retries fail or non-retryable error occurs.
+        """
+        for attempt in range(max_retries + 1):
             try:
                 return func()
             except Exception as e:
-                error_str = str(e).lower()
-                is_conflict = "conflict" in error_str or "concurrent" in error_str
-                if attempt == max_retries - 1 or not is_conflict:
+                error_str = str(e)
+                # Check for Delta concurrency exceptions
+                is_concurrent_error = any(
+                    msg in error_str
+                    for msg in [
+                        "ConcurrentAppendException",
+                        "ConcurrentDeleteReadException",
+                        "ConcurrentDeleteDeleteException",
+                        "DELTA_CONCURRENT",
+                        "concurrent",
+                        "conflict",
+                    ]
+                )
+                if not is_concurrent_error or attempt >= max_retries:
                     raise
-                delay = base_delay * (2**attempt) + random.uniform(0, 0.1)
+                # Exponential backoff with jitter
+                delay = base_delay * (2**attempt) + random.uniform(0, 0.5)
+                logger.debug(
+                    f"Delta concurrent write (attempt {attempt + 1}/{max_retries + 1}), "
+                    f"retrying in {delay:.2f}s..."
+                )
                 time.sleep(delay)
 
     def _get_all_pipelines_cached(self) -> Dict[str, Dict[str, Any]]:
@@ -1224,7 +1255,7 @@ class CatalogManager:
         if not self.spark and not self.engine:
             return
 
-        try:
+        def _do_log_run():
             if self.spark:
                 from pyspark.sql import functions as F
 
@@ -1277,6 +1308,8 @@ class CatalogManager:
                     options={"schema_mode": "merge"},
                 )
 
+        try:
+            self._retry_with_backoff(_do_log_run)
         except Exception as e:
             logger.warning(f"Failed to log run to system catalog: {e}")
 
@@ -1299,7 +1332,7 @@ class CatalogManager:
         if not records:
             return
 
-        try:
+        def _do_batch_log():
             if self.spark:
                 from pyspark.sql import functions as F
 
@@ -1356,6 +1389,8 @@ class CatalogManager:
                 )
                 logger.debug(f"Batch logged {len(records)} run records to meta_runs")
 
+        try:
+            self._retry_with_backoff(_do_batch_log)
         except Exception as e:
             logger.warning(f"Failed to batch log runs to system catalog: {e}")
 
@@ -1372,7 +1407,7 @@ class CatalogManager:
         if not self.spark and not self.engine:
             return
 
-        try:
+        def _do_log_pattern():
             if self.spark:
                 rows = [
                     (
@@ -1408,57 +1443,10 @@ class CatalogManager:
                     mode="append",
                 )
 
+        try:
+            self._retry_with_backoff(_do_log_pattern)
         except Exception as e:
             logger.warning(f"Failed to log pattern to system catalog: {e}")
-
-    def _retry_on_concurrent_write(
-        self,
-        operation: callable,
-        max_retries: int = 3,
-        base_delay: float = 0.5,
-    ) -> Any:
-        """Retry an operation on Delta concurrent write conflicts.
-
-        Uses exponential backoff with jitter to handle ConcurrentAppendException.
-
-        Args:
-            operation: Callable to execute.
-            max_retries: Maximum number of retry attempts.
-            base_delay: Base delay in seconds (doubles each retry).
-
-        Returns:
-            Result of the operation.
-
-        Raises:
-            Exception: If all retries fail.
-        """
-        last_exception = None
-        for attempt in range(max_retries + 1):
-            try:
-                return operation()
-            except Exception as e:
-                error_str = str(e)
-                # Check for Delta concurrency exceptions
-                is_concurrent_error = any(
-                    msg in error_str
-                    for msg in [
-                        "ConcurrentAppendException",
-                        "ConcurrentDeleteReadException",
-                        "ConcurrentDeleteDeleteException",
-                        "DELTA_CONCURRENT",
-                    ]
-                )
-                if not is_concurrent_error or attempt >= max_retries:
-                    raise
-                last_exception = e
-                # Exponential backoff with jitter
-                delay = base_delay * (2**attempt) + random.uniform(0, 0.5)
-                logger.debug(
-                    f"Delta concurrent write conflict (attempt {attempt + 1}/{max_retries + 1}), "
-                    f"retrying in {delay:.2f}s..."
-                )
-                time.sleep(delay)
-        raise last_exception
 
     def register_asset(
         self,
@@ -1553,7 +1541,7 @@ class CatalogManager:
                 )
 
         try:
-            self._retry_on_concurrent_write(_do_register)
+            self._retry_with_backoff(_do_register)
         except Exception as e:
             logger.warning(f"Failed to register asset in system catalog: {e}")
 
@@ -2235,7 +2223,7 @@ class CatalogManager:
         if not self.spark and not self.engine:
             return
 
-        try:
+        def _do_log_metrics():
             if self.spark:
                 rows = [(metric_name, definition_sql, dimensions, source_table)]
                 schema = self._get_schema_meta_metrics()
@@ -2264,6 +2252,8 @@ class CatalogManager:
 
             logger.debug(f"Logged metric: {metric_name}")
 
+        try:
+            self._retry_with_backoff(_do_log_metrics)
         except Exception as e:
             logger.warning(f"Failed to log metric to system catalog: {e}")
 
