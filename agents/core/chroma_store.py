@@ -45,11 +45,25 @@ class ChromaVectorStore(BaseVectorStore):
         self.collection_name = collection_name or self.DEFAULT_COLLECTION
 
         logger.info(f"Initializing ChromaDB at {self.persist_dir}")
-        self.client = chromadb.PersistentClient(path=str(self.persist_dir))
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection_name,
-            metadata={"hnsw:space": "cosine"},
-        )
+        try:
+            self.client = chromadb.PersistentClient(path=str(self.persist_dir))
+            self.collection = self.client.get_or_create_collection(
+                name=self.collection_name,
+                metadata={"hnsw:space": "cosine"},
+            )
+        except Exception as e:
+            if "metadata" in str(e).lower() or "segment" in str(e).lower():
+                logger.warning(f"Corrupted index detected, recreating: {e}")
+                import shutil
+                shutil.rmtree(self.persist_dir, ignore_errors=True)
+                self.persist_dir.mkdir(parents=True, exist_ok=True)
+                self.client = chromadb.PersistentClient(path=str(self.persist_dir))
+                self.collection = self.client.get_or_create_collection(
+                    name=self.collection_name,
+                    metadata={"hnsw:space": "cosine"},
+                )
+            else:
+                raise
 
     def add_chunks(self, chunks: list[dict[str, Any]]) -> dict[str, int]:
         """Insert or update chunks in ChromaDB.
