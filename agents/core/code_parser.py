@@ -6,10 +6,13 @@ relationships for indexing into Azure AI Search.
 
 import ast
 import hashlib
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -150,27 +153,55 @@ class OdibiCodeParser:
         """
         # Try odibi/ subfolder first, fall back to root
         odibi_subdir = self.odibi_root / "odibi"
+
+        logger.info(f"parse_directory called with odibi_root={self.odibi_root}")
+        logger.info(f"odibi_subdir={odibi_subdir}, exists={odibi_subdir.exists()}")
+
         if directory:
             target_dir = directory
+            logger.info(f"Using provided directory: {target_dir}")
         elif odibi_subdir.exists():
             target_dir = odibi_subdir
+            logger.info(f"Using odibi subdir: {target_dir}")
         else:
             target_dir = self.odibi_root
+            logger.info(f"Falling back to root: {target_dir}")
+
+        logger.info(f"target_dir={target_dir}, exists={target_dir.exists()}, is_dir={target_dir.is_dir() if target_dir.exists() else 'N/A'}")
 
         all_chunks = []
+        files_found = 0
+        files_skipped = 0
+        files_parsed = 0
 
-        for py_file in target_dir.rglob("*.py"):
+        try:
+            py_files = list(target_dir.rglob("*.py"))
+            logger.info(f"rglob found {len(py_files)} .py files in {target_dir}")
+        except Exception as e:
+            logger.error(f"rglob failed: {e}")
+            py_files = []
+
+        for py_file in py_files:
+            files_found += 1
             if "__pycache__" in str(py_file):
+                files_skipped += 1
                 continue
             if py_file.name.startswith("_") and py_file.name != "__init__.py":
+                files_skipped += 1
                 continue
             # Skip test files and examples for cleaner index
             if "test" in str(py_file).lower() or "example" in str(py_file).lower():
+                files_skipped += 1
                 continue
 
+            files_parsed += 1
             chunks = self.parse_file(py_file)
             all_chunks.extend(chunks)
 
+        logger.info(
+            f"parse_directory complete: found={files_found}, skipped={files_skipped}, "
+            f"parsed={files_parsed}, chunks={len(all_chunks)}"
+        )
         return all_chunks
 
     def _process_class(
