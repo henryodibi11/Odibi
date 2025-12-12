@@ -390,13 +390,29 @@ def create_folder_picker(
                 debug_info.append(f"Index dir: {index_dir}")
 
                 if index_dir.exists():
-                    shutil.rmtree(index_dir, ignore_errors=True)
-                    debug_info.append("Deleted old index")
+                    try:
+                        shutil.rmtree(index_dir)
+                        debug_info.append("Deleted old index")
+                    except Exception as rmtree_err:
+                        debug_info.append(f"rmtree failed: {rmtree_err}")
 
-                index_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    index_dir.mkdir(parents=True, exist_ok=True)
+                    test_file = index_dir / ".write_test"
+                    test_file.write_text("test")
+                    test_file.unlink()
+                    debug_info.append("Index dir is writable")
+                except Exception as write_err:
+                    debug_info.append(f"Index dir NOT writable: {write_err}")
+                    return "❌ Cannot write to index directory. On Databricks, try restarting the cluster.\n\nDebug:\n" + "\n".join(debug_info)
 
                 store = ChromaVectorStore(persist_dir=str(index_dir))
-                debug_info.append(f"Store created, initial count: {store.count()}")
+                initial_count = store.count()
+                debug_info.append(f"Store created, initial count: {initial_count}")
+
+                if initial_count > 0:
+                    debug_info.append("Clearing existing data with delete_all()")
+                    store.delete_all()
 
                 embedder = LocalEmbedder()
                 debug_info.append(f"Embedder: {embedder.model_name}")
