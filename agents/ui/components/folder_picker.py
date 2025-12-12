@@ -330,7 +330,6 @@ def create_folder_picker(
                 return f"❌ {message}"
 
             try:
-                from agents.core.index_manager import ensure_index
                 from agents.core.code_parser import OdibiCodeParser
 
                 target_path = Path(path)
@@ -356,17 +355,36 @@ def create_folder_picker(
                 chunks = parser.parse_directory()
                 debug_info.append(f"Parser returned: {len(chunks)} chunks")
 
-                store = ensure_index(odibi_root=path, force_reindex=True)
+                from agents.pipelines.indexer import LocalIndexer
+                from agents.core.embeddings import LocalEmbedder
+                from agents.core.chroma_store import ChromaVectorStore
+                import shutil
 
-                try:
-                    count = store.count()
-                except Exception as count_err:
-                    if "metadata" in str(count_err).lower() or "segment" in str(count_err).lower():
-                        debug_info.append(f"ChromaDB corrupted, retrying: {count_err}")
-                        store = ensure_index(odibi_root=path, force_reindex=True)
-                        count = store.count()
-                    else:
-                        raise
+                index_dir = target_path / ".odibi" / "index"
+                debug_info.append(f"Index dir: {index_dir}")
+
+                if index_dir.exists():
+                    shutil.rmtree(index_dir, ignore_errors=True)
+                    debug_info.append("Deleted old index")
+
+                index_dir.mkdir(parents=True, exist_ok=True)
+
+                store = ChromaVectorStore(persist_dir=str(index_dir))
+                debug_info.append(f"Store created, initial count: {store.count()}")
+
+                embedder = LocalEmbedder()
+                debug_info.append(f"Embedder: {embedder.model_name}")
+
+                indexer = LocalIndexer(
+                    odibi_root=str(target_path),
+                    embedder=embedder,
+                    vector_store=store,
+                )
+
+                summary = indexer.run_indexing()
+                debug_info.append(f"Indexing summary: {summary}")
+
+                count = summary.get("uploaded", 0)
 
                 project_state.mark_indexed(path)
 
