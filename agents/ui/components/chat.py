@@ -225,6 +225,42 @@ class ChatHandler:
         )
         return LLMClient(llm_config)
 
+    def _sanitize_conversation_history(self) -> None:
+        """Remove corrupted tool_calls that lack corresponding tool responses.
+
+        The OpenAI API requires every assistant message with tool_calls to be
+        followed by tool messages for each tool_call_id. This method detects
+        and removes any such orphaned tool_calls.
+        """
+        if not self.conversation_history:
+            return
+
+        tool_call_ids_needed = set()
+        tool_call_ids_found = set()
+
+        for msg in self.conversation_history:
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                for tc in msg["tool_calls"]:
+                    tool_call_ids_needed.add(tc.get("id"))
+            elif msg.get("role") == "tool":
+                tool_call_ids_found.add(msg.get("tool_call_id"))
+
+        orphaned_ids = tool_call_ids_needed - tool_call_ids_found
+        if not orphaned_ids:
+            return
+
+        cleaned = []
+        for msg in self.conversation_history:
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                has_orphan = any(tc.get("id") in orphaned_ids for tc in msg["tool_calls"])
+                if has_orphan:
+                    if msg.get("content"):
+                        cleaned.append({"role": "assistant", "content": msg["content"]})
+                    continue
+            cleaned.append(msg)
+
+        self.conversation_history = cleaned
+
     def _extract_tool_call_from_text(self, content: str) -> Optional[list[dict]]:
         """Extract tool calls from text when model outputs JSON instead of using function calling.
 
@@ -577,6 +613,8 @@ class ChatHandler:
                 iteration += 1
                 yield history, f"🤔 Thinking... (step {iteration})", None, False
 
+                self._sanitize_conversation_history()
+
                 model_lower = self.config.llm.model.lower()
                 no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
                 
@@ -748,6 +786,8 @@ class ChatHandler:
                 return
 
             yield history, f"🤔 Thinking... (step {iteration + 1})", None, False
+
+            self._sanitize_conversation_history()
 
             model_lower = self.config.llm.model.lower()
             no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
