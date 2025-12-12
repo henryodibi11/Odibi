@@ -517,20 +517,31 @@ class ChatHandler:
 
                 yield history, f"🤔 Thinking... (step {iteration})", None, False
 
-                response = ""
-                streaming_history = history.copy()
-                streaming_history.append({"role": "assistant", "content": ""})
+                model_lower = self.config.llm.model.lower()
+                is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "o4" in model_lower
 
-                for chunk in client.chat_stream(
-                    messages=self.conversation_history,
-                    system_prompt=system_prompt,
-                    temperature=0.1,
-                ):
-                    if self.should_stop:
-                        break
-                    response += chunk
-                    streaming_history[-1]["content"] = response
-                    yield streaming_history, "✍️ Writing...", None, False
+                if is_reasoning_model:
+                    yield history, "🧠 Reasoning... (this may take a moment)", None, False
+                    response = client.chat(
+                        messages=self.conversation_history,
+                        system_prompt=system_prompt,
+                        temperature=0.1,
+                    )
+                else:
+                    response = ""
+                    streaming_history = history.copy()
+                    streaming_history.append({"role": "assistant", "content": ""})
+
+                    for chunk in client.chat_stream(
+                        messages=self.conversation_history,
+                        system_prompt=system_prompt,
+                        temperature=0.1,
+                    ):
+                        if self.should_stop:
+                            break
+                        response += chunk
+                        streaming_history[-1]["content"] = response
+                        yield streaming_history, "✍️ Writing...", None, False
 
                 tool_matches = list(self.TOOL_PATTERN.finditer(response))
 

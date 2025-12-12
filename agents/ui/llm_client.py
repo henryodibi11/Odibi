@@ -259,11 +259,13 @@ class LLMClient:
                             break
                         try:
                             chunk = json.loads(data)
-                            delta = chunk.get("choices", [{}])[0].get("delta", {})
-                            content = delta.get("content", "")
-                            if content:
-                                yield content
-                        except json.JSONDecodeError:
+                            choices = chunk.get("choices", [])
+                            if choices:
+                                delta = choices[0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield content
+                        except (json.JSONDecodeError, IndexError, KeyError):
                             continue
 
         except requests.exceptions.Timeout:
