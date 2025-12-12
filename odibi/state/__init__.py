@@ -1,11 +1,45 @@
 import json
 import logging
 import os
+import random
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _retry_delta_operation(func, max_retries: int = 3, base_delay: float = 0.5):
+    """Retry a Delta operation with exponential backoff on concurrency conflicts.
+
+    Only logs debug during retries. Raises after all retries fail.
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except Exception as e:
+            error_str = str(e)
+            is_concurrent = any(
+                msg in error_str
+                for msg in [
+                    "ConcurrentAppendException",
+                    "ConcurrentDeleteReadException",
+                    "ConcurrentDeleteDeleteException",
+                    "DELTA_CONCURRENT",
+                    "concurrent",
+                    "conflict",
+                ]
+            )
+            if not is_concurrent or attempt >= max_retries:
+                raise
+            delay = base_delay * (2**attempt) + random.uniform(0, 0.5)
+            logger.debug(
+                f"Delta concurrent write (attempt {attempt + 1}/{max_retries + 1}), "
+                f"retrying in {delay:.2f}s..."
+            )
+            time.sleep(delay)
+
 
 # Suppress noisy delta-rs transaction conflict warnings (handled by retry)
 # Must be set before deltalake is imported
@@ -289,10 +323,13 @@ class CatalogStateBackend(StateBackend):
         val_str = json.dumps(value, default=str)
         row = {"key": key, "value": val_str, "updated_at": datetime.utcnow()}
 
-        if self.spark:
-            self._set_hwm_spark(row)
-        else:
-            self._set_hwm_local(row)
+        def _do_set():
+            if self.spark:
+                self._set_hwm_spark(row)
+            else:
+                self._set_hwm_local(row)
+
+        _retry_delta_operation(_do_set)
 
     def _set_hwm_spark(self, row):
         from pyspark.sql.types import StringType, StructField, StructType, TimestampType
