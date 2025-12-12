@@ -164,15 +164,17 @@ class LLMClient:
             full_messages.append({"role": "system", "content": system_prompt})
         full_messages.extend(messages)
 
+        model_lower = self.config.model.lower()
+        is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "o4" in model_lower
+
         payload = {
             "messages": full_messages,
-            "temperature": temperature,
         }
 
-        model_lower = self.config.model.lower()
-        if "o1" in model_lower or "o3" in model_lower or "o4" in model_lower:
+        if is_reasoning_model:
             payload["max_completion_tokens"] = max_tokens
         else:
+            payload["temperature"] = temperature
             payload["max_tokens"] = max_tokens
 
         if self.config.api_type != "azure":
@@ -223,16 +225,18 @@ class LLMClient:
             full_messages.append({"role": "system", "content": system_prompt})
         full_messages.extend(messages)
 
+        model_lower = self.config.model.lower()
+        is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "o4" in model_lower
+
         payload = {
             "messages": full_messages,
-            "temperature": temperature,
             "stream": True,
         }
 
-        model_lower = self.config.model.lower()
-        if "o1" in model_lower or "o3" in model_lower or "o4" in model_lower:
+        if is_reasoning_model:
             payload["max_completion_tokens"] = max_tokens
         else:
+            payload["temperature"] = temperature
             payload["max_tokens"] = max_tokens
 
         if self.config.api_type != "azure":
