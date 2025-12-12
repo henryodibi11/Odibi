@@ -357,7 +357,16 @@ def create_folder_picker(
                 debug_info.append(f"Parser returned: {len(chunks)} chunks")
 
                 store = ensure_index(odibi_root=path, force_reindex=True)
-                count = store.count()
+
+                try:
+                    count = store.count()
+                except Exception as count_err:
+                    if "metadata" in str(count_err).lower() or "segment" in str(count_err).lower():
+                        debug_info.append(f"ChromaDB corrupted, retrying: {count_err}")
+                        store = ensure_index(odibi_root=path, force_reindex=True)
+                        count = store.count()
+                    else:
+                        raise
 
                 project_state.mark_indexed(path)
 

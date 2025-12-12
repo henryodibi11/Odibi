@@ -193,4 +193,32 @@ class ChromaVectorStore(BaseVectorStore):
         Returns:
             Document count.
         """
-        return self.collection.count()
+        try:
+            return self.collection.count()
+        except Exception as e:
+            if "metadata" in str(e).lower() or "segment" in str(e).lower():
+                logger.warning(f"Corrupted index detected in count(), recreating: {e}")
+                self._recreate_from_scratch()
+                return 0
+            raise
+
+    def _recreate_from_scratch(self) -> None:
+        """Recreate the ChromaDB database from scratch due to corruption."""
+        import shutil
+
+        import chromadb
+
+        logger.info(f"Recreating ChromaDB at {self.persist_dir}")
+        try:
+            del self.collection
+            del self.client
+        except Exception:
+            pass
+
+        shutil.rmtree(self.persist_dir, ignore_errors=True)
+        self.persist_dir.mkdir(parents=True, exist_ok=True)
+        self.client = chromadb.PersistentClient(path=str(self.persist_dir))
+        self.collection = self.client.get_or_create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
