@@ -34,7 +34,10 @@ class ProjectState:
         if not path:
             return
 
-        path = str(Path(path).resolve())
+        try:
+            path = str(Path(path).resolve())
+        except (OSError, RuntimeError):
+            path = str(Path(path))
         self.active_path = path
 
         existing = next((p for p in self.recent_projects if p.path == path), None)
