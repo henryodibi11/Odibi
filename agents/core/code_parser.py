@@ -148,13 +148,24 @@ class OdibiCodeParser:
         Returns:
             List of all CodeChunk objects.
         """
-        target_dir = directory or (self.odibi_root / "odibi")
+        # Try odibi/ subfolder first, fall back to root
+        odibi_subdir = self.odibi_root / "odibi"
+        if directory:
+            target_dir = directory
+        elif odibi_subdir.exists():
+            target_dir = odibi_subdir
+        else:
+            target_dir = self.odibi_root
+
         all_chunks = []
 
         for py_file in target_dir.rglob("*.py"):
             if "__pycache__" in str(py_file):
                 continue
             if py_file.name.startswith("_") and py_file.name != "__init__.py":
+                continue
+            # Skip test files and examples for cleaner index
+            if "test" in str(py_file).lower() or "example" in str(py_file).lower():
                 continue
 
             chunks = self.parse_file(py_file)
