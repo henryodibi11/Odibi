@@ -10,6 +10,7 @@ from typing import Optional
 import gradio as gr
 
 from .components.chat import create_chat_interface, setup_chat_handlers
+from .components.folder_picker import create_folder_picker
 from .components.memories import (
     create_memory_panel,
     format_memory_list,
@@ -22,7 +23,7 @@ from .components.conversation import (
     create_conversation_panel,
     setup_conversation_handlers,
 )
-from .config import AgentUIConfig, load_config
+from .config import AgentUIConfig, load_config, save_config
 
 CSS = """
 .memory-list {
@@ -64,6 +65,11 @@ def create_app(
     def on_config_save(new_config: AgentUIConfig):
         current_config[0] = new_config
 
+    def on_project_change(path: str):
+        cfg = current_config[0]
+        cfg.project.odibi_root = path
+        save_config(cfg)
+
     with gr.Blocks(title="🧠 Odibi Assistant") as app:
         gr.Markdown(
             """
@@ -75,6 +81,11 @@ def create_app(
 
         with gr.Row():
             with gr.Column(scale=1):
+                folder_column, folder_components = create_folder_picker(
+                    initial_path=config.project.project_root,
+                    on_change=on_project_change,
+                )
+
                 settings_column, settings_components = create_settings_panel(
                     initial_config=config,
                     on_save=on_config_save,
