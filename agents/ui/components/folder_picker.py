@@ -103,7 +103,46 @@ def register_index_dir(project_path: str, index_dir: str) -> None:
 def get_registered_index_dir(project_path: str) -> str | None:
     """Get the registered index directory for a project path."""
     registry = _load_index_registry()
-    return registry.get(project_path)
+    registered = registry.get(project_path)
+    if registered and Path(registered).exists():
+        return registered
+    return None
+
+
+def find_existing_index_dir(project_path: str) -> str | None:
+    """Find an existing index directory for a project path.
+
+    Scans /tmp/.odibi_index/ for directories matching the project hash.
+    Returns the most recently modified one.
+    """
+    import hashlib
+
+    if not (project_path.startswith("/Workspace/") or project_path.startswith("/Repos/")):
+        local_index = Path(project_path) / ".odibi" / "index"
+        if local_index.exists():
+            return str(local_index)
+        return None
+
+    path_hash = hashlib.md5(project_path.encode()).hexdigest()[:8]
+    base_dir = Path("/tmp/.odibi_index")
+
+    if not base_dir.exists():
+        return None
+
+    matching_dirs = []
+    for d in base_dir.iterdir():
+        if d.is_dir() and d.name.startswith(path_hash):
+            try:
+                mtime = d.stat().st_mtime
+                matching_dirs.append((mtime, str(d)))
+            except OSError:
+                continue
+
+    if matching_dirs:
+        matching_dirs.sort(reverse=True)
+        return matching_dirs[0][1]
+
+    return None
 
 
 def get_index_dir(project_path: str, unique: bool = False) -> Path:
@@ -378,6 +417,7 @@ def create_folder_picker(
                 index_dir = (
                     project_state.get_index_dir(path)
                     or get_registered_index_dir(path)
+                    or find_existing_index_dir(path)
                     or str(get_index_dir(path))
                 )
 

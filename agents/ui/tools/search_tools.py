@@ -283,7 +283,11 @@ def semantic_search(
     try:
         from agents.core.embeddings import LocalEmbedder
         from agents.core.index_manager import ensure_index
-        from agents.ui.components.folder_picker import get_index_dir, get_registered_index_dir
+        from agents.ui.components.folder_picker import (
+            get_index_dir,
+            get_registered_index_dir,
+            find_existing_index_dir,
+        )
     except ImportError as e:
         return SemanticSearchResult(
             success=False,
@@ -292,7 +296,11 @@ def semantic_search(
         )
 
     try:
-        index_dir = get_registered_index_dir(root) or str(get_index_dir(root))
+        index_dir = (
+            get_registered_index_dir(root)
+            or find_existing_index_dir(root)
+            or str(get_index_dir(root))
+        )
         store = ensure_index(odibi_root=root, index_dir=index_dir)
 
         embedder = LocalEmbedder()
