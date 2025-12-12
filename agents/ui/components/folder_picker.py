@@ -73,6 +73,39 @@ class ProjectState:
         return ""
 
 
+_INDEX_REGISTRY_FILE = "/tmp/.odibi_index_registry.json"
+
+
+def _load_index_registry() -> dict:
+    """Load the index registry from disk."""
+    import json
+    try:
+        with open(_INDEX_REGISTRY_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_index_registry(registry: dict) -> None:
+    """Save the index registry to disk."""
+    import json
+    with open(_INDEX_REGISTRY_FILE, "w") as f:
+        json.dump(registry, f)
+
+
+def register_index_dir(project_path: str, index_dir: str) -> None:
+    """Register an index directory for a project path."""
+    registry = _load_index_registry()
+    registry[project_path] = index_dir
+    _save_index_registry(registry)
+
+
+def get_registered_index_dir(project_path: str) -> str | None:
+    """Get the registered index directory for a project path."""
+    registry = _load_index_registry()
+    return registry.get(project_path)
+
+
 def get_index_dir(project_path: str, unique: bool = False) -> Path:
     """Get the appropriate index directory for a project.
 
@@ -342,11 +375,11 @@ def create_folder_picker(
             try:
                 from agents.core.index_manager import needs_reindex
 
-                saved_index_dir = project_state.get_index_dir(path)
-                if saved_index_dir:
-                    index_dir = saved_index_dir
-                else:
-                    index_dir = str(get_index_dir(path))
+                index_dir = (
+                    project_state.get_index_dir(path)
+                    or get_registered_index_dir(path)
+                    or str(get_index_dir(path))
+                )
 
                 needs, reason = needs_reindex(path, index_dir=index_dir)
                 if needs:
@@ -374,67 +407,25 @@ def create_folder_picker(
                 return f"❌ {message}"
 
             try:
-                from agents.core.code_parser import OdibiCodeParser
-
-                target_path = Path(path)
-                odibi_subdir = target_path / "odibi"
-
-                debug_info = []
-                debug_info.append(f"Path: {path}")
-                debug_info.append(f"Path exists: {target_path.exists()}")
-                debug_info.append(f"odibi/ exists: {odibi_subdir.exists()}")
-
-                scan_dir = odibi_subdir if odibi_subdir.exists() else target_path
-                debug_info.append(f"Scanning: {scan_dir}")
-
-                try:
-                    py_files = list(scan_dir.rglob("*.py"))
-                    debug_info.append(f"rglob found: {len(py_files)} files")
-                    if py_files[:3]:
-                        debug_info.append(f"First 3: {[str(f.name) for f in py_files[:3]]}")
-                except Exception as e:
-                    debug_info.append(f"rglob error: {e}")
-
-                parser = OdibiCodeParser(str(target_path))
-                chunks = parser.parse_directory()
-                debug_info.append(f"Parser returned: {len(chunks)} chunks")
-
                 from agents.pipelines.indexer import LocalIndexer
                 from agents.core.embeddings import LocalEmbedder
                 from agents.core.chroma_store import ChromaVectorStore
                 import shutil
 
+                target_path = Path(path)
                 is_databricks = path.startswith("/Workspace/") or path.startswith("/Repos/")
 
                 if is_databricks:
                     index_dir = get_index_dir(path, unique=True)
-                    debug_info.append("Using unique temp dir (Databricks)")
                 else:
                     index_dir = get_index_dir(path)
                     if index_dir.exists():
-                        try:
-                            shutil.rmtree(index_dir)
-                            debug_info.append("Deleted old index")
-                        except Exception as rmtree_err:
-                            debug_info.append(f"rmtree failed: {rmtree_err}")
+                        shutil.rmtree(index_dir, ignore_errors=True)
 
-                debug_info.append(f"Index dir: {index_dir}")
-
-                try:
-                    index_dir.mkdir(parents=True, exist_ok=True)
-                    test_file = index_dir / ".write_test"
-                    test_file.write_text("test")
-                    test_file.unlink()
-                    debug_info.append("Index dir is writable")
-                except Exception as write_err:
-                    debug_info.append(f"Index dir NOT writable: {write_err}")
-                    return "❌ Cannot write to index directory. On Databricks, try restarting the cluster.\n\nDebug:\n" + "\n".join(debug_info)
+                index_dir.mkdir(parents=True, exist_ok=True)
 
                 store = ChromaVectorStore(persist_dir=str(index_dir))
-                debug_info.append(f"Store created, count: {store.count()}")
-
                 embedder = LocalEmbedder()
-                debug_info.append(f"Embedder: {embedder.model_name}")
 
                 indexer = LocalIndexer(
                     odibi_root=str(target_path),
@@ -443,20 +434,19 @@ def create_folder_picker(
                 )
 
                 summary = indexer.run_indexing()
-                debug_info.append(f"Indexing summary: {summary}")
-
                 count = summary.get("uploaded", 0)
 
                 project_state.mark_indexed(path, index_dir=str(index_dir))
+                register_index_dir(path, str(index_dir))
 
                 if count == 0:
-                    return f"⚠️ Indexed **{count}** chunks\n\nDebug:\n" + "\n".join(debug_info)
+                    error_msg = summary.get("upload_error", "Unknown error")
+                    return f"⚠️ Indexed **0** chunks. Error: {error_msg}"
                 return f"✅ Indexed **{count}** code chunks from `{Path(path).name}`"
             except ImportError as e:
                 return f"❌ Missing dependencies: {e}\n\nInstall: `pip install chromadb sentence-transformers`"
             except Exception as e:
-                import traceback
-                return f"❌ Indexing failed: {e}\n\n{traceback.format_exc()}"
+                return f"❌ Indexing failed: {e}"
 
         components["index_btn"].click(
             fn=index_codebase,
