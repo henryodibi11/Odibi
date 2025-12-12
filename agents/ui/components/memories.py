@@ -150,11 +150,12 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
         return MemoryManager(backend_type="local")
 
     backend_type = config.memory.backend_type
+    project_root = config.project.project_root or "."
 
     if backend_type == "local":
         return MemoryManager(
             backend_type="local",
-            local_path=f"{config.project.project_root}/.odibi/memories",
+            local_path=f"{project_root}/.odibi/memories",
         )
 
     if backend_type == "odibi" and config.memory.connection_name:
@@ -162,17 +163,40 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
             from odibi.connections import load_connections
             from odibi.engine.pandas_engine import PandasEngine
 
+            # Try to find project.yaml
             project_yaml = config.project.project_yaml_path
+            if not project_yaml:
+                # Auto-detect from project_root
+                from pathlib import Path
+
+                candidate = Path(project_root) / "project.yaml"
+                if candidate.exists():
+                    project_yaml = str(candidate)
+
             if project_yaml:
                 connections = load_connections(project_yaml)
                 connection = connections.get(config.memory.connection_name)
                 if connection:
+                    print(
+                        f"Memory backend: ADLS via '{config.memory.connection_name}' "
+                        f"-> {config.memory.path_prefix}"
+                    )
                     return MemoryManager(
                         backend_type="odibi",
                         connection=connection,
                         engine=PandasEngine(),
                         path_prefix=config.memory.path_prefix or "agent/memories",
                     )
+                else:
+                    print(
+                        f"Warning: Connection '{config.memory.connection_name}' "
+                        f"not found in {project_yaml}"
+                    )
+            else:
+                print(
+                    f"Warning: No project.yaml found. Cannot load connection "
+                    f"'{config.memory.connection_name}'. Falling back to local."
+                )
         except Exception as e:
             print(f"Failed to create odibi backend: {e}")
 
@@ -185,9 +209,11 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
         except Exception as e:
             print(f"Failed to create delta backend: {e}")
 
+    # Fallback to local
+    print(f"Memory backend: local -> {project_root}/.odibi/memories")
     return MemoryManager(
         backend_type="local",
-        local_path=f"{config.project.project_root}/.odibi/memories",
+        local_path=f"{project_root}/.odibi/memories",
     )
 
 

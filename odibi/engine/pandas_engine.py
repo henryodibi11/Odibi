@@ -384,7 +384,7 @@ class PandasEngine(Engine):
                 full_path = matched_files
                 is_glob = True
 
-        # Prepare read options
+        # Prepare read options (options already includes storage_options from caller)
         read_kwargs = options.copy()
 
         # Extract 'query' or 'filter' option for post-read filtering
@@ -1019,6 +1019,10 @@ class PandasEngine(Engine):
             # Default to records if not specified
             if "orient" not in writer_options:
                 writer_options["orient"] = "records"
+
+            # Include storage_options for cloud storage (ADLS, S3, GCS)
+            if "storage_options" in merged_options:
+                writer_options["storage_options"] = merged_options["storage_options"]
 
             df.to_json(full_path, **writer_options)
 
