@@ -10,10 +10,15 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 
 
-def _retry_delta_operation(func, max_retries: int = 3, base_delay: float = 0.5):
+def _retry_delta_operation(func, max_retries: int = 5, base_delay: float = 1.0):
     """Retry a Delta operation with exponential backoff on concurrency conflicts.
 
     Only logs debug during retries. Raises after all retries fail.
+
+    Args:
+        func: Callable to execute.
+        max_retries: Maximum retry attempts (default 5 for high concurrency).
+        base_delay: Base delay in seconds (doubles each retry).
     """
     for attempt in range(max_retries + 1):
         try:
@@ -33,7 +38,8 @@ def _retry_delta_operation(func, max_retries: int = 3, base_delay: float = 0.5):
             )
             if not is_concurrent or attempt >= max_retries:
                 raise
-            delay = base_delay * (2**attempt) + random.uniform(0, 0.5)
+            # Exponential backoff with jitter (1s, 2s, 4s, 8s, 16s = ~31s total)
+            delay = base_delay * (2**attempt) + random.uniform(0, 1.0)
             logger.debug(
                 f"Delta concurrent write (attempt {attempt + 1}/{max_retries + 1}), "
                 f"retrying in {delay:.2f}s..."

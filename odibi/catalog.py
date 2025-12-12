@@ -140,7 +140,7 @@ class CatalogManager:
         self._nodes_cache = None
         self._outputs_cache = None
 
-    def _retry_with_backoff(self, func, max_retries: int = 3, base_delay: float = 0.5):
+    def _retry_with_backoff(self, func, max_retries: int = 5, base_delay: float = 1.0):
         """Retry a function with exponential backoff and jitter for concurrent writes.
 
         Only retries on Delta Lake concurrency exceptions. Other exceptions are
@@ -148,7 +148,7 @@ class CatalogManager:
 
         Args:
             func: Callable to execute.
-            max_retries: Maximum retry attempts (default 3).
+            max_retries: Maximum retry attempts (default 5 for high concurrency).
             base_delay: Base delay in seconds (doubles each retry).
 
         Returns:
@@ -176,8 +176,8 @@ class CatalogManager:
                 )
                 if not is_concurrent_error or attempt >= max_retries:
                     raise
-                # Exponential backoff with jitter
-                delay = base_delay * (2**attempt) + random.uniform(0, 0.5)
+                # Exponential backoff with jitter (1s, 2s, 4s, 8s, 16s = ~31s total)
+                delay = base_delay * (2**attempt) + random.uniform(0, 1.0)
                 logger.debug(
                     f"Delta concurrent write (attempt {attempt + 1}/{max_retries + 1}), "
                     f"retrying in {delay:.2f}s..."
@@ -2004,7 +2004,7 @@ class CatalogManager:
         if not self.spark and not self.engine:
             return
 
-        try:
+        def _do_record():
             record = {
                 "source_table": source_table,
                 "target_table": target_table,
@@ -2057,6 +2057,8 @@ class CatalogManager:
 
             logger.debug(f"Recorded lineage: {source_table} -> {target_table}")
 
+        try:
+            self._retry_with_backoff(_do_record)
         except Exception as e:
             logger.warning(f"Failed to record lineage: {e}")
 
