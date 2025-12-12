@@ -493,7 +493,7 @@ class ChatHandler:
             )
             return format_parallel_results(results)
 
-        elif tool_name == "python":
+        elif tool_name == "execute_python":
             result = execute_python(
                 code=args.get("code", ""),
                 timeout=args.get("timeout", 30),
@@ -644,7 +644,7 @@ class ChatHandler:
                         "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
                         "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
                         "git_diff": "📦", "git_log": "📦", "task": "🤖",
-                        "parallel_tasks": "🚀", "python": "🐍", "sql": "🗃️",
+                        "parallel_tasks": "🚀", "execute_python": "🐍", "sql": "🗃️",
                         "list_tables": "📋", "describe_table": "📊",
                     }.get(tool_name, "🔧")
 
@@ -703,7 +703,7 @@ class ChatHandler:
         tool_call_id = tool_call.get("tool_call_id", "call_confirmed")
 
         tool_emoji = {
-            "write_file": "✏️", "run_command": "⚡", "python": "🐍",
+            "write_file": "✏️", "run_command": "⚡", "execute_python": "🐍",
             "sql": "🗃️", "odibi_run": "🔄",
         }.get(tool_name, "🔧")
 

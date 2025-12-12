@@ -476,7 +476,7 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
-            "name": "python",
+            "name": "execute_python",
             "description": "Execute Python code. In Databricks, has access to spark, pd, np.",
             "parameters": {
                 "type": "object",
@@ -580,7 +580,7 @@ TOOLS_REQUIRING_CONFIRMATION = {
     "write_file",
     "run_command",
     "odibi_run",
-    "python",
+    "execute_python",
     "sql",
     "ruff",  # only when fix=True
 }
