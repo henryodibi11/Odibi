@@ -12,22 +12,19 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Absolute path to the file to read"
-                    },
+                    "path": {"type": "string", "description": "Absolute path to the file to read"},
                     "start_line": {
                         "type": "integer",
-                        "description": "Starting line number (1-indexed). Default: 1"
+                        "description": "Starting line number (1-indexed). Default: 1",
                     },
                     "end_line": {
                         "type": "integer",
-                        "description": "Ending line number (inclusive). Default: start_line + 500"
-                    }
+                        "description": "Ending line number (inclusive). Default: start_line + 500",
+                    },
                 },
-                "required": ["path"]
-            }
-        }
+                "required": ["path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -37,18 +34,12 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to write to"
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Content to write to the file"
-                    }
+                    "path": {"type": "string", "description": "Path to write to"},
+                    "content": {"type": "string", "description": "Content to write to the file"},
                 },
-                "required": ["path", "content"]
-            }
-        }
+                "required": ["path", "content"],
+            },
+        },
     },
     {
         "type": "function",
@@ -58,22 +49,19 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Directory path to list"
-                    },
+                    "path": {"type": "string", "description": "Directory path to list"},
                     "pattern": {
                         "type": "string",
-                        "description": "Glob pattern to filter. Default: *"
+                        "description": "Glob pattern to filter. Default: *",
                     },
                     "recursive": {
                         "type": "boolean",
-                        "description": "Whether to recurse into subdirectories. Default: false"
-                    }
+                        "description": "Whether to recurse into subdirectories. Default: false",
+                    },
                 },
-                "required": ["path"]
-            }
-        }
+                "required": ["path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -85,24 +73,21 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Text or regex pattern to search for"
+                        "description": "Text or regex pattern to search for",
                     },
-                    "path": {
-                        "type": "string",
-                        "description": "Directory or file to search in"
-                    },
+                    "path": {"type": "string", "description": "Directory or file to search in"},
                     "file_pattern": {
                         "type": "string",
-                        "description": "Glob pattern for files to search. Default: *.py"
+                        "description": "Glob pattern for files to search. Default: *.py",
                     },
                     "is_regex": {
                         "type": "boolean",
-                        "description": "Whether pattern is a regex. Default: false"
-                    }
+                        "description": "Whether pattern is a regex. Default: false",
+                    },
                 },
-                "required": ["pattern", "path"]
-            }
-        }
+                "required": ["pattern", "path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -114,16 +99,13 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Glob pattern (e.g., **/*.py, *test*.py)"
+                        "description": "Glob pattern (e.g., **/*.py, *test*.py)",
                     },
-                    "path": {
-                        "type": "string",
-                        "description": "Base directory to search from"
-                    }
+                    "path": {"type": "string", "description": "Base directory to search from"},
                 },
-                "required": ["pattern", "path"]
-            }
-        }
+                "required": ["pattern", "path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -135,20 +117,20 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Natural language query describing what you're looking for"
+                        "description": "Natural language query describing what you're looking for",
                     },
                     "k": {
                         "type": "integer",
-                        "description": "Number of results to return. Default: 5"
+                        "description": "Number of results to return. Default: 5",
                     },
                     "chunk_type": {
                         "type": "string",
-                        "description": "Filter by type: function, class, module"
-                    }
+                        "description": "Filter by type: function, class, module",
+                    },
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -158,18 +140,15 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "Shell command to execute"
-                    },
+                    "command": {"type": "string", "description": "Shell command to execute"},
                     "working_dir": {
                         "type": "string",
-                        "description": "Working directory for the command"
-                    }
+                        "description": "Working directory for the command",
+                    },
                 },
-                "required": ["command"]
-            }
-        }
+                "required": ["command"],
+            },
+        },
     },
     {
         "type": "function",
@@ -181,20 +160,14 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "test_path": {
                         "type": "string",
-                        "description": "Path to test file or directory"
+                        "description": "Path to test file or directory",
                     },
-                    "verbose": {
-                        "type": "boolean",
-                        "description": "Verbose output. Default: true"
-                    },
-                    "markers": {
-                        "type": "string",
-                        "description": "Pytest markers to filter tests"
-                    }
+                    "verbose": {"type": "boolean", "description": "Verbose output. Default: true"},
+                    "markers": {"type": "string", "description": "Pytest markers to filter tests"},
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -204,18 +177,12 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to lint. Default: ."
-                    },
-                    "fix": {
-                        "type": "boolean",
-                        "description": "Auto-fix issues. Default: false"
-                    }
+                    "path": {"type": "string", "description": "Path to lint. Default: ."},
+                    "fix": {"type": "boolean", "description": "Auto-fix issues. Default: false"},
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -225,26 +192,23 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to check. Default: ."
-                    },
+                    "path": {"type": "string", "description": "Path to check. Default: ."},
                     "include_ruff": {
                         "type": "boolean",
-                        "description": "Include ruff. Default: true"
+                        "description": "Include ruff. Default: true",
                     },
                     "include_mypy": {
                         "type": "boolean",
-                        "description": "Include mypy. Default: false"
+                        "description": "Include mypy. Default: false",
                     },
                     "include_pytest": {
                         "type": "boolean",
-                        "description": "Include pytest. Default: false"
-                    }
+                        "description": "Include pytest. Default: false",
+                    },
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -254,14 +218,11 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to type check. Default: ."
-                    }
+                    "path": {"type": "string", "description": "Path to type check. Default: ."}
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -271,18 +232,15 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query"
-                    },
+                    "query": {"type": "string", "description": "Search query"},
                     "max_results": {
                         "type": "integer",
-                        "description": "Maximum results to return. Default: 5"
-                    }
+                        "description": "Maximum results to return. Default: 5",
+                    },
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -292,14 +250,11 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "URL of the web page to read"
-                    }
+                    "url": {"type": "string", "description": "URL of the web page to read"}
                 },
-                "required": ["url"]
-            }
-        }
+                "required": ["url"],
+            },
+        },
     },
     {
         "type": "function",
@@ -319,28 +274,24 @@ TOOL_DEFINITIONS = [
                                 "content": {"type": "string"},
                                 "status": {
                                     "type": "string",
-                                    "enum": ["todo", "in-progress", "completed"]
-                                }
+                                    "enum": ["todo", "in-progress", "completed"],
+                                },
                             },
-                            "required": ["id", "content", "status"]
-                        }
+                            "required": ["id", "content", "status"],
+                        },
                     }
                 },
-                "required": ["todos"]
-            }
-        }
+                "required": ["todos"],
+            },
+        },
     },
     {
         "type": "function",
         "function": {
             "name": "todo_read",
             "description": "Read the current task list.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
     },
     {
         "type": "function",
@@ -349,27 +300,18 @@ TOOL_DEFINITIONS = [
             "description": "Render a Mermaid diagram (flowchart, sequence, etc.).",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "Mermaid diagram code"
-                    }
-                },
-                "required": ["code"]
-            }
-        }
+                "properties": {"code": {"type": "string", "description": "Mermaid diagram code"}},
+                "required": ["code"],
+            },
+        },
     },
     {
         "type": "function",
         "function": {
             "name": "git_status",
             "description": "Show git repository status (modified, staged, untracked files).",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
     },
     {
         "type": "function",
@@ -379,18 +321,15 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to diff. Default: all changes"
-                    },
+                    "path": {"type": "string", "description": "Path to diff. Default: all changes"},
                     "staged": {
                         "type": "boolean",
-                        "description": "Show staged changes. Default: false"
-                    }
+                        "description": "Show staged changes. Default: false",
+                    },
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -402,16 +341,13 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "max_count": {
                         "type": "integer",
-                        "description": "Maximum commits to show. Default: 10"
+                        "description": "Maximum commits to show. Default: 10",
                     },
-                    "path": {
-                        "type": "string",
-                        "description": "Filter by path"
-                    }
+                    "path": {"type": "string", "description": "Filter by path"},
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -423,20 +359,17 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "pipeline_path": {
                         "type": "string",
-                        "description": "Path to the pipeline configuration"
+                        "description": "Path to the pipeline configuration",
                     },
-                    "dry_run": {
-                        "type": "boolean",
-                        "description": "Dry run mode. Default: true"
-                    },
+                    "dry_run": {"type": "boolean", "description": "Dry run mode. Default: true"},
                     "engine": {
                         "type": "string",
-                        "description": "Engine: pandas or spark. Default: pandas"
-                    }
+                        "description": "Engine: pandas or spark. Default: pandas",
+                    },
                 },
-                "required": ["pipeline_path"]
-            }
-        }
+                "required": ["pipeline_path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -448,12 +381,12 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "prompt": {
                         "type": "string",
-                        "description": "Task description for the sub-agent"
+                        "description": "Task description for the sub-agent",
                     }
                 },
-                "required": ["prompt"]
-            }
-        }
+                "required": ["prompt"],
+            },
+        },
     },
     {
         "type": "function",
@@ -466,12 +399,12 @@ TOOL_DEFINITIONS = [
                     "tasks": {
                         "type": "array",
                         "description": "Array of task prompts to run in parallel",
-                        "items": {"type": "string"}
+                        "items": {"type": "string"},
                     }
                 },
-                "required": ["tasks"]
-            }
-        }
+                "required": ["tasks"],
+            },
+        },
     },
     {
         "type": "function",
@@ -481,18 +414,15 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "Python code to execute"
-                    },
+                    "code": {"type": "string", "description": "Python code to execute"},
                     "timeout": {
                         "type": "integer",
-                        "description": "Timeout in seconds. Default: 30"
-                    }
+                        "description": "Timeout in seconds. Default: 30",
+                    },
                 },
-                "required": ["code"]
-            }
-        }
+                "required": ["code"],
+            },
+        },
     },
     {
         "type": "function",
@@ -502,22 +432,19 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "SQL query to execute"
-                    },
+                    "query": {"type": "string", "description": "SQL query to execute"},
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum rows to return. Default: 100"
+                        "description": "Maximum rows to return. Default: 100",
                     },
                     "show_schema": {
                         "type": "boolean",
-                        "description": "Include schema info. Default: false"
-                    }
+                        "description": "Include schema info. Default: false",
+                    },
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -529,16 +456,13 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "database": {
                         "type": "string",
-                        "description": "Database/schema to list tables from"
+                        "description": "Database/schema to list tables from",
                     },
-                    "pattern": {
-                        "type": "string",
-                        "description": "Pattern to filter table names"
-                    }
+                    "pattern": {"type": "string", "description": "Pattern to filter table names"},
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -550,12 +474,12 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "table_name": {
                         "type": "string",
-                        "description": "Full table name (database.table or just table)"
+                        "description": "Full table name (database.table or just table)",
                     }
                 },
-                "required": ["table_name"]
-            }
-        }
+                "required": ["table_name"],
+            },
+        },
     },
     {
         "type": "function",
@@ -565,15 +489,89 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Path to the file to restore"
-                    }
+                    "path": {"type": "string", "description": "Path to the file to restore"}
                 },
-                "required": ["path"]
-            }
-        }
-    }
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "remember",
+            "description": "Save an important memory for future reference. Use this to remember decisions, learnings, bug fixes, preferences, or important context that should persist across sessions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "summary": {
+                        "type": "string",
+                        "description": "Brief one-line summary of what to remember",
+                    },
+                    "content": {"type": "string", "description": "Full details and context"},
+                    "memory_type": {
+                        "type": "string",
+                        "enum": [
+                            "decision",
+                            "learning",
+                            "bug_fix",
+                            "preference",
+                            "todo",
+                            "feature",
+                            "context",
+                        ],
+                        "description": "Type of memory: decision (design choices), learning (insights), bug_fix (fixes), preference (user preferences), todo (tasks), feature (implementations), context (background info)",
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Tags for categorizing and searching the memory",
+                    },
+                    "importance": {
+                        "type": "number",
+                        "description": "Importance score from 0.0 to 1.0. Default: 0.7",
+                    },
+                },
+                "required": ["summary", "memory_type"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "recall",
+            "description": "Search past memories for relevant context. Use this to find previous decisions, learnings, or context.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query to find relevant memories",
+                    },
+                    "memory_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "decision",
+                                "learning",
+                                "bug_fix",
+                                "preference",
+                                "todo",
+                                "feature",
+                                "context",
+                            ],
+                        },
+                        "description": "Filter by memory types",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum memories to return. Default: 10",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
 TOOLS_REQUIRING_CONFIRMATION = {

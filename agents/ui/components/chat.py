@@ -66,6 +66,8 @@ from ..tools.code_execution import (
 )
 from ..tools.tool_definitions import TOOL_DEFINITIONS, TOOLS_REQUIRING_CONFIRMATION
 from .todo_panel import todo_read, todo_write, update_todo_display
+from .memories import get_memory_manager, format_memory_list
+from agents.core.memory import MemoryType
 
 AGENT_CHOICES = [
     ("🤖 Auto (Orchestrator)", "auto"),
@@ -80,13 +82,13 @@ CHAT_SYSTEM_PROMPT = """
 You are a powerful AI coding assistant that works autonomously with any codebase.
 
 You have access to tools for: file operations, code search, shell commands, web research,
-task management, diagrams, git, code execution (Databricks), and sub-agent spawning.
+task management, diagrams, git, code execution (Databricks), sub-agent spawning, and MEMORY.
 
 ## CRITICAL RULES - YOU MUST FOLLOW THESE
 
 ### Rule 1: ALWAYS USE TOOLS FOR FACTS
 - **NEVER** describe what's in a directory without calling `list_directory` first
-- **NEVER** describe file contents without calling `read_file` first  
+- **NEVER** describe file contents without calling `read_file` first
 - **NEVER** claim to know what exists without verifying with tools
 - **NEVER** make up fake file trees, contents, or search results
 - If you don't know something, USE A TOOL to find out. DO NOT GUESS.
@@ -112,6 +114,34 @@ task management, diagrams, git, code execution (Databricks), and sub-agent spawn
 4. **todo_write** - Use to plan and track progress on complex tasks
 5. **mermaid** - Use to create diagrams when explaining architecture
 6. **diagnostics** - Run after making code changes
+
+## Memory System - USE PROACTIVELY
+
+You have **remember** and **recall** tools for persistent memory across sessions:
+
+### WHEN TO USE `remember`:
+- When the user makes a design **decision** (e.g., "let's use SQLAlchemy")
+- When you discover an important **learning** (e.g., "this function requires X")
+- When you fix a **bug_fix** (e.g., "race condition fixed by adding lock")
+- When user states a **preference** (e.g., "I prefer functional style")
+- When identifying a **todo** for later
+- After implementing a **feature** worth documenting
+
+### WHEN TO USE `recall`:
+- At the START of complex tasks to check for relevant past context
+- When the user asks about something you might have discussed before
+- When you need to maintain consistency with past decisions
+
+**Memory Types:**
+- `decision` - Design choices and rationale
+- `learning` - Insights, patterns, discoveries
+- `bug_fix` - Bug descriptions and solutions
+- `preference` - User's coding style preferences
+- `todo` - Tasks for later
+- `feature` - Feature implementations
+- `context` - Background information
+
+**BE PROACTIVE:** If something seems important enough to remember, SAVE IT without asking!
 
 ## Sub-Agent Usage - USE ACTIVELY
 
@@ -143,7 +173,7 @@ Be proactive about using sub-agents - they make you faster and more thorough!
 
 ## Project Context
 
-You are helping the user with their codebase. If it's an Odibi project (has project.yaml), 
+You are helping the user with their codebase. If it's an Odibi project (has project.yaml),
 you can also help with pipelines, transformers, and connections.
 """
 
@@ -298,9 +328,13 @@ class ChatHandler:
         import re
         import uuid
 
-        json_match = re.search(r'\{[^{}]*"(?:id|operation|tool|function|name)"[^{}]*(?:\{[^{}]*\})?[^{}]*\}', content, re.DOTALL)
+        json_match = re.search(
+            r'\{[^{}]*"(?:id|operation|tool|function|name)"[^{}]*(?:\{[^{}]*\})?[^{}]*\}',
+            content,
+            re.DOTALL,
+        )
         if not json_match:
-            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+            json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
             else:
@@ -314,11 +348,11 @@ class ChatHandler:
             return None
 
         tool_name = (
-            data.get("id") or 
-            data.get("name") or 
-            data.get("operation") or 
-            data.get("tool") or 
-            data.get("function")
+            data.get("id")
+            or data.get("name")
+            or data.get("operation")
+            or data.get("tool")
+            or data.get("function")
         )
         if not tool_name:
             return None
@@ -338,16 +372,22 @@ class ChatHandler:
         if "params" in data:
             args = data["params"]
         else:
-            args = {k: v for k, v in data.items() if k not in ("id", "name", "operation", "tool", "function")}
-
-        return [{
-            "id": f"call_{uuid.uuid4().hex[:8]}",
-            "type": "function",
-            "function": {
-                "name": tool_name,
-                "arguments": json.dumps(args),
+            args = {
+                k: v
+                for k, v in data.items()
+                if k not in ("id", "name", "operation", "tool", "function")
             }
-        }]
+
+        return [
+            {
+                "id": f"call_{uuid.uuid4().hex[:8]}",
+                "type": "function",
+                "function": {
+                    "name": tool_name,
+                    "arguments": json.dumps(args),
+                },
+            }
+        ]
 
     def execute_tool(self, tool_call: dict) -> str:
         """Execute a tool call and return formatted result.
@@ -578,6 +618,54 @@ class ChatHandler:
             )
             return format_execution_result(result)
 
+        elif tool_name == "remember":
+            try:
+                manager = get_memory_manager(self.config)
+                memory_type_str = args.get("memory_type", "learning")
+                memory_type = MemoryType(memory_type_str)
+                tags = args.get("tags", [])
+                if isinstance(tags, str):
+                    tags = [t.strip() for t in tags.split(",") if t.strip()]
+
+                manager.remember(
+                    memory_type=memory_type,
+                    summary=args.get("summary", ""),
+                    content=args.get("content", args.get("summary", "")),
+                    tags=tags,
+                    importance=args.get("importance", 0.7),
+                )
+                emoji = {
+                    "decision": "🔵",
+                    "learning": "🟢",
+                    "bug_fix": "🔴",
+                    "preference": "🟣",
+                    "todo": "🟡",
+                    "feature": "🟠",
+                    "context": "⚪",
+                }.get(memory_type_str, "📝")
+                return f"✅ Memory saved: {emoji} **{memory_type_str.upper()}**\n\n> {args.get('summary', '')}"
+            except Exception as e:
+                return f"❌ Failed to save memory: {str(e)}"
+
+        elif tool_name == "recall":
+            try:
+                manager = get_memory_manager(self.config)
+                query = args.get("query", "")
+                memory_types = args.get("memory_types")
+                limit = args.get("limit", 10)
+
+                if memory_types:
+                    memory_types = [MemoryType(t) for t in memory_types]
+
+                memories = manager.recall(query, memory_types=memory_types, top_k=limit)
+                if not memories:
+                    return f"📭 No memories found for: '{query}'"
+                return (
+                    f"**🧠 Recalled Memories ({len(memories)}):**\n\n{format_memory_list(memories)}"
+                )
+            except Exception as e:
+                return f"❌ Failed to recall memories: {str(e)}"
+
         return f"❓ Unknown tool: {tool_name}"
 
     def requires_confirmation(self, tool_name: str, args: dict = None) -> bool:
@@ -638,7 +726,7 @@ class ChatHandler:
 
                 model_lower = self.config.llm.model.lower()
                 no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
-                
+
                 response = client.chat(
                     messages=self.conversation_history,
                     system_prompt=system_prompt,
@@ -667,7 +755,7 @@ class ChatHandler:
                 for tc in tool_calls:
                     tool_name = tc["function"]["name"]
                     tool_id = tc["id"]
-                    
+
                     try:
                         args = json.loads(tc["function"]["arguments"])
                     except json.JSONDecodeError:
@@ -683,61 +771,84 @@ class ChatHandler:
                         }
                         args_json = json.dumps(args, indent=2)
                         action_desc = (
-                            f"**Pending Action:** `{tool_name}`\n"
-                            f"```json\n{args_json}\n```"
+                            f"**Pending Action:** `{tool_name}`\n" f"```json\n{args_json}\n```"
                         )
                         history.append({"role": "assistant", "content": action_desc})
                         yield history, "Awaiting confirmation...", self.pending_action, True
                         return
 
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": content,
-                    "tool_calls": tool_calls,
-                })
+                self.conversation_history.append(
+                    {
+                        "role": "assistant",
+                        "content": content,
+                        "tool_calls": tool_calls,
+                    }
+                )
 
                 tool_results = []
 
                 for tc in tool_calls:
                     tool_name = tc["function"]["name"]
                     tool_id = tc["id"]
-                    
+
                     try:
                         args = json.loads(tc["function"]["arguments"])
                     except json.JSONDecodeError:
                         args = {}
 
                     tool_emoji = {
-                        "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
-                        "grep": "🔍", "glob": "🔍", "search": "🧠", "run_command": "⚡",
-                        "pytest": "🧪", "ruff": "🔧", "diagnostics": "🩺", "typecheck": "📝",
-                        "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
-                        "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
-                        "git_diff": "📦", "git_log": "📦", "task": "🤖",
-                        "parallel_tasks": "🚀", "execute_python": "🐍", "sql": "🗃️",
-                        "list_tables": "📋", "describe_table": "📊",
+                        "read_file": "📖",
+                        "write_file": "✏️",
+                        "list_directory": "📁",
+                        "grep": "🔍",
+                        "glob": "🔍",
+                        "search": "🧠",
+                        "run_command": "⚡",
+                        "pytest": "🧪",
+                        "ruff": "🔧",
+                        "diagnostics": "🩺",
+                        "typecheck": "📝",
+                        "web_search": "🌐",
+                        "read_web_page": "🌐",
+                        "todo_write": "📋",
+                        "todo_read": "📋",
+                        "mermaid": "📊",
+                        "git_status": "📦",
+                        "git_diff": "📦",
+                        "git_log": "📦",
+                        "task": "🤖",
+                        "parallel_tasks": "🚀",
+                        "execute_python": "🐍",
+                        "sql": "🗃️",
+                        "list_tables": "📋",
+                        "describe_table": "📊",
+                        "remember": "💾",
+                        "recall": "🧠",
                     }.get(tool_name, "🔧")
 
                     yield history, f"{tool_emoji} Running `{tool_name}`...", None, False
 
                     result = self.execute_tool({"tool": tool_name, "args": args})
-                    tool_results.append({
-                        "tool_call_id": tool_id,
-                        "tool": tool_name,
-                        "result": result,
-                    })
+                    tool_results.append(
+                        {
+                            "tool_call_id": tool_id,
+                            "tool": tool_name,
+                            "result": result,
+                        }
+                    )
 
-                    history.append({
-                        "role": "assistant",
-                        "content": f"**{tool_emoji} {tool_name}:**\n{result}"
-                    })
+                    history.append(
+                        {"role": "assistant", "content": f"**{tool_emoji} {tool_name}:**\n{result}"}
+                    )
 
                 for tr in tool_results:
-                    self.conversation_history.append({
-                        "role": "tool",
-                        "tool_call_id": tr["tool_call_id"],
-                        "content": tr["result"],
-                    })
+                    self.conversation_history.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tr["tool_call_id"],
+                            "content": tr["result"],
+                        }
+                    )
 
                 yield history, "🔄 Processing results...", None, False
 
@@ -773,11 +884,13 @@ class ChatHandler:
             original_tool_calls = tool_call.get("tool_calls", [])
             original_content = tool_call.get("content")
 
-            self.conversation_history.append({
-                "role": "assistant",
-                "content": original_content,
-                "tool_calls": original_tool_calls,
-            })
+            self.conversation_history.append(
+                {
+                    "role": "assistant",
+                    "content": original_content,
+                    "tool_calls": original_tool_calls,
+                }
+            )
 
             tool_results = []
 
@@ -790,32 +903,57 @@ class ChatHandler:
                     tc_args = {}
 
                 tool_emoji = {
-                    "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
-                    "grep": "🔍", "glob": "🔍", "search": "🧠", "run_command": "⚡",
-                    "pytest": "🧪", "ruff": "🔧", "diagnostics": "🩺", "typecheck": "📝",
-                    "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
-                    "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
-                    "git_diff": "📦", "git_log": "📦", "task": "🤖",
-                    "parallel_tasks": "🚀", "execute_python": "🐍", "sql": "🗃️",
-                    "list_tables": "📋", "describe_table": "📊",
+                    "read_file": "📖",
+                    "write_file": "✏️",
+                    "list_directory": "📁",
+                    "grep": "🔍",
+                    "glob": "🔍",
+                    "search": "🧠",
+                    "run_command": "⚡",
+                    "pytest": "🧪",
+                    "ruff": "🔧",
+                    "diagnostics": "🩺",
+                    "typecheck": "📝",
+                    "web_search": "🌐",
+                    "read_web_page": "🌐",
+                    "todo_write": "📋",
+                    "todo_read": "📋",
+                    "mermaid": "📊",
+                    "git_status": "📦",
+                    "git_diff": "📦",
+                    "git_log": "📦",
+                    "task": "🤖",
+                    "parallel_tasks": "🚀",
+                    "execute_python": "🐍",
+                    "sql": "🗃️",
+                    "list_tables": "📋",
+                    "describe_table": "📊",
+                    "remember": "💾",
+                    "recall": "🧠",
                 }.get(tc_name, "🔧")
 
                 yield history, f"{tool_emoji} Executing `{tc_name}`...", None, False
 
                 result = self.execute_tool({"tool": tc_name, "args": tc_args})
-                tool_results.append({
-                    "tool_call_id": tc_id,
-                    "tool": tc_name,
-                    "result": result,
-                })
-                history.append({"role": "assistant", "content": f"**{tool_emoji} {tc_name}:**\n{result}"})
+                tool_results.append(
+                    {
+                        "tool_call_id": tc_id,
+                        "tool": tc_name,
+                        "result": result,
+                    }
+                )
+                history.append(
+                    {"role": "assistant", "content": f"**{tool_emoji} {tc_name}:**\n{result}"}
+                )
 
             for tr in tool_results:
-                self.conversation_history.append({
-                    "role": "tool",
-                    "tool_call_id": tr["tool_call_id"],
-                    "content": tr["result"],
-                })
+                self.conversation_history.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tr["tool_call_id"],
+                        "content": tr["result"],
+                    }
+                )
 
             yield history, "🔄 Continuing...", None, False
 
@@ -881,11 +1019,13 @@ class ChatHandler:
                         yield history, "Awaiting confirmation...", self.pending_action, True
                         return
 
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": content,
-                    "tool_calls": tool_calls,
-                })
+                self.conversation_history.append(
+                    {
+                        "role": "assistant",
+                        "content": content,
+                        "tool_calls": tool_calls,
+                    }
+                )
 
                 tool_results = []
 
@@ -898,31 +1038,56 @@ class ChatHandler:
                         tc_args = {}
 
                     tc_emoji = {
-                        "read_file": "📖", "write_file": "✏️", "list_directory": "📁",
-                        "grep": "🔍", "glob": "🔍", "search": "🧠", "run_command": "⚡",
-                        "pytest": "🧪", "ruff": "🔧", "diagnostics": "🩺", "typecheck": "📝",
-                        "web_search": "🌐", "read_web_page": "🌐", "todo_write": "📋",
-                        "todo_read": "📋", "mermaid": "📊", "git_status": "📦",
-                        "git_diff": "📦", "git_log": "📦", "task": "🤖",
-                        "parallel_tasks": "🚀", "execute_python": "🐍", "sql": "🗃️",
-                        "list_tables": "📋", "describe_table": "📊",
+                        "read_file": "📖",
+                        "write_file": "✏️",
+                        "list_directory": "📁",
+                        "grep": "🔍",
+                        "glob": "🔍",
+                        "search": "🧠",
+                        "run_command": "⚡",
+                        "pytest": "🧪",
+                        "ruff": "🔧",
+                        "diagnostics": "🩺",
+                        "typecheck": "📝",
+                        "web_search": "🌐",
+                        "read_web_page": "🌐",
+                        "todo_write": "📋",
+                        "todo_read": "📋",
+                        "mermaid": "📊",
+                        "git_status": "📦",
+                        "git_diff": "📦",
+                        "git_log": "📦",
+                        "task": "🤖",
+                        "parallel_tasks": "🚀",
+                        "execute_python": "🐍",
+                        "sql": "🗃️",
+                        "list_tables": "📋",
+                        "describe_table": "📊",
+                        "remember": "💾",
+                        "recall": "🧠",
                     }.get(tc_name, "🔧")
                     yield history, f"{tc_emoji} Running `{tc_name}`...", None, False
 
                     tc_result = self.execute_tool({"tool": tc_name, "args": tc_args})
-                    tool_results.append({
-                        "tool_call_id": tc_id,
-                        "tool": tc_name,
-                        "result": tc_result,
-                    })
-                    history.append({"role": "assistant", "content": f"**{tc_emoji} {tc_name}:**\n{tc_result}"})
+                    tool_results.append(
+                        {
+                            "tool_call_id": tc_id,
+                            "tool": tc_name,
+                            "result": tc_result,
+                        }
+                    )
+                    history.append(
+                        {"role": "assistant", "content": f"**{tc_emoji} {tc_name}:**\n{tc_result}"}
+                    )
 
                 for tr in tool_results:
-                    self.conversation_history.append({
-                        "role": "tool",
-                        "tool_call_id": tr["tool_call_id"],
-                        "content": tr["result"],
-                    })
+                    self.conversation_history.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tr["tool_call_id"],
+                            "content": tr["result"],
+                        }
+                    )
 
                 yield history, "🔄 Processing...", None, False
 
