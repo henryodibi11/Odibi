@@ -77,38 +77,48 @@ AGENT_CHOICES = [
 
 
 CHAT_SYSTEM_PROMPT = """
-You are a helpful AI coding assistant that can work with any codebase.
+You are a powerful AI coding assistant that works autonomously with any codebase.
 
 You have access to tools for: file operations, code search, shell commands, web research,
 task management, diagrams, git, code execution (Databricks), and sub-agent spawning.
 
-## Behavior Guidelines
+## CRITICAL RULES - YOU MUST FOLLOW THESE
 
-1. **Be proactive** - Use tools immediately without asking permission for read-only operations
-2. **Use todo_write** to plan complex tasks and track progress
-3. **Use diagrams** when explaining architecture or flows
-4. **Run diagnostics** after making code changes
-5. **Ask confirmation ONLY for writes** - write_file, run_command, python, sql
+### Rule 1: ALWAYS USE TOOLS FOR FACTS
+- **NEVER** describe what's in a directory without calling `list_directory` first
+- **NEVER** describe file contents without calling `read_file` first  
+- **NEVER** claim to know what exists without verifying with tools
+- **NEVER** make up fake file trees, contents, or search results
+- If you don't know something, USE A TOOL to find out. DO NOT GUESS.
 
-## Agentic Behavior - CRITICAL
+### Rule 2: AGENTIC LOOP - NEVER STOP MID-TASK
+- You operate in an AGENTIC LOOP. After each tool execution, you receive results and MUST continue.
+- **NEVER** say "I'll do X" and then stop - ACTUALLY DO IT with tool calls
+- **NEVER** ask "would you like me to continue?" - just CONTINUE
+- **NEVER** output partial results - COMPLETE the full task
+- **NEVER** output raw JSON like `{"operation": ...}` - always use proper tool calls
+- If you plan to call a tool, CALL IT immediately in the same turn
 
-You operate in an AGENTIC LOOP. After each tool execution, you receive results and MUST:
-1. **Continue working** until the task is FULLY complete
-2. **Never ask** "would you like me to continue?" - just CONTINUE
-3. **Never give partial results** - COMPLETE the task
-4. **Call multiple tools** if needed to fully answer the question
+### Rule 3: PROACTIVE EXECUTION
+- Use tools IMMEDIATELY without asking permission for read-only operations
+- Call multiple tools in sequence if needed to fully answer the question
+- After calling a tool and receiving results, CONTINUE REASONING about what to do next
 
-For complex tasks:
-1. Use todo_write to plan steps
-2. Execute each step, marking todos as you go  
-3. Run diagnostics after code changes
-4. Summarize what you did when complete
+## Tool Usage Guidelines
+
+1. **list_directory** - ALWAYS use this to see what's in a folder before describing it
+2. **read_file** - ALWAYS use this to see file contents before describing them
+3. **grep** / **glob** / **search** - Use to find code patterns
+4. **todo_write** - Use to plan and track progress on complex tasks
+5. **mermaid** - Use to create diagrams when explaining architecture
+6. **diagnostics** - Run after making code changes
 
 ## Response Format
 
 - Use markdown formatting
 - Code blocks with language hints
 - Keep responses concise but informative
+- When showing directory contents, show the ACTUAL results from tools, not fabricated trees
 
 ## Project Context
 
@@ -214,6 +224,63 @@ class ChatHandler:
             api_version=self.config.llm.api_version,
         )
         return LLMClient(llm_config)
+
+    def _extract_tool_call_from_text(self, content: str) -> Optional[list[dict]]:
+        """Extract tool calls from text when model outputs JSON instead of using function calling.
+
+        This handles cases where the model outputs raw JSON like:
+        {"operation": "file_operations.ls", "path": "/some/path"}
+
+        Args:
+            content: The text content from the model.
+
+        Returns:
+            List of tool call dicts compatible with OpenAI format, or None.
+        """
+        import re
+        import uuid
+
+        json_match = re.search(r'\{[^{}]*"(?:operation|tool|function)"[^{}]*\}', content, re.DOTALL)
+        if not json_match:
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                return None
+        else:
+            json_str = json_match.group(0)
+
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            return None
+
+        operation = data.get("operation") or data.get("tool") or data.get("function")
+        if not operation:
+            return None
+
+        tool_mapping = {
+            "file_operations.ls": "list_directory",
+            "file_operations.read": "read_file",
+            "file_operations.write": "write_file",
+            "ls": "list_directory",
+            "read": "read_file",
+            "write": "write_file",
+            "search": "grep",
+        }
+
+        tool_name = tool_mapping.get(operation, operation)
+
+        args = {k: v for k, v in data.items() if k not in ("operation", "tool", "function")}
+
+        return [{
+            "id": f"call_{uuid.uuid4().hex[:8]}",
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "arguments": json.dumps(args),
+            }
+        }]
 
     def execute_tool(self, tool_call: dict) -> str:
         """Execute a tool call and return formatted result.
@@ -516,6 +583,12 @@ class ChatHandler:
                 content = response.get("content")
                 tool_calls = response.get("tool_calls")
 
+                if content and not tool_calls:
+                    extracted = self._extract_tool_call_from_text(content)
+                    if extracted:
+                        tool_calls = extracted
+                        content = None
+
                 if content:
                     history.append({"role": "assistant", "content": content})
 
@@ -665,6 +738,12 @@ class ChatHandler:
 
             content = response.get("content")
             tool_calls = response.get("tool_calls")
+
+            if content and not tool_calls:
+                extracted = self._extract_tool_call_from_text(content)
+                if extracted:
+                    tool_calls = extracted
+                    content = None
 
             if content:
                 history.append({"role": "assistant", "content": content})
