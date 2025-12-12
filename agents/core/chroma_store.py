@@ -110,7 +110,7 @@ class ChromaVectorStore(BaseVectorStore):
             return {"succeeded": len(chunks), "failed": 0}
         except Exception as e:
             logger.error(f"Failed to upsert chunks: {e}")
-            return {"succeeded": 0, "failed": len(chunks)}
+            return {"succeeded": 0, "failed": len(chunks), "error": str(e)}
 
     def similarity_search(
         self,

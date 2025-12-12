@@ -170,6 +170,8 @@ class LocalIndexer:
             "embedding_dimension": self.embedder.dimension,
             "timestamp": datetime.now().isoformat(),
         }
+        if "error" in upload_result:
+            summary["upload_error"] = upload_result["error"]
 
         logger.info(f"Indexing complete: {summary}")
         return summary
