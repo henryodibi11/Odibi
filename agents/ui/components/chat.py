@@ -229,6 +229,7 @@ class ChatHandler:
         """Extract tool calls from text when model outputs JSON instead of using function calling.
 
         This handles cases where the model outputs raw JSON like:
+        {"id": "list_directory", "params": {"path": "/some/path"}}
         {"operation": "file_operations.ls", "path": "/some/path"}
 
         Args:
@@ -240,7 +241,7 @@ class ChatHandler:
         import re
         import uuid
 
-        json_match = re.search(r'\{[^{}]*"(?:operation|tool|function)"[^{}]*\}', content, re.DOTALL)
+        json_match = re.search(r'\{[^{}]*"(?:id|operation|tool|function|name)"[^{}]*(?:\{[^{}]*\})?[^{}]*\}', content, re.DOTALL)
         if not json_match:
             json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
             if json_match:
@@ -255,8 +256,14 @@ class ChatHandler:
         except json.JSONDecodeError:
             return None
 
-        operation = data.get("operation") or data.get("tool") or data.get("function")
-        if not operation:
+        tool_name = (
+            data.get("id") or 
+            data.get("name") or 
+            data.get("operation") or 
+            data.get("tool") or 
+            data.get("function")
+        )
+        if not tool_name:
             return None
 
         tool_mapping = {
@@ -269,9 +276,12 @@ class ChatHandler:
             "search": "grep",
         }
 
-        tool_name = tool_mapping.get(operation, operation)
+        tool_name = tool_mapping.get(tool_name, tool_name)
 
-        args = {k: v for k, v in data.items() if k not in ("operation", "tool", "function")}
+        if "params" in data:
+            args = data["params"]
+        else:
+            args = {k: v for k, v in data.items() if k not in ("id", "name", "operation", "tool", "function")}
 
         return [{
             "id": f"call_{uuid.uuid4().hex[:8]}",
