@@ -92,10 +92,12 @@ class TodoManager:
         """Replace all todos with a new list."""
         self.todos = [TodoItem.from_dict(t) for t in todos]
         if self.todos:
-            max_id = max(
-                int(t.id.split("-")[1]) for t in self.todos if "-" in t.id
-            )
-            self._id_counter = max_id
+            valid_ids = [
+                int(t.id.split("-")[1]) 
+                for t in self.todos 
+                if "-" in t.id and t.id.split("-")[1].isdigit()
+            ]
+            self._id_counter = max(valid_ids) if valid_ids else len(self.todos)
 
     def to_list(self) -> list[dict]:
         """Convert all todos to list of dicts."""
