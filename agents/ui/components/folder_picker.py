@@ -19,6 +19,7 @@ class RecentProject:
     name: str
     last_used: datetime = field(default_factory=datetime.now)
     indexed: bool = False
+    index_dir: str = ""
 
 
 @dataclass
@@ -55,15 +56,24 @@ class ProjectState:
         """Get recent projects as dropdown choices."""
         return [(f"📁 {p.name} ({p.path})", p.path) for p in self.recent_projects]
 
-    def mark_indexed(self, path: str) -> None:
+    def mark_indexed(self, path: str, index_dir: str = "") -> None:
         """Mark a project as indexed."""
         for p in self.recent_projects:
             if p.path == path:
                 p.indexed = True
+                if index_dir:
+                    p.index_dir = index_dir
                 break
 
+    def get_index_dir(self, path: str) -> str:
+        """Get the index directory for a project."""
+        for p in self.recent_projects:
+            if p.path == path:
+                return p.index_dir
+        return ""
 
-def get_index_dir(project_path: str) -> Path:
+
+def get_index_dir(project_path: str, unique: bool = False) -> Path:
     """Get the appropriate index directory for a project.
 
     On Databricks (/Workspace/ or /Repos/), uses /tmp/ since the
@@ -71,15 +81,20 @@ def get_index_dir(project_path: str) -> Path:
 
     Args:
         project_path: The project root path.
+        unique: If True, append a timestamp to create a unique directory.
 
     Returns:
         Path to the index directory.
     """
     import hashlib
+    import time
 
     if project_path.startswith("/Workspace/") or project_path.startswith("/Repos/"):
         path_hash = hashlib.md5(project_path.encode()).hexdigest()[:8]
-        return Path(f"/tmp/.odibi_index/{path_hash}")
+        base = f"/tmp/.odibi_index/{path_hash}"
+        if unique:
+            base = f"{base}_{int(time.time())}"
+        return Path(base)
     return Path(project_path) / ".odibi" / "index"
 
 
@@ -327,12 +342,17 @@ def create_folder_picker(
             try:
                 from agents.core.index_manager import needs_reindex
 
-                index_dir = get_index_dir(path)
-                needs, reason = needs_reindex(path, index_dir=str(index_dir))
-                if needs:
-                    return f"⚠️ **Index needed:** {reason}"
+                saved_index_dir = project_state.get_index_dir(path)
+                if saved_index_dir:
+                    index_dir = saved_index_dir
                 else:
-                    return f"✅ **Index up to date:** {reason}"
+                    index_dir = str(get_index_dir(path))
+
+                needs, reason = needs_reindex(path, index_dir=index_dir)
+                if needs:
+                    return f"⚠️ **Index needed:** {reason}\n\nIndex dir: `{index_dir}`"
+                else:
+                    return f"✅ **Index up to date:** {reason}\n\nIndex dir: `{index_dir}`"
             except ImportError:
                 return "⚠️ Index manager not available. Install chromadb and sentence-transformers."
             except Exception as e:
@@ -384,17 +404,21 @@ def create_folder_picker(
                 from agents.core.chroma_store import ChromaVectorStore
                 import shutil
 
-                index_dir = get_index_dir(path)
-                if str(index_dir).startswith("/tmp/"):
-                    debug_info.append("Using temp dir (Databricks read-only workspace)")
-                debug_info.append(f"Index dir: {index_dir}")
+                is_databricks = path.startswith("/Workspace/") or path.startswith("/Repos/")
 
-                if index_dir.exists():
-                    try:
-                        shutil.rmtree(index_dir)
-                        debug_info.append("Deleted old index")
-                    except Exception as rmtree_err:
-                        debug_info.append(f"rmtree failed: {rmtree_err}")
+                if is_databricks:
+                    index_dir = get_index_dir(path, unique=True)
+                    debug_info.append("Using unique temp dir (Databricks)")
+                else:
+                    index_dir = get_index_dir(path)
+                    if index_dir.exists():
+                        try:
+                            shutil.rmtree(index_dir)
+                            debug_info.append("Deleted old index")
+                        except Exception as rmtree_err:
+                            debug_info.append(f"rmtree failed: {rmtree_err}")
+
+                debug_info.append(f"Index dir: {index_dir}")
 
                 try:
                     index_dir.mkdir(parents=True, exist_ok=True)
@@ -407,12 +431,7 @@ def create_folder_picker(
                     return "❌ Cannot write to index directory. On Databricks, try restarting the cluster.\n\nDebug:\n" + "\n".join(debug_info)
 
                 store = ChromaVectorStore(persist_dir=str(index_dir))
-                initial_count = store.count()
-                debug_info.append(f"Store created, initial count: {initial_count}")
-
-                if initial_count > 0:
-                    debug_info.append("Clearing existing data with delete_all()")
-                    store.delete_all()
+                debug_info.append(f"Store created, count: {store.count()}")
 
                 embedder = LocalEmbedder()
                 debug_info.append(f"Embedder: {embedder.model_name}")
@@ -428,7 +447,7 @@ def create_folder_picker(
 
                 count = summary.get("uploaded", 0)
 
-                project_state.mark_indexed(path)
+                project_state.mark_indexed(path, index_dir=str(index_dir))
 
                 if count == 0:
                     return f"⚠️ Indexed **{count}** chunks\n\nDebug:\n" + "\n".join(debug_info)
