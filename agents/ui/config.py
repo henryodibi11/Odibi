@@ -67,19 +67,19 @@ class MemoryConfig:
 class ProjectConfig:
     """Project configuration.
 
-    Supports two separate paths:
-    - odibi_root: Path to the Odibi library/repo (for connections, project.yaml)
-    - working_project: Any folder you want the assistant to analyze/index
+    Supports two paths:
+    - working_project: Primary folder for work, config storage, and indexing (required)
+    - reference_repo: Optional secondary codebase for grep/read access
     """
 
-    odibi_root: str = "d:/odibi"
     working_project: str = ""
+    reference_repo: str = ""
     project_yaml_path: Optional[str] = None
 
     @property
     def project_root(self) -> str:
-        """The active working project path (or odibi_root if not set)."""
-        return self.working_project or self.odibi_root
+        """The active working project path."""
+        return self.working_project
 
     @project_root.setter
     def project_root(self, value: str) -> None:
@@ -87,8 +87,8 @@ class ProjectConfig:
         self.working_project = value
 
     def __post_init__(self):
-        if not self.project_yaml_path:
-            candidate = Path(self.odibi_root) / "project.yaml"
+        if not self.project_yaml_path and self.working_project:
+            candidate = Path(self.working_project) / "project.yaml"
             if candidate.exists():
                 self.project_yaml_path = str(candidate)
 
@@ -119,8 +119,8 @@ class AgentUIConfig:
                 "table_path": self.memory.table_path,
             },
             "project": {
-                "odibi_root": self.project.odibi_root,
                 "working_project": self.project.working_project,
+                "reference_repo": self.project.reference_repo,
                 "project_yaml_path": self.project.project_yaml_path,
             },
             "default_agent": self.default_agent,
@@ -150,39 +150,45 @@ class AgentUIConfig:
                 table_path=memory_data.get("table_path", "system.agent_memories"),
             ),
             project=ProjectConfig(
-                odibi_root=project_data.get("odibi_root", "d:/odibi"),
                 working_project=project_data.get("working_project", ""),
+                reference_repo=project_data.get("reference_repo", ""),
                 project_yaml_path=project_data.get("project_yaml_path"),
             ),
             default_agent=data.get("default_agent", "auto"),
         )
 
 
-def get_config_path(odibi_root: str = "d:/odibi") -> Path:
+def get_config_path(working_project: str) -> Path:
     """Get the path to the agent config file."""
-    return Path(odibi_root) / ".odibi" / "agent_config.yaml"
+    return Path(working_project) / ".odibi" / "agent_config.yaml"
 
 
-def load_config(odibi_root: str = "d:/odibi") -> AgentUIConfig:
+def load_config(working_project: str = "") -> AgentUIConfig:
     """Load configuration from YAML file."""
-    config_path = get_config_path(odibi_root)
+    if not working_project:
+        return AgentUIConfig()
+
+    config_path = get_config_path(working_project)
 
     if not config_path.exists():
-        return AgentUIConfig(project=ProjectConfig(odibi_root=odibi_root))
+        return AgentUIConfig(project=ProjectConfig(working_project=working_project))
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         config = AgentUIConfig.from_dict(data)
-        config.project.odibi_root = odibi_root
+        config.project.working_project = working_project
         return config
     except Exception:
-        return AgentUIConfig(project=ProjectConfig(odibi_root=odibi_root))
+        return AgentUIConfig(project=ProjectConfig(working_project=working_project))
 
 
 def save_config(config: AgentUIConfig) -> bool:
     """Save configuration to YAML file."""
-    config_path = get_config_path(config.project.odibi_root)
+    if not config.project.working_project:
+        return False
+
+    config_path = get_config_path(config.project.working_project).resolve()
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:

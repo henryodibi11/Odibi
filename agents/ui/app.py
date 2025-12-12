@@ -41,20 +41,20 @@ footer {
 
 
 def create_app(
-    odibi_root: str = "d:/odibi",
+    working_project: str = "",
     config: Optional[AgentUIConfig] = None,
 ) -> gr.Blocks:
     """Create the Odibi Assistant Gradio app.
 
     Args:
-        odibi_root: Root directory of the Odibi project.
+        working_project: Root directory of the project to work on.
         config: Optional pre-loaded configuration.
 
     Returns:
         Gradio Blocks application.
     """
     if config is None:
-        config = load_config(odibi_root)
+        config = load_config(working_project)
 
     current_config = [config]
 
@@ -113,7 +113,7 @@ def create_app(
 
 
 def launch(
-    odibi_root: str = "d:/odibi",
+    working_project: str = "",
     share: bool = False,
     server_name: Optional[str] = None,
     server_port: Optional[int] = None,
@@ -126,7 +126,7 @@ def launch(
     - Databricks: Renders inline in notebook
 
     Args:
-        odibi_root: Root directory of the Odibi project.
+        working_project: Root directory of the project to work on.
         share: Create a public shareable link.
         server_name: Server hostname (default: localhost).
         server_port: Server port (default: auto-select).
@@ -139,7 +139,7 @@ def launch(
         ```python
         # Local - opens in browser
         from agents.ui import launch
-        launch()
+        launch(working_project="d:/my-project")
 
         # Databricks - renders inline
         from agents.ui import launch
@@ -152,7 +152,7 @@ def launch(
         launch(share=True)
         ```
     """
-    app = create_app(odibi_root=odibi_root)
+    app = create_app(working_project=working_project)
 
     is_databricks = (
         "DATABRICKS_RUNTIME_VERSION" in os.environ

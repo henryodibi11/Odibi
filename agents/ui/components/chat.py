@@ -487,9 +487,14 @@ class ChatHandler:
             client = self.get_llm_client()
 
             system_prompt = CHAT_SYSTEM_PROMPT
-            system_prompt += f"\n\n**Working Project:** {self.config.project.project_root}"
-            if self.config.project.odibi_root != self.config.project.project_root:
-                system_prompt += f"\n**Odibi Library:** {self.config.project.odibi_root} (available for grep/read when needed)"
+            system_prompt += "\n\n## Accessible Paths"
+            system_prompt += f"\n**Working Project:** {self.config.project.project_root}"
+            system_prompt += "\n  - Primary codebase for all operations"
+            system_prompt += "\n  - Use this for grep, read, write, index, and run commands"
+            if self.config.project.reference_repo:
+                system_prompt += f"\n**Reference Repo:** {self.config.project.reference_repo}"
+                system_prompt += "\n  - Secondary codebase available for grep/read"
+                system_prompt += "\n  - Use when user asks about code in this repo"
 
             iteration = 0
             self.reset_stop()

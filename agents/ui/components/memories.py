@@ -154,7 +154,7 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
     if backend_type == "local":
         return MemoryManager(
             backend_type="local",
-            local_path=f"{config.project.odibi_root}/.odibi/memories",
+            local_path=f"{config.project.project_root}/.odibi/memories",
         )
 
     if backend_type == "odibi" and config.memory.connection_name:
@@ -187,7 +187,7 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
 
     return MemoryManager(
         backend_type="local",
-        local_path=f"{config.project.odibi_root}/.odibi/memories",
+        local_path=f"{config.project.project_root}/.odibi/memories",
     )
 
 

@@ -154,14 +154,14 @@ class TestConfigPersistence:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = load_config(tmpdir)
             assert isinstance(config, AgentUIConfig)
-            assert config.project.odibi_root == tmpdir
+            assert config.project.working_project == tmpdir
 
     def test_save_and_load_config(self):
         """Test saving and loading config."""
         with tempfile.TemporaryDirectory() as tmpdir:
             original = AgentUIConfig(
                 llm=LLMConfig(model="gpt-4o"),
-                project=ProjectConfig(odibi_root=tmpdir),
+                project=ProjectConfig(working_project=tmpdir),
             )
 
             success = save_config(original)
@@ -178,7 +178,7 @@ class TestConfigPersistence:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = AgentUIConfig(
                 llm=LLMConfig(api_key="super-secret-key"),
-                project=ProjectConfig(odibi_root=tmpdir),
+                project=ProjectConfig(working_project=tmpdir),
             )
 
             save_config(config)

@@ -119,17 +119,23 @@ def create_settings_panel(
                 visible=config.memory.backend_type == "delta",
             )
 
-        with gr.Accordion("📁 Odibi Library", open=False):
-            components["odibi_root"] = gr.Textbox(
-                label="Odibi Repo Path",
-                value=config.project.odibi_root,
-                placeholder="d:/odibi",
-                info="Path to Odibi library (for connections & project.yaml)",
+        with gr.Accordion("📂 Working Project", open=True):
+            from .folder_picker import create_folder_picker, ProjectState
+
+            project_state = ProjectState()
+            picker_column, picker_components = create_folder_picker(
+                initial_path=config.project.working_project,
+                project_state=project_state,
             )
+            components["folder_picker"] = picker_components
+            components["project_state"] = project_state
+            components["working_project"] = picker_components["path_input"]
+
             components["project_yaml"] = gr.Textbox(
                 label="project.yaml Path (optional)",
                 value=config.project.project_yaml_path or "",
                 placeholder="path/to/project.yaml",
+                info="For loading Odibi connections",
             )
             with gr.Row():
                 components["refresh_connections_btn"] = gr.Button(
@@ -137,17 +143,13 @@ def create_settings_panel(
                     size="sm",
                 )
 
-        with gr.Accordion("📂 Working Project", open=True):
-            from .folder_picker import create_folder_picker, ProjectState
-
-            project_state = ProjectState()
-            picker_column, picker_components = create_folder_picker(
-                initial_path=config.project.working_project or config.project.odibi_root,
-                project_state=project_state,
+        with gr.Accordion("📚 Reference Repo (optional)", open=False):
+            components["reference_repo"] = gr.Textbox(
+                label="Reference Repo Path",
+                value=config.project.reference_repo,
+                placeholder="",
+                info="Additional codebase the agent can grep/read",
             )
-            components["folder_picker"] = picker_components
-            components["project_state"] = project_state
-            components["working_project"] = picker_components["path_input"]
 
         with gr.Row():
             components["save_btn"] = gr.Button(
@@ -208,10 +210,13 @@ def create_settings_panel(
             connection_name: str,
             memory_path: str,
             delta_table: str,
-            odibi_root: str,
-            project_yaml: str,
             working_project: str,
+            project_yaml: str,
+            reference_repo: str,
         ) -> str:
+            if not working_project:
+                return "❌ Working Project path is required"
+
             new_config = AgentUIConfig(
                 llm=LLMConfig(
                     endpoint=endpoint,
@@ -228,8 +233,8 @@ def create_settings_panel(
                     table_path=delta_table,
                 ),
                 project=ProjectConfig(
-                    odibi_root=odibi_root,
                     working_project=working_project,
+                    reference_repo=reference_repo,
                     project_yaml_path=project_yaml if project_yaml else None,
                 ),
             )
@@ -254,9 +259,9 @@ def create_settings_panel(
                 components["connection_name"],
                 components["memory_path"],
                 components["delta_table"],
-                components["odibi_root"],
-                components["project_yaml"],
                 components["working_project"],
+                components["project_yaml"],
+                components["reference_repo"],
             ],
             outputs=[components["status"]],
         )
@@ -280,7 +285,8 @@ def get_config_from_components(components: dict[str, Any]) -> AgentUIConfig:
             table_path=components["delta_table"].value,
         ),
         project=ProjectConfig(
-            odibi_root=components["odibi_root"].value,
+            working_project=components["working_project"].value,
+            reference_repo=components["reference_repo"].value,
             project_yaml_path=components["project_yaml"].value,
         ),
     )
