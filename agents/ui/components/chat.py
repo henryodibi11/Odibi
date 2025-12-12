@@ -58,6 +58,13 @@ from ..tools.task_tools import (
     format_task_result,
     format_parallel_results,
 )
+from ..tools.code_execution import (
+    execute_python,
+    execute_sql,
+    list_tables,
+    describe_table,
+    format_execution_result,
+)
 from .todo_panel import todo_read, todo_write, update_todo_display
 
 AGENT_CHOICES = [
@@ -122,6 +129,18 @@ Use sub-agents when:
 - Tasks can be done independently
 - You want to speed up complex analysis
 
+### Code Execution (Databricks)
+- **python(code)** - Execute Python code (has access to spark, pd, np)
+- **sql(query, limit?, show_schema?)** - Execute SQL query via Spark
+- **list_tables(database?, pattern?)** - List available tables
+- **describe_table(table_name)** - Get schema and sample data
+
+Use code execution to:
+- Analyze data in tables
+- Run computations
+- Transform DataFrames
+- Test code snippets
+
 ## Tool Usage Format
 
 When you need to use a tool, output it in this exact format:
@@ -152,6 +171,14 @@ Examples:
 
 ```tool
 {"tool": "parallel_tasks", "args": {"tasks": ["Find all test files and count them", "Search for TODO comments in the codebase", "List the main modules in the project"]}}
+```
+
+```tool
+{"tool": "python", "args": {"code": "import pandas as pd\\ndf = spark.table('my_table').toPandas()\\nprint(df.describe())"}}
+```
+
+```tool
+{"tool": "sql", "args": {"query": "SELECT * FROM my_database.my_table LIMIT 10", "show_schema": true}}
 ```
 
 ## Guidelines
@@ -500,11 +527,39 @@ class ChatHandler:
             )
             return format_parallel_results(results)
 
+        elif tool_name == "python":
+            result = execute_python(
+                code=args.get("code", ""),
+                timeout=args.get("timeout", 30),
+            )
+            return format_execution_result(result)
+
+        elif tool_name == "sql":
+            result = execute_sql(
+                query=args.get("query", ""),
+                limit=args.get("limit", 100),
+                show_schema=args.get("show_schema", False),
+            )
+            return format_execution_result(result)
+
+        elif tool_name == "list_tables":
+            result = list_tables(
+                database=args.get("database"),
+                pattern=args.get("pattern"),
+            )
+            return format_execution_result(result)
+
+        elif tool_name == "describe_table":
+            result = describe_table(
+                table_name=args.get("table_name", ""),
+            )
+            return format_execution_result(result)
+
         return f"❓ Unknown tool: {tool_name}"
 
     def requires_confirmation(self, tool_call: dict) -> bool:
         """Check if a tool call requires user confirmation."""
-        dangerous_tools = {"write_file", "run_command", "odibi_run"}
+        dangerous_tools = {"write_file", "run_command", "odibi_run", "python", "sql"}
         tool_name = tool_call.get("tool", "")
 
         if tool_name in dangerous_tools:
@@ -659,6 +714,10 @@ class ChatHandler:
                                 "git_log": "📦",
                                 "task": "🤖",
                                 "parallel_tasks": "🚀",
+                                "python": "🐍",
+                                "sql": "🗃️",
+                                "list_tables": "📋",
+                                "describe_table": "📊",
                             }.get(tool_call["tool"], "🔧")
                             
                             status_msg = f"{tool_emoji} Running `{tool_call['tool']}`..."
