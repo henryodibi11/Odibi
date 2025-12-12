@@ -151,11 +151,14 @@ def ensure_index(
     odibi_root_path = Path(odibi_root)
     index_dir_path = Path(index_dir or (odibi_root_path / ".odibi_index"))
     index_dir_path.mkdir(parents=True, exist_ok=True)
-    meta_path = index_dir_path / META_FILE
 
     embedding_model = embedding_model or LocalEmbedder.DEFAULT_MODEL
 
     store = ChromaVectorStore(persist_dir=str(index_dir_path))
+
+    # Recompute meta_path after ChromaVectorStore init (may have deleted/recreated dir)
+    index_dir_path.mkdir(parents=True, exist_ok=True)
+    meta_path = index_dir_path / META_FILE
 
     if force_reindex:
         should_reindex = True
