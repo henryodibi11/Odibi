@@ -59,18 +59,26 @@ footer {
 }
 
 .status-bar {
-    min-height: 24px;
-    padding: 8px 12px;
+    min-height: 32px;
+    padding: 12px 16px;
     background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
-    border-radius: 6px;
+    border: 1px solid #00d4ff;
+    border-radius: 8px;
     color: #00d4ff;
-    font-size: 14px;
-    margin: 8px 0;
+    font-size: 15px;
+    font-weight: 500;
+    margin: 12px 0;
     animation: pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
 }
 
 .status-bar:empty {
     display: none;
+    animation: none;
+}
+
+.status-bar p {
+    margin: 0 !important;
 }
 
 @keyframes pulse {

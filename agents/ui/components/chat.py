@@ -143,10 +143,13 @@ Use code execution to:
 
 ## Tool Usage Format
 
-When you need to use a tool, output it in this exact format:
+IMPORTANT: When you need to use a tool, you MUST output it in this EXACT format with the ```tool code fence:
 ```tool
 {"tool": "tool_name", "args": {"arg1": "value1", "arg2": "value2"}}
 ```
+
+DO NOT say "I will use a tool" or "tool call coming up" - just output the tool block directly.
+DO NOT describe what you're about to do - just do it.
 
 Examples:
 ```tool
@@ -253,7 +256,6 @@ def create_chat_interface(
                 scale=1,
                 size="sm",
                 variant="stop",
-                visible=False,
             )
             components["clear_btn"] = gr.Button("🗑️ Clear", scale=1, size="sm")
 
