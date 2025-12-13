@@ -1,0 +1,3646 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/02_dimension_pattern/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Dimension Pattern Tutorial - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dimension-pattern-tutorial" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dimension Pattern Tutorial
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/tutorials/getting_started.md" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/guides/dogfooding.md" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/reference/cheatsheet.md" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/patterns/README.md" class="md-tabs__link">
+          
+  
+  
+  Patterns
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/semantics/index.md" class="md-tabs__link">
+          
+  
+  
+  Semantic Layer
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/validation/fk.md" class="md-tabs__link">
+          
+  
+  
+  Validation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../docs/explanation/architecture.md" class="md-tabs__link">
+          
+  
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../docs/guides/contributing.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/getting_started.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimensional Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dimensional Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/01_introduction.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/02_dimension_pattern.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/03_date_dimension_pattern.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Date Dimension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/04_fact_pattern.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/05_aggregation_pattern.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregation Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/06_full_star_schema.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Star Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/07_semantic_layer_intro.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semantic Layer Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/08_defining_metrics.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/09_defining_dimensions.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Dimensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/10_querying_metrics.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Querying Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/11_materializing_metrics.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Materializing Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/12_semantic_full_example.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semantic Full Example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/tutorials/dimensional_modeling/13_fk_validation.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/dogfooding.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dogfooding (Meta)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/writing_transformations.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/cli_master_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Master CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/python_api_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/production_deployment.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/environments.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/secrets.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/setup_azure.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/performance_tuning.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/wsl_setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/cheatsheet.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/yaml_schema.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/supported_formats.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/pipeline.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/engine.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/connections.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/reference/api/cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Patterns
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/README.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/append_only_raw.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Append-Only Raw
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/hwm_pattern_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    High Water Mark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/merge_upsert.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge/Upsert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/windowed_reprocess.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windowed Reprocess
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/dimension.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/date_dimension.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Date Dimension Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/fact.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/patterns/aggregation.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregation Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semantic Layer
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Semantic Layer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/semantics/index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/semantics/metrics.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/semantics/query.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Querying
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/semantics/materialize.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Materializing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Validation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/validation/fk.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/architecture.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/explanation/case_studies.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../docs/guides/contributing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="dimension-pattern-tutorial">Dimension Pattern Tutorial</h1>
+<p>In this tutorial, you'll learn how to use Odibi's <code>dimension</code> pattern to build dimension tables with automatic surrogate key generation and SCD (Slowly Changing Dimension) support.</p>
+<p><strong>What You'll Learn:</strong>
+- How surrogate keys are generated
+- SCD Type 0 (static) - never update
+- SCD Type 1 (overwrite) - update in place
+- SCD Type 2 (history) - track all changes
+- Unknown member handling</p>
+<hr />
+<h2 id="source-data">Source Data</h2>
+<p>We'll start with this customer data (12 rows):</p>
+<p><strong>Source Data (customers.csv) - 12 rows:</strong></p>
+<table>
+<thead>
+<tr>
+<th>customer_id</th>
+<th>name</th>
+<th>email</th>
+<th>region</th>
+<th>city</th>
+<th>state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C001</td>
+<td>Alice Johnson</td>
+<td>alice@example.com</td>
+<td>North</td>
+<td>Chicago</td>
+<td>IL</td>
+</tr>
+<tr>
+<td>C002</td>
+<td>Bob Smith</td>
+<td>bob@example.com</td>
+<td>South</td>
+<td>Houston</td>
+<td>TX</td>
+</tr>
+<tr>
+<td>C003</td>
+<td>Carol White</td>
+<td>carol@example.com</td>
+<td>North</td>
+<td>Detroit</td>
+<td>MI</td>
+</tr>
+<tr>
+<td>C004</td>
+<td>David Brown</td>
+<td>david@example.com</td>
+<td>East</td>
+<td>New York</td>
+<td>NY</td>
+</tr>
+<tr>
+<td>C005</td>
+<td>Emma Davis</td>
+<td>emma@example.com</td>
+<td>West</td>
+<td>Seattle</td>
+<td>WA</td>
+</tr>
+<tr>
+<td>C006</td>
+<td>Frank Miller</td>
+<td>frank@example.com</td>
+<td>South</td>
+<td>Miami</td>
+<td>FL</td>
+</tr>
+<tr>
+<td>C007</td>
+<td>Grace Lee</td>
+<td>grace@example.com</td>
+<td>East</td>
+<td>Boston</td>
+<td>MA</td>
+</tr>
+<tr>
+<td>C008</td>
+<td>Henry Wilson</td>
+<td>henry@example.com</td>
+<td>West</td>
+<td>Portland</td>
+<td>OR</td>
+</tr>
+<tr>
+<td>C009</td>
+<td>Ivy Chen</td>
+<td>ivy@example.com</td>
+<td>North</td>
+<td>Minneapolis</td>
+<td>MN</td>
+</tr>
+<tr>
+<td>C010</td>
+<td>Jack Taylor</td>
+<td>jack@example.com</td>
+<td>South</td>
+<td>Dallas</td>
+<td>TX</td>
+</tr>
+<tr>
+<td>C011</td>
+<td>Karen Martinez</td>
+<td>karen@example.com</td>
+<td>East</td>
+<td>Philadelphia</td>
+<td>PA</td>
+</tr>
+<tr>
+<td>C012</td>
+<td>Leo Anderson</td>
+<td>leo@example.com</td>
+<td>West</td>
+<td>Denver</td>
+<td>CO</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="step-1-scd-type-0-static-dimensions">Step 1: SCD Type 0 - Static Dimensions</h2>
+<p><strong>When to use:</strong> Reference data that never changes (country codes, fixed lookups).</p>
+<p>SCD Type 0 creates surrogate keys but never updates existing records. New records are inserted, but changes to existing records are ignored.</p>
+<h3 id="yaml-configuration">YAML Configuration</h3>
+<pre><code class="language-yaml">project: dimension_tutorial
+engine: pandas
+
+connections:
+  source:
+    type: file
+    path: ./data
+  warehouse:
+    type: file
+    path: ./warehouse
+
+story:
+  connection: warehouse
+  path: stories
+
+pipelines:
+  - pipeline: build_dim_customer_scd0
+    nodes:
+      - name: dim_customer
+        read:
+          connection: source
+          path: customers.csv
+          format: csv
+
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 0
+          unknown_member: true
+
+        write:
+          connection: warehouse
+          path: dim_customer
+          format: parquet
+          mode: overwrite
+</code></pre>
+<h3 id="output-dim_customer-13-rows">Output: dim_customer (13 rows)</h3>
+<p>After running with <code>scd_type: 0</code>, here's the dimension table with generated surrogate keys:</p>
+<table>
+<thead>
+<tr>
+<th>customer_sk</th>
+<th>customer_id</th>
+<th>name</th>
+<th>email</th>
+<th>region</th>
+<th>city</th>
+<th>state</th>
+<th>load_timestamp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>-1</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>1900-01-01 00:00:00</td>
+</tr>
+<tr>
+<td>1</td>
+<td>C001</td>
+<td>Alice Johnson</td>
+<td>alice@example.com</td>
+<td>North</td>
+<td>Chicago</td>
+<td>IL</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>2</td>
+<td>C002</td>
+<td>Bob Smith</td>
+<td>bob@example.com</td>
+<td>South</td>
+<td>Houston</td>
+<td>TX</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>3</td>
+<td>C003</td>
+<td>Carol White</td>
+<td>carol@example.com</td>
+<td>North</td>
+<td>Detroit</td>
+<td>MI</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>4</td>
+<td>C004</td>
+<td>David Brown</td>
+<td>david@example.com</td>
+<td>East</td>
+<td>New York</td>
+<td>NY</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>5</td>
+<td>C005</td>
+<td>Emma Davis</td>
+<td>emma@example.com</td>
+<td>West</td>
+<td>Seattle</td>
+<td>WA</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>6</td>
+<td>C006</td>
+<td>Frank Miller</td>
+<td>frank@example.com</td>
+<td>South</td>
+<td>Miami</td>
+<td>FL</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>7</td>
+<td>C007</td>
+<td>Grace Lee</td>
+<td>grace@example.com</td>
+<td>East</td>
+<td>Boston</td>
+<td>MA</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>8</td>
+<td>C008</td>
+<td>Henry Wilson</td>
+<td>henry@example.com</td>
+<td>West</td>
+<td>Portland</td>
+<td>OR</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>9</td>
+<td>C009</td>
+<td>Ivy Chen</td>
+<td>ivy@example.com</td>
+<td>North</td>
+<td>Minneapolis</td>
+<td>MN</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>10</td>
+<td>C010</td>
+<td>Jack Taylor</td>
+<td>jack@example.com</td>
+<td>South</td>
+<td>Dallas</td>
+<td>TX</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>11</td>
+<td>C011</td>
+<td>Karen Martinez</td>
+<td>karen@example.com</td>
+<td>East</td>
+<td>Philadelphia</td>
+<td>PA</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>12</td>
+<td>C012</td>
+<td>Leo Anderson</td>
+<td>leo@example.com</td>
+<td>West</td>
+<td>Denver</td>
+<td>CO</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key observations:</strong>
+- <strong>Row 0</strong> is the unknown member (customer_sk = 0, customer_id = -1)
+- Surrogate keys are sequential integers starting at 1
+- Each source row gets a unique SK</p>
+<hr />
+<h2 id="step-2-scd-type-1-overwrite-updates">Step 2: SCD Type 1 - Overwrite Updates</h2>
+<p><strong>When to use:</strong> Attributes where you only need the current value (email, phone, preferences).</p>
+<p>SCD Type 1 updates existing records in place when changes are detected. No history is preserved.</p>
+<h3 id="the-update-scenario">The Update Scenario</h3>
+<p>Three customers changed their email addresses:</p>
+<p><strong>Updated Source Data (customers_updated.csv) - 3 changes highlighted:</strong></p>
+<table>
+<thead>
+<tr>
+<th>customer_id</th>
+<th>name</th>
+<th>email</th>
+<th>region</th>
+<th>city</th>
+<th>state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C001</td>
+<td>Alice Johnson</td>
+<td><strong>alice.johnson@newmail.com</strong></td>
+<td>North</td>
+<td>Chicago</td>
+<td>IL</td>
+</tr>
+<tr>
+<td>C002</td>
+<td>Bob Smith</td>
+<td>bob@example.com</td>
+<td>South</td>
+<td>Houston</td>
+<td>TX</td>
+</tr>
+<tr>
+<td>C003</td>
+<td>Carol White</td>
+<td>carol@example.com</td>
+<td>North</td>
+<td>Detroit</td>
+<td>MI</td>
+</tr>
+<tr>
+<td>C004</td>
+<td>David Brown</td>
+<td><strong>david.b@corporate.com</strong></td>
+<td>East</td>
+<td>New York</td>
+<td>NY</td>
+</tr>
+<tr>
+<td>C005</td>
+<td>Emma Davis</td>
+<td>emma@example.com</td>
+<td>West</td>
+<td>Seattle</td>
+<td>WA</td>
+</tr>
+<tr>
+<td>C006</td>
+<td>Frank Miller</td>
+<td>frank@example.com</td>
+<td>South</td>
+<td>Miami</td>
+<td>FL</td>
+</tr>
+<tr>
+<td>C007</td>
+<td>Grace Lee</td>
+<td><strong>grace.lee@gmail.com</strong></td>
+<td>East</td>
+<td>Boston</td>
+<td>MA</td>
+</tr>
+<tr>
+<td>C008</td>
+<td>Henry Wilson</td>
+<td>henry@example.com</td>
+<td>West</td>
+<td>Portland</td>
+<td>OR</td>
+</tr>
+<tr>
+<td>C009</td>
+<td>Ivy Chen</td>
+<td>ivy@example.com</td>
+<td>North</td>
+<td>Minneapolis</td>
+<td>MN</td>
+</tr>
+<tr>
+<td>C010</td>
+<td>Jack Taylor</td>
+<td>jack@example.com</td>
+<td>South</td>
+<td>Dallas</td>
+<td>TX</td>
+</tr>
+<tr>
+<td>C011</td>
+<td>Karen Martinez</td>
+<td>karen@example.com</td>
+<td>East</td>
+<td>Philadelphia</td>
+<td>PA</td>
+</tr>
+<tr>
+<td>C012</td>
+<td>Leo Anderson</td>
+<td>leo@example.com</td>
+<td>West</td>
+<td>Denver</td>
+<td>CO</td>
+</tr>
+</tbody>
+</table>
+<h3 id="yaml-configuration_1">YAML Configuration</h3>
+<pre><code class="language-yaml">project: dimension_tutorial
+engine: pandas
+
+connections:
+  source:
+    type: file
+    path: ./data
+  warehouse:
+    type: file
+    path: ./warehouse
+
+story:
+  connection: warehouse
+  path: stories
+
+pipelines:
+  - pipeline: build_dim_customer_scd1
+    nodes:
+      - name: dim_customer
+        read:
+          connection: source
+          path: customers_updated.csv
+          format: csv
+
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 1
+          track_columns:
+            - name
+            - email
+            - region
+            - city
+            - state
+          target: warehouse.dim_customer
+          unknown_member: true
+          audit:
+            load_timestamp: true
+
+        write:
+          connection: warehouse
+          path: dim_customer
+          format: parquet
+          mode: overwrite
+</code></pre>
+<h3 id="before-vs-after-comparison">Before vs After Comparison</h3>
+<p><strong>BEFORE (original load):</strong></p>
+<table>
+<thead>
+<tr>
+<th>customer_sk</th>
+<th>customer_id</th>
+<th>email</th>
+<th>load_timestamp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>-1</td>
+<td>Unknown</td>
+<td>1900-01-01 00:00:00</td>
+</tr>
+<tr>
+<td>1</td>
+<td>C001</td>
+<td>alice@example.com</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>4</td>
+<td>C004</td>
+<td>david@example.com</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>7</td>
+<td>C007</td>
+<td>grace@example.com</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+</tbody>
+</table>
+<p><strong>AFTER (SCD1 update):</strong></p>
+<table>
+<thead>
+<tr>
+<th>customer_sk</th>
+<th>customer_id</th>
+<th>email</th>
+<th>load_timestamp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>-1</td>
+<td>Unknown</td>
+<td>1900-01-01 00:00:00</td>
+</tr>
+<tr>
+<td>1</td>
+<td>C001</td>
+<td><strong>alice.johnson@newmail.com</strong></td>
+<td><strong>2024-01-20 14:30:00</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>C004</td>
+<td><strong>david.b@corporate.com</strong></td>
+<td><strong>2024-01-20 14:30:00</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td>C007</td>
+<td><strong>grace.lee@gmail.com</strong></td>
+<td><strong>2024-01-20 14:30:00</strong></td>
+</tr>
+<tr>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key observations:</strong>
+- <strong>Same surrogate keys</strong> - C001 is still customer_sk = 1
+- <strong>Values updated in place</strong> - old emails are gone
+- <strong>Timestamp updated</strong> - shows when the record was last modified
+- <strong>No history preserved</strong> - we can't see the old email addresses</p>
+<h3 id="complete-scd1-output-13-rows">Complete SCD1 Output (13 rows)</h3>
+<table>
+<thead>
+<tr>
+<th>customer_sk</th>
+<th>customer_id</th>
+<th>name</th>
+<th>email</th>
+<th>region</th>
+<th>city</th>
+<th>state</th>
+<th>load_timestamp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>-1</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>1900-01-01 00:00:00</td>
+</tr>
+<tr>
+<td>1</td>
+<td>C001</td>
+<td>Alice Johnson</td>
+<td>alice.johnson@newmail.com</td>
+<td>North</td>
+<td>Chicago</td>
+<td>IL</td>
+<td>2024-01-20 14:30:00</td>
+</tr>
+<tr>
+<td>2</td>
+<td>C002</td>
+<td>Bob Smith</td>
+<td>bob@example.com</td>
+<td>South</td>
+<td>Houston</td>
+<td>TX</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>3</td>
+<td>C003</td>
+<td>Carol White</td>
+<td>carol@example.com</td>
+<td>North</td>
+<td>Detroit</td>
+<td>MI</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>4</td>
+<td>C004</td>
+<td>David Brown</td>
+<td>david.b@corporate.com</td>
+<td>East</td>
+<td>New York</td>
+<td>NY</td>
+<td>2024-01-20 14:30:00</td>
+</tr>
+<tr>
+<td>5</td>
+<td>C005</td>
+<td>Emma Davis</td>
+<td>emma@example.com</td>
+<td>West</td>
+<td>Seattle</td>
+<td>WA</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>6</td>
+<td>C006</td>
+<td>Frank Miller</td>
+<td>frank@example.com</td>
+<td>South</td>
+<td>Miami</td>
+<td>FL</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>7</td>
+<td>C007</td>
+<td>Grace Lee</td>
+<td>grace.lee@gmail.com</td>
+<td>East</td>
+<td>Boston</td>
+<td>MA</td>
+<td>2024-01-20 14:30:00</td>
+</tr>
+<tr>
+<td>8</td>
+<td>C008</td>
+<td>Henry Wilson</td>
+<td>henry@example.com</td>
+<td>West</td>
+<td>Portland</td>
+<td>OR</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>9</td>
+<td>C009</td>
+<td>Ivy Chen</td>
+<td>ivy@example.com</td>
+<td>North</td>
+<td>Minneapolis</td>
+<td>MN</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>10</td>
+<td>C010</td>
+<td>Jack Taylor</td>
+<td>jack@example.com</td>
+<td>South</td>
+<td>Dallas</td>
+<td>TX</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>11</td>
+<td>C011</td>
+<td>Karen Martinez</td>
+<td>karen@example.com</td>
+<td>East</td>
+<td>Philadelphia</td>
+<td>PA</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+<tr>
+<td>12</td>
+<td>C012</td>
+<td>Leo Anderson</td>
+<td>leo@example.com</td>
+<td>West</td>
+<td>Denver</td>
+<td>CO</td>
+<td>2024-01-15 10:00:00</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="step-3-scd-type-2-full-history-tracking">Step 3: SCD Type 2 - Full History Tracking</h2>
+<p><strong>When to use:</strong> Attributes where historical accuracy matters (address for shipping analysis, tier for billing history).</p>
+<p>SCD Type 2 preserves full history by creating a new row for each change. Old versions are closed with a <code>valid_to</code> date.</p>
+<h3 id="the-history-scenario">The History Scenario</h3>
+<p>Same three customers changed their emails. With SCD2, we keep both versions:</p>
+<h3 id="yaml-configuration_2">YAML Configuration</h3>
+<pre><code class="language-yaml">project: dimension_tutorial
+engine: pandas
+
+connections:
+  source:
+    type: file
+    path: ./data
+  warehouse:
+    type: file
+    path: ./warehouse
+
+story:
+  connection: warehouse
+  path: stories
+
+pipelines:
+  - pipeline: build_dim_customer_scd2
+    nodes:
+      - name: dim_customer
+        read:
+          connection: source
+          path: customers_updated.csv
+          format: csv
+
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_columns:
+            - name
+            - email
+            - region
+            - city
+            - state
+          target: warehouse.dim_customer
+          valid_from_col: valid_from
+          valid_to_col: valid_to
+          is_current_col: is_current
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: &quot;crm&quot;
+
+        write:
+          connection: warehouse
+          path: dim_customer
+          format: parquet
+          mode: overwrite
+</code></pre>
+<h3 id="output-full-history-16-rows">Output: Full History (16 rows)</h3>
+<table>
+<thead>
+<tr>
+<th>customer_sk</th>
+<th>customer_id</th>
+<th>name</th>
+<th>email</th>
+<th>region</th>
+<th>valid_from</th>
+<th>valid_to</th>
+<th>is_current</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>-1</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>1900-01-01</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>1</td>
+<td>C001</td>
+<td>Alice Johnson</td>
+<td>alice@example.com</td>
+<td>North</td>
+<td>2024-01-15</td>
+<td>2024-01-20</td>
+<td><strong>false</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>C002</td>
+<td>Bob Smith</td>
+<td>bob@example.com</td>
+<td>South</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>3</td>
+<td>C003</td>
+<td>Carol White</td>
+<td>carol@example.com</td>
+<td>North</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>4</td>
+<td>C004</td>
+<td>David Brown</td>
+<td>david@example.com</td>
+<td>East</td>
+<td>2024-01-15</td>
+<td>2024-01-20</td>
+<td><strong>false</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>C005</td>
+<td>Emma Davis</td>
+<td>emma@example.com</td>
+<td>West</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>6</td>
+<td>C006</td>
+<td>Frank Miller</td>
+<td>frank@example.com</td>
+<td>South</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>7</td>
+<td>C007</td>
+<td>Grace Lee</td>
+<td>grace@example.com</td>
+<td>East</td>
+<td>2024-01-15</td>
+<td>2024-01-20</td>
+<td><strong>false</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td>C008</td>
+<td>Henry Wilson</td>
+<td>henry@example.com</td>
+<td>West</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>9</td>
+<td>C009</td>
+<td>Ivy Chen</td>
+<td>ivy@example.com</td>
+<td>North</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>10</td>
+<td>C010</td>
+<td>Jack Taylor</td>
+<td>jack@example.com</td>
+<td>South</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>11</td>
+<td>C011</td>
+<td>Karen Martinez</td>
+<td>karen@example.com</td>
+<td>East</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td>12</td>
+<td>C012</td>
+<td>Leo Anderson</td>
+<td>leo@example.com</td>
+<td>West</td>
+<td>2024-01-15</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+<tr>
+<td><strong>13</strong></td>
+<td>C001</td>
+<td>Alice Johnson</td>
+<td><strong>alice.johnson@newmail.com</strong></td>
+<td>North</td>
+<td>2024-01-20</td>
+<td>NULL</td>
+<td><strong>true</strong></td>
+</tr>
+<tr>
+<td><strong>14</strong></td>
+<td>C004</td>
+<td>David Brown</td>
+<td><strong>david.b@corporate.com</strong></td>
+<td>East</td>
+<td>2024-01-20</td>
+<td>NULL</td>
+<td><strong>true</strong></td>
+</tr>
+<tr>
+<td><strong>15</strong></td>
+<td>C007</td>
+<td>Grace Lee</td>
+<td><strong>grace.lee@gmail.com</strong></td>
+<td>East</td>
+<td>2024-01-20</td>
+<td>NULL</td>
+<td><strong>true</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key observations:</strong>
+- <strong>New surrogate keys</strong> for new versions (13, 14, 15)
+- <strong>Old versions marked closed</strong> (is_current = false, valid_to = 2024-01-20)
+- <strong>New versions marked current</strong> (is_current = true, valid_to = NULL)
+- <strong>Full history preserved</strong> - we can query data as of any point in time</p>
+<h3 id="how-to-query-scd2">How to Query SCD2</h3>
+<p><strong>Current view (most common):</strong></p>
+<pre><code class="language-sql">SELECT * FROM dim_customer WHERE is_current = true;
+</code></pre>
+<p><strong>Point-in-time query (as of January 17):</strong></p>
+<pre><code class="language-sql">SELECT * FROM dim_customer 
+WHERE '2024-01-17' &gt;= valid_from 
+  AND ('2024-01-17' &lt; valid_to OR valid_to IS NULL);
+</code></pre>
+<p><strong>Customer C001's email history:</strong></p>
+<pre><code class="language-sql">SELECT customer_sk, email, valid_from, valid_to 
+FROM dim_customer 
+WHERE customer_id = 'C001'
+ORDER BY valid_from;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>customer_sk</th>
+<th>email</th>
+<th>valid_from</th>
+<th>valid_to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>alice@example.com</td>
+<td>2024-01-15</td>
+<td>2024-01-20</td>
+</tr>
+<tr>
+<td>13</td>
+<td>alice.johnson@newmail.com</td>
+<td>2024-01-20</td>
+<td>NULL</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="understanding-the-unknown-member">Understanding the Unknown Member</h2>
+<p>The unknown member row (customer_sk = 0) is automatically created when <code>unknown_member: true</code>:</p>
+<table>
+<thead>
+<tr>
+<th>customer_sk</th>
+<th>customer_id</th>
+<th>name</th>
+<th>email</th>
+<th>all other columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>-1</td>
+<td>Unknown</td>
+<td>Unknown</td>
+<td>Unknown</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why it matters:</strong></p>
+<p>When building fact tables, orders might reference a customer_id that doesn't exist in the dimension (data quality issue, late-arriving data, etc.). Instead of:
+- Failing the pipeline (strict but inflexible)
+- Losing the order data (dangerous)</p>
+<p>We assign those orphan records to customer_sk = 0. This:
+- Preserves all fact data
+- Makes orphans easily identifiable
+- Allows later cleanup/investigation</p>
+<hr />
+<h2 id="complete-runnable-example">Complete Runnable Example</h2>
+<p>Here's a complete YAML file you can run:</p>
+<pre><code class="language-yaml"># File: odibi_dimension_tutorial.yaml
+project: dimension_tutorial
+engine: pandas
+
+connections:
+  source:
+    type: file
+    path: ./examples/tutorials/dimensional_modeling/data
+  warehouse:
+    type: file
+    path: ./warehouse
+
+story:
+  connection: warehouse
+  path: stories
+
+pipelines:
+  # Initial load with SCD2
+  - pipeline: initial_load
+    description: &quot;First load of customer dimension&quot;
+    nodes:
+      - name: dim_customer
+        description: &quot;Customer dimension with SCD2 history tracking&quot;
+        read:
+          connection: source
+          path: customers.csv
+          format: csv
+
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_columns:
+            - name
+            - email
+            - region
+            - city
+            - state
+          target: warehouse.dim_customer
+          valid_from_col: valid_from
+          valid_to_col: valid_to
+          is_current_col: is_current
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: &quot;crm&quot;
+
+        write:
+          connection: warehouse
+          path: dim_customer
+          format: parquet
+          mode: overwrite
+
+  # Incremental update with changes
+  - pipeline: incremental_update
+    description: &quot;Process updates to customer dimension&quot;
+    nodes:
+      - name: dim_customer
+        description: &quot;Update customer dimension with new email addresses&quot;
+        read:
+          connection: source
+          path: customers_updated.csv
+          format: csv
+
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_columns:
+            - name
+            - email
+            - region
+            - city
+            - state
+          target: warehouse.dim_customer
+          valid_from_col: valid_from
+          valid_to_col: valid_to
+          is_current_col: is_current
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: &quot;crm&quot;
+
+        write:
+          connection: warehouse
+          path: dim_customer
+          format: parquet
+          mode: overwrite
+</code></pre>
+<hr />
+<h2 id="python-api-alternative">Python API Alternative</h2>
+<p>If you prefer Python over YAML:</p>
+<pre><code class="language-python">from odibi.patterns.dimension import DimensionPattern
+from odibi.context import EngineContext
+from odibi.enums import EngineType
+import pandas as pd
+
+# Load source data
+source_df = pd.read_csv(&quot;examples/tutorials/dimensional_modeling/data/customers.csv&quot;)
+
+# Create pattern
+pattern = DimensionPattern(params={
+    &quot;natural_key&quot;: &quot;customer_id&quot;,
+    &quot;surrogate_key&quot;: &quot;customer_sk&quot;,
+    &quot;scd_type&quot;: 2,
+    &quot;track_columns&quot;: [&quot;name&quot;, &quot;email&quot;, &quot;region&quot;, &quot;city&quot;, &quot;state&quot;],
+    &quot;unknown_member&quot;: True,
+    &quot;audit&quot;: {
+        &quot;load_timestamp&quot;: True,
+        &quot;source_system&quot;: &quot;crm&quot;
+    }
+})
+
+# Validate configuration
+pattern.validate()
+
+# Execute pattern
+context = EngineContext(df=source_df, engine_type=EngineType.PANDAS)
+result_df = pattern.execute(context)
+
+# View results
+print(f&quot;Generated {len(result_df)} dimension rows&quot;)
+print(result_df.head(15))
+</code></pre>
+<hr />
+<h2 id="what-you-learned">What You Learned</h2>
+<p>In this tutorial, you learned:</p>
+<ul>
+<li><strong>SCD Type 0</strong> creates surrogate keys but never updates existing records</li>
+<li><strong>SCD Type 1</strong> updates records in place, losing history but keeping current data</li>
+<li><strong>SCD Type 2</strong> creates new rows for changes, preserving full history with valid_from/valid_to dates</li>
+<li><strong>Surrogate keys</strong> are auto-generated integers, sequential starting from 1</li>
+<li><strong>Unknown member</strong> (SK=0) provides a default for orphan FK handling</li>
+<li><strong>track_columns</strong> defines which columns trigger a new version in SCD1/SCD2</li>
+<li><strong>Audit columns</strong> (load_timestamp, source_system) track when/where data came from</li>
+</ul>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<p>Now that you can build customer dimensions, let's create a date dimension that's automatically generated.</p>
+<p><strong>Next:</strong> <a href="../03_date_dimension_pattern/">Date Dimension Pattern Tutorial</a></p>
+<hr />
+<h2 id="navigation">Navigation</h2>
+<table>
+<thead>
+<tr>
+<th>Previous</th>
+<th>Up</th>
+<th>Next</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../01_introduction/">Introduction</a></td>
+<td><a href="../../getting_started/">Tutorials</a></td>
+<td><a href="../03_date_dimension_pattern/">Date Dimension</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="reference">Reference</h2>
+<p>For complete parameter documentation, see: <a href="../../../patterns/dimension/">Dimension Pattern Reference</a></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "toc.integrate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

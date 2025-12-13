@@ -1,0 +1,2516 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/henryodibi11/Odibi/main/docs/schemas/odibi.json",
+  "title": "ProjectConfig",
+  "description": "Complete project configuration from YAML.\n\n### \ud83c\udfe2 \"Enterprise Setup\" Guide\n\n**Business Problem:**\n\"We need a robust production environment with alerts, retries, and proper logging.\"\n\n**Recipe: Production Ready**\n```yaml\nproject: \"Customer360\"\nengine: \"spark\"\n\n# 1. Resilience\nretry:\n  enabled: true\n  max_attempts: 3\n  backoff: \"exponential\"\n\n# 2. Observability\nlogging:\n  level: \"INFO\"\n  structured: true  # JSON logs for Splunk/Datadog\n\n# 3. Alerting\nalerts:\n  - type: \"slack\"\n    url: \"${SLACK_WEBHOOK_URL}\"\n    on_events: [\"on_failure\"]\n\n# ... connections and pipelines ...\n```",
+  "properties": {
+    "project": {
+      "description": "Project name",
+      "title": "Project",
+      "type": "string"
+    },
+    "engine": {
+      "$ref": "#/$defs/EngineType",
+      "default": "pandas",
+      "description": "Execution engine"
+    },
+    "connections": {
+      "additionalProperties": {
+        "discriminator": {
+          "mapping": {
+            "azure_blob": "#/$defs/AzureBlobConnectionConfig",
+            "delta": "#/$defs/DeltaConnectionConfig",
+            "http": "#/$defs/HttpConnectionConfig",
+            "local": "#/$defs/LocalConnectionConfig",
+            "sql_server": "#/$defs/SQLServerConnectionConfig"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/LocalConnectionConfig"
+          },
+          {
+            "$ref": "#/$defs/AzureBlobConnectionConfig"
+          },
+          {
+            "$ref": "#/$defs/DeltaConnectionConfig"
+          },
+          {
+            "$ref": "#/$defs/SQLServerConnectionConfig"
+          },
+          {
+            "$ref": "#/$defs/HttpConnectionConfig"
+          }
+        ]
+      },
+      "description": "Named connections (at least one required)",
+      "title": "Connections",
+      "type": "object"
+    },
+    "pipelines": {
+      "description": "Pipeline definitions (at least one required)",
+      "items": {
+        "$ref": "#/$defs/PipelineConfig"
+      },
+      "title": "Pipelines",
+      "type": "array"
+    },
+    "story": {
+      "$ref": "#/$defs/StoryConfig",
+      "description": "Story generation configuration (mandatory)"
+    },
+    "system": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SystemConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "System Catalog configuration"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Project description",
+      "title": "Description"
+    },
+    "version": {
+      "default": "1.0.0",
+      "description": "Project version",
+      "title": "Version",
+      "type": "string"
+    },
+    "owner": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Project owner/contact",
+      "title": "Owner"
+    },
+    "vars": {
+      "additionalProperties": true,
+      "description": "Global variables for substitution (e.g. ${vars.env})",
+      "title": "Vars",
+      "type": "object"
+    },
+    "retry": {
+      "$ref": "#/$defs/RetryConfig"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig"
+    },
+    "alerts": {
+      "description": "Alert configurations",
+      "items": {
+        "$ref": "#/$defs/AlertConfig"
+      },
+      "title": "Alerts",
+      "type": "array"
+    },
+    "performance": {
+      "$ref": "#/$defs/PerformanceConfig",
+      "description": "Performance tuning"
+    },
+    "environments": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Structure: same as ProjectConfig but with only overridden fields. Not yet validated strictly.",
+      "title": "Environments"
+    }
+  },
+  "required": [
+    "project",
+    "connections",
+    "pipelines",
+    "story"
+  ],
+  "type": "object",
+  "$defs": {
+    "AcceptedValuesTest": {
+      "properties": {
+        "type": {
+          "const": "accepted_values",
+          "default": "accepted_values",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the check",
+          "title": "Name"
+        },
+        "column": {
+          "title": "Column",
+          "type": "string"
+        },
+        "values": {
+          "items": {},
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "column",
+        "values"
+      ],
+      "title": "AcceptedValuesTest",
+      "type": "object"
+    },
+    "AlertConfig": {
+      "description": "Configuration for alerts.\n\nExample:\n```yaml\nalerts:\n  - type: \"slack\"\n    url: \"https://hooks.slack.com/...\"\n    on_events: [\"on_failure\"]\n```",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/AlertType"
+        },
+        "url": {
+          "description": "Webhook URL",
+          "title": "Url",
+          "type": "string"
+        },
+        "on_events": {
+          "default": [
+            "on_failure"
+          ],
+          "description": "Events to trigger alert: on_start, on_success, on_failure",
+          "items": {
+            "$ref": "#/$defs/AlertEvent"
+          },
+          "title": "On Events",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Extra metadata for alert (must be JSON-serializable, e.g. simple strings/numbers)",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ],
+      "title": "AlertConfig",
+      "type": "object"
+    },
+    "AlertEvent": {
+      "description": "Events that trigger alerts.",
+      "enum": [
+        "on_start",
+        "on_success",
+        "on_failure"
+      ],
+      "title": "AlertEvent",
+      "type": "string"
+    },
+    "AlertType": {
+      "description": "Types of alerting channels.",
+      "enum": [
+        "webhook",
+        "slack",
+        "teams"
+      ],
+      "title": "AlertType",
+      "type": "string"
+    },
+    "AutoOptimizeConfig": {
+      "description": "Configuration for Delta Lake automatic optimization.\n\nExample:\n```yaml\nauto_optimize:\n  enabled: true\n  vacuum_retention_hours: 168\n```",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "description": "Enable auto optimization",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "vacuum_retention_hours": {
+          "default": 168,
+          "description": "Hours to retain history for VACUUM (default 7 days). Set to 0 to disable VACUUM.",
+          "title": "Vacuum Retention Hours",
+          "type": "integer"
+        }
+      },
+      "title": "AutoOptimizeConfig",
+      "type": "object"
+    },
+    "AzureBlobAccountKeyAuth": {
+      "properties": {
+        "mode": {
+          "const": "account_key",
+          "default": "account_key",
+          "title": "Mode",
+          "type": "string"
+        },
+        "account_key": {
+          "title": "Account Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_key"
+      ],
+      "title": "AzureBlobAccountKeyAuth",
+      "type": "object"
+    },
+    "AzureBlobConnectionConfig": {
+      "description": "Azure Blob Storage connection.\n\nScenario 1: Prod with Key Vault-managed key\n```yaml\nadls_bronze:\n  type: \"azure_blob\"\n  account_name: \"myaccount\"\n  container: \"bronze\"\n  auth:\n    mode: \"key_vault\"\n    key_vault: \"kv-data\"\n    secret: \"adls-account-key\"\n```\n\nScenario 2: Local dev with inline account key\n```yaml\nadls_dev:\n  type: \"azure_blob\"\n  account_name: \"devaccount\"\n  container: \"sandbox\"\n  auth:\n    mode: \"account_key\"\n    account_key: \"${ADLS_ACCOUNT_KEY}\"\n```\n\nScenario 3: MSI (no secrets)\n```yaml\nadls_msi:\n  type: \"azure_blob\"\n  account_name: \"myaccount\"\n  container: \"bronze\"\n  auth:\n    mode: \"aad_msi\"\n    # optional: client_id for user-assigned identity\n    client_id: \"00000000-0000-0000-0000-000000000000\"\n```",
+      "properties": {
+        "type": {
+          "const": "azure_blob",
+          "default": "azure_blob",
+          "title": "Type",
+          "type": "string"
+        },
+        "validation_mode": {
+          "$ref": "#/$defs/ValidationMode",
+          "default": "lazy"
+        },
+        "account_name": {
+          "title": "Account Name",
+          "type": "string"
+        },
+        "container": {
+          "title": "Container",
+          "type": "string"
+        },
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "aad_msi": "#/$defs/AzureBlobMsiAuth",
+              "account_key": "#/$defs/AzureBlobAccountKeyAuth",
+              "connection_string": "#/$defs/AzureBlobConnectionStringAuth",
+              "key_vault": "#/$defs/AzureBlobKeyVaultAuth",
+              "sas": "#/$defs/AzureBlobSasAuth"
+            },
+            "propertyName": "mode"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AzureBlobKeyVaultAuth"
+            },
+            {
+              "$ref": "#/$defs/AzureBlobAccountKeyAuth"
+            },
+            {
+              "$ref": "#/$defs/AzureBlobSasAuth"
+            },
+            {
+              "$ref": "#/$defs/AzureBlobConnectionStringAuth"
+            },
+            {
+              "$ref": "#/$defs/AzureBlobMsiAuth"
+            }
+          ],
+          "title": "Auth"
+        }
+      },
+      "required": [
+        "account_name",
+        "container"
+      ],
+      "title": "AzureBlobConnectionConfig",
+      "type": "object"
+    },
+    "AzureBlobConnectionStringAuth": {
+      "properties": {
+        "mode": {
+          "const": "connection_string",
+          "default": "connection_string",
+          "title": "Mode",
+          "type": "string"
+        },
+        "connection_string": {
+          "title": "Connection String",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_string"
+      ],
+      "title": "AzureBlobConnectionStringAuth",
+      "type": "object"
+    },
+    "AzureBlobKeyVaultAuth": {
+      "properties": {
+        "mode": {
+          "const": "key_vault",
+          "default": "key_vault",
+          "title": "Mode",
+          "type": "string"
+        },
+        "key_vault": {
+          "title": "Key Vault",
+          "type": "string"
+        },
+        "secret": {
+          "title": "Secret",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_vault",
+        "secret"
+      ],
+      "title": "AzureBlobKeyVaultAuth",
+      "type": "object"
+    },
+    "AzureBlobMsiAuth": {
+      "properties": {
+        "mode": {
+          "const": "aad_msi",
+          "default": "aad_msi",
+          "title": "Mode",
+          "type": "string"
+        },
+        "client_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client Id"
+        }
+      },
+      "title": "AzureBlobMsiAuth",
+      "type": "object"
+    },
+    "AzureBlobSasAuth": {
+      "properties": {
+        "mode": {
+          "const": "sas",
+          "default": "sas",
+          "title": "Mode",
+          "type": "string"
+        },
+        "sas_token": {
+          "title": "Sas Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sas_token"
+      ],
+      "title": "AzureBlobSasAuth",
+      "type": "object"
+    },
+    "BackoffStrategy": {
+      "enum": [
+        "exponential",
+        "linear",
+        "constant"
+      ],
+      "title": "BackoffStrategy",
+      "type": "string"
+    },
+    "ColumnMetadata": {
+      "description": "Metadata for a column in the data dictionary.",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column description",
+          "title": "Description"
+        },
+        "pii": {
+          "default": false,
+          "description": "Contains PII?",
+          "title": "Pii",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Tags (e.g. 'business_key', 'measure')",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "title": "ColumnMetadata",
+      "type": "object"
+    },
+    "CustomSQLTest": {
+      "properties": {
+        "type": {
+          "const": "custom_sql",
+          "default": "custom_sql",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the check",
+          "title": "Name"
+        },
+        "condition": {
+          "title": "Condition",
+          "type": "string"
+        },
+        "threshold": {
+          "default": 0.0,
+          "description": "Failure rate threshold (0.0 = strictly no failures allowed)",
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "condition"
+      ],
+      "title": "CustomSQLTest",
+      "type": "object"
+    },
+    "DeltaConnectionConfig": {
+      "description": "Delta Lake connection.\n\nScenario 1: Delta via metastore\n```yaml\ndelta_silver:\n  type: \"delta\"\n  catalog: \"spark_catalog\"\n  schema: \"silver_db\"\n```\n\nScenario 2: Direct path + Node usage\n```yaml\ndelta_local:\n  type: \"local\"\n  base_path: \"dbfs:/mnt/delta\"\n\n# In pipeline:\n# read:\n#   connection: \"delta_local\"\n#   format: \"delta\"\n#   path: \"bronze/orders\"\n```",
+      "properties": {
+        "type": {
+          "const": "delta",
+          "default": "delta",
+          "title": "Type",
+          "type": "string"
+        },
+        "validation_mode": {
+          "$ref": "#/$defs/ValidationMode",
+          "default": "lazy"
+        },
+        "catalog": {
+          "description": "Spark catalog name (e.g. 'spark_catalog')",
+          "title": "Catalog",
+          "type": "string"
+        },
+        "schema": {
+          "description": "Database/schema name",
+          "title": "Schema",
+          "type": "string"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional default table name for this connection (used by story/pipeline helpers)",
+          "title": "Table"
+        }
+      },
+      "required": [
+        "catalog",
+        "schema"
+      ],
+      "title": "DeltaConnectionConfig",
+      "type": "object"
+    },
+    "EngineType": {
+      "description": "Supported execution engines.",
+      "enum": [
+        "spark",
+        "pandas"
+      ],
+      "title": "EngineType",
+      "type": "string"
+    },
+    "ErrorStrategy": {
+      "description": "Strategy for handling node failures.",
+      "enum": [
+        "fail_fast",
+        "fail_later",
+        "ignore"
+      ],
+      "title": "ErrorStrategy",
+      "type": "string"
+    },
+    "HttpApiKeyAuth": {
+      "properties": {
+        "mode": {
+          "const": "api_key",
+          "default": "api_key",
+          "title": "Mode",
+          "type": "string"
+        },
+        "header_name": {
+          "default": "Authorization",
+          "title": "Header Name",
+          "type": "string"
+        },
+        "value_template": {
+          "default": "Bearer {token}",
+          "title": "Value Template",
+          "type": "string"
+        }
+      },
+      "title": "HttpApiKeyAuth",
+      "type": "object"
+    },
+    "HttpBasicAuth": {
+      "properties": {
+        "mode": {
+          "const": "basic",
+          "default": "basic",
+          "title": "Mode",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "password": {
+          "title": "Password",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "title": "HttpBasicAuth",
+      "type": "object"
+    },
+    "HttpBearerAuth": {
+      "properties": {
+        "mode": {
+          "const": "bearer",
+          "default": "bearer",
+          "title": "Mode",
+          "type": "string"
+        },
+        "token": {
+          "title": "Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "title": "HttpBearerAuth",
+      "type": "object"
+    },
+    "HttpConnectionConfig": {
+      "description": "HTTP connection.\n\nScenario: Bearer token via env var\n```yaml\napi_source:\n  type: \"http\"\n  base_url: \"https://api.example.com\"\n  headers:\n    User-Agent: \"odibi-pipeline\"\n  auth:\n    mode: \"bearer\"\n    token: \"${API_TOKEN}\"\n```",
+      "properties": {
+        "type": {
+          "const": "http",
+          "default": "http",
+          "title": "Type",
+          "type": "string"
+        },
+        "validation_mode": {
+          "$ref": "#/$defs/ValidationMode",
+          "default": "lazy"
+        },
+        "base_url": {
+          "title": "Base Url",
+          "type": "string"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Headers",
+          "type": "object"
+        },
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "api_key": "#/$defs/HttpApiKeyAuth",
+              "basic": "#/$defs/HttpBasicAuth",
+              "bearer": "#/$defs/HttpBearerAuth",
+              "none": "#/$defs/HttpNoAuth"
+            },
+            "propertyName": "mode"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/HttpNoAuth"
+            },
+            {
+              "$ref": "#/$defs/HttpBasicAuth"
+            },
+            {
+              "$ref": "#/$defs/HttpBearerAuth"
+            },
+            {
+              "$ref": "#/$defs/HttpApiKeyAuth"
+            }
+          ],
+          "title": "Auth"
+        }
+      },
+      "required": [
+        "base_url"
+      ],
+      "title": "HttpConnectionConfig",
+      "type": "object"
+    },
+    "HttpNoAuth": {
+      "properties": {
+        "mode": {
+          "const": "none",
+          "default": "none",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "HttpNoAuth",
+      "type": "object"
+    },
+    "IncrementalConfig": {
+      "description": "Configuration for automatic incremental loading.\n\nModes:\n1. **Rolling Window** (Default): Uses a time-based lookback from NOW().\n   Good for: Stateless loading where you just want \"recent\" data.\n   Args: `lookback`, `unit`\n\n2. **Stateful**: Tracks the High-Water Mark (HWM) of the key column.\n   Good for: Exact incremental ingestion (e.g. CDC-like).\n   Args: `state_key` (optional), `watermark_lag` (optional)\n\nGenerates SQL:\n- Rolling: `WHERE column >= NOW() - lookback`\n- Stateful: `WHERE column > last_hwm - lag`",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/IncrementalMode",
+          "default": "rolling_window",
+          "description": "Incremental strategy: 'rolling_window' or 'stateful'"
+        },
+        "key_column": {
+          "description": "Primary column to filter on (e.g., updated_at)",
+          "title": "Key Column",
+          "type": "string"
+        },
+        "fallback_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Backup column if primary is NULL (e.g., created_at). Generates COALESCE(col, fallback) >= ...",
+          "title": "Fallback Column"
+        },
+        "lookback": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Time units to look back (Rolling Window only)",
+          "title": "Lookback"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IncrementalUnit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Time unit for lookback (Rolling Window only). Options: 'hour', 'day', 'month', 'year'"
+        },
+        "state_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique ID for state tracking. Defaults to node name if not provided.",
+          "title": "State Key"
+        },
+        "watermark_lag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Safety buffer to handle late-arriving data. Subtracts this duration (e.g., '2h', '30m') from the stored High Water Mark when generating the query. Useful if your source system has eventual consistency or replication lag.",
+          "title": "Watermark Lag"
+        }
+      },
+      "required": [
+        "key_column"
+      ],
+      "title": "IncrementalConfig",
+      "type": "object"
+    },
+    "IncrementalMode": {
+      "description": "Mode for incremental loading.",
+      "enum": [
+        "rolling_window",
+        "stateful"
+      ],
+      "title": "IncrementalMode",
+      "type": "string"
+    },
+    "IncrementalUnit": {
+      "description": "Time units for incremental lookback.\n\nValues:\n* `hour`\n* `day`\n* `month`\n* `year`",
+      "enum": [
+        "hour",
+        "day",
+        "month",
+        "year"
+      ],
+      "title": "IncrementalUnit",
+      "type": "string"
+    },
+    "LocalConnectionConfig": {
+      "description": "Local filesystem connection.\n\nExample:\n```yaml\nlocal_data:\n  type: \"local\"\n  base_path: \"./data\"\n```",
+      "properties": {
+        "type": {
+          "const": "local",
+          "default": "local",
+          "title": "Type",
+          "type": "string"
+        },
+        "validation_mode": {
+          "$ref": "#/$defs/ValidationMode",
+          "default": "lazy"
+        },
+        "base_path": {
+          "default": "./data",
+          "description": "Base directory path",
+          "title": "Base Path",
+          "type": "string"
+        }
+      },
+      "title": "LocalConnectionConfig",
+      "type": "object"
+    },
+    "LogLevel": {
+      "description": "Logging levels.",
+      "enum": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    },
+    "LoggingConfig": {
+      "description": "Logging configuration.\n\nExample:\n```yaml\nlogging:\n  level: \"INFO\"\n  structured: true\n```",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO"
+        },
+        "structured": {
+          "default": false,
+          "description": "Output JSON logs",
+          "title": "Structured",
+          "type": "boolean"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Extra metadata in logs",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "title": "LoggingConfig",
+      "type": "object"
+    },
+    "NodeConfig": {
+      "description": "Configuration for a single node.\n\n### \ud83e\udde0 \"The Smart Node\" Pattern\n\n**Business Problem:**\n\"We need complex dependencies, caching for heavy computations, and the ability to run only specific parts of the pipeline.\"\n\n**The Solution:**\nNodes are the building blocks. They handle dependencies (`depends_on`), execution control (`tags`, `enabled`), and performance (`cache`).\n\n### \ud83d\udd78\ufe0f DAG & Dependencies\n**The Glue of the Pipeline.**\nNodes don't run in isolation. They form a Directed Acyclic Graph (DAG).\n\n*   **`depends_on`**: Critical! If Node B reads from Node A (in memory), you MUST list `[\"Node A\"]`.\n    *   *Implicit Data Flow*: If a node has no `read` block, it automatically picks up the DataFrame from its first dependency.\n\n### \ud83c\udff7\ufe0f Orchestration Tags\n**Run What You Need.**\nTags allow you to execute slices of your pipeline.\n*   `odibi run --tag daily` -> Runs all nodes with \"daily\" tag.\n*   `odibi run --tag critical` -> Runs high-priority nodes.\n\n### \ud83e\udd16 Choosing Your Logic: Transformer vs. Transform\n\n**1. The \"Transformer\" (Top-Level)**\n*   **What it is:** A pre-packaged, heavy-duty operation that defines the *entire purpose* of the node.\n*   **When to use:** When applying a standard Data Engineering pattern (e.g., SCD2, Merge, Deduplicate).\n*   **Analogy:** \"Run this App.\"\n*   **Syntax:** `transformer: \"scd2\"` + `params: {...}`\n\n**2. The \"Transform Steps\" (Process Chain)**\n*   **What it is:** A sequence of smaller steps (SQL, functions, operations) executed in order.\n*   **When to use:** For custom business logic, data cleaning, or feature engineering pipelines.\n*   **Analogy:** \"Run this Script.\"\n*   **Syntax:** `transform: { steps: [...] }`\n\n*Note: You can use both! The `transformer` runs first, then `transform` steps refine the result.*\n\n### \ud83d\udd17 Chaining Operations\n**You can mix and match!**\nThe execution order is always:\n1.  **Read** (or Dependency Injection)\n2.  **Transformer** (The \"App\" logic, e.g., Deduplicate)\n3.  **Transform Steps** (The \"Script\" logic, e.g., cleanup)\n4.  **Validation**\n5.  **Write**\n\n*Constraint:* You must define **at least one** of `read`, `transformer`, `transform`, or `write`.\n\n### \u26a1 Example: App vs. Script\n\n**Scenario 1: The Full ETL Flow (Chained)**\n*Shows explicit Read, Transform Chain, and Write.*\n\n```yaml\n# 1. Ingest (The Dependency)\n- name: \"load_raw_users\"\n  read: { connection: \"s3_landing\", format: \"json\", path: \"users/*.json\" }\n  write: { connection: \"bronze\", format: \"parquet\", path: \"users_raw\" }\n\n# 2. Process (The Consumer)\n- name: \"clean_users\"\n  depends_on: [\"load_raw_users\"]\n\n  # \"clean_text\" is a registered function from the Transformer Catalog\n  transform:\n    steps:\n      - sql: \"SELECT * FROM df WHERE email IS NOT NULL\"\n      - function: \"clean_text\"\n        params: { columns: [\"email\"], case: \"lower\" }\n\n  write: { connection: \"silver\", format: \"delta\", table: \"dim_users\" }\n```\n\n**Scenario 2: The \"App\" Node (Top-Level Transformer)**\n*Shows a node that applies a pattern (Deduplicate) to incoming data.*\n\n```yaml\n- name: \"deduped_users\"\n  depends_on: [\"clean_users\"]\n\n  # The \"App\": Deduplication (From Transformer Catalog)\n  transformer: \"deduplicate\"\n  params:\n    keys: [\"user_id\"]\n    order_by: \"updated_at DESC\"\n\n  write: { connection: \"gold\", format: \"delta\", table: \"users_unique\" }\n```\n\n**Scenario 3: The Tagged Runner (Reporting)**\n*Shows how tags allow running specific slices (e.g., `odibi run --tag daily`).*\n\n```yaml\n- name: \"daily_report\"\n  tags: [\"daily\", \"reporting\"]\n  depends_on: [\"deduped_users\"]\n\n  # Ad-hoc aggregation script\n  transform:\n    steps:\n      - sql: \"SELECT date_trunc('day', updated_at) as day, count(*) as total FROM df GROUP BY 1\"\n\n  write: { connection: \"local_data\", format: \"csv\", path: \"reports/daily_stats.csv\" }\n```\n\n**Scenario 4: The \"Kitchen Sink\" (All Operations)**\n*Shows Read -> Transformer -> Transform -> Write execution order.*\n\n**Why this works:**\n1.  **Internal Chaining (`df`):** In every step (Transformer or SQL), `df` refers to the output of the *previous* step.\n2.  **External Access (`depends_on`):** If you added `depends_on: [\"other_node\"]`, you could also run `SELECT * FROM other_node` in your SQL steps!\n\n```yaml\n- name: \"complex_flow\"\n  # 1. Read -> Creates initial 'df'\n  read: { connection: \"bronze\", format: \"parquet\", path: \"users\" }\n\n  # 2. Transformer (The \"App\": Deduplicate first)\n  # Takes 'df' (from Read), dedups it, returns new 'df'\n  transformer: \"deduplicate\"\n  params: { keys: [\"user_id\"], order_by: \"updated_at DESC\" }\n\n  # 3. Transform Steps (The \"Script\": Filter AFTER deduplication)\n  # SQL sees the deduped data as 'df'\n  transform:\n    steps:\n      - sql: \"SELECT * FROM df WHERE status = 'active'\"\n\n  # 4. Write -> Saves the final filtered 'df'\n  write: { connection: \"silver\", format: \"delta\", table: \"active_unique_users\" }\n```\n\n### \ud83d\udcda Transformer Catalog\n\nThese are the built-in functions you can use in two ways:\n\n1.  **As a Top-Level Transformer:** `transformer: \"name\"` (Defines the node's main logic)\n2.  **As a Step in a Chain:** `transform: { steps: [{ function: \"name\" }] }` (Part of a sequence)\n\n*Note: `merge` and `scd2` are special \"Heavy Lifters\" and should generally be used as Top-Level Transformers.*\n\n**Data Engineering Patterns**\n*   `merge`: Upsert/Merge into target (Delta/SQL). *([Params](#mergeparams))*\n*   `scd2`: Slowly Changing Dimensions Type 2. *([Params](#scd2params))*\n*   `deduplicate`: Remove duplicates using window functions. *([Params](#deduplicateparams))*\n\n**Relational Algebra**\n*   `join`: Join two datasets. *([Params](#joinparams))*\n*   `union`: Stack datasets vertically. *([Params](#unionparams))*\n*   `pivot`: Rotate rows to columns. *([Params](#pivotparams))*\n*   `unpivot`: Rotate columns to rows (melt). *([Params](#unpivotparams))*\n*   `aggregate`: Group by and sum/count/avg. *([Params](#aggregateparams))*\n\n**Data Quality & Cleaning**\n*   `validate_and_flag`: Check rules and flag invalid rows. *([Params](#validateandflagparams))*\n*   `clean_text`: Trim and normalize case. *([Params](#cleantextparams))*\n*   `filter_rows`: SQL-based filtering. *([Params](#filterrowsparams))*\n*   `fill_nulls`: Replace NULLs with defaults. *([Params](#fillnullsparams))*\n\n**Feature Engineering**\n*   `derive_columns`: Create new cols via SQL expressions. *([Params](#derivecolumnsparams))*\n*   `case_when`: Conditional logic (if-else). *([Params](#casewhenparams))*\n*   `generate_surrogate_key`: Create MD5 keys from columns. *([Params](#surrogatekeyparams))*\n*   `date_diff`, `date_add`, `date_trunc`: Date arithmetic.\n\n**Scenario 1: The Full ETL Flow**\n*(Show two nodes: one loader, one processor)*\n\n```yaml\n# 1. Ingest (The Dependency)\n- name: \"load_raw_users\"\n  read: { connection: \"s3_landing\", format: \"json\", path: \"users/*.json\" }\n  write: { connection: \"bronze\", format: \"parquet\", path: \"users_raw\" }\n\n# 2. Process (The Consumer)\n- name: \"clean_users\"\n  depends_on: [\"load_raw_users\"]  # <--- Explicit dependency\n\n  # Explicit Transformation Steps\n  transform:\n    steps:\n      - sql: \"SELECT * FROM df WHERE email IS NOT NULL\"\n      - function: \"clean_text\"\n        params: { columns: [\"email\"], case: \"lower\" }\n\n  write: { connection: \"silver\", format: \"delta\", table: \"dim_users\" }\n```\n\n**Scenario 2: The \"App\" Node (Transformer)**\n*(Show a node that is a Transformer, no read needed if it picks up from dependency)*\n\n```yaml\n- name: \"deduped_users\"\n  depends_on: [\"clean_users\"]\n\n  # The \"App\": Deduplication\n  transformer: \"deduplicate\"\n  params:\n    keys: [\"user_id\"]\n    order_by: \"updated_at DESC\"\n\n  write: { connection: \"gold\", format: \"delta\", table: \"users_unique\" }\n```\n\n**Scenario 3: The Tagged Runner**\n*Run only this with `odibi run --tag daily`*\n```yaml\n- name: \"daily_report\"\n  tags: [\"daily\", \"reporting\"]\n  # ...\n```",
+      "properties": {
+        "name": {
+          "description": "Unique node name",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable description",
+          "title": "Description"
+        },
+        "enabled": {
+          "default": true,
+          "description": "If False, node is skipped during execution",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Operational tags for selective execution (e.g., 'daily', 'critical'). Use with `odibi run --tag`.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "depends_on": {
+          "description": "List of parent nodes that must complete before this node runs. The output of these nodes is available for reading.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "columns": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ColumnMetadata"
+          },
+          "description": "Data Dictionary defining the output schema. Used for documentation, PII tagging, and validation.",
+          "title": "Columns",
+          "type": "object"
+        },
+        "read": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReadConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Input operation (Load). If missing, data is taken from the first dependency."
+        },
+        "transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransformConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Chain of fine-grained transformation steps (SQL, functions). Runs after 'transformer' if both are present."
+        },
+        "write": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WriteConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Output operation (Save to file/table)."
+        },
+        "streaming": {
+          "default": false,
+          "description": "Enable streaming execution for this node (Spark only)",
+          "title": "Streaming",
+          "type": "boolean"
+        },
+        "transformer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the 'App' logic to run (e.g., 'deduplicate', 'scd2'). See Transformer Catalog for options.",
+          "title": "Transformer"
+        },
+        "params": {
+          "additionalProperties": true,
+          "description": "Parameters for transformer",
+          "title": "Params",
+          "type": "object"
+        },
+        "pre_sql": {
+          "description": "SQL to run before node execution",
+          "items": {
+            "type": "string"
+          },
+          "title": "Pre Sql",
+          "type": "array"
+        },
+        "post_sql": {
+          "description": "SQL to run after node execution",
+          "items": {
+            "type": "string"
+          },
+          "title": "Post Sql",
+          "type": "array"
+        },
+        "materialized": {
+          "anyOf": [
+            {
+              "enum": [
+                "table",
+                "view",
+                "incremental"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Materialization strategy (Gold layer)",
+          "title": "Materialized"
+        },
+        "cache": {
+          "default": false,
+          "description": "Cache result for reuse",
+          "title": "Cache",
+          "type": "boolean"
+        },
+        "log_level": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Override log level for this node"
+        },
+        "on_error": {
+          "$ref": "#/$defs/ErrorStrategy",
+          "default": "fail_later",
+          "description": "Failure handling strategy"
+        },
+        "validation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValidationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schema_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SchemaPolicyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Schema drift handling policy"
+        },
+        "privacy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrivacyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Privacy Suite: PII anonymization settings"
+        },
+        "sensitive": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "default": false,
+          "description": "If true or list of columns, masks sample data in stories",
+          "title": "Sensitive"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "NodeConfig",
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "transformer": {
+                "const": "merge"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "$ref": "#/$defs/MergeParams"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "NotNullTest": {
+      "properties": {
+        "type": {
+          "const": "not_null",
+          "default": "not_null",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the check",
+          "title": "Name"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "NotNullTest",
+      "type": "object"
+    },
+    "OnFailAction": {
+      "enum": [
+        "alert",
+        "ignore"
+      ],
+      "title": "OnFailAction",
+      "type": "string"
+    },
+    "OnMissingColumns": {
+      "enum": [
+        "fail",
+        "fill_null"
+      ],
+      "title": "OnMissingColumns",
+      "type": "string"
+    },
+    "OnNewColumns": {
+      "enum": [
+        "ignore",
+        "fail",
+        "add_nullable"
+      ],
+      "title": "OnNewColumns",
+      "type": "string"
+    },
+    "PerformanceConfig": {
+      "description": "Performance tuning configuration.",
+      "properties": {
+        "use_arrow": {
+          "default": true,
+          "description": "Use Apache Arrow-backed DataFrames (Pandas only). Reduces memory and speeds up I/O.",
+          "title": "Use Arrow",
+          "type": "boolean"
+        }
+      },
+      "title": "PerformanceConfig",
+      "type": "object"
+    },
+    "PipelineConfig": {
+      "description": "Configuration for a pipeline.\n\nExample:\n```yaml\npipelines:\n  - pipeline: \"user_onboarding\"\n    description: \"Ingest and process new users\"\n    layer: \"silver\"\n    nodes:\n      - name: \"node1\"\n        ...\n```",
+      "properties": {
+        "pipeline": {
+          "description": "Pipeline name",
+          "title": "Pipeline",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pipeline description",
+          "title": "Description"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Logical layer (bronze/silver/gold)",
+          "title": "Layer"
+        },
+        "nodes": {
+          "description": "List of nodes in this pipeline",
+          "items": {
+            "$ref": "#/$defs/NodeConfig"
+          },
+          "title": "Nodes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "pipeline",
+        "nodes"
+      ],
+      "title": "PipelineConfig",
+      "type": "object"
+    },
+    "PrivacyConfig": {
+      "description": "Configuration for PII anonymization.\n\nExample:\n```yaml\nprivacy:\n  method: \"hash\"\n  salt: \"my_secret_salt\"\n```",
+      "properties": {
+        "method": {
+          "$ref": "#/$defs/PrivacyMethod",
+          "description": "Anonymization method. Options: 'hash', 'mask', 'redact'"
+        },
+        "salt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Salt for hashing (optional but recommended). Combined with value before hashing.",
+          "title": "Salt"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "PrivacyConfig",
+      "type": "object"
+    },
+    "PrivacyMethod": {
+      "description": "Supported privacy anonymization methods.",
+      "enum": [
+        "hash",
+        "mask",
+        "redact"
+      ],
+      "title": "PrivacyMethod",
+      "type": "string"
+    },
+    "ProjectConfig": {
+      "description": "Complete project configuration from YAML.\n\n### \ud83c\udfe2 \"Enterprise Setup\" Guide\n\n**Business Problem:**\n\"We need a robust production environment with alerts, retries, and proper logging.\"\n\n**Recipe: Production Ready**\n```yaml\nproject: \"Customer360\"\nengine: \"spark\"\n\n# 1. Resilience\nretry:\n  enabled: true\n  max_attempts: 3\n  backoff: \"exponential\"\n\n# 2. Observability\nlogging:\n  level: \"INFO\"\n  structured: true  # JSON logs for Splunk/Datadog\n\n# 3. Alerting\nalerts:\n  - type: \"slack\"\n    url: \"${SLACK_WEBHOOK_URL}\"\n    on_events: [\"on_failure\"]\n\n# ... connections and pipelines ...\n```",
+      "properties": {
+        "project": {
+          "description": "Project name",
+          "title": "Project",
+          "type": "string"
+        },
+        "engine": {
+          "$ref": "#/$defs/EngineType",
+          "default": "pandas",
+          "description": "Execution engine"
+        },
+        "connections": {
+          "additionalProperties": {
+            "discriminator": {
+              "mapping": {
+                "azure_blob": "#/$defs/AzureBlobConnectionConfig",
+                "delta": "#/$defs/DeltaConnectionConfig",
+                "http": "#/$defs/HttpConnectionConfig",
+                "local": "#/$defs/LocalConnectionConfig",
+                "sql_server": "#/$defs/SQLServerConnectionConfig"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/LocalConnectionConfig"
+              },
+              {
+                "$ref": "#/$defs/AzureBlobConnectionConfig"
+              },
+              {
+                "$ref": "#/$defs/DeltaConnectionConfig"
+              },
+              {
+                "$ref": "#/$defs/SQLServerConnectionConfig"
+              },
+              {
+                "$ref": "#/$defs/HttpConnectionConfig"
+              }
+            ]
+          },
+          "description": "Named connections (at least one required)",
+          "title": "Connections",
+          "type": "object"
+        },
+        "pipelines": {
+          "description": "Pipeline definitions (at least one required)",
+          "items": {
+            "$ref": "#/$defs/PipelineConfig"
+          },
+          "title": "Pipelines",
+          "type": "array"
+        },
+        "story": {
+          "$ref": "#/$defs/StoryConfig",
+          "description": "Story generation configuration (mandatory)"
+        },
+        "system": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SystemConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "System Catalog configuration"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Project description",
+          "title": "Description"
+        },
+        "version": {
+          "default": "1.0.0",
+          "description": "Project version",
+          "title": "Version",
+          "type": "string"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Project owner/contact",
+          "title": "Owner"
+        },
+        "vars": {
+          "additionalProperties": true,
+          "description": "Global variables for substitution (e.g. ${vars.env})",
+          "title": "Vars",
+          "type": "object"
+        },
+        "retry": {
+          "$ref": "#/$defs/RetryConfig"
+        },
+        "logging": {
+          "$ref": "#/$defs/LoggingConfig"
+        },
+        "alerts": {
+          "description": "Alert configurations",
+          "items": {
+            "$ref": "#/$defs/AlertConfig"
+          },
+          "title": "Alerts",
+          "type": "array"
+        },
+        "performance": {
+          "$ref": "#/$defs/PerformanceConfig",
+          "description": "Performance tuning"
+        },
+        "environments": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Structure: same as ProjectConfig but with only overridden fields. Not yet validated strictly.",
+          "title": "Environments"
+        }
+      },
+      "required": [
+        "project",
+        "connections",
+        "pipelines",
+        "story"
+      ],
+      "title": "ProjectConfig",
+      "type": "object"
+    },
+    "RangeTest": {
+      "properties": {
+        "type": {
+          "const": "range",
+          "default": "range",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the check",
+          "title": "Name"
+        },
+        "column": {
+          "title": "Column",
+          "type": "string"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        }
+      },
+      "required": [
+        "column"
+      ],
+      "title": "RangeTest",
+      "type": "object"
+    },
+    "ReadConfig": {
+      "description": "Configuration for reading data.\n\n### \ud83d\udcd6 \"Universal Reader\" Guide\n\n**Business Problem:**\n\"I need to read from files, databases, streams, and even travel back in time to see how data looked yesterday.\"\n\n**Recipe 1: The Time Traveler (Delta/Iceberg)**\n*Reproduce a bug by seeing the data exactly as it was.*\n```yaml\nread:\n  connection: \"silver_lake\"\n  format: \"delta\"\n  table: \"fact_sales\"\n  time_travel:\n    as_of_timestamp: \"2023-10-25T14:00:00Z\"\n```\n\n**Recipe 2: The Streamer**\n*Process data in real-time.*\n```yaml\nread:\n  connection: \"event_hub\"\n  format: \"json\"\n  streaming: true\n```\n\n**Recipe 3: The SQL Query**\n*Push down filtering to the source database.*\n```yaml\nread:\n  connection: \"enterprise_dw\"\n  format: \"sql\"\n  # Use the query option to filter at source!\n  query: \"SELECT * FROM huge_table WHERE date >= '2024-01-01'\"\n```",
+      "properties": {
+        "connection": {
+          "description": "Connection name from project.yaml",
+          "title": "Connection",
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/$defs/ReadFormat",
+          "description": "Data format (csv, parquet, delta, etc.)"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table name for SQL/Delta",
+          "title": "Table"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path for file-based sources",
+          "title": "Path"
+        },
+        "streaming": {
+          "default": false,
+          "description": "Enable streaming read (Spark only)",
+          "title": "Streaming",
+          "type": "boolean"
+        },
+        "query": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector.",
+          "title": "Query"
+        },
+        "incremental": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IncrementalConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Automatic incremental loading strategy (CDC-like). If set, generates query based on target state (HWM)."
+        },
+        "time_travel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeTravelConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Time travel options (Delta only)"
+        },
+        "archive_options": {
+          "additionalProperties": true,
+          "description": "Options for archiving bad records (e.g. badRecordsPath for Spark)",
+          "title": "Archive Options",
+          "type": "object"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Format-specific options",
+          "title": "Options",
+          "type": "object"
+        }
+      },
+      "required": [
+        "connection",
+        "format"
+      ],
+      "title": "ReadConfig",
+      "type": "object"
+    },
+    "ReadFormat": {
+      "enum": [
+        "csv",
+        "parquet",
+        "delta",
+        "json",
+        "sql"
+      ],
+      "title": "ReadFormat",
+      "type": "string"
+    },
+    "RegexMatchTest": {
+      "properties": {
+        "type": {
+          "const": "regex_match",
+          "default": "regex_match",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the check",
+          "title": "Name"
+        },
+        "column": {
+          "title": "Column",
+          "type": "string"
+        },
+        "pattern": {
+          "title": "Pattern",
+          "type": "string"
+        }
+      },
+      "required": [
+        "column",
+        "pattern"
+      ],
+      "title": "RegexMatchTest",
+      "type": "object"
+    },
+    "RetryConfig": {
+      "description": "Retry configuration.\n\nExample:\n```yaml\nretry:\n  enabled: true\n  max_attempts: 3\n  backoff: \"exponential\"\n```",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "max_attempts": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "backoff": {
+          "$ref": "#/$defs/BackoffStrategy",
+          "default": "exponential"
+        }
+      },
+      "title": "RetryConfig",
+      "type": "object"
+    },
+    "RowCountTest": {
+      "properties": {
+        "type": {
+          "const": "row_count",
+          "default": "row_count",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the check",
+          "title": "Name"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        }
+      },
+      "title": "RowCountTest",
+      "type": "object"
+    },
+    "SQLAadPasswordAuth": {
+      "properties": {
+        "mode": {
+          "const": "aad_password",
+          "default": "aad_password",
+          "title": "Mode",
+          "type": "string"
+        },
+        "tenant_id": {
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "client_id": {
+          "title": "Client Id",
+          "type": "string"
+        },
+        "client_secret": {
+          "title": "Client Secret",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "client_id",
+        "client_secret"
+      ],
+      "title": "SQLAadPasswordAuth",
+      "type": "object"
+    },
+    "SQLConnectionStringAuth": {
+      "properties": {
+        "mode": {
+          "const": "connection_string",
+          "default": "connection_string",
+          "title": "Mode",
+          "type": "string"
+        },
+        "connection_string": {
+          "title": "Connection String",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_string"
+      ],
+      "title": "SQLConnectionStringAuth",
+      "type": "object"
+    },
+    "SQLLoginAuth": {
+      "properties": {
+        "mode": {
+          "const": "sql_login",
+          "default": "sql_login",
+          "title": "Mode",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "password": {
+          "title": "Password",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "title": "SQLLoginAuth",
+      "type": "object"
+    },
+    "SQLMsiAuth": {
+      "properties": {
+        "mode": {
+          "const": "aad_msi",
+          "default": "aad_msi",
+          "title": "Mode",
+          "type": "string"
+        },
+        "client_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client Id"
+        }
+      },
+      "title": "SQLMsiAuth",
+      "type": "object"
+    },
+    "SQLServerConnectionConfig": {
+      "description": "SQL Server connection.\n\nScenario 1: Managed identity (AAD MSI)\n```yaml\nsql_dw_msi:\n  type: \"sql_server\"\n  host: \"server.database.windows.net\"\n  database: \"dw\"\n  auth:\n    mode: \"aad_msi\"\n```\n\nScenario 2: SQL login\n```yaml\nsql_dw_login:\n  type: \"sql_server\"\n  host: \"server.database.windows.net\"\n  database: \"dw\"\n  auth:\n    mode: \"sql_login\"\n    username: \"dw_writer\"\n    password: \"${DW_PASSWORD}\"\n```",
+      "properties": {
+        "type": {
+          "const": "sql_server",
+          "default": "sql_server",
+          "title": "Type",
+          "type": "string"
+        },
+        "validation_mode": {
+          "$ref": "#/$defs/ValidationMode",
+          "default": "lazy"
+        },
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "database": {
+          "title": "Database",
+          "type": "string"
+        },
+        "port": {
+          "default": 1433,
+          "title": "Port",
+          "type": "integer"
+        },
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "aad_msi": "#/$defs/SQLMsiAuth",
+              "aad_password": "#/$defs/SQLAadPasswordAuth",
+              "connection_string": "#/$defs/SQLConnectionStringAuth",
+              "sql_login": "#/$defs/SQLLoginAuth"
+            },
+            "propertyName": "mode"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SQLLoginAuth"
+            },
+            {
+              "$ref": "#/$defs/SQLAadPasswordAuth"
+            },
+            {
+              "$ref": "#/$defs/SQLMsiAuth"
+            },
+            {
+              "$ref": "#/$defs/SQLConnectionStringAuth"
+            }
+          ],
+          "title": "Auth"
+        }
+      },
+      "required": [
+        "host",
+        "database"
+      ],
+      "title": "SQLServerConnectionConfig",
+      "type": "object"
+    },
+    "SchemaMode": {
+      "enum": [
+        "enforce",
+        "evolve"
+      ],
+      "title": "SchemaMode",
+      "type": "string"
+    },
+    "SchemaPolicyConfig": {
+      "description": "Configuration for Schema Management (Drift Handling).\n\nControls how the node handles differences between input data and target table schema.",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/SchemaMode",
+          "default": "enforce",
+          "description": "Schema evolution mode: 'enforce' or 'evolve'"
+        },
+        "on_new_columns": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OnNewColumns"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Action for new columns in input: 'ignore', 'fail', 'add_nullable'"
+        },
+        "on_missing_columns": {
+          "$ref": "#/$defs/OnMissingColumns",
+          "default": "fill_null",
+          "description": "Action for missing columns in input: 'fail', 'fill_null'"
+        }
+      },
+      "title": "SchemaPolicyConfig",
+      "type": "object"
+    },
+    "StoryConfig": {
+      "description": "Story generation configuration.\n\nStories are ODIBI's core value - execution reports with lineage.\nThey must use a connection for consistent, traceable output.\n\nExample:\n```yaml\nstory:\n  connection: \"local_data\"\n  path: \"stories/\"\n  retention_days: 30\n```",
+      "properties": {
+        "connection": {
+          "description": "Connection name for story output (uses connection's path resolution)",
+          "title": "Connection",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path for stories (relative to connection base_path)",
+          "title": "Path",
+          "type": "string"
+        },
+        "max_sample_rows": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Max Sample Rows",
+          "type": "integer"
+        },
+        "auto_generate": {
+          "default": true,
+          "title": "Auto Generate",
+          "type": "boolean"
+        },
+        "retention_days": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Days to keep stories",
+          "title": "Retention Days"
+        },
+        "retention_count": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "description": "Max number of stories to keep",
+          "title": "Retention Count"
+        }
+      },
+      "required": [
+        "connection",
+        "path"
+      ],
+      "title": "StoryConfig",
+      "type": "object"
+    },
+    "SystemConfig": {
+      "description": "Configuration for the Odibi System Catalog (The Brain).\n\nStores metadata, state, and pattern configurations.",
+      "properties": {
+        "connection": {
+          "description": "Connection to store system tables (e.g., 'adls_bronze')",
+          "title": "Connection",
+          "type": "string"
+        },
+        "path": {
+          "default": "_odibi_system",
+          "description": "Path relative to connection root",
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection"
+      ],
+      "title": "SystemConfig",
+      "type": "object"
+    },
+    "TimeTravelConfig": {
+      "description": "Configuration for time travel reading (Delta/Iceberg).\n\nExample:\n```yaml\ntime_travel:\n  as_of_version: 10\n  # OR\n  as_of_timestamp: \"2023-10-01T12:00:00Z\"\n```",
+      "properties": {
+        "as_of_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Version number to time travel to",
+          "title": "As Of Version"
+        },
+        "as_of_timestamp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timestamp string to time travel to",
+          "title": "As Of Timestamp"
+        }
+      },
+      "title": "TimeTravelConfig",
+      "type": "object"
+    },
+    "TransformConfig": {
+      "description": "Configuration for transforming data.\n\n### \ud83d\udd27 \"Transformation Pipeline\" Guide\n\n**Business Problem:**\n\"I have complex logic that mixes SQL for speed and Python for complex calculations.\"\n\n**The Solution:**\nChain multiple steps together. Output of Step 1 becomes input of Step 2.\n\n**Function Registry:**\nThe `function` step type looks up functions registered with `@transform` (or `@register`).\nThis allows you to use the *same* registered functions as both top-level Transformers and steps in a chain.\n\n**Recipe: The Mix-and-Match**\n```yaml\ntransform:\n  steps:\n    # Step 1: SQL Filter (Fast)\n    - sql: \"SELECT * FROM df WHERE status = 'ACTIVE'\"\n\n    # Step 2: Custom Python Function (Complex Logic)\n    # Looks up 'calculate_lifetime_value' in the registry\n    - function: \"calculate_lifetime_value\"\n      params: { discount_rate: 0.05 }\n\n    # Step 3: Built-in Operation (Standard)\n    - operation: \"drop_duplicates\"\n      params: { subset: [\"user_id\"] }\n```",
+      "properties": {
+        "steps": {
+          "description": "List of transformation steps (SQL strings or TransformStep configs)",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/TransformStep"
+              }
+            ]
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "title": "TransformConfig",
+      "type": "object"
+    },
+    "TransformStep": {
+      "description": "Single transformation step.",
+      "properties": {
+        "sql": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sql"
+        },
+        "function": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Function"
+        },
+        "operation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operation"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "title": "TransformStep",
+      "type": "object"
+    },
+    "UniqueTest": {
+      "properties": {
+        "type": {
+          "const": "unique",
+          "default": "unique",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the check",
+          "title": "Name"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "UniqueTest",
+      "type": "object"
+    },
+    "ValidationAction": {
+      "enum": [
+        "fail",
+        "warn"
+      ],
+      "title": "ValidationAction",
+      "type": "string"
+    },
+    "ValidationConfig": {
+      "description": "Configuration for data validation (Quality Gate).\n\n### \ud83d\udee1\ufe0f \"The Indestructible Pipeline\" Pattern\n\n**Business Problem:**\n\"Bad data polluted our Gold reports, causing executives to make wrong decisions. We need to stop it *before* it lands.\"\n\n**The Solution:**\nA Quality Gate that runs *after* transformation but *before* writing.\n\n**Recipe: The Quality Gate**\n```yaml\nvalidation:\n  mode: \"fail\"          # fail (stop pipeline) or warn (log only)\n  on_fail: \"alert\"      # alert or ignore\n\n  tests:\n    # 1. Completeness\n    - type: \"not_null\"\n      columns: [\"transaction_id\", \"customer_id\"]\n\n    # 2. Integrity\n    - type: \"unique\"\n      columns: [\"transaction_id\"]\n\n    - type: \"accepted_values\"\n      column: \"status\"\n      values: [\"PENDING\", \"COMPLETED\", \"FAILED\"]\n\n    # 3. Ranges & Patterns\n    - type: \"range\"\n      column: \"age\"\n      min: 18\n      max: 120\n\n    - type: \"regex_match\"\n      column: \"email\"\n      pattern: \"^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$\"\n\n    # 4. Business Logic (SQL)\n    - type: \"custom_sql\"\n      name: \"dates_ordered\"\n      condition: \"created_at <= completed_at\"\n      threshold: 0.01   # Allow 1% failure\n```",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/ValidationAction",
+          "default": "fail",
+          "description": "Execution mode: 'fail' (stop pipeline) or 'warn' (log only)"
+        },
+        "on_fail": {
+          "$ref": "#/$defs/OnFailAction",
+          "default": "alert",
+          "description": "Action on failure: 'alert' (send notification) or 'ignore'"
+        },
+        "tests": {
+          "description": "List of validation tests",
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "accepted_values": "#/$defs/AcceptedValuesTest",
+                "custom_sql": "#/$defs/CustomSQLTest",
+                "not_null": "#/$defs/NotNullTest",
+                "range": "#/$defs/RangeTest",
+                "regex_match": "#/$defs/RegexMatchTest",
+                "row_count": "#/$defs/RowCountTest",
+                "unique": "#/$defs/UniqueTest",
+                "volume_drop": "#/$defs/VolumeDropTest"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NotNullTest"
+              },
+              {
+                "$ref": "#/$defs/UniqueTest"
+              },
+              {
+                "$ref": "#/$defs/AcceptedValuesTest"
+              },
+              {
+                "$ref": "#/$defs/RowCountTest"
+              },
+              {
+                "$ref": "#/$defs/CustomSQLTest"
+              },
+              {
+                "$ref": "#/$defs/RangeTest"
+              },
+              {
+                "$ref": "#/$defs/RegexMatchTest"
+              },
+              {
+                "$ref": "#/$defs/VolumeDropTest"
+              }
+            ]
+          },
+          "title": "Tests",
+          "type": "array"
+        }
+      },
+      "title": "ValidationConfig",
+      "type": "object"
+    },
+    "ValidationMode": {
+      "description": "Validation execution mode.",
+      "enum": [
+        "lazy",
+        "eager"
+      ],
+      "title": "ValidationMode",
+      "type": "string"
+    },
+    "VolumeDropTest": {
+      "description": "Checks if row count dropped significantly compared to history.\nFormula: (current - avg) / avg < -threshold",
+      "properties": {
+        "type": {
+          "const": "volume_drop",
+          "default": "volume_drop",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for the check",
+          "title": "Name"
+        },
+        "threshold": {
+          "default": 0.5,
+          "description": "Max allowed drop (0.5 = 50% drop)",
+          "title": "Threshold",
+          "type": "number"
+        },
+        "lookback_days": {
+          "default": 7,
+          "description": "Days of history to average",
+          "title": "Lookback Days",
+          "type": "integer"
+        }
+      },
+      "title": "VolumeDropTest",
+      "type": "object"
+    },
+    "WriteConfig": {
+      "description": "Configuration for writing data.\n\n### \ud83d\ude80 \"Big Data Performance\" Guide\n\n**Business Problem:**\n\"My dashboards are slow because the query scans terabytes of data just to find one day's sales.\"\n\n**The Solution:**\nUse **Partitioning** for coarse filtering (skipping huge chunks) and **Z-Ordering** for fine-grained skipping (colocating related data).\n\n**Recipe: Lakehouse Optimized**\n```yaml\nwrite:\n  connection: \"gold_lake\"\n  format: \"delta\"\n  table: \"fact_sales\"\n  mode: \"append\"\n\n  # 1. Partitioning: Physical folders.\n  # Use for low-cardinality columns often used in WHERE clauses.\n  # WARNING: Do NOT partition by high-cardinality cols like ID or Timestamp!\n  partition_by: [\"country_code\", \"txn_year_month\"]\n\n  # 2. Z-Ordering: Data clustering.\n  # Use for high-cardinality columns often used in JOINs or predicates.\n  zorder_by: [\"customer_id\", \"product_id\"]\n\n  # 3. Table Properties: Engine tuning.\n  table_properties:\n    \"delta.autoOptimize.optimizeWrite\": \"true\"\n    \"delta.autoOptimize.autoCompact\": \"true\"\n```",
+      "properties": {
+        "connection": {
+          "description": "Connection name from project.yaml",
+          "title": "Connection",
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/$defs/ReadFormat",
+          "description": "Output format (csv, parquet, delta, etc.)"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table name for SQL/Delta",
+          "title": "Table"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path for file-based outputs",
+          "title": "Path"
+        },
+        "register_table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Register file output as external table (Spark/Delta only)",
+          "title": "Register Table"
+        },
+        "mode": {
+          "$ref": "#/$defs/WriteMode",
+          "default": "overwrite",
+          "description": "Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once'"
+        },
+        "partition_by": {
+          "description": "List of columns to physically partition the output by (folder structure). Use for low-cardinality columns (e.g. date, country).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Partition By",
+          "type": "array"
+        },
+        "zorder_by": {
+          "description": "List of columns to Z-Order by. Improves read performance for high-cardinality columns used in filters/joins (Delta only).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Zorder By",
+          "type": "array"
+        },
+        "table_properties": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Table properties (e.g. comments, retention)",
+          "title": "Table Properties",
+          "type": "object"
+        },
+        "merge_schema": {
+          "default": false,
+          "description": "Allow schema evolution (mergeSchema option in Delta)",
+          "title": "Merge Schema",
+          "type": "boolean"
+        },
+        "first_run_query": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads.",
+          "title": "First Run Query"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Format-specific options",
+          "title": "Options",
+          "type": "object"
+        },
+        "auto_optimize": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/AutoOptimizeConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Auto-run OPTIMIZE and VACUUM after write (Delta only)",
+          "title": "Auto Optimize"
+        }
+      },
+      "required": [
+        "connection",
+        "format"
+      ],
+      "title": "WriteConfig",
+      "type": "object"
+    },
+    "WriteMode": {
+      "description": "Write modes for output operations.",
+      "enum": [
+        "overwrite",
+        "append",
+        "upsert",
+        "append_once"
+      ],
+      "title": "WriteMode",
+      "type": "string"
+    },
+    "AuditColumnsConfig": {
+      "properties": {
+        "created_col": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column to set only on first insert",
+          "title": "Created Col"
+        },
+        "updated_col": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column to update on every merge",
+          "title": "Updated Col"
+        }
+      },
+      "title": "AuditColumnsConfig",
+      "type": "object"
+    },
+    "MergeParams": {
+      "description": "Configuration for Merge transformer (Upsert/Append).\n\n### \u2696\ufe0f \"GDPR & Compliance\" Guide\n\n**Business Problem:**\n\"A user exercised their 'Right to be Forgotten'. We need to remove them from our Silver tables immediately.\"\n\n**The Solution:**\nUse the `delete_match` strategy. The source dataframe contains the IDs to be deleted, and the transformer removes them from the target.\n\n**Recipe: Right to be Forgotten**\n```yaml\ntransformer: \"merge\"\nparams:\n  target: \"silver.customers\"\n  keys: [\"customer_id\"]\n\n  # The \"Eraser\" Mode\n  strategy: \"delete_match\"\n```\n\n**Other Strategies:**\n*   **upsert** (Default): Update existing records, insert new ones.\n*   **append_only**: Ignore duplicates, only insert new keys.",
+      "properties": {
+        "target": {
+          "description": "Target table name or path",
+          "title": "Target",
+          "type": "string"
+        },
+        "keys": {
+          "description": "List of join keys",
+          "items": {
+            "type": "string"
+          },
+          "title": "Keys",
+          "type": "array"
+        },
+        "strategy": {
+          "$ref": "#/$defs/MergeStrategy",
+          "default": "upsert",
+          "description": "Merge behavior: 'upsert', 'append_only', 'delete_match'"
+        },
+        "audit_cols": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuditColumnsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "{'created_col': '...', 'updated_col': '...'}"
+        },
+        "optimize_write": {
+          "default": false,
+          "description": "Run OPTIMIZE after write (Spark)",
+          "title": "Optimize Write",
+          "type": "boolean"
+        },
+        "zorder_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Columns to Z-Order by",
+          "title": "Zorder By"
+        },
+        "cluster_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Columns to Liquid Cluster by (Delta)",
+          "title": "Cluster By"
+        }
+      },
+      "required": [
+        "target",
+        "keys"
+      ],
+      "title": "MergeParams",
+      "type": "object"
+    },
+    "MergeStrategy": {
+      "enum": [
+        "upsert",
+        "append_only",
+        "delete_match"
+      ],
+      "title": "MergeStrategy",
+      "type": "string"
+    }
+  }
+}
