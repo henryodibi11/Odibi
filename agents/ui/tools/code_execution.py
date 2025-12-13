@@ -25,6 +25,7 @@ class ExecutionResult:
 def is_databricks() -> bool:
     """Check if running in Databricks."""
     import os
+
     return (
         "DATABRICKS_RUNTIME_VERSION" in os.environ
         or "SPARK_HOME" in os.environ
@@ -36,6 +37,7 @@ def _check_spark_available() -> bool:
     """Check if Spark is available."""
     try:
         from pyspark.sql import SparkSession
+
         return SparkSession.getActiveSession() is not None
     except ImportError:
         return False
@@ -45,6 +47,7 @@ def get_spark_session():
     """Get the active Spark session."""
     try:
         from pyspark.sql import SparkSession
+
         return SparkSession.getActiveSession()
     except ImportError:
         return None
@@ -83,12 +86,14 @@ def execute_python(
 
         try:
             import pandas as pd
+
             namespace["pd"] = pd
         except ImportError:
             pass
 
         try:
             import numpy as np
+
             namespace["np"] = np
         except ImportError:
             pass
@@ -99,7 +104,9 @@ def execute_python(
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
             exec(code, namespace)
 
-            if "\n" not in code and not code.strip().startswith(("import", "from", "def", "class", "if", "for", "while", "with", "try")):
+            if "\n" not in code and not code.strip().startswith(
+                ("import", "from", "def", "class", "if", "for", "while", "with", "try")
+            ):
                 try:
                     eval_result = eval(code.split("\n")[-1], namespace)
                     if eval_result is not None:
@@ -223,12 +230,14 @@ def list_tables(
         for t in tables:
             if pattern and pattern.lower() not in t.name.lower():
                 continue
-            table_info.append({
-                "name": t.name,
-                "database": t.database,
-                "type": t.tableType,
-                "isTemporary": t.isTemporary,
-            })
+            table_info.append(
+                {
+                    "name": t.name,
+                    "database": t.database,
+                    "type": t.tableType,
+                    "isTemporary": t.isTemporary,
+                }
+            )
 
         if not table_info:
             return ExecutionResult(
@@ -237,6 +246,7 @@ def list_tables(
             )
 
         import pandas as pd
+
         pdf = pd.DataFrame(table_info)
         return ExecutionResult(
             success=True,

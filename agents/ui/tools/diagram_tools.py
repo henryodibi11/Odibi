@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Optional
 
 
-
 @dataclass
 class DiagramResult:
     """Result of diagram rendering."""
@@ -62,9 +61,7 @@ def render_mermaid(
             "timeline",
         ]
 
-        has_valid_type = any(
-            code.strip().startswith(dt) for dt in diagram_types
-        )
+        has_valid_type = any(code.strip().startswith(dt) for dt in diagram_types)
         if not has_valid_type:
             return DiagramResult(
                 success=False,
@@ -128,10 +125,14 @@ def render_mermaid_local(code: str) -> DiagramResult:
             result = subprocess.run(
                 [
                     "mmdc",
-                    "-i", str(input_file),
-                    "-o", str(output_file),
-                    "-t", "dark",
-                    "-b", "transparent",
+                    "-i",
+                    str(input_file),
+                    "-o",
+                    str(output_file),
+                    "-t",
+                    "dark",
+                    "-b",
+                    "transparent",
                 ],
                 capture_output=True,
                 timeout=30,

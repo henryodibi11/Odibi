@@ -15,8 +15,10 @@ All you need is: endpoint, api_key, model name.
 """
 
 import json
-from dataclasses import dataclass
-from typing import Optional
+import time
+import threading
+from dataclasses import dataclass, field
+from typing import Callable, Generator, Optional
 
 import requests
 
@@ -48,14 +50,14 @@ class LLMConfig:
         # Ollama (local)
         LLMConfig(
             endpoint="http://localhost:11434/v1",
-            api_key="ollama",  # any non-empty string
+            api_key="not-needed",  # any non-empty string
             model="llama3.2",
         )
 
         # LM Studio (local)
         LLMConfig(
             endpoint="http://localhost:1234/v1",
-            api_key="lm-studio",
+            api_key="not-needed",
             model="local-model",
         )
     """
@@ -94,8 +96,36 @@ class LLMConfig:
             self.api_type = "azure"
 
 
+@dataclass
+class TokenUsage:
+    """Token usage information from a completion."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+    @property
+    def input_tokens(self) -> int:
+        return self.prompt_tokens
+
+    @property
+    def output_tokens(self) -> int:
+        return self.completion_tokens
+
+
+@dataclass
+class ChatResponse:
+    """Enhanced response from a chat completion."""
+
+    content: Optional[str] = None
+    tool_calls: Optional[list] = None
+    usage: TokenUsage = field(default_factory=TokenUsage)
+    finish_reason: str = ""
+    model: str = ""
+
+
 class LLMClient:
-    """Provider-agnostic LLM client.
+    """Provider-agnostic LLM client with streaming and retry support.
 
     Uses the OpenAI chat completions API format, which is supported by
     most LLM providers.
@@ -109,6 +139,20 @@ class LLMClient:
         """
         self.config = config
         self._session = requests.Session()
+        self._cancel_event = threading.Event()
+
+    def cancel(self) -> None:
+        """Cancel any ongoing request."""
+        self._cancel_event.set()
+
+    def reset_cancel(self) -> None:
+        """Reset the cancel flag."""
+        self._cancel_event.clear()
+
+    @property
+    def is_cancelled(self) -> bool:
+        """Check if cancellation was requested."""
+        return self._cancel_event.is_set()
 
     def _get_headers(self) -> dict[str, str]:
         """Get request headers based on API type."""
@@ -135,6 +179,51 @@ class LLMClient:
                 endpoint = f"{endpoint}/v1"
             return f"{endpoint}/chat/completions"
 
+    def _retry_with_backoff(
+        self,
+        func: Callable,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 30.0,
+    ):
+        """Execute a function with exponential backoff retry.
+
+        Args:
+            func: Function to execute.
+            max_retries: Maximum number of retries.
+            base_delay: Initial delay in seconds.
+            max_delay: Maximum delay between retries.
+
+        Returns:
+            Result of the function.
+
+        Raises:
+            The last exception if all retries fail.
+        """
+        last_exception = None
+
+        for attempt in range(max_retries + 1):
+            if self.is_cancelled:
+                raise LLMError("Request cancelled")
+
+            try:
+                return func()
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                last_exception = e
+                if attempt < max_retries:
+                    delay = min(base_delay * (2**attempt), max_delay)
+                    time.sleep(delay)
+            except LLMError as e:
+                if "rate limit" in str(e).lower() or "429" in str(e):
+                    last_exception = e
+                    if attempt < max_retries:
+                        delay = min(base_delay * (2**attempt), max_delay)
+                        time.sleep(delay)
+                else:
+                    raise
+
+        raise LLMError(f"Max retries exceeded: {last_exception}")
+
     def chat(
         self,
         messages: list[dict[str, str]],
@@ -153,60 +242,71 @@ class LLMClient:
             tools: Optional list of tool definitions for function calling.
 
         Returns:
-            Dict with 'content' (str or None) and 'tool_calls' (list or None).
+            Dict with 'content' (str or None), 'tool_calls' (list or None),
+            and 'usage' (TokenUsage).
 
         Raises:
             LLMError: If the API call fails.
         """
-        url = self._get_url()
-        headers = self._get_headers()
+        self.reset_cancel()
 
-        full_messages = []
-        if system_prompt:
-            full_messages.append({"role": "system", "content": system_prompt})
-        full_messages.extend(messages)
+        def make_request():
+            url = self._get_url()
+            headers = self._get_headers()
 
-        model_lower = self.config.model.lower()
-        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4"))
-        no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
+            full_messages = []
+            if system_prompt:
+                full_messages.append({"role": "system", "content": system_prompt})
+            full_messages.extend(messages)
 
-        payload = {
-            "messages": full_messages,
-        }
+            model_lower = self.config.model.lower()
+            uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4"))
+            no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
 
-        if uses_completion_tokens:
-            payload["max_completion_tokens"] = max_tokens
-        else:
-            payload["temperature"] = temperature
-            payload["max_tokens"] = max_tokens
+            payload = {
+                "messages": full_messages,
+            }
 
-        if tools and not no_tools_support:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+            if uses_completion_tokens:
+                payload["max_completion_tokens"] = max_tokens
+            else:
+                payload["temperature"] = temperature
+                payload["max_tokens"] = max_tokens
 
-        if self.config.api_type != "azure":
-            payload["model"] = self.config.model
+            if tools and not no_tools_support:
+                payload["tools"] = tools
+                payload["tool_choice"] = "auto"
 
-        try:
+            if self.config.api_type != "azure":
+                payload["model"] = self.config.model
+
             response = self._session.post(url, headers=headers, json=payload, timeout=180)
+
+            if response.status_code == 429:
+                raise LLMError(f"Rate limit exceeded: {response.text[:200]}")
 
             if response.status_code != 200:
                 raise LLMError(f"LLM API error: {response.status_code} - {response.text[:500]}")
 
             result = response.json()
             message = result["choices"][0]["message"]
-            
+
+            usage_data = result.get("usage", {})
+            usage = TokenUsage(
+                prompt_tokens=usage_data.get("prompt_tokens", 0),
+                completion_tokens=usage_data.get("completion_tokens", 0),
+                total_tokens=usage_data.get("total_tokens", 0),
+            )
+
             return {
                 "content": message.get("content"),
                 "tool_calls": message.get("tool_calls"),
+                "usage": usage,
+                "finish_reason": result["choices"][0].get("finish_reason", ""),
+                "model": result.get("model", self.config.model),
             }
 
-        except requests.exceptions.Timeout:
-            raise LLMError("LLM API request timed out")
-        except requests.exceptions.RequestException as e:
-            raise LLMError(f"LLM API connection error: {e}")
-        except (KeyError, IndexError, json.JSONDecodeError) as e:
-            raise LLMError(f"Invalid LLM API response: {e}")
+        return self._retry_with_backoff(make_request)
 
     def chat_stream(
         self,
@@ -214,7 +314,7 @@ class LLMClient:
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 4096,
-    ):
+    ) -> Generator[str, None, None]:
         """Send a streaming chat completion request.
 
         Args:
@@ -229,6 +329,7 @@ class LLMClient:
         Raises:
             LLMError: If the API call fails.
         """
+        self.reset_cancel()
         url = self._get_url()
         headers = self._get_headers()
 
@@ -263,6 +364,10 @@ class LLMClient:
                 raise LLMError(f"LLM API error: {response.status_code} - {response.text[:500]}")
 
             for line in response.iter_lines():
+                if self.is_cancelled:
+                    response.close()
+                    return
+
                 if line:
                     line = line.decode("utf-8")
                     if line.startswith("data: "):
@@ -284,6 +389,154 @@ class LLMClient:
             raise LLMError("LLM API request timed out")
         except requests.exceptions.RequestException as e:
             raise LLMError(f"LLM API connection error: {e}")
+
+    def chat_stream_with_tools(
+        self,
+        messages: list[dict[str, str]],
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: int = 4096,
+        tools: Optional[list[dict]] = None,
+        on_content: Optional[Callable[[str], None]] = None,
+        on_tool_call_start: Optional[Callable[[str], None]] = None,
+        on_thinking: Optional[Callable[[str], None]] = None,
+    ) -> ChatResponse:
+        """Stream a chat completion with tool support.
+
+        This method streams content tokens for display while also handling
+        tool calls. It provides callbacks for real-time UI updates.
+
+        Args:
+            messages: List of message dicts.
+            system_prompt: Optional system message.
+            temperature: Sampling temperature.
+            max_tokens: Maximum tokens.
+            tools: Tool definitions for function calling.
+            on_content: Callback for each content chunk.
+            on_tool_call_start: Callback when tool call detection starts.
+            on_thinking: Callback for thinking/reasoning tokens.
+
+        Returns:
+            ChatResponse with full content and tool calls.
+        """
+        self.reset_cancel()
+        url = self._get_url()
+        headers = self._get_headers()
+
+        full_messages = []
+        if system_prompt:
+            full_messages.append({"role": "system", "content": system_prompt})
+        full_messages.extend(messages)
+
+        model_lower = self.config.model.lower()
+        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4"))
+        no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
+
+        payload = {
+            "messages": full_messages,
+            "stream": True,
+        }
+
+        if uses_completion_tokens:
+            payload["max_completion_tokens"] = max_tokens
+        else:
+            payload["temperature"] = temperature
+            payload["max_tokens"] = max_tokens
+
+        if tools and not no_tools_support:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+
+        if self.config.api_type != "azure":
+            payload["model"] = self.config.model
+
+        accumulated_content = ""
+        tool_calls = []
+        finish_reason = ""
+
+        try:
+            response = self._session.post(
+                url, headers=headers, json=payload, timeout=180, stream=True
+            )
+
+            if response.status_code != 200:
+                raise LLMError(f"LLM API error: {response.status_code} - {response.text[:500]}")
+
+            for line in response.iter_lines():
+                if self.is_cancelled:
+                    response.close()
+                    break
+
+                if not line:
+                    continue
+
+                line = line.decode("utf-8")
+                if not line.startswith("data: "):
+                    continue
+
+                data = line[6:]
+                if data == "[DONE]":
+                    break
+
+                try:
+                    chunk = json.loads(data)
+                    choices = chunk.get("choices", [])
+                    if not choices:
+                        continue
+
+                    choice = choices[0]
+                    delta = choice.get("delta", {})
+                    finish_reason = choice.get("finish_reason", "") or finish_reason
+
+                    content = delta.get("content", "")
+                    if content:
+                        accumulated_content += content
+                        if on_content:
+                            on_content(content)
+
+                    tool_call_deltas = delta.get("tool_calls", [])
+                    for tc_delta in tool_call_deltas:
+                        tc_index = tc_delta.get("index", 0)
+
+                        while len(tool_calls) <= tc_index:
+                            tool_calls.append(
+                                {
+                                    "id": "",
+                                    "type": "function",
+                                    "function": {"name": "", "arguments": ""},
+                                }
+                            )
+
+                        tc = tool_calls[tc_index]
+
+                        if "id" in tc_delta:
+                            tc["id"] = tc_delta["id"]
+                            if on_tool_call_start:
+                                on_tool_call_start(tc_delta.get("function", {}).get("name", ""))
+
+                        if "function" in tc_delta:
+                            func = tc_delta["function"]
+                            if "name" in func:
+                                tc["function"]["name"] = func["name"]
+                            if "arguments" in func:
+                                tc["function"]["arguments"] += func["arguments"]
+
+                except (json.JSONDecodeError, IndexError, KeyError):
+                    continue
+
+        except requests.exceptions.Timeout:
+            raise LLMError("LLM API request timed out")
+        except requests.exceptions.RequestException as e:
+            raise LLMError(f"LLM API connection error: {e}")
+
+        valid_tool_calls = [tc for tc in tool_calls if tc["id"] and tc["function"]["name"]]
+
+        return ChatResponse(
+            content=accumulated_content if accumulated_content else None,
+            tool_calls=valid_tool_calls if valid_tool_calls else None,
+            finish_reason=finish_reason,
+            model=self.config.model,
+        )
 
 
 class LLMError(Exception):

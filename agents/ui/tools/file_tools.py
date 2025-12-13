@@ -168,12 +168,22 @@ def read_file(
         )
 
 
+@dataclass
+class WriteResult(FileResult):
+    """Extended result for write operations with diff support."""
+
+    diff: str = ""
+    old_content: str = ""
+    is_new_file: bool = False
+
+
 def write_file(
     path: str,
     content: str,
     create_dirs: bool = True,
-) -> FileResult:
-    """Write content to a file.
+    generate_diff: bool = True,
+) -> WriteResult:
+    """Write content to a file with diff preview.
 
     Supports Databricks DBFS and Workspace paths.
 
@@ -183,9 +193,10 @@ def write_file(
               /Workspace/... for workspace files.
         content: Content to write.
         create_dirs: Create parent directories if needed.
+        generate_diff: Whether to generate a diff of changes.
 
     Returns:
-        FileResult indicating success/failure.
+        WriteResult indicating success/failure with optional diff.
     """
     try:
         normalized_path = normalize_databricks_path(path)
@@ -197,7 +208,7 @@ def write_file(
 
             if not is_valid_dbfs and not is_valid_workspace:
                 suggestion = suggest_databricks_path(path)
-                return FileResult(
+                return WriteResult(
                     success=False,
                     content="",
                     path=str(path),
@@ -210,10 +221,17 @@ def write_file(
         if create_dirs:
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
+        old_content = ""
+        is_new_file = not file_path.exists()
+        diff = ""
+
         if file_path.exists():
             try:
-                existing_content = file_path.read_text(encoding="utf-8")
-                FileHistory.save_state(str(file_path), existing_content)
+                old_content = file_path.read_text(encoding="utf-8")
+                FileHistory.save_state(str(file_path), old_content)
+
+                if generate_diff and old_content != content:
+                    diff = _generate_diff(old_content, content, file_path.name)
             except Exception:
                 pass
 
@@ -222,16 +240,22 @@ def write_file(
 
         display_path = get_dbfs_display_path(str(file_path.absolute()))
 
-        return FileResult(
+        status = "Created" if is_new_file else "Updated"
+        message = f"{status} {display_path} ({len(content)} bytes)"
+
+        return WriteResult(
             success=True,
-            content=f"Successfully wrote {len(content)} bytes to {display_path}",
+            content=message,
             path=display_path,
             line_count=content.count("\n") + 1,
+            diff=diff,
+            old_content=old_content,
+            is_new_file=is_new_file,
         )
 
     except PermissionError:
         suggestion = suggest_databricks_path(path)
-        return FileResult(
+        return WriteResult(
             success=False,
             content="",
             path=str(path),
@@ -240,12 +264,62 @@ def write_file(
 
     except Exception as e:
         suggestion = suggest_databricks_path(path) if is_databricks() else ""
-        return FileResult(
+        return WriteResult(
             success=False,
             content="",
             path=str(path),
             error=f"{str(e)}{suggestion}",
         )
+
+
+def _generate_diff(old_content: str, new_content: str, filename: str) -> str:
+    """Generate a unified diff between old and new content.
+
+    Args:
+        old_content: Original file content.
+        new_content: New file content.
+        filename: Name of the file for diff header.
+
+    Returns:
+        Unified diff string.
+    """
+    import difflib
+
+    old_lines = old_content.splitlines(keepends=True)
+    new_lines = new_content.splitlines(keepends=True)
+
+    diff = difflib.unified_diff(
+        old_lines,
+        new_lines,
+        fromfile=f"a/{filename}",
+        tofile=f"b/{filename}",
+        lineterm="",
+    )
+
+    return "".join(diff)
+
+
+def format_write_result(result: WriteResult, show_diff: bool = True) -> str:
+    """Format a write result for display with optional diff.
+
+    Args:
+        result: The write result to format.
+        show_diff: Whether to include the diff preview.
+
+    Returns:
+        Markdown-formatted result.
+    """
+    if not result.success:
+        return f"❌ **Error:** {result.error}"
+
+    output = f"✅ {result.content}"
+
+    if show_diff and result.diff:
+        output += f"\n\n<details>\n<summary>📝 View changes</summary>\n\n```diff\n{result.diff}\n```\n\n</details>"
+    elif result.is_new_file:
+        output += " (new file)"
+
+    return output
 
 
 def list_directory(

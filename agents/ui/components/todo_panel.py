@@ -93,8 +93,8 @@ class TodoManager:
         self.todos = [TodoItem.from_dict(t) for t in todos]
         if self.todos:
             valid_ids = [
-                int(t.id.split("-")[1]) 
-                for t in self.todos 
+                int(t.id.split("-")[1])
+                for t in self.todos
                 if "-" in t.id and t.id.split("-")[1].isdigit()
             ]
             self._id_counter = max(valid_ids) if valid_ids else len(self.todos)

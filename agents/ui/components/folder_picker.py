@@ -79,6 +79,7 @@ _INDEX_REGISTRY_FILE = "/tmp/.odibi_index_registry.json"
 def _load_index_registry() -> dict:
     """Load the index registry from disk."""
     import json
+
     try:
         with open(_INDEX_REGISTRY_FILE) as f:
             return json.load(f)
@@ -89,6 +90,7 @@ def _load_index_registry() -> dict:
 def _save_index_registry(registry: dict) -> None:
     """Save the index registry to disk."""
     import json
+
     with open(_INDEX_REGISTRY_FILE, "w") as f:
         json.dump(registry, f)
 

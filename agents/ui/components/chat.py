@@ -771,7 +771,7 @@ class ChatHandler:
                         }
                         args_json = json.dumps(args, indent=2)
                         action_desc = (
-                            f"**Pending Action:** `{tool_name}`\n" f"```json\n{args_json}\n```"
+                            f"**Pending Action:** `{tool_name}`\n```json\n{args_json}\n```"
                         )
                         history.append({"role": "assistant", "content": action_desc})
                         yield history, "Awaiting confirmation...", self.pending_action, True

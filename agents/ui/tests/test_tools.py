@@ -52,7 +52,7 @@ class TestReadFile:
         """Test reading specific line range."""
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test.py"
-            content = "\n".join(f"line {i+1}" for i in range(10)) + "\n"
+            content = "\n".join(f"line {i + 1}" for i in range(10)) + "\n"
             path.write_text(content)
 
             result = read_file(str(path), start_line=3, end_line=5)

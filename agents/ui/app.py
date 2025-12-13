@@ -2,6 +2,17 @@
 
 Combines settings, chat, and memory components into a unified interface
 that works both locally and in Databricks notebooks.
+
+Enhanced version with:
+- Token-by-token streaming
+- Visible thinking/reasoning
+- Activity feed
+- Collapsible tool results
+- File link clickability
+- Token/cost display
+- Dark/light theme toggle
+- Sound notifications
+- Conversation branching
 """
 
 import os
@@ -9,7 +20,7 @@ from typing import Optional
 
 import gradio as gr
 
-from .components.chat import create_chat_interface, setup_chat_handlers
+from .components.enhanced_chat import create_enhanced_chat_interface, setup_enhanced_chat_handlers
 from .components.memories import (
     create_memory_panel,
     format_memory_list,
@@ -23,69 +34,9 @@ from .components.conversation import (
     setup_conversation_handlers,
 )
 from .config import AgentUIConfig, load_config
+from .constants import ENHANCED_CSS, ENHANCED_JS
 
-CSS = """
-/* Optimized for Databricks notebook inline */
-.gradio-container {
-    max-width: 100% !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 12px !important;
-}
-
-footer {
-    display: none !important;
-}
-
-/* Large chat area for notebook */
-.chatbot {
-    height: 700px !important;
-    min-height: 500px !important;
-}
-
-/* Compact side panels */
-.memory-list {
-    max-height: 250px;
-    overflow-y: auto;
-}
-
-/* Tighter spacing */
-.gr-accordion {
-    margin-bottom: 8px !important;
-}
-
-.gr-block {
-    padding: 8px !important;
-}
-
-.status-bar {
-    min-height: 32px;
-    padding: 12px 16px;
-    background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid #00d4ff;
-    border-radius: 8px;
-    color: #00d4ff;
-    font-size: 15px;
-    font-weight: 500;
-    margin: 12px 0;
-    animation: pulse 1.5s ease-in-out infinite;
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
-}
-
-.status-bar:empty {
-    display: none;
-    animation: none;
-}
-
-.status-bar p {
-    margin: 0 !important;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-"""
+CSS = ENHANCED_CSS
 
 
 def create_app(
@@ -112,12 +63,14 @@ def create_app(
     def on_config_save(new_config: AgentUIConfig):
         current_config[0] = new_config
 
-    with gr.Blocks(title="🧠 Odibi Assistant") as app:
+    with gr.Blocks(title="🧠 Odibi Assistant", css=CSS) as app:
+        gr.HTML(ENHANCED_JS)
+
         gr.Markdown(
             """
             # 🧠 Odibi AI Assistant
 
-            A conversational AI assistant that works with any codebase.
+            A conversational AI assistant with visible thinking and real-time activity tracking.
             """
         )
 
@@ -135,9 +88,9 @@ def create_app(
                 memory_column, memory_components = create_memory_panel(config=config)
 
             with gr.Column(scale=2):
-                chat_column, chat_components = create_chat_interface(config=config)
+                chat_column, chat_components = create_enhanced_chat_interface(config=config)
 
-        setup_chat_handlers(chat_components, get_config)
+        setup_enhanced_chat_handlers(chat_components, get_config)
 
         setup_conversation_handlers(conv_components, chat_components, get_config)
 
@@ -210,7 +163,6 @@ def launch(
 
     launch_kwargs = {
         "share": share,
-        "css": CSS,
     }
 
     try:

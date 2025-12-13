@@ -155,11 +155,11 @@ def linkify_paths(text: str, base_path: Optional[str] = None) -> str:
         Text with paths converted to markdown links.
     """
     path_pattern = re.compile(
-        r'`([A-Za-z]:[/\\][^`\n]+|/[^`\n]+\.[a-zA-Z0-9]+)`'
-        r'|'
-        r'\b([A-Za-z]:[/\\][^\s\n]+\.[a-zA-Z0-9]+)'
-        r'|'
-        r'\b(/[^\s\n]+\.[a-zA-Z0-9]+)\b'
+        r"`([A-Za-z]:[/\\][^`\n]+|/[^`\n]+\.[a-zA-Z0-9]+)`"
+        r"|"
+        r"\b([A-Za-z]:[/\\][^\s\n]+\.[a-zA-Z0-9]+)"
+        r"|"
+        r"\b(/[^\s\n]+\.[a-zA-Z0-9]+)\b"
     )
 
     def replace_path(match: re.Match) -> str:
@@ -172,14 +172,14 @@ def linkify_paths(text: str, base_path: Optional[str] = None) -> str:
             path_obj = Path(base_path) / path_obj
 
         if path_obj.suffix:
-            line_match = re.search(r':(\d+)(?:-(\d+))?$', str(path))
+            line_match = re.search(r":(\d+)(?:-(\d+))?$", str(path))
             line = None
             line_end = None
             if line_match:
                 line = int(line_match.group(1))
                 if line_match.group(2):
                     line_end = int(line_match.group(2))
-                path = re.sub(r':\d+(?:-\d+)?$', '', str(path))
+                path = re.sub(r":\d+(?:-\d+)?$", "", str(path))
 
             return create_file_link(str(path_obj), line=line, line_end=line_end)
 
