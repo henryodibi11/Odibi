@@ -13,7 +13,7 @@ import codecs
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     from rich.console import Console
@@ -169,7 +169,7 @@ class StructuredLogger:
 
         if self.structured:
             log_entry = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "level": level,
                 "message": message,
                 **redacted_kwargs,

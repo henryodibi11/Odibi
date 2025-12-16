@@ -17,7 +17,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -263,7 +263,7 @@ class LoggingContext:
 
     def _base_context(self) -> Dict[str, Any]:
         """Build base context dict for all log entries."""
-        ctx = {"timestamp": datetime.utcnow().isoformat()}
+        ctx = {"timestamp": datetime.now(timezone.utc).isoformat()}
         if self.pipeline_id:
             ctx["pipeline_id"] = self.pipeline_id
         if self.node_id:

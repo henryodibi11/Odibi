@@ -4,7 +4,7 @@ import os
 import random
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -339,7 +339,7 @@ class CatalogStateBackend(StateBackend):
 
     def set_hwm(self, key: str, value: Any) -> None:
         val_str = json.dumps(value, default=str)
-        row = {"key": key, "value": val_str, "updated_at": datetime.utcnow()}
+        row = {"key": key, "value": val_str, "updated_at": datetime.now(timezone.utc)}
 
         def _do_set():
             if self.spark:

@@ -341,7 +341,7 @@ def _apply_soft_delete(
         deleted_keys_df["_del_flag"] = True
 
         df = df.merge(deleted_keys_df, on=keys, how="left")
-        df[soft_delete_col] = df["_del_flag"].fillna(False).astype(bool)
+        df[soft_delete_col] = df["_del_flag"].notna()
         df = df.drop(columns=["_del_flag"])
         result = df
 

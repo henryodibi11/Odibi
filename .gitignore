@@ -152,3 +152,5 @@ _system_catalog/
 
 # Projects folder (user-specific)
 projects/
+.odibi/
+.odibi/

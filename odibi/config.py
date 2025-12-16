@@ -1049,6 +1049,8 @@ class OnFailAction(str, Enum):
 
 
 class TestType(str, Enum):
+    __test__ = False  # Prevent pytest collection
+
     NOT_NULL = "not_null"
     UNIQUE = "unique"
     ACCEPTED_VALUES = "accepted_values"

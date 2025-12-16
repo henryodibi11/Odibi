@@ -192,11 +192,11 @@ def set_content_hash_in_state(
     if state_backend is None:
         return
 
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     key = make_content_hash_key(node_name, table_name)
     value = {
         "hash": content_hash,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     state_backend.set_hwm(key, value)

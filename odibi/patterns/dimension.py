@@ -667,4 +667,7 @@ class DimensionPattern(Pattern):
                         unknown_row[col] = "Unknown"
 
             unknown_df = pd.DataFrame([unknown_row])
+            for col in unknown_df.columns:
+                if col in df.columns:
+                    unknown_df[col] = unknown_df[col].astype(df[col].dtype)
             return pd.concat([unknown_df, df], ignore_index=True)

@@ -1305,7 +1305,6 @@ class CatalogManager:
                     format="delta",
                     path=self.tables["meta_runs"],
                     mode="append",
-                    options={"schema_mode": "merge"},
                 )
 
         try:
@@ -1385,7 +1384,6 @@ class CatalogManager:
                     format="delta",
                     path=self.tables["meta_runs"],
                     mode="append",
-                    options={"schema_mode": "merge"},
                 )
                 logger.debug(f"Batch logged {len(records)} run records to meta_runs")
 
@@ -2425,12 +2423,14 @@ class CatalogManager:
                 df.write.format("delta").mode("append").save(self.tables["meta_metrics"])
 
             elif self.engine:
+                import json
+
                 import pandas as pd
 
                 data = {
                     "metric_name": [metric_name],
                     "definition_sql": [definition_sql],
-                    "dimensions": [dimensions],
+                    "dimensions": [json.dumps(dimensions)],
                     "source_table": [source_table],
                 }
                 df = pd.DataFrame(data)

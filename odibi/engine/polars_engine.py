@@ -254,7 +254,7 @@ class PolarsEngine(Engine):
 
             return df.pivot(
                 index=params.get("group_by"),
-                columns=params["pivot_column"],
+                on=params["pivot_column"],
                 values=params["value_column"],
                 aggregate_function=params.get("agg_func", "first"),
             )  # Returns DataFrame

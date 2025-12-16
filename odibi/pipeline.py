@@ -150,11 +150,12 @@ class Pipeline:
         # Initialize engine
         engine_config = {}
         if performance_config:
-            engine_config["performance"] = (
-                performance_config.dict()
-                if hasattr(performance_config, "dict")
-                else performance_config
-            )
+            if hasattr(performance_config, "model_dump"):
+                engine_config["performance"] = performance_config.model_dump()
+            elif hasattr(performance_config, "dict"):
+                engine_config["performance"] = performance_config.dict()
+            else:
+                engine_config["performance"] = performance_config
 
         try:
             EngineClass = get_engine_class(engine)
