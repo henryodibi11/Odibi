@@ -172,7 +172,8 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
         s_col = F.col(col)
         t_col = F.col(f"{t_prefix}{col}")
         # Null-safe equality check: NOT (source <=> target)
-        change_conds.append(F.not_(s_col.eqNullSafe(t_col)))
+        # Use ~ operator instead of F.not_() which doesn't exist in PySpark
+        change_conds.append(~s_col.eqNullSafe(t_col))
 
     if change_conds:
         from functools import reduce
@@ -185,14 +186,17 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     # Filter: TargetKey IS NULL OR is_changed
     rows_to_insert = joined.filter(
         F.col(f"{t_prefix}{params.keys[0]}").isNull() | is_changed
-    ).select(
-        source_df.columns
-    )  # Select original source columns
+    ).select(source_df.columns)  # Select original source columns
 
     # Add metadata to inserts (Start=eff_col, End=Null, Current=True)
     rows_to_insert = rows_to_insert.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
         flag_col, F.lit(True)
     )
+
+    # Drop the effective_time_col (txn_date) from inserts since it's not part of target schema
+    # Target schema = source columns (minus eff_col) + end_col + flag_col
+    if eff_col in rows_to_insert.columns:
+        rows_to_insert = rows_to_insert.drop(eff_col)
 
     # B) Close Old Records
     # We need to update target_df.

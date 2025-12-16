@@ -51,10 +51,22 @@ def load_plugins():
     """
     try:
         # Handle different entry_points API versions
-        if sys.version_info < (3, 10):
-            eps = entry_points().get("odibi.connections", [])
-        else:
+        # Python 3.9: entry_points() returns SelectableGroups, use .select() or get via group attr
+        # Python 3.10+: entry_points(group=...) works directly
+        if sys.version_info >= (3, 10):
             eps = entry_points(group="odibi.connections")
+        elif sys.version_info >= (3, 9):
+            # Python 3.9: use select() method if available, else try group attribute
+            all_eps = entry_points()
+            if hasattr(all_eps, "select"):
+                eps = all_eps.select(group="odibi.connections")
+            elif hasattr(all_eps, "get"):
+                eps = all_eps.get("odibi.connections", [])
+            else:
+                eps = getattr(all_eps, "odibi.connections", [])
+        else:
+            # Python 3.8 and earlier
+            eps = entry_points().get("odibi.connections", [])
 
         for ep in eps:
             try:

@@ -1726,7 +1726,7 @@ class SparkEngine(Engine):
 
         if "types" in schema_rules:
             type_map = {
-                "int": ["integer", "long", "short", "byte"],
+                "int": ["integer", "long", "short", "byte", "bigint"],
                 "float": ["double", "float"],
                 "str": ["string"],
                 "bool": ["boolean"],

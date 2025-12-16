@@ -120,5 +120,35 @@ examples/diagnostics_demo/output_*/
 examples/diagnostics_demo/stories_*/
 
 # Odibi Internal
-.odibi/
 spark_catalog.*.stories/
+
+# Keep source_cache datasets, ignore rest of .odibi
+.odibi/*
+!.odibi/source_cache/
+
+# Archived experimental code
+_archive/
+agents/
+
+# Temp campaign/test folders
+improve_odibi/
+spark-warehouse/
+artifacts/
+explorer_sandboxes/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Misc temp files
+$null
+*.log
+
+# Generated parquet/delta data
+*.parquet
+_delta_log/
+_system_catalog/
+
+# Projects folder (user-specific)
+projects/
