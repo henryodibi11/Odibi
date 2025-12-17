@@ -669,7 +669,14 @@ class ChatHandler:
         return f"❓ Unknown tool: {tool_name}"
 
     def requires_confirmation(self, tool_name: str, args: dict = None) -> bool:
-        """Check if a tool call requires user confirmation."""
+        """Check if a tool call requires user confirmation.
+
+        Set ODIBI_AUTO_APPROVE=1 to skip all confirmations.
+        """
+        import os
+
+        if os.environ.get("ODIBI_AUTO_APPROVE", "").lower() in ("1", "true", "yes"):
+            return False
         if tool_name in TOOLS_REQUIRING_CONFIRMATION:
             if tool_name == "ruff":
                 return args.get("fix", False) if args else False
