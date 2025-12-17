@@ -190,6 +190,28 @@ class ConversationStore:
             return True
         return False
 
+    def rebuild_index(self) -> int:
+        """Rebuild the backend index and reload conversations.
+
+        This scans actual files in storage and rebuilds the index.
+        Useful when the index is out of sync with stored files.
+
+        Returns:
+            Number of conversations found.
+        """
+        if self._backend and hasattr(self._backend, "rebuild_index"):
+            count = self._backend.rebuild_index()
+            # Clear and reload conversations after index rebuild
+            self._conversations.clear()
+            self._load_all()
+            return count
+        elif self.backend_type == "local":
+            # Local backend doesn't need index rebuild - just reload
+            self._conversations.clear()
+            self._load_all()
+            return len(self._conversations)
+        return 0
+
     def create(
         self,
         messages: list[dict[str, str]],
@@ -476,6 +498,11 @@ def create_conversation_panel() -> tuple[gr.Column, dict[str, Any]]:
                     size="sm",
                     variant="stop",
                 )
+            components["rebuild_index_btn"] = gr.Button(
+                "🔄 Rebuild Index",
+                size="sm",
+                variant="secondary",
+            )
 
     components["store"] = store
     return conv_column, components
@@ -605,5 +632,37 @@ def setup_conversation_handlers(
     conv_components["delete_conv_btn"].click(
         fn=delete_conversation,
         inputs=[conv_components["conv_dropdown"]],
+        outputs=[conv_components["conv_list"], conv_components["conv_dropdown"]],
+    )
+
+    def rebuild_index() -> tuple[str, Any]:
+        """Rebuild the conversation index from actual files in storage."""
+        try:
+            config = get_config()
+            store = get_conversation_store(config)
+            count = store.rebuild_index()
+
+            # Refresh the conversation list
+            convs = store.list_recent(10)
+            lines = []
+            for c in convs:
+                date = c.updated_at.strftime("%m/%d %H:%M")
+                lines.append(f"- **{c.title}** ({date})")
+
+            # Update dropdown choices
+            choices = [(c.title, c.id) for c in convs]
+            status = f"✅ Rebuilt index: {count} conversations found"
+            logger.info("Rebuilt conversation index: %d items", count)
+            return (
+                "\n".join(lines) if lines else status,
+                gr.update(choices=choices, value=None),
+            )
+        except Exception as e:
+            logger.error("Failed to rebuild index: %s", e, exc_info=True)
+            return f"❌ Rebuild failed: {e}", gr.update()
+
+    conv_components["rebuild_index_btn"].click(
+        fn=rebuild_index,
+        inputs=[],
         outputs=[conv_components["conv_list"], conv_components["conv_dropdown"]],
     )

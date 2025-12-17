@@ -294,25 +294,119 @@ class OdibiConnectionBackend(MemoryBackend):
             del index[memory_id]
             self._save_index(index)
 
-            # Also delete the actual file from storage
-            try:
-                file_path = self._memory_path(memory_id)
-                # Use engine's delete if available, otherwise log warning
-                if hasattr(self.engine, "delete"):
-                    self.engine.delete(
-                        connection=self.connection,
-                        path=file_path,
-                    )
-                else:
-                    logger.warning("Engine doesn't support delete, file may remain: %s", file_path)
-            except Exception as e:
-                logger.warning("Failed to delete file from storage: %s", e)
+            # Delete the actual file from storage using fsspec
+            self._delete_file(memory_id)
 
             return True
         return False
 
+    def _delete_file(self, memory_id: str) -> bool:
+        """Delete a file from storage using fsspec.
+
+        Args:
+            memory_id: The ID of the memory/conversation to delete.
+
+        Returns:
+            True if deleted successfully, False otherwise.
+        """
+        try:
+            import fsspec
+
+            storage_options = {}
+            if hasattr(self.connection, "pandas_storage_options"):
+                storage_options = self.connection.pandas_storage_options()
+
+            file_path = self._memory_path(memory_id)
+            full_path = self.connection.get_path(file_path)
+
+            fs, path = fsspec.core.url_to_fs(full_path, **storage_options)
+
+            if fs.exists(path):
+                fs.rm(path)
+                logger.info("Deleted file from storage: %s", memory_id)
+                return True
+            else:
+                logger.warning("File not found in storage: %s", memory_id)
+                return False
+        except Exception as e:
+            logger.warning("Failed to delete file from storage: %s - %s", memory_id, e)
+            return False
+
     def list_all(self) -> list[str]:
         return list(self._load_index().keys())
+
+    def rebuild_index(self) -> int:
+        """Rebuild the index by scanning actual files in storage.
+
+        This method scans the storage path for all JSON files (excluding _index.json)
+        and rebuilds the index from the actual files. Useful when the index is out of
+        sync with the actual files in storage.
+
+        Returns:
+            Number of items indexed.
+        """
+        import re
+
+        try:
+            # Use fsspec to list files in the storage path
+            storage_options = {}
+            if hasattr(self.connection, "pandas_storage_options"):
+                storage_options = self.connection.pandas_storage_options()
+
+            # Build the full path for listing
+            full_path = self.connection.get_path(self.path_prefix)
+
+            # Use adlfs/fsspec to list files
+            import fsspec
+
+            # Parse the abfss:// URI to get filesystem and path
+            fs, path = fsspec.core.url_to_fs(full_path, **storage_options)
+
+            # List all JSON files in the path
+            files = fs.glob(f"{path}/*.json")
+
+            # Build new index from actual files
+            new_index: dict[str, str] = {}
+            pattern = re.compile(r"([^/]+)\.json$")
+
+            for file_path in files:
+                match = pattern.search(file_path)
+                if match:
+                    file_id = match.group(1)
+                    # Skip the index file itself
+                    if file_id == "_index":
+                        continue
+
+                    # Try to load the file to get created_at
+                    try:
+                        data = self.load(file_id)
+                        if data:
+                            created_at = data.get(
+                                "created_at", datetime.now().isoformat()
+                            )
+                            new_index[file_id] = created_at
+                        else:
+                            # File exists but couldn't load - use current time
+                            new_index[file_id] = datetime.now().isoformat()
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to load %s during index rebuild: %s", file_id, e
+                        )
+                        new_index[file_id] = datetime.now().isoformat()
+
+            # Save the rebuilt index
+            self._save_index(new_index)
+            logger.info(
+                "Rebuilt index with %d items (was %d)",
+                len(new_index),
+                len(self._index_cache or {}),
+            )
+
+            return len(new_index)
+
+        except Exception as e:
+            logger.error("Failed to rebuild index: %s", e, exc_info=True)
+            return 0
 
     def search(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         try:
