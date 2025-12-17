@@ -8,6 +8,7 @@ Supports storing memories via any Odibi connection:
 """
 
 import json
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,6 +16,8 @@ from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from odibi.engine.base import Engine
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryBackend(ABC):
@@ -252,7 +255,7 @@ class OdibiConnectionBackend(MemoryBackend):
 
             return True
         except Exception as e:
-            print(f"Failed to save memory {memory_id}: {e}")
+            logger.error("Failed to save memory %s: %s", memory_id, e, exc_info=True)
             return False
 
     def load(self, memory_id: str) -> Optional[dict[str, Any]]:
@@ -265,8 +268,8 @@ class OdibiConnectionBackend(MemoryBackend):
             )
             if df is not None and len(df) > 0:
                 return df.to_dict(orient="records")[0]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("Failed to load memory %s: %s", memory_id, e, exc_info=True)
         return None
 
     def delete(self, memory_id: str) -> bool:
@@ -281,29 +284,33 @@ class OdibiConnectionBackend(MemoryBackend):
         return list(self._load_index().keys())
 
     def search(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
-        query_lower = query.lower()
-        results = []
+        try:
+            query_lower = query.lower()
+            results = []
 
-        for memory_id in self.list_all():
-            data = self.load(memory_id)
-            if not data:
-                continue
+            for memory_id in self.list_all():
+                data = self.load(memory_id)
+                if not data:
+                    continue
 
-            content = data.get("content", "").lower()
-            summary = data.get("summary", "").lower()
-            tags = [t.lower() for t in data.get("tags", [])]
+                content = data.get("content", "").lower()
+                summary = data.get("summary", "").lower()
+                tags = [t.lower() for t in data.get("tags", [])]
 
-            if (
-                query_lower in content
-                or query_lower in summary
-                or any(query_lower in tag for tag in tags)
-            ):
-                results.append(data)
+                if (
+                    query_lower in content
+                    or query_lower in summary
+                    or any(query_lower in tag for tag in tags)
+                ):
+                    results.append(data)
 
-            if len(results) >= limit:
-                break
+                if len(results) >= limit:
+                    break
 
-        return results
+            return results
+        except Exception as e:
+            logger.error("Failed to search memories for query '%s': %s", query, e, exc_info=True)
+            return []
 
 
 class DeltaTableBackend(MemoryBackend):

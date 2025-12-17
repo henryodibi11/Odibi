@@ -576,6 +576,8 @@ def discover_modules(root_dir: str = "odibi") -> List[str]:
     for file_path in path.rglob("*.py"):
         if "introspect.py" in str(file_path):  # Avoid self
             continue
+        if "tests" in file_path.parts or "test_" in file_path.name:  # Skip test files
+            continue
 
         # Convert path to module notation
         # e.g. odibi\transformers\scd.py -> odibi.transformers.scd

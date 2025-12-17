@@ -3,12 +3,23 @@
 View, search, and manage agent memories.
 """
 
+import logging
 from typing import Any, Callable, Optional
 
 import gradio as gr
 from odibi.agents.core.memory import Memory, MemoryManager, MemoryType
 
 from ..config import AgentUIConfig
+
+logger = logging.getLogger(__name__)
+
+_current_backend_info: str = "not initialized"
+
+
+def get_current_backend_info() -> str:
+    """Return the current backend description."""
+    return _current_backend_info
+
 
 MEMORY_TYPE_COLORS = {
     MemoryType.DECISION: "🔵",
@@ -146,6 +157,8 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
     Returns:
         MemoryManager instance.
     """
+    global _current_backend_info
+
     if config is None:
         return MemoryManager(backend_type="local")
 
@@ -177,10 +190,11 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
                 connections = load_connections(project_yaml)
                 connection = connections.get(config.memory.connection_name)
                 if connection:
-                    print(
-                        f"Memory backend: ADLS via '{config.memory.connection_name}' "
+                    _current_backend_info = (
+                        f"ADLS via '{config.memory.connection_name}' "
                         f"-> {config.memory.path_prefix}"
                     )
+                    logger.info("Memory backend: %s", _current_backend_info)
                     return MemoryManager(
                         backend_type="odibi",
                         connection=connection,
@@ -188,17 +202,18 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
                         path_prefix=config.memory.path_prefix or "agent/memories",
                     )
                 else:
-                    print(
-                        f"Warning: Connection '{config.memory.connection_name}' "
-                        f"not found in {project_yaml}"
+                    logger.warning(
+                        "Connection '%s' not found in %s",
+                        config.memory.connection_name,
+                        project_yaml,
                     )
             else:
-                print(
-                    f"Warning: No project.yaml found. Cannot load connection "
-                    f"'{config.memory.connection_name}'. Falling back to local."
+                logger.warning(
+                    "No project.yaml found. Cannot load connection '%s'. Falling back to local.",
+                    config.memory.connection_name,
                 )
         except Exception as e:
-            print(f"Failed to create odibi backend: {e}")
+            logger.error("Failed to create odibi backend: %s", e)
 
     if backend_type == "delta":
         try:
@@ -207,10 +222,11 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
                 table_path=config.memory.table_path or "system.agent_memories",
             )
         except Exception as e:
-            print(f"Failed to create delta backend: {e}")
+            logger.error("Failed to create delta backend: %s", e)
 
     # Fallback to local
-    print(f"Memory backend: local -> {project_root}/.odibi/memories")
+    _current_backend_info = f"local -> {project_root}/.odibi/memories"
+    logger.info("Memory backend: %s", _current_backend_info)
     return MemoryManager(
         backend_type="local",
         local_path=f"{project_root}/.odibi/memories",

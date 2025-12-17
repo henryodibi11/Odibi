@@ -119,6 +119,17 @@ def create_settings_panel(
                 visible=config.memory.backend_type == "delta",
             )
 
+            with gr.Row():
+                components["test_memory_btn"] = gr.Button(
+                    "🔌 Test Connection",
+                    size="sm",
+                    visible=config.memory.backend_type != "local",
+                )
+            components["memory_status"] = gr.Markdown(
+                "",
+                visible=True,
+            )
+
         with gr.Accordion("📂 Working Project", open=True):
             from .folder_picker import create_folder_picker, ProjectState
 
@@ -177,6 +188,7 @@ def create_settings_panel(
                 gr.update(visible=backend_type != "local"),
                 gr.update(visible=backend_type == "odibi"),
                 gr.update(visible=backend_type == "delta"),
+                gr.update(visible=backend_type != "local"),
             )
 
         components["backend_type"].change(
@@ -186,7 +198,84 @@ def create_settings_panel(
                 components["connection_name"],
                 components["memory_path"],
                 components["delta_table"],
+                components["test_memory_btn"],
             ],
+        )
+
+        def test_memory_connection(
+            backend_type: str,
+            connection_name: str,
+            memory_path: str,
+            delta_table: str,
+            working_project: str,
+            project_yaml: str,
+        ) -> str:
+            """Test if the memory backend connection works."""
+            if backend_type == "local":
+                return "✅ Local backend is always available"
+
+            if backend_type == "odibi":
+                if not connection_name or connection_name == "(no connections)":
+                    return "❌ No connection selected"
+                try:
+                    from odibi.connections import load_connections
+                    from odibi.engine.pandas_engine import PandasEngine
+                    from pathlib import Path
+
+                    proj_yaml = project_yaml
+                    if not proj_yaml:
+                        candidate = Path(working_project) / "project.yaml"
+                        if candidate.exists():
+                            proj_yaml = str(candidate)
+
+                    if not proj_yaml:
+                        return "❌ No project.yaml found"
+
+                    connections = load_connections(proj_yaml)
+                    connection = connections.get(connection_name)
+                    if not connection:
+                        return f"❌ Connection '{connection_name}' not found"
+
+                    engine = PandasEngine()
+                    test_path = f"{memory_path}/_connection_test.json"
+                    import pandas as pd
+
+                    test_df = pd.DataFrame([{"test": "connection_check"}])
+                    engine.write(
+                        df=test_df,
+                        connection=connection,
+                        format="json",
+                        path=test_path,
+                        mode="overwrite",
+                        options={},
+                    )
+                    return f"✅ ADLS connection works! Path: {memory_path}"
+                except Exception as e:
+                    return f"❌ Connection failed: {e}"
+
+            if backend_type == "delta":
+                try:
+                    from pyspark.sql import SparkSession
+
+                    spark = SparkSession.builder.getOrCreate()
+                    spark.sql(f"DESCRIBE TABLE {delta_table}")
+                    return f"✅ Delta table accessible: {delta_table}"
+                except Exception as e:
+                    return f"❌ Delta table check failed: {e}"
+
+            return "❓ Unknown backend type"
+
+        components["test_memory_btn"].click(
+            fn=test_memory_connection,
+            inputs=[
+                components["backend_type"],
+                components["connection_name"],
+                components["memory_path"],
+                components["delta_table"],
+                components["working_project"],
+                components["project_yaml"],
+            ],
+            outputs=[components["memory_status"]],
         )
 
         def refresh_connections(project_yaml_path: str):
