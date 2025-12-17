@@ -211,11 +211,32 @@ class ConversationStore:
         conv_id = f"conv-{uuid.uuid4().hex[:8]}"
 
         if not title and messages:
-            first_user = next(
-                (m["content"][:50] for m in messages if m["role"] == "user"),
-                "New Conversation",
-            )
-            title = first_user + ("..." if len(first_user) >= 50 else "")
+            # Find first user message content
+            first_user_content = None
+            for m in messages:
+                if isinstance(m, dict) and m.get("role") == "user":
+                    content = m.get("content", "")
+                    # Handle both string and list content formats
+                    if isinstance(content, list):
+                        # Extract text from content parts
+                        content = " ".join(
+                            p.get("text", str(p)) if isinstance(p, dict) else str(p)
+                            for p in content
+                        )
+                    first_user_content = str(content)[:50] if content else None
+                    break
+                elif isinstance(m, (list, tuple)) and len(m) >= 1:
+                    # Gradio tuple format: (user_msg, assistant_msg)
+                    content = m[0] if m[0] else ""
+                    if isinstance(content, list):
+                        content = " ".join(str(p) for p in content)
+                    first_user_content = str(content)[:50] if content else None
+                    break
+
+            if first_user_content:
+                title = first_user_content + ("..." if len(first_user_content) >= 50 else "")
+            else:
+                title = "New Conversation"
         else:
             title = title or "New Conversation"
 
