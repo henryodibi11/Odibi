@@ -381,17 +381,13 @@ class OdibiConnectionBackend(MemoryBackend):
                     try:
                         data = self.load(file_id)
                         if data:
-                            created_at = data.get(
-                                "created_at", datetime.now().isoformat()
-                            )
+                            created_at = data.get("created_at", datetime.now().isoformat())
                             new_index[file_id] = created_at
                         else:
                             # File exists but couldn't load - use current time
                             new_index[file_id] = datetime.now().isoformat()
                     except Exception as e:
-                        logger.warning(
-                            "Failed to load %s during index rebuild: %s", file_id, e
-                        )
+                        logger.warning("Failed to load %s during index rebuild: %s", file_id, e)
                         new_index[file_id] = datetime.now().isoformat()
 
             # Save the rebuilt index
