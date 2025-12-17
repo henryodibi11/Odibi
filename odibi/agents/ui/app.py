@@ -201,8 +201,12 @@ def create_app(
                 manager = get_memory_manager(cfg)
                 memories = manager.store.get_recent(days=30, limit=20)
                 return format_memory_list(memories)
-            except Exception:
-                return "_Could not load memories_"
+            except Exception as e:
+                import traceback
+
+                print(f"Memory load error: {e}")
+                traceback.print_exc()
+                return f"_Could not load memories: {e}_"
 
         app.load(
             fn=load_initial_memories,

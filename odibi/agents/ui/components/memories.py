@@ -208,17 +208,21 @@ def setup_memory_handlers(
     """
 
     def search_memories(query: str, type_filters: list[str]) -> str:
-        config = get_config()
-        manager = get_memory_manager(config)
+        try:
+            config = get_config()
+            manager = get_memory_manager(config)
 
-        if query:
-            memory_types = [MemoryType(t) for t in type_filters] if type_filters else None
-            memories = manager.recall(query, memory_types=memory_types, top_k=20)
-        else:
-            memory_types = [MemoryType(t) for t in type_filters] if type_filters else None
-            memories = manager.store.get_recent(days=30, memory_types=memory_types, limit=20)
+            if query:
+                memory_types = [MemoryType(t) for t in type_filters] if type_filters else None
+                memories = manager.recall(query, memory_types=memory_types, top_k=20)
+            else:
+                memory_types = [MemoryType(t) for t in type_filters] if type_filters else None
+                memories = manager.store.get_recent(days=30, memory_types=memory_types, limit=20)
 
-        return format_memory_list(memories)
+            return format_memory_list(memories)
+        except Exception as e:
+            logger.error("Memory search error: %s", e, exc_info=True)
+            return f"❌ Error loading memories: {e}"
 
     def refresh_memories(type_filters: list[str]) -> str:
         return search_memories("", type_filters)
