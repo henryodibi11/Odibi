@@ -262,16 +262,33 @@ def get_odibi_connection(
     Raises:
         ConnectionError: If connection exists but fails to load (with details)
     """
-    if not project_yaml_path or not Path(project_yaml_path).exists():
-        return None
+    if not project_yaml_path:
+        raise ConnectionError("No project.yaml path provided")
+
+    # Check if file exists (handle both local and Databricks paths)
+    try:
+        import os
+
+        if not os.path.exists(project_yaml_path):
+            raise ConnectionError(f"project.yaml not found at: {project_yaml_path}")
+    except Exception as e:
+        raise ConnectionError(f"Cannot access path '{project_yaml_path}': {e}") from e
 
     try:
         from odibi.config import load_config_from_file
-        from odibi.context import EngineContext
 
         config = load_config_from_file(project_yaml_path)
-        if connection_name not in config.connections:
-            return None
+    except Exception as e:
+        raise ConnectionError(f"Failed to parse '{project_yaml_path}': {e}") from e
+
+    if connection_name not in config.connections:
+        available = list(config.connections.keys())
+        raise ConnectionError(
+            f"Connection '{connection_name}' not in config. Available: {available}"
+        )
+
+    try:
+        from odibi.context import EngineContext
 
         conn_config = config.connections[connection_name]
         ctx = EngineContext.create(conn_config)
