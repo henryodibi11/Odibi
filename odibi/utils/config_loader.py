@@ -75,10 +75,15 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
 
     logger.debug("Reading configuration file", absolute_path=abs_path)
 
-    with open(abs_path, "r") as f:
+    with open(abs_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    logger.debug("File content loaded", file_size=len(content))
+    # Debug: Log first 100 chars to detect encoding/BOM issues
+    logger.debug(
+        "File content loaded",
+        file_size=len(content),
+        first_100_repr=repr(content[:100]),
+    )
 
     env_vars_found = []
 
@@ -93,7 +98,16 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
                 file=abs_path,
             )
             raise ValueError(f"Missing environment variable: {var_name}")
-        logger.debug("Environment variable substituted", variable=var_name)
+        # Check for problematic characters that could break YAML
+        if any(c in value for c in ["\n", "\r", ":", "#"]):
+            logger.warning(
+                "Environment variable contains YAML-sensitive characters",
+                variable=var_name,
+                has_newline="\n" in value or "\r" in value,
+                has_colon=":" in value,
+                has_hash="#" in value,
+            )
+        logger.debug("Environment variable substituted", variable=var_name, length=len(value))
         return value
 
     # Substitute variables
