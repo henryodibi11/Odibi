@@ -138,13 +138,12 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
 
     if backend_type == "odibi" and config.memory.connection_name:
         try:
-            from odibi.connections import load_connections
             from odibi.engine.pandas_engine import PandasEngine
+            from ..config import get_odibi_connection
 
             # Try to find project.yaml
             project_yaml = config.project.project_yaml_path
             if not project_yaml:
-                # Auto-detect from project_root
                 from pathlib import Path
 
                 candidate = Path(project_root) / "project.yaml"
@@ -152,8 +151,7 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
                     project_yaml = str(candidate)
 
             if project_yaml:
-                connections = load_connections(project_yaml)
-                connection = connections.get(config.memory.connection_name)
+                connection = get_odibi_connection(project_yaml, config.memory.connection_name)
                 if connection:
                     _current_backend_info = (
                         f"ADLS via '{config.memory.connection_name}' "

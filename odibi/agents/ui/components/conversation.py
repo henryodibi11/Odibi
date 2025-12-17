@@ -333,9 +333,9 @@ def get_conversation_store(
         _conversation_store = ConversationStore(storage_dir=storage_dir)
     elif config.memory.backend_type == "odibi" and config.memory.connection_name:
         try:
-            from odibi.connections import load_connections
             from odibi.engine.pandas_engine import PandasEngine
             from pathlib import Path
+            from ..config import get_odibi_connection
 
             # Find project.yaml
             project_yaml = config.project.project_yaml_path
@@ -345,8 +345,7 @@ def get_conversation_store(
                     project_yaml = str(candidate)
 
             if project_yaml:
-                connections = load_connections(project_yaml)
-                connection = connections.get(config.memory.connection_name)
+                connection = get_odibi_connection(project_yaml, config.memory.connection_name)
                 if connection:
                     # Use conversations subfolder within memory path
                     conv_path = f"{config.memory.path_prefix or 'agent'}/conversations"

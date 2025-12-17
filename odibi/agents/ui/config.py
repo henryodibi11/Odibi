@@ -238,3 +238,34 @@ def load_odibi_connections(project_yaml_path: Optional[str] = None) -> list[str]
         return []
     except Exception:
         return []
+
+
+def get_odibi_connection(
+    project_yaml_path: str,
+    connection_name: str,
+) -> Optional[Any]:
+    """Get an Odibi connection object by name.
+
+    Args:
+        project_yaml_path: Path to project.yaml/odibi.yaml
+        connection_name: Name of the connection to retrieve
+
+    Returns:
+        Connection object or None if not found
+    """
+    if not project_yaml_path or not Path(project_yaml_path).exists():
+        return None
+
+    try:
+        from odibi.config import load_config_from_file
+        from odibi.context import EngineContext
+
+        config = load_config_from_file(project_yaml_path)
+        if connection_name not in config.connections:
+            return None
+
+        conn_config = config.connections[connection_name]
+        ctx = EngineContext.create(conn_config)
+        return ctx.connection
+    except Exception:
+        return None

@@ -220,9 +220,9 @@ def create_settings_panel(
                 if not connection_name or connection_name == "(no connections)":
                     return "❌ No connection selected"
                 try:
-                    from odibi.connections import load_connections
                     from odibi.engine.pandas_engine import PandasEngine
                     from pathlib import Path
+                    from ..config import get_odibi_connection
 
                     proj_yaml = project_yaml
                     if not proj_yaml:
@@ -233,8 +233,7 @@ def create_settings_panel(
                     if not proj_yaml:
                         return "❌ No project.yaml found"
 
-                    connections = load_connections(proj_yaml)
-                    connection = connections.get(connection_name)
+                    connection = get_odibi_connection(proj_yaml, connection_name)
                     if not connection:
                         return f"❌ Connection '{connection_name}' not found"
 
