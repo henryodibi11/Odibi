@@ -231,11 +231,15 @@ def create_settings_panel(
                             proj_yaml = str(candidate)
 
                     if not proj_yaml:
-                        return "❌ No project.yaml found"
+                        return f"❌ No project.yaml found (checked: {working_project}/project.yaml)"
 
                     connection = get_odibi_connection(proj_yaml, connection_name)
                     if not connection:
-                        return f"❌ Connection '{connection_name}' not found"
+                        # Show available connections for debugging
+                        from ..config import load_odibi_connections
+
+                        available = load_odibi_connections(proj_yaml)
+                        return f"❌ Connection '{connection_name}' not found in {proj_yaml}. Available: {available}"
 
                     engine = PandasEngine()
                     test_path = f"{memory_path}/_connection_test.json"

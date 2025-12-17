@@ -253,7 +253,12 @@ def get_odibi_connection(
     Returns:
         Connection object or None if not found
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     if not project_yaml_path or not Path(project_yaml_path).exists():
+        logger.warning("Project yaml not found: %s", project_yaml_path)
         return None
 
     try:
@@ -262,10 +267,16 @@ def get_odibi_connection(
 
         config = load_config_from_file(project_yaml_path)
         if connection_name not in config.connections:
+            logger.warning(
+                "Connection '%s' not in config. Available: %s",
+                connection_name,
+                list(config.connections.keys()),
+            )
             return None
 
         conn_config = config.connections[connection_name]
         ctx = EngineContext.create(conn_config)
         return ctx.connection
-    except Exception:
+    except Exception as e:
+        logger.error("Failed to get connection '%s': %s", connection_name, e)
         return None
