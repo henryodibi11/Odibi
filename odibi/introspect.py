@@ -12,6 +12,15 @@ try:
 except ImportError:
     from typing_extensions import Annotated, get_args, get_origin
 
+# Python 3.10+ has types.UnionType for X | Y syntax
+try:
+    from types import UnionType
+
+    HAS_UNION_TYPE = True
+except ImportError:
+    UnionType = None  # type: ignore
+    HAS_UNION_TYPE = False
+
 from pydantic import BaseModel
 
 # Try to import registry/transformers to get function metadata
@@ -643,9 +652,10 @@ def format_type_hint(annotation: Any) -> str:
         if args:
             return format_type_hint(args[0])
 
-    # Handle Union / Optional
+    # Handle Union / Optional (including Python 3.10+ X | Y syntax)
     origin = get_origin(annotation)
-    if origin is Union:
+    is_union = origin is Union or (HAS_UNION_TYPE and isinstance(annotation, UnionType))
+    if is_union:
         args = get_args(annotation)
         # Check if it's Optional (Union[T, None])
         # Filter out NoneType
