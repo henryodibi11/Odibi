@@ -64,6 +64,14 @@ class MemoryConfig:
 
 
 @dataclass
+class AgentConfig:
+    """Agent behavior configuration."""
+
+    max_iterations: int = 50
+    subtask_max_iterations: int = 3
+
+
+@dataclass
 class ProjectConfig:
     """Project configuration.
 
@@ -114,6 +122,7 @@ class AgentUIConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     project: ProjectConfig = field(default_factory=ProjectConfig)
+    agent: AgentConfig = field(default_factory=AgentConfig)
     default_agent: str = "auto"
 
     def to_dict(self) -> dict[str, Any]:
@@ -137,6 +146,10 @@ class AgentUIConfig:
                 "reference_repos": self.project.reference_repos,
                 "project_yaml_path": self.project.project_yaml_path,
             },
+            "agent": {
+                "max_iterations": self.agent.max_iterations,
+                "subtask_max_iterations": self.agent.subtask_max_iterations,
+            },
             "default_agent": self.default_agent,
         }
 
@@ -146,6 +159,7 @@ class AgentUIConfig:
         llm_data = data.get("llm", {})
         memory_data = data.get("memory", {})
         project_data = data.get("project", {})
+        agent_data = data.get("agent", {})
 
         model = llm_data.get("model") or llm_data.get("deployment_name", "gpt-4o")
 
@@ -168,6 +182,10 @@ class AgentUIConfig:
                 reference_repos=project_data.get("reference_repos")
                 or ([project_data["reference_repo"]] if project_data.get("reference_repo") else []),
                 project_yaml_path=project_data.get("project_yaml_path"),
+            ),
+            agent=AgentConfig(
+                max_iterations=agent_data.get("max_iterations", 50),
+                subtask_max_iterations=agent_data.get("subtask_max_iterations", 3),
             ),
             default_agent=data.get("default_agent", "auto"),
         )

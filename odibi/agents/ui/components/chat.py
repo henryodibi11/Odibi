@@ -1151,8 +1151,9 @@ def setup_chat_handlers(
             return
 
         handler.config = get_config()
+        max_iters = getattr(handler.config.agent, "max_iterations", 50)
 
-        for result in handler.process_message(message, history, agent):
+        for result in handler.process_message(message, history, agent, max_iterations=max_iters):
             updated_history, status, pending, show_actions = result
             yield (
                 updated_history,

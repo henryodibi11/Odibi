@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional
 import gradio as gr
 
 from ..config import (
+    AgentConfig,
     AgentUIConfig,
     LLMConfig,
     MemoryConfig,
@@ -169,6 +170,24 @@ def create_settings_panel(
                 placeholder="/path/to/repo1\n/path/to/repo2",
                 info="Additional codebases the agent can grep/read (one per line)",
                 lines=3,
+            )
+
+        with gr.Accordion("🔧 Agent Settings", open=False):
+            components["max_iterations"] = gr.Slider(
+                label="Max Iterations",
+                minimum=10,
+                maximum=200,
+                step=10,
+                value=config.agent.max_iterations,
+                info="Maximum thinking steps per message (default: 50)",
+            )
+            components["subtask_max_iterations"] = gr.Slider(
+                label="Subtask Max Iterations",
+                minimum=1,
+                maximum=20,
+                step=1,
+                value=config.agent.subtask_max_iterations,
+                info="Max iterations for sub-tasks like implement (default: 3)",
             )
 
         with gr.Row():
@@ -349,6 +368,8 @@ def create_settings_panel(
             working_project: str,
             project_yaml: str,
             reference_repos_text: str,
+            max_iterations: int,
+            subtask_max_iterations: int,
         ) -> str:
             if not working_project:
                 return "❌ Working Project path is required"
@@ -381,6 +402,10 @@ def create_settings_panel(
                     reference_repos=reference_repos,
                     project_yaml_path=project_yaml if project_yaml else None,
                 ),
+                agent=AgentConfig(
+                    max_iterations=int(max_iterations),
+                    subtask_max_iterations=int(subtask_max_iterations),
+                ),
             )
 
             success = save_config(new_config)
@@ -407,6 +432,8 @@ def create_settings_panel(
                 components["working_project"],
                 components["project_yaml"],
                 components["reference_repos"],
+                components["max_iterations"],
+                components["subtask_max_iterations"],
             ],
             outputs=[components["status"]],
         )

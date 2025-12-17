@@ -668,11 +668,12 @@ class EnhancedChatHandler:
             return format_experiment_result(result)
 
         elif tool_name == "implement_feature":
+            subtask_default = getattr(self.config.agent, "subtask_max_iterations", 3)
             result = implement_feature(
                 description=args.get("description", ""),
                 target_files=args.get("target_files", []),
                 test_pattern=args.get("test_pattern"),
-                max_iterations=args.get("max_iterations", 3),
+                max_iterations=args.get("max_iterations", subtask_default),
                 project_root=self.config.project.project_root,
             )
             return format_implementation_result(result)
@@ -1279,8 +1280,11 @@ def setup_enhanced_chat_handlers(
             return
 
         handler.config = get_config()
+        max_iters = getattr(handler.config.agent, "max_iterations", 50)
 
-        for result in handler.process_message_streaming(message, history, agent):
+        for result in handler.process_message_streaming(
+            message, history, agent, max_iterations=max_iters
+        ):
             updated_history, status, thinking, activity, pending, show_actions = result
             yield (
                 updated_history,
