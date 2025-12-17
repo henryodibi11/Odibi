@@ -516,15 +516,20 @@ def setup_conversation_handlers(
                 date = c.updated_at.strftime("%m/%d %H:%M")
                 lines.append(f"- **{c.title}** ({date})")
 
-            return "\n".join(lines) if lines else "*No saved conversations*"
+            # Also update dropdown choices
+            choices = [(c.title, c.id) for c in convs]
+            return (
+                "\n".join(lines) if lines else "*No saved conversations*",
+                gr.update(choices=choices),
+            )
         except Exception as e:
             logger.error("Failed to save conversation: %s", e, exc_info=True)
-            return f"❌ Save failed: {e}"
+            return f"❌ Save failed: {e}", gr.update()
 
     conv_components["save_conv_btn"].click(
         fn=save_conversation,
         inputs=[chat_components["chatbot"]],
-        outputs=[conv_components["conv_list"]],
+        outputs=[conv_components["conv_list"], conv_components["conv_dropdown"]],
     )
 
     def export_conversation(history: list[dict]) -> tuple[str, Any]:
@@ -544,12 +549,18 @@ def setup_conversation_handlers(
         if not conv_id:
             return []
 
-        config = get_config()
-        store = get_conversation_store(config)
-        conv = store.get(conv_id)
-        if conv:
-            return conv.messages
-        return []
+        try:
+            config = get_config()
+            store = get_conversation_store(config)
+            conv = store.get(conv_id)
+            if conv:
+                logger.info("Loaded conversation: %s (%d messages)", conv_id, len(conv.messages))
+                return conv.messages
+            logger.warning("Conversation not found: %s", conv_id)
+            return []
+        except Exception as e:
+            logger.error("Failed to load conversation: %s", e, exc_info=True)
+            return []
 
     conv_components["load_conv_btn"].click(
         fn=load_conversation,
