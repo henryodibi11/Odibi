@@ -82,7 +82,8 @@ agents = [
     "gradio>=4.0.0",
     "requests>=2.28.0",
     "chromadb>=0.5.0",  # 0.5+ supports pydantic v2
-    "sentence-transformers>=2.2.0",
+    "sentence-transformers>=3.0.0",
+    "threadpoolctl>=3.1.0",  # fixes compatibility issues in Databricks
 ]
 all = [
     "pyspark>=3.4.0",
