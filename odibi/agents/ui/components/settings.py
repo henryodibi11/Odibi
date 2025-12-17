@@ -240,11 +240,24 @@ def create_settings_panel(
                         )
 
                     from ..config import ConnectionError as OdibiConnectionError
+                    import os
+
+                    # Debug: Check if key env vars are available
+                    env_debug = []
+                    for var in ["PROD_AZURE_STORAGE_ACCOUNT", "PROD_AZURE_STORAGE_KEY"]:
+                        val = os.environ.get(var)
+                        if val:
+                            env_debug.append(f"✓ {var}: (set, {len(val)} chars)")
+                        else:
+                            env_debug.append(f"✗ {var}: NOT SET")
 
                     try:
                         connection = get_odibi_connection(proj_yaml, connection_name)
                     except OdibiConnectionError as ce:
-                        return f"❌ {ce}\n\n**Using path:** `{proj_yaml}`"
+                        env_info = "\n".join(env_debug)
+                        return (
+                            f"❌ {ce}\n\n**Using path:** `{proj_yaml}`\n\n**Env vars:**\n{env_info}"
+                        )
 
                     if not connection:
                         # Show available connections for debugging

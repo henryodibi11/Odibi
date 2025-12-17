@@ -252,6 +252,8 @@ def get_odibi_connection(
 ) -> Optional[Any]:
     """Get an Odibi connection object by name.
 
+    Uses the same loading approach as odibi framework for compatibility.
+
     Args:
         project_yaml_path: Path to project.yaml/odibi.yaml
         connection_name: Name of the connection to retrieve
@@ -266,26 +268,21 @@ def get_odibi_connection(
         raise ConnectionError("No project.yaml path provided")
 
     # Check if file exists (handle both local and Databricks paths)
-    try:
-        import os
+    if not os.path.exists(project_yaml_path):
+        raise ConnectionError(f"project.yaml not found at: {project_yaml_path}")
 
-        if not os.path.exists(project_yaml_path):
-            raise ConnectionError(f"project.yaml not found at: {project_yaml_path}")
-    except Exception as e:
-        raise ConnectionError(f"Cannot access path '{project_yaml_path}': {e}") from e
-
+    # Load config the same way odibi framework does
     try:
         from odibi.config import load_config_from_file
 
         config = load_config_from_file(project_yaml_path)
     except Exception as e:
-        # Provide more detailed error for YAML parsing failures
+        # Provide more detailed error for parsing failures
         error_detail = str(e)
         try:
-            # Try to read and show the first few lines for debugging
             with open(project_yaml_path, "r", encoding="utf-8") as f:
-                preview = f.read(500)
-            error_detail = f"{e}\n\nFile preview (first 500 chars):\n{preview}"
+                raw_content = f.read(500)
+            error_detail = f"{e}\n\nRaw file (first 500 chars):\n{raw_content}"
         except Exception:
             pass
         raise ConnectionError(f"Failed to parse '{project_yaml_path}': {error_detail}") from e
@@ -296,6 +293,7 @@ def get_odibi_connection(
             f"Connection '{connection_name}' not in config. Available: {available}"
         )
 
+    # Create the connection using EngineContext (same as odibi framework)
     try:
         from odibi.context import EngineContext
 
