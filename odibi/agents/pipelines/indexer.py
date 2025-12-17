@@ -235,6 +235,13 @@ class MultiRepoIndexer:
         results = {}
         for repo_path in self.repos:
             repo_name = repo_path.name
+
+            existing_count = self.vector_store.count(repo=repo_name)
+            if existing_count > 0 and not force_recreate:
+                logger.info(f"Skipping {repo_name}: already indexed ({existing_count} chunks)")
+                results[repo_name] = {"uploaded": existing_count, "skipped": True}
+                continue
+
             logger.info(f"Indexing repo: {repo_name} at {repo_path}")
 
             indexer = LocalIndexer(
