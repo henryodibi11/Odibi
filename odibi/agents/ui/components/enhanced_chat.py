@@ -275,6 +275,43 @@ class EnhancedChatHandler:
         """Check if stop was requested."""
         return self.state.stop_requested
 
+    def _sanitize_conversation_history(self) -> None:
+        """Remove corrupted tool_calls that lack corresponding tool responses.
+
+        The OpenAI API requires every assistant message with tool_calls to be
+        followed by tool messages for each tool_call_id. This method detects
+        and removes any such orphaned tool_calls.
+        """
+        history = self.state.conversation_history
+        if not history:
+            return
+
+        tool_call_ids_needed = set()
+        tool_call_ids_found = set()
+
+        for msg in history:
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                for tc in msg["tool_calls"]:
+                    tool_call_ids_needed.add(tc.get("id"))
+            elif msg.get("role") == "tool":
+                tool_call_ids_found.add(msg.get("tool_call_id"))
+
+        orphaned_ids = tool_call_ids_needed - tool_call_ids_found
+        if not orphaned_ids:
+            return
+
+        cleaned = []
+        for msg in history:
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                has_orphan = any(tc.get("id") in orphaned_ids for tc in msg["tool_calls"])
+                if has_orphan:
+                    if msg.get("content"):
+                        cleaned.append({"role": "assistant", "content": msg["content"]})
+                    continue
+            cleaned.append(msg)
+
+        self.state.conversation_history = cleaned
+
     def get_llm_client(self) -> LLMClient:
         """Get the LLM client from current config."""
         llm_config = LLMConfig(
@@ -708,6 +745,9 @@ class EnhancedChatHandler:
 
                 def on_tool_start(name: str):
                     add_activity(f"Preparing to call {name}...", tool_name=name)
+
+                # Sanitize history before each LLM call to remove orphaned tool_calls
+                self._sanitize_conversation_history()
 
                 response = client.chat_stream_with_tools(
                     messages=self.state.conversation_history,
