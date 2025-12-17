@@ -532,17 +532,21 @@ def setup_conversation_handlers(
         outputs=[conv_components["conv_list"], conv_components["conv_dropdown"]],
     )
 
-    def export_conversation(history: list[dict]) -> tuple[str, Any]:
+    def export_conversation(history: list[dict]) -> Any:
         if not history:
-            return "", gr.update(visible=False)
+            return gr.update(visible=True, value="*No conversation to export*")
 
-        markdown = export_to_markdown(history)
-        return markdown, gr.update(visible=True)
+        try:
+            markdown = export_to_markdown(history)
+            return gr.update(visible=True, value=markdown)
+        except Exception as e:
+            logger.error("Export failed: %s", e, exc_info=True)
+            return gr.update(visible=True, value=f"❌ Export failed: {e}")
 
     conv_components["export_btn"].click(
         fn=export_conversation,
         inputs=[chat_components["chatbot"]],
-        outputs=[conv_components["export_output"], conv_components["export_output"]],
+        outputs=[conv_components["export_output"]],
     )
 
     def load_conversation(conv_id: str) -> list[dict]:
