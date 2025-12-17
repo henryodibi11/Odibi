@@ -471,23 +471,28 @@ def setup_conversation_handlers(
         if not history:
             return "*Nothing to save*"
 
-        config = get_config()
-        # Get store with config to use correct backend (local/ADLS/delta)
-        store = get_conversation_store(config)
-        project_path = config.project.project_root if config else None
+        try:
+            config = get_config()
+            # Get store with config to use correct backend (local/ADLS/delta)
+            store = get_conversation_store(config)
+            project_path = config.project.project_root if config else None
 
-        store.create(
-            messages=history,
-            project_path=project_path,
-        )
+            conv = store.create(
+                messages=history,
+                project_path=project_path,
+            )
+            logger.info("Saved conversation: %s", conv.id if conv else "unknown")
 
-        convs = store.list_recent(10)
-        lines = []
-        for c in convs:
-            date = c.updated_at.strftime("%m/%d %H:%M")
-            lines.append(f"- **{c.title}** ({date})")
+            convs = store.list_recent(10)
+            lines = []
+            for c in convs:
+                date = c.updated_at.strftime("%m/%d %H:%M")
+                lines.append(f"- **{c.title}** ({date})")
 
-        return "\n".join(lines) if lines else "*No saved conversations*"
+            return "\n".join(lines) if lines else "*No saved conversations*"
+        except Exception as e:
+            logger.error("Failed to save conversation: %s", e, exc_info=True)
+            return f"❌ Save failed: {e}"
 
     conv_components["save_conv_btn"].click(
         fn=save_conversation,
