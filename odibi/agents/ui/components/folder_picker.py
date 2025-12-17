@@ -55,9 +55,11 @@ class ProjectState:
             return
 
         try:
-            path = str(Path(path).resolve())
-        except (OSError, RuntimeError):
-            path = str(Path(path))
+            # On Databricks, resolve() can fail for /Workspace paths
+            resolved = Path(path).resolve()
+            path = str(resolved) if resolved.exists() else path
+        except (OSError, RuntimeError, Exception):
+            pass  # Keep original path
         self.active_path = path
 
         existing = next((p for p in self.recent_projects if p.path == path), None)

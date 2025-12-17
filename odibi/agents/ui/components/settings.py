@@ -155,9 +155,10 @@ def create_settings_panel(
                 )
 
         with gr.Accordion("📚 Reference Repos (optional)", open=False):
+            ref_repos = getattr(config.project, "reference_repos", []) or []
             components["reference_repos"] = gr.Textbox(
                 label="Reference Repo Paths",
-                value="\n".join(config.project.reference_repos),
+                value="\n".join(ref_repos) if isinstance(ref_repos, list) else str(ref_repos),
                 placeholder="/path/to/repo1\n/path/to/repo2",
                 info="Additional codebases the agent can grep/read (one per line)",
                 lines=3,
@@ -379,9 +380,15 @@ def get_config_from_components(components: dict[str, Any]) -> AgentUIConfig:
         ),
         project=ProjectConfig(
             working_project=components["working_project"].value,
-            reference_repos=[
-                r.strip() for r in components["reference_repos"].value.split("\n") if r.strip()
-            ],
+            reference_repos=(
+                [
+                    r.strip()
+                    for r in (components.get("reference_repos") or gr.Textbox()).value.split("\n")
+                    if r.strip()
+                ]
+                if components.get("reference_repos")
+                else []
+            ),
             project_yaml_path=components["project_yaml"].value,
         ),
     )
