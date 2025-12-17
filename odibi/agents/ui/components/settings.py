@@ -231,14 +231,20 @@ def create_settings_panel(
                             proj_yaml = str(candidate)
 
                     if not proj_yaml:
-                        return f"❌ No project.yaml found (checked: {working_project}/project.yaml)"
+                        return (
+                            f"❌ No project.yaml found\n\n"
+                            f"**Checked paths:**\n"
+                            f"- project_yaml field: `{project_yaml or '(empty)'}`\n"
+                            f"- working_project: `{working_project}`\n"
+                            f"- auto-detect: `{working_project}/project.yaml`"
+                        )
 
                     from ..config import ConnectionError as OdibiConnectionError
 
                     try:
                         connection = get_odibi_connection(proj_yaml, connection_name)
                     except OdibiConnectionError as ce:
-                        return f"❌ {ce}"
+                        return f"❌ {ce}\n\n**Using path:** `{proj_yaml}`"
 
                     if not connection:
                         # Show available connections for debugging

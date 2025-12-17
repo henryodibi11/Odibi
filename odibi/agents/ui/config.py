@@ -279,7 +279,16 @@ def get_odibi_connection(
 
         config = load_config_from_file(project_yaml_path)
     except Exception as e:
-        raise ConnectionError(f"Failed to parse '{project_yaml_path}': {e}") from e
+        # Provide more detailed error for YAML parsing failures
+        error_detail = str(e)
+        try:
+            # Try to read and show the first few lines for debugging
+            with open(project_yaml_path, "r", encoding="utf-8") as f:
+                preview = f.read(500)
+            error_detail = f"{e}\n\nFile preview (first 500 chars):\n{preview}"
+        except Exception:
+            pass
+        raise ConnectionError(f"Failed to parse '{project_yaml_path}': {error_detail}") from e
 
     if connection_name not in config.connections:
         available = list(config.connections.keys())
