@@ -314,9 +314,15 @@ class EnhancedChatHandler:
 
     def get_llm_client(self) -> LLMClient:
         """Get the LLM client from current config."""
+        api_key = self.config.llm.api_key
+        print(f"[DEBUG] get_llm_client: endpoint={self.config.llm.endpoint}")
+        print(
+            f"[DEBUG] get_llm_client: api_key={'***' + api_key[-4:] if len(api_key) > 4 else '(empty or short)'}"
+        )
+        print(f"[DEBUG] get_llm_client: model={self.config.llm.model}")
         llm_config = LLMConfig(
             endpoint=self.config.llm.endpoint,
-            api_key=self.config.llm.api_key,
+            api_key=api_key,
             model=self.config.llm.model,
             api_type=self.config.llm.api_type,
             api_version=self.config.llm.api_version,
@@ -1229,6 +1235,9 @@ def setup_enhanced_chat_handlers(
             return
 
         handler.config = get_config()
+        print(
+            f"[DEBUG] on_send: got config with api_key={'***' + handler.config.llm.api_key[-4:] if len(handler.config.llm.api_key) > 4 else '(empty or short)'}"
+        )
 
         for result in handler.process_message_streaming(message, history, agent):
             updated_history, status, thinking, activity, pending, show_actions = result

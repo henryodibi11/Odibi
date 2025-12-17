@@ -311,11 +311,15 @@ def create_settings_panel(
             # Parse reference repos from newline-separated text
             reference_repos = [r.strip() for r in reference_repos_text.split("\n") if r.strip()]
 
+            # If api_key is empty, preserve the current key from config (which may have come from env vars)
+            # This handles the case where user edits other settings without re-entering the API key
+            effective_api_key = api_key if api_key else config.llm.api_key
+
             new_config = AgentUIConfig(
                 llm=LLMConfig(
                     endpoint=endpoint,
                     model=model,
-                    api_key=api_key,
+                    api_key=effective_api_key,
                     api_type=api_type,
                     api_version=config.llm.api_version,  # Preserve api_version
                 ),
@@ -337,6 +341,9 @@ def create_settings_panel(
             success = save_config(new_config)
 
             if on_save:
+                print(
+                    f"[DEBUG] save_settings: api_key from UI={'***' + api_key[-4:] if len(api_key) > 4 else '(empty)'}, effective={'***' + effective_api_key[-4:] if len(effective_api_key) > 4 else '(empty)'}"
+                )
                 on_save(new_config)
 
             if success:
