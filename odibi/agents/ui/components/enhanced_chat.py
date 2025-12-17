@@ -330,7 +330,7 @@ class EnhancedChatHandler:
         """Auto-save conversation to the configured backend.
 
         Saves after each complete exchange (user message + assistant response).
-        Uses conversation store for persistence.
+        Uses the same backend as the memory system (local, ADLS, or Delta).
         """
         if not history or len(history) < 2:
             return
@@ -338,7 +338,8 @@ class EnhancedChatHandler:
         try:
             from .conversation import get_conversation_store
 
-            store = get_conversation_store()
+            # Pass config to use the same backend as memory system
+            store = get_conversation_store(self.config)
             project_path = self.config.project.project_root if self.config else None
 
             if self._conversation_id:

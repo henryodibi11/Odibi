@@ -1,15 +1,22 @@
 """Conversation management - persistence, export, and history.
 
 Save and load conversations, export to markdown.
+Supports multiple backends: local, odibi (ADLS), delta.
 """
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 import gradio as gr
+
+if TYPE_CHECKING:
+    from ..config import AgentUIConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,34 +55,74 @@ class Conversation:
 
 
 class ConversationStore:
-    """Stores and retrieves conversations."""
+    """Stores and retrieves conversations.
 
-    def __init__(self, storage_dir: Optional[str] = None):
+    Supports multiple backends via the memory backend system:
+    - local: JSON files in ~/.odibi/conversations or project/.odibi/conversations
+    - odibi: ADLS/Azure Blob via Odibi connection
+    - delta: Delta Lake table
+    """
+
+    def __init__(
+        self,
+        storage_dir: Optional[str] = None,
+        backend_type: str = "local",
+        connection: Optional[Any] = None,
+        engine: Optional[Any] = None,
+        path_prefix: str = "agent/conversations",
+    ):
         """Initialize the store.
 
         Args:
-            storage_dir: Directory to store conversations.
-                        Defaults to ~/.odibi/conversations.
+            storage_dir: Directory for local storage (if backend_type="local").
+            backend_type: "local", "odibi", or "delta".
+            connection: Odibi connection (for odibi/delta backends).
+            engine: Odibi engine (for odibi/delta backends).
+            path_prefix: Path prefix for remote backends.
         """
-        if storage_dir:
-            self.storage_dir = Path(storage_dir)
-        else:
-            self.storage_dir = Path.home() / ".odibi" / "conversations"
-
-        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        self.backend_type = backend_type
         self._conversations: dict[str, Conversation] = {}
+
+        if backend_type == "local":
+            if storage_dir:
+                self.storage_dir = Path(storage_dir)
+            else:
+                self.storage_dir = Path.home() / ".odibi" / "conversations"
+            self.storage_dir.mkdir(parents=True, exist_ok=True)
+            self._backend = None
+        else:
+            self.storage_dir = None
+            from odibi.agents.core.memory_backends import create_memory_backend
+
+            self._backend = create_memory_backend(
+                backend_type,
+                connection=connection,
+                engine=engine,
+                path_prefix=path_prefix,
+            )
+
         self._load_all()
 
     def _load_all(self) -> None:
         """Load all saved conversations."""
-        for file in self.storage_dir.glob("*.json"):
+        if self.backend_type == "local" and self.storage_dir:
+            for file in self.storage_dir.glob("*.json"):
+                try:
+                    with open(file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    conv = Conversation.from_dict(data)
+                    self._conversations[conv.id] = conv
+                except Exception:
+                    continue
+        elif self._backend:
             try:
-                with open(file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                conv = Conversation.from_dict(data)
-                self._conversations[conv.id] = conv
-            except Exception:
-                continue
+                for conv_id in self._backend.list_all():
+                    data = self._backend.load(conv_id)
+                    if data:
+                        conv = Conversation.from_dict(data)
+                        self._conversations[conv.id] = conv
+            except Exception as e:
+                logger.warning("Failed to load conversations from backend: %s", e)
 
     def save(self, conversation: Conversation) -> None:
         """Save a conversation.
@@ -86,9 +133,15 @@ class ConversationStore:
         conversation.updated_at = datetime.now()
         self._conversations[conversation.id] = conversation
 
-        file_path = self.storage_dir / f"{conversation.id}.json"
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(conversation.to_dict(), f, indent=2)
+        if self.backend_type == "local" and self.storage_dir:
+            file_path = self.storage_dir / f"{conversation.id}.json"
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(conversation.to_dict(), f, indent=2)
+        elif self._backend:
+            try:
+                self._backend.save(conversation.id, conversation.to_dict())
+            except Exception as e:
+                logger.error("Failed to save conversation to backend: %s", e)
 
     def get(self, conv_id: str) -> Optional[Conversation]:
         """Get a conversation by ID.
@@ -125,9 +178,15 @@ class ConversationStore:
         """
         if conv_id in self._conversations:
             del self._conversations[conv_id]
-            file_path = self.storage_dir / f"{conv_id}.json"
-            if file_path.exists():
-                file_path.unlink()
+            if self.backend_type == "local" and self.storage_dir:
+                file_path = self.storage_dir / f"{conv_id}.json"
+                if file_path.exists():
+                    file_path.unlink()
+            elif self._backend:
+                try:
+                    self._backend.delete(conv_id)
+                except Exception as e:
+                    logger.warning("Failed to delete conversation from backend: %s", e)
             return True
         return False
 
@@ -240,13 +299,94 @@ def generate_title(messages: list[dict[str, str]], max_length: int = 50) -> str:
 
 
 _conversation_store: Optional[ConversationStore] = None
+_conversation_store_config_hash: Optional[str] = None
 
 
-def get_conversation_store() -> ConversationStore:
-    """Get the global conversation store."""
-    global _conversation_store
-    if _conversation_store is None:
+def get_conversation_store(
+    config: Optional["AgentUIConfig"] = None,
+) -> ConversationStore:
+    """Get or create a conversation store based on config.
+
+    Args:
+        config: UI configuration. If provided, uses the memory backend settings.
+                If None, uses local storage.
+
+    Returns:
+        ConversationStore instance configured for the appropriate backend.
+    """
+    global _conversation_store, _conversation_store_config_hash
+
+    # Calculate config hash to detect changes
+    if config:
+        config_hash = f"{config.memory.backend_type}:{config.memory.connection_name}:{config.memory.path_prefix}"
+    else:
+        config_hash = "local:none:none"
+
+    # Return cached store if config hasn't changed
+    if _conversation_store is not None and _conversation_store_config_hash == config_hash:
+        return _conversation_store
+
+    # Create new store based on config
+    if config is None or config.memory.backend_type == "local":
+        project_root = config.project.project_root if config else None
+        storage_dir = f"{project_root}/.odibi/conversations" if project_root else None
+        _conversation_store = ConversationStore(storage_dir=storage_dir)
+    elif config.memory.backend_type == "odibi" and config.memory.connection_name:
+        try:
+            from odibi.connections import load_connections
+            from odibi.engine.pandas_engine import PandasEngine
+            from pathlib import Path
+
+            # Find project.yaml
+            project_yaml = config.project.project_yaml_path
+            if not project_yaml:
+                candidate = Path(config.project.project_root or ".") / "project.yaml"
+                if candidate.exists():
+                    project_yaml = str(candidate)
+
+            if project_yaml:
+                connections = load_connections(project_yaml)
+                connection = connections.get(config.memory.connection_name)
+                if connection:
+                    # Use conversations subfolder within memory path
+                    conv_path = f"{config.memory.path_prefix or 'agent'}/conversations"
+                    _conversation_store = ConversationStore(
+                        backend_type="odibi",
+                        connection=connection,
+                        engine=PandasEngine(),
+                        path_prefix=conv_path,
+                    )
+                    logger.info(
+                        "Conversation store: ADLS via '%s' -> %s",
+                        config.memory.connection_name,
+                        conv_path,
+                    )
+                else:
+                    logger.warning(
+                        "Connection '%s' not found, falling back to local",
+                        config.memory.connection_name,
+                    )
+                    _conversation_store = ConversationStore()
+            else:
+                logger.warning("No project.yaml found, falling back to local")
+                _conversation_store = ConversationStore()
+        except Exception as e:
+            logger.error("Failed to create ADLS conversation store: %s", e)
+            _conversation_store = ConversationStore()
+    elif config.memory.backend_type == "delta":
+        try:
+            _conversation_store = ConversationStore(
+                backend_type="delta",
+                path_prefix=config.memory.table_path or "system.agent_conversations",
+            )
+            logger.info("Conversation store: Delta -> %s", config.memory.table_path)
+        except Exception as e:
+            logger.error("Failed to create Delta conversation store: %s", e)
+            _conversation_store = ConversationStore()
+    else:
         _conversation_store = ConversationStore()
+
+    _conversation_store_config_hash = config_hash
     return _conversation_store
 
 
@@ -327,13 +467,14 @@ def setup_conversation_handlers(
         chat_components: Chat interface components.
         get_config: Function to get current config.
     """
-    store = conv_components["store"]
 
     def save_conversation(history: list[dict]) -> str:
         if not history:
             return "*Nothing to save*"
 
         config = get_config()
+        # Get store with config to use correct backend (local/ADLS/delta)
+        store = get_conversation_store(config)
         project_path = config.project.project_root if config else None
 
         store.create(
@@ -372,6 +513,8 @@ def setup_conversation_handlers(
         if not conv_id:
             return []
 
+        config = get_config()
+        store = get_conversation_store(config)
         conv = store.get(conv_id)
         if conv:
             return conv.messages
