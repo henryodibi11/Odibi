@@ -471,7 +471,7 @@ class TestPhase12Invariants:
             manager = IssueDiscoveryManager(tmpdir)
 
             # Run discovery
-            result = manager.run_discovery(tmpdir)
+            _result = manager.run_discovery(tmpdir)
 
             # File should be unchanged
             assert test_file.read_text() == original_content

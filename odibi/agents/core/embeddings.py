@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """Embedding abstractions for the Odibi Agent Suite.
 
 Provides a base interface and implementations for:
 - Local embeddings using sentence-transformers
 - Azure OpenAI embeddings (optional)
 """
+
+from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod

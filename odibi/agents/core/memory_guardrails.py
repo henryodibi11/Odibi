@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Memory Query Guardrails for Pre-Autonomy Safety.
 
 Phase 5.D: Implements mechanical constraints on how agents can query
@@ -11,6 +9,8 @@ CRITICAL CONSTRAINTS:
 - No raw agent reasoning or scratchpads can be retrieved
 - This is enforcement at the API boundary, not prompt wording
 """
+
+from __future__ import annotations
 
 import logging
 import re

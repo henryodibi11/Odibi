@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Memory-Informed Proposal Scorecard.
 
 Phase 5.E: Advisory scoring for improvement proposals using indexed memory.
@@ -18,6 +16,8 @@ CRITICAL CONSTRAINTS:
 - Output is descriptive, not prescriptive
 - Does NOT influence execution flow
 """
+
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field

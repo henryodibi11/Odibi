@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Manual Re-Indexing of Cycle Learnings.
 
 Phase 5.C: Implements a manual, explicit re-indexing step for cycle learnings.
@@ -15,6 +13,8 @@ CRITICAL CONSTRAINTS:
 - No raw agent messages, no rejected proposals, no partial cycles
 - No full diffs, no raw code, no executable content
 """
+
+from __future__ import annotations
 
 import json
 import logging

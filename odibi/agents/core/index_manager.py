@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Automatic index management for the Odibi Agent Suite.
 
 Handles automatic indexing of the codebase:
@@ -7,6 +5,8 @@ Handles automatic indexing of the codebase:
 - Re-indexing when code files change
 - Re-indexing when embedding model changes
 """
+
+from __future__ import annotations
 
 import json
 import logging

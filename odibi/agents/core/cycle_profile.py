@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Cycle Profile Schema and Loader - Phase 9.C.
 
 This module provides:
@@ -19,6 +17,8 @@ SAFETY:
 - Fail fast on invalid profiles
 - All existing learning-mode safety guards maintained
 """
+
+from __future__ import annotations
 
 import hashlib
 import logging

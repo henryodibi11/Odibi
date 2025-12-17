@@ -249,7 +249,7 @@ class TestCleanupAll:
 
         shutil.rmtree(info1.sandbox_path)
 
-        count = manager.cleanup_all()
+        _count = manager.cleanup_all()
 
         assert not info2.sandbox_path.exists()
 

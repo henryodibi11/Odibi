@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 """File system tools for agents.
 
 Read, write, and list files from the codebase.
 Supports both local filesystem and Databricks (DBFS/Workspace).
 """
+
+from __future__ import annotations
 
 import os
 from dataclasses import dataclass

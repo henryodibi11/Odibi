@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Review Context Enrichment for Memory-Aware Review.
 
 Phase 5.F: Provides advisory context to ReviewerAgent without influencing decisions.
@@ -15,6 +13,8 @@ CRITICAL CONSTRAINTS:
 - Does NOT influence approval/rejection
 - Does NOT expose raw memory, embeddings, or code
 """
+
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field

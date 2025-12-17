@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 """Folder picker component for selecting any project directory.
 
 Provides a user-friendly way to select and switch between projects/codebases.
 """
+
+from __future__ import annotations
 
 import os
 import tempfile

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Code indexing pipeline for the Odibi Agent Suite.
 
 This module provides:
@@ -7,6 +5,8 @@ This module provides:
 2. MultiRepoIndexer - Index multiple repositories into a single index
 3. AzureIndexer - Azure AI Search indexing (optional, for cloud deployment)
 """
+
+from __future__ import annotations
 
 import json
 import logging

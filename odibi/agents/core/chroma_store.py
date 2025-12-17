@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 """ChromaDB vector store implementation.
 
 Local, persistent vector storage using ChromaDB.
 No cloud dependencies required.
 """
+
+from __future__ import annotations
 
 import logging
 from pathlib import Path

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Cycle Report Generator for human-readable Markdown reports.
 
 Phase 5.B: Human-Readable Cycle Reports
@@ -16,6 +14,8 @@ CONSTRAINTS:
 - Scorecard is ADVISORY ONLY (Phase 5.E)
 - Memory signals are ADVISORY ONLY (Phase 5.F)
 """
+
+from __future__ import annotations
 
 import os
 from typing import TYPE_CHECKING

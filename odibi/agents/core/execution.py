@@ -24,13 +24,13 @@ import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
+from .enforcement import PermissionDeniedError, PermissionEnforcer
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .agent_base import AgentPermissions, AgentRole
     from .source_binding import ExecutionSourceContext, SourceBindingGuard
-
-from .enforcement import PermissionDeniedError, PermissionEnforcer
 
 
 StreamOutputCallback = Callable[[str, bool], None]
