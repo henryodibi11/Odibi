@@ -293,12 +293,33 @@ def get_odibi_connection(
             f"Connection '{connection_name}' not in config. Available: {available}"
         )
 
-    # Create the connection using EngineContext (same as odibi framework)
+    # Create the connection using the same factory pattern as PipelineManager
     try:
-        from odibi.context import EngineContext
+        from odibi.connections.factory import register_builtins
+        from odibi.plugins import get_connection_factory, load_plugins
+
+        register_builtins()
+        load_plugins()
 
         conn_config = config.connections[connection_name]
-        ctx = EngineContext.create(conn_config)
-        return ctx.connection
+        if hasattr(conn_config, "model_dump"):
+            conn_dict = conn_config.model_dump()
+        elif hasattr(conn_config, "dict"):
+            conn_dict = conn_config.dict()
+        else:
+            conn_dict = dict(conn_config) if hasattr(conn_config, "__iter__") else conn_config
+
+        conn_type = conn_dict.get("type", "local")
+        factory = get_connection_factory(conn_type)
+
+        if not factory:
+            raise ConnectionError(
+                f"Unsupported connection type: {conn_type}. "
+                f"Supported: local, azure_blob, delta, sql_server, etc."
+            )
+
+        return factory(connection_name, conn_dict)
+    except ConnectionError:
+        raise
     except Exception as e:
         raise ConnectionError(f"Failed to create connection '{connection_name}': {e}") from e
