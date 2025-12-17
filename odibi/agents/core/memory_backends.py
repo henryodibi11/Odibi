@@ -64,12 +64,12 @@ class MemoryBackend(ABC):
                 continue
 
             created_str = data.get("created_at", "")
-            if created_str:
+            if created_str and isinstance(created_str, str):
                 try:
                     created = datetime.fromisoformat(created_str)
                     if created < cutoff:
                         continue
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
 
             if memory_types:
