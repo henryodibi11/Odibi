@@ -253,23 +253,29 @@ def validate_project_path(path: str) -> tuple[bool, str]:
     if not path:
         return False, "Please enter a path"
 
-    path_obj = Path(path)
+    try:
+        path_obj = Path(path)
 
-    if not path_obj.exists():
-        return False, f"Path does not exist: {path}"
+        if not path_obj.exists():
+            return False, f"Path does not exist: {path}"
 
-    if not path_obj.is_dir():
-        return False, f"Path is not a directory: {path}"
+        if not path_obj.is_dir():
+            return False, f"Path is not a directory: {path}"
 
-    is_git_repo = (path_obj / ".git").exists()
-    has_python = list(path_obj.glob("*.py")) or list(path_obj.glob("**/*.py"))
+        is_git_repo = (path_obj / ".git").exists()
+        try:
+            has_python = list(path_obj.glob("*.py")) or list(path_obj.glob("**/*.py"))
+        except (OSError, PermissionError):
+            has_python = False
 
-    if is_git_repo:
-        return True, f"✅ Git repository: {path_obj.name}"
-    elif has_python:
-        return True, f"✅ Python project: {path_obj.name}"
-    else:
-        return True, f"✅ Directory: {path_obj.name}"
+        if is_git_repo:
+            return True, f"✅ Git repository: {path_obj.name}"
+        elif has_python:
+            return True, f"✅ Python project: {path_obj.name}"
+        else:
+            return True, f"✅ Directory: {path_obj.name}"
+    except Exception as e:
+        return False, f"Error validating path: {e}"
 
 
 def get_project_info(path: str) -> dict[str, Any]:
@@ -429,32 +435,38 @@ def create_folder_picker(
 
         def on_set_project(path: str) -> tuple[str, Any]:
             """Set the active project."""
-            is_valid, message = validate_project_path(path)
+            try:
+                if not path:
+                    return "❌ No path provided", gr.update()
 
-            if not is_valid:
-                return f"❌ {message}", gr.update()
+                is_valid, message = validate_project_path(path)
 
-            project_state.set_active(path)
+                if not is_valid:
+                    return f"❌ {message}", gr.update()
 
-            if on_change:
-                on_change(path)
+                project_state.set_active(path)
 
-            info = get_project_info(path)
-            status_parts = [f"**{message}**"]
+                if on_change:
+                    on_change(path)
 
-            if info["languages"]:
-                status_parts.append(f"Languages: {', '.join(info['languages'][:3])}")
-            if info["file_count"] > 0:
-                status_parts.append(f"Files: {info['file_count']}")
+                info = get_project_info(path)
+                status_parts = [f"**{message}**"]
 
-            recent_choices = project_state.get_recent_choices()
-            return (
-                "\n\n".join(status_parts),
-                gr.update(
-                    choices=recent_choices,
-                    visible=len(recent_choices) > 0,
-                ),
-            )
+                if info.get("languages"):
+                    status_parts.append(f"Languages: {', '.join(info['languages'][:3])}")
+                if info.get("file_count", 0) > 0:
+                    status_parts.append(f"Files: {info['file_count']}")
+
+                recent_choices = project_state.get_recent_choices()
+                return (
+                    "\n\n".join(status_parts),
+                    gr.update(
+                        choices=recent_choices,
+                        visible=len(recent_choices) > 0,
+                    ),
+                )
+            except Exception as e:
+                return f"❌ Error: {e}", gr.update()
 
         components["set_project_btn"].click(
             fn=on_set_project,
