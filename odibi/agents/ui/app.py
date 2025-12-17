@@ -168,7 +168,7 @@ def create_app(
 
                 chat_column, chat_components = create_enhanced_chat_interface(config=config)
 
-        setup_enhanced_chat_handlers(chat_components, get_config)
+        chat_handler = setup_enhanced_chat_handlers(chat_components, get_config)
 
         setup_explorer_handlers(explorer_components, chat_components)
 
@@ -189,7 +189,7 @@ def create_app(
             escalation_components, discovery_components, get_runner, chat_components
         )
 
-        setup_conversation_handlers(conv_components, chat_components, get_config)
+        setup_conversation_handlers(conv_components, chat_components, get_config, chat_handler)
 
         setup_memory_handlers(memory_components, get_config)
 

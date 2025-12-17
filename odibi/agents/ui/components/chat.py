@@ -276,6 +276,17 @@ class ChatHandler:
         )
         return LLMClient(llm_config)
 
+    def load_history(self, messages: list[dict[str, str]]) -> None:
+        """Load conversation history for LLM context.
+
+        Call this when loading a saved conversation so the LLM
+        has context of previous messages.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'.
+        """
+        self.conversation_history = messages.copy() if messages else []
+
     def _sanitize_conversation_history(self) -> None:
         """Remove corrupted tool_calls that lack corresponding tool responses.
 

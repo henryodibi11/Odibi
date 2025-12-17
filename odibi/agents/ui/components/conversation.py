@@ -512,6 +512,7 @@ def setup_conversation_handlers(
     conv_components: dict[str, Any],
     chat_components: dict[str, Any],
     get_config: Callable[[], Any],
+    chat_handler: Optional[Any] = None,
 ) -> None:
     """Set up event handlers for conversation management.
 
@@ -519,6 +520,7 @@ def setup_conversation_handlers(
         conv_components: Conversation panel components.
         chat_components: Chat interface components.
         get_config: Function to get current config.
+        chat_handler: Chat handler instance to sync conversation history.
     """
 
     def save_conversation(history: list[dict]) -> str:
@@ -586,6 +588,9 @@ def setup_conversation_handlers(
             conv = store.get(conv_id)
             if conv:
                 logger.info("Loaded conversation: %s (%d messages)", conv_id, len(conv.messages))
+                # Sync the chat handler's conversation history so LLM has context
+                if chat_handler and hasattr(chat_handler, "load_history"):
+                    chat_handler.load_history(conv.messages)
                 return conv.messages
             logger.warning("Conversation not found: %s", conv_id)
             return []
