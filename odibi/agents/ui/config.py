@@ -208,8 +208,9 @@ def save_config(config: AgentUIConfig) -> bool:
 
     try:
         data = config.to_dict()
-        if data["llm"].get("api_key"):
-            data["llm"]["api_key"] = "***"
+        # Don't persist API key to disk for security - user must re-enter each session
+        # But keep the key in memory for the current session
+        data["llm"]["api_key"] = ""
 
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)

@@ -317,6 +317,7 @@ def create_settings_panel(
                     model=model,
                     api_key=api_key,
                     api_type=api_type,
+                    api_version=config.llm.api_version,  # Preserve api_version
                 ),
                 memory=MemoryConfig(
                     backend_type=backend_type,
