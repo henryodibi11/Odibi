@@ -466,10 +466,16 @@ def create_conversation_panel() -> tuple[gr.Column, dict[str, Any]]:
                 choices=choices,
                 value=None,
             )
-            components["load_conv_btn"] = gr.Button(
-                "📂 Load",
-                size="sm",
-            )
+            with gr.Row():
+                components["load_conv_btn"] = gr.Button(
+                    "📂 Load",
+                    size="sm",
+                )
+                components["delete_conv_btn"] = gr.Button(
+                    "🗑️ Delete",
+                    size="sm",
+                    variant="stop",
+                )
 
     components["store"] = store
     return conv_column, components
@@ -549,4 +555,40 @@ def setup_conversation_handlers(
         fn=load_conversation,
         inputs=[conv_components["conv_dropdown"]],
         outputs=[chat_components["chatbot"]],
+    )
+
+    def delete_conversation(conv_id: str) -> tuple[str, Any]:
+        """Delete selected conversation and refresh the list."""
+        if not conv_id:
+            return "*Select a conversation to delete*", gr.update()
+
+        try:
+            config = get_config()
+            store = get_conversation_store(config)
+            deleted = store.delete(conv_id)
+
+            if deleted:
+                # Refresh the conversation list
+                convs = store.list_recent(10)
+                lines = []
+                for c in convs:
+                    date = c.updated_at.strftime("%m/%d %H:%M")
+                    lines.append(f"- **{c.title}** ({date})")
+
+                # Update dropdown choices
+                choices = [(c.title, c.id) for c in convs]
+                return (
+                    "\n".join(lines) if lines else "*No saved conversations*",
+                    gr.update(choices=choices, value=None),
+                )
+            else:
+                return "*Conversation not found*", gr.update()
+        except Exception as e:
+            logger.error("Failed to delete conversation: %s", e, exc_info=True)
+            return f"❌ Delete failed: {e}", gr.update()
+
+    conv_components["delete_conv_btn"].click(
+        fn=delete_conversation,
+        inputs=[conv_components["conv_dropdown"]],
+        outputs=[conv_components["conv_list"], conv_components["conv_dropdown"]],
     )
