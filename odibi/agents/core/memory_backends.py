@@ -267,10 +267,26 @@ class OdibiConnectionBackend(MemoryBackend):
                 options={},
             )
             if df is not None and len(df) > 0:
-                return df.to_dict(orient="records")[0]
+                record = df.to_dict(orient="records")[0]
+                # Convert pandas Timestamps to ISO strings for consistency
+                return self._normalize_record(record)
         except Exception as e:
             logger.error("Failed to load memory %s: %s", memory_id, e, exc_info=True)
         return None
+
+    def _normalize_record(self, record: dict[str, Any]) -> dict[str, Any]:
+        """Convert pandas Timestamps and other types to JSON-serializable formats."""
+        import pandas as pd
+
+        normalized = {}
+        for key, value in record.items():
+            if isinstance(value, pd.Timestamp):
+                normalized[key] = value.isoformat()
+            elif hasattr(value, "isoformat"):
+                normalized[key] = value.isoformat()
+            else:
+                normalized[key] = value
+        return normalized
 
     def delete(self, memory_id: str) -> bool:
         index = self._load_index()
