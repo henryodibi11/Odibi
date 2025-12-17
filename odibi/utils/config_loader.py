@@ -152,7 +152,19 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
             # Recursive load
             # Note: We pass env down to imported files too
             logger.debug("Loading imported configuration", path=full_import_path)
-            imported_data = load_yaml_with_env(full_import_path, env=env)
+            try:
+                imported_data = load_yaml_with_env(full_import_path, env=env)
+            except Exception as e:
+                logger.error(
+                    "Failed to load imported configuration",
+                    import_path=import_path,
+                    resolved_path=full_import_path,
+                    parent_file=abs_path,
+                    error=str(e),
+                )
+                raise ValueError(
+                    f"Failed to load import '{import_path}' " f"(resolved: {full_import_path}): {e}"
+                ) from e
 
             # Merge imported data INTO the current data
             # This way, the main file acts as the "master" that accumulates imports
