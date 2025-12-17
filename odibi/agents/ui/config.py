@@ -240,6 +240,12 @@ def load_odibi_connections(project_yaml_path: Optional[str] = None) -> list[str]
         return []
 
 
+class ConnectionError(Exception):
+    """Error when loading a connection."""
+
+    pass
+
+
 def get_odibi_connection(
     project_yaml_path: str,
     connection_name: str,
@@ -252,13 +258,11 @@ def get_odibi_connection(
 
     Returns:
         Connection object or None if not found
+
+    Raises:
+        ConnectionError: If connection exists but fails to load (with details)
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     if not project_yaml_path or not Path(project_yaml_path).exists():
-        logger.warning("Project yaml not found: %s", project_yaml_path)
         return None
 
     try:
@@ -267,16 +271,10 @@ def get_odibi_connection(
 
         config = load_config_from_file(project_yaml_path)
         if connection_name not in config.connections:
-            logger.warning(
-                "Connection '%s' not in config. Available: %s",
-                connection_name,
-                list(config.connections.keys()),
-            )
             return None
 
         conn_config = config.connections[connection_name]
         ctx = EngineContext.create(conn_config)
         return ctx.connection
     except Exception as e:
-        logger.error("Failed to get connection '%s': %s", connection_name, e)
-        return None
+        raise ConnectionError(f"Failed to create connection '{connection_name}': {e}") from e
