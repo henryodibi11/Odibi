@@ -293,6 +293,21 @@ class OdibiConnectionBackend(MemoryBackend):
         if memory_id in index:
             del index[memory_id]
             self._save_index(index)
+
+            # Also delete the actual file from storage
+            try:
+                file_path = self._memory_path(memory_id)
+                # Use engine's delete if available, otherwise log warning
+                if hasattr(self.engine, "delete"):
+                    self.engine.delete(
+                        connection=self.connection,
+                        path=file_path,
+                    )
+                else:
+                    logger.warning("Engine doesn't support delete, file may remain: %s", file_path)
+            except Exception as e:
+                logger.warning("Failed to delete file from storage: %s", e)
+
             return True
         return False
 
