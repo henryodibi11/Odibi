@@ -1,9 +1,16 @@
+import sys
 import tempfile
 from pathlib import Path
+
+import pytest
 
 from odibi.introspect import generate_docs
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="Type hint rendering differs between Python versions; docs generated with 3.11+",
+)
 def test_docs_are_synced():
     """
     Ensure that docs/reference/yaml_schema.md is up-to-date with the codebase.
