@@ -154,12 +154,13 @@ def create_settings_panel(
                     size="sm",
                 )
 
-        with gr.Accordion("📚 Reference Repo (optional)", open=False):
-            components["reference_repo"] = gr.Textbox(
-                label="Reference Repo Path",
-                value=config.project.reference_repo,
-                placeholder="",
-                info="Additional codebase the agent can grep/read",
+        with gr.Accordion("📚 Reference Repos (optional)", open=False):
+            components["reference_repos"] = gr.Textbox(
+                label="Reference Repo Paths",
+                value="\n".join(config.project.reference_repos),
+                placeholder="/path/to/repo1\n/path/to/repo2",
+                info="Additional codebases the agent can grep/read (one per line)",
+                lines=3,
             )
 
         with gr.Row():
@@ -301,10 +302,13 @@ def create_settings_panel(
             delta_table: str,
             working_project: str,
             project_yaml: str,
-            reference_repo: str,
+            reference_repos_text: str,
         ) -> str:
             if not working_project:
                 return "❌ Working Project path is required"
+
+            # Parse reference repos from newline-separated text
+            reference_repos = [r.strip() for r in reference_repos_text.split("\n") if r.strip()]
 
             new_config = AgentUIConfig(
                 llm=LLMConfig(
@@ -323,7 +327,7 @@ def create_settings_panel(
                 ),
                 project=ProjectConfig(
                     working_project=working_project,
-                    reference_repo=reference_repo,
+                    reference_repos=reference_repos,
                     project_yaml_path=project_yaml if project_yaml else None,
                 ),
             )
@@ -350,7 +354,7 @@ def create_settings_panel(
                 components["delta_table"],
                 components["working_project"],
                 components["project_yaml"],
-                components["reference_repo"],
+                components["reference_repos"],
             ],
             outputs=[components["status"]],
         )
@@ -375,7 +379,9 @@ def get_config_from_components(components: dict[str, Any]) -> AgentUIConfig:
         ),
         project=ProjectConfig(
             working_project=components["working_project"].value,
-            reference_repo=components["reference_repo"].value,
+            reference_repos=[
+                r.strip() for r in components["reference_repos"].value.split("\n") if r.strip()
+            ],
             project_yaml_path=components["project_yaml"].value,
         ),
     )

@@ -707,8 +707,10 @@ class ChatHandler:
             system_prompt = CHAT_SYSTEM_PROMPT
             system_prompt += "\n\n## Accessible Paths"
             system_prompt += f"\n**Working Project:** {self.config.project.project_root}"
-            if self.config.project.reference_repo:
-                system_prompt += f"\n**Reference Repo:** {self.config.project.reference_repo}"
+            if self.config.project.reference_repos:
+                system_prompt += "\n**Reference Repos:**"
+                for repo in self.config.project.reference_repos:
+                    system_prompt += f"\n- {repo}"
 
             iteration = 0
             self.reset_stop()

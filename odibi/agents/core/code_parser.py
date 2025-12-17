@@ -59,12 +59,67 @@ class CodeChunk:
 
 
 class CodeParser:
-    """Parser for extracting code structure from any Python codebase."""
+    """Parser for extracting code structure from any codebase."""
 
     ENGINE_KEYWORDS = {
         "pandas": ["pandas", "pd.", "DataFrame", "Series", "apply", "groupby"],
         "spark": ["spark", "SparkSession", "pyspark", "udf", "broadcast", "rdd"],
         "polars": ["polars", "pl.", "LazyFrame", "collect"],
+    }
+
+    # File extensions to index (text-based files)
+    INDEXABLE_EXTENSIONS = {
+        # Code
+        ".py",
+        ".sql",
+        ".scala",
+        ".r",
+        ".sh",
+        ".bash",
+        # Notebooks
+        ".ipynb",
+        # Config/Data
+        ".yaml",
+        ".yml",
+        ".json",
+        ".toml",
+        ".ini",
+        ".cfg",
+        # Documentation
+        ".md",
+        ".rst",
+        ".txt",
+        # Web
+        ".html",
+        ".css",
+        ".js",
+        ".ts",
+        ".jsx",
+        ".tsx",
+        ".svelte",
+        ".vue",
+    }
+
+    # Directories to skip
+    SKIP_DIRS = {
+        "__pycache__",
+        ".git",
+        ".hg",
+        ".svn",
+        "node_modules",
+        ".venv",
+        "venv",
+        ".tox",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "dist",
+        "build",
+        "egg-info",
+        ".eggs",
+        ".ipynb_checkpoints",
+        "_archive",
+        ".odibi",
     }
 
     def __init__(self, root: str, repo_name: str | None = None):
@@ -141,8 +196,24 @@ class CodeParser:
 
         return chunks
 
+    def _should_skip_path(self, path: Path) -> bool:
+        """Check if a path should be skipped."""
+        path_parts = set(path.parts)
+        return bool(path_parts & self.SKIP_DIRS)
+
+    def _get_all_files(self, target_dir: Path) -> list[Path]:
+        """Get all indexable files in a directory."""
+        all_files = []
+        for ext in self.INDEXABLE_EXTENSIONS:
+            try:
+                files = list(target_dir.rglob(f"*{ext}"))
+                all_files.extend(files)
+            except Exception as e:
+                logger.warning(f"rglob failed for {ext}: {e}")
+        return all_files
+
     def parse_directory(self, directory: Optional[Path] = None) -> list[CodeChunk]:
-        """Parse all Python files in a directory.
+        """Parse all indexable files in a directory.
 
         Args:
             directory: Directory to parse (defaults to root or <root>/<repo_name> subfolder).
@@ -168,34 +239,36 @@ class CodeParser:
         files_found = 0
         files_skipped = 0
         files_parsed = 0
+        files_by_type: dict[str, int] = {}
 
-        try:
-            py_files = list(target_dir.rglob("*.py"))
-            logger.info(f"rglob found {len(py_files)} .py files in {target_dir}")
-        except Exception as e:
-            logger.error(f"rglob failed: {e}")
-            py_files = []
+        all_files = self._get_all_files(target_dir)
+        logger.info(f"Found {len(all_files)} indexable files in {target_dir}")
 
-        for py_file in py_files:
+        for file_path in all_files:
             files_found += 1
-            if "__pycache__" in str(py_file):
-                files_skipped += 1
-                continue
-            if py_file.name.startswith("_") and py_file.name != "__init__.py":
-                files_skipped += 1
-                continue
-            if "test" in str(py_file).lower() or "example" in str(py_file).lower():
+
+            if self._should_skip_path(file_path):
                 files_skipped += 1
                 continue
 
+            ext = file_path.suffix.lower()
+            files_by_type[ext] = files_by_type.get(ext, 0) + 1
             files_parsed += 1
-            chunks = self.parse_file(py_file)
+
+            if ext == ".py":
+                chunks = self.parse_file(file_path)
+            elif ext == ".ipynb":
+                chunks = self._parse_notebook(file_path)
+            else:
+                chunks = self._parse_text_file(file_path)
+
             all_chunks.extend(chunks)
 
         logger.info(
             f"parse_directory complete: found={files_found}, skipped={files_skipped}, "
             f"parsed={files_parsed}, chunks={len(all_chunks)}"
         )
+        logger.info(f"Files by type: {files_by_type}")
         return all_chunks
 
     def _process_class(
@@ -465,6 +538,91 @@ class CodeParser:
             tags.append("write")
 
         return list(set(tags))
+
+    def _parse_text_file(self, file_path: Path) -> list[CodeChunk]:
+        """Parse a text file (markdown, sql, yaml, etc.) as a single chunk."""
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception as e:
+            logger.warning(f"Failed to read {file_path}: {e}")
+            return []
+
+        if not content.strip():
+            return []
+
+        rel_path = file_path.relative_to(self.root)
+        ext = file_path.suffix.lower()
+        chunk_type = {
+            ".md": "markdown",
+            ".rst": "documentation",
+            ".txt": "text",
+            ".sql": "sql",
+            ".yaml": "config",
+            ".yml": "config",
+            ".json": "config",
+            ".toml": "config",
+        }.get(ext, "file")
+
+        chunk_id = hashlib.md5(f"{self.repo_name}:{rel_path}".encode()).hexdigest()
+
+        return [
+            CodeChunk(
+                id=chunk_id,
+                file_path=str(rel_path),
+                module_name=str(rel_path),
+                chunk_type=chunk_type,
+                name=file_path.name,
+                content=content[:50000],  # Limit size
+                repo=self.repo_name,
+                line_start=1,
+                line_end=content.count("\n") + 1,
+            )
+        ]
+
+    def _parse_notebook(self, file_path: Path) -> list[CodeChunk]:
+        """Parse a Jupyter/Databricks notebook (.ipynb) into chunks."""
+        import json
+
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+            nb = json.loads(content)
+        except Exception as e:
+            logger.warning(f"Failed to parse notebook {file_path}: {e}")
+            return []
+
+        rel_path = file_path.relative_to(self.root)
+        chunks = []
+        cell_num = 0
+
+        for cell in nb.get("cells", []):
+            cell_num += 1
+            cell_type = cell.get("cell_type", "code")
+            source = "".join(cell.get("source", []))
+
+            if not source.strip():
+                continue
+
+            chunk_id = hashlib.md5(
+                f"{self.repo_name}:{rel_path}:cell{cell_num}".encode()
+            ).hexdigest()
+
+            chunk_type = "notebook_code" if cell_type == "code" else "notebook_markdown"
+
+            chunks.append(
+                CodeChunk(
+                    id=chunk_id,
+                    file_path=str(rel_path),
+                    module_name=f"{rel_path}#cell{cell_num}",
+                    chunk_type=chunk_type,
+                    name=f"{file_path.stem}_cell{cell_num}",
+                    content=source[:10000],  # Limit cell size
+                    repo=self.repo_name,
+                    line_start=cell_num,
+                    line_end=cell_num,
+                )
+            )
+
+        return chunks
 
 
 # Backward compatibility alias

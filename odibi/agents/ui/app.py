@@ -78,9 +78,9 @@ def create_app(
     if config is None:
         config = load_config(working_project)
 
-    # Set reference repo from launch() repos parameter
-    if reference_repos and not config.project.reference_repo:
-        config.project.reference_repo = reference_repos[0]
+    # Set reference repos from launch() repos parameter
+    if reference_repos and not config.project.reference_repos:
+        config.project.reference_repos = reference_repos
 
     current_config = [config]
 

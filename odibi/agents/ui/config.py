@@ -67,14 +67,28 @@ class MemoryConfig:
 class ProjectConfig:
     """Project configuration.
 
-    Supports two paths:
+    Supports multiple paths:
     - working_project: Primary folder for work, config storage, and indexing (required)
-    - reference_repo: Optional secondary codebase for grep/read access
+    - reference_repos: Optional list of additional codebases for grep/read access
     """
 
     working_project: str = ""
-    reference_repo: str = ""
+    reference_repos: list[str] = field(default_factory=list)
     project_yaml_path: Optional[str] = None
+
+    @property
+    def reference_repo(self) -> str:
+        """Backward compatibility: return first reference repo or empty string."""
+        return self.reference_repos[0] if self.reference_repos else ""
+
+    @reference_repo.setter
+    def reference_repo(self, value: str) -> None:
+        """Backward compatibility: set as first reference repo."""
+        if value:
+            if not self.reference_repos:
+                self.reference_repos = [value]
+            else:
+                self.reference_repos[0] = value
 
     @property
     def project_root(self) -> str:
@@ -120,7 +134,7 @@ class AgentUIConfig:
             },
             "project": {
                 "working_project": self.project.working_project,
-                "reference_repo": self.project.reference_repo,
+                "reference_repos": self.project.reference_repos,
                 "project_yaml_path": self.project.project_yaml_path,
             },
             "default_agent": self.default_agent,
@@ -151,7 +165,8 @@ class AgentUIConfig:
             ),
             project=ProjectConfig(
                 working_project=project_data.get("working_project", ""),
-                reference_repo=project_data.get("reference_repo", ""),
+                reference_repos=project_data.get("reference_repos")
+                or ([project_data["reference_repo"]] if project_data.get("reference_repo") else []),
                 project_yaml_path=project_data.get("project_yaml_path"),
             ),
             default_agent=data.get("default_agent", "auto"),
