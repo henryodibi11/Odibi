@@ -339,7 +339,7 @@ class TestSourceBinder:
         binder = SourceBinder(temp_odibi_root)
         result = binder.bind(mock_resolution_result)
 
-        binding_path = result.bound_source_map.binding_root
+        _binding_path = result.bound_source_map.binding_root
 
         # Cleanup
         success = binder.cleanup_binding(mock_resolution_result.cycle_id)
@@ -828,5 +828,5 @@ class TestEnvironmentInjection:
         cmd_str = " ".join(cmd)
 
         assert "BOUND_SOURCE_ROOT" in cmd_str
-        assert "PATH=" not in cmd_str or "PATH" in cmd_str.split("BOUND_SOURCE_ROOT")[0] == False
+        assert "PATH=" not in cmd_str or "PATH" not in cmd_str.split("BOUND_SOURCE_ROOT")[0]
         assert "MALICIOUS_VAR" not in cmd_str
