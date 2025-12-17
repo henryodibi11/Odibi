@@ -62,12 +62,14 @@ CSS = ENHANCED_CSS
 
 def create_app(
     working_project: str = "",
+    reference_repos: list[str] | None = None,
     config: Optional[AgentUIConfig] = None,
 ) -> gr.Blocks:
     """Create the Odibi Assistant Gradio app.
 
     Args:
         working_project: Root directory of the project to work on.
+        reference_repos: Additional repos for grep/read access.
         config: Optional pre-loaded configuration.
 
     Returns:
@@ -75,6 +77,10 @@ def create_app(
     """
     if config is None:
         config = load_config(working_project)
+
+    # Set reference repo from launch() repos parameter
+    if reference_repos and not config.project.reference_repo:
+        config.project.reference_repo = reference_repos[0]
 
     current_config = [config]
 
@@ -260,7 +266,17 @@ def launch(
         result = indexer.run_indexing(force_recreate=reindex)
         print(f"Indexed {result['total_chunks']} chunks from {result['total_repos']} repos")
 
-    app = create_app(working_project=working_project)
+        # Use first repo as working project, rest as reference repos
+        if not working_project:
+            working_project = repos[0]
+        reference_repos = repos[1:] if len(repos) > 1 else []
+    else:
+        reference_repos = []
+
+    app = create_app(
+        working_project=working_project,
+        reference_repos=reference_repos,
+    )
 
     is_databricks = (
         "DATABRICKS_RUNTIME_VERSION" in os.environ
