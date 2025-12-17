@@ -1,0 +1,28 @@
+# Cycle Source Configuration: Improvement Mode (Strict)
+#
+# Phase 8.A - Example Configuration
+#
+# Use Case:
+#   - Cycles that propose code changes
+#   - Requires clean data for reliable validation
+#   - Smaller tiers for faster regression checks
+#
+# Guardrails:
+#   - NO tier600gb+ (too large for change validation)
+#   - Clean pools only (no messy data)
+#   - Maximum 2 sources for focused improvements
+
+selection_policy: improvement_default
+
+allowed_tiers:
+  - tier0
+  - tier20gb
+
+max_sources: 2
+
+require_clean: true
+allow_messy: false
+
+deterministic: true
+allow_tier_mixing: false
+require_frozen: true

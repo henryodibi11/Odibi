@@ -1,0 +1,31 @@
+# Cycle Source Configuration: Scheduled Mode (Production)
+#
+# Phase 8.A - Example Configuration
+#
+# Use Case:
+#   - Unattended overnight/weekend cycles
+#   - Fully deterministic and reproducible
+#   - FROZEN pools required (no live data)
+#
+# Guardrails:
+#   - require_frozen=true is MANDATORY for scheduled mode
+#   - Deterministic selection for audit trails
+#   - All tiers available (including 600GB+)
+
+selection_policy: scheduled_default
+
+allowed_tiers:
+  - tier0
+  - tier20gb
+  - tier100gb
+
+max_sources: 3
+
+require_clean: false
+allow_messy: true
+
+deterministic: true
+allow_tier_mixing: false
+
+# REQUIRED: Scheduled mode MUST use frozen pools
+require_frozen: true

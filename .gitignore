@@ -128,7 +128,6 @@ spark_catalog.*.stories/
 
 # Archived experimental code
 _archive/
-agents/
 
 # Temp campaign/test folders
 improve_odibi/

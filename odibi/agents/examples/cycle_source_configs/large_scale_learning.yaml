@@ -1,0 +1,35 @@
+# Cycle Source Configuration: Large-Scale Learning
+#
+# Phase 8.A - Example Configuration
+#
+# Use Case:
+#   - Learning cycles with massive datasets
+#   - FineWeb CC snapshots (500GB+ each)
+#   - OSM Planet (75GB)
+#   - Multi-tier mixing allowed for coverage
+#
+# Guardrails:
+#   - Learning mode allows tier600gb and tier2tb
+#   - Tier mixing explicitly enabled
+#   - Higher max_sources for comprehensive coverage
+#
+# NOTE: This config is ONLY valid for LEARNING mode.
+#       Improvement mode would reject tier600gb+.
+
+selection_policy: learning_default
+
+allowed_tiers:
+  - tier600gb
+  - tier2tb
+
+max_sources: 5
+
+require_clean: false
+allow_messy: true
+
+deterministic: true
+
+# Enable tier mixing for large-scale analysis
+allow_tier_mixing: true
+
+require_frozen: true
