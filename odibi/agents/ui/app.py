@@ -88,9 +88,6 @@ def create_app(
         return current_config[0]
 
     def on_config_save(new_config: AgentUIConfig):
-        print(
-            f"[DEBUG] on_config_save: api_key={'***' + new_config.llm.api_key[-4:] if len(new_config.llm.api_key) > 4 else '(empty or short)'}"
-        )
         current_config[0] = new_config
 
     with gr.Blocks(title="🧠 Odibi Assistant", css=CSS, js=ENHANCED_JS_RAW) as app:

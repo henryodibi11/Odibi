@@ -75,45 +75,10 @@ def create_memory_panel(
         )
 
         gr.Markdown("---")
-        gr.Markdown("### ➕ Quick Save")
-
-        components["new_memory_type"] = gr.Dropdown(
-            label="Type",
-            choices=[
-                ("🔵 Decision", "decision"),
-                ("🟢 Learning", "learning"),
-                ("🔴 Bug Fix", "bug_fix"),
-                ("🟡 TODO", "todo"),
-                ("🟠 Feature", "feature"),
-                ("⚪ Context", "context"),
-            ],
-            value="learning",
+        gr.Markdown(
+            "_Memories are auto-saved by the agent. "
+            "Use 'remember' in chat to save specific learnings._"
         )
-
-        components["new_memory_summary"] = gr.Textbox(
-            label="Summary",
-            placeholder="Brief summary...",
-            lines=1,
-        )
-
-        components["new_memory_content"] = gr.Textbox(
-            label="Details",
-            placeholder="Full details...",
-            lines=3,
-        )
-
-        components["new_memory_tags"] = gr.Textbox(
-            label="Tags (comma-separated)",
-            placeholder="tag1, tag2, tag3",
-            lines=1,
-        )
-
-        components["save_memory_btn"] = gr.Button(
-            "💾 Save Memory",
-            variant="secondary",
-        )
-
-        components["save_status"] = gr.Markdown("")
 
     return memory_column, components
 
@@ -257,45 +222,6 @@ def setup_memory_handlers(
 
         return format_memory_list(memories)
 
-    def save_new_memory(
-        memory_type: str,
-        summary: str,
-        content: str,
-        tags_str: str,
-    ) -> tuple[str, str, str, str, str]:
-        if not summary:
-            return (
-                "❌ Summary is required",
-                gr.update(),
-                gr.update(),
-                gr.update(),
-                gr.update(),
-            )
-
-        config = get_config()
-        manager = get_memory_manager(config)
-
-        tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
-
-        manager.remember(
-            memory_type=MemoryType(memory_type),
-            summary=summary,
-            content=content or summary,
-            tags=tags,
-            importance=0.7,
-        )
-
-        memories = manager.store.get_recent(days=30, limit=20)
-        memory_list_md = format_memory_list(memories)
-
-        return (
-            "✅ Memory saved!",
-            "",
-            "",
-            "",
-            memory_list_md,
-        )
-
     def refresh_memories(type_filters: list[str]) -> str:
         return search_memories("", type_filters)
 
@@ -315,21 +241,4 @@ def setup_memory_handlers(
         fn=refresh_memories,
         inputs=[components["memory_type_filter"]],
         outputs=[components["memory_list"]],
-    )
-
-    components["save_memory_btn"].click(
-        fn=save_new_memory,
-        inputs=[
-            components["new_memory_type"],
-            components["new_memory_summary"],
-            components["new_memory_content"],
-            components["new_memory_tags"],
-        ],
-        outputs=[
-            components["save_status"],
-            components["new_memory_summary"],
-            components["new_memory_content"],
-            components["new_memory_tags"],
-            components["memory_list"],
-        ],
     )

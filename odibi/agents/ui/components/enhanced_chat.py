@@ -259,6 +259,7 @@ class EnhancedChatHandler:
         self.state = ChatState()
         self._client: Optional[LLMClient] = None
         self._task_collector = TaskProgressCollector()
+        self._conversation_id: Optional[str] = None
 
     def request_stop(self) -> None:
         """Request the agent loop to stop."""
@@ -314,15 +315,9 @@ class EnhancedChatHandler:
 
     def get_llm_client(self) -> LLMClient:
         """Get the LLM client from current config."""
-        api_key = self.config.llm.api_key
-        print(f"[DEBUG] get_llm_client: endpoint={self.config.llm.endpoint}")
-        print(
-            f"[DEBUG] get_llm_client: api_key={'***' + api_key[-4:] if len(api_key) > 4 else '(empty or short)'}"
-        )
-        print(f"[DEBUG] get_llm_client: model={self.config.llm.model}")
         llm_config = LLMConfig(
             endpoint=self.config.llm.endpoint,
-            api_key=api_key,
+            api_key=self.config.llm.api_key,
             model=self.config.llm.model,
             api_type=self.config.llm.api_type,
             api_version=self.config.llm.api_version,
@@ -330,6 +325,40 @@ class EnhancedChatHandler:
         self._client = LLMClient(llm_config)
         self.state.current_model = self.config.llm.model
         return self._client
+
+    def _auto_save_conversation(self, history: list[dict]) -> None:
+        """Auto-save conversation to the configured backend.
+
+        Saves after each complete exchange (user message + assistant response).
+        Uses conversation store for persistence.
+        """
+        if not history or len(history) < 2:
+            return
+
+        try:
+            from .conversation import get_conversation_store
+
+            store = get_conversation_store()
+            project_path = self.config.project.project_root if self.config else None
+
+            if self._conversation_id:
+                # Update existing conversation
+                conv = store.get(self._conversation_id)
+                if conv:
+                    conv.messages = history
+                    store.save(conv)
+            else:
+                # Create new conversation
+                conv = store.create(
+                    messages=history,
+                    project_path=project_path,
+                )
+                self._conversation_id = conv.id
+        except Exception as e:
+            # Silently fail - don't interrupt chat for save errors
+            import logging
+
+            logging.getLogger(__name__).debug("Auto-save failed: %s", e)
 
     def _on_task_progress(self, progress: TaskProgress):
         """Handle progress updates from sub-agents."""
@@ -800,6 +829,8 @@ class EnhancedChatHandler:
                         )
                     complete_thinking()
                     complete_activity(add_activity("Response complete"))
+                    # Auto-save conversation after each complete exchange
+                    self._auto_save_conversation(history)
                     yield (
                         history,
                         self._format_token_display(),
@@ -956,6 +987,7 @@ class EnhancedChatHandler:
         self.state.pending_action = None
         self.state.total_input_tokens = 0
         self.state.total_output_tokens = 0
+        self._conversation_id = None  # Reset for new conversation
         clear_activity()
         reset_thinking()
         return [], "", "", "_No activity yet_"
@@ -1235,9 +1267,6 @@ def setup_enhanced_chat_handlers(
             return
 
         handler.config = get_config()
-        print(
-            f"[DEBUG] on_send: got config with api_key={'***' + handler.config.llm.api_key[-4:] if len(handler.config.llm.api_key) > 4 else '(empty or short)'}"
-        )
 
         for result in handler.process_message_streaming(message, history, agent):
             updated_history, status, thinking, activity, pending, show_actions = result

@@ -341,9 +341,6 @@ def create_settings_panel(
             success = save_config(new_config)
 
             if on_save:
-                print(
-                    f"[DEBUG] save_settings: api_key from UI={'***' + api_key[-4:] if len(api_key) > 4 else '(empty)'}, effective={'***' + effective_api_key[-4:] if len(effective_api_key) > 4 else '(empty)'}"
-                )
                 on_save(new_config)
 
             if success:
