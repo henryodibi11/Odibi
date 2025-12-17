@@ -87,6 +87,13 @@ def create_settings_panel(
                 value=config.llm.api_type,
                 visible=True,
             )
+            components["api_version"] = gr.Textbox(
+                label="API Version (Azure)",
+                value=config.llm.api_version,
+                placeholder="2024-12-01-preview",
+                info="Required for Azure OpenAI",
+                visible=config.llm.api_type == "azure",
+            )
 
         with gr.Accordion("💾 Memory Backend", open=True):
             components["backend_type"] = gr.Radio(
@@ -183,6 +190,15 @@ def create_settings_panel(
             fn=on_provider_change,
             inputs=[components["provider"]],
             outputs=[components["endpoint"], components["api_type"]],
+        )
+
+        def update_api_version_visibility(api_type: str):
+            return gr.update(visible=api_type == "azure")
+
+        components["api_type"].change(
+            fn=update_api_version_visibility,
+            inputs=[components["api_type"]],
+            outputs=[components["api_version"]],
         )
 
         def update_visibility(backend_type: str):
@@ -325,6 +341,7 @@ def create_settings_panel(
             model: str,
             api_key: str,
             api_type: str,
+            api_version: str,
             backend_type: str,
             connection_name: str,
             memory_path: str,
@@ -349,7 +366,7 @@ def create_settings_panel(
                     model=model,
                     api_key=effective_api_key,
                     api_type=api_type,
-                    api_version=config.llm.api_version,  # Preserve api_version
+                    api_version=api_version or "2024-12-01-preview",
                 ),
                 memory=MemoryConfig(
                     backend_type=backend_type,
@@ -382,6 +399,7 @@ def create_settings_panel(
                 components["model"],
                 components["api_key"],
                 components["api_type"],
+                components["api_version"],
                 components["backend_type"],
                 components["connection_name"],
                 components["memory_path"],
