@@ -79,7 +79,7 @@ polars = [
     "polars>=0.20.0",
 ]
 agents = [
-    "gradio>=4.0.0",
+    "gradio>=4.44.0",  # 4.44+ required for Blocks(js=) parameter
     "requests>=2.28.0",
     "chromadb>=0.5.0",  # 0.5+ supports pydantic v2
     "sentence-transformers>=3.0.0",
