@@ -102,7 +102,8 @@ def read_file(
     path: str,
     start_line: int = 1,
     end_line: Optional[int] = None,
-    max_lines: int = 500,
+    max_lines: Optional[int] = None,
+    read_all: bool = True,
 ) -> FileResult:
     """Read a file from the filesystem.
 
@@ -114,7 +115,8 @@ def read_file(
               /Workspace/... for workspace files.
         start_line: Starting line number (1-indexed).
         end_line: Ending line number (inclusive).
-        max_lines: Maximum lines to return.
+        max_lines: Maximum lines to return (only used if read_all=False).
+        read_all: If True (default), read entire file. If False, use max_lines limit.
 
     Returns:
         FileResult with content or error.
@@ -145,12 +147,28 @@ def read_file(
 
         total_lines = len(lines)
         start_idx = max(0, start_line - 1)
-        end_idx = min(total_lines, end_line or (start_idx + max_lines))
+
+        # Determine end index based on read_all flag
+        if end_line is not None:
+            end_idx = min(total_lines, end_line)
+        elif read_all:
+            end_idx = total_lines
+        else:
+            effective_max = max_lines or 500
+            end_idx = min(total_lines, start_idx + effective_max)
 
         selected_lines = lines[start_idx:end_idx]
         numbered_content = "".join(
             f"{i + start_idx + 1}: {line}" for i, line in enumerate(selected_lines)
         )
+
+        # Add truncation warning if file was cut off
+        if end_idx < total_lines and not read_all:
+            remaining = total_lines - end_idx
+            numbered_content += (
+                f"\n\n⚠️ TRUNCATED: Lines {start_idx + 1}-{end_idx} of {total_lines}. "
+                f"{remaining} more lines. Use read_all=True or specify end_line."
+            )
 
         display_path = get_dbfs_display_path(str(file_path.absolute()))
 

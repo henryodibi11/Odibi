@@ -10,7 +10,7 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a file from the filesystem. Returns the file contents with line numbers.",
+            "description": "Read a file from the filesystem. Returns the COMPLETE file contents with line numbers by default. Use start_line/end_line only for very large files.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -21,7 +21,7 @@ TOOL_DEFINITIONS = [
                     },
                     "end_line": {
                         "type": "integer",
-                        "description": "Ending line number (inclusive). Default: start_line + 500",
+                        "description": "Ending line number (inclusive). Default: reads to end of file",
                     },
                 },
                 "required": ["path"],
@@ -32,12 +32,15 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "write_file",
-            "description": "Write content to a file. Creates parent directories if needed.",
+            "description": "Write content to a file. Creates parent directories if needed. IMPORTANT: Always write the COMPLETE file content - never use placeholders like '// rest of file' or truncate content.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Path to write to"},
-                    "content": {"type": "string", "description": "Content to write to the file"},
+                    "content": {
+                        "type": "string",
+                        "description": "COMPLETE content to write. Must include ALL code - do not truncate or use placeholders.",
+                    },
                 },
                 "required": ["path", "content"],
             },
