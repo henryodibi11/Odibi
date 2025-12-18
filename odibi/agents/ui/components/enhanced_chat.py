@@ -179,6 +179,22 @@ You have **remember** and **recall** tools for persistent memory across sessions
 
 **BE PROACTIVE:** If something seems important enough to remember, SAVE IT without asking!
 
+## Semantic Search - USE FOR DISCOVERY
+
+You have a **search** tool that uses AI embeddings to find code by meaning, not just keywords:
+
+### WHEN TO USE `search` vs `grep`:
+- **search** - Finding code by concept/behavior: "authentication logic", "database connections", "error handling"
+- **grep** - Finding exact text matches: specific function names, variable names, error messages
+
+### SEARCH FIRST STRATEGY:
+1. When exploring unfamiliar code, START with `search` to discover relevant files
+2. Use `search` when you don't know exact function/class names
+3. After `search` finds relevant chunks, use `read_file` to see full context
+4. Fall back to `grep` when you need exact string matches
+
+**Example:** To find how validation works, use `search(query="input validation logic")` NOT `grep(pattern="valid")`.
+
 ## Sub-Agent Usage - USE ACTIVELY
 
 You have access to **task** and **parallel_tasks** tools for spawning sub-agents:
@@ -765,6 +781,30 @@ class EnhancedChatHandler:
                 system_prompt += "\n**Reference Repos:**"
                 for repo in self.config.project.reference_repos:
                     system_prompt += f"\n- {repo}"
+
+            # Check if semantic search index is available
+            try:
+                from odibi.agents.ui.components.folder_picker import (
+                    get_registered_index_dir,
+                    find_existing_index_dir,
+                )
+
+                index_dir = get_registered_index_dir(
+                    self.config.project.project_root
+                ) or find_existing_index_dir(self.config.project.project_root)
+                if index_dir:
+                    system_prompt += (
+                        "\n\n**Semantic Search:** ✅ Index available - "
+                        "use `search` tool for concept-based code discovery!"
+                    )
+                else:
+                    system_prompt += (
+                        "\n\n**Semantic Search:** ❌ No index - "
+                        "use `grep` for text search. Index via folder picker to enable."
+                    )
+            except Exception:
+                pass
+
             if memory_context:
                 system_prompt += memory_context
 
