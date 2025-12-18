@@ -878,6 +878,7 @@ class EnhancedChatHandler:
                     messages=self.state.conversation_history,
                     system_prompt=system_prompt,
                     temperature=0.1,
+                    max_tokens=16384,  # Increased from 4096 to handle large file writes
                     tools=TOOL_DEFINITIONS if not no_tools_support else None,
                     on_content=on_content,
                     on_tool_call_start=on_tool_start,
@@ -1171,6 +1172,7 @@ class EnhancedChatHandler:
                     messages=[{"role": "system", "content": system_prompt}]
                     + self.state.conversation_history,
                     tools=TOOL_DEFINITIONS,
+                    max_tokens=16384,  # Increased to handle large file writes
                 )
 
                 self.state.total_input_tokens += response.usage.input_tokens

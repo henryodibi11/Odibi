@@ -229,7 +229,7 @@ class LLMClient:
         messages: list[dict[str, str]],
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 16384,
         tools: Optional[list[dict]] = None,
     ) -> ChatResponse:
         """Send a chat completion request with optional function calling.
@@ -312,7 +312,7 @@ class LLMClient:
         messages: list[dict[str, str]],
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 16384,
     ) -> Generator[str, None, None]:
         """Send a streaming chat completion request.
 
@@ -394,7 +394,7 @@ class LLMClient:
         messages: list[dict[str, str]],
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 16384,
         tools: Optional[list[dict]] = None,
         on_content: Optional[Callable[[str], None]] = None,
         on_tool_call_start: Optional[Callable[[str], None]] = None,
