@@ -422,10 +422,39 @@ class EnhancedChatHandler:
             return linkify_file_paths(content)
 
         elif tool_name == "write_file":
-            result = write_file(
-                path=args.get("path", ""),
-                content=args.get("content", ""),
-            )
+            path = args.get("path", "")
+            content = args.get("content", "")
+
+            # Log what we're writing for debugging
+            content_len = len(content)
+            line_count = content.count("\n") + 1 if content else 0
+            print(f"[write_file] Path: {path}")
+            print(f"[write_file] Content: {content_len} chars, {line_count} lines")
+
+            if not content:
+                return "❌ **Error:** No content provided to write_file. The content parameter is empty."
+
+            # Check for truncation indicators
+            truncation_markers = [
+                "// ... rest of",
+                "# ... rest of",
+                "// ...",
+                "# ...",
+                "/* ... */",
+                "... (remaining",
+                "... rest of file",
+                "[truncated]",
+                "// TODO: add remaining",
+            ]
+            for marker in truncation_markers:
+                if marker.lower() in content.lower():
+                    return (
+                        f"❌ **Error:** Content appears to be truncated (found '{marker}'). "
+                        f"You must provide the COMPLETE file content, not a summary. "
+                        f"Read the original file first and include ALL content."
+                    )
+
+            result = write_file(path=path, content=content)
             return format_write_result(result, show_diff=True)
 
         elif tool_name == "list_directory":
