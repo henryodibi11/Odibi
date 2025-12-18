@@ -965,6 +965,9 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
             c.lower() for c in context.df.columns
         ]
 
+        ts_start = f"to_timestamp({start_col})"
+        ts_end = f"to_timestamp({end_col})"
+
         duration_expr = ""
         if params.duration_col:
             duration_expr = f", (unix_timestamp(adj_{end_col}) - unix_timestamp(adj_{start_col})) / 60.0 AS {params.duration_col}"
@@ -976,38 +979,44 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
         single_day_sql = f"""
         WITH events_with_days AS (
             SELECT *,
-                datediff(to_date({end_col}), to_date({start_col})) + 1 AS _event_days
+                {ts_start} AS _ts_start,
+                {ts_end} AS _ts_end,
+                datediff(to_date({ts_end}), to_date({ts_start})) + 1 AS _event_days
             FROM df
         )
-        SELECT * EXCEPT({single_day_except}){f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}" if params.duration_col else ""}
+        SELECT * EXCEPT({single_day_except}, _ts_start, _ts_end){f", (unix_timestamp(_ts_end) - unix_timestamp(_ts_start)) / 60.0 AS {params.duration_col}" if params.duration_col else ""}
         FROM events_with_days
         WHERE _event_days = 1
         """
 
-        multi_day_except_adjusted = "_exploded_day, _event_days"
+        multi_day_except_adjusted = "_exploded_day, _event_days, _ts_start, _ts_end"
         if duration_col_exists:
-            multi_day_except_adjusted = f"_exploded_day, _event_days, {params.duration_col}"
+            multi_day_except_adjusted = (
+                f"_exploded_day, _event_days, _ts_start, _ts_end, {params.duration_col}"
+            )
 
         multi_day_sql = f"""
         WITH events_with_days AS (
             SELECT *,
-                datediff(to_date({end_col}), to_date({start_col})) + 1 AS _event_days
+                {ts_start} AS _ts_start,
+                {ts_end} AS _ts_end,
+                datediff(to_date({ts_end}), to_date({ts_start})) + 1 AS _event_days
             FROM df
         ),
         multi_day AS (
             SELECT *,
-                explode(sequence(to_date({start_col}), to_date({end_col}), interval 1 day)) AS _exploded_day
+                explode(sequence(to_date(_ts_start), to_date(_ts_end), interval 1 day)) AS _exploded_day
             FROM events_with_days
             WHERE _event_days > 1
         ),
         multi_day_adjusted AS (
             SELECT * EXCEPT({multi_day_except_adjusted}),
                 CASE
-                    WHEN to_date(_exploded_day) = to_date({start_col}) THEN {start_col}
+                    WHEN to_date(_exploded_day) = to_date(_ts_start) THEN _ts_start
                     ELSE to_timestamp(concat(cast(_exploded_day as string), ' 00:00:00'))
                 END AS adj_{start_col},
                 CASE
-                    WHEN to_date(_exploded_day) = to_date({end_col}) THEN {end_col}
+                    WHEN to_date(_exploded_day) = to_date(_ts_end) THEN _ts_end
                     ELSE to_timestamp(concat(cast(date_add(_exploded_day, 1) as string), ' 00:00:00'))
                 END AS adj_{end_col}
             FROM multi_day
@@ -1090,6 +1099,9 @@ def _split_by_hour(context: EngineContext, params: SplitEventsByPeriodParams) ->
     end_col = params.end_col
 
     if context.engine_type == EngineType.SPARK:
+        ts_start = f"to_timestamp({start_col})"
+        ts_end = f"to_timestamp({end_col})"
+
         duration_expr = ""
         if params.duration_col:
             duration_expr = f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}"
@@ -1097,33 +1109,35 @@ def _split_by_hour(context: EngineContext, params: SplitEventsByPeriodParams) ->
         sql = f"""
         WITH events_with_hours AS (
             SELECT *,
-                CAST((unix_timestamp({end_col}) - unix_timestamp({start_col})) / 3600 AS INT) + 1 AS _event_hours
+                {ts_start} AS _ts_start,
+                {ts_end} AS _ts_end,
+                CAST((unix_timestamp({ts_end}) - unix_timestamp({ts_start})) / 3600 AS INT) + 1 AS _event_hours
             FROM df
         ),
         multi_hour AS (
             SELECT *,
                 explode(sequence(
-                    date_trunc('hour', {start_col}),
-                    date_trunc('hour', {end_col}),
+                    date_trunc('hour', _ts_start),
+                    date_trunc('hour', _ts_end),
                     interval 1 hour
                 )) AS _exploded_hour
             FROM events_with_hours
             WHERE _event_hours > 1
         ),
         multi_hour_adjusted AS (
-            SELECT * EXCEPT(_exploded_hour, _event_hours),
+            SELECT * EXCEPT(_exploded_hour, _event_hours, _ts_start, _ts_end),
                 CASE
-                    WHEN date_trunc('hour', {start_col}) = _exploded_hour THEN {start_col}
+                    WHEN date_trunc('hour', _ts_start) = _exploded_hour THEN _ts_start
                     ELSE _exploded_hour
                 END AS {start_col},
                 CASE
-                    WHEN date_trunc('hour', {end_col}) = _exploded_hour THEN {end_col}
+                    WHEN date_trunc('hour', _ts_end) = _exploded_hour THEN _ts_end
                     ELSE _exploded_hour + interval 1 hour
                 END AS {end_col}
             FROM multi_hour
         ),
         single_hour AS (
-            SELECT * EXCEPT(_event_hours){duration_expr}
+            SELECT * EXCEPT(_event_hours, _ts_start, _ts_end){duration_expr}
             FROM events_with_hours
             WHERE _event_hours = 1
         )
@@ -1203,6 +1217,9 @@ def _split_by_shift(context: EngineContext, params: SplitEventsByPeriodParams) -
     shifts = params.shifts
 
     if context.engine_type == EngineType.SPARK:
+        ts_start = f"to_timestamp({start_col})"
+        ts_end = f"to_timestamp({end_col})"
+
         duration_expr = ""
         if params.duration_col:
             duration_expr = f", (unix_timestamp({end_col}) - unix_timestamp({start_col})) / 60.0 AS {params.duration_col}"
@@ -1210,12 +1227,14 @@ def _split_by_shift(context: EngineContext, params: SplitEventsByPeriodParams) -
         sql = f"""
         WITH base AS (
             SELECT *,
-                datediff(to_date({end_col}), to_date({start_col})) + 1 AS _span_days
+                {ts_start} AS _ts_start,
+                {ts_end} AS _ts_end,
+                datediff(to_date({ts_end}), to_date({ts_start})) + 1 AS _span_days
             FROM df
         ),
         day_exploded AS (
             SELECT *,
-                explode(sequence(to_date({start_col}), to_date({end_col}), interval 1 day)) AS _day
+                explode(sequence(to_date(_ts_start), to_date(_ts_end), interval 1 day)) AS _day
             FROM base
         ),
         with_shift_times AS (
@@ -1235,12 +1254,12 @@ def _split_by_shift(context: EngineContext, params: SplitEventsByPeriodParams) -
             {
             " UNION ALL ".join(
                 [
-                    f"SELECT * EXCEPT({', '.join([f'_shift_{j}_start, _shift_{j}_end' for j in range(len(shifts))])}), "
-                    f"GREATEST({start_col}, _shift_{i}_start) AS {start_col}, "
-                    f"LEAST({end_col}, _shift_{i}_end) AS {end_col}, "
+                    f"SELECT * EXCEPT({', '.join([f'_shift_{j}_start, _shift_{j}_end' for j in range(len(shifts))])}, _ts_start, _ts_end), "
+                    f"GREATEST(_ts_start, _shift_{i}_start) AS {start_col}, "
+                    f"LEAST(_ts_end, _shift_{i}_end) AS {end_col}, "
                     f"'{s.name}' AS {shift_col} "
                     f"FROM with_shift_times "
-                    f"WHERE {start_col} < _shift_{i}_end AND {end_col} > _shift_{i}_start"
+                    f"WHERE _ts_start < _shift_{i}_end AND _ts_end > _shift_{i}_start"
                     for i, s in enumerate(shifts)
                 ]
             )
