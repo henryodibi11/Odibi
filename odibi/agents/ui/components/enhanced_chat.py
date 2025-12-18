@@ -430,6 +430,7 @@ class EnhancedChatHandler:
             line_count = content.count("\n") + 1 if content else 0
             print(f"[write_file] Path: {path}")
             print(f"[write_file] Content: {content_len} chars, {line_count} lines")
+            print(f"[write_file] Args keys: {list(args.keys())}")
 
             if not content:
                 return "❌ **Error:** No content provided to write_file. The content parameter is empty."
@@ -926,11 +927,31 @@ class EnhancedChatHandler:
                 for tc in tool_calls:
                     tool_name = tc["function"]["name"]
                     tool_id = tc["id"]
+                    raw_args = tc["function"].get("arguments", "")
 
                     try:
-                        args = json.loads(tc["function"]["arguments"])
-                    except json.JSONDecodeError:
+                        args = json.loads(raw_args) if raw_args else {}
+                    except json.JSONDecodeError as e:
+                        # Log the parsing failure
+                        print(f"[ERROR] Failed to parse tool args for {tool_name}: {e}")
+                        print(f"[ERROR] Raw arguments ({len(raw_args)} chars): {raw_args[:500]}...")
                         args = {}
+                        # Add error to history so LLM knows parsing failed
+                        error_msg = (
+                            f"❌ **Tool call failed:** Could not parse arguments for `{tool_name}`. "
+                            f"The JSON was malformed or truncated ({len(raw_args)} chars received). "
+                            f"Error: {e}"
+                        )
+                        history.append({"role": "assistant", "content": error_msg})
+                        yield (
+                            history,
+                            "❌ Tool call parsing failed",
+                            thinking_update,
+                            refresh_activity_display(),
+                            None,
+                            False,
+                        )
+                        continue
 
                     if self.requires_confirmation(tool_name, args):
                         self.state.pending_action = {
