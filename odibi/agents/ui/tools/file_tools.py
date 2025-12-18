@@ -158,7 +158,17 @@ def read_file(
             end_idx = min(total_lines, start_idx + effective_max)
 
         selected_lines = lines[start_idx:end_idx]
-        numbered_content = "".join(
+        lines_read = len(selected_lines)
+
+        # Add header with verification info
+        header = f"📄 {path} | {lines_read} of {total_lines} lines"
+        if lines_read == total_lines:
+            header += " | ✅ COMPLETE"
+        else:
+            header += f" | ⚠️ PARTIAL (lines {start_idx + 1}-{end_idx})"
+        header += "\n" + "─" * 60 + "\n"
+
+        numbered_content = header + "".join(
             f"{i + start_idx + 1}: {line}" for i, line in enumerate(selected_lines)
         )
 
@@ -258,16 +268,40 @@ def write_file(
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
+        # Verify write by reading back
+        try:
+            written_content = file_path.read_text(encoding="utf-8")
+            if written_content != content:
+                return WriteResult(
+                    success=False,
+                    content="",
+                    path=str(path),
+                    error=(
+                        f"Write verification failed: wrote {len(content)} bytes "
+                        f"but file contains {len(written_content)} bytes"
+                    ),
+                )
+            verified_lines = written_content.count("\n") + 1
+        except Exception as e:
+            return WriteResult(
+                success=False,
+                content="",
+                path=str(path),
+                error=f"Write verification failed: {e}",
+            )
+
         display_path = get_dbfs_display_path(str(file_path.absolute()))
 
         status = "Created" if is_new_file else "Updated"
-        message = f"{status} {display_path} ({len(content)} bytes)"
+        message = (
+            f"✅ {status} {display_path} ({len(content)} bytes, {verified_lines} lines) - VERIFIED"
+        )
 
         return WriteResult(
             success=True,
             content=message,
             path=display_path,
-            line_count=content.count("\n") + 1,
+            line_count=verified_lines,
             diff=diff,
             old_content=old_content,
             is_new_file=is_new_file,
