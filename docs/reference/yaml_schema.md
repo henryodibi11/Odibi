@@ -426,6 +426,10 @@ Stores metadata, state, and pattern configurations.
 
 Local filesystem connection.
 
+**When to Use:** Development, testing, small datasets, local processing.
+
+**See Also:** [AzureBlobConnectionConfig](#azureblobconnectionconfig) for cloud alternatives.
+
 Example:
 ```yaml
 local_data:
@@ -442,7 +446,14 @@ local_data:
 ### `DeltaConnectionConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
-Delta Lake connection.
+Delta Lake connection for ACID-compliant data lakes.
+
+**When to Use:**
+- Production data lakes on Azure/AWS/GCP
+- Need time travel, ACID transactions, schema evolution
+- Upsert/merge operations
+
+**See Also:** [WriteConfig](#writeconfig) for Delta write options
 
 Scenario 1: Delta via metastore
 ```yaml
@@ -476,7 +487,11 @@ delta_local:
 ### `AzureBlobConnectionConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
-Azure Blob Storage connection.
+Azure Blob Storage / ADLS Gen2 connection.
+
+**When to Use:** Azure-based data lakes, landing zones, raw data storage.
+
+**See Also:** [DeltaConnectionConfig](#deltaconnectionconfig) for Delta-specific options
 
 Scenario 1: Prod with Key Vault-managed key
 ```yaml
@@ -524,7 +539,11 @@ adls_msi:
 ### `SQLServerConnectionConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
-SQL Server connection.
+SQL Server / Azure SQL Database connection.
+
+**When to Use:** Reading from SQL Server sources, Azure SQL DB, Azure Synapse.
+
+**See Also:** [ReadConfig](#readconfig) for query options
 
 Scenario 1: Managed identity (AAD MSI)
 ```yaml
@@ -587,7 +606,18 @@ api_source:
 ### `ReadConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
-Configuration for reading data.
+Configuration for reading data into a node.
+
+**When to Use:** First node in a pipeline, or any node that reads from storage.
+
+**Key Concepts:**
+- `connection`: References a named connection from `connections:` section
+- `format`: File format (csv, parquet, delta, json, sql)
+- `incremental`: Enable incremental loading (only new data)
+
+**See Also:**
+- [Incremental Loading](../patterns/incremental_stateful.md) - HWM-based loading
+- [IncrementalConfig](#incrementalconfig) - Incremental loading options
 
 ### 📖 "Universal Reader" Guide
 
@@ -670,7 +700,11 @@ to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
 
 Configuration for automatic incremental loading.
 
-Modes:
+**When to Use:** Load only new/changed data instead of full table scans.
+
+**See Also:** [ReadConfig](#readconfig)
+
+**Modes:**
 1. **Rolling Window** (Default): Uses a time-based lookback from NOW().
    Good for: Stateless loading where you just want "recent" data.
    Args: `lookback`, `unit`
@@ -741,7 +775,20 @@ time_travel:
 ### `TransformConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
-Configuration for transforming data.
+Configuration for transformation steps within a node.
+
+**When to Use:** Custom business logic, data cleaning, SQL transformations.
+
+**Key Concepts:**
+- `steps`: Ordered list of operations (SQL, functions, or both)
+- Each step receives the DataFrame from the previous step
+- Steps execute in order: step1 → step2 → step3
+
+**See Also:** [Transformer Catalog](#nodeconfig)
+
+**Transformer vs Transform:**
+- `transformer`: Single heavy operation (scd2, merge, deduplicate)
+- `transform.steps`: Chain of lighter operations
 
 ### 🔧 "Transformation Pipeline" Guide
 
@@ -853,7 +900,12 @@ transform:
 ### `ValidationConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
-Configuration for data validation (Quality Gate).
+Configuration for data validation (post-transform checks).
+
+**When to Use:** Output data quality checks that run after transformation but before writing.
+
+**See Also:** [Validation Guide](../features/quality_gates.md), [Quarantine Guide](../features/quarantine.md),
+[Contracts Overview](#contracts-data-quality-gates) (pre-transform checks)
 
 ### 🛡️ "The Indestructible Pipeline" Pattern
 
@@ -927,6 +979,10 @@ validation:
 
 Configuration for quarantine table routing.
 
+**When to Use:** Capture invalid records for review/reprocessing instead of failing the pipeline.
+
+**See Also:** [Quarantine Guide](../features/quarantine.md), [ValidationConfig](#validationconfig)
+
 Routes rows that fail validation tests to a quarantine table
 with rejection metadata for later analysis/reprocessing.
 
@@ -997,6 +1053,10 @@ All gates must pass before changes can be promoted.
 > *Used in: [EnvironmentConfig](#environmentconfig), [ValidationConfig](#validationconfig)*
 
 Quality gate configuration for batch-level validation.
+
+**When to Use:** Pipeline-level pass/fail thresholds, row count limits, change detection.
+
+**See Also:** [Quality Gates](../features/quality_gates.md), [ValidationConfig](#validationconfig)
 
 Gates evaluate the entire batch before writing, ensuring
 data quality thresholds are met.
@@ -1069,7 +1129,17 @@ gate:
 ### `WriteConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
-Configuration for writing data.
+Configuration for writing data from a node.
+
+**When to Use:** Any node that persists data to storage.
+
+**Key Concepts:**
+- `mode`: How to handle existing data (overwrite, append, upsert)
+- `keys`: Required for upsert mode - columns that identify unique records
+- `partition_by`: Columns to partition output by (improves query performance)
+
+**See Also:**
+- [Performance Tuning](../guides/performance_tuning.md) - Partitioning strategies
 
 ### 🚀 "Big Data Performance" Guide
 
@@ -1264,17 +1334,69 @@ auto_optimize:
 | **vacuum_retention_hours** | int | No | `168` | Hours to retain history for VACUUM (default 7 days). Set to 0 to disable VACUUM. |
 
 ---
+### `PrivacyConfig`
+> *Used in: [NodeConfig](#nodeconfig)*
+
+Configuration for PII anonymization.
+
+### 🔐 Privacy & PII Protection
+
+**How It Works:**
+1. Mark columns as `pii: true` in the `columns` metadata
+2. Configure a `privacy` block with the anonymization method
+3. During node execution, all columns marked as PII (and inherited from dependencies) are anonymized
+4. Upstream PII markings are inherited by downstream nodes
+
+**Example:**
+```yaml
+columns:
+  customer_email:
+    pii: true  # Mark as PII
+  customer_id:
+    pii: false
+
+privacy:
+  method: hash       # hash, mask, or redact
+  salt: "secret_key" # Optional: makes hash unique/secure
+  declassify: []     # Remove columns from PII protection
+```
+
+**Methods:**
+- `hash`: SHA256 hash (length 64). With salt, prevents pre-computed rainbow tables.
+- `mask`: Show only last 4 chars, replace rest with `*`. Example: `john@email.com` → `****@email.com`
+- `redact`: Replace entire value with `[REDACTED]`
+
+**Important:**
+- `pii: true` alone does NOTHING. You must set a `privacy.method` to actually mask data.
+- PII inheritance: If dependency outputs PII columns, this node inherits them unless declassified.
+- Salt is optional but recommended for hash to prevent attacks.
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **method** | PrivacyMethod | Yes | - | Anonymization method: 'hash' (SHA256), 'mask' (show last 4), or 'redact' ([REDACTED]) |
+| **salt** | Optional[str] | No | - | Salt for hashing (optional but recommended). Appended before hashing to create unique hashes. Example: 'company_secret_key_2025' |
+| **declassify** | List[str] | No | `PydanticUndefined` | List of columns to remove from PII protection (stops inheritance from upstream). Example: ['customer_id'] |
+
+---
 ## Contracts (Data Quality Gates)
 
-### Pre-Condition Circuit Breakers
+### Contracts (Pre-Transform Checks)
 
 Contracts are **fail-fast data quality checks** that run on input data **before** transformation.
-Unlike validation (which runs after transforms and can warn), contracts always halt execution on failure.
+They always halt execution on failure - use them to prevent bad data from entering the pipeline.
 
-**Use Cases:**
-- Ensure source data meets minimum quality standards before processing
-- Prevent bad data from propagating through the pipeline
-- Fail early to save compute resources
+**Contracts vs Validation vs Quality Gates:**
+
+| Feature | When it Runs | On Failure | Use Case |
+|---------|--------------|------------|----------|
+| **Contracts** | Before transform | Always fails | Input data quality (not-null, unique keys) |
+| **Validation** | After transform | Configurable (fail/warn/quarantine) | Output data quality (ranges, formats) |
+| **Quality Gates** | After validation | Configurable (abort/warn) | Pipeline-level thresholds (pass rate, row counts) |
+| **Quarantine** | With validation | Routes bad rows | Capture invalid records for review |
+
+**See Also:**
+- [Validation Guide](../features/quality_gates.md) - Full validation configuration
+- [Quarantine Guide](../features/quarantine.md) - Quarantine setup and review
+- [Getting Started: Validation](../tutorials/getting_started.md#add-data-validation)
 
 **Example:**
 ```yaml
@@ -1289,11 +1411,6 @@ Unlike validation (which runs after transforms and can warn), contracts always h
       max_age: "24h"
   read:
     source: raw_orders
-  transform:
-    steps:
-      - function: filter
-        params:
-          condition: "status != 'cancelled'"
 ```
 
 ---
@@ -1302,6 +1419,10 @@ Unlike validation (which runs after transforms and can warn), contracts always h
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
 Ensures a column only contains values from an allowed list.
+
+**When to Use:** Enum-like fields, status columns, categorical data validation.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates)
 
 ```yaml
 contracts:
@@ -1343,6 +1464,10 @@ contracts:
 
 Checks if a column's statistical distribution is within expected bounds.
 
+**When to Use:** Detect data drift, anomaly detection, statistical monitoring.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates)
+
 ```yaml
 contracts:
   - type: distribution
@@ -1364,13 +1489,17 @@ contracts:
 ### `FreshnessContract`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
-Ensures data is not stale by checking a timestamp column.
+Validates that data is not stale by checking a timestamp column.
+
+**When to Use:** Source systems that should update regularly, SLA monitoring.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates)
 
 ```yaml
 contracts:
   - type: freshness
     column: updated_at
-    max_age: "24h"  # Data must be less than 24 hours old
+    max_age: "24h"  # Fail if no data newer than 24 hours
 ```
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1384,12 +1513,16 @@ contracts:
 ### `NotNullTest`
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
-Ensures specified columns contain no null values.
+Ensures specified columns contain no NULL values.
+
+**When to Use:** Primary keys, required fields, foreign keys that must resolve.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates)
 
 ```yaml
 contracts:
   - type: not_null
-    columns: [customer_id, order_date]
+    columns: [order_id, customer_id, created_at]
 ```
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1403,6 +1536,10 @@ contracts:
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
 Ensures column values fall within a specified range.
+
+**When to Use:** Numeric bounds validation (ages, prices, quantities), date ranges.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates)
 
 ```yaml
 contracts:
@@ -1426,6 +1563,10 @@ contracts:
 
 Ensures column values match a regex pattern.
 
+**When to Use:** Format validation (emails, phone numbers, IDs, codes).
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates)
+
 ```yaml
 contracts:
   - type: regex_match
@@ -1445,6 +1586,10 @@ contracts:
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
 Validates that row count falls within expected bounds.
+
+**When to Use:** Ensure minimum data completeness, detect truncated loads, cap batch sizes.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates), [GateConfig](#gateconfig)
 
 ```yaml
 contracts:
@@ -1466,6 +1611,10 @@ contracts:
 
 Validates that the DataFrame schema matches expected columns.
 
+**When to Use:** Enforce schema stability, detect upstream schema drift, ensure column presence.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates), [SchemaPolicyConfig](#schemapolicyconfig)
+
 Uses the `columns` metadata from NodeConfig to verify schema.
 
 ```yaml
@@ -1486,10 +1635,17 @@ contracts:
 
 Ensures specified columns (or combination) contain unique values.
 
+**When to Use:** Primary keys, natural keys, deduplication verification.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates)
+
 ```yaml
 contracts:
   - type: unique
-    columns: [order_id]
+    columns: [order_id]  # Single column
+  # OR composite key:
+  - type: unique
+    columns: [customer_id, order_date]  # Composite uniqueness
 ```
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1503,7 +1659,19 @@ contracts:
 > *Used in: [NodeConfig](#nodeconfig), [ValidationConfig](#validationconfig)*
 
 Checks if row count dropped significantly compared to history.
-Formula: (current - avg) / avg < -threshold
+
+**When to Use:** Detect source outages, partial loads, or data pipeline issues.
+
+**See Also:** [Contracts Overview](#contracts-data-quality-gates), [RowCountTest](#rowcounttest)
+
+Formula: `(current - avg) / avg < -threshold`
+
+```yaml
+contracts:
+  - type: volume_drop
+    threshold: 0.5  # Fail if > 50% drop from 7-day average
+    lookback_days: 7
+```
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['volume_drop'] | No | `TestType.VOLUME_DROP` | - |
@@ -3190,6 +3358,18 @@ your data warehouse.
 
 Build complete dimension tables with surrogate keys and SCD (Slowly Changing Dimension) support.
 
+**When to Use:**
+- Building dimension tables from source systems (customers, products, locations)
+- Need surrogate keys for star schema joins
+- Need to track historical changes (SCD Type 2)
+
+**Beginner Note:**
+Dimensions are the "who, what, where, when" of your data warehouse.
+A customer dimension has customer_id (natural key) and customer_sk (surrogate key).
+Fact tables join to dimensions via surrogate keys.
+
+**See Also:** [FactPattern](#factpattern), [DateDimensionPattern](#datedimensionpattern)
+
 **Features:**
 - Auto-generate integer surrogate keys (MAX(existing) + ROW_NUMBER)
 - SCD Type 0 (static), 1 (overwrite), 2 (history tracking)
@@ -3235,6 +3415,16 @@ pattern:
 
 Generate a complete date dimension table with pre-calculated attributes for BI/reporting.
 
+**When to Use:**
+- Every data warehouse needs a date dimension for time-based analytics
+- Enable date filtering, grouping by week/month/quarter, fiscal year reporting
+
+**Beginner Note:**
+The date dimension is foundational for any BI/reporting system.
+It lets you query "sales by month" or "orders in fiscal Q2" without complex date calculations.
+
+**See Also:** [DimensionPattern](#dimensionpattern)
+
 **Features:**
 - Generates all dates in a range with rich attributes
 - Calendar and fiscal year support
@@ -3273,6 +3463,18 @@ pattern:
 ## FactPattern
 
 Build fact tables with automatic surrogate key lookups from dimensions.
+
+**When to Use:**
+- Building fact tables from transactional data (orders, events, transactions)
+- Need to look up surrogate keys from dimension tables
+- Need to handle orphan records (missing dimension matches)
+
+**Beginner Note:**
+Facts are the "how much, how many" of your data warehouse.
+An orders fact has measures (quantity, revenue) and dimension keys (customer_sk, product_sk).
+The pattern automatically looks up SKs from dimensions.
+
+**See Also:** [DimensionPattern](#dimensionpattern), [QuarantineConfig](#quarantineconfig)
 
 **Features:**
 - Automatic SK lookups from dimension tables (with SCD2 current-record filtering)
@@ -3346,6 +3548,17 @@ pattern:
 ## AggregationPattern
 
 Declarative aggregation with GROUP BY and optional incremental merge.
+
+**When to Use:**
+- Building summary/aggregate tables (daily sales, monthly metrics)
+- Need incremental aggregation (update existing aggregates)
+- Gold layer reporting tables
+
+**Beginner Note:**
+Aggregations summarize facts at a higher grain.
+Example: daily_sales aggregates orders by date with SUM(revenue).
+
+**See Also:** [FactPattern](#factpattern)
 
 **Features:**
 - Declare grain (GROUP BY columns)

@@ -634,17 +634,17 @@ schema:
 
 pool_id: {pool_id}
 version: "1.0.0"
-name: "{dataset.name}{' (Messy Variant)' if is_messy else ''}"
+name: "{dataset.name}{" (Messy Variant)" if is_messy else ""}"
 description: |
   {dataset.description}
-  {'Messy variant with intentional data quality issues.' if is_messy else ''}
+  {"Messy variant with intentional data quality issues." if is_messy else ""}
 
 file_format: {dataset.file_format}
 source_type: local
-data_quality: {'messy' if is_messy else 'clean'}
+data_quality: {"messy" if is_messy else "clean"}
 tier: {tier_name}
 {schema_section}
-cache_path: "tiers/{tier_name}/{dataset.name}/{'messy' if is_messy else 'raw'}/"
+cache_path: "tiers/{tier_name}/{dataset.name}/{"messy" if is_messy else "raw"}/"
 
 status: frozen
 lifecycle: FROZEN
@@ -720,12 +720,12 @@ def process_tier(
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Process a complete tier."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Processing Tier: {tier.name}")
     print(f"Description: {tier.description}")
     print(f"Expected Size: {tier.expected_total_size_gb} GB")
     print(f"Datasets: {len(tier.datasets)}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     tier_dir = TIERS_CACHE / tier.name
     ensure_dir(tier_dir)

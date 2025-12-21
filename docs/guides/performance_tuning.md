@@ -115,23 +115,43 @@ For real-time latency or processing infinite datasets (Kafka, Auto-Loader) witho
 
 ---
 
-## 3. Core Framework Optimizations
+## 3. Polars Engine Optimizations
 
-### ⚙️ C-Compilation (mypyc)
+The Polars engine is a lightweight, fast alternative to Pandas with native Rust performance.
+
+### 🦺 Lazy Execution
 
 **What it does:**
-Compiles the core Odibi orchestration logic (`graph.py`, `pipeline.py`) into C extensions.
+Polars uses a lazy execution model where queries are not executed until you call `.collect()`. This allows the query optimizer to reorder, combine, and skip operations.
 
 **Why use it?**
-Reduces the overhead of the framework itself. While your data processing happens in Spark/Pandas, the logic deciding *what* to run runs 2-10x faster.
+-   **Query Optimization:** Predicate pushdown, projection pruning, and filter hoisting happen automatically.
+-   **Memory Efficiency:** Only columns you need are loaded into memory.
+-   **Performance:** Often 5-10x faster than Pandas for analytical workloads.
 
-**How to enable:**
-Install `mypy` in your environment **before** installing Odibi.
-```bash
-pip install mypy
-pip install odibi
+**How to use:**
+Set your engine to Polars and Odibi handles lazy evaluation automatically:
+```yaml
+engine: polars
 ```
-The setup script detects `mypy` and automatically compiles the extensions.
+
+### 📂 Scan Methods (Streaming Large Files)
+
+**What it does:**
+Uses `scan_csv`, `scan_parquet`, and `scan_ndjson` to read files lazily without loading them entirely into memory.
+
+**Why use it?**
+Process files larger than RAM by streaming them in chunks.
+
+**Automatic:** Odibi's Polars engine uses scan methods by default for supported formats.
+
+### ⚡ Native Parallelism
+
+**What it does:**
+Polars uses all available CPU cores automatically—no configuration needed.
+
+**Why use it?**
+Unlike Pandas (single-threaded), Polars parallelizes operations like groupby, join, and filter across all cores.
 
 ---
 
@@ -144,4 +164,6 @@ The setup script detects `mypy` and automatically compiles the extensions.
 | `cluster_by` | Spark | High-cardinality filters, skewed data | **High** (Read performance) |
 | `optimize_write` | Spark | Frequent writes, streaming, "small files" | **High** (Prevents degradation) |
 | `streaming: true` | Spark | Real-time ingestion | **Architectural** |
-| `mypyc` Compile | Core | Heavy orchestration loops | **Medium** (Framework overhead) |
+| Lazy Execution | Polars | Analytical workloads, large datasets | **High** (Speed + Memory) |
+| Scan Methods | Polars | Files larger than RAM | **High** (Streaming) |
+| Native Parallelism | Polars | Multi-core utilization | **High** (Automatic) |

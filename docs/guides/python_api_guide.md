@@ -177,7 +177,7 @@ if diff.sample_updated:
 
 ## 📚 Reference: Custom Transformations
 
-To extend the Python API with your own functions, see the [Writing Custom Transformations](writing-transformations.md) guide.
+To extend the Python API with your own functions, see the [Writing Custom Transformations](writing_transformations.md) guide.
 
 **Quick Snippet:**
 ```python

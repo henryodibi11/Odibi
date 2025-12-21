@@ -268,17 +268,24 @@ def split_valid_invalid(
         for mask in test_masks.values():
             combined_valid_mask = combined_valid_mask & mask
 
-        valid_df = df.filter(combined_valid_mask)
-        invalid_df = df.filter(~combined_valid_mask)
+        df_cached = df.cache()
+
+        valid_df = df_cached.filter(combined_valid_mask)
+        invalid_df = df_cached.filter(~combined_valid_mask)
+
+        valid_df = valid_df.cache()
+        invalid_df = invalid_df.cache()
 
         rows_valid = valid_df.count()
         rows_quarantined = invalid_df.count()
+        total = rows_valid + rows_quarantined
 
         test_results = {}
         for name, mask in test_masks.items():
-            pass_count = df.filter(mask).count()
-            total = rows_valid + rows_quarantined
+            pass_count = df_cached.filter(mask).count()
             test_results[name] = [True] * pass_count + [False] * (total - pass_count)
+
+        df_cached.unpersist()
 
     elif is_polars:
         import polars as pl

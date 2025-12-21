@@ -77,6 +77,7 @@ GROUP_MAPPING = {
     "DeleteDetectionConfig": "Operation",
     "TransformConfig": "Operation",
     "ValidationConfig": "Operation",
+    "PrivacyConfig": "Operation",
     "ColumnMetadata": "Core",
     "TimeTravelConfig": "Operation",
     "LocalConnectionConfig": "Connection",
@@ -219,15 +220,24 @@ TYPE_ALIASES = {
 
 SECTION_INTROS = {
     "Contract": """
-### Pre-Condition Circuit Breakers
+### Contracts (Pre-Transform Checks)
 
 Contracts are **fail-fast data quality checks** that run on input data **before** transformation.
-Unlike validation (which runs after transforms and can warn), contracts always halt execution on failure.
+They always halt execution on failure - use them to prevent bad data from entering the pipeline.
 
-**Use Cases:**
-- Ensure source data meets minimum quality standards before processing
-- Prevent bad data from propagating through the pipeline
-- Fail early to save compute resources
+**Contracts vs Validation vs Quality Gates:**
+
+| Feature | When it Runs | On Failure | Use Case |
+|---------|--------------|------------|----------|
+| **Contracts** | Before transform | Always fails | Input data quality (not-null, unique keys) |
+| **Validation** | After transform | Configurable (fail/warn/quarantine) | Output data quality (ranges, formats) |
+| **Quality Gates** | After validation | Configurable (abort/warn) | Pipeline-level thresholds (pass rate, row counts) |
+| **Quarantine** | With validation | Routes bad rows | Capture invalid records for review |
+
+**See Also:**
+- [Validation Guide](../features/quality_gates.md) - Full validation configuration
+- [Quarantine Guide](../features/quarantine.md) - Quarantine setup and review
+- [Getting Started: Validation](../tutorials/getting_started.md#add-data-validation)
 
 **Example:**
 ```yaml
@@ -242,11 +252,6 @@ Unlike validation (which runs after transforms and can warn), contracts always h
       max_age: "24h"
   read:
     source: raw_orders
-  transform:
-    steps:
-      - function: filter
-        params:
-          condition: "status != 'cancelled'"
 ```
 """,
     "Semantic": """
@@ -339,6 +344,18 @@ your data warehouse.
 
 Build complete dimension tables with surrogate keys and SCD (Slowly Changing Dimension) support.
 
+**When to Use:**
+- Building dimension tables from source systems (customers, products, locations)
+- Need surrogate keys for star schema joins
+- Need to track historical changes (SCD Type 2)
+
+**Beginner Note:**
+Dimensions are the "who, what, where, when" of your data warehouse.
+A customer dimension has customer_id (natural key) and customer_sk (surrogate key).
+Fact tables join to dimensions via surrogate keys.
+
+**See Also:** [FactPattern](#factpattern), [DateDimensionPattern](#datedimensionpattern)
+
 **Features:**
 - Auto-generate integer surrogate keys (MAX(existing) + ROW_NUMBER)
 - SCD Type 0 (static), 1 (overwrite), 2 (history tracking)
@@ -384,6 +401,16 @@ pattern:
 
 Generate a complete date dimension table with pre-calculated attributes for BI/reporting.
 
+**When to Use:**
+- Every data warehouse needs a date dimension for time-based analytics
+- Enable date filtering, grouping by week/month/quarter, fiscal year reporting
+
+**Beginner Note:**
+The date dimension is foundational for any BI/reporting system.
+It lets you query "sales by month" or "orders in fiscal Q2" without complex date calculations.
+
+**See Also:** [DimensionPattern](#dimensionpattern)
+
 **Features:**
 - Generates all dates in a range with rich attributes
 - Calendar and fiscal year support
@@ -422,6 +449,18 @@ pattern:
 ## FactPattern
 
 Build fact tables with automatic surrogate key lookups from dimensions.
+
+**When to Use:**
+- Building fact tables from transactional data (orders, events, transactions)
+- Need to look up surrogate keys from dimension tables
+- Need to handle orphan records (missing dimension matches)
+
+**Beginner Note:**
+Facts are the "how much, how many" of your data warehouse.
+An orders fact has measures (quantity, revenue) and dimension keys (customer_sk, product_sk).
+The pattern automatically looks up SKs from dimensions.
+
+**See Also:** [DimensionPattern](#dimensionpattern), [QuarantineConfig](#quarantineconfig)
 
 **Features:**
 - Automatic SK lookups from dimension tables (with SCD2 current-record filtering)
@@ -495,6 +534,17 @@ pattern:
 ## AggregationPattern
 
 Declarative aggregation with GROUP BY and optional incremental merge.
+
+**When to Use:**
+- Building summary/aggregate tables (daily sales, monthly metrics)
+- Need incremental aggregation (update existing aggregates)
+- Gold layer reporting tables
+
+**Beginner Note:**
+Aggregations summarize facts at a higher grain.
+Example: daily_sales aggregates orders by date with SUM(revenue).
+
+**See Also:** [FactPattern](#factpattern)
 
 **Features:**
 - Declare grain (GROUP BY columns)

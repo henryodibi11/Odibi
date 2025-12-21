@@ -44,6 +44,13 @@ ruff format .                       # Format code
 pre-commit run --all-files          # Run all checks
 ```
 
+### Documentation Generation
+```bash
+python odibi/introspect.py          # Regenerate yaml_schema.md from Pydantic models
+```
+Auto-generates `docs/reference/yaml_schema.md` by introspecting config classes.
+The docstrings in `odibi/config.py` are the source of truth for documentation.
+
 ### WSL/Spark Testing (Windows)
 Tests requiring Spark must run through WSL:
 ```bash

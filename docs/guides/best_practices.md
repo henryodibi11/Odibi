@@ -431,7 +431,17 @@ performance:
 
 ---
 
-## 7. Data Quality
+## 7. Data Quality & Validation
+
+### Validation Strategy Overview
+
+Odibi provides three validation mechanisms for different use cases:
+
+| Mechanism | When Executed | Purpose | On Failure |
+|-----------|---------------|---------|------------|
+| **Contracts** | Before processing | Input validation | Always stops pipeline |
+| **Validation** | After transformation | Output checks | Configurable (warn/error) |
+| **Gates** | Before write | Critical path checks | Blocks downstream nodes |
 
 ### Use Contracts for Input Validation
 
@@ -464,8 +474,24 @@ Warn (or fail) if output doesn't meet expectations:
         columns: [date, revenue]
       - type: unique
         columns: [date]
+      - type: range
+        column: revenue
+        min: 0
     on_failure: warn  # or "error" to fail the pipeline
 ```
+
+### Available Validation Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `not_null` | Check for null values | `columns: [id, name]` |
+| `unique` | Check for duplicates | `columns: [id]` |
+| `row_count` | Validate row counts | `min: 100, max: 1000000` |
+| `freshness` | Check data recency | `column: updated_at, max_age: "24h"` |
+| `range` | Numeric bounds | `column: amount, min: 0, max: 10000` |
+| `regex` | Pattern matching | `column: email, pattern: "^.+@.+$"` |
+| `referential` | FK validation | `column: customer_id, reference: dim_customer.id` |
+| `custom` | Custom Python function | `function: my_validation_func` |
 
 ### Use Quality Gates for Critical Paths
 
@@ -475,6 +501,83 @@ Warn (or fail) if output doesn't meet expectations:
     - type: row_count
       min: 1000
       on_failure: block  # Stops pipeline if < 1000 rows
+```
+
+### FK Validation for Fact Tables
+
+Ensure referential integrity before loading fact tables:
+
+```yaml
+- name: fact_orders
+  depends_on: [dim_customer, dim_product]
+  read:
+    connection: staging
+    path: orders
+  validation:
+    tests:
+      - type: referential
+        column: customer_id
+        reference: dim_customer.customer_id
+        on_orphan: warn
+      - type: referential
+        column: product_id
+        reference: dim_product.product_id
+        on_orphan: filter  # Remove orphan rows
+  write:
+    connection: warehouse
+    path: fact_orders
+```
+
+### Custom Validation Functions
+
+Register custom validation logic:
+
+```python
+from odibi import transform
+
+@transform("validate_business_rules")
+def validate_business_rules(context, current):
+    """Custom business rule validation."""
+    errors = []
+    
+    # Rule 1: Order amount must match line items
+    mismatched = current[current['total'] != current['line_items_sum']]
+    if len(mismatched) > 0:
+        errors.append(f"{len(mismatched)} orders with mismatched totals")
+    
+    # Rule 2: Future dates not allowed
+    future_orders = current[current['order_date'] > pd.Timestamp.now()]
+    if len(future_orders) > 0:
+        errors.append(f"{len(future_orders)} orders with future dates")
+    
+    if errors:
+        context.log_warning(f"Validation issues: {'; '.join(errors)}")
+    
+    return current
+```
+
+Use in YAML:
+```yaml
+transform:
+  steps:
+    - function: validate_business_rules
+```
+
+### Quarantine Bad Records
+
+Separate bad data for review instead of failing:
+
+```yaml
+- name: process_orders
+  validation:
+    tests:
+      - type: not_null
+        columns: [order_id, amount]
+    on_failure: quarantine
+    quarantine:
+      connection: warehouse
+      path: quarantine/orders
+      include_reason: true  # Adds _quarantine_reason column
 ```
 
 ---

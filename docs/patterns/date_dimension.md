@@ -202,6 +202,93 @@ fiscal_year_start_month: 1  # Default
 
 ---
 
+---
+
+## Complete Configuration Reference
+
+### All Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `start_date` | str | Yes | - | Start date in YYYY-MM-DD format |
+| `end_date` | str | Yes | - | End date in YYYY-MM-DD format |
+| `fiscal_year_start_month` | int | No | 1 | Month when fiscal year starts (1-12) |
+| `unknown_member` | bool | No | false | Add unknown date row with date_sk=0 |
+| `date_format` | str | No | "%Y-%m-%d" | Format string for date parsing |
+| `week_start_day` | int | No | 1 | First day of week (1=Monday, 7=Sunday) |
+| `include_holidays` | bool | No | false | Generate is_holiday column (requires holiday_country) |
+| `holiday_country` | str | No | "US" | Country code for holiday calendar |
+
+### Advanced Configuration Example
+
+```yaml
+nodes:
+  - name: dim_date
+    transformer: date_dimension
+    params:
+      # Required
+      start_date: "2015-01-01"
+      end_date: "2035-12-31"
+      
+      # Fiscal calendar
+      fiscal_year_start_month: 7      # July fiscal year
+      
+      # Unknown member
+      unknown_member: true            # Add SK=0 row for orphans
+      
+      # Week configuration
+      week_start_day: 1               # Monday (ISO standard)
+      
+      # Holiday support (if holidays package installed)
+      include_holidays: true
+      holiday_country: "US"
+    write:
+      connection: warehouse
+      path: dim_date
+      format: delta
+      mode: overwrite
+```
+
+### Output Column Customization
+
+To customize output columns, add a SQL step after generation:
+
+```yaml
+nodes:
+  - name: dim_date_raw
+    transformer: date_dimension
+    params:
+      start_date: "2020-01-01"
+      end_date: "2030-12-31"
+      fiscal_year_start_month: 10
+      unknown_member: true
+
+  - name: dim_date
+    depends_on: [dim_date_raw]
+    transform:
+      steps:
+        - sql: |
+            SELECT 
+              date_sk,
+              full_date,
+              day_of_week,
+              month_name,
+              quarter_name,
+              year,
+              fiscal_year,
+              fiscal_quarter,
+              is_weekend,
+              -- Custom columns
+              CONCAT(year, '-', LPAD(month, 2, '0')) AS year_month,
+              CASE WHEN month IN (11, 12) THEN true ELSE false END AS is_holiday_season
+            FROM dim_date_raw
+    write:
+      connection: warehouse
+      path: dim_date
+```
+
+---
+
 ## See Also
 
 - [Dimension Pattern](./dimension.md) - Build regular dimensions

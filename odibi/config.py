@@ -374,6 +374,10 @@ class LocalConnectionConfig(BaseConnectionConfig):
     """
     Local filesystem connection.
 
+    **When to Use:** Development, testing, small datasets, local processing.
+
+    **See Also:** [AzureBlobConnectionConfig](#azureblobconnectionconfig) for cloud alternatives.
+
     Example:
     ```yaml
     local_data:
@@ -437,7 +441,11 @@ AzureBlobAuthConfig = Annotated[
 
 class AzureBlobConnectionConfig(BaseConnectionConfig):
     """
-    Azure Blob Storage connection.
+    Azure Blob Storage / ADLS Gen2 connection.
+
+    **When to Use:** Azure-based data lakes, landing zones, raw data storage.
+
+    **See Also:** [DeltaConnectionConfig](#deltaconnectionconfig) for Delta-specific options
 
     Scenario 1: Prod with Key Vault-managed key
     ```yaml
@@ -485,7 +493,14 @@ class AzureBlobConnectionConfig(BaseConnectionConfig):
 
 class DeltaConnectionConfig(BaseConnectionConfig):
     """
-    Delta Lake connection.
+    Delta Lake connection for ACID-compliant data lakes.
+
+    **When to Use:**
+    - Production data lakes on Azure/AWS/GCP
+    - Need time travel, ACID transactions, schema evolution
+    - Upsert/merge operations
+
+    **See Also:** [WriteConfig](#writeconfig) for Delta write options
 
     Scenario 1: Delta via metastore
     ```yaml
@@ -559,7 +574,11 @@ SQLServerAuthConfig = Annotated[
 
 class SQLServerConnectionConfig(BaseConnectionConfig):
     """
-    SQL Server connection.
+    SQL Server / Azure SQL Database connection.
+
+    **When to Use:** Reading from SQL Server sources, Azure SQL DB, Azure Synapse.
+
+    **See Also:** [ReadConfig](#readconfig) for query options
 
     Scenario 1: Managed identity (AAD MSI)
     ```yaml
@@ -744,7 +763,11 @@ class IncrementalConfig(BaseModel):
     """
     Configuration for automatic incremental loading.
 
-    Modes:
+    **When to Use:** Load only new/changed data instead of full table scans.
+
+    **See Also:** [ReadConfig](#readconfig)
+
+    **Modes:**
     1. **Rolling Window** (Default): Uses a time-based lookback from NOW().
        Good for: Stateless loading where you just want "recent" data.
        Args: `lookback`, `unit`
@@ -839,7 +862,18 @@ class IncrementalConfig(BaseModel):
 
 class ReadConfig(BaseModel):
     """
-    Configuration for reading data.
+    Configuration for reading data into a node.
+
+    **When to Use:** First node in a pipeline, or any node that reads from storage.
+
+    **Key Concepts:**
+    - `connection`: References a named connection from `connections:` section
+    - `format`: File format (csv, parquet, delta, json, sql)
+    - `incremental`: Enable incremental loading (only new data)
+
+    **See Also:**
+    - [Incremental Loading](../patterns/incremental_stateful.md) - HWM-based loading
+    - [IncrementalConfig](#incrementalconfig) - Incremental loading options
 
     ### 📖 "Universal Reader" Guide
 
@@ -1001,7 +1035,20 @@ class TransformStep(BaseModel):
 
 class TransformConfig(BaseModel):
     """
-    Configuration for transforming data.
+    Configuration for transformation steps within a node.
+
+    **When to Use:** Custom business logic, data cleaning, SQL transformations.
+
+    **Key Concepts:**
+    - `steps`: Ordered list of operations (SQL, functions, or both)
+    - Each step receives the DataFrame from the previous step
+    - Steps execute in order: step1 → step2 → step3
+
+    **See Also:** [Transformer Catalog](#nodeconfig)
+
+    **Transformer vs Transform:**
+    - `transformer`: Single heavy operation (scd2, merge, deduplicate)
+    - `transform.steps`: Chain of lighter operations
 
     ### 🔧 "Transformation Pipeline" Guide
 
@@ -1081,7 +1128,19 @@ class BaseTestConfig(BaseModel):
 class VolumeDropTest(BaseTestConfig):
     """
     Checks if row count dropped significantly compared to history.
-    Formula: (current - avg) / avg < -threshold
+
+    **When to Use:** Detect source outages, partial loads, or data pipeline issues.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates), [RowCountTest](#rowcounttest)
+
+    Formula: `(current - avg) / avg < -threshold`
+
+    ```yaml
+    contracts:
+      - type: volume_drop
+        threshold: 0.5  # Fail if > 50% drop from 7-day average
+        lookback_days: 7
+    ```
     """
 
     type: Literal[TestType.VOLUME_DROP] = TestType.VOLUME_DROP
@@ -1091,12 +1150,16 @@ class VolumeDropTest(BaseTestConfig):
 
 class NotNullTest(BaseTestConfig):
     """
-    Ensures specified columns contain no null values.
+    Ensures specified columns contain no NULL values.
+
+    **When to Use:** Primary keys, required fields, foreign keys that must resolve.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates)
 
     ```yaml
     contracts:
       - type: not_null
-        columns: [customer_id, order_date]
+        columns: [order_id, customer_id, created_at]
     ```
     """
 
@@ -1108,10 +1171,17 @@ class UniqueTest(BaseTestConfig):
     """
     Ensures specified columns (or combination) contain unique values.
 
+    **When to Use:** Primary keys, natural keys, deduplication verification.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates)
+
     ```yaml
     contracts:
       - type: unique
-        columns: [order_id]
+        columns: [order_id]  # Single column
+      # OR composite key:
+      - type: unique
+        columns: [customer_id, order_date]  # Composite uniqueness
     ```
     """
 
@@ -1124,6 +1194,10 @@ class UniqueTest(BaseTestConfig):
 class AcceptedValuesTest(BaseTestConfig):
     """
     Ensures a column only contains values from an allowed list.
+
+    **When to Use:** Enum-like fields, status columns, categorical data validation.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates)
 
     ```yaml
     contracts:
@@ -1141,6 +1215,10 @@ class AcceptedValuesTest(BaseTestConfig):
 class RowCountTest(BaseTestConfig):
     """
     Validates that row count falls within expected bounds.
+
+    **When to Use:** Ensure minimum data completeness, detect truncated loads, cap batch sizes.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates), [GateConfig](#gateconfig)
 
     ```yaml
     contracts:
@@ -1178,6 +1256,10 @@ class RangeTest(BaseTestConfig):
     """
     Ensures column values fall within a specified range.
 
+    **When to Use:** Numeric bounds validation (ages, prices, quantities), date ranges.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates)
+
     ```yaml
     contracts:
       - type: range
@@ -1201,6 +1283,10 @@ class RegexMatchTest(BaseTestConfig):
     """
     Ensures column values match a regex pattern.
 
+    **When to Use:** Format validation (emails, phone numbers, IDs, codes).
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates)
+
     ```yaml
     contracts:
       - type: regex_match
@@ -1217,6 +1303,10 @@ class RegexMatchTest(BaseTestConfig):
 class SchemaContract(BaseTestConfig):
     """
     Validates that the DataFrame schema matches expected columns.
+
+    **When to Use:** Enforce schema stability, detect upstream schema drift, ensure column presence.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates), [SchemaPolicyConfig](#schemapolicyconfig)
 
     Uses the `columns` metadata from NodeConfig to verify schema.
 
@@ -1235,6 +1325,10 @@ class SchemaContract(BaseTestConfig):
 class DistributionContract(BaseTestConfig):
     """
     Checks if a column's statistical distribution is within expected bounds.
+
+    **When to Use:** Detect data drift, anomaly detection, statistical monitoring.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates)
 
     ```yaml
     contracts:
@@ -1257,13 +1351,17 @@ class DistributionContract(BaseTestConfig):
 
 class FreshnessContract(BaseTestConfig):
     """
-    Ensures data is not stale by checking a timestamp column.
+    Validates that data is not stale by checking a timestamp column.
+
+    **When to Use:** Source systems that should update regularly, SLA monitoring.
+
+    **See Also:** [Contracts Overview](#contracts-data-quality-gates)
 
     ```yaml
     contracts:
       - type: freshness
         column: updated_at
-        max_age: "24h"  # Data must be less than 24 hours old
+        max_age: "24h"  # Fail if no data newer than 24 hours
     ```
     """
 
@@ -1339,6 +1437,10 @@ class QuarantineColumnsConfig(BaseModel):
 class QuarantineConfig(BaseModel):
     """
     Configuration for quarantine table routing.
+
+    **When to Use:** Capture invalid records for review/reprocessing instead of failing the pipeline.
+
+    **See Also:** [Quarantine Guide](../features/quarantine.md), [ValidationConfig](#validationconfig)
 
     Routes rows that fail validation tests to a quarantine table
     with rejection metadata for later analysis/reprocessing.
@@ -1456,6 +1558,10 @@ class GateConfig(BaseModel):
     """
     Quality gate configuration for batch-level validation.
 
+    **When to Use:** Pipeline-level pass/fail thresholds, row count limits, change detection.
+
+    **See Also:** [Quality Gates](../features/quality_gates.md), [ValidationConfig](#validationconfig)
+
     Gates evaluate the entire batch before writing, ensuring
     data quality thresholds are met.
 
@@ -1495,7 +1601,12 @@ class GateConfig(BaseModel):
 
 class ValidationConfig(BaseModel):
     """
-    Configuration for data validation (Quality Gate).
+    Configuration for data validation (post-transform checks).
+
+    **When to Use:** Output data quality checks that run after transformation but before writing.
+
+    **See Also:** [Validation Guide](../features/quality_gates.md), [Quarantine Guide](../features/quarantine.md),
+    [Contracts Overview](#contracts-data-quality-gates) (pre-transform checks)
 
     ### 🛡️ "The Indestructible Pipeline" Pattern
 
@@ -1574,6 +1685,23 @@ class ValidationConfig(BaseModel):
         default=None,
         description="Quality gate configuration for batch-level validation",
     )
+
+    @model_validator(mode="after")
+    def validate_quarantine_config(self):
+        """Warn if quarantine config exists but no tests use on_fail: quarantine."""
+        import warnings
+
+        if self.quarantine and self.tests:
+            has_quarantine_tests = any(t.on_fail == ContractSeverity.QUARANTINE for t in self.tests)
+            if not has_quarantine_tests:
+                warnings.warn(
+                    "Quarantine config is defined but no tests have 'on_fail: quarantine'. "
+                    "Quarantine will not be used. Add 'on_fail: quarantine' to tests that "
+                    "should route failed rows to quarantine.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+        return self
 
 
 class AutoOptimizeConfig(BaseModel):
@@ -1732,7 +1860,17 @@ class StreamingWriteConfig(BaseModel):
 
 class WriteConfig(BaseModel):
     """
-    Configuration for writing data.
+    Configuration for writing data from a node.
+
+    **When to Use:** Any node that persists data to storage.
+
+    **Key Concepts:**
+    - `mode`: How to handle existing data (overwrite, append, upsert)
+    - `keys`: Required for upsert mode - columns that identify unique records
+    - `partition_by`: Columns to partition output by (improves query performance)
+
+    **See Also:**
+    - [Performance Tuning](../guides/performance_tuning.md) - Partitioning strategies
 
     ### 🚀 "Big Data Performance" Guide
 
@@ -1896,24 +2034,50 @@ class PrivacyConfig(BaseModel):
     """
     Configuration for PII anonymization.
 
-    Example:
+    ### 🔐 Privacy & PII Protection
+
+    **How It Works:**
+    1. Mark columns as `pii: true` in the `columns` metadata
+    2. Configure a `privacy` block with the anonymization method
+    3. During node execution, all columns marked as PII (and inherited from dependencies) are anonymized
+    4. Upstream PII markings are inherited by downstream nodes
+
+    **Example:**
     ```yaml
+    columns:
+      customer_email:
+        pii: true  # Mark as PII
+      customer_id:
+        pii: false
+
     privacy:
-      method: "hash"
-      salt: "my_secret_salt"
+      method: hash       # hash, mask, or redact
+      salt: "secret_key" # Optional: makes hash unique/secure
+      declassify: []     # Remove columns from PII protection
     ```
+
+    **Methods:**
+    - `hash`: SHA256 hash (length 64). With salt, prevents pre-computed rainbow tables.
+    - `mask`: Show only last 4 chars, replace rest with `*`. Example: `john@email.com` → `****@email.com`
+    - `redact`: Replace entire value with `[REDACTED]`
+
+    **Important:**
+    - `pii: true` alone does NOTHING. You must set a `privacy.method` to actually mask data.
+    - PII inheritance: If dependency outputs PII columns, this node inherits them unless declassified.
+    - Salt is optional but recommended for hash to prevent attacks.
     """
 
     method: PrivacyMethod = Field(
-        ..., description="Anonymization method. Options: 'hash', 'mask', 'redact'"
+        ...,
+        description="Anonymization method: 'hash' (SHA256), 'mask' (show last 4), or 'redact' ([REDACTED])",
     )
     salt: Optional[str] = Field(
         default=None,
-        description="Salt for hashing (optional but recommended). Combined with value before hashing.",
+        description="Salt for hashing (optional but recommended). Appended before hashing to create unique hashes. Example: 'company_secret_key_2025'",
     )
     declassify: List[str] = Field(
         default_factory=list,
-        description="List of columns to declassify (remove from PII inheritance).",
+        description="List of columns to remove from PII protection (stops inheritance from upstream). Example: ['customer_id']",
     )
 
 

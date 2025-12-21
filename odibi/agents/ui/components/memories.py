@@ -154,8 +154,7 @@ def get_memory_manager(config: Optional[AgentUIConfig] = None) -> MemoryManager:
                 connection = get_odibi_connection(project_yaml, config.memory.connection_name)
                 if connection:
                     _current_backend_info = (
-                        f"ADLS via '{config.memory.connection_name}' "
-                        f"-> {config.memory.path_prefix}"
+                        f"ADLS via '{config.memory.connection_name}' -> {config.memory.path_prefix}"
                     )
                     logger.info("Memory backend: %s", _current_backend_info)
                     return MemoryManager(

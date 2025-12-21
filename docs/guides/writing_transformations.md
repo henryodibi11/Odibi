@@ -105,6 +105,181 @@ transform:
         LEFT JOIN customer_info AS c ON o.id = c.id
 ```
 
+## SQL Transformations
+
+For standard data transformations, SQL is often cleaner than Python. Odibi supports inline SQL and SQL file references.
+
+### Inline SQL
+
+```yaml
+nodes:
+  - name: clean_orders
+    depends_on: [raw_orders]
+    transform:
+      steps:
+        - sql: |
+            SELECT 
+              order_id,
+              customer_id,
+              UPPER(TRIM(status)) AS status,
+              CAST(amount AS DECIMAL(10,2)) AS amount,
+              COALESCE(discount, 0) AS discount
+            FROM raw_orders
+            WHERE order_id IS NOT NULL
+```
+
+### Multi-Table SQL Joins
+
+Reference any node from `depends_on`:
+
+```yaml
+nodes:
+  - name: enriched_orders
+    depends_on: [clean_orders, customers, products]
+    transform:
+      steps:
+        - sql: |
+            SELECT 
+              o.*,
+              c.customer_name,
+              c.segment,
+              p.product_name,
+              p.category
+            FROM clean_orders o
+            LEFT JOIN customers c ON o.customer_id = c.id
+            LEFT JOIN products p ON o.product_id = p.id
+```
+
+### SQL File Reference
+
+For complex queries, use external SQL files:
+
+```yaml
+transform:
+  steps:
+    - sql_file: sql/complex_aggregation.sql
+```
+
+**sql/complex_aggregation.sql:**
+```sql
+WITH daily_totals AS (
+    SELECT 
+        DATE(order_date) AS order_day,
+        customer_id,
+        SUM(amount) AS daily_amount
+    FROM orders
+    GROUP BY DATE(order_date), customer_id
+)
+SELECT 
+    order_day,
+    COUNT(DISTINCT customer_id) AS unique_customers,
+    SUM(daily_amount) AS revenue
+FROM daily_totals
+GROUP BY order_day
+```
+
+### Window Functions in SQL
+
+```yaml
+transform:
+  steps:
+    - sql: |
+        SELECT 
+          *,
+          ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) AS order_rank,
+          SUM(amount) OVER (PARTITION BY customer_id) AS customer_lifetime_value,
+          LAG(amount) OVER (PARTITION BY customer_id ORDER BY order_date) AS prev_order_amount
+        FROM orders
+```
+
+### Combining SQL and Python Steps
+
+```yaml
+transform:
+  steps:
+    # Step 1: SQL for standard transformations
+    - sql: |
+        SELECT * FROM raw_orders 
+        WHERE status != 'CANCELLED'
+    
+    # Step 2: Python for complex logic
+    - function: enrich_with_api_data
+      params:
+        api_endpoint: "https://api.example.com/enrichment"
+    
+    # Step 3: SQL for final shaping
+    - sql: |
+        SELECT order_id, customer_id, amount, enriched_data
+        FROM current_df
+        ORDER BY order_date
+```
+
+---
+
+## Registering Custom Transforms with @transform
+
+The `@transform` decorator registers your function so Odibi can find it by name in YAML configurations.
+
+### Basic Registration
+
+```python
+from odibi import transform
+
+@transform
+def clean_names(context, current):
+    """Function is registered as 'clean_names' (uses function name)."""
+    current['name'] = current['name'].str.strip().str.title()
+    return current
+```
+
+### Custom Name Registration
+
+```python
+@transform("normalize_addresses")
+def my_address_normalizer(context, current):
+    """Function is registered as 'normalize_addresses'."""
+    # ... address normalization logic
+    return current
+```
+
+### Registration with Category and Parameter Model
+
+```python
+from pydantic import BaseModel
+
+class EnrichmentParams(BaseModel):
+    lookup_table: str
+    join_key: str
+    columns: list[str]
+
+@transform(name="enrich_data", category="enrichment", param_model=EnrichmentParams)
+def enrich_data(context, current, lookup_table: str, join_key: str, columns: list):
+    """
+    Registered as 'enrich_data' with parameter validation.
+    
+    Parameters are validated against EnrichmentParams before execution.
+    """
+    lookup_df = context.get(lookup_table)
+    return current.merge(lookup_df[columns + [join_key]], on=join_key, how='left')
+```
+
+### Where to Put Your Transforms
+
+1. **Project-level:** Create `transformations/custom_transforms.py`
+2. **Import in project.yaml:**
+   ```yaml
+   python_imports:
+     - transformations.custom_transforms
+   ```
+3. **Use in nodes:**
+   ```yaml
+   transform:
+     steps:
+       - function: normalize_addresses
+   ```
+
+---
+
 ## Summary of Function Signature Rules
 
 | Signature | Behavior |
@@ -113,3 +288,11 @@ transform:
 | `def func(context, current):` | Receives context AND the result of the previous step. |
 | `def func(context, my_param):` | Receives context and a parameter from YAML. |
 | `def func(context, current, my_param):` | Receives all three. |
+
+---
+
+## See Also
+
+- [Patterns Overview](../patterns/README.md) - Built-in transformation patterns
+- [Best Practices](./best_practices.md) - Code organization guidelines
+- [YAML Schema Reference](../reference/yaml_schema.md) - Full configuration reference

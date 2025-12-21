@@ -5,6 +5,8 @@ repo_url: https://github.com/henryodibi11/Odibi
 repo_name: henryodibi11/Odibi
 edit_uri: edit/main/docs/
 
+docs_dir: docs
+
 theme:
   name: material
   features:
@@ -37,60 +39,80 @@ plugins:
 nav:
   - Home: README.md
   - Tutorials:
-      - Getting Started: docs/tutorials/getting_started.md
+      - Getting Started: tutorials/getting_started.md
       - Dimensional Modeling:
-          - Introduction: docs/tutorials/dimensional_modeling/01_introduction.md
-          - Dimension Pattern: docs/tutorials/dimensional_modeling/02_dimension_pattern.md
-          - Date Dimension: docs/tutorials/dimensional_modeling/03_date_dimension_pattern.md
-          - Fact Pattern: docs/tutorials/dimensional_modeling/04_fact_pattern.md
-          - Aggregation Pattern: docs/tutorials/dimensional_modeling/05_aggregation_pattern.md
-          - Full Star Schema: docs/tutorials/dimensional_modeling/06_full_star_schema.md
-          - Semantic Layer Intro: docs/tutorials/dimensional_modeling/07_semantic_layer_intro.md
-          - Defining Metrics: docs/tutorials/dimensional_modeling/08_defining_metrics.md
-          - Defining Dimensions: docs/tutorials/dimensional_modeling/09_defining_dimensions.md
-          - Querying Metrics: docs/tutorials/dimensional_modeling/10_querying_metrics.md
-          - Materializing Metrics: docs/tutorials/dimensional_modeling/11_materializing_metrics.md
-          - Semantic Full Example: docs/tutorials/dimensional_modeling/12_semantic_full_example.md
-          - FK Validation: docs/tutorials/dimensional_modeling/13_fk_validation.md
+          - Introduction: tutorials/dimensional_modeling/01_introduction.md
+          - Dimension Pattern: tutorials/dimensional_modeling/02_dimension_pattern.md
+          - Date Dimension: tutorials/dimensional_modeling/03_date_dimension_pattern.md
+          - Fact Pattern: tutorials/dimensional_modeling/04_fact_pattern.md
+          - Aggregation Pattern: tutorials/dimensional_modeling/05_aggregation_pattern.md
+          - Full Star Schema: tutorials/dimensional_modeling/06_full_star_schema.md
+          - Semantic Layer Intro: tutorials/dimensional_modeling/07_semantic_layer_intro.md
+          - Defining Metrics: tutorials/dimensional_modeling/08_defining_metrics.md
+          - Defining Dimensions: tutorials/dimensional_modeling/09_defining_dimensions.md
+          - Querying Metrics: tutorials/dimensional_modeling/10_querying_metrics.md
+          - Materializing Metrics: tutorials/dimensional_modeling/11_materializing_metrics.md
+          - Semantic Full Example: tutorials/dimensional_modeling/12_semantic_full_example.md
+          - FK Validation: tutorials/dimensional_modeling/13_fk_validation.md
   - Guides:
-      - Dogfooding (Meta): docs/guides/dogfooding.md
-      - Writing Transformations: docs/guides/writing_transformations.md
-      - Master CLI: docs/guides/cli_master_guide.md
-      - Python API Guide: docs/guides/python_api_guide.md
-      - Production Deployment: docs/guides/production_deployment.md
-      - Environments: docs/guides/environments.md
-      - Secrets Management: docs/guides/secrets.md
-      - Azure Setup: docs/guides/setup_azure.md
-      - Performance Tuning: docs/guides/performance_tuning.md
-      - WSL Setup: docs/guides/wsl_setup.md
+      - Dogfooding (Meta): guides/dogfooding.md
+      - Writing Transformations: guides/writing_transformations.md
+      - Master CLI: guides/cli_master_guide.md
+      - Python API Guide: guides/python_api_guide.md
+      - Production Deployment: guides/production_deployment.md
+      - Environments: guides/environments.md
+      - Secrets Management: guides/secrets.md
+      - Azure Setup: guides/setup_azure.md
+      - Performance Tuning: guides/performance_tuning.md
+      - WSL Setup: guides/wsl_setup.md
+      - Best Practices: guides/best_practices.md
   - Reference:
-      - Cheatsheet: docs/reference/cheatsheet.md
-      - Configuration Guide: docs/reference/configuration.md
-      - YAML Schema: docs/reference/yaml_schema.md
-      - Supported Formats: docs/reference/supported_formats.md
+      - Cheatsheet: reference/cheatsheet.md
+      - Configuration Guide: reference/configuration.md
+      - YAML Schema: reference/yaml_schema.md
+      - Supported Formats: reference/supported_formats.md
+      - Engine Parity: reference/PARITY_TABLE.md
       - API:
-        - Pipeline: docs/reference/api/pipeline.md
-        - Engine: docs/reference/api/engine.md
-        - Connections: docs/reference/api/connections.md
-        - CLI: docs/reference/api/cli.md
+        - Pipeline: reference/api/pipeline.md
+        - Engine: reference/api/engine.md
+        - Connections: reference/api/connections.md
+        - CLI: reference/api/cli.md
+  - Features:
+      - Engines: features/engines.md
+      - Pipelines: features/pipelines.md
+      - Connections: features/connections.md
+      - CLI: features/cli.md
+      - Validation: features/quality_gates.md
+      - Quarantine: features/quarantine.md
+      - Alerting: features/alerting.md
+      - Stories: features/stories.md
+      - Catalog: features/catalog.md
+      - Lineage: features/lineage.md
+      - Transformers: features/transformers.md
+      - Patterns: features/patterns.md
+      - Schema Tracking: features/schema_tracking.md
+      - Diagnostics: features/diagnostics.md
+      - Orchestration: features/orchestration.md
   - Patterns:
-      - Overview: docs/patterns/README.md
-      - Append-Only Raw: docs/patterns/append_only_raw.md
-      - High Water Mark: docs/patterns/hwm_pattern_guide.md
-      - Merge/Upsert: docs/patterns/merge_upsert.md
-      - Windowed Reprocess: docs/patterns/windowed_reprocess.md
-      - Dimension Pattern: docs/patterns/dimension.md
-      - Date Dimension Pattern: docs/patterns/date_dimension.md
-      - Fact Pattern: docs/patterns/fact.md
-      - Aggregation Pattern: docs/patterns/aggregation.md
+      - Overview: patterns/README.md
+      - Append-Only Raw: patterns/append_only_raw.md
+      - Incremental Stateful: patterns/incremental_stateful.md
+      - Merge/Upsert: patterns/merge_upsert.md
+      - Windowed Reprocess: patterns/windowed_reprocess.md
+      - Dimension Pattern: patterns/dimension.md
+      - Date Dimension Pattern: patterns/date_dimension.md
+      - Fact Pattern: patterns/fact.md
+      - Aggregation Pattern: patterns/aggregation.md
+      - SCD2 Pattern: patterns/scd2.md
+      - Smart Read: patterns/smart_read.md
+      - Skip If Unchanged: patterns/skip_if_unchanged.md
   - Semantic Layer:
-      - Overview: docs/semantics/index.md
-      - Defining Metrics: docs/semantics/metrics.md
-      - Querying: docs/semantics/query.md
-      - Materializing: docs/semantics/materialize.md
+      - Overview: semantics/index.md
+      - Defining Metrics: semantics/metrics.md
+      - Querying: semantics/query.md
+      - Materializing: semantics/materialize.md
   - Validation:
-      - FK Validation: docs/validation/fk.md
+      - FK Validation: validation/fk.md
   - Explanation:
-      - Architecture: docs/explanation/architecture.md
-      - Case Studies: docs/explanation/case_studies.md
-  - Contributing: docs/guides/contributing.md
+      - Architecture: explanation/architecture.md
+      - Case Studies: explanation/case_studies.md

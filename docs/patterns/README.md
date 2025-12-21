@@ -20,7 +20,7 @@ This directory contains documentation for common data pipeline patterns used in 
 
 **When to use:** When your source has timestamps (created_at, updated_at) and you want incremental reads. Essential for daily incremental loads.
 
-**See also:** [Manual HWM Guide](./hwm_pattern_guide.md) - understanding the underlying SQL pattern.
+**See also:** [Manual HWM Guide](./incremental_stateful.md) - understanding the underlying SQL pattern.
 
 ---
 

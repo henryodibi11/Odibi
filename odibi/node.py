@@ -1474,7 +1474,7 @@ class NodeExecutor:
                     )
 
                 result_df = quarantine_result.valid_df
-            test_results = quarantine_result.test_results
+                test_results = quarantine_result.test_results
 
         # Run standard validation on remaining rows
         self._execute_validation(config, result_df)

@@ -51,12 +51,6 @@ odibi graph my_pipeline.yaml
 odibi graph my_pipeline.yaml --format mermaid
 ```
 
-### 4. Generate VS Code Setup
-Configure VS Code for optimal Odibi development (IntelliSense, schema validation).
-```bash
-odibi init-vscode
-```
-
 ---
 
 ## 🔴 Level 3: Hero (Advanced Tools)
@@ -75,11 +69,11 @@ odibi story diff stories/runs/20231027_120000.json stories/runs/20231027_120500.
 ### 2. Manage Secrets
 Securely manage local secrets for your pipelines.
 ```bash
-# Initialize secrets store
+# Initialize secrets store (creates .env.template)
 odibi secrets init
 
-# Set a secret
-odibi secrets set MY_API_KEY value123
+# Validate all secrets are configured
+odibi secrets validate
 ```
 
 ---

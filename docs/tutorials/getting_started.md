@@ -140,10 +140,76 @@ Open the HTML file in your browser to view the report:
 
 ---
 
-## 7. What's Next?
+## 7. Add Data Validation
 
-You have successfully built a data pipeline!
+Data pipelines are only as good as their data quality checks. Let's add validation to catch bad data before it corrupts your warehouse.
+
+### Inline Validation in YAML
+
+Add validation rules directly to your node:
+
+```yaml
+nodes:
+  - name: customers
+    read:
+      connection: landing
+      format: csv
+      path: customers.csv
+    validation:
+      tests:
+        - type: not_null
+          columns: [id, name]
+        - type: unique
+          columns: [id]
+        - type: row_count
+          min: 1
+      on_failure: warn  # or "error" to stop the pipeline
+    write:
+      connection: raw
+      format: parquet
+      path: customers
+```
+
+### Using Contracts for Input Validation
+
+Contracts validate data **before** processing:
+
+```yaml
+nodes:
+  - name: validate_orders
+    contracts:
+      - type: not_null
+        columns: [order_id, customer_id, amount]
+      - type: freshness
+        column: created_at
+        max_age: "24h"
+    read:
+      connection: landing
+      path: orders.csv
+    write:
+      connection: raw
+      path: orders
+```
+
+If contracts fail, the pipeline stops immediately with clear error messages.
+
+### Running Validation
+
+Run the pipeline and watch for validation warnings:
+
+```bash
+odibi run odibi.yaml
+```
+
+Validation results appear in both the console output and the Data Story.
+
+---
+
+## 8. What's Next?
+
+You have successfully built a data pipeline with data validation!
 
 *   **[Incremental Loading](../patterns/incremental_stateful.md):** Learn how to efficiently process only new data using State Tracking ("Auto-Pilot").
 *   **[Write Custom Transformations](../guides/writing_transformations.md):** Learn how to add Python logic (like advanced validation) to your pipeline.
+*   **[Data Validation Guide](../validation/README.md):** Deep dive into all validation options.
 *   **[Master the CLI](../guides/cli_master_guide.md):** Learn about `odibi stress` and `odibi doctor`.

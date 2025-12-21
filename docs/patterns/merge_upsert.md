@@ -374,7 +374,7 @@ Shows every merge operation, versions, and row counts.
 ## Related Patterns
 
 - **[Append-Only Raw](./append_only_raw.md)** → Source layer (unmerged, duplicates OK)
-- **[High Water Mark](./hwm_pattern_guide.md)** → How to efficiently feed Raw with new data
+- **[High Water Mark](./incremental_stateful.md)** → How to efficiently feed Raw with new data
 
 ---
 

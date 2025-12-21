@@ -185,7 +185,7 @@ Never overwrite Raw. Never delete from Raw. Never use `merge` in Raw.
 
 ## Related Patterns
 
-- **[High Water Mark](./hwm_pattern_guide.md)** → Efficiently filter SQL sources for incremental reads
+- **[High Water Mark](./incremental_stateful.md)** → Efficiently filter SQL sources for incremental reads
 - **[Merge/Upsert](./merge_upsert.md)** → Deduplicate Raw data in Silver
 
 ---

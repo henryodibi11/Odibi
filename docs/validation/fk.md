@@ -375,6 +375,119 @@ print(f"Lineage: {lineage}")
 
 ---
 
+---
+
+## Pipeline Integration Patterns
+
+### Pattern 1: Pre-Load Validation
+
+Validate FK relationships **before** writing to the warehouse:
+
+```python
+from odibi.validation.fk import validate_fk_on_load, RelationshipConfig
+
+@transform
+def validate_and_load_orders(context, current):
+    """Validate FKs before writing to warehouse."""
+    relationships = [
+        RelationshipConfig(
+            name="orders_to_customers",
+            fact="orders",
+            dimension="dim_customer",
+            fact_key="customer_id",
+            dimension_key="customer_id"
+        )
+    ]
+    
+    validated_df = validate_fk_on_load(
+        fact_df=current,
+        relationships=relationships,
+        context=context,
+        on_failure="filter"  # Remove orphans
+    )
+    return validated_df
+```
+
+YAML configuration:
+```yaml
+nodes:
+  - name: dim_customer
+    read:
+      connection: warehouse
+      path: dim_customer
+
+  - name: validated_orders
+    depends_on: [dim_customer]
+    read:
+      connection: staging
+      path: orders
+    transform:
+      steps:
+        - function: validate_and_load_orders
+    write:
+      connection: warehouse
+      path: fact_orders
+```
+
+### Pattern 2: Post-Pipeline Audit Job
+
+Run FK validation as a separate audit pipeline:
+
+```yaml
+pipelines:
+  - pipeline: audit_referential_integrity
+    description: "Nightly FK validation audit"
+    nodes:
+      - name: load_dimensions
+        read:
+          connection: warehouse
+          tables:
+            - dim_customer
+            - dim_product
+            - dim_date
+
+      - name: validate_fact_orders
+        depends_on: [load_dimensions]
+        read:
+          connection: warehouse
+          path: fact_orders
+        transform:
+          steps:
+            - function: run_fk_audit
+              params:
+                relationships_file: "config/fk_relationships.yaml"
+```
+
+### Pattern 3: Integrated with Data Quality Gate
+
+Use FK validation as a quality gate:
+
+```yaml
+nodes:
+  - name: fact_orders
+    read:
+      connection: staging
+      path: orders
+    transformer: fact
+    params:
+      grain: [order_id]
+      dimensions:
+        - source_column: customer_id
+          dimension_table: dim_customer
+          dimension_key: customer_id
+          surrogate_key: customer_sk
+    gate:
+      - type: custom
+        function: fk_validation_gate
+        params:
+          max_orphan_percent: 0.1  # Fail if > 0.1% orphans
+    write:
+      connection: warehouse
+      path: fact_orders
+```
+
+---
+
 ## See Also
 
 - [Fact Pattern](../patterns/fact.md) - Build fact tables with orphan handling

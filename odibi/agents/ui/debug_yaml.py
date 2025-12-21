@@ -11,9 +11,9 @@ def debug_yaml_loading(yaml_path: str):
     """Test all loading methods and compare results."""
     import os
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"DEBUG: Testing YAML loading for: {yaml_path}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Check file exists
     print("\n1. File existence check:")
@@ -66,7 +66,7 @@ def debug_yaml_loading(yaml_path: str):
     except Exception as e:
         print(f"   FAILED: {type(e).__name__}: {e}")
 
-    print(f"\n{'='*60}\n")
+    print(f"\n{'=' * 60}\n")
 
 
 if __name__ == "__main__":

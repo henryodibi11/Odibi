@@ -177,7 +177,7 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
                     error=str(e),
                 )
                 raise ValueError(
-                    f"Failed to load import '{import_path}' " f"(resolved: {full_import_path}): {e}"
+                    f"Failed to load import '{import_path}' (resolved: {full_import_path}): {e}"
                 ) from e
 
             # Merge imported data INTO the current data

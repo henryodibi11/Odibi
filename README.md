@@ -41,12 +41,12 @@ We have rebuilt our documentation to help you learn fast.
 
 ### 🏁 Start Here
 *   **[Getting Started Tutorial](docs/tutorials/getting_started.md):** Go from zero to production in 10 minutes.
-*   **[Master CLI Guide](docs/guides/cli_master.md):** Learn `run`, `stress`, `doctor`, and more.
+*   **[Master CLI Guide](docs/guides/cli_master_guide.md):** Learn `run`, `stress`, `doctor`, and more.
 
 ### 📘 Guides & How-To
 *   **[WSL Setup Guide](docs/guides/wsl_setup.md):** The definitive guide to Windows development.
 *   **[Production Deployment](docs/guides/production_deployment.md):** Moving from local to Azure/Databricks.
-*   **[Custom Transformations](docs/guides/writing-transformations.md):** Write your own Python logic.
+*   **[Custom Transformations](docs/guides/writing_transformations.md):** Write your own Python logic.
 
 ### ⚙️ Reference
 *   **[Cheatsheet](docs/reference/cheatsheet.md):** Syntax and commands on one page.

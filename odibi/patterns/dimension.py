@@ -221,7 +221,7 @@ class DimensionPattern(Pattern):
                 return spark.read.format("delta").load(target)
         except Exception as e:
             ctx.warning(
-                f"Could not load existing target '{target}': {e}. " "Treating as initial load.",
+                f"Could not load existing target '{target}': {e}. Treating as initial load.",
                 pattern="DimensionPattern",
                 target=target,
             )
@@ -283,7 +283,7 @@ class DimensionPattern(Pattern):
                 return None
         except Exception as e:
             ctx.warning(
-                f"Could not load existing target '{target}': {e}. " "Treating as initial load.",
+                f"Could not load existing target '{target}': {e}. Treating as initial load.",
                 pattern="DimensionPattern",
                 target=target,
             )

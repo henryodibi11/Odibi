@@ -95,7 +95,7 @@ pipeline_config = PipelineConfig(**config['pipelines'][0])  # Validates pipeline
 
 **What Pydantic does:**
 - Checks that `project`, `engine`, `connections` exist
-- Ensures `engine` is either "pandas" or "spark" (not "panda" or "pands")
+- Ensures `engine` is "pandas", "spark", or "polars" (not "panda" or "pands")
 - Validates each node has required fields (`name`, at least one operation)
 - Converts strings to enums where needed (e.g., `engine: "pandas"` → `EngineType.PANDAS`)
 
@@ -179,7 +179,7 @@ result = manager.run('bronze_to_silver')  # Runs specific pipeline
 | Section | Purpose | Required |
 |---------|---------|----------|
 | `project` | Project name | ✅ Yes |
-| `engine` | Execution engine (pandas/spark) | ✅ Yes |
+| `engine` | Execution engine (pandas/spark/polars) | ✅ Yes |
 | `connections` | Where data lives | ✅ Yes |
 | `pipelines` | List of pipelines | ✅ Yes |
 | `story` | Story generation config | ✅ Yes |
@@ -485,7 +485,7 @@ project_config = ProjectConfig(**config)
 # ✅ Validation passed - checks:
 #    - Required fields: project, connections, story, pipelines
 #    - story.connection exists in connections
-#    - engine is valid (pandas or spark)
+#    - engine is valid (pandas, spark, or polars)
 
 # Create connections
 connections = {
@@ -998,7 +998,7 @@ def execute_sql(self, sql: str, context: Context):
 ```yaml
 # PROJECT LEVEL (required)
 project: string               # Project name
-engine: pandas|spark          # Execution engine
+engine: pandas|spark|polars   # Execution engine
 
 # GLOBAL SETTINGS (optional)
 retry:
