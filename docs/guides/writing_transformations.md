@@ -152,12 +152,28 @@ nodes:
 
 ### SQL File Reference
 
-For complex queries, use external SQL files:
+For complex queries, use external SQL files. Paths are resolved **relative to your main YAML config file**:
 
 ```yaml
+# In your main odibi.yaml (or imported pipeline YAML)
 transform:
   steps:
     - sql_file: sql/complex_aggregation.sql
+```
+
+For layered project structures:
+```yaml
+# If your project is:
+# project/
+# ├── main.yaml
+# └── pipelines/
+#     └── silver/
+#         └── sql/
+#             └── transform.sql
+
+transform:
+  steps:
+    - sql_file: pipelines/silver/sql/transform.sql
 ```
 
 **sql/complex_aggregation.sql:**

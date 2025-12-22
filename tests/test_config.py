@@ -251,6 +251,56 @@ class TestTransformConfig:
         if hasattr(config.steps[0], "function"):
             assert config.steps[0].function == "clean_data"
 
+    def test_transform_with_sql_file_step(self):
+        """Transform can have sql_file step."""
+        from odibi.config import TransformStep
+
+        config = TransformConfig(
+            steps=[
+                {"sql_file": "sql/transform.sql"},
+            ]
+        )
+        assert len(config.steps) == 1
+        step = config.steps[0]
+        assert isinstance(step, TransformStep)
+        assert step.sql_file == "sql/transform.sql"
+        assert step.sql is None
+        assert step.function is None
+        assert step.operation is None
+
+    def test_transform_step_requires_exactly_one_type(self):
+        """TransformStep must have exactly one of sql, sql_file, function, operation."""
+        from odibi.config import TransformStep
+
+        # No type specified - should fail
+        with pytest.raises(ValidationError):
+            TransformStep()
+
+        # Multiple types specified - should fail
+        with pytest.raises(ValidationError):
+            TransformStep(sql="SELECT 1", sql_file="file.sql")
+
+        with pytest.raises(ValidationError):
+            TransformStep(sql_file="file.sql", function="my_func")
+
+    def test_transform_mixed_steps(self):
+        """Transform can mix sql, sql_file, function, and operation steps."""
+        from odibi.config import TransformStep
+
+        config = TransformConfig(
+            steps=[
+                "SELECT * FROM df WHERE active = true",
+                {"sql_file": "pipelines/silver/sql/aggregate.sql"},
+                {"function": "apply_rules", "params": {"threshold": 0.5}},
+                {"sql": "SELECT * FROM df ORDER BY id"},
+                {"operation": "drop_duplicates", "params": {"subset": ["id"]}},
+            ]
+        )
+        assert len(config.steps) == 5
+        assert isinstance(config.steps[0], str)
+        assert isinstance(config.steps[1], TransformStep)
+        assert config.steps[1].sql_file == "pipelines/silver/sql/aggregate.sql"
+
 
 class TestNodeConfig:
     """Test NodeConfig validation."""

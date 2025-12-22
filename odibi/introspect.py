@@ -76,6 +76,7 @@ GROUP_MAPPING = {
     "AutoOptimizeConfig": "Operation",
     "DeleteDetectionConfig": "Operation",
     "TransformConfig": "Operation",
+    "TransformStep": "Operation",
     "ValidationConfig": "Operation",
     "PrivacyConfig": "Operation",
     "ColumnMetadata": "Core",

@@ -7,6 +7,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
@@ -1238,6 +1239,9 @@ class NodeExecutor:
                                 )
                             elif step.sql:
                                 current_df = self._execute_sql_step(step.sql)
+                            elif step.sql_file:
+                                sql_content = self._resolve_sql_file(step.sql_file)
+                                current_df = self._execute_sql_step(sql_content)
                             else:
                                 raise TransformError(f"Invalid transform step: {step}")
 
@@ -1307,12 +1311,48 @@ class NodeExecutor:
         if hasattr(step, "sql") and step.sql:
             sql_preview = step.sql[:50] + "..." if len(step.sql) > 50 else step.sql
             return f"sql:{sql_preview}"
+        if hasattr(step, "sql_file") and step.sql_file:
+            return f"sql_file:{step.sql_file}"
         return "unknown"
 
     def _execute_sql_step(self, sql: str) -> Any:
         """Execute SQL transformation."""
         self._executed_sql.append(sql)
         return self.engine.execute_sql(sql, self.context)
+
+    def _resolve_sql_file(self, sql_file_path: str) -> str:
+        """Load SQL content from external file.
+
+        Args:
+            sql_file_path: Path to .sql file, relative to main config file.
+
+        Returns:
+            SQL content as string.
+
+        Raises:
+            FileNotFoundError: If the SQL file does not exist.
+            ValueError: If the file cannot be read.
+        """
+        if not self.config_file:
+            raise ValueError(
+                f"Cannot resolve sql_file '{sql_file_path}': config_file path not available. "
+                "Ensure pipeline was loaded from a YAML file."
+            )
+
+        config_dir = Path(self.config_file).parent
+        file_path = config_dir / sql_file_path
+
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"SQL file not found: {sql_file_path}\n"
+                f"Looked in: {file_path.absolute()}\n"
+                f"Config directory: {config_dir.absolute()}"
+            )
+
+        try:
+            return file_path.read_text(encoding="utf-8")
+        except Exception as e:
+            raise ValueError(f"Error reading SQL file '{sql_file_path}': {e}") from e
 
     def _execute_function_step(
         self,

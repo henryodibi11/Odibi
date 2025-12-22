@@ -1382,6 +1382,35 @@ privacy:
 | **declassify** | List[str] | No | `PydanticUndefined` | List of columns to remove from PII protection (stops inheritance from upstream). Example: ['customer_id'] |
 
 ---
+### `TransformStep`
+> *Used in: [TransformConfig](#transformconfig)*
+
+Single transformation step.
+
+Supports four step types (exactly one required):
+
+* `sql` - Inline SQL query string
+* `sql_file` - Path to external .sql file (relative to main config file)
+* `function` - Registered Python function name
+* `operation` - Built-in operation (e.g., drop_duplicates)
+
+**sql_file Example:**
+```yaml
+transform:
+  steps:
+    - sql_file: pipelines/silver/sql/transform.sql
+```
+
+The path is resolved relative to your main YAML config file location.
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **sql** | Optional[str] | No | - | Inline SQL query. Use `df` to reference the current DataFrame. |
+| **sql_file** | Optional[str] | No | - | Path to external .sql file, relative to main config file. |
+| **function** | Optional[str] | No | - | Name of a registered Python function (@transform or @register). |
+| **operation** | Optional[str] | No | - | Built-in operation name (e.g., drop_duplicates, fill_na). |
+| **params** | Dict[str, Any] | No | `PydanticUndefined` | Parameters to pass to function or operation. |
+
+---
 ## Contracts (Data Quality Gates)
 
 ### Contracts (Pre-Transform Checks)

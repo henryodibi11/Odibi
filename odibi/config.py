@@ -1017,19 +1017,55 @@ class ReadConfig(BaseModel):
 
 
 class TransformStep(BaseModel):
-    """Single transformation step."""
+    """
+    Single transformation step.
 
-    sql: Optional[str] = None
-    function: Optional[str] = None
-    operation: Optional[str] = None
-    params: Dict[str, Any] = Field(default_factory=dict)
+    Supports four step types (exactly one required):
+
+    * `sql` - Inline SQL query string
+    * `sql_file` - Path to external .sql file (relative to main config file)
+    * `function` - Registered Python function name
+    * `operation` - Built-in operation (e.g., drop_duplicates)
+
+    **sql_file Example:**
+    ```yaml
+    transform:
+      steps:
+        - sql_file: pipelines/silver/sql/transform.sql
+    ```
+
+    The path is resolved relative to your main YAML config file location.
+    """
+
+    sql: Optional[str] = Field(
+        default=None,
+        description="Inline SQL query. Use `df` to reference the current DataFrame.",
+    )
+    sql_file: Optional[str] = Field(
+        default=None,
+        description="Path to external .sql file, relative to main config file.",
+    )
+    function: Optional[str] = Field(
+        default=None,
+        description="Name of a registered Python function (@transform or @register).",
+    )
+    operation: Optional[str] = Field(
+        default=None,
+        description="Built-in operation name (e.g., drop_duplicates, fill_na).",
+    )
+    params: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Parameters to pass to function or operation.",
+    )
 
     @model_validator(mode="after")
     def check_step_type(self):
         """Ensure exactly one step type is provided."""
-        step_types = [self.sql, self.function, self.operation]
+        step_types = [self.sql, self.sql_file, self.function, self.operation]
         if sum(x is not None for x in step_types) != 1:
-            raise ValueError("Exactly one of 'sql', 'function', or 'operation' must be provided")
+            raise ValueError(
+                "Exactly one of 'sql', 'sql_file', 'function', or 'operation' must be provided"
+            )
         return self
 
 
