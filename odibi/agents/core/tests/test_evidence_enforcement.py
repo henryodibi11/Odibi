@@ -136,9 +136,9 @@ class TestUserAgentEvidenceEnforcement:
         ]
 
         for pattern in fabricated_patterns:
-            assert pattern.lower() not in response.content.lower(), (
-                f"Fabricated pattern '{pattern}' found in response"
-            )
+            assert (
+                pattern.lower() not in response.content.lower()
+            ), f"Fabricated pattern '{pattern}' found in response"
 
     def test_user_agent_includes_evidence_hash(self, user_agent):
         """UserAgent must include evidence hash in response when executing."""
