@@ -3,6 +3,7 @@
 import hashlib
 import inspect
 import logging
+import re
 import time
 import traceback
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from odibi.config import IncrementalConfig, IncrementalMode, NodeConfig, RetryConfig, WriteMode
-from odibi.context import Context, EngineContext
+from odibi.context import Context, EngineContext, _get_unique_view_name
 from odibi.enums import EngineType
 from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
 from odibi.registry import FunctionRegistry
@@ -1227,7 +1228,7 @@ class NodeExecutor:
                             self.context.register("df", current_df)
 
                         if isinstance(step, str):
-                            current_df = self._execute_sql_step(step)
+                            current_df = self._execute_sql_step(step, current_df)
                         else:
                             if step.function:
                                 current_df = self._execute_function_step(
@@ -1238,10 +1239,10 @@ class NodeExecutor:
                                     step.operation, step.params, current_df
                                 )
                             elif step.sql:
-                                current_df = self._execute_sql_step(step.sql)
+                                current_df = self._execute_sql_step(step.sql, current_df)
                             elif step.sql_file:
                                 sql_content = self._resolve_sql_file(step.sql_file)
-                                current_df = self._execute_sql_step(sql_content)
+                                current_df = self._execute_sql_step(sql_content, current_df)
                             else:
                                 raise TransformError(f"Invalid transform step: {step}")
 
@@ -1315,10 +1316,31 @@ class NodeExecutor:
             return f"sql_file:{step.sql_file}"
         return "unknown"
 
-    def _execute_sql_step(self, sql: str) -> Any:
-        """Execute SQL transformation."""
+    def _execute_sql_step(self, sql: str, current_df: Any = None) -> Any:
+        """Execute SQL transformation with thread-safe view names.
+
+        Uses unique temp view names to avoid race conditions when
+        multiple nodes execute SQL steps in parallel.
+
+        Args:
+            sql: SQL query string (references to 'df' are replaced with unique view)
+            current_df: DataFrame to register as the source for 'df' references
+
+        Returns:
+            Result DataFrame from SQL execution
+        """
         self._executed_sql.append(sql)
-        return self.engine.execute_sql(sql, self.context)
+
+        if current_df is not None:
+            view_name = _get_unique_view_name()
+            self.context.register(view_name, current_df)
+            try:
+                safe_sql = re.sub(r"\bdf\b", view_name, sql)
+                return self.engine.execute_sql(safe_sql, self.context)
+            finally:
+                self.context.unregister(view_name)
+        else:
+            return self.engine.execute_sql(sql, self.context)
 
     def _resolve_sql_file(self, sql_file_path: str) -> str:
         """Load SQL content from external file.

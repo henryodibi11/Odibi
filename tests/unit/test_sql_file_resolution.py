@@ -141,7 +141,9 @@ class TestSqlFileExecution:
             assert result.success
             mock_engine.execute_sql.assert_called()
             call_args = mock_engine.execute_sql.call_args[0]
-            assert "SELECT * FROM df WHERE active = true" in call_args[0]
+            # 'df' is replaced with unique view name for thread-safety
+            assert "WHERE active = true" in call_args[0]
+            assert "_df_" in call_args[0]  # unique view name pattern
 
     def test_mixed_sql_and_sql_file_steps(self, mock_context, mock_engine, connections):
         """Can mix inline sql and sql_file steps in same transform."""
