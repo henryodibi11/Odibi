@@ -2791,6 +2791,7 @@ params:
 | **update_condition** | Optional[str] | No | - | SQL condition for update clause (e.g. 'source.ver > target.ver') |
 | **insert_condition** | Optional[str] | No | - | SQL condition for insert clause (e.g. 'source.status != "deleted"') |
 | **delete_condition** | Optional[str] | No | - | SQL condition for delete clause (e.g. 'source.status = "deleted"') |
+| **table_properties** | Optional[dict] | No | - | Delta table properties for initial table creation (e.g., column mapping) |
 
 ---
 #### `scd2` (SCD2Params)

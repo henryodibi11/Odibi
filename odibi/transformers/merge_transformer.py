@@ -136,6 +136,10 @@ class MergeParams(BaseModel):
     delete_condition: Optional[str] = Field(
         None, description="SQL condition for delete clause (e.g. 'source.status = \"deleted\"')"
     )
+    table_properties: Optional[dict] = Field(
+        None,
+        description="Delta table properties for initial table creation (e.g., column mapping)",
+    )
 
     @field_validator("keys")
     @classmethod
@@ -211,6 +215,7 @@ def merge(context, current, **params):
             merge_params.update_condition,
             merge_params.insert_condition,
             merge_params.delete_condition,
+            merge_params.table_properties,
             params,  # pass raw params if needed by internal logic or refactor internal logic
         )
     elif isinstance(real_context, PandasContext):
@@ -246,6 +251,7 @@ def _merge_spark(
     update_condition,
     insert_condition,
     delete_condition,
+    table_properties,
     params,
 ):
     if DeltaTable is None:
@@ -353,6 +359,12 @@ def _merge_spark(
             # If cluster_by is present, we delegate to engine.write logic?
             # Or implement CTAS here similar to engine.write
 
+            # Build TBLPROPERTIES clause if table_properties provided
+            tbl_props_clause = ""
+            if table_properties:
+                props_str = ", ".join(f"'{k}' = '{v}'" for k, v in table_properties.items())
+                tbl_props_clause = f" TBLPROPERTIES ({props_str})"
+
             if cluster_by:
                 # Use CTAS logic for Liquid Clustering creation
                 if isinstance(cluster_by, str):
@@ -370,16 +382,32 @@ def _merge_spark(
                 target_identifier = f"delta.`{target}`" if is_path else target
 
                 spark.sql(
-                    f"CREATE TABLE IF NOT EXISTS {target_identifier} USING DELTA CLUSTER BY ({cols}) AS SELECT * FROM {temp_view}"
+                    f"CREATE TABLE IF NOT EXISTS {target_identifier} USING DELTA{tbl_props_clause} CLUSTER BY ({cols}) AS SELECT * FROM {temp_view}"
                 )
                 spark.catalog.dropTempView(temp_view)
             else:
-                writer = batch_df.write.format("delta").mode("overwrite")
+                # Create temp view for CTAS with properties
+                temp_view = f"odibi_merge_init_{abs(hash(target))}"
+                batch_df.createOrReplaceTempView(temp_view)
 
-                if "/" in target or "\\" in target or ":" in target or target.startswith("."):
-                    writer.save(target)
+                is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
+                target_identifier = f"delta.`{target}`" if is_path else target
+
+                if table_properties:
+                    # Use CTAS to apply table properties
+                    spark.sql(
+                        f"CREATE TABLE IF NOT EXISTS {target_identifier} USING DELTA{tbl_props_clause} AS SELECT * FROM {temp_view}"
+                    )
+                    spark.catalog.dropTempView(temp_view)
                 else:
-                    writer.saveAsTable(target)
+                    # Original path: use DataFrameWriter
+                    spark.catalog.dropTempView(temp_view)
+                    writer = batch_df.write.format("delta").mode("overwrite")
+
+                    if is_path:
+                        writer.save(target)
+                    else:
+                        writer.saveAsTable(target)
 
         # --- Post-Merge Optimization ---
         if optimize_write or zorder_by:
