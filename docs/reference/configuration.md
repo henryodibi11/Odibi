@@ -1167,9 +1167,7 @@ YAML file
 ---
 
 **Questions? Confusion?**  
-Open an issue on GitHub or check:
-- [examples/templates/template_full.yaml](../examples/templates/template_full.yaml) - Complete YAML reference
-- [docs/tutorials/walkthroughs/01_local_pipeline_pandas.ipynb](docs/tutorials/walkthroughs/01_local_pipeline_pandas.ipynb) - Interactive tutorial
+Open an issue on GitHub or check the examples in the `examples/` directory for complete YAML references.
 
 ---
 

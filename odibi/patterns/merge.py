@@ -11,10 +11,10 @@ class MergePattern(Pattern):
     """
     Merge Pattern: Upsert/Merge logic.
 
-    Params:
-        target (str): Target table/path.
-        keys (list): Join keys.
-        strategy (str): 'upsert', 'append_only', 'delete_match'.
+    Configuration Options (via params dict):
+        - **target** (str): Target table/path.
+        - **keys** (list): Join keys.
+        - **strategy** (str): 'upsert', 'append_only', 'delete_match'.
     """
 
     def validate(self) -> None:

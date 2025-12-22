@@ -592,4 +592,4 @@ connections:
 
 - [YAML Schema Reference](../reference/yaml_schema.md#connections)
 - [Pipeline Configuration](pipelines.md)
-- [Security Best Practices](../guides/security.md)
+- [Secrets Management](../guides/secrets.md)

@@ -392,6 +392,5 @@ WHERE DATE(order_date) >= DATE_SUB(CURRENT_DATE(), 30)
 
 ## References
 
-- [Odibi Architecture Manifesto: Pattern C - Aggregation](../design/02_architecture_manifesto.md#pattern-c-aggregation-silver--gold)
 - [Databricks: Dynamic Partition Overwrite](https://docs.databricks.com/en/sql/language-manual/sql-conf-spark-sql-sources-partitionOverwriteMode.html)
 - [Fundamentals of Data Engineering: Chapter on Aggregation](https://www.fundamentalsofdataengineering.com/)

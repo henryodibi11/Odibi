@@ -904,8 +904,7 @@ Configuration for data validation (post-transform checks).
 
 **When to Use:** Output data quality checks that run after transformation but before writing.
 
-**See Also:** [Validation Guide](../features/quality_gates.md), [Quarantine Guide](../features/quarantine.md),
-[Contracts Overview](#contracts-data-quality-gates) (pre-transform checks)
+**See Also:** Validation Guide, Quarantine Guide, Contracts Overview (pre-transform checks)
 
 ### 🛡️ "The Indestructible Pipeline" Pattern
 
@@ -972,6 +971,8 @@ validation:
 | **tests** | List[[TestConfig](#contracts-data-quality-gates)] | No | `PydanticUndefined` | List of validation tests<br>**Options:** [NotNullTest](#notnulltest), [UniqueTest](#uniquetest), [AcceptedValuesTest](#acceptedvaluestest), [RowCountTest](#rowcounttest), [CustomSQLTest](#customsqltest), [RangeTest](#rangetest), [RegexMatchTest](#regexmatchtest), [VolumeDropTest](#volumedroptest), [SchemaContract](#schemacontract), [DistributionContract](#distributioncontract), [FreshnessContract](#freshnesscontract) |
 | **quarantine** | Optional[[QuarantineConfig](#quarantineconfig)] | No | - | Quarantine configuration for failed rows |
 | **gate** | Optional[[GateConfig](#gateconfig)] | No | - | Quality gate configuration for batch-level validation |
+| **fail_fast** | bool | No | `False` | Stop validation on first failure. Skips remaining tests for faster feedback. |
+| **cache_df** | bool | No | `False` | Cache DataFrame before validation (Spark only). Improves performance with many tests. |
 
 ---
 ### `QuarantineConfig`
@@ -999,6 +1000,8 @@ validation:
     add_columns:
       _rejection_reason: true
       _rejected_at: true
+    max_rows: 10000
+    sample_fraction: 0.1
 ```
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1007,6 +1010,8 @@ validation:
 | **table** | Optional[str] | No | - | Table name for quarantine |
 | **add_columns** | [QuarantineColumnsConfig](#quarantinecolumnsconfig) | No | `PydanticUndefined` | Metadata columns to add to quarantined rows |
 | **retention_days** | Optional[int] | No | `90` | Days to retain quarantined data (auto-cleanup) |
+| **max_rows** | Optional[int] | No | - | Maximum number of rows to quarantine per run. Limits storage for high-failure batches. |
+| **sample_fraction** | Optional[float] | No | - | Sample fraction of invalid rows to quarantine (0.0-1.0). Use for sampling large invalid sets. |
 
 ---
 ### `QuarantineColumnsConfig`
@@ -1056,7 +1061,7 @@ Quality gate configuration for batch-level validation.
 
 **When to Use:** Pipeline-level pass/fail thresholds, row count limits, change detection.
 
-**See Also:** [Quality Gates](../features/quality_gates.md), [ValidationConfig](#validationconfig)
+**See Also:** Quality Gates, [ValidationConfig](#validationconfig)
 
 Gates evaluate the entire batch before writing, ensuring
 data quality thresholds are met.

@@ -887,8 +887,8 @@ conn.read_sql(f"SELECT * FROM users WHERE id = {user_id}")
 **You now understand the architecture!**
 
 Learn how to build on it:
-- **[Transformation Guide](../guides/custom_transformations.md)** - Create custom operations
-- **[Troubleshooting](../guides/troubleshooting.md)** - Debug issues
+- **[Transformation Guide](../guides/writing_transformations.md)** - Create custom operations
+- **[Troubleshooting](../troubleshooting.md)** - Debug issues
 - **Read the code!** Start with `operations/` directory
 
 ---

@@ -1458,6 +1458,8 @@ class QuarantineConfig(BaseModel):
         add_columns:
           _rejection_reason: true
           _rejected_at: true
+        max_rows: 10000
+        sample_fraction: 0.1
     ```
     """
 
@@ -1472,6 +1474,17 @@ class QuarantineConfig(BaseModel):
         default=90,
         ge=1,
         description="Days to retain quarantined data (auto-cleanup)",
+    )
+    max_rows: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Maximum number of rows to quarantine per run. Limits storage for high-failure batches.",
+    )
+    sample_fraction: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Sample fraction of invalid rows to quarantine (0.0-1.0). Use for sampling large invalid sets.",
     )
 
     @model_validator(mode="after")
@@ -1560,7 +1573,7 @@ class GateConfig(BaseModel):
 
     **When to Use:** Pipeline-level pass/fail thresholds, row count limits, change detection.
 
-    **See Also:** [Quality Gates](../features/quality_gates.md), [ValidationConfig](#validationconfig)
+    **See Also:** Quality Gates, [ValidationConfig](#validationconfig)
 
     Gates evaluate the entire batch before writing, ensuring
     data quality thresholds are met.
@@ -1605,8 +1618,7 @@ class ValidationConfig(BaseModel):
 
     **When to Use:** Output data quality checks that run after transformation but before writing.
 
-    **See Also:** [Validation Guide](../features/quality_gates.md), [Quarantine Guide](../features/quarantine.md),
-    [Contracts Overview](#contracts-data-quality-gates) (pre-transform checks)
+    **See Also:** Validation Guide, Quarantine Guide, Contracts Overview (pre-transform checks)
 
     ### 🛡️ "The Indestructible Pipeline" Pattern
 
@@ -1684,6 +1696,14 @@ class ValidationConfig(BaseModel):
     gate: Optional[GateConfig] = Field(
         default=None,
         description="Quality gate configuration for batch-level validation",
+    )
+    fail_fast: bool = Field(
+        default=False,
+        description="Stop validation on first failure. Skips remaining tests for faster feedback.",
+    )
+    cache_df: bool = Field(
+        default=False,
+        description="Cache DataFrame before validation (Spark only). Improves performance with many tests.",
     )
 
     @model_validator(mode="after")

@@ -119,6 +119,42 @@ pytest -k "extras" -v
 pytest -m "not slow" -v
 ```
 
+### WSL/Linux Setup (for Windows Users)
+
+If you're running tests in WSL for Spark compatibility:
+
+```bash
+# 1. Install Python 3.9+ and create symlink
+sudo apt update
+sudo apt install python3.9 python3.9-venv python3.9-dev
+sudo apt install python-is-python3  # Creates 'python' symlink
+
+# 2. Create virtual environment
+python3.9 -m venv venv
+source venv/bin/activate
+
+# 3. Install odibi with all dependencies
+pip install -e .[dev,spark]
+
+# 4. Install SQLAlchemy for Azure SQL tests
+pip install sqlalchemy pyodbc
+
+# 5. Set Spark Python version (if using Spark)
+export PYSPARK_PYTHON=python3.9
+export PYSPARK_DRIVER_PYTHON=python3.9
+
+# 6. Run tests
+pytest tests/ -v
+```
+
+**Common WSL Issues:**
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `FileNotFoundError: 'python'` | Missing python symlink | `sudo apt install python-is-python3` |
+| `PYTHON_VERSION_MISMATCH` | Spark worker version differs | Set `PYSPARK_PYTHON` and `PYSPARK_DRIVER_PYTHON` |
+| `No module named 'sqlalchemy'` | SQLAlchemy not installed | `pip install sqlalchemy` |
+
 ### Test Coverage
 
 - Core modules: **90%+** coverage required

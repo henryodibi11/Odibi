@@ -1,10 +1,16 @@
 """
-Quarantine table support for routing failed validation rows.
+Optimized quarantine table support for routing failed validation rows.
+
+Performance optimizations:
+- Removed per-row test_results lists (O(N*tests) memory savings)
+- Added sampling/limiting for large invalid sets
+- Single pass for combined mask evaluation
+- No unnecessary Python list conversions
 
 This module provides functionality to:
 1. Split DataFrames into valid and invalid portions based on test results
 2. Add metadata columns to quarantined rows
-3. Write quarantined rows to a dedicated table
+3. Write quarantined rows to a dedicated table (with optional sampling)
 """
 
 import logging
@@ -31,7 +37,7 @@ class QuarantineResult:
     invalid_df: Any
     rows_quarantined: int
     rows_valid: int
-    test_results: Dict[str, List[bool]] = field(default_factory=dict)
+    test_results: Dict[str, Dict[str, int]] = field(default_factory=dict)
     failed_test_details: Dict[int, List[str]] = field(default_factory=dict)
 
 
@@ -134,6 +140,12 @@ def _evaluate_test_mask(
                 return cond
             return pl.lit(True)
 
+        elif test.type == TestType.REGEX_MATCH:
+            col = test.column
+            if col in df.columns:
+                return pl.col(col).str.contains(test.pattern) | pl.col(col).is_null()
+            return pl.lit(True)
+
         return pl.lit(True)
 
     else:
@@ -198,6 +210,9 @@ def split_valid_invalid(
 
     Only tests with on_fail == QUARANTINE are evaluated for splitting.
     A row is invalid if it fails ANY quarantine test.
+
+    Performance: Removed per-row test_results lists to save O(N*tests) memory.
+    Now stores only aggregate counts per test.
 
     Args:
         df: DataFrame to split
@@ -283,7 +298,8 @@ def split_valid_invalid(
         test_results = {}
         for name, mask in test_masks.items():
             pass_count = df_cached.filter(mask).count()
-            test_results[name] = [True] * pass_count + [False] * (total - pass_count)
+            fail_count = total - pass_count
+            test_results[name] = {"pass_count": pass_count, "fail_count": fail_count}
 
         df_cached.unpersist()
 
@@ -317,7 +333,9 @@ def split_valid_invalid(
 
         test_results = {}
         for name, mask in test_masks.items():
-            test_results[name] = mask.tolist()
+            pass_count = int(mask.sum())
+            fail_count = len(df) - pass_count
+            test_results[name] = {"pass_count": pass_count, "fail_count": fail_count}
 
     logger.info(f"Quarantine split: {rows_valid} valid, {rows_quarantined} invalid")
 
@@ -333,7 +351,7 @@ def split_valid_invalid(
 
 def add_quarantine_metadata(
     invalid_df: Any,
-    test_results: Dict[str, List[bool]],
+    test_results: Dict[str, Any],
     config: QuarantineColumnsConfig,
     engine: Any,
     node_name: str,
@@ -345,7 +363,7 @@ def add_quarantine_metadata(
 
     Args:
         invalid_df: DataFrame of invalid rows
-        test_results: Dict of test_name -> per-row boolean results
+        test_results: Dict of test_name -> aggregate results (not per-row)
         config: QuarantineColumnsConfig specifying which columns to add
         engine: Engine instance
         node_name: Name of the originating node
@@ -447,6 +465,56 @@ def add_quarantine_metadata(
         return result_df
 
 
+def _apply_sampling(
+    invalid_df: Any,
+    config: QuarantineConfig,
+    is_spark: bool,
+    is_polars: bool,
+) -> Any:
+    """
+    Apply sampling/limiting to invalid DataFrame based on config.
+
+    Args:
+        invalid_df: DataFrame of invalid rows
+        config: QuarantineConfig with max_rows and sample_fraction
+        is_spark: Whether using Spark engine
+        is_polars: Whether using Polars engine
+
+    Returns:
+        Sampled/limited DataFrame
+    """
+    sample_fraction = getattr(config, "sample_fraction", None)
+    max_rows = getattr(config, "max_rows", None)
+
+    if sample_fraction is None and max_rows is None:
+        return invalid_df
+
+    if is_spark:
+        result = invalid_df
+        if sample_fraction is not None:
+            result = result.sample(fraction=sample_fraction)
+        if max_rows is not None:
+            result = result.limit(max_rows)
+        return result
+
+    elif is_polars:
+        result = invalid_df
+        if sample_fraction is not None:
+            n_samples = max(1, int(len(result) * sample_fraction))
+            result = result.sample(n=min(n_samples, len(result)))
+        if max_rows is not None:
+            result = result.head(max_rows)
+        return result
+
+    else:
+        result = invalid_df
+        if sample_fraction is not None:
+            result = result.sample(frac=sample_fraction)
+        if max_rows is not None:
+            result = result.head(max_rows)
+        return result
+
+
 def write_quarantine(
     invalid_df: Any,
     config: QuarantineConfig,
@@ -456,9 +524,11 @@ def write_quarantine(
     """
     Write quarantined rows to destination (always append mode).
 
+    Supports optional sampling/limiting via config.max_rows and config.sample_fraction.
+
     Args:
         invalid_df: DataFrame of invalid rows with metadata
-        config: QuarantineConfig specifying destination
+        config: QuarantineConfig specifying destination and sampling options
         engine: Engine instance
         connections: Dict of connection configurations
 
@@ -484,6 +554,8 @@ def write_quarantine(
                 is_polars = True
         except ImportError:
             pass
+
+    invalid_df = _apply_sampling(invalid_df, config, is_spark, is_polars)
 
     if is_spark:
         row_count = invalid_df.count()

@@ -193,7 +193,7 @@ class StructuredLogger:
 
         if self.structured:
             log_entry = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "level": level,
                 "message": message,
                 **redacted_kwargs,

@@ -2,418 +2,494 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://henryodibi11.github.io/Odibi/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/AUDIT_FINDINGS/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/CROSS_PIPELINE_DEPENDENCIES_PLAN/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/DOCUMENTATION_CAMPAIGN/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/DOCUMENTATION_QUALITY_AUDIT/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/FEATURE_PARITY_AUDIT/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/LOGGING_AUDIT_REPORT/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/NEW_GITHUB_ISSUES/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/OPEN_SOURCE_LAUNCH_PLAN/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/REFERENCE_ENRICHMENT_CAMPAIGN/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/ROADMAP/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/catalog_audit_report/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/phase_9a_autonomous_learning/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/phase_9c_cycle_profiles/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/source_pools_design/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/source_tiers/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/troubleshooting/</loc>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/api/context/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/architecture/ODIBI_2.1_UNIFIED_ARCH/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/architecture/delete-detection-design/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/architecture/ingestion-correctness/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/architecture/performance-analysis-findings/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/architecture/performance-optimization-plan/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/explanation/architecture/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/explanation/case_studies/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/alerting/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/catalog/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/cli/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/configuration/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/connections/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/cross-pipeline-dependencies/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/diagnostics/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/engines/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/lineage/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/features/observability/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/orchestration/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/patterns/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/pipelines/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/plugins/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/quality_gates/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/quarantine/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/schema_tracking/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/features/state/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/stories/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/features/transformers/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/features/ui/</loc>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/features/validation_performance/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/MIGRATION_GUIDE/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/avoiding_the_builder_trap/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/best_practices/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/cli_master_guide/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/dimensional_modeling_guide/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/dogfooding/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/environments/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/performance_tuning/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/production_deployment/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/python_api_guide/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/recipes/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/secrets/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/setup_azure/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/guides/testing/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/the_definitive_guide/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/writing_transformations/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/guides/wsl_setup/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/aggregation/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/append_only_raw/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/date_dimension/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/dimension/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/fact/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/incremental_stateful/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/legacy_hwm_manual/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/merge_upsert/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/scd2/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/skip_if_unchanged/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/smart_read/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/patterns/windowed_reprocess/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/plans/gold_layer_implementation_plan/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/plans/gold_layer_implementation_prompt/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/playbook/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/PARITY_TABLE/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/cheatsheet/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/configuration/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/reference/glossary/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/supported_formats/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/yaml_schema/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/api/cli/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/reference/api/config/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/api/connections/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/api/engine/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/reference/api/patterns/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/reference/api/pipeline/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/reference/api/validation/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/roadmap/MEDALLION_ENHANCEMENTS_PLAN/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/roadmap/STREAMING_SUPPORT_PLAN/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/roadmap/SYSTEM_CATALOG_INTEGRATION_PLAN/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/roadmap/ease_of_life_proposals/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/semantics/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/semantics/materialize/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/semantics/metrics/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/semantics/query/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/tutorials/azure_connections/</loc>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/tutorials/bronze_layer/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/getting_started/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/tutorials/gold_layer/</loc>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/tutorials/silver_layer/</loc>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/tutorials/spark_engine/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/01_introduction/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/02_dimension_pattern/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/03_date_dimension_pattern/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/04_fact_pattern/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/05_aggregation_pattern/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/06_full_star_schema/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/07_semantic_layer_intro/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/08_defining_metrics/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/09_defining_dimensions/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/10_querying_metrics/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/11_materializing_metrics/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/12_semantic_full_example/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/dimensional_modeling/13_fk_validation/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/tutorials/walkthroughs/data/stories/schema_evolution_demo_20251119_165610/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
+    </url>
+    <url>
+         <loc>https://henryodibi11.github.io/Odibi/validation/</loc>
+         <lastmod>2025-12-22</lastmod>
     </url>
     <url>
          <loc>https://henryodibi11.github.io/Odibi/validation/fk/</loc>
-         <lastmod>2025-12-21</lastmod>
+         <lastmod>2025-12-22</lastmod>
     </url>
 </urlset>

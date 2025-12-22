@@ -749,4 +749,6 @@ transformations/      → Custom Python code
 - [Performance Tuning](performance_tuning.md) — Optimization details
 - [Production Deployment](production_deployment.md) — Going to production
 - [Cross-Pipeline Dependencies](../features/cross-pipeline-dependencies.md) — `$pipeline.node` references
-- [Configuration Reference](../reference/configuration.md) — Full YAML schema
+- [YAML Schema Reference](../reference/yaml_schema.md) — Full configuration options
+- [Validation Overview](../validation/README.md) — Data quality framework
+- [Glossary](../reference/glossary.md) — Terminology reference

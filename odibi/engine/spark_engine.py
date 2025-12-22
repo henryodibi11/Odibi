@@ -73,7 +73,7 @@ class SparkEngine(Engine):
     def __init__(
         self,
         connections: Optional[Dict[str, Any]] = None,
-        spark_session=None,
+        spark_session: Any = None,
         config: Optional[Dict[str, Any]] = None,
     ):
         """Initialize Spark engine with import guard.
@@ -464,7 +464,7 @@ class SparkEngine(Engine):
         options: Optional[Dict[str, Any]] = None,
         as_of_version: Optional[int] = None,
         as_of_timestamp: Optional[str] = None,
-    ):
+    ) -> Any:
         """Read data using Spark.
 
         Args:
@@ -721,7 +721,7 @@ class SparkEngine(Engine):
 
     def write(
         self,
-        df,
+        df: Any,
         connection: Any,
         format: str,
         table: Optional[str] = None,
@@ -1518,7 +1518,7 @@ class SparkEngine(Engine):
             )
             raise
 
-    def execute_sql(self, sql: str, context: Any = None):
+    def execute_sql(self, sql: str, context: Any = None) -> Any:
         """Execute SQL query in Spark.
 
         Args:
@@ -2133,13 +2133,13 @@ class SparkEngine(Engine):
 
     def add_write_metadata(
         self,
-        df,
-        metadata_config,
+        df: Any,
+        metadata_config: Any,
         source_connection: Optional[str] = None,
         source_table: Optional[str] = None,
         source_path: Optional[str] = None,
         is_file_source: bool = False,
-    ):
+    ) -> Any:
         """Add metadata columns to DataFrame before writing (Bronze layer lineage).
 
         Args:

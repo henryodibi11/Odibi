@@ -10,7 +10,7 @@ We follow the **Diátaxis** framework, organizing documentation by user needs:
 *Start here if you are new.*
 Step-by-step lessons that take you from "Zero" to "Running Pipeline".
 *   **[Getting Started](tutorials/getting_started.md):** Your first 10 minutes with Odibi.
-*   **[Databricks Setup](tutorials/databricks_setup.ipynb):** Running Odibi on Spark clusters.
+*   **[Spark Engine](tutorials/spark_engine.md):** Running Odibi on Spark clusters.
 
 ### 2. 📘 How-To Guides (Task-Oriented)
 *Read these when you need to solve a specific problem.*

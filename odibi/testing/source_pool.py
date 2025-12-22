@@ -8,7 +8,7 @@ replayable data sources that exercise all supported Odibi data types and
 ingestion paths.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
@@ -212,11 +212,11 @@ class SourcePoolConfig(BaseModel):
         description="Data license (e.g., 'CC0', 'MIT', 'Public Domain')",
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When this pool definition was created",
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Last modification timestamp",
     )
 
@@ -259,7 +259,7 @@ class SourcePoolIndex(BaseModel):
     """
 
     version: str = Field(default="1.0.0", description="Index schema version")
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     pools: Dict[str, str] = Field(
         default_factory=dict,
         description="Map of pool_id -> metadata file path (relative to source_metadata/)",
@@ -268,10 +268,10 @@ class SourcePoolIndex(BaseModel):
     def add_pool(self, pool_id: str, metadata_path: str) -> None:
         """Register a pool in the index."""
         self.pools[pool_id] = metadata_path
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def remove_pool(self, pool_id: str) -> None:
         """Remove a pool from the index."""
         if pool_id in self.pools:
             del self.pools[pool_id]
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)

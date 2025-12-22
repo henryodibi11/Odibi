@@ -358,7 +358,7 @@ class AzureADLS(BaseConnection):
 
         return base_options
 
-    def configure_spark(self, spark) -> None:
+    def configure_spark(self, spark: "Any") -> None:
         """Configure Spark session with storage credentials.
 
         Args:

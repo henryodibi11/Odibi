@@ -353,7 +353,7 @@ odibi catalog state config.yaml --pipeline my_incremental_etl
 
 ## Related
 
-- [Quick Start Guide](../guides/quickstart.md) - Getting started with Odibi
+- [Getting Started](../tutorials/getting_started.md) - Getting started with Odibi
 - [CLI Master Guide](../guides/cli_master_guide.md) - Comprehensive CLI reference
-- [System Catalog](system_catalog.md) - Catalog metadata details
+- [System Catalog](catalog.md) - Catalog metadata details
 - [YAML Schema Reference](../reference/yaml_schema.md) - Configuration reference

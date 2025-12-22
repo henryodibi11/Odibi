@@ -380,6 +380,5 @@ Shows every merge operation, versions, and row counts.
 
 ## References
 
-- [Odibi Merge Transformer Spec](../design/03_merge_transformer_spec.md)
 - [Databricks: Delta Lake MERGE](https://docs.databricks.com/en/sql/language-manual/delta-merge-into.html)
 - [Fundamentals of Data Engineering: Chapter on SCD](https://www.fundamentalsofdataengineering.com/)

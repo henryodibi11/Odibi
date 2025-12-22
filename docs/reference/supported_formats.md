@@ -280,4 +280,4 @@ All formats support:
     mode: append  # or overwrite
 ```
 
-See the **[Delta Lake Guide](../guides/delta_lake.md)** for advanced features like VACUUM and Restore.
+Delta Lake supports advanced features like VACUUM and Restore.

@@ -1174,7 +1174,7 @@ class CatalogManager:
         if hasattr(node_config, "model_dump"):
             dump = node_config.model_dump(mode="json", exclude={"description", "tags", "log_level"})
         else:
-            dump = node_config.dict(exclude={"description", "tags", "log_level"})
+            dump = node_config.model_dump(exclude={"description", "tags", "log_level"})
 
         return {
             "pipeline_name": pipeline_name,

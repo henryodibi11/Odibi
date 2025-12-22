@@ -233,7 +233,7 @@ def dict_based_mapping(context: EngineContext, params: DictMappingParams) -> Eng
         # Pandas map is fast
         df[target_col] = df[params.column].map(params.mapping)
         if params.default is not None:
-            df[target_col] = df[target_col].fillna(params.default)
+            df[target_col] = df[target_col].fillna(params.default).infer_objects(copy=False)
         return context.with_df(df)
 
     else:

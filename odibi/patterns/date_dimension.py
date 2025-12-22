@@ -17,13 +17,13 @@ class DateDimensionPattern(Pattern):
     Creates a date dimension with pre-calculated attributes useful for
     BI/reporting including day of week, quarter, fiscal year, etc.
 
-    Params:
-        start_date (str): Start date in YYYY-MM-DD format
-        end_date (str): End date in YYYY-MM-DD format
-        date_key_format (str): Format for date_sk (default: "yyyyMMdd" -> 20240115)
-        fiscal_year_start_month (int): Month when fiscal year starts (1-12, default: 1)
-        include_time (bool): If true, generate time dimension (not implemented yet)
-        unknown_member (bool): If true, add unknown date row with date_sk=0
+    Configuration Options (via params dict):
+        - **start_date** (str): Start date in YYYY-MM-DD format
+        - **end_date** (str): End date in YYYY-MM-DD format
+        - **date_key_format** (str): Format for date_sk (default: "yyyyMMdd" -> 20240115)
+        - **fiscal_year_start_month** (int): Month when fiscal year starts (1-12, default: 1)
+        - **include_time** (bool): If true, generate time dimension (not implemented yet)
+        - **unknown_member** (bool): If true, add unknown date row with date_sk=0
 
     Generated Columns:
         - date_sk: Integer surrogate key (YYYYMMDD format)

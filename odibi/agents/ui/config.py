@@ -323,7 +323,7 @@ def get_odibi_connection(
         if hasattr(conn_config, "model_dump"):
             conn_dict = conn_config.model_dump()
         elif hasattr(conn_config, "dict"):
-            conn_dict = conn_config.dict()
+            conn_dict = conn_config.model_dump()
         else:
             conn_dict = dict(conn_config) if hasattr(conn_config, "__iter__") else conn_config
 

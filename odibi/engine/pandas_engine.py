@@ -1077,7 +1077,7 @@ class PandasEngine(Engine):
     def add_write_metadata(
         self,
         df: pd.DataFrame,
-        metadata_config,
+        metadata_config: Any,
         source_connection: Optional[str] = None,
         source_table: Optional[str] = None,
         source_path: Optional[str] = None,

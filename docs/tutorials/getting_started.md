@@ -142,11 +142,11 @@ Open the HTML file in your browser to view the report:
 
 ## 7. Add Data Validation
 
-Data pipelines are only as good as their data quality checks. Let's add validation to catch bad data before it corrupts your warehouse.
+Data pipelines are only as good as their data quality. Let's add validation tests to catch bad data before it corrupts your warehouse.
 
 ### Inline Validation in YAML
 
-Add validation rules directly to your node:
+Add validation tests directly to your node:
 
 ```yaml
 nodes:
@@ -205,11 +205,47 @@ Validation results appear in both the console output and the Data Story.
 
 ---
 
-## 8. What's Next?
+## 8. Building Dimensions (SCD2)
+
+Once you're comfortable with basic pipelines, you can build proper dimensional models. Here's a quick example of a Slowly Changing Dimension Type 2:
+
+```yaml
+nodes:
+  - name: dim_customer
+    read:
+      connection: bronze
+      table: raw_customers
+    pattern:
+      type: dimension
+      params:
+        natural_key: customer_id        # Business key
+        surrogate_key: customer_sk      # Generated integer key
+        scd_type: 2                     # Track history
+        track_columns: [name, email, city]
+        target: silver.dim_customer     # Read existing for merge
+        unknown_member: true            # Add SK=0 for orphans
+    write:
+      connection: silver
+      table: dim_customer
+```
+
+**What this does:**
+- Generates integer surrogate keys (`customer_sk`)
+- Tracks changes to `name`, `email`, `city` over time
+- Maintains `is_current`, `valid_from`, `valid_to` columns
+- Creates an "unknown" row (SK=0) for handling orphan fact records
+
+For a complete dimensional modeling tutorial, see [Dimensional Modeling](dimensional_modeling/).
+
+---
+
+## 9. What's Next?
 
 You have successfully built a data pipeline with data validation!
 
 *   **[Incremental Loading](../patterns/incremental_stateful.md):** Learn how to efficiently process only new data using State Tracking ("Auto-Pilot").
 *   **[Write Custom Transformations](../guides/writing_transformations.md):** Learn how to add Python logic (like advanced validation) to your pipeline.
 *   **[Data Validation Guide](../validation/README.md):** Deep dive into all validation options.
+*   **[Spark Engine Tutorial](spark_engine.md):** Scale up with Apache Spark.
+*   **[Azure Connections](azure_connections.md):** Connect to Azure Blob, ADLS, and SQL.
 *   **[Master the CLI](../guides/cli_master_guide.md):** Learn about `odibi stress` and `odibi doctor`.

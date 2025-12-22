@@ -153,7 +153,7 @@ class Pipeline:
             if hasattr(performance_config, "model_dump"):
                 engine_config["performance"] = performance_config.model_dump()
             elif hasattr(performance_config, "dict"):
-                engine_config["performance"] = performance_config.dict()
+                engine_config["performance"] = performance_config.model_dump()
             else:
                 engine_config["performance"] = performance_config
 
@@ -346,7 +346,7 @@ class Pipeline:
                 if hasattr(self.config, "model_dump"):
                     dump = self.config.model_dump(mode="json")
                 else:
-                    dump = self.config.dict()
+                    dump = self.config.model_dump()
                 dump_str = json.dumps(dump, sort_keys=True)
                 local_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
 
@@ -860,13 +860,13 @@ class Pipeline:
             if hasattr(self.config, "model_dump"):
                 config_dump = self.config.model_dump(mode="json")
             else:
-                config_dump = self.config.dict()
+                config_dump = self.config.model_dump()
 
             if self.project_config:
                 project_dump = (
                     self.project_config.model_dump(mode="json")
                     if hasattr(self.project_config, "model_dump")
-                    else self.project_config.dict()
+                    else self.project_config.model_dump()
                 )
                 for field in ["project", "plant", "asset", "business_unit", "layer"]:
                     if field in project_dump and project_dump[field]:
@@ -1443,7 +1443,7 @@ class PipelineManager:
             if hasattr(conn_config, "model_dump"):
                 conn_config = conn_config.model_dump()
             elif hasattr(conn_config, "dict"):
-                conn_config = conn_config.dict()
+                conn_config = conn_config.model_dump()
 
             conn_type = conn_config.get("type", "local")
 
@@ -1712,7 +1712,7 @@ class PipelineManager:
                 if hasattr(config, "model_dump"):
                     dump = config.model_dump(mode="json")
                 else:
-                    dump = config.dict()
+                    dump = config.model_dump()
                 dump_str = json.dumps(dump, sort_keys=True)
                 pipeline_hash = hashlib.md5(dump_str.encode("utf-8")).hexdigest()
 
@@ -1740,7 +1740,7 @@ class PipelineManager:
                             mode="json", exclude={"description", "tags", "log_level"}
                         )
                     else:
-                        node_dump = node.dict(exclude={"description", "tags", "log_level"})
+                        node_dump = node.model_dump(exclude={"description", "tags", "log_level"})
                     node_dump_str = json.dumps(node_dump, sort_keys=True)
                     node_hash = hashlib.md5(node_dump_str.encode("utf-8")).hexdigest()
 

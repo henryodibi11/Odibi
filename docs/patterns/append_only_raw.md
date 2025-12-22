@@ -190,7 +190,4 @@ Never overwrite Raw. Never delete from Raw. Never use `merge` in Raw.
 
 ---
 
-## References
 
-- [Odibi Architecture Manifesto: Pattern A - Ingestion](../design/02_architecture_manifesto.md#pattern-a-ingestion-landing--raw)
-- [Raw is Sacred Principle](../design/02_architecture_manifesto.md#2-raw-is-sacred-the-time-machine-rule)

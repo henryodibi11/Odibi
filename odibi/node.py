@@ -2220,7 +2220,7 @@ class NodeExecutor:
             sql_hash = hashlib.md5(normalized_sql.encode("utf-8")).hexdigest()
 
         config_snapshot = (
-            config.model_dump(mode="json") if hasattr(config, "model_dump") else config.dict()
+            config.model_dump(mode="json") if hasattr(config, "model_dump") else config.model_dump()
         )
 
         metadata = {
@@ -2672,7 +2672,7 @@ class Node:
         dump = (
             self.config.model_dump(mode="json", exclude={"description", "tags", "log_level"})
             if hasattr(self.config, "model_dump")
-            else self.config.dict(exclude={"description", "tags", "log_level"})
+            else self.config.model_dump(exclude={"description", "tags", "log_level"})
         )
 
         # Sort keys to ensure determinism

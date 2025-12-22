@@ -38,8 +38,13 @@ plugins:
 
 nav:
   - Home: README.md
+  - Playbook: playbook/README.md
   - Tutorials:
       - Getting Started: tutorials/getting_started.md
+      - Layer Guides:
+          - Bronze Layer: tutorials/bronze_layer.md
+          - Silver Layer: tutorials/silver_layer.md
+          - Gold Layer: tutorials/gold_layer.md
       - Dimensional Modeling:
           - Introduction: tutorials/dimensional_modeling/01_introduction.md
           - Dimension Pattern: tutorials/dimensional_modeling/02_dimension_pattern.md
@@ -75,8 +80,12 @@ nav:
       - API:
         - Pipeline: reference/api/pipeline.md
         - Engine: reference/api/engine.md
+        - Patterns: reference/api/patterns.md
+        - Validation: reference/api/validation.md
+        - Config: reference/api/config.md
         - Connections: reference/api/connections.md
         - CLI: reference/api/cli.md
+  - Troubleshooting: troubleshooting.md
   - Features:
       - Engines: features/engines.md
       - Pipelines: features/pipelines.md
@@ -113,6 +122,7 @@ nav:
       - Materializing: semantics/materialize.md
   - Validation:
       - FK Validation: validation/fk.md
+      - Performance: features/validation_performance.md
   - Explanation:
       - Architecture: explanation/architecture.md
       - Case Studies: explanation/case_studies.md

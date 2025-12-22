@@ -1,198 +1,90 @@
-# New GitHub Issues (Copy-Paste Ready)
+# GitHub Issues Tracker
+
+## Completed Issues ✅
+
+These issues have been resolved and can be closed if opened.
 
 ---
 
-## Issue #32
+### Issue: CLI missing `--tag` flag ✅ COMPLETED
 
-**Title:** CLI missing `--tag` flag for running nodes by tag
+**Labels:** `bug`, `cli`
 
-**Labels:** bug, cli, priority-high
-
-**Body:**
-
-```
-The documentation describes tag-based execution (`odibi run --tag daily`), but the `--tag` flag is not implemented in the CLI.
-
-## Evidence
-
-- Config: `NodeConfig.tags` field exists in `odibi/config.py`
-- Docs reference: `odibi run --tag daily`
-- CLI: No `--tag` argument in `odibi/cli/main.py`
-
-## Expected Behavior
-
-Users should be able to run only nodes with specific tags:
-
-```bash
-odibi run pipeline.yaml --tag daily
-```
-
-## Fix
-
-Add `--tag` argument to the run parser and filter nodes in `Pipeline.run()`.
-```
+The `--tag` flag is now implemented in `odibi/cli/main.py:79`.
 
 ---
 
-## Issue #33
+### Issue: CLI missing `--node` and `--pipeline` flags ✅ COMPLETED
 
-**Title:** CLI missing `--node` and `--pipeline` flags for orchestration
+**Labels:** `bug`, `cli`, `orchestration`
 
-**Labels:** bug, cli, orchestration, priority-high
-
-**Body:**
-
-```
-Orchestration templates generate commands with flags that don't exist in the CLI.
-
-## Evidence
-
-`odibi/orchestration/airflow.py` and `odibi/orchestration/dagster.py` generate:
-
-```bash
-odibi run --pipeline {{ pipeline_name }} --node {{ node.name }}
-```
-
-But these flags do not exist in `odibi/cli/main.py`.
-
-## Impact
-
-Generated Airflow/Dagster DAGs will fail to execute.
-
-## Fix
-
-Add `--pipeline` and `--node` arguments to the run command.
-```
+Both flags now exist in `odibi/cli/main.py:83,88`.
 
 ---
 
-## Issue #34
+### Issue: `materialized` config option has no effect ✅ COMPLETED
 
-**Title:** `materialized` config option has no effect
+**Labels:** `bug`, `config`
 
-**Labels:** bug, config, priority-medium
-
-**Body:**
-
-```
-The `materialized` field (`table`, `view`, `incremental`) is defined in `NodeConfig` but never read or used in node execution.
-
-## Evidence
-
-- Config defines `materialized` field in `odibi/config.py`
-- No references to `config.materialized` in `odibi/node.py`
-
-## Impact
-
-Users can set this option but it's silently ignored.
-
-## Fix
-
-Either implement materialization strategies or remove/deprecate the field.
-```
+Implemented in `odibi/node.py:199-1743` - supports `view` and `incremental` strategies.
 
 ---
 
-## Issue #35
+### Issue: Add `POLARS` to `EngineType` enum ✅ COMPLETED
 
-**Title:** Add `POLARS` to `EngineType` enum
+**Labels:** `enhancement`, `engine`
 
-**Labels:** enhancement, engine, priority-medium
-
-**Body:**
-
-```
-`PolarsEngine` exists and is registered, but `EngineType` enum only has `SPARK` and `PANDAS`.
-
-## Evidence
-
-- `odibi/engine/polars_engine.py` - Full implementation exists
-- `odibi/engine/registry.py` - Registered as "polars"
-- `odibi/config.py` - Only SPARK/PANDAS in enum
-
-## Impact
-
-Users cannot set `engine: polars` in YAML config.
-
-## Fix
-
-Add `POLARS = "polars"` to `EngineType` enum in `odibi/config.py`.
-```
+Added in `odibi/config.py:19`.
 
 ---
 
-## Issue #36
+### Issue: PandasEngine missing `as_of_timestamp` time travel ✅ COMPLETED
 
-**Title:** PandasEngine missing `as_of_timestamp` time travel
+**Labels:** `bug`, `engine-parity`
 
-**Labels:** bug, engine-parity, priority-low
-
-**Body:**
-
-```
-`as_of_timestamp` is accepted in read config but only `as_of_version` is implemented for Delta time travel in PandasEngine.
-
-## Evidence
-
-- Method signature accepts both in `odibi/engine/pandas_engine.py`
-- Only version is used, timestamp is ignored
-- SparkEngine supports both
-
-## Impact
-
-Timestamp-based time travel silently ignored in Pandas engine.
-
-## Fix
-
-Implement `timestampAsOf` option in PandasEngine's Delta read logic.
-```
+Implemented in `odibi/engine/pandas_engine.py:281-283`.
 
 ---
 
-## Issue #37
+### Issue: PolarsEngine missing abstract methods ✅ COMPLETED
 
-**Title:** PolarsEngine missing abstract methods
+**Labels:** `enhancement`, `engine-parity`
 
-**Labels:** enhancement, engine-parity, priority-low
-
-**Body:**
-
-```
-PolarsEngine doesn't implement all abstract methods from `Engine` base class.
-
-## Missing Methods
-
-- `harmonize_schema()` - Not implemented
-- `anonymize()` - Not implemented
-- `add_write_metadata()` - Not implemented
-- `table_exists()` - Partial (file only)
-- `maintain_table()` - Not implemented
-
-## Impact
-
-Polars pipelines will fail if these features are used.
-
-## Fix
-
-Implement remaining abstract methods or raise `NotImplementedError` with clear message.
-```
+`harmonize_schema` and `anonymize` now implemented in `polars_engine.py`.
 
 ---
 
-## Issue #38
+### Issue: Validation engine performance optimizations ✅ COMPLETED
 
-**Title:** `environments` config not implemented
+**Labels:** `enhancement`, `performance`
 
-**Labels:** enhancement, config, priority-low
+Fixed in validation engine overhaul:
+- Pandas UNIQUE double scan
+- Pandas ACCEPTED_VALUES memory waste
+- Polars eager collection (now lazy)
+- Added all missing Polars contract types
+- Quarantine memory optimization (removed O(N×tests) lists)
+- Added `fail_fast` and `cache_df` config options
+- Added quarantine `max_rows` and `sample_fraction`
+
+---
+
+## Open Issues
+
+### Issue: `environments` config not implemented
+
+**Labels:** `enhancement`, `config`, `phase-3`
+
+**Priority:** Low
 
 **Body:**
 
 ```
 The `environments` field is defined in `ProjectConfig` but does nothing.
 
-## Evidence
+## Current State
 
-The validator in `odibi/config.py` explicitly notes:
+The validator explicitly notes this is deferred to Phase 3:
 
 ```python
 @model_validator(mode="after")
@@ -201,25 +93,385 @@ def check_environments_not_implemented(self):
     return self
 ```
 
-## Impact
+## Expected Behavior
 
-Users can define environments but they're silently ignored.
+Users should be able to define environment-specific overrides:
 
-## Fix
+```yaml
+environments:
+  dev:
+    connections:
+      bronze:
+        base_path: ./dev_data
+  prod:
+    connections:
+      bronze:
+        base_path: abfss://bronze@prod.dfs.core.windows.net
+```
 
-Either implement environment switching or remove the field with a deprecation notice.
+## Acceptance Criteria
+
+- [ ] Environment switching via CLI flag or env var
+- [ ] Config merging (base + environment overrides)
+- [ ] Tests for environment resolution
+```
+
+---
+
+### Issue: Retry logic not wired to execution
+
+**Labels:** `bug`, `reliability`, `priority-high`
+
+**Priority:** High (Quick Win)
+
+**Body:**
+
+```
+`RetryConfig` exists in config.py but is not connected to actual node execution.
+
+## Evidence
+
+- `odibi/config.py` defines `RetryConfig` with `max_attempts`, `backoff` strategy
+- `odibi/node.py` does not use retry config during execution
+- Transient Azure failures (throttling, network) cause immediate pipeline failure
+
+## Expected Behavior
+
+Nodes should retry on transient failures with configurable backoff:
+
+```yaml
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff: exponential
+```
+
+## Acceptance Criteria
+
+- [ ] Wire RetryConfig to node execution
+- [ ] Implement exponential/linear/constant backoff
+- [ ] Retry only on transient errors (network, throttling), not data errors
+- [ ] Log retry attempts with context
+- [ ] Tests for retry behavior
+```
+
+---
+
+### Issue: Idempotency for append mode writes
+
+**Labels:** `enhancement`, `reliability`, `priority-high`
+
+**Priority:** High
+
+**Body:**
+
+```
+Re-running the same batch in append mode can create duplicate records.
+
+## Problem
+
+If a pipeline fails after node 3 writes but before completion:
+1. User re-runs pipeline
+2. Nodes 1-3 re-execute and append again
+3. Data is duplicated
+
+## Expected Behavior
+
+Append writes should be idempotent - re-running with same data should not duplicate.
+
+## Proposed Solutions
+
+Option A: **Batch ID deduplication**
+- Add `_batch_id` column on write
+- Delete existing batch before append
+- Simple but requires DELETE capability
+
+Option B: **Content hash check**
+- Hash input data, skip if already written
+- Works with append-only systems
+
+Option C: **Write-ahead log**
+- Track which batches completed
+- Skip already-completed nodes on re-run
+
+## Acceptance Criteria
+
+- [ ] Design decision on approach
+- [ ] Implementation for chosen approach
+- [ ] Works with Delta Lake append
+- [ ] Tests for idempotent re-runs
+```
+
+---
+
+### Issue: Rollback on partial pipeline failure
+
+**Labels:** `enhancement`, `reliability`, `priority-medium`
+
+**Priority:** Medium
+
+**Body:**
+
+```
+If node 3/5 fails, nodes 1-2 have already written data but pipeline is marked "failed".
+
+## Problem
+
+No automatic cleanup of partial writes. User must manually identify and fix.
+
+## Expected Behavior
+
+Options:
+1. **Transaction-like rollback** - Undo writes from failed run
+2. **Checkpoint resume** - Resume from last successful node
+3. **Dry-run mode** - Validate all nodes before writing any
+
+## Acceptance Criteria
+
+- [ ] Design decision on approach
+- [ ] Implementation
+- [ ] Clear error message showing what was written before failure
+- [ ] Recovery documentation
+```
+
+---
+
+### Issue: Dead letter queue for unparseable records
+
+**Labels:** `enhancement`, `data-quality`, `priority-low`
+
+**Priority:** Low
+
+**Body:**
+
+```
+Records that fail parsing (malformed JSON, encoding errors) have no destination.
+
+## Current State
+
+- Quarantine handles validation failures (records that parse but fail contracts)
+- Parsing failures cause node failure with no recovery
+
+## Expected Behavior
+
+Unparseable records should go to a dead letter destination for investigation.
+
+## Acceptance Criteria
+
+- [ ] DLQ config option in read config
+- [ ] Capture parsing errors with context
+- [ ] Continue processing valid records
+```
+
+---
+
+### Issue: Metrics export (Prometheus/Azure Monitor)
+
+**Labels:** `enhancement`, `observability`, `priority-medium`
+
+**Priority:** Medium
+
+**Body:**
+
+```
+No way to export pipeline metrics to monitoring systems.
+
+## Current State
+
+- Stories capture execution details (great for debugging)
+- No push to Prometheus, StatsD, Azure Monitor, etc.
+
+## Expected Behavior
+
+```yaml
+observability:
+  metrics:
+    type: prometheus  # or azure_monitor, statsd
+    endpoint: http://pushgateway:9091
+    labels:
+      environment: prod
+```
+
+Metrics to export:
+- `odibi_pipeline_duration_seconds`
+- `odibi_node_duration_seconds`
+- `odibi_rows_processed_total`
+- `odibi_validation_failures_total`
+- `odibi_quarantine_rows_total`
+
+## Acceptance Criteria
+
+- [ ] Prometheus pushgateway support
+- [ ] Azure Monitor support (for your use case)
+- [ ] Configurable labels/dimensions
+```
+
+---
+
+### Issue: Distributed tracing (OpenTelemetry)
+
+**Labels:** `enhancement`, `observability`, `priority-low`
+
+**Priority:** Low
+
+**Body:**
+
+```
+No distributed tracing for cross-node debugging.
+
+## Expected Behavior
+
+```yaml
+observability:
+  tracing:
+    enabled: true
+    exporter: otlp
+    endpoint: http://jaeger:4317
+```
+
+Each node execution creates a span with:
+- Parent: pipeline span
+- Attributes: node name, row count, duration
+- Events: validation results, errors
+
+## Acceptance Criteria
+
+- [ ] OpenTelemetry SDK integration
+- [ ] Span per pipeline and node
+- [ ] Trace context propagation
+```
+
+---
+
+### Issue: Real Spark integration tests
+
+**Labels:** `testing`, `priority-medium`
+
+**Priority:** Medium
+
+**Body:**
+
+```
+Most Spark tests use mocks, not real SparkSession.
+
+## Current State
+
+- `test_spark_real.py` exists but limited
+- Many Spark code paths untested with real execution
+
+## Acceptance Criteria
+
+- [ ] Integration tests with real SparkSession (WSL/Linux)
+- [ ] Test Delta Lake operations end-to-end
+- [ ] Test Spark-specific features (partitioning, caching)
+- [ ] CI setup for Spark tests
+```
+
+---
+
+### Issue: Load/stress testing suite
+
+**Labels:** `testing`, `performance`, `priority-low`
+
+**Priority:** Low
+
+**Body:**
+
+```
+No benchmarks for large datasets (10M+ rows).
+
+## Current State
+
+- `tests/benchmarks/` exists with basic benchmarks
+- No stress tests for production-scale data
+
+## Acceptance Criteria
+
+- [ ] Benchmark with 1M, 10M, 100M rows
+- [ ] Memory profiling
+- [ ] Identify performance regressions
+```
+
+---
+
+### Issue: Streaming/CDC support
+
+**Labels:** `enhancement`, `future`, `priority-low`
+
+**Priority:** Low (Future)
+
+**Body:**
+
+```
+No support for real-time streaming or Change Data Capture.
+
+## Expected Behavior (Future)
+
+```yaml
+read:
+  connection: eventhub
+  stream: true
+  watermark_column: event_time
+  watermark_delay: "10 minutes"
+```
+
+## Note
+
+This is a significant feature. Park for future consideration.
+```
+
+---
+
+### Issue: Data profiling / statistics
+
+**Labels:** `enhancement`, `data-quality`, `priority-low`
+
+**Priority:** Low
+
+**Body:**
+
+```
+Only basic stats captured. No histograms, distributions, or anomaly detection.
+
+## Expected Behavior
+
+```yaml
+profiling:
+  enabled: true
+  include:
+    - histograms
+    - null_percentage
+    - unique_count
+    - min_max
+```
+
+## Acceptance Criteria
+
+- [ ] Extended profiling in story metadata
+- [ ] Optional (can be expensive for large data)
 ```
 
 ---
 
 ## Summary
 
-| Issue | Title | Priority |
-|-------|-------|----------|
-| #32 | CLI missing `--tag` flag | High |
-| #33 | CLI missing `--node`/`--pipeline` flags | High |
-| #34 | `materialized` config ignored | Medium |
-| #35 | Add POLARS to EngineType enum | Medium |
-| #36 | PandasEngine missing timestamp time travel | Low |
-| #37 | PolarsEngine missing abstract methods | Low |
-| #38 | `environments` config not implemented | Low |
+| Issue | Priority | Status |
+|-------|----------|--------|
+| `--tag` flag | - | ✅ Completed |
+| `--node`/`--pipeline` flags | - | ✅ Completed |
+| `materialized` config | - | ✅ Completed |
+| POLARS enum | - | ✅ Completed |
+| PandasEngine timestamp time travel | - | ✅ Completed |
+| PolarsEngine methods | - | ✅ Completed |
+| Validation performance | - | ✅ Completed |
+| `environments` config | Low | 🔲 Open |
+| **Retry wiring** | **High** | 🔲 Open |
+| **Idempotency for append** | **High** | 🔲 Open |
+| Rollback on failure | Medium | 🔲 Open |
+| Dead letter queue | Low | 🔲 Open |
+| Metrics export | Medium | 🔲 Open |
+| Distributed tracing | Low | 🔲 Open |
+| Real Spark tests | Medium | 🔲 Open |
+| Load/stress tests | Low | 🔲 Open |
+| Streaming/CDC | Low | 🔲 Future |
+| Data profiling | Low | 🔲 Open |

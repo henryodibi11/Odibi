@@ -429,7 +429,7 @@ class CatalogStateBackend(StateBackend):
         if not updates:
             return
 
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc)
         rows = [
             {
                 "key": u["key"],

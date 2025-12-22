@@ -583,5 +583,5 @@ for source in upstream:
 ## Related
 
 - [Pipeline Configuration](../reference/yaml_schema.md) - YAML schema reference
-- [Incremental Processing](incremental.md) - HWM-based incremental loads
+- [State Management](state.md) - HWM-based incremental loads
 - [Alerting](alerting.md) - Notifications for pipeline events

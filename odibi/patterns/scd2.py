@@ -13,12 +13,12 @@ class SCD2Pattern(Pattern):
 
     Tracks history by creating new rows for updates.
 
-    Params:
-        keys (list): Business keys.
-        time_col (str): Timestamp column for versioning (default: current time).
-        valid_from_col (str): Name of start date column (default: valid_from).
-        valid_to_col (str): Name of end date column (default: valid_to).
-        is_current_col (str): Name of current flag column (default: is_current).
+    Configuration Options (via params dict):
+        - **keys** (list): Business keys.
+        - **time_col** (str): Timestamp column for versioning (default: current time).
+        - **valid_from_col** (str): Name of start date column (default: valid_from).
+        - **valid_to_col** (str): Name of end date column (default: valid_to).
+        - **is_current_col** (str): Name of current flag column (default: is_current).
     """
 
     def validate(self) -> None:

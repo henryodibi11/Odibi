@@ -288,5 +288,5 @@ for pipeline in config.pipelines:
 ## Related
 
 - [Pipeline Configuration](../reference/yaml_schema.md) - YAML schema reference
-- [CLI Reference](../reference/cli.md) - `odibi run` command details
-- [Retry Configuration](retry.md) - Retry settings used by orchestrators
+- [CLI Reference](cli.md) - `odibi run` command details
+- Retry configuration is defined in your YAML config under the `retry` section

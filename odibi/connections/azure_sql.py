@@ -276,7 +276,7 @@ class AzureSQL(BaseConnection):
             auth_mode=self.auth_mode,
         )
 
-    def get_engine(self):
+    def get_engine(self) -> Any:
         """
         Get or create SQLAlchemy engine.
 

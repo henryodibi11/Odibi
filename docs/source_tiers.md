@@ -354,5 +354,3 @@ Ensure write permissions to `.odibi/source_cache/tiers/`.
 ## Related Documentation
 
 - [Source Pools Design](source_pools_design.md)
-- [Source Cache README](.odibi/source_cache/README.md)
-- [Pool Index](.odibi/source_metadata/pool_index.yaml)

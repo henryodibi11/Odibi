@@ -19,22 +19,16 @@ class AggregationPattern(Pattern):
     - Time rollups (generate multiple grain levels)
     - Audit columns
 
-    Params:
-        grain (list): Columns to GROUP BY (defines uniqueness)
-        measures (list): Measure definitions with name and aggregation expr
+    Configuration Options (via params dict):
+        - **grain** (list): Columns to GROUP BY (defines uniqueness)
+        - **measures** (list): Measure definitions with name and aggregation expr
             - name: Output column name
             - expr: SQL aggregation expression (e.g., "SUM(amount)")
-        incremental (dict): Incremental merge configuration (optional)
+        - **incremental** (dict): Incremental merge configuration (optional)
             - timestamp_column: Column to identify new data
             - merge_strategy: "replace", "sum", "min", or "max"
-                - replace: Overwrite existing values for matching grain
-                - sum: Add new values to existing
-                - min: Keep minimum value between existing and new
-                - max: Keep maximum value between existing and new
-        having (str): Optional HAVING clause for filtering aggregates
-        audit (dict): Audit column configuration
-            - load_timestamp (bool)
-            - source_system (str)
+        - **having** (str): Optional HAVING clause for filtering aggregates
+        - **audit** (dict): Audit column configuration
 
     Example Config:
         pattern:
@@ -405,11 +399,13 @@ class AggregationPattern(Pattern):
                 n_col = f"{name}_n" if f"{name}_n" in merged.columns else name
 
                 if e_col in merged.columns and n_col in merged.columns:
-                    result[name] = merged[e_col].fillna(0) + merged[n_col].fillna(0)
+                    result[name] = merged[e_col].fillna(0).infer_objects(copy=False) + merged[
+                        n_col
+                    ].fillna(0).infer_objects(copy=False)
                 elif e_col in merged.columns:
-                    result[name] = merged[e_col].fillna(0)
+                    result[name] = merged[e_col].fillna(0).infer_objects(copy=False)
                 elif n_col in merged.columns:
-                    result[name] = merged[n_col].fillna(0)
+                    result[name] = merged[n_col].fillna(0).infer_objects(copy=False)
                 else:
                     result[name] = 0
 

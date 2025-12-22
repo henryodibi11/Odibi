@@ -472,7 +472,7 @@ class FactPattern(Pattern):
             )
 
         if orphan_handling == "unknown":
-            merged[sk_col] = merged[sk_col].fillna(0).astype(int)
+            merged[sk_col] = merged[sk_col].fillna(0).infer_objects(copy=False).astype(int)
 
         if orphan_handling == "quarantine" and orphan_count > 0:
             orphan_rows = merged[orphan_mask].drop(columns=[f"_dim_{dim_key}"]).copy()

@@ -30,14 +30,14 @@ class DimensionPattern(Pattern):
     - Optional unknown member row (SK=0) for orphan FK handling
     - Audit columns (load_timestamp, source_system)
 
-    Params:
-        natural_key (str): Natural/business key column name
-        surrogate_key (str): Surrogate key column name to generate
-        scd_type (int): 0=static, 1=overwrite, 2=history tracking (default: 1)
-        track_columns (list): Columns to track for SCD1/2 changes
-        target (str): Target table path (required for SCD2 to read existing history)
-        unknown_member (bool): If true, insert a row with SK=0 for orphan FK handling
-        audit (dict): Audit configuration with load_timestamp and source_system
+    Configuration Options (via params dict):
+        - **natural_key** (str): Natural/business key column name
+        - **surrogate_key** (str): Surrogate key column name to generate
+        - **scd_type** (int): 0=static, 1=overwrite, 2=history tracking (default: 1)
+        - **track_columns** (list): Columns to track for SCD1/2 changes
+        - **target** (str): Target table path (required for SCD2 to read existing history)
+        - **unknown_member** (bool): If true, insert a row with SK=0 for orphan FK handling
+        - **audit** (dict): Audit configuration with load_timestamp and source_system
 
     Supported target formats:
         Spark:

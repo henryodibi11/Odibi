@@ -173,7 +173,5 @@ These patterns are built on the **Odibi Architecture Manifesto**:
 
 ## Further Reading
 
-- [Odibi Architecture Manifesto](../design/02_architecture_manifesto.md)
-- [Merge Transformer Spec](../design/03_merge_transformer_spec.md)
 - Databricks: "Incremental Processing" documentation
 - Book: *Fundamentals of Data Engineering* by Joe Reis & Matt Housley

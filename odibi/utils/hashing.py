@@ -27,7 +27,7 @@ def calculate_config_hash(
     if hasattr(config, "model_dump"):
         dump = config.model_dump(mode="json", exclude=exclude)
     elif hasattr(config, "dict"):
-        dump = config.dict(exclude=exclude)
+        dump = config.model_dump(exclude=exclude)
     else:
         dump = config
 
@@ -44,7 +44,7 @@ def calculate_pipeline_hash(config: Any) -> str:
     if hasattr(config, "model_dump"):
         dump = config.model_dump(mode="json")
     elif hasattr(config, "dict"):
-        dump = config.dict()
+        dump = config.model_dump()
     else:
         dump = config
 

@@ -198,7 +198,7 @@ class OpenLineageAdapter:
                     source_code=(
                         str(config.model_dump_json())
                         if hasattr(config, "model_dump_json")
-                        else str(config.dict())
+                        else str(config.model_dump())
                     ),
                 )
             }
