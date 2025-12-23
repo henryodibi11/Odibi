@@ -152,28 +152,41 @@ nodes:
 
 ### SQL File Reference
 
-For complex queries, use external SQL files. Paths are resolved **relative to your main YAML config file**:
+For complex queries, use external SQL files. Paths are resolved **relative to the YAML file where the node is defined**:
 
 ```yaml
-# In your main odibi.yaml (or imported pipeline YAML)
+# In silver.yaml
 transform:
   steps:
-    - sql_file: sql/complex_aggregation.sql
+    - sql_file: sql/complex_aggregation.sql  # relative to silver.yaml
 ```
 
-For layered project structures:
-```yaml
-# If your project is:
-# project/
-# ├── main.yaml
-# └── pipelines/
-#     └── silver/
-#         └── sql/
-#             └── transform.sql
+**Example project structure:**
+```
+project/
+├── project.yaml              # imports pipelines/silver/silver.yaml
+└── pipelines/
+    └── silver/
+        ├── silver.yaml       # defines the node
+        └── sql/
+            └── transform.sql
+```
 
+In `silver.yaml`, use a path relative to `silver.yaml`:
+```yaml
+# silver.yaml
 transform:
   steps:
-    - sql_file: pipelines/silver/sql/transform.sql
+    - sql_file: sql/transform.sql   # ✓ Correct: relative to silver.yaml
+```
+
+**Important:** Do NOT use absolute paths or paths relative to project.yaml:
+```yaml
+# ✗ Wrong - absolute path
+- sql_file: /pipelines/silver/sql/transform.sql
+
+# ✗ Wrong - relative to project.yaml instead of silver.yaml  
+- sql_file: pipelines/silver/sql/transform.sql
 ```
 
 **sql/complex_aggregation.sql:**

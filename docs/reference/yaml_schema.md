@@ -394,6 +394,7 @@ These are the built-in functions you can use in two ways:
 | **schema_policy** | Optional[[SchemaPolicyConfig](#schemapolicyconfig)] | No | - | Schema drift handling policy |
 | **privacy** | Optional[[PrivacyConfig](#privacyconfig)] | No | - | Privacy Suite: PII anonymization settings |
 | **sensitive** | bool \| List[str] | No | `False` | If true or list of columns, masks sample data in stories |
+| **source_yaml** | Optional[str] | No | - | Internal: source YAML file path for sql_file resolution |
 
 ---
 ### `ColumnMetadata`
@@ -1390,22 +1391,35 @@ Single transformation step.
 Supports four step types (exactly one required):
 
 * `sql` - Inline SQL query string
-* `sql_file` - Path to external .sql file (relative to main config file)
+* `sql_file` - Path to external .sql file (relative to the YAML file defining the node)
 * `function` - Registered Python function name
 * `operation` - Built-in operation (e.g., drop_duplicates)
 
 **sql_file Example:**
+
+If your project structure is:
+```
+project.yaml              # imports pipelines/silver/silver.yaml
+pipelines/
+  silver/
+    silver.yaml           # defines the node
+    sql/
+      transform.sql       # your SQL file
+```
+
+In `silver.yaml`, use a path relative to `silver.yaml`:
 ```yaml
 transform:
   steps:
-    - sql_file: pipelines/silver/sql/transform.sql
+    - sql_file: sql/transform.sql   # relative to silver.yaml
 ```
 
-The path is resolved relative to your main YAML config file location.
+**Important:** The path is resolved relative to the YAML file where the node is defined,
+NOT the project.yaml that imports it. Do NOT use absolute paths like `/pipelines/silver/sql/...`.
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **sql** | Optional[str] | No | - | Inline SQL query. Use `df` to reference the current DataFrame. |
-| **sql_file** | Optional[str] | No | - | Path to external .sql file, relative to main config file. |
+| **sql_file** | Optional[str] | No | - | Path to external .sql file, relative to the YAML file defining the node. Example: 'sql/transform.sql' resolves relative to the node's source YAML. |
 | **function** | Optional[str] | No | - | Name of a registered Python function (@transform or @register). |
 | **operation** | Optional[str] | No | - | Built-in operation name (e.g., drop_duplicates, fill_na). |
 | **params** | Dict[str, Any] | No | `PydanticUndefined` | Parameters to pass to function or operation. |

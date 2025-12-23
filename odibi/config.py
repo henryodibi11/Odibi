@@ -1023,18 +1023,31 @@ class TransformStep(BaseModel):
     Supports four step types (exactly one required):
 
     * `sql` - Inline SQL query string
-    * `sql_file` - Path to external .sql file (relative to main config file)
+    * `sql_file` - Path to external .sql file (relative to the YAML file defining the node)
     * `function` - Registered Python function name
     * `operation` - Built-in operation (e.g., drop_duplicates)
 
     **sql_file Example:**
+
+    If your project structure is:
+    ```
+    project.yaml              # imports pipelines/silver/silver.yaml
+    pipelines/
+      silver/
+        silver.yaml           # defines the node
+        sql/
+          transform.sql       # your SQL file
+    ```
+
+    In `silver.yaml`, use a path relative to `silver.yaml`:
     ```yaml
     transform:
       steps:
-        - sql_file: pipelines/silver/sql/transform.sql
+        - sql_file: sql/transform.sql   # relative to silver.yaml
     ```
 
-    The path is resolved relative to your main YAML config file location.
+    **Important:** The path is resolved relative to the YAML file where the node is defined,
+    NOT the project.yaml that imports it. Do NOT use absolute paths like `/pipelines/silver/sql/...`.
     """
 
     sql: Optional[str] = Field(
@@ -1043,7 +1056,10 @@ class TransformStep(BaseModel):
     )
     sql_file: Optional[str] = Field(
         default=None,
-        description="Path to external .sql file, relative to main config file.",
+        description=(
+            "Path to external .sql file, relative to the YAML file defining the node. "
+            "Example: 'sql/transform.sql' resolves relative to the node's source YAML."
+        ),
     )
     function: Optional[str] = Field(
         default=None,
