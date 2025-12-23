@@ -536,7 +536,7 @@ class Pipeline:
                     performance_config=self.performance_config,
                     pipeline_name=self.config.pipeline,
                     batch_write_buffers=batch_buffers,
-                    config_file=node_config._source_yaml,
+                    config_file=node_config.source_yaml,
                 )
                 result = node.execute()
 
@@ -1102,7 +1102,7 @@ class Pipeline:
             connections=self.connections,
             performance_config=self.performance_config,
             pipeline_name=self.config.pipeline,
-            config_file=node_config._source_yaml,
+            config_file=node_config.source_yaml,
         )
 
         return node.execute()

@@ -2556,9 +2556,13 @@ class NodeConfig(BaseModel):
     )
 
     # Internal: tracks which YAML file this node was defined in (for sql_file resolution)
-    _source_yaml: Optional[str] = None
+    source_yaml: Optional[str] = Field(
+        default=None,
+        alias="_source_yaml",
+        description="Internal: source YAML file path for sql_file resolution",
+    )
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = {"populate_by_name": True}
 
     @model_validator(mode="after")
     def check_at_least_one_operation(self):
