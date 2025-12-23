@@ -69,18 +69,25 @@ nodes:
 
     transformer: "scd2"
     params:
-      connection: adls_prod            # Connection name
-      path: OEE/silver/dim_customers   # Relative path
+      connection: adls_prod            # READ existing history from here
+      path: OEE/silver/dim_customers
       keys: ["customer_id"]
       track_cols: ["address", "tier"]
       effective_time_col: "txn_date"
 
     write:
-      connection: adls_prod
-      path: OEE/silver/dim_customers   # Same location as target
+      connection: adls_prod            # WRITE result back (same location)
+      path: OEE/silver/dim_customers
       format: "delta"
       mode: "overwrite"
 ```
+
+> **Why specify the path twice?**
+> - `params.connection/path` → Where to **read** existing history (to detect changes)
+> - `write.connection/path` → Where to **write** the full result
+>
+> They should typically match. SCD2 returns a DataFrame (doesn't write directly),
+> so the write phase handles persistence separately.
 
 ### Full Configuration
 
