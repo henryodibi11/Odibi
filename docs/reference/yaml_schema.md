@@ -849,6 +849,7 @@ transform:
 
 **Recipe 2: Snapshot Diff (For Full Snapshot Sources)**
 Use ONLY with full snapshot ingestion, NOT with HWM incremental.
+Requires `connection` and `path` to specify the target Delta table for comparison.
 ```yaml
 transform:
   steps:
@@ -856,6 +857,8 @@ transform:
       params:
         mode: snapshot_diff
         keys: [customer_id]
+        connection: silver_conn    # Required: connection to target Delta table
+        path: "silver/customers"   # Required: path to target Delta table
 ```
 
 **Recipe 3: Conservative Threshold**
@@ -888,6 +891,8 @@ transform:
 | --- | --- | --- | --- | --- |
 | **mode** | DeleteDetectionMode | No | `DeleteDetectionMode.NONE` | Delete detection strategy: none, snapshot_diff, sql_compare |
 | **keys** | List[str] | No | `PydanticUndefined` | Business key columns for comparison |
+| **connection** | Optional[str] | No | - | For snapshot_diff: connection name to target Delta table (required for snapshot_diff) |
+| **path** | Optional[str] | No | - | For snapshot_diff: path to target Delta table (required for snapshot_diff) |
 | **soft_delete_col** | Optional[str] | No | `_is_deleted` | Column to flag deletes (True = deleted). Set to null for hard-delete (removes rows). |
 | **source_connection** | Optional[str] | No | - | For sql_compare: connection name to query live source |
 | **source_table** | Optional[str] | No | - | For sql_compare: table to query for current keys |

@@ -184,6 +184,7 @@ class DeleteDetectionConfig(BaseModel):
 
     **Recipe 2: Snapshot Diff (For Full Snapshot Sources)**
     Use ONLY with full snapshot ingestion, NOT with HWM incremental.
+    Requires `connection` and `path` to specify the target Delta table for comparison.
     ```yaml
     transform:
       steps:
@@ -191,6 +192,8 @@ class DeleteDetectionConfig(BaseModel):
           params:
             mode: snapshot_diff
             keys: [customer_id]
+            connection: silver_conn    # Required: connection to target Delta table
+            path: "silver/customers"   # Required: path to target Delta table
     ```
 
     **Recipe 3: Conservative Threshold**
@@ -229,6 +232,15 @@ class DeleteDetectionConfig(BaseModel):
     keys: List[str] = Field(
         default_factory=list,
         description="Business key columns for comparison",
+    )
+
+    connection: Optional[str] = Field(
+        default=None,
+        description="For snapshot_diff: connection name to target Delta table (required for snapshot_diff)",
+    )
+    path: Optional[str] = Field(
+        default=None,
+        description="For snapshot_diff: path to target Delta table (required for snapshot_diff)",
     )
 
     soft_delete_col: Optional[str] = Field(
@@ -280,6 +292,12 @@ class DeleteDetectionConfig(BaseModel):
 
         if not self.keys:
             raise ValueError(f"delete_detection: 'keys' required for mode='{self.mode.value}'")
+
+        if self.mode == DeleteDetectionMode.SNAPSHOT_DIFF:
+            if not self.connection or not self.path:
+                raise ValueError(
+                    "delete_detection: 'connection' and 'path' required for snapshot_diff mode"
+                )
 
         if self.mode == DeleteDetectionMode.SQL_COMPARE:
             if not self.source_connection:

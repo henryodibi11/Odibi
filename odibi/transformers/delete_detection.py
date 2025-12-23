@@ -77,11 +77,24 @@ def _snapshot_diff_spark(
     keys = config.keys
     spark = context.spark
 
-    table_path = _get_target_path(context)
+    # Priority: explicit connection+path from config, then fallback to context inference
+    table_path = None
+    if config.connection and config.path:
+        conn = _get_connection(context, config.connection)
+        if conn and hasattr(conn, "get_path"):
+            table_path = conn.get_path(config.path)
+        else:
+            logger.warning(
+                f"detect_deletes: Connection '{config.connection}' not found or doesn't support get_path."
+            )
+
+    if not table_path:
+        table_path = _get_target_path(context)
+
     if not table_path:
         logger.warning(
             "detect_deletes: Could not determine target table path. Skipping. "
-            "Ensure the node has a 'write' block or 'inputs' with a pipeline reference."
+            "Provide 'connection' and 'path' params, or ensure the node has a 'write' block."
         )
         return context
 
@@ -143,12 +156,25 @@ def _snapshot_diff_pandas(
         )
 
     keys = config.keys
-    table_path = _get_target_path(context)
+
+    # Priority: explicit connection+path from config, then fallback to context inference
+    table_path = None
+    if config.connection and config.path:
+        conn = _get_connection(context, config.connection)
+        if conn and hasattr(conn, "get_path"):
+            table_path = conn.get_path(config.path)
+        else:
+            logger.warning(
+                f"detect_deletes: Connection '{config.connection}' not found or doesn't support get_path."
+            )
+
+    if not table_path:
+        table_path = _get_target_path(context)
 
     if not table_path:
         logger.warning(
             "detect_deletes: Could not determine target table path. Skipping. "
-            "Ensure the node has a 'write' block or 'inputs' with a pipeline reference."
+            "Provide 'connection' and 'path' params, or ensure the node has a 'write' block."
         )
         return context
 
