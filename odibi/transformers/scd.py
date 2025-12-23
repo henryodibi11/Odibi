@@ -237,9 +237,10 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
 
     # Preserve effective_time_col with a unique name before join to avoid resolution issues
     # This ensures we can always reference it regardless of target schema
-    # Use backticks in case eff_col has special characters
+    # Use source_df[col] syntax to bind column reference directly to this DataFrame
+    # (F.col() can get confused during lazy evaluation with complex join plans)
     eff_col_preserved = "__src_eff_time"
-    source_with_eff = source_df.withColumn(eff_col_preserved, F.col(f"`{eff_col}`"))
+    source_with_eff = source_df.withColumn(eff_col_preserved, source_df[eff_col])
 
     # Alias source_df to ensure column references are unambiguous after join
     # Use backticks to handle column names with spaces or special characters
