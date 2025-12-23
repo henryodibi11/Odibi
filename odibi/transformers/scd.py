@@ -219,6 +219,9 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
 
     if target_df is None:
         # First Run: Return Source prepared
+        # Drop effective_time_col as it's only used for SCD logic, not stored in target
+        if eff_col in new_records.columns:
+            new_records = new_records.drop(eff_col)
         return context.with_df(new_records)
 
     # 2. Logic: Compare Source vs Target (Current Records Only)
@@ -339,7 +342,11 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     )
 
     # 3. Union: Updated History + New Inserts
-    # Ensure schemas match
+    # Drop effective_time_col from final_target if it exists (legacy data migration)
+    # This ensures schema consistency with rows_to_insert which also drops eff_col
+    if eff_col in final_target.columns:
+        final_target = final_target.drop(eff_col)
+
     # UnionByName handles column order differences
     final_df = final_target.unionByName(rows_to_insert)
 
