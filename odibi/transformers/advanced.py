@@ -444,31 +444,33 @@ def generate_surrogate_key(context: EngineContext, params: SurrogateKeyParams) -
     # 1. Build the concatenation expression
     # We must cast to string and coalesce nulls
 
-    def safe_col(col):
+    def safe_col(col, quote_char):
         # Spark/DuckDB cast syntax slightly different but standard SQL CAST(x AS STRING) usually works
-        # Spark: cast(col as string)
-        # DuckDB: cast(col as varchar) or string
-        return f"COALESCE(CAST({col} AS STRING), '')"
+        # Spark: cast(col as string) with backticks for quoting
+        # DuckDB: cast(col as varchar) with double quotes for quoting
+        return f"COALESCE(CAST({quote_char}{col}{quote_char} AS STRING), '')"
 
     if context.engine_type == EngineType.SPARK:
         # Spark CONCAT_WS skips nulls, but we coerced them to empty string above anyway for safety.
         # Actually, if we want strict "dbt style" surrogate keys, we often treat NULL as a specific token.
         # But empty string is standard for "simple" SKs.
-
-        cols_expr = ", ".join([safe_col(c) for c in params.columns])
+        quote_char = "`"
+        cols_expr = ", ".join([safe_col(c, quote_char) for c in params.columns])
         concat_expr = f"concat_ws('{params.separator}', {cols_expr})"
         final_expr = f"md5({concat_expr})"
+        output_col = f"`{params.output_col}`"
 
     else:
         # DuckDB / Pandas
         # DuckDB also supports concat_ws and md5.
         # Note: DuckDB CAST AS STRING is valid.
-
-        cols_expr = ", ".join([safe_col(c) for c in params.columns])
+        quote_char = '"'
+        cols_expr = ", ".join([safe_col(c, quote_char) for c in params.columns])
         concat_expr = f"concat_ws('{params.separator}', {cols_expr})"
         final_expr = f"md5({concat_expr})"
+        output_col = f'"{params.output_col}"'
 
-    sql_query = f"SELECT *, {final_expr} AS {params.output_col} FROM df"
+    sql_query = f"SELECT *, {final_expr} AS {output_col} FROM df"
     return context.sql(sql_query)
 
 
