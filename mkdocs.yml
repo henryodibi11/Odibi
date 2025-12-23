@@ -60,6 +60,7 @@ nav:
           - Semantic Full Example: tutorials/dimensional_modeling/12_semantic_full_example.md
           - FK Validation: tutorials/dimensional_modeling/13_fk_validation.md
   - Guides:
+      - Medallion Architecture: guides/medallion_architecture.md
       - Dogfooding (Meta): guides/dogfooding.md
       - Writing Transformations: guides/writing_transformations.md
       - Master CLI: guides/cli_master_guide.md
