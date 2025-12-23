@@ -18,7 +18,7 @@ Medallion Architecture organizes your data into three layers, like refining raw 
 │   [API]        ──────►  [Raw Copy]  ───►  [Cleaned]  ───►  [Dims]  │
 │   [Files]      ──────►  [Raw Copy]  ───►  [Cleaned]  ───►  [KPIs]  │
 │                                                                     │
-│   "Just land it"      "Fix it"         "Make it              │
+│   "Just land it"      "Fix it"         "Make it                    │
 │                                          business-ready"           │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -85,17 +85,17 @@ Fixing problems in the source data.
 |-----------|---------|----------|
 | Deduplication | `ROW_NUMBER() OVER (PARTITION BY id ORDER BY updated_at DESC)` | Cleaning |
 | Remove bad characters | `REPLACE(name, '"', '')` | Cleaning |
-| Fix typos | `REPLACE(status, 'Iprocess', 'Inprocess')` | Cleaning |
+| Fix typos | `REPLACE(status, 'Actve', 'Active')` | Cleaning |
 | Handle nulls | `COALESCE(middle_name, '')` | Cleaning |
 | Trim whitespace | `TRIM(customer_name)` | Cleaning |
 
 ```sql
 -- Example: Cleaning product codes
 CASE
-    WHEN LEFT(REPLACE(Product_Code, '"', ''), 1) = 'N'
-    THEN SUBSTRING(REPLACE(Product_Code, '"', ''), 2)
-    ELSE REPLACE(Product_Code, '"', '')
-END AS Product_Code
+    WHEN LEFT(REPLACE(product_code, '"', ''), 1) = 'X'
+    THEN SUBSTRING(REPLACE(product_code, '"', ''), 2)
+    ELSE REPLACE(product_code, '"', '')
+END AS product_code
 ```
 
 #### 2. Type Casting & Standardization
@@ -104,14 +104,14 @@ Making data types consistent.
 | Operation | Example | Category |
 |-----------|---------|----------|
 | Cast types | `CAST(date_string AS DATE)` | Standardization |
-| Parse timestamps | `to_timestamp(Date)` | Standardization |
-| Unit conversion | `HOURS * 60 AS Duration_Min` | Standardization |
+| Parse timestamps | `to_timestamp(date_col)` | Standardization |
+| Unit conversion | `hours * 60 AS duration_minutes` | Standardization |
 | Standardize casing | `UPPER(country_code)` | Standardization |
 
 ```sql
 -- Example: Standardizing dates
-to_timestamp(Date) AS Date,
-DATEDIFF(to_date(Date), to_date('2021-01-01')) + 1 AS DateID
+to_timestamp(order_date) AS order_date,
+DATEDIFF(to_date(order_date), to_date('2020-01-01')) + 1 AS date_id
 ```
 
 #### 3. Conforming to Standard Schema
@@ -119,25 +119,25 @@ Mapping source-specific values to enterprise-standard values.
 
 | Operation | Example | Category |
 |-----------|---------|----------|
-| Code mapping | `'DRYER 1' → 'Flash Dryer 1'` | Conforming |
-| Category standardization | `'Schedul%' → 'Market Related'` | Conforming |
-| Rename columns | `SHIFT AS ShiftID` | Conforming |
-| Add source context | `'Indianapolis' AS Plant_Name` | Conforming |
+| Code mapping | `'M1' → 'Machine 1'` | Conforming |
+| Category standardization | `'Sched%' → 'Scheduled'` | Conforming |
+| Rename columns | `cust_id AS customer_id` | Conforming |
+| Add source context | `'West Region' AS region_name` | Conforming |
 
 ```sql
 -- Example: Mapping source codes to standard names
 CASE
-    WHEN DRYER = 'DRYER 1' THEN 'Flash Dryer 1'
-    WHEN DRYER = 'DRYER 2' THEN 'Flash Dryer 2'
-    WHEN DRYER = 'DRYER 3' THEN 'Flash Dryer 3'
-END AS Channel,
+    WHEN machine_code = 'M1' THEN 'Machine 1'
+    WHEN machine_code = 'M2' THEN 'Machine 2'
+    WHEN machine_code = 'M3' THEN 'Machine 3'
+END AS machine_name,
 
 CASE
-    WHEN CATEGORY LIKE '%Schedul%' THEN 'Market Related'
-    WHEN CATEGORY LIKE '%Maintenance%' THEN 'Internal Scheduled - Maintenance'
-    WHEN CATEGORY LIKE '%Mechanical%' THEN 'Internal Unscheduled - Maintenance'
-    ELSE 'Internal Unscheduled - Production'
-END AS Category
+    WHEN category LIKE '%Sched%' THEN 'Scheduled'
+    WHEN category LIKE '%Maint%' THEN 'Maintenance'
+    WHEN category LIKE '%Breakdown%' THEN 'Unplanned'
+    ELSE 'Other'
+END AS downtime_category
 ```
 
 #### 4. Enrichment via Lookups
@@ -145,24 +145,24 @@ Adding dimension attributes from reference tables.
 
 | Operation | Example | Category |
 |-----------|---------|----------|
-| Join to calendar | Get `DateID` from date dimension | Enrichment |
-| Join to plant/process | Get `P_ID` from plant dimension | Enrichment |
-| Join to reason codes | Get `LID` from reason lookup | Enrichment |
-| Join to product master | Get `Product_Name` from product dim | Enrichment |
+| Join to calendar | Get `date_id` from date dimension | Enrichment |
+| Join to location | Get `location_id` from location dimension | Enrichment |
+| Join to reason codes | Get `reason_id` from reason lookup | Enrichment |
+| Join to product master | Get `product_name` from product dim | Enrichment |
 
 ```sql
 -- Example: Enriching with dimension lookups
 SELECT
-    s1.DateID,
-    s1.Channel,
-    s1.Shutdown_Duration_Min,
-    lid.LID AS ReasonID,       -- From reason code lookup
-    pp.P_ID                     -- From plant/process dimension
-FROM step1 s1
-LEFT JOIN cleaned_Indy_TD_Downtime_Reasons lid
-    ON lid.Category = s1.Category 
-LEFT JOIN cleaned_vw_dim_plantprocess pp
-    ON s1.Channel = pp.Channel
+    e.event_id,
+    e.event_date,
+    e.duration_minutes,
+    r.reason_id,           -- From reason code lookup
+    l.location_id          -- From location dimension
+FROM events e
+LEFT JOIN reason_codes r
+    ON r.category = e.category 
+LEFT JOIN dim_location l
+    ON e.site_code = l.site_code
 ```
 
 #### 5. Soft Delete Detection
@@ -176,36 +176,36 @@ Tracking records that exist in Bronze but no longer exist in the source.
 
 ### What Does NOT Happen Here
 ❌ Combining data from multiple source systems  
-❌ Business calculations (like OEE %)  
+❌ Business calculations (like KPIs, ratios)  
 ❌ Aggregations for reporting  
 ❌ Creating facts that span multiple sources
 
 ### Example Silver Node
 ```yaml
-- name: cleaned_indy_downtime
+- name: cleaned_warehouse_events
   inputs:
-    input_name: $bronze.indy_production_tblDryerDowntime
+    input_name: $bronze.warehouse_event_log
   depends_on:
-    - cleaned_Indy_TD_Downtime_Reasons  # Lookup table
-    - cleaned_vw_dim_plantprocess        # Dimension table
+    - cleaned_reason_codes     # Lookup table
+    - cleaned_dim_location     # Dimension table
   transformer: deduplicate
   params:
-    keys: [DryerDowntimeID]
+    keys: [event_id]
     order_by: "_extracted_at DESC"
   transform:
     steps:
       - sql: |
           SELECT
-              to_timestamp(Date) AS Date,
-              DATEDIFF(to_date(Date), '2021-01-01') + 1 AS DateID,
-              'Indianapolis' AS Plant_Name,
-              CASE WHEN DRYER = 'DRYER 1' THEN 'Flash Dryer 1' ... END AS Channel,
-              HOURS * 60 AS Shutdown_Duration_Min
+              to_timestamp(event_date) AS event_date,
+              DATEDIFF(to_date(event_date), '2020-01-01') + 1 AS date_id,
+              'Warehouse A' AS location_name,
+              CASE WHEN machine = 'M1' THEN 'Machine 1' ... END AS machine_name,
+              duration_hours * 60 AS duration_minutes
           FROM df
       - function: detect_deletes
         params:
           mode: sql_compare
-          keys: [DryerDowntimeID]
+          keys: [event_id]
 ```
 
 ### The Golden Rule of Silver
@@ -231,24 +231,24 @@ Merging the same type of data from different systems.
 
 | Operation | Example | Category |
 |-----------|---------|----------|
-| Union facts | Combine downtime from Aspen + Cardinal + Indy | Combining |
+| Union facts | Combine events from System A + System B + System C | Combining |
 | Reconciliation | UNION (not UNION ALL) to dedupe across sources | Combining |
 | Cross-system dedup | Same event recorded in multiple systems | Combining |
 
 ```sql
--- Example: Combining downtime from all sources
-SELECT DateID, P_ID, Shutdown_Duration_Min, Notes
-FROM cleaned_aspen_downtime
+-- Example: Combining events from all sources
+SELECT date_id, location_id, duration_minutes, notes
+FROM cleaned_system_a_events
 
 UNION ALL
 
-SELECT DateID, P_ID, Shutdown_Duration_Min, Notes
-FROM cleaned_cardinal_downtime
+SELECT date_id, location_id, duration_minutes, notes
+FROM cleaned_system_b_events
 
 UNION ALL
 
-SELECT DateID, P_ID, Shutdown_Duration_Min, Notes
-FROM cleaned_indy_downtime
+SELECT date_id, location_id, duration_minutes, notes
+FROM cleaned_system_c_events
 ```
 
 #### 2. Business Calculations
@@ -256,46 +256,49 @@ Applying business definitions and formulas.
 
 | Operation | Example | Category |
 |-----------|---------|----------|
-| Define metrics | `Production Total = COALESCE(Revised_Pounds, Pounds)` | Business Rule |
-| Calculate KPIs | `OEE = Availability × Performance × Quality` | Business Rule |
+| Define metrics | `total_output = COALESCE(revised_qty, original_qty)` | Business Rule |
+| Calculate KPIs | `efficiency = actual_output / expected_output * 100` | Business Rule |
 | Apply business logic | "If negative, treat as zero" | Business Rule |
-| Default values | "Use 67 if ReasonID is null and duration < 10 min" | Business Rule |
+| Default values | "Use default reason if null and duration < 10 min" | Business Rule |
 
 ```sql
--- Example: Business definition of Production Total
+-- Example: Business definition of Total Output
 COALESCE(
     CASE
-        WHEN COALESCE(Revised_Pounds, Pounds) <= 0 THEN 0
-        ELSE COALESCE(Revised_Pounds, Pounds)
+        WHEN COALESCE(revised_quantity, original_quantity) <= 0 THEN 0
+        ELSE COALESCE(revised_quantity, original_quantity)
     END, 
-0) AS `Production Total`
+0) AS total_output
 ```
 
-This is Gold because it answers: *"What does 'production' MEAN to the business?"*
+This is Gold because it answers: *"What does 'output' MEAN to the business?"*
 
 #### 3. Cross-Fact Joins
 Joining multiple fact tables together.
 
 | Operation | Example | Category |
 |-----------|---------|----------|
-| Join facts | Production + Downtime + Quality → OEE | Cross-Fact |
+| Join facts | Production + Downtime + Quality → Efficiency | Cross-Fact |
 | Build wide tables | Denormalized reporting tables | Cross-Fact |
 | Calculate ratios | Downtime / Available Hours | Cross-Fact |
 
 ```sql
--- Example: Joining facts for OEE calculation
+-- Example: Joining facts for efficiency calculation
 SELECT 
-    c.DateId,
-    c.P_ID,
-    p.`Production Total`,
-    d.Shutdown_Duration_Min,
-    q.BadProduct,
-    -- OEE calculation uses all three facts
-    (p.`Production Total` / p.`Nominal Capacity`) * 100 AS Performance_Pct
-FROM calendar_with_pids c
-LEFT JOIN combined_production p ON c.DateId = p.DateId AND c.P_ID = p.P_ID
-LEFT JOIN combined_downtime d ON c.DateId = d.DateId AND c.P_ID = d.P_ID
-LEFT JOIN combined_quality q ON c.DateId = q.DateId AND c.P_ID = q.P_ID
+    c.date_id,
+    c.location_id,
+    p.total_output,
+    d.downtime_minutes,
+    q.defect_count,
+    -- Efficiency uses multiple facts
+    (p.total_output / p.target_output) * 100 AS efficiency_pct
+FROM calendar_scaffold c
+LEFT JOIN combined_production p 
+    ON c.date_id = p.date_id AND c.location_id = p.location_id
+LEFT JOIN combined_downtime d 
+    ON c.date_id = d.date_id AND c.location_id = d.location_id
+LEFT JOIN combined_quality q 
+    ON c.date_id = q.date_id AND c.location_id = q.location_id
 ```
 
 #### 4. Aggregations for Reporting
@@ -303,8 +306,8 @@ Pre-computing summaries for dashboards and reports.
 
 | Operation | Example | Category |
 |-----------|---------|----------|
-| Daily rollups | SUM(production) GROUP BY date, plant | Aggregation |
-| Weekly summaries | AVG(oee) by week | Aggregation |
+| Daily rollups | SUM(production) GROUP BY date, location | Aggregation |
+| Weekly summaries | AVG(efficiency) by week | Aggregation |
 | YTD calculations | Running totals | Aggregation |
 
 #### 5. Derived Dimensions
@@ -312,50 +315,50 @@ Creating dimensions that don't exist in source systems.
 
 | Operation | Example | Category |
 |-----------|---------|----------|
-| Date spine | Calendar × P_IDs for all combinations | Derived Dim |
-| Distinct lists | All P_IDs with any activity | Derived Dim |
+| Date spine | Calendar × Locations for all combinations | Derived Dim |
+| Distinct lists | All locations with any activity | Derived Dim |
 
 ```sql
--- Example: Create all Date × P_ID combinations
+-- Example: Create all Date × Location combinations
 SELECT *
-FROM calendar_dimension
-CROSS JOIN distinct_pids
+FROM dim_calendar
+CROSS JOIN distinct_locations
 ```
 
 ### Example Gold Node
 ```yaml
-- name: fact_oee_daily
-  description: "Daily OEE metrics by plant and process"
+- name: fact_daily_efficiency
+  description: "Daily efficiency metrics by location"
   depends_on:
-    - combined_production   # Silver → Gold: multiple sources unioned
-    - combined_downtime     # Silver → Gold: multiple sources unioned
-    - combined_quality      # Silver → Gold: multiple sources unioned
-    - calendar_with_pids    # Scaffold dimension
+    - combined_production   # Multiple sources unioned
+    - combined_downtime     # Multiple sources unioned
+    - combined_quality      # Multiple sources unioned
+    - calendar_scaffold     # Date × Location scaffold
   transform:
     steps:
       - sql: |
           SELECT
-              c.DateId,
-              c.P_ID,
-              COALESCE(p.`Production Total`, 0) AS Production_Lbs,
-              COALESCE(d.Shutdown_Duration_Min, 0) AS Downtime_Min,
-              COALESCE(q.BadProduct, 0) AS Quality_Loss_Lbs,
-              -- OEE Calculation (Business Formula)
+              c.date_id,
+              c.location_id,
+              COALESCE(p.total_output, 0) AS output_units,
+              COALESCE(d.downtime_minutes, 0) AS downtime_min,
+              COALESCE(q.defect_count, 0) AS defects,
+              -- Efficiency Calculation (Business Formula)
               CASE 
-                  WHEN p.`Nominal Capacity` > 0 
-                  THEN (p.`Production Total` / p.`Nominal Capacity`) * 100
+                  WHEN p.target_output > 0 
+                  THEN (p.total_output / p.target_output) * 100
                   ELSE 0 
-              END AS Performance_Pct
-          FROM calendar_with_pids c
+              END AS efficiency_pct
+          FROM calendar_scaffold c
           LEFT JOIN combined_production p 
-              ON c.DateId = p.DateId AND c.P_ID = p.P_ID
+              ON c.date_id = p.date_id AND c.location_id = p.location_id
           LEFT JOIN combined_downtime d 
-              ON c.DateId = d.DateId AND c.P_ID = d.P_ID
+              ON c.date_id = d.date_id AND c.location_id = d.location_id
           LEFT JOIN combined_quality q 
-              ON c.DateId = q.DateId AND c.P_ID = q.P_ID
+              ON c.date_id = q.date_id AND c.location_id = q.location_id
   write:
     connection: gold
-    table: fact_oee_daily
+    table: fact_daily_efficiency
     format: delta
 ```
 
@@ -393,10 +396,10 @@ CROSS JOIN distinct_pids
 | "How do I get data from the source?" | Bronze |
 | "How do I fix this source's data quality issues?" | Silver |
 | "How do I standardize this source to our schema?" | Silver |
-| "How do I look up P_ID from a dimension table?" | Silver |
-| "How do I combine Aspen + Cardinal + Indy data?" | Gold |
-| "What does 'Production Total' mean to the business?" | Gold |
-| "How do I calculate OEE?" | Gold |
+| "How do I look up IDs from a dimension table?" | Silver |
+| "How do I combine data from System A + B + C?" | Gold |
+| "What does 'Total Output' mean to the business?" | Gold |
+| "How do I calculate efficiency?" | Gold |
 | "What should the dashboard show?" | Gold |
 
 ### The One-Source Test
@@ -409,16 +412,16 @@ CROSS JOIN distinct_pids
 │   YES ──────────────────────────────► SILVER                │
 │    │                                                        │
 │    │   Examples:                                            │
-│    │   • Cleaning Aspen data                               │
-│    │   • Joining Indy data to calendar dimension           │
-│    │   • Mapping Cardinal codes to standard categories     │
+│    │   • Cleaning System A data                             │
+│    │   • Joining System B data to calendar dimension        │
+│    │   • Mapping System C codes to standard categories      │
 │    │                                                        │
 │   NO ───────────────────────────────► GOLD                  │
 │    │                                                        │
 │    │   Examples:                                            │
-│    │   • Combining all downtime sources                    │
-│    │   • Calculating OEE from production + downtime        │
-│    │   • Creating unified fact tables                      │
+│    │   • Combining all event sources                        │
+│    │   • Calculating efficiency from production + downtime  │
+│    │   • Creating unified fact tables                       │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -436,13 +439,13 @@ CROSS JOIN distinct_pids
       - sql: |
           SELECT 
               *,
-              (Production / Capacity) * 100 AS OEE_Performance  -- Business formula!
+              (actual / target) * 100 AS efficiency  -- Business formula!
           FROM df
 ```
 
-**Why it's wrong:** OEE is a business definition. Silver should just clean the data.
+**Why it's wrong:** Efficiency is a business definition. Silver should just clean the data.
 
-**Fix:** Move the OEE calculation to Gold.
+**Fix:** Move the efficiency calculation to Gold.
 
 ### ❌ Mistake 2: Raw Data in Silver
 ```yaml
@@ -463,16 +466,16 @@ CROSS JOIN distinct_pids
 ### ❌ Mistake 3: Combining Sources in Silver
 ```yaml
 # WRONG - UNION in Silver
-- name: cleaned_all_downtime
+- name: cleaned_all_events
   depends_on:
-    - cleaned_aspen_downtime
-    - cleaned_cardinal_downtime
+    - cleaned_system_a_events
+    - cleaned_system_b_events
   transform:
     steps:
       - sql: |
-          SELECT * FROM cleaned_aspen_downtime
+          SELECT * FROM cleaned_system_a_events
           UNION ALL
-          SELECT * FROM cleaned_cardinal_downtime  -- Combining sources!
+          SELECT * FROM cleaned_system_b_events  -- Combining sources!
 ```
 
 **Why it's wrong:** Silver should process one source at a time.
@@ -487,16 +490,16 @@ CROSS JOIN distinct_pids
 pipelines/
 ├── bronze/
 │   └── bronze.yaml
-│       # Nodes: bronze_aspen_oee, bronze_cardinal_wiki, bronze_indy_downtime
+│       # Nodes: bronze_system_a, bronze_system_b, bronze_system_c
 │
 ├── silver/
 │   └── silver.yaml
-│       # Nodes: cleaned_aspen_oee, cleaned_cardinal_wiki, cleaned_indy_downtime
+│       # Nodes: cleaned_system_a, cleaned_system_b, cleaned_system_c
 │       # Each cleans ONE source
 │
 └── gold/
     └── gold.yaml
-        # Nodes: combined_downtime, combined_production, fact_oee_daily
+        # Nodes: combined_events, combined_production, fact_daily_efficiency
         # Combines Silver outputs, applies business logic
 ```
 
