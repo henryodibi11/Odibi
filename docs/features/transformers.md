@@ -493,7 +493,7 @@ Track historical changes with SCD Type 2.
 ```yaml
 transformer: "scd2"
 params:
-  target: "gold/customers"        # Path to existing history
+  target: "silver.dim_customers"  # Registered table name
   keys: ["customer_id"]           # Entity keys
   track_cols: ["address", "tier"] # Columns to monitor for changes
   effective_time_col: "txn_date"  # When change occurred
@@ -501,11 +501,25 @@ params:
   current_flag_col: "is_current"  # Current record flag
 ```
 
+**Connection-Based Path (ADLS):**
+
+```yaml
+transformer: "scd2"
+params:
+  connection: adls_prod           # Connection name
+  path: OEE/silver/dim_customers  # Relative path
+  keys: ["customer_id"]
+  track_cols: ["address", "tier"]
+  effective_time_col: "txn_date"
+```
+
 **How SCD2 Works:**
 1. **Match**: Finds existing records using `keys`
 2. **Compare**: Checks `track_cols` to detect changes
 3. **Close**: Updates old record's `end_time_col` if changed
 4. **Insert**: Adds new record with open-ended validity
+
+**Note:** SCD2 returns a DataFrame. You must add a `write:` block with `mode: overwrite`.
 
 ### Merge Transformer
 

@@ -2849,16 +2849,25 @@ Parameters for SCD Type 2 (Slowly Changing Dimensions) transformer.
 **The Solution:**
 SCD Type 2 tracks the full history of changes. Each record has an "effective window" (start/end dates) and a flag indicating if it is the current version.
 
-**Recipe:**
+**Recipe 1: Using table name**
 ```yaml
 transformer: "scd2"
 params:
-  target: "gold/customers"         # Path to existing history
-  keys: ["customer_id"]            # How we identify the entity
-  track_cols: ["address", "tier"]  # What changes we care about
-  effective_time_col: "txn_date"   # When the change actually happened
-  end_time_col: "valid_to"         # (Optional) Name of closing timestamp
-  current_flag_col: "is_active"    # (Optional) Name of current flag
+  target: "silver.dim_customers"   # Registered table name
+  keys: ["customer_id"]
+  track_cols: ["address", "tier"]
+  effective_time_col: "txn_date"
+```
+
+**Recipe 2: Using connection + path (ADLS)**
+```yaml
+transformer: "scd2"
+params:
+  connection: adls_prod            # Connection name
+  path: OEE/silver/dim_customers   # Relative path
+  keys: ["customer_id"]
+  track_cols: ["address", "tier"]
+  effective_time_col: "txn_date"
 ```
 
 **How it works:**
@@ -2866,11 +2875,16 @@ params:
 2. **Compare**: Checks `track_cols` to see if data changed.
 3. **Close**: If changed, updates the old record's `end_time_col` to the new `effective_time_col`.
 4. **Insert**: Adds a new record with `effective_time_col` as start and open-ended end date.
+
+**Note:** SCD2 returns a DataFrame containing the full history. You must use a `write:` block
+to persist the result (typically with `mode: overwrite` to the same location as `target`).
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **target** | str | Yes | - | Target table name or path containing history |
+| **target** | Optional[str] | No | - | Target table name or full path (use this OR connection+path) |
+| **connection** | Optional[str] | No | - | Connection name to resolve path (use with 'path' param) |
+| **path** | Optional[str] | No | - | Relative path within connection (e.g., 'OEE/silver/dim_customers') |
 | **keys** | List[str] | Yes | - | Natural keys to identify unique entities |
 | **track_cols** | List[str] | Yes | - | Columns to monitor for changes |
 | **effective_time_col** | str | Yes | - | Source column indicating when the change occurred. |

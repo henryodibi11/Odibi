@@ -2,7 +2,7 @@ import os
 import time
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from odibi.context import EngineContext
 from odibi.enums import EngineType
@@ -21,16 +21,25 @@ class SCD2Params(BaseModel):
     **The Solution:**
     SCD Type 2 tracks the full history of changes. Each record has an "effective window" (start/end dates) and a flag indicating if it is the current version.
 
-    **Recipe:**
+    **Recipe 1: Using table name**
     ```yaml
     transformer: "scd2"
     params:
-      target: "gold/customers"         # Path to existing history
-      keys: ["customer_id"]            # How we identify the entity
-      track_cols: ["address", "tier"]  # What changes we care about
-      effective_time_col: "txn_date"   # When the change actually happened
-      end_time_col: "valid_to"         # (Optional) Name of closing timestamp
-      current_flag_col: "is_active"    # (Optional) Name of current flag
+      target: "silver.dim_customers"   # Registered table name
+      keys: ["customer_id"]
+      track_cols: ["address", "tier"]
+      effective_time_col: "txn_date"
+    ```
+
+    **Recipe 2: Using connection + path (ADLS)**
+    ```yaml
+    transformer: "scd2"
+    params:
+      connection: adls_prod            # Connection name
+      path: OEE/silver/dim_customers   # Relative path
+      keys: ["customer_id"]
+      track_cols: ["address", "tier"]
+      effective_time_col: "txn_date"
     ```
 
     **How it works:**
@@ -38,9 +47,23 @@ class SCD2Params(BaseModel):
     2. **Compare**: Checks `track_cols` to see if data changed.
     3. **Close**: If changed, updates the old record's `end_time_col` to the new `effective_time_col`.
     4. **Insert**: Adds a new record with `effective_time_col` as start and open-ended end date.
+
+    **Note:** SCD2 returns a DataFrame containing the full history. You must use a `write:` block
+    to persist the result (typically with `mode: overwrite` to the same location as `target`).
     """
 
-    target: str = Field(..., description="Target table name or path containing history")
+    target: Optional[str] = Field(
+        None,
+        description="Target table name or full path (use this OR connection+path)",
+    )
+    connection: Optional[str] = Field(
+        None,
+        description="Connection name to resolve path (use with 'path' param)",
+    )
+    path: Optional[str] = Field(
+        None,
+        description="Relative path within connection (e.g., 'OEE/silver/dim_customers')",
+    )
     keys: List[str] = Field(..., description="Natural keys to identify unique entities")
     track_cols: List[str] = Field(..., description="Columns to monitor for changes")
     effective_time_col: str = Field(
@@ -55,6 +78,15 @@ class SCD2Params(BaseModel):
         default=None, description="Column indicating soft deletion (boolean)"
     )
 
+    @model_validator(mode="after")
+    def check_target_or_connection(self):
+        """Ensure either target or connection+path is provided."""
+        if not self.target and not (self.connection and self.path):
+            raise ValueError("SCD2: provide either 'target' OR both 'connection' and 'path'.")
+        if self.target and (self.connection or self.path):
+            raise ValueError("SCD2: use 'target' OR 'connection'+'path', not both.")
+        return self
+
 
 def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> EngineContext:
     """
@@ -65,9 +97,39 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
     ctx = get_logging_context()
     start_time = time.time()
 
+    # Resolve target path from connection if provided
+    target = params.target
+
+    if params.connection and params.path:
+        # Resolve path via connection
+        connection = None
+        if hasattr(context, "engine") and hasattr(context.engine, "connections"):
+            connections = context.engine.connections
+            if connections and params.connection in connections:
+                connection = connections[params.connection]
+
+        if connection is None:
+            raise ValueError(
+                f"SCD2: connection '{params.connection}' not found. "
+                "Ensure the connection is defined in your project config."
+            )
+
+        if hasattr(connection, "get_path"):
+            target = connection.get_path(params.path)
+            ctx.debug(
+                "Resolved SCD2 target path via connection",
+                connection=params.connection,
+                relative_path=params.path,
+                resolved_path=target,
+            )
+        else:
+            raise ValueError(
+                f"SCD2: connection '{params.connection}' does not support path resolution."
+            )
+
     ctx.debug(
         "SCD2 starting",
-        target=params.target,
+        target=target,
         keys=params.keys,
         track_cols=params.track_cols,
     )
@@ -87,10 +149,13 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
         source_rows=rows_before,
     )
 
+    # Create a modified params with resolved target for internal functions
+    resolved_params = params.model_copy(update={"target": target})
+
     if context.engine_type == EngineType.SPARK:
-        result = _scd2_spark(context, source_df, params)
+        result = _scd2_spark(context, source_df, resolved_params)
     elif context.engine_type == EngineType.PANDAS:
-        result = _scd2_pandas(context, source_df, params)
+        result = _scd2_pandas(context, source_df, resolved_params)
     else:
         ctx.error("SCD2 failed: unsupported engine", engine_type=str(context.engine_type))
         raise ValueError(f"Unsupported engine: {context.engine_type}")
@@ -106,7 +171,7 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
     elapsed_ms = (time.time() - start_time) * 1000
     ctx.debug(
         "SCD2 completed",
-        target=params.target,
+        target=target,
         source_rows=rows_before,
         result_rows=rows_after,
         elapsed_ms=round(elapsed_ms, 2),
@@ -186,9 +251,7 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     # Filter: TargetKey IS NULL OR is_changed
     rows_to_insert = joined.filter(
         F.col(f"{t_prefix}{params.keys[0]}").isNull() | is_changed
-    ).select(
-        source_df.columns
-    )  # Select original source columns
+    ).select(source_df.columns)  # Select original source columns
 
     # Add metadata to inserts (Start=eff_col, End=Null, Current=True)
     rows_to_insert = rows_to_insert.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(

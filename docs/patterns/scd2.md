@@ -40,7 +40,7 @@ Each record has an "effective window" (`effective_time` to `end_time`) and a fla
 
 Use the `scd2` transformer in your pipeline node.
 
-### Minimal Example
+### Option 1: Using Table Name
 
 ```yaml
 nodes:
@@ -49,16 +49,37 @@ nodes:
 
     transformer: "scd2"
     params:
-      target: "gold/dim_customers"     # Path to existing history
+      target: "silver.dim_customers"   # Registered table name
       keys: ["customer_id"]            # Unique ID
       track_cols: ["address", "tier"]  # Changes here trigger a new version
       effective_time_col: "txn_date"   # When the change happened
 
     write:
-      connection: "gold_lake"
+      table: "silver.dim_customers"
       format: "delta"
-      path: "gold/dim_customers"
-      mode: "overwrite"                # Important: SCD2 returns FULL history, so we overwrite
+      mode: "overwrite"                # Important: SCD2 returns FULL history
+```
+
+### Option 2: Using Connection + Path (ADLS)
+
+```yaml
+nodes:
+  - name: "dim_customers"
+    # ... (read from source) ...
+
+    transformer: "scd2"
+    params:
+      connection: adls_prod            # Connection name
+      path: OEE/silver/dim_customers   # Relative path
+      keys: ["customer_id"]
+      track_cols: ["address", "tier"]
+      effective_time_col: "txn_date"
+
+    write:
+      connection: adls_prod
+      path: OEE/silver/dim_customers   # Same location as target
+      format: "delta"
+      mode: "overwrite"
 ```
 
 ### Full Configuration
@@ -66,7 +87,7 @@ nodes:
 ```yaml
 transformer: "scd2"
 params:
-  target: "gold/dim_customers"
+  target: "silver.dim_customers"       # OR use connection + path
   keys: ["customer_id"]
   track_cols: ["address", "tier", "email"]
 
