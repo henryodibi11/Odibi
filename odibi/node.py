@@ -1151,7 +1151,15 @@ class NodeExecutor:
             df = self.engine.materialize(df)
 
         func_name = config.transformer
-        params = config.params
+        params = dict(config.params) if config.params else {}
+
+        # Merge global delta_table_properties into merge transformer params
+        if func_name == "merge" and self.performance_config:
+            global_props = getattr(self.performance_config, "delta_table_properties", None) or {}
+            node_props = params.get("table_properties") or {}
+            merged_props = {**global_props, **node_props}
+            if merged_props:
+                params["table_properties"] = merged_props
 
         FunctionRegistry.validate_params(func_name, params)
         func = FunctionRegistry.get(func_name)
