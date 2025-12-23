@@ -227,8 +227,13 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     for c in current_target.columns:
         renamed_target = renamed_target.withColumnRenamed(c, f"{t_prefix}{c}")
 
+    # Preserve effective_time_col with a unique name before join to avoid resolution issues
+    # This ensures we can always reference it regardless of target schema
+    eff_col_preserved = "__src_eff_time"
+    source_with_eff = source_df.withColumn(eff_col_preserved, F.col(eff_col))
+
     # Alias source_df to ensure column references are unambiguous after join
-    source_aliased = source_df.alias("__source")
+    source_aliased = source_with_eff.alias("__source")
     join_cond = [F.col(f"__source.{k}") == renamed_target[f"{t_prefix}{k}"] for k in params.keys]
 
     joined = source_aliased.join(renamed_target, join_cond, "left")
@@ -272,10 +277,10 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     # Strategy:
     # 1. Identify keys that CHANGED (from joined result)
     # Also carry over the NEW effective date from source to use as END date
-    # Use __source alias to explicitly reference effective_time_col from source
+    # Use the preserved eff_col_preserved column to avoid resolution issues
     changed_keys_with_date = joined.filter(is_changed).select(
         *[F.col(f"__source.{k}").alias(k) for k in params.keys],
-        F.col(f"__source.{eff_col}").alias("__new_end_date"),
+        F.col(f"__source.{eff_col_preserved}").alias("__new_end_date"),
     )
 
     # 2. Join Target with Changed Keys to apply updates
