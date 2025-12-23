@@ -547,6 +547,25 @@ params:
   cluster_by: ["region"]
 ```
 
+**Connection-Based Path (ADLS):**
+
+Use `connection` + `path` instead of `target` to leverage connection-based path resolution:
+
+```yaml
+transform:
+  steps:
+    - function: merge
+      params:
+        connection: adls_prod           # Connection name
+        path: OEE/silver/customers      # Relative path
+        register_table: silver.customers  # Register in metastore
+        keys: ["customer_id"]
+        strategy: "upsert"
+        audit_cols:
+          created_col: "_created_at"
+          updated_col: "_updated_at"
+```
+
 ### Validation Transformers
 
 Cross-dataset validation checks.

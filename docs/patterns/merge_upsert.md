@@ -331,6 +331,31 @@ params:
 
 This inserts new rows but ignores duplicates instead of updating.
 
+### Pattern: Connection-Based Path with Table Registration
+
+Use a connection to resolve ADLS paths and register the table in Unity Catalog:
+
+```yaml
+transform:
+  steps:
+    - sql_file: "sql/clean_orders.sql"
+    - function: merge
+      params:
+        connection: adls_prod
+        path: OEE/silver/orders
+        register_table: silver.orders
+        keys: [order_id]
+        strategy: upsert
+        audit_cols:
+          created_col: "_created_at"
+          updated_col: "_updated_at"
+```
+
+This:
+1. Resolves the full ADLS path via the `adls_prod` connection
+2. Performs the merge operation
+3. Registers the Delta table as `silver.orders` in the metastore
+
 ---
 
 ## Debugging

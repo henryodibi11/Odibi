@@ -107,13 +107,45 @@ class MergeParams(BaseModel):
       insert_condition: "source.is_deleted = false"
     ```
 
+    **Recipe 6: Connection-based Path Resolution (ADLS)**
+    "Use a connection to resolve paths, just like write config."
+    ```yaml
+    transform:
+      steps:
+        - function: merge
+          params:
+            connection: goat_prod
+            path: OEE/silver/customers
+            register_table: silver.customers
+            keys: ["customer_id"]
+            strategy: "upsert"
+            audit_cols:
+              created_col: "_created_at"
+              updated_col: "_updated_at"
+    ```
+
     **Strategies:**
     *   **upsert** (Default): Update existing records, insert new ones.
     *   **append_only**: Ignore duplicates, only insert new keys.
     *   **delete_match**: Delete records in target that match keys in source.
     """
 
-    target: str = Field(..., description="Target table name or path")
+    target: Optional[str] = Field(
+        None,
+        description="Target table name or full path (use this OR connection+path)",
+    )
+    connection: Optional[str] = Field(
+        None,
+        description="Connection name to resolve path (use with 'path' param)",
+    )
+    path: Optional[str] = Field(
+        None,
+        description="Relative path within connection (e.g., 'OEE/silver/customers')",
+    )
+    register_table: Optional[str] = Field(
+        None,
+        description="Register as Unity Catalog/metastore table after merge (e.g., 'silver.customers')",
+    )
     keys: List[str] = Field(..., description="List of join keys")
     strategy: MergeStrategy = Field(
         default=MergeStrategy.UPSERT,
@@ -147,6 +179,15 @@ class MergeParams(BaseModel):
         if not v:
             raise ValueError("Merge: 'keys' must not be empty.")
         return v
+
+    @model_validator(mode="after")
+    def check_target_or_connection(self):
+        """Ensure either target or connection+path is provided."""
+        if not self.target and not (self.connection and self.path):
+            raise ValueError("Merge: provide either 'target' OR both 'connection' and 'path'.")
+        if self.target and (self.connection or self.path):
+            raise ValueError("Merge: use 'target' OR 'connection'+'path', not both.")
+        return self
 
     @model_validator(mode="after")
     def check_strategy_and_audit(self):
@@ -188,11 +229,43 @@ def merge(context, params=None, current=None, **kwargs):
         else:
             raise ValueError("Merge requires a DataFrame: pass via context.df or as 'current' arg")
 
+    # Resolve target path from connection if provided
+    target = merge_params.target
+    register_table = merge_params.register_table
+
+    if merge_params.connection and merge_params.path:
+        # Resolve path via connection
+        connection = None
+        if hasattr(context, "engine") and hasattr(context.engine, "connections"):
+            connections = context.engine.connections
+            if connections and merge_params.connection in connections:
+                connection = connections[merge_params.connection]
+
+        if connection is None:
+            raise ValueError(
+                f"Merge: connection '{merge_params.connection}' not found. "
+                "Ensure the connection is defined in your project config."
+            )
+
+        if hasattr(connection, "get_path"):
+            target = connection.get_path(merge_params.path)
+            ctx.debug(
+                "Resolved merge target path via connection",
+                connection=merge_params.connection,
+                relative_path=merge_params.path,
+                resolved_path=target,
+            )
+        else:
+            raise ValueError(
+                f"Merge: connection '{merge_params.connection}' does not support path resolution."
+            )
+
     ctx.debug(
         "Merge starting",
-        target=merge_params.target,
+        target=target,
         keys=merge_params.keys,
         strategy=merge_params.strategy.value,
+        register_table=register_table,
     )
 
     # Get source row count
@@ -211,7 +284,6 @@ def merge(context, params=None, current=None, **kwargs):
     if isinstance(context, EngineContext):
         real_context = context.context
 
-    target = merge_params.target
     keys = merge_params.keys
     strategy = merge_params.strategy
     audit_cols = merge_params.audit_cols
@@ -239,17 +311,40 @@ def merge(context, params=None, current=None, **kwargs):
             kwargs,
         )
     elif isinstance(real_context, PandasContext):
-        result = _merge_pandas(
-            context, current, target, keys, strategy, audit_cols, kwargs
-        )
+        result = _merge_pandas(context, current, target, keys, strategy, audit_cols, kwargs)
     else:
         ctx.error("Merge failed: unsupported context", context_type=str(type(real_context)))
         raise ValueError(f"Unsupported context type: {type(real_context)}")
 
+    # Register table in metastore if requested (Spark only)
+    if register_table and isinstance(real_context, SparkContext):
+        try:
+            spark = context.spark
+            if spark:
+                ctx.debug(
+                    "Registering table in metastore",
+                    table_name=register_table,
+                    location=target,
+                )
+                spark.sql(
+                    f"CREATE TABLE IF NOT EXISTS {register_table} USING DELTA LOCATION '{target}'"
+                )
+                ctx.info(
+                    "Table registered successfully",
+                    table_name=register_table,
+                    location=target,
+                )
+        except Exception as e:
+            ctx.warning(
+                f"Failed to register table: {e}",
+                table_name=register_table,
+                error=str(e),
+            )
+
     elapsed_ms = (time.time() - start_time) * 1000
     ctx.debug(
         "Merge completed",
-        target=merge_params.target,
+        target=target,
         strategy=merge_params.strategy.value,
         source_rows=rows_before,
         elapsed_ms=round(elapsed_ms, 2),

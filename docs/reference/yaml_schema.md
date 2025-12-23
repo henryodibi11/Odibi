@@ -2718,6 +2718,12 @@ params:
 Merge transformer implementation.
 Handles Upsert, Append-Only, and Delete-Match strategies.
 
+Args:
+    context: EngineContext (preferred) or legacy PandasContext/SparkContext
+    params: MergeParams object (when called via function step) or DataFrame (legacy)
+    current: DataFrame (legacy positional arg, deprecated)
+    **kwargs: Parameters when not using MergeParams
+
 Configuration for Merge transformer (Upsert/Append).
 
 ### ⚖️ "GDPR & Compliance" Guide
@@ -2787,6 +2793,23 @@ params:
   insert_condition: "source.is_deleted = false"
 ```
 
+**Recipe 6: Connection-based Path Resolution (ADLS)**
+"Use a connection to resolve paths, just like write config."
+```yaml
+transform:
+  steps:
+    - function: merge
+      params:
+        connection: goat_prod
+        path: OEE/silver/customers
+        register_table: silver.customers
+        keys: ["customer_id"]
+        strategy: "upsert"
+        audit_cols:
+          created_col: "_created_at"
+          updated_col: "_updated_at"
+```
+
 **Strategies:**
 *   **upsert** (Default): Update existing records, insert new ones.
 *   **append_only**: Ignore duplicates, only insert new keys.
@@ -2795,7 +2818,10 @@ params:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **target** | str | Yes | - | Target table name or path |
+| **target** | Optional[str] | No | - | Target table name or full path (use this OR connection+path) |
+| **connection** | Optional[str] | No | - | Connection name to resolve path (use with 'path' param) |
+| **path** | Optional[str] | No | - | Relative path within connection (e.g., 'OEE/silver/customers') |
+| **register_table** | Optional[str] | No | - | Register as Unity Catalog/metastore table after merge (e.g., 'silver.customers') |
 | **keys** | List[str] | Yes | - | List of join keys |
 | **strategy** | MergeStrategy | No | `MergeStrategy.UPSERT` | Merge behavior: 'upsert', 'append_only', 'delete_match' |
 | **audit_cols** | Optional[[AuditColumnsConfig](#auditcolumnsconfig)] | No | - | {'created_col': '...', 'updated_col': '...'} |
