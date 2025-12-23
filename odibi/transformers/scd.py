@@ -203,6 +203,14 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     end_col = params.end_time_col
     flag_col = params.current_flag_col
 
+    # Validate effective_time_col exists in source
+    source_cols = source_df.columns
+    if eff_col not in source_cols:
+        raise ValueError(
+            f"SCD2: effective_time_col '{eff_col}' not found in source DataFrame. "
+            f"Available columns: {source_cols}"
+        )
+
     # Prepare Source: Add SCD metadata columns
     # New records start as Current
     new_records = source_df.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
