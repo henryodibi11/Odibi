@@ -1050,7 +1050,19 @@ class NodeExecutor:
                     pattern_cls = get_pattern_class(config.transformer)
                     is_pattern = True
 
-                    pattern = pattern_cls(self.engine, config)
+                    # Inject delta_table_properties into config.params for patterns
+                    pattern_config = config
+                    if self.performance_config and config.transformer in ("merge", "scd2"):
+                        global_props = (
+                            getattr(self.performance_config, "delta_table_properties", None) or {}
+                        )
+                        if global_props:
+                            merged_params = dict(config.params) if config.params else {}
+                            node_props = merged_params.get("table_properties") or {}
+                            merged_params["table_properties"] = {**global_props, **node_props}
+                            pattern_config = config.model_copy(update={"params": merged_params})
+
+                    pattern = pattern_cls(self.engine, pattern_config)
                     pattern.validate()
 
                     engine_ctx = EngineContext(
