@@ -156,17 +156,37 @@ class MergeParams(BaseModel):
 
 
 @transform("merge", category="transformer", param_model=MergeParams)
-def merge(context, current, **params):
+def merge(context, params=None, current=None, **kwargs):
     """
     Merge transformer implementation.
     Handles Upsert, Append-Only, and Delete-Match strategies.
+
+    Args:
+        context: EngineContext (preferred) or legacy PandasContext/SparkContext
+        params: MergeParams object (when called via function step) or DataFrame (legacy)
+        current: DataFrame (legacy positional arg, deprecated)
+        **kwargs: Parameters when not using MergeParams
     """
     ctx = get_logging_context()
     start_time = time.time()
 
-    # Validate params using Pydantic model
-    # This ensures runtime behavior matches the "Cookbook" docs
-    merge_params = MergeParams(**params)
+    # Handle legacy signature: merge(context, source_df, **params)
+    # where params (2nd arg) is actually the DataFrame
+    if params is not None and not isinstance(params, MergeParams):
+        # Legacy call: params is actually the DataFrame
+        current = params
+        merge_params = MergeParams(**kwargs)
+    elif isinstance(params, MergeParams):
+        merge_params = params
+    else:
+        merge_params = MergeParams(**kwargs)
+
+    # Get current DataFrame: prefer explicit current, then context.df
+    if current is None:
+        if hasattr(context, "df"):
+            current = context.df
+        else:
+            raise ValueError("Merge requires a DataFrame: pass via context.df or as 'current' arg")
 
     ctx.debug(
         "Merge starting",
@@ -203,7 +223,7 @@ def merge(context, current, **params):
 
     if isinstance(real_context, SparkContext):
         result = _merge_spark(
-            context,  # Pass EngineContext wrapper to access .spark and potentially .engine
+            context,
             current,
             target,
             keys,
@@ -216,12 +236,12 @@ def merge(context, current, **params):
             merge_params.insert_condition,
             merge_params.delete_condition,
             merge_params.table_properties,
-            params,  # pass raw params if needed by internal logic or refactor internal logic
+            kwargs,
         )
     elif isinstance(real_context, PandasContext):
         result = _merge_pandas(
-            context, current, target, keys, strategy, audit_cols, params
-        )  # Pass EngineContext wrapper
+            context, current, target, keys, strategy, audit_cols, kwargs
+        )
     else:
         ctx.error("Merge failed: unsupported context", context_type=str(type(real_context)))
         raise ValueError(f"Unsupported context type: {type(real_context)}")
