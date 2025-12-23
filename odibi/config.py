@@ -293,11 +293,8 @@ class DeleteDetectionConfig(BaseModel):
         if not self.keys:
             raise ValueError(f"delete_detection: 'keys' required for mode='{self.mode.value}'")
 
-        if self.mode == DeleteDetectionMode.SNAPSHOT_DIFF:
-            if not self.connection or not self.path:
-                raise ValueError(
-                    "delete_detection: 'connection' and 'path' required for snapshot_diff mode"
-                )
+        # Note: snapshot_diff can use connection+path OR fallback to context inference
+        # Validation at runtime in detect_deletes transformer will warn if neither available
 
         if self.mode == DeleteDetectionMode.SQL_COMPARE:
             if not self.source_connection:

@@ -51,12 +51,23 @@ class TestDeleteDetectionConfigValidation:
             DeleteDetectionConfig(mode=DeleteDetectionMode.SNAPSHOT_DIFF)
 
     def test_snapshot_diff_valid_with_keys(self):
-        """Snapshot diff mode works with keys."""
+        """Snapshot diff mode works with keys (connection+path optional, can fallback to context)."""
         config = DeleteDetectionConfig(
             mode=DeleteDetectionMode.SNAPSHOT_DIFF,
             keys=["customer_id", "order_id"],
         )
         assert config.keys == ["customer_id", "order_id"]
+
+    def test_snapshot_diff_with_explicit_connection_path(self):
+        """Snapshot diff mode accepts explicit connection and path."""
+        config = DeleteDetectionConfig(
+            mode=DeleteDetectionMode.SNAPSHOT_DIFF,
+            keys=["customer_id"],
+            connection="silver_conn",
+            path="silver/customers",
+        )
+        assert config.connection == "silver_conn"
+        assert config.path == "silver/customers"
 
     def test_sql_compare_requires_keys(self):
         """SQL compare mode requires keys."""
