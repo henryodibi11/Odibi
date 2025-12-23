@@ -11,6 +11,21 @@ from odibi.utils.logging import logger
 ENV_PATTERN = re.compile(r"\$\{(?:env:)?([A-Za-z0-9_]+)\}")
 
 
+def _tag_nodes_with_source(data: Dict[str, Any], source_path: str) -> None:
+    """Tag all nodes in pipelines with their source YAML file path.
+
+    This enables sql_file resolution to work correctly when pipelines are imported
+    from different directories.
+    """
+    pipelines = data.get("pipelines", [])
+    for pipeline in pipelines:
+        if isinstance(pipeline, dict):
+            nodes = pipeline.get("nodes", [])
+            for node in nodes:
+                if isinstance(node, dict) and "_source_yaml" not in node:
+                    node["_source_yaml"] = source_path
+
+
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """Merge override dictionary into base dictionary.
 
@@ -129,6 +144,9 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
         raise
 
     logger.debug("YAML parsed successfully", top_level_keys=list(data.keys()))
+
+    # Tag all nodes in this file with their source YAML path (for sql_file resolution)
+    _tag_nodes_with_source(data, abs_path)
 
     # Handle imports
     imports = data.pop("imports", [])

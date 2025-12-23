@@ -2555,6 +2555,11 @@ class NodeConfig(BaseModel):
         default=False, description="If true or list of columns, masks sample data in stories"
     )
 
+    # Internal: tracks which YAML file this node was defined in (for sql_file resolution)
+    _source_yaml: Optional[str] = None
+
+    model_config = {"arbitrary_types_allowed": True}
+
     @model_validator(mode="after")
     def check_at_least_one_operation(self):
         """Ensure at least one operation is defined."""
