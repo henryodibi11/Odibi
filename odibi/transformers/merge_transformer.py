@@ -414,7 +414,7 @@ def _merge_spark(
         if is_delta:
             delta_table = get_delta_table()
 
-            condition = " AND ".join([f"target.{k} = source.{k}" for k in keys])
+            condition = " AND ".join([f"target.`{k}` = source.`{k}`" for k in keys])
             merger = delta_table.alias("target").merge(batch_df.alias("source"), condition)
 
             orig_auto_merge = None
@@ -430,7 +430,7 @@ def _merge_spark(
                     # do NOT exist in target, it throws UNRESOLVED_EXPRESSION if schema evolution
                     # is not enabled or handled automatically by the merge operation for updates.
 
-                    update_expr[col_name] = f"source.{col_name}"
+                    update_expr[f"`{col_name}`"] = f"source.`{col_name}`"
 
                 # Enable automatic schema evolution for the merge
                 # This is critical for adding new columns (like audit cols)
@@ -487,7 +487,7 @@ def _merge_spark(
                 else:
                     cluster_cols = cluster_by
 
-                cols = ", ".join(cluster_cols)
+                cols = ", ".join(f"`{c}`" for c in cluster_cols)
                 # Create temp view
                 temp_view = f"odibi_merge_init_{abs(hash(target))}"
                 batch_df.createOrReplaceTempView(temp_view)
@@ -541,7 +541,7 @@ def _merge_spark(
                     else:
                         zorder_cols = zorder_by
 
-                    cols = ", ".join(zorder_cols)
+                    cols = ", ".join(f"`{c}`" for c in zorder_cols)
                     sql += f" ZORDER BY ({cols})"
 
                 spark.sql(sql)
@@ -631,7 +631,8 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
             # Assuming keys are simple.
 
             # Join condition: s.k1 = t.k1 AND s.k2 = t.k2
-            join_cond = " AND ".join([f"s.{k} = t.{k}" for k in keys])
+            # Quote column names with double quotes for DuckDB compatibility
+            join_cond = " AND ".join([f's."{k}" = t."{k}"' for k in keys])
 
             query = ""
             if strategy == MergeStrategy.UPSERT:
