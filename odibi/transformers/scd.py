@@ -251,7 +251,9 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     # Filter: TargetKey IS NULL OR is_changed
     rows_to_insert = joined.filter(
         F.col(f"{t_prefix}{params.keys[0]}").isNull() | is_changed
-    ).select(source_df.columns)  # Select original source columns
+    ).select(
+        source_df.columns
+    )  # Select original source columns
 
     # Add metadata to inserts (Start=eff_col, End=Null, Current=True)
     rows_to_insert = rows_to_insert.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
