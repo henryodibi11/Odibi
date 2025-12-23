@@ -270,8 +270,9 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     # Strategy:
     # 1. Identify keys that CHANGED (from joined result)
     # Also carry over the NEW effective date from source to use as END date
+    # Use source_df[eff_col] to explicitly reference from source (target doesn't have this col)
     changed_keys_with_date = joined.filter(is_changed).select(
-        *[F.col(k) for k in params.keys], F.col(eff_col).alias("__new_end_date")
+        *[F.col(k) for k in params.keys], source_df[eff_col].alias("__new_end_date")
     )
 
     # 2. Join Target with Changed Keys to apply updates
