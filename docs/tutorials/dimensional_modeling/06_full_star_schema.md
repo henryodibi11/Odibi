@@ -198,7 +198,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 2
-          track_columns:
+          track_cols:
             - name
             - email
             - region
@@ -234,7 +234,7 @@ pipelines:
           natural_key: product_id
           surrogate_key: product_sk
           scd_type: 1
-          track_columns:
+          track_cols:
             - name
             - category
             - subcategory

@@ -210,7 +210,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 2
-          track_columns: [name, email, region]
+          track_cols: [name, email, region]
           target: warehouse.dim_customer
           unknown_member: true
         write:
@@ -227,7 +227,7 @@ pipelines:
           natural_key: product_id
           surrogate_key: product_sk
           scd_type: 1
-          track_columns: [name, category, price]
+          track_cols: [name, category, price]
           target: warehouse.dim_product
           unknown_member: true
         write:

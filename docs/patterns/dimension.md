@@ -37,7 +37,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 2
-          track_columns: [name, email, address]
+          track_cols: [name, email, address]
           target: warehouse.dim_customer
           unknown_member: true
           audit:
@@ -71,7 +71,7 @@ pipelines:
 | `natural_key` | str | Yes | - | Natural/business key column name |
 | `surrogate_key` | str | Yes | - | Surrogate key column name to generate |
 | `scd_type` | int | No | 1 | 0=static, 1=overwrite, 2=history tracking |
-| `track_columns` | list | For SCD1/2 | - | Columns to track for changes |
+| `track_cols` | list | For SCD1/2 | - | Columns to track for changes |
 | `target` | str | For SCD2 | - | Target table path (required to read existing history) |
 | `unknown_member` | bool | No | false | Insert a row with SK=0 for orphan FK handling |
 | `audit` | dict | No | {} | Audit column configuration |
@@ -131,7 +131,7 @@ nodes:
       natural_key: customer_id
       surrogate_key: customer_sk
       scd_type: 1
-      track_columns: [name, email, address]
+      track_cols: [name, email, address]
       target: warehouse.dim_customer
       audit:
         load_timestamp: true
@@ -160,7 +160,7 @@ nodes:
       natural_key: customer_id
       surrogate_key: customer_sk
       scd_type: 2
-      track_columns: [name, email, address, city, state]
+      track_cols: [name, email, address, city, state]
       target: warehouse.dim_customer
       valid_from_col: valid_from     # Optional, default: valid_from
       valid_to_col: valid_to         # Optional, default: valid_to
@@ -232,7 +232,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 2
-          track_columns:
+          track_cols:
             - name
             - email
             - phone
@@ -262,7 +262,7 @@ pipelines:
           natural_key: product_id
           surrogate_key: product_sk
           scd_type: 1
-          track_columns: [name, category, price, status]
+          track_cols: [name, category, price, status]
           target: warehouse.dim_product
           unknown_member: true
         write:
@@ -307,7 +307,7 @@ pattern = DimensionPattern(params={
     "natural_key": "customer_id",
     "surrogate_key": "customer_sk",
     "scd_type": 2,
-    "track_columns": ["name", "email", "address"],
+    "track_cols": ["name", "email", "address"],
     "target": "gold.dim_customer",
     "unknown_member": True,
     "audit": {

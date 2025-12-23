@@ -79,7 +79,7 @@ class TestDimensionPatternValidation:
             "natural_key": "customer_id",
             "surrogate_key": "customer_sk",
             "scd_type": 2,
-            "track_columns": ["name"],
+            "track_cols": ["name"],
         }
 
         pattern = DimensionPattern(mock_engine, mock_config)
@@ -87,8 +87,8 @@ class TestDimensionPatternValidation:
         with pytest.raises(ValueError, match="target"):
             pattern.validate()
 
-    def test_validate_scd1_requires_track_columns(self, mock_engine, mock_config):
-        """Test that SCD1 requires track_columns."""
+    def test_validate_scd1_requires_track_cols(self, mock_engine, mock_config):
+        """Test that SCD1 requires track_cols."""
         mock_config.params = {
             "natural_key": "customer_id",
             "surrogate_key": "customer_sk",
@@ -97,11 +97,11 @@ class TestDimensionPatternValidation:
 
         pattern = DimensionPattern(mock_engine, mock_config)
 
-        with pytest.raises(ValueError, match="track_columns"):
+        with pytest.raises(ValueError, match="track_cols"):
             pattern.validate()
 
-    def test_validate_scd2_requires_track_columns(self, mock_engine, mock_config):
-        """Test that SCD2 requires track_columns."""
+    def test_validate_scd2_requires_track_cols(self, mock_engine, mock_config):
+        """Test that SCD2 requires track_cols."""
         mock_config.params = {
             "natural_key": "customer_id",
             "surrogate_key": "customer_sk",
@@ -111,7 +111,7 @@ class TestDimensionPatternValidation:
 
         pattern = DimensionPattern(mock_engine, mock_config)
 
-        with pytest.raises(ValueError, match="track_columns"):
+        with pytest.raises(ValueError, match="track_cols"):
             pattern.validate()
 
     def test_validate_success_scd0(self, mock_engine, mock_config):
@@ -131,7 +131,7 @@ class TestDimensionPatternValidation:
             "natural_key": "customer_id",
             "surrogate_key": "customer_sk",
             "scd_type": 1,
-            "track_columns": ["name", "email"],
+            "track_cols": ["name", "email"],
         }
 
         pattern = DimensionPattern(mock_engine, mock_config)
@@ -143,7 +143,7 @@ class TestDimensionPatternValidation:
             "natural_key": "customer_id",
             "surrogate_key": "customer_sk",
             "scd_type": 2,
-            "track_columns": ["name", "email"],
+            "track_cols": ["name", "email"],
             "target": "gold/dim_customer",
         }
 
@@ -229,7 +229,7 @@ class TestDimensionPatternSCD1:
             "natural_key": "customer_id",
             "surrogate_key": "customer_sk",
             "scd_type": 1,
-            "track_columns": ["name"],
+            "track_cols": ["name"],
             "audit": {"load_timestamp": False},
         }
 
@@ -260,7 +260,7 @@ class TestDimensionPatternSCD1:
             "natural_key": "customer_id",
             "surrogate_key": "customer_sk",
             "scd_type": 1,
-            "track_columns": ["name"],
+            "track_cols": ["name"],
             "target": str(target_path),
             "audit": {"load_timestamp": False},
         }

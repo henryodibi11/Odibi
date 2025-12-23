@@ -77,7 +77,7 @@ params:
   natural_key: customer_id
   surrogate_key: customer_sk
   scd_type: 2
-  track_columns: [name, email, address]
+  track_cols: [name, email, address]
 ```
 
 ---

@@ -167,7 +167,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 1
-          track_columns:
+          track_cols:
             - name
             - email
             - region
@@ -275,7 +275,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 2
-          track_columns:
+          track_cols:
             - name
             - email
             - region
@@ -412,7 +412,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 2
-          track_columns:
+          track_cols:
             - name
             - email
             - region
@@ -449,7 +449,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 2
-          track_columns:
+          track_cols:
             - name
             - email
             - region
@@ -491,7 +491,7 @@ pattern = DimensionPattern(params={
     "natural_key": "customer_id",
     "surrogate_key": "customer_sk",
     "scd_type": 2,
-    "track_columns": ["name", "email", "region", "city", "state"],
+    "track_cols": ["name", "email", "region", "city", "state"],
     "unknown_member": True,
     "audit": {
         "load_timestamp": True,
@@ -522,7 +522,7 @@ In this tutorial, you learned:
 - **SCD Type 2** creates new rows for changes, preserving full history with valid_from/valid_to dates
 - **Surrogate keys** are auto-generated integers, sequential starting from 1
 - **Unknown member** (SK=0) provides a default for orphan FK handling
-- **track_columns** defines which columns trigger a new version in SCD1/SCD2
+- **track_cols** defines which columns trigger a new version in SCD1/SCD2
 - **Audit columns** (load_timestamp, source_system) track when/where data came from
 
 ---

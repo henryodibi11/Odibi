@@ -288,7 +288,7 @@ pipelines:
           natural_key: customer_id
           surrogate_key: customer_sk
           scd_type: 2
-          track_columns: [name, region]
+          track_cols: [name, region]
         write:
           connection: warehouse
           path: dim_customer

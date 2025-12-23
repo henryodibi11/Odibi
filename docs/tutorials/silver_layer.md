@@ -106,7 +106,7 @@ nodes:
         natural_key: customer_id
         surrogate_key: customer_sk
         scd_type: 2
-        track_columns: [name, email, address, city, state]
+        track_cols: [name, email, address, city, state]
         target: silver.dim_customer
         effective_from_col: valid_from
         effective_to_col: valid_to

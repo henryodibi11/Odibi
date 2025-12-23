@@ -48,7 +48,7 @@ Create `odibi/patterns/dimension.py` - a new `DimensionPattern` that builds a co
        natural_key: customer_id         # Required
        surrogate_key: customer_sk       # Required
        scd_type: 2                      # 0, 1, or 2
-       track_columns: [name, city]      # For SCD1/2
+       track_cols: [name, city]      # For SCD1/2
        target: gold/dim_customer        # For SCD2 (existing table)
        unknown_member: true             # Optional
        audit:
@@ -92,7 +92,7 @@ This config should work:
       natural_key: customer_id
       surrogate_key: customer_sk
       scd_type: 2
-      track_columns: [name, email, city]
+      track_cols: [name, email, city]
       target: gold/dim_customer
       unknown_member: true
       audit:

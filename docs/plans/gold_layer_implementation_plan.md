@@ -42,7 +42,7 @@ pattern:
     natural_key: customer_id           # Business key (from Silver)
     surrogate_key: customer_sk         # Generated (auto-increment)
     scd_type: 2                        # 0=static, 1=overwrite, 2=history
-    track_columns: [name, email, city] # Columns to track for changes
+    track_cols: [name, email, city] # Columns to track for changes
     unknown_member: true               # Add row for orphan FKs
     audit:
       load_timestamp: true
@@ -400,7 +400,7 @@ pipelines:
             natural_key: customer_id
             surrogate_key: customer_sk
             scd_type: 2
-            track_columns: [name, city]
+            track_cols: [name, city]
             unknown_member: true
         write:
           connection: gold

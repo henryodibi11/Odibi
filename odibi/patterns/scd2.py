@@ -59,7 +59,7 @@ class SCD2Pattern(Pattern):
         valid_from_col = self.params.get("valid_from_col", "valid_from")
         valid_to_col = self.params.get("valid_to_col", "valid_to")
         is_current_col = self.params.get("is_current_col", "is_current")
-        track_columns = self.params.get("track_columns")
+        track_cols = self.params.get("track_cols")
 
         ctx.debug(
             "SCD2 pattern starting",
@@ -69,7 +69,7 @@ class SCD2Pattern(Pattern):
             valid_from_col=valid_from_col,
             valid_to_col=valid_to_col,
             is_current_col=is_current_col,
-            track_columns=track_columns,
+            track_cols=track_cols,
         )
 
         source_count = None

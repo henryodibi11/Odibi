@@ -3472,7 +3472,7 @@ Fact tables join to dimensions via surrogate keys.
 | `natural_key` | str | Yes | Natural/business key column name |
 | `surrogate_key` | str | Yes | Surrogate key column name to generate |
 | `scd_type` | int | No | 0=static, 1=overwrite, 2=history (default: 1) |
-| `track_columns` | list | SCD1/2 | Columns to track for change detection |
+| `track_cols` | list | SCD1/2 | Columns to track for change detection |
 | `target` | str | SCD2 | Target table path to read existing history |
 | `unknown_member` | bool | No | Insert row with SK=0 for orphan handling |
 | `audit.load_timestamp` | bool | No | Add load_timestamp column |
@@ -3490,7 +3490,7 @@ pattern:
     natural_key: customer_id
     surrogate_key: customer_sk
     scd_type: 2
-    track_columns: [name, email, address, city]
+    track_cols: [name, email, address, city]
     target: warehouse.dim_customer
     unknown_member: true
     audit:

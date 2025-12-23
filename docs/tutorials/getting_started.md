@@ -221,7 +221,7 @@ nodes:
         natural_key: customer_id        # Business key
         surrogate_key: customer_sk      # Generated integer key
         scd_type: 2                     # Track history
-        track_columns: [name, email, city]
+        track_cols: [name, email, city]
         target: silver.dim_customer     # Read existing for merge
         unknown_member: true            # Add SK=0 for orphans
     write:

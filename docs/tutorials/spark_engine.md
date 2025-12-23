@@ -210,7 +210,7 @@ nodes:
         natural_key: customer_id
         surrogate_key: customer_sk
         scd_type: 2
-        track_columns: [name, email, address, city]
+        track_cols: [name, email, address, city]
         target: silver.dim_customer
         unknown_member: true
     write:

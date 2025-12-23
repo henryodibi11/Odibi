@@ -34,7 +34,7 @@ class DimensionPattern(Pattern):
         - **natural_key** (str): Natural/business key column name
         - **surrogate_key** (str): Surrogate key column name to generate
         - **scd_type** (int): 0=static, 1=overwrite, 2=history tracking (default: 1)
-        - **track_columns** (list): Columns to track for SCD1/2 changes
+        - **track_cols** (list): Columns to track for SCD1/2 changes
         - **target** (str): Target table path (required for SCD2 to read existing history)
         - **unknown_member** (bool): If true, insert a row with SK=0 for orphan FK handling
         - **audit** (dict): Audit configuration with load_timestamp and source_system
@@ -94,13 +94,13 @@ class DimensionPattern(Pattern):
             )
             raise ValueError("DimensionPattern: 'target' parameter is required for scd_type=2.")
 
-        if scd_type in (1, 2) and not self.params.get("track_columns"):
+        if scd_type in (1, 2) and not self.params.get("track_cols"):
             ctx.error(
-                "DimensionPattern validation failed: 'track_columns' required for SCD1/2",
+                "DimensionPattern validation failed: 'track_cols' required for SCD1/2",
                 pattern="DimensionPattern",
             )
             raise ValueError(
-                "DimensionPattern: 'track_columns' parameter is required for scd_type 1 or 2."
+                "DimensionPattern: 'track_cols' parameter is required for scd_type 1 or 2."
             )
 
         ctx.debug(
@@ -115,7 +115,7 @@ class DimensionPattern(Pattern):
         natural_key = self.params.get("natural_key")
         surrogate_key = self.params.get("surrogate_key")
         scd_type = self.params.get("scd_type", 1)
-        track_columns = self.params.get("track_columns", [])
+        track_cols = self.params.get("track_cols", [])
         target = self.params.get("target")
         unknown_member = self.params.get("unknown_member", False)
         audit_config = self.params.get("audit", {})
@@ -126,7 +126,7 @@ class DimensionPattern(Pattern):
             natural_key=natural_key,
             surrogate_key=surrogate_key,
             scd_type=scd_type,
-            track_columns=track_columns,
+            track_cols=track_cols,
             target=target,
             unknown_member=unknown_member,
         )
@@ -139,11 +139,11 @@ class DimensionPattern(Pattern):
                 result_df = self._execute_scd0(context, natural_key, surrogate_key, target)
             elif scd_type == 1:
                 result_df = self._execute_scd1(
-                    context, natural_key, surrogate_key, track_columns, target
+                    context, natural_key, surrogate_key, track_cols, target
                 )
             else:
                 result_df = self._execute_scd2(
-                    context, natural_key, surrogate_key, track_columns, target
+                    context, natural_key, surrogate_key, track_cols, target
                 )
 
             result_df = self._add_audit_columns(context, result_df, audit_config)
@@ -380,7 +380,7 @@ class DimensionPattern(Pattern):
         context: EngineContext,
         natural_key: str,
         surrogate_key: str,
-        track_columns: List[str],
+        track_cols: List[str],
         target: Optional[str],
     ):
         """
@@ -399,11 +399,11 @@ class DimensionPattern(Pattern):
 
         if context.engine_type == EngineType.SPARK:
             return self._execute_scd1_spark(
-                context, source_df, existing_df, natural_key, surrogate_key, track_columns, max_sk
+                context, source_df, existing_df, natural_key, surrogate_key, track_cols, max_sk
             )
         else:
             return self._execute_scd1_pandas(
-                context, source_df, existing_df, natural_key, surrogate_key, track_columns, max_sk
+                context, source_df, existing_df, natural_key, surrogate_key, track_cols, max_sk
             )
 
     def _execute_scd1_spark(
@@ -413,7 +413,7 @@ class DimensionPattern(Pattern):
         existing_df,
         natural_key: str,
         surrogate_key: str,
-        track_columns: List[str],
+        track_cols: List[str],
         max_sk: int,
     ):
         from pyspark.sql import functions as F
@@ -458,7 +458,7 @@ class DimensionPattern(Pattern):
         existing_df,
         natural_key: str,
         surrogate_key: str,
-        track_columns: List[str],
+        track_cols: List[str],
         max_sk: int,
     ):
         import pandas as pd
@@ -497,7 +497,7 @@ class DimensionPattern(Pattern):
         context: EngineContext,
         natural_key: str,
         surrogate_key: str,
-        track_columns: List[str],
+        track_cols: List[str],
         target: str,
     ):
         """
@@ -524,7 +524,7 @@ class DimensionPattern(Pattern):
         scd_params = SCD2Params(
             target=target,
             keys=[natural_key],
-            track_cols=track_columns,
+            track_cols=track_cols,
             effective_time_col=valid_from_col,
             end_time_col=valid_to_col,
             current_flag_col=is_current_col,
