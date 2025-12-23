@@ -227,14 +227,17 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     for c in current_target.columns:
         renamed_target = renamed_target.withColumnRenamed(c, f"{t_prefix}{c}")
 
-    join_cond = [source_df[k] == renamed_target[f"{t_prefix}{k}"] for k in params.keys]
+    # Alias source_df to ensure column references are unambiguous after join
+    source_aliased = source_df.alias("__source")
+    join_cond = [F.col(f"__source.{k}") == renamed_target[f"{t_prefix}{k}"] for k in params.keys]
 
-    joined = source_df.join(renamed_target, join_cond, "left")
+    joined = source_aliased.join(renamed_target, join_cond, "left")
 
     # Determine Status: Changed if track columns differ
+    # Use explicit __source alias for source columns to avoid ambiguity
     change_conds = []
     for col in params.track_cols:
-        s_col = F.col(col)
+        s_col = F.col(f"__source.{col}")
         t_col = F.col(f"{t_prefix}{col}")
         # Null-safe equality check: NOT (source <=> target)
         # Use ~ operator instead of F.not_() which doesn't exist in PySpark
@@ -249,11 +252,10 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
 
     # A) Rows to Insert (New Keys OR Changed Keys)
     # Filter: TargetKey IS NULL OR is_changed
+    # Select source columns using the __source alias
     rows_to_insert = joined.filter(
         F.col(f"{t_prefix}{params.keys[0]}").isNull() | is_changed
-    ).select(
-        source_df.columns
-    )  # Select original source columns
+    ).select([F.col(f"__source.{c}").alias(c) for c in source_df.columns])
 
     # Add metadata to inserts (Start=eff_col, End=Null, Current=True)
     rows_to_insert = rows_to_insert.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
@@ -270,9 +272,10 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     # Strategy:
     # 1. Identify keys that CHANGED (from joined result)
     # Also carry over the NEW effective date from source to use as END date
-    # Use source_df[eff_col] to explicitly reference from source (target doesn't have this col)
+    # Use __source alias to explicitly reference effective_time_col from source
     changed_keys_with_date = joined.filter(is_changed).select(
-        *[F.col(k) for k in params.keys], source_df[eff_col].alias("__new_end_date")
+        *[F.col(f"__source.{k}").alias(k) for k in params.keys],
+        F.col(f"__source.{eff_col}").alias("__new_end_date"),
     )
 
     # 2. Join Target with Changed Keys to apply updates
