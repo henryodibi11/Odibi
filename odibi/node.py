@@ -1050,9 +1050,10 @@ class NodeExecutor:
                     pattern_cls = get_pattern_class(config.transformer)
                     is_pattern = True
 
-                    # Inject delta_table_properties into config.params for patterns
+                    # Inject delta_table_properties into config.params for patterns that write Delta
                     pattern_config = config
-                    if self.performance_config and config.transformer in ("merge", "scd2"):
+                    delta_patterns = ("merge", "scd2", "dimension", "aggregation", "fact")
+                    if self.performance_config and config.transformer in delta_patterns:
                         global_props = (
                             getattr(self.performance_config, "delta_table_properties", None) or {}
                         )
