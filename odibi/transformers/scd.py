@@ -241,17 +241,19 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     source_with_eff = source_df.withColumn(eff_col_preserved, F.col(eff_col))
 
     # Alias source_df to ensure column references are unambiguous after join
+    # Use backticks to handle column names with spaces or special characters
     source_aliased = source_with_eff.alias("__source")
-    join_cond = [F.col(f"__source.{k}") == renamed_target[f"{t_prefix}{k}"] for k in params.keys]
+    join_cond = [F.col(f"`__source`.`{k}`") == F.col(f"`{t_prefix}{k}`") for k in params.keys]
 
     joined = source_aliased.join(renamed_target, join_cond, "left")
 
     # Determine Status: Changed if track columns differ
     # Use explicit __source alias for source columns to avoid ambiguity
+    # Use backticks to handle column names with spaces or special characters
     change_conds = []
     for col in params.track_cols:
-        s_col = F.col(f"__source.{col}")
-        t_col = F.col(f"{t_prefix}{col}")
+        s_col = F.col(f"`__source`.`{col}`")
+        t_col = F.col(f"`{t_prefix}{col}`")
         # Null-safe equality check: NOT (source <=> target)
         # Use ~ operator instead of F.not_() which doesn't exist in PySpark
         change_conds.append(~s_col.eqNullSafe(t_col))
@@ -265,10 +267,10 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
 
     # A) Rows to Insert (New Keys OR Changed Keys)
     # Filter: TargetKey IS NULL OR is_changed
-    # Select source columns using the __source alias
+    # Select source columns using the __source alias with backticks for special chars
     rows_to_insert = joined.filter(
-        F.col(f"{t_prefix}{params.keys[0]}").isNull() | is_changed
-    ).select([F.col(f"__source.{c}").alias(c) for c in source_df.columns])
+        F.col(f"`{t_prefix}{params.keys[0]}`").isNull() | is_changed
+    ).select([F.col(f"`__source`.`{c}`").alias(c) for c in source_df.columns])
 
     # Add metadata to inserts (Start=eff_col, End=Null, Current=True)
     rows_to_insert = rows_to_insert.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
@@ -285,10 +287,10 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     # Strategy:
     # 1. Identify keys that CHANGED (from joined result)
     # Also carry over the NEW effective date from source to use as END date
-    # Use the preserved eff_col_preserved column to avoid resolution issues
+    # Use backticks to handle column names with spaces or special characters
     changed_keys_with_date = joined.filter(is_changed).select(
-        *[F.col(f"__source.{k}").alias(k) for k in params.keys],
-        F.col(f"__source.{eff_col_preserved}").alias("__new_end_date"),
+        *[F.col(f"`__source`.`{k}`").alias(k) for k in params.keys],
+        F.col(f"`__source`.`{eff_col_preserved}`").alias("__new_end_date"),
     )
 
     # 2. Join Target with Changed Keys to apply updates
@@ -306,27 +308,28 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     # Else:
     #    Keep original
 
+    # Use backticks for column references to handle special characters
     final_target = target_updated.select(
         *[
             (
                 F.when(
-                    (F.col("__new_end_date").isNotNull())
-                    & (F.col(f"tgt.{flag_col}") == F.lit(True)),
-                    F.col("__new_end_date"),
+                    (F.col("`__new_end_date`").isNotNull())
+                    & (F.col(f"`tgt`.`{flag_col}`") == F.lit(True)),
+                    F.col("`__new_end_date`"),
                 )
-                .otherwise(F.col(f"tgt.{end_col}"))
+                .otherwise(F.col(f"`tgt`.`{end_col}`"))
                 .alias(end_col)
                 if c == end_col
                 else (
                     F.when(
-                        (F.col("__new_end_date").isNotNull())
-                        & (F.col(f"tgt.{flag_col}") == F.lit(True)),
+                        (F.col("`__new_end_date`").isNotNull())
+                        & (F.col(f"`tgt`.`{flag_col}`") == F.lit(True)),
                         F.lit(False),
                     )
-                    .otherwise(F.col(f"tgt.{c}"))
+                    .otherwise(F.col(f"`tgt`.`{c}`"))
                     .alias(c)
                     if c == flag_col
-                    else F.col(f"tgt.{c}")
+                    else F.col(f"`tgt`.`{c}`")
                 )
             )
             for c in target_df.columns
