@@ -103,6 +103,10 @@ nav:
       - Schema Tracking: features/schema_tracking.md
       - Diagnostics: features/diagnostics.md
       - Orchestration: features/orchestration.md
+  - Learning:
+      - Curriculum: learning/curriculum.md
+      - Data Engineering 101: learning/data_engineering_101.md
+      - Glossary: learning/glossary.md
   - Patterns:
       - Overview: patterns/README.md
       - Append-Only Raw: patterns/append_only_raw.md
@@ -116,6 +120,7 @@ nav:
       - SCD2 Pattern: patterns/scd2.md
       - Smart Read: patterns/smart_read.md
       - Skip If Unchanged: patterns/skip_if_unchanged.md
+      - Anti-Patterns: patterns/anti_patterns.md
   - Semantic Layer:
       - Overview: semantics/index.md
       - Defining Metrics: semantics/metrics.md
