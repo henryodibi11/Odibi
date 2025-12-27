@@ -144,6 +144,80 @@ If no `system` config is provided, Odibi uses `LocalJSONStateBackend` automatica
 ⚠️ No system catalog configured. Using local JSON state backend (local-only mode).
 ```
 
+## Troubleshooting
+
+### Resume not working - nodes re-run every time
+
+**Symptom:** `--resume` flag doesn't skip completed nodes.
+
+**Causes:**
+- No system catalog configured (state not persisted)
+- State file deleted or corrupted
+- Node name changed between runs
+
+**Fixes:**
+```yaml
+# Ensure system catalog is configured
+system:
+  connection: catalog_conn
+  meta_runs_path: meta/runs
+  meta_state_path: meta/state
+```
+
+### High Water Mark (HWM) not updating
+
+**Symptom:** Incremental reads fetch all data instead of new records.
+
+**Causes:**
+- First run always does full load (expected)
+- HWM column has NULL values
+- State backend not persisting
+
+**Fixes:**
+```bash
+# Check current HWM state
+odibi catalog state --config config.yaml
+
+# Verify HWM column has no NULLs
+# HWM is set to MAX(column) after successful run
+```
+
+### State corruption after failed run
+
+**Symptom:** Pipeline behaves unexpectedly after a failure.
+
+**Fix:** Reset state for specific node:
+```bash
+# View current state
+odibi catalog state --config config.yaml
+
+# If needed, delete and re-run (full load)
+# State will be rebuilt on next successful run
+```
+
+### Local JSON state lost between environments
+
+**Cause:** `LocalJSONStateBackend` stores state in `.odibi/state.json` locally.
+
+**Fix:** Use `CatalogStateBackend` with Delta Lake for shared/persistent state:
+```yaml
+system:
+  connection: shared_storage
+  meta_runs_path: _odibi/runs
+  meta_state_path: _odibi/state
+```
+
+### Concurrent pipeline runs corrupt state
+
+**Symptom:** State inconsistent when multiple pipelines run simultaneously.
+
+**Fix:** Use Delta Lake catalog backend (supports concurrent writes with retry):
+```yaml
+system:
+  connection: delta_catalog
+  meta_state_path: _odibi/state  # Delta table with ACID support
+```
+
 ## Related
 
 - [Incremental Loading](../patterns/incremental_stateful.md) — HWM-based incremental

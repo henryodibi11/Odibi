@@ -588,6 +588,82 @@ connections:
 5. **Separate connections** - Use different connections for different security zones
 6. **Register secrets** - Secrets are automatically registered for log redaction
 
+## Troubleshooting
+
+### "Connection not found" error
+
+**Symptom:** `ConnectionError: Connection 'my_conn' not found`
+
+**Causes:**
+- Typo in connection name (check spelling, case-sensitive)
+- Connection defined in wrong environment block
+- YAML indentation error
+
+**Fix:**
+```bash
+# Validate your config
+odibi validate config.yaml
+```
+
+### Azure authentication failures
+
+**Symptom:** `AuthenticationError: DefaultAzureCredential failed`
+
+**Causes:**
+- Service principal credentials incorrect or expired
+- Managed Identity not enabled on compute
+- Missing RBAC permissions on storage account
+
+**Fixes:**
+```bash
+# Check if Azure CLI is authenticated
+az account show
+
+# For Service Principal, verify credentials
+az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
+
+# For Managed Identity, ensure it's enabled and has Storage Blob Data Contributor role
+```
+
+### "Path not found" on Azure ADLS
+
+**Symptom:** File reads fail with path errors
+
+**Causes:**
+- Container name missing or incorrect
+- Path prefix doesn't match actual structure
+- SAS token doesn't have read permissions
+
+**Fix:** Verify the full path:
+```yaml
+connections:
+  adls_data:
+    type: azure_adls
+    account_name: mystorageaccount
+    container: data          # Container name
+    path_prefix: bronze      # Prefix within container
+```
+
+The actual path read will be: `abfss://data@mystorageaccount.dfs.core.windows.net/bronze/<your_path>`
+
+### Environment variable not substituted
+
+**Symptom:** Literal `${VAR}` appears in logs or errors
+
+**Causes:**
+- Environment variable not set
+- Variable name typo
+- Running in wrong shell/environment
+
+**Fix:**
+```bash
+# Check if variable is set
+echo $MY_SECRET
+
+# Use odibi secrets to validate
+odibi secrets validate config.yaml
+```
+
 ## Related
 
 - [YAML Schema Reference](../reference/yaml_schema.md#connections)

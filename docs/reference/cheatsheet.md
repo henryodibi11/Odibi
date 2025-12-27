@@ -1,4 +1,4 @@
-# ⚡ Odibi Cheatsheet
+# Odibi Cheatsheet
 
 ## CLI Commands
 

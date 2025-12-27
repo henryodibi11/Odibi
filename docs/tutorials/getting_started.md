@@ -1,4 +1,4 @@
-# 🏁 Getting Started with Odibi
+# Getting Started with Odibi
 
 This tutorial will guide you through creating your first data pipeline. By the end, you will have a running project that reads data, cleans it, and generates an audit report ("Data Story").
 
@@ -236,6 +236,65 @@ nodes:
 - Creates an "unknown" row (SK=0) for handling orphan fact records
 
 For a complete dimensional modeling tutorial, see [Dimensional Modeling](dimensional_modeling/).
+
+---
+
+## Troubleshooting
+
+### "ModuleNotFoundError: No module named 'odibi'"
+
+**Cause:** Odibi not installed or virtual environment not activated.
+
+**Fix:**
+```bash
+# Activate your virtual environment first
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
+
+# Then verify installation
+pip show odibi
+```
+
+### Pipeline runs but no output files
+
+**Causes:**
+- Write path doesn't exist
+- Permission denied on output directory
+- Dry-run mode enabled
+
+**Fix:**
+```bash
+# Check if dry-run is enabled (remove --dry-run flag)
+odibi run odibi.yaml
+
+# Ensure output directory exists
+mkdir -p data/silver
+```
+
+### "No such file or directory" for input data
+
+**Cause:** File path in config doesn't match actual location.
+
+**Fix:** Verify the path relative to where you run the command:
+```bash
+# If config says: path: landing/customers.csv
+# File should be at: ./data/landing/customers.csv (relative to base_path)
+
+ls data/landing/customers.csv
+```
+
+### Story not generated
+
+**Causes:**
+- Story connection not configured
+- Story path doesn't exist
+
+**Fix:** Ensure your config has a story section:
+```yaml
+story:
+  connection: raw_data  # Must match a defined connection
+  path: stories/
+```
 
 ---
 

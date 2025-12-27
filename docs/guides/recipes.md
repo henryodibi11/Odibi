@@ -1,4 +1,4 @@
-# 🍳 Odibi Cookbook: Recipes for Common Patterns
+# Odibi Cookbook: Recipes for Common Patterns
 
 This guide provides copy-pasteable solutions for real-world Data Engineering problems.
 

@@ -1,4 +1,4 @@
-# 💻 Odibi CLI: Zero to Hero
+# Odibi CLI: Zero to Hero
 > **Ultimate Cheatsheet & Reference (v2.4.0)**
 
 The Command Line Interface (CLI) is your primary tool for managing Odibi projects.

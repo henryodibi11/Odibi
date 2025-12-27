@@ -1,4 +1,4 @@
-# 🏛️ Case Studies (Reference Projects)
+# Case Studies (Reference Projects)
 
 Odibi is battle-tested. To prove it, we built "The Gauntlet"—a series of reference implementations covering diverse industries and data challenges.
 

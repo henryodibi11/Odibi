@@ -1,6 +1,8 @@
-# Odibi Glossary
+# Quick Glossary
 
 Standard terminology used across Odibi documentation.
+
+> **Looking for in-depth explanations?** See the [Learning Glossary](../learning/glossary.md) for beginner-friendly definitions with examples and real-world analogies.
 
 ## Data Quality Terms
 

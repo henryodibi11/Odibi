@@ -411,6 +411,59 @@ register_engine("duckdb", DuckDBEngine)
 5. **Run maintenance** - Enable auto-optimize for Delta tables
 6. **Test locally first** - Develop with pandas, deploy with spark
 
+## Troubleshooting
+
+### Switching from Pandas to Spark breaks my pipeline
+
+**Symptom:** Code works locally with pandas but fails on Spark.
+
+**Common Causes:**
+- Using pandas-specific operations (`.apply()`, `.iterrows()`)
+- Column name case sensitivity (Spark is case-insensitive by default)
+- Type coercion differences
+
+**Fixes:**
+- Use SQL transforms instead of Python where possible
+- Use `transform.steps` with SQL strings (engine-agnostic)
+- Test with `--dry-run` before switching engines
+
+### "Engine 'polars' not found"
+
+**Cause:** Polars not installed.
+
+**Fix:**
+```bash
+pip install polars
+```
+
+### Memory errors with Pandas engine
+
+**Symptom:** `MemoryError` or system becomes unresponsive.
+
+**Causes:**
+- Dataset too large for available RAM
+- Multiple DataFrames held in memory
+
+**Fixes:**
+- Switch to Spark for datasets >1GB
+- Use chunked reading if staying on Pandas:
+```yaml
+read:
+  options:
+    chunksize: 100000
+```
+
+### Polars lazy vs eager mode issues
+
+**Symptom:** Operations don't execute or return LazyFrame instead of DataFrame.
+
+**Fix:** Odibi handles collection automatically, but if using custom transforms:
+```python
+# Force collection in custom transforms
+if hasattr(df, 'collect'):
+    df = df.collect()
+```
+
 ## Related
 
 - [Connections](connections.md) - Data source configuration

@@ -17,14 +17,17 @@ theme:
     - content.code.copy
   palette:
     - scheme: default
-      primary: indigo
-      accent: indigo
+      primary: green
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
     - scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: green
+      accent: teal
       toggle:
         icon: material/brightness-4
-        name: Switch to dark mode
+        name: Switch to light mode
 
 plugins:
   - search
@@ -39,12 +42,16 @@ plugins:
 nav:
   - Home: README.md
   - Playbook: playbook/README.md
+
+  - Getting Started:
+      - Quickstart: tutorials/getting_started.md
+      - Bronze Layer: tutorials/bronze_layer.md
+      - Silver Layer: tutorials/silver_layer.md
+      - Gold Layer: tutorials/gold_layer.md
+      - Spark Engine: tutorials/spark_engine.md
+      - Azure Connections: tutorials/azure_connections.md
+
   - Tutorials:
-      - Getting Started: tutorials/getting_started.md
-      - Layer Guides:
-          - Bronze Layer: tutorials/bronze_layer.md
-          - Silver Layer: tutorials/silver_layer.md
-          - Gold Layer: tutorials/gold_layer.md
       - Dimensional Modeling:
           - Introduction: tutorials/dimensional_modeling/01_introduction.md
           - Dimension Pattern: tutorials/dimensional_modeling/02_dimension_pattern.md
@@ -59,12 +66,71 @@ nav:
           - Materializing Metrics: tutorials/dimensional_modeling/11_materializing_metrics.md
           - Semantic Full Example: tutorials/dimensional_modeling/12_semantic_full_example.md
           - FK Validation: tutorials/dimensional_modeling/13_fk_validation.md
+
+  - Core Concepts:
+      - Pipelines & Nodes: features/pipelines.md
+      - Connections: features/connections.md
+      - Engines: features/engines.md
+      - Transformers: features/transformers.md
+      - Loading Patterns (SCD2, Merge): features/patterns.md
+      - Configuration: features/configuration.md
+      - State Management: features/state.md
+      - Stories: features/stories.md
+      - Orchestration: features/orchestration.md
+      - Cross-Pipeline Dependencies: features/cross-pipeline-dependencies.md
+
+  - Patterns:
+      - Overview: patterns/README.md
+      - Data Loading:
+          - Append-Only Raw: patterns/append_only_raw.md
+          - Incremental Stateful: patterns/incremental_stateful.md
+          - Merge/Upsert: patterns/merge_upsert.md
+          - Windowed Reprocess: patterns/windowed_reprocess.md
+          - Smart Read: patterns/smart_read.md
+          - Skip If Unchanged: patterns/skip_if_unchanged.md
+          - Legacy HWM (Manual): patterns/legacy_hwm_manual.md
+      - Dimensional Modeling:
+          - Dimension Pattern: patterns/dimension.md
+          - Date Dimension: patterns/date_dimension.md
+          - Fact Pattern: patterns/fact.md
+          - Aggregation Pattern: patterns/aggregation.md
+          - SCD2 Pattern: patterns/scd2.md
+      - Anti-Patterns: patterns/anti_patterns.md
+
+  - Data Quality:
+      - Overview: validation/README.md
+      - Contracts: validation/contracts.md
+      - Validation Tests: validation/tests.md
+      - Quality Gates: features/quality_gates.md
+      - Quarantine: features/quarantine.md
+      - FK Validation: validation/fk.md
+      - Performance: features/validation_performance.md
+
+  - Semantic Layer:
+      - Overview: semantics/index.md
+      - Defining Metrics: semantics/metrics.md
+      - Querying: semantics/query.md
+      - Materializing: semantics/materialize.md
+
+  - Monitoring:
+      - Alerting: features/alerting.md
+      - Observability: features/observability.md
+      - Diagnostics: features/diagnostics.md
+      - Lineage: features/lineage.md
+      - Schema Tracking: features/schema_tracking.md
+      - Catalog: features/catalog.md
+      - Web UI: features/ui.md
+
   - Guides:
+      - The Definitive Guide: guides/the_definitive_guide.md
+      - Planning Walkthroughs: guides/planning_walkthroughs.md
+      - Cookbook (Recipes): guides/recipes.md
       - Medallion Architecture: guides/medallion_architecture.md
-      - Dogfooding (Meta): guides/dogfooding.md
       - Writing Transformations: guides/writing_transformations.md
-      - Master CLI: guides/cli_master_guide.md
+      - Testing Pipelines: guides/testing.md
+      - CLI Master Guide: guides/cli_master_guide.md
       - Python API Guide: guides/python_api_guide.md
+      - Plugins & Extensibility: features/plugins.md
       - Production Deployment: guides/production_deployment.md
       - Environments: guides/environments.md
       - Secrets Management: guides/secrets.md
@@ -72,63 +138,36 @@ nav:
       - Performance Tuning: guides/performance_tuning.md
       - WSL Setup: guides/wsl_setup.md
       - Best Practices: guides/best_practices.md
+      - Avoiding the Builder Trap: guides/avoiding_the_builder_trap.md
+      - Dimensional Modeling Guide: guides/dimensional_modeling_guide.md
+      - Dogfooding (Meta): guides/dogfooding.md
+      - Migration Guide: guides/MIGRATION_GUIDE.md
+
   - Reference:
       - Cheatsheet: reference/cheatsheet.md
-      - Configuration Guide: reference/configuration.md
       - YAML Schema: reference/yaml_schema.md
+      - Configuration Guide: reference/configuration.md
       - Supported Formats: reference/supported_formats.md
       - Engine Parity: reference/PARITY_TABLE.md
+      - Quick Glossary: reference/glossary.md
+      - CLI Reference: features/cli.md
       - API:
-        - Pipeline: reference/api/pipeline.md
-        - Engine: reference/api/engine.md
-        - Patterns: reference/api/patterns.md
-        - Validation: reference/api/validation.md
-        - Config: reference/api/config.md
-        - Connections: reference/api/connections.md
-        - CLI: reference/api/cli.md
-  - Troubleshooting: troubleshooting.md
-  - Features:
-      - Engines: features/engines.md
-      - Pipelines: features/pipelines.md
-      - Connections: features/connections.md
-      - CLI: features/cli.md
-      - Validation: features/quality_gates.md
-      - Quarantine: features/quarantine.md
-      - Alerting: features/alerting.md
-      - Stories: features/stories.md
-      - Catalog: features/catalog.md
-      - Lineage: features/lineage.md
-      - Transformers: features/transformers.md
-      - Patterns: features/patterns.md
-      - Schema Tracking: features/schema_tracking.md
-      - Diagnostics: features/diagnostics.md
-      - Orchestration: features/orchestration.md
+          - Pipeline: reference/api/pipeline.md
+          - Engine: reference/api/engine.md
+          - Context: api/context.md
+          - Patterns: reference/api/patterns.md
+          - Validation: reference/api/validation.md
+          - Config: reference/api/config.md
+          - Connections: reference/api/connections.md
+          - CLI: reference/api/cli.md
+
   - Learning:
       - Curriculum: learning/curriculum.md
       - Data Engineering 101: learning/data_engineering_101.md
       - Glossary: learning/glossary.md
-  - Patterns:
-      - Overview: patterns/README.md
-      - Append-Only Raw: patterns/append_only_raw.md
-      - Incremental Stateful: patterns/incremental_stateful.md
-      - Merge/Upsert: patterns/merge_upsert.md
-      - Windowed Reprocess: patterns/windowed_reprocess.md
-      - Dimension Pattern: patterns/dimension.md
-      - Date Dimension Pattern: patterns/date_dimension.md
-      - Fact Pattern: patterns/fact.md
-      - Aggregation Pattern: patterns/aggregation.md
-      - SCD2 Pattern: patterns/scd2.md
-      - Smart Read: patterns/smart_read.md
-      - Skip If Unchanged: patterns/skip_if_unchanged.md
-      - Anti-Patterns: patterns/anti_patterns.md
-  - Semantic Layer:
-      - Overview: semantics/index.md
-      - Defining Metrics: semantics/metrics.md
-      - Querying: semantics/query.md
-      - Materializing: semantics/materialize.md
-  - Validation:
-      - FK Validation: validation/fk.md
-      - Performance: features/validation_performance.md
+
+  - Troubleshooting: troubleshooting.md
+
   - Explanation:
       - Architecture: explanation/architecture.md
       - Case Studies: explanation/case_studies.md

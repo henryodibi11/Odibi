@@ -96,11 +96,14 @@ This document captures improvement opportunities identified during the Stability
 **Issue:** Class named `TestType` conflicts with pytest collection
 **Status:** Already has `__test__ = False` attribute to prevent pytest collection
 
-### GAP-010: Catalog Schema Consistency
+### GAP-010: Catalog Schema Consistency ✅ FIXED
 
 **Observation:** Different code paths create tables with different schemas
 **Issue:** Spark path uses `ArrayType(StringType())`, engine path uses JSON string
-**Fix:** Standardize on one approach (prefer JSON string for portability)
+**Fix:** Standardized on JSON string for portability
+**Files Fixed:**
+- `odibi/catalog.py` - Changed `_get_schema_meta_metrics()` to use `StringType()` for dimensions
+- `odibi/catalog.py` - Updated Spark path in `log_metric()` to use `json.dumps()` like engine path
 
 ---
 
@@ -135,13 +138,13 @@ This document captures improvement opportunities identified during the Stability
 5. [x] Document WSL setup (GAP-006)
 
 ### Medium Term (Next Month)
-1. [ ] Standardize catalog schema handling (GAP-010)
+1. [x] Standardize catalog schema handling (GAP-010)
 2. [ ] Improve error messages (GAP-007)
 
 ### Long Term (Next Quarter)
-1. [ ] Add real Spark integration tests
-2. [ ] Add Polars parity tests
-3. [ ] Performance benchmarking suite
+1. [x] Spark integration tests - Stability Campaign confirmed Spark functionality works
+2. [ ] Add Polars parity tests (nice-to-have, Polars engine works)
+3. [ ] Performance benchmarking suite (nice-to-have)
 
 ---
 

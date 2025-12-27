@@ -280,6 +280,72 @@ write:
     delta.autoOptimize.autoCompact: true
 ```
 
+## Troubleshooting
+
+### "Py4JJavaError: Java gateway process exited"
+
+**Cause:** Java not installed or JAVA_HOME not set.
+
+**Fix:**
+```bash
+# Install Java 11 or 17
+# Ubuntu/Debian
+sudo apt install openjdk-11-jdk
+
+# Mac (Homebrew)
+brew install openjdk@11
+
+# Set JAVA_HOME
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+```
+
+### "SparkSession not found" or "No module named pyspark"
+
+**Cause:** Spark extras not installed.
+
+**Fix:**
+```bash
+pip install "odibi[spark]"
+```
+
+### Spark job hangs or is extremely slow
+
+**Causes:**
+- Too many small files (small file problem)
+- Insufficient memory for driver/executors
+- Shuffle spill to disk
+
+**Fixes:**
+```yaml
+# Add performance tuning
+performance:
+  spark:
+    conf:
+      spark.sql.shuffle.partitions: "200"
+      spark.sql.files.maxPartitionBytes: "134217728"  # 128MB
+```
+
+### "AnalysisException: Table not found"
+
+**Cause:** Table not registered in Spark catalog.
+
+**Fix:** Use explicit path or register the table:
+```yaml
+read:
+  connection: delta_lake
+  path: silver/customers    # Use path, not table name
+  format: delta
+```
+
+### Delta Lake MERGE fails with "concurrent modification"
+
+**Cause:** Multiple jobs writing to same table simultaneously.
+
+**Fixes:**
+- Enable optimistic concurrency: `delta.isolationLevel: WriteSerializable`
+- Use Databricks workflows with job clusters (single writer)
+- Add retry logic in pipeline config
+
 ## Next Steps
 
 - [Azure Connections](azure_connections.md) - Connect to Azure Blob/ADLS

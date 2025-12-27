@@ -1,0 +1,69 @@
+# Generated from Bronze Walkthrough - BRZ_001
+# Source: B1_Row1 (SAP ERP - AFKO Production Orders)
+
+project: walkthrough_test
+
+connections:
+  sap_erp_prod:
+    type: sql_server
+    connection_string: ${SAP_ERP_CONN}
+  delta_lake:
+    type: local
+    base_path: ./data/lake
+
+pipelines:
+  - pipeline: bronze_production
+    tags: [daily, critical, production]
+    nodes:
+      - name: bronze_production_orders
+        description: "Land production orders from SAP as-is (Bronze = no transforms)"
+        
+        read:
+          connection: sap_erp_prod
+          format: sql
+          table: SAPPR1.dbo.AFKO
+          
+        incremental:
+          mode: rolling_window
+          column: AEDAT
+          lookback: 3
+          lookback_unit: day
+          fallback_column: ERDAT
+          
+        schema:
+          policy: allow_new_cols
+          
+        metadata:
+          columns:
+            - _extracted_at
+            - _batch_id
+            - _source_system
+            
+        bad_records:
+          path: bronze/bad_records/production_orders
+          
+        write:
+          connection: delta_lake
+          format: delta
+          path: bronze/production/orders
+          mode: append  # Bronze always appends
+          
+        validation:
+          contracts:
+            - type: not_null
+              column: AUFNR
+              on_failure: error
+              is_quality_gate: true
+              
+            - type: row_count
+              params:
+                min: 1
+              on_failure: error
+              is_quality_gate: true
+              
+            - type: freshness
+              column: _extracted_at
+              params:
+                max_age: 24h
+              on_failure: warn
+              is_quality_gate: false

@@ -571,12 +571,13 @@ class CatalogManager:
     def _get_schema_meta_metrics(self) -> StructType:
         """
         meta_metrics (Semantics): Tracks business logic.
+        Note: dimensions is stored as JSON string for cross-engine portability.
         """
         return StructType(
             [
                 StructField("metric_name", StringType(), True),
                 StructField("definition_sql", StringType(), True),
-                StructField("dimensions", ArrayType(StringType()), True),
+                StructField("dimensions", StringType(), True),
                 StructField("source_table", StringType(), True),
             ]
         )
@@ -2415,16 +2416,17 @@ class CatalogManager:
             return
 
         def _do_log_metrics():
+            import json
+
             if self.spark:
-                rows = [(metric_name, definition_sql, dimensions, source_table)]
+                dimensions_json = json.dumps(dimensions)
+                rows = [(metric_name, definition_sql, dimensions_json, source_table)]
                 schema = self._get_schema_meta_metrics()
 
                 df = self.spark.createDataFrame(rows, schema)
                 df.write.format("delta").mode("append").save(self.tables["meta_metrics"])
 
             elif self.engine:
-                import json
-
                 import pandas as pd
 
                 data = {

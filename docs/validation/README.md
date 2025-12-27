@@ -13,16 +13,18 @@ Odibi provides a comprehensive validation framework to ensure data quality at ev
 
 ## Quick Links
 
-### Core Documentation
+### Guides
 
-- [Quality Gates](../features/quality_gates.md) - Batch-level validation with pass rates and row count checks
-- [FK Validation](fk.md) - Foreign key validation between fact and dimension tables
+- [Contracts](contracts.md) - Pre-transform fail-fast checks (always fail on violation)
+- [Validation Tests](tests.md) - Post-transform row-level checks (fail/warn/quarantine)
+- [Quality Gates](../features/quality_gates.md) - Batch-level thresholds and pass rates
 - [Quarantine](../features/quarantine.md) - Capture and review invalid records
+- [FK Validation](fk.md) - Referential integrity between fact and dimension tables
 
-### Configuration Reference
+### Reference
 
-- [Contracts Reference](../reference/yaml_schema.md#contracts-data-quality-gates) - Pre-transform fail-fast checks
-- [Validation Tests Reference](../reference/yaml_schema.md#validationconfig) - Row-level tests (not_null, unique, range, etc.)
+- [Contracts Schema](../reference/yaml_schema.md#contracts-data-quality-gates) - All contract types
+- [Validation Schema](../reference/yaml_schema.md#validationconfig) - Full validation configuration
 
 ## Choosing the Right Validation
 
