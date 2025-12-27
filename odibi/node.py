@@ -2402,10 +2402,10 @@ class NodeExecutor:
             )
 
         # Create output record for cross-pipeline dependencies (batch written at end of pipeline)
-        if config.write:
-            output_record = self._create_output_record(config, metadata.get("rows"))
-            if output_record:
-                metadata["_output_record"] = output_record
+        # Supports both explicit write blocks and merge/scd2 function outputs
+        output_record = self._create_output_record(config, metadata.get("rows"))
+        if output_record:
+            metadata["_output_record"] = output_record
 
         return metadata
 
