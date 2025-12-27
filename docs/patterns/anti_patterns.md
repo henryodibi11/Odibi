@@ -968,6 +968,6 @@ contracts:
 ## Next Steps
 
 - [SCD2 Troubleshooting](./scd2.md#common-errors-and-debugging)
-- [Validation Patterns](./validation.md)
+- [Validation Patterns](../validation/README.md)
 - [Best Practices Guide](../guides/best_practices.md)
 - [Troubleshooting Guide](../troubleshooting.md)

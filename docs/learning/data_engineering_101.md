@@ -1126,7 +1126,7 @@ Congratulations! You now understand the fundamentals of data engineering:
 
 📖 **[Glossary](glossary.md)** - Quick definitions for data engineering terms
 
-🛠️ **[First Tutorial](../tutorials/first_pipeline.md)** - Build your first Odibi pipeline
+🛠️ **[First Tutorial](../tutorials/getting_started.md)** - Build your first Odibi pipeline
 
 ### Key Concepts to Explore Next
 

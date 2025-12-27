@@ -95,7 +95,7 @@ connections:
 
 **Why it matters:** Connections let you reuse access settings across many pipelines. Change the password once, and all pipelines using that connection keep working.
 
-**Learn more:** [Connections Reference](../reference/connections.md)
+**Learn more:** [Connections Reference](../features/connections.md)
 
 ---
 
@@ -116,7 +116,7 @@ connections:
 
 **Why it matters:** Odibi uses the DAG to know what can run in parallel (Load Sales and Load Products) and what must wait (Join can't start until both loads finish).
 
-**Learn more:** [Pipeline Concepts](../concepts/pipelines.md)
+**Learn more:** [Pipeline Concepts](../features/pipelines.md)
 
 ---
 
@@ -145,7 +145,7 @@ validation:
 
 **Why it matters:** Bad data leads to bad decisions. If 20% of your sales records have missing amounts, your revenue reports are wrong. Data quality catches problems before they spread.
 
-**Learn more:** [Validation Guide](../patterns/validation.md)
+**Learn more:** [Validation Guide](../validation/README.md)
 
 ---
 
@@ -164,7 +164,7 @@ write_mode: merge
 
 **Why it matters:** Regular files (CSV, Parquet) can't handle updates well—you'd have to rewrite the entire file. Delta Lake lets you update just the rows that changed, and if something goes wrong, you can undo it.
 
-**Learn more:** [Delta Lake Integration](../reference/delta.md)
+**Learn more:** [Delta Lake Integration](../reference/supported_formats.md)
 
 ---
 
@@ -213,7 +213,7 @@ engine: spark  # For big data (millions+ rows)
 
 **Why it matters:** Using Spark for 100 rows is overkill (slow startup). Using Pandas for 100 million rows crashes your computer. Picking the right engine means your pipeline runs efficiently.
 
-**Learn more:** [Engine Guide](../concepts/engines.md)
+**Learn more:** [Engine Guide](../features/engines.md)
 
 ---
 
@@ -246,7 +246,7 @@ silver_node:
 
 **Why it matters:** ELT is more flexible because you keep the raw data. If business rules change, you can re-transform from Bronze. ETL might have thrown away data you now need.
 
-**Learn more:** [Pipeline Architecture](../concepts/architecture.md)
+**Learn more:** [Pipeline Architecture](../explanation/architecture.md)
 
 ---
 
@@ -301,7 +301,7 @@ validation:
 
 **Why it matters:** Foreign keys ensure data integrity. If an order references "customer_id: 99999" but that customer doesn't exist, something is wrong. FK validation catches these broken links.
 
-**Learn more:** [FK Validation](../patterns/validation.md#foreign-key-checks)
+**Learn more:** [FK Validation](../validation/README.md)
 
 ---
 
@@ -359,7 +359,7 @@ write_mode: append
 
 **Why it matters:** Pipelines fail and get retried. If your pipeline isn't idempotent, retrying it corrupts your data (duplicates, wrong totals). Idempotent pipelines are safe to rerun.
 
-**Learn more:** [Write Modes](../reference/yaml_schema.md#write-modes)
+**Learn more:** [Write Modes](../reference/yaml_schema.md)
 
 ---
 
@@ -380,7 +380,7 @@ incremental:
 
 **Why it matters:** Full reloads waste time and compute. If you have 5 years of data but only 1 day is new, why process all 5 years? Incremental loads are faster and cheaper.
 
-**Learn more:** [Incremental Processing](../concepts/incremental.md)
+**Learn more:** [Incremental Processing](../features/state.md)
 
 ---
 
@@ -409,7 +409,7 @@ transformations:
 
 **Why it matters:** Data lives in separate tables. Joins connect them. Without joins, you'd have order numbers but no customer names, product IDs but no descriptions.
 
-**Learn more:** [Join Transformer](../transformers/join.md)
+**Learn more:** [Join Transformer](../features/transformers.md)
 
 ---
 
@@ -450,7 +450,7 @@ gold_daily_sales:
 
 **Why it matters:** This structure makes debugging easy (check Bronze for raw data), ensures data quality (Silver validates), and provides fast analytics (Gold is optimized for queries).
 
-**Learn more:** [Architecture Guide](../concepts/architecture.md)
+**Learn more:** [Architecture Guide](../explanation/architecture.md)
 
 ---
 
@@ -471,7 +471,7 @@ merge_keys:
 
 **Why it matters:** Without merge, you'd have to delete all matching rows, then insert—risky and slow. Merge handles both cases atomically, keeping your data consistent.
 
-**Learn more:** [Merge Pattern](../patterns/merge.md)
+**Learn more:** [Merge Pattern](../patterns/merge_upsert.md)
 
 ---
 
@@ -493,7 +493,7 @@ natural_key:
 
 **Why it matters:** Natural keys connect your data to the real world. When someone asks about "employee E12345," you can find them. Surrogate keys like "row 847291" mean nothing to business users.
 
-**Learn more:** [Keys and Identifiers](../concepts/keys.md)
+**Learn more:** [Keys and Identifiers](../features/pipelines.md)
 
 ---
 
@@ -525,7 +525,7 @@ nodes:
 
 **Why it matters:** Breaking work into nodes makes pipelines easier to understand, debug, and maintain. If something fails, you know exactly which step broke.
 
-**Learn more:** [Node Configuration](../reference/yaml_schema.md#nodes)
+**Learn more:** [Node Configuration](../reference/yaml_schema.md)
 
 ---
 
@@ -553,7 +553,7 @@ validation:
 
 **Why it matters:** Orphan records break joins and analytics. Queries for "sales by customer region" can't work if the customer doesn't exist. Catching orphans prevents broken reports.
 
-**Learn more:** [Orphan Detection](../patterns/validation.md#orphan-detection)
+**Learn more:** [Orphan Detection](../validation/README.md)
 
 ---
 
@@ -587,7 +587,7 @@ tracked_columns:
 
 **Why it matters:** Patterns encode best practices. Writing SCD2 logic from scratch takes hours and often has bugs. Using the pattern takes 5 lines and works correctly.
 
-**Learn more:** [Patterns Reference](../patterns/index.md)
+**Learn more:** [Patterns Reference](../patterns/README.md)
 
 ---
 
@@ -621,7 +621,7 @@ pipeline:
 
 **Why it matters:** Pipelines automate data flow. Instead of manually running scripts, pipelines run on schedule, handle failures gracefully, and process data consistently every time.
 
-**Learn more:** [Pipeline Guide](../concepts/pipelines.md)
+**Learn more:** [Pipeline Guide](../features/pipelines.md)
 
 ---
 
@@ -649,7 +649,7 @@ validation:
 
 **Why it matters:** Without quarantine, bad data silently corrupts your analytics. With quarantine, good data flows through while problems are captured for review and correction.
 
-**Learn more:** [Quarantine Setup](../patterns/validation.md#quarantine)
+**Learn more:** [Quarantine Setup](../validation/README.md)
 
 ---
 
@@ -681,7 +681,7 @@ schema:
 
 **Why it matters:** Schemas catch errors early. If someone tries to put "hello" in an integer column, the schema rejects it immediately instead of corrupting downstream reports.
 
-**Learn more:** [Schema Definition](../reference/yaml_schema.md#schema)
+**Learn more:** [Schema Definition](../reference/yaml_schema.md)
 
 ---
 
@@ -704,7 +704,7 @@ natural_key:
 
 **Why it matters:** Use SCD1 when history doesn't matter (typo corrections, updated contact info). It's simpler and uses less storage than SCD2.
 
-**Learn more:** [SCD Patterns](../patterns/scd.md)
+**Learn more:** [SCD Patterns](../patterns/scd2.md)
 
 ---
 
@@ -736,7 +736,7 @@ customer_id | loyalty_tier | effective_start | effective_end | is_current
 
 **Why it matters:** Historical analysis requires history. "What tier was this customer when they made this purchase?" Without SCD2, you can't answer that question.
 
-**Learn more:** [SCD2 Pattern](../patterns/scd.md#scd-type-2)
+**Learn more:** [SCD2 Pattern](../patterns/scd2.md)
 
 ---
 
@@ -804,7 +804,7 @@ fact_sales:
 
 **Why it matters:** Star schemas are optimized for analytics. Queries like "sales by region by month by product category" are fast because the structure matches how business users think.
 
-**Learn more:** [Dimensional Modeling](../concepts/dimensional-modeling.md)
+**Learn more:** [Dimensional Modeling](../guides/dimensional_modeling_guide.md)
 
 ---
 
@@ -826,7 +826,7 @@ generate_surrogate_key:
 
 **Why it matters:** Surrogate keys are stable (never change), performant (integers join faster than strings), and handle SCD2 (each version gets its own key). They're the internal "address" for each row.
 
-**Learn more:** [Key Generation](../reference/yaml_schema.md#surrogate-keys)
+**Learn more:** [Key Generation](../reference/yaml_schema.md)
 
 ---
 
@@ -864,7 +864,7 @@ transformations:
 
 **Why it matters:** Transformers are composable building blocks. Complex data processing becomes a readable list of simple steps.
 
-**Learn more:** [Transformers Reference](../transformers/index.md)
+**Learn more:** [Transformers Reference](../features/transformers.md)
 
 ---
 
@@ -908,7 +908,7 @@ validation:
 
 **Why it matters:** Bad data in = bad decisions out. Validation catches problems at the door instead of letting them corrupt your analytics.
 
-**Learn more:** [Validation Guide](../patterns/validation.md)
+**Learn more:** [Validation Guide](../validation/README.md)
 
 ---
 
@@ -953,6 +953,6 @@ validation:
 
 ## Next Steps
 
-- **New to Odibi?** Start with [Getting Started](../getting-started/index.md)
-- **Building your first pipeline?** See [Tutorial](../tutorials/first-pipeline.md)
+- **New to Odibi?** Start with [Getting Started](../tutorials/getting_started.md)
+- **Building your first pipeline?** See [Tutorial](../tutorials/getting_started.md)
 - **Looking for specific syntax?** Check [YAML Schema Reference](../reference/yaml_schema.md)
