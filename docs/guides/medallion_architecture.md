@@ -76,6 +76,19 @@ Clean and standardize **ONE source** at a time. Make it trustworthy.
 > If YES → Silver ✓  
 > If NO → Probably Gold
 
+!!! note "Reference Tables Are Allowed in Silver"
+    The One-Source Test refers to **business source systems**, not reference/lookup data.
+    
+    **Silver CAN join with:**
+    
+    - Reference/lookup tables (code mappings, static lists)
+    - Dimension lookups for enrichment (product_code → product_name)
+    - Self-joins within the same source
+    
+    **Silver should NOT join:**
+    
+    - Multiple business source systems (SAP + Salesforce → use Gold)
+
 ### What Happens Here
 
 #### 1. Data Cleaning

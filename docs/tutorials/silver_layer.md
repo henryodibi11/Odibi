@@ -15,6 +15,19 @@ Silver is your **single source of truth**. All downstream consumers (Gold, BI, M
 | Typed | Consistent data types |
 | Conformed | Standard naming, formats |
 
+### The One-Source Test
+
+> "Could this node run if only ONE source system existed?"
+
+- **YES** → Silver ✓
+- **NO** → Probably Gold
+
+!!! note "Reference Tables Are Allowed"
+    Reference/lookup table joins ARE allowed in Silver. The test refers to **business source systems**, not supporting data.
+    
+    - ✅ `orders` JOIN `product_codes` (lookup) = Silver
+    - ❌ `sap_orders` JOIN `salesforce_customers` = Gold
+
 ---
 
 ## Quick Start: Merge from Bronze
