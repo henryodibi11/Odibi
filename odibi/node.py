@@ -2445,32 +2445,105 @@ class NodeExecutor:
         This record is collected during execution and batch-written to meta_outputs
         at the end of pipeline execution for performance.
 
+        Extracts output info from:
+        1. Explicit write block (preferred)
+        2. merge/scd2 function params in transform steps (fallback)
+
         Args:
             config: Node configuration
             row_count: Number of rows written
 
         Returns:
-            Dict with output metadata or None if no write config
+            Dict with output metadata or None if no output location found
         """
-        if not config.write:
-            return None
+        if config.write:
+            write_cfg = config.write
+            output_type = (
+                "managed_table" if write_cfg.table and not write_cfg.path else "external_table"
+            )
+            return {
+                "pipeline_name": self.pipeline_name,
+                "node_name": config.name,
+                "output_type": output_type,
+                "connection_name": write_cfg.connection,
+                "path": write_cfg.path,
+                "format": write_cfg.format,
+                "table_name": write_cfg.register_table or write_cfg.table,
+                "last_run": datetime.now(),
+                "row_count": row_count,
+            }
 
-        write_cfg = config.write
-        output_type = (
-            "managed_table" if write_cfg.table and not write_cfg.path else "external_table"
-        )
+        output_info = self._extract_output_from_transform_steps(config)
+        if output_info:
+            return {
+                "pipeline_name": self.pipeline_name,
+                "node_name": config.name,
+                "output_type": output_info.get("output_type", "external_table"),
+                "connection_name": output_info.get("connection"),
+                "path": output_info.get("path"),
+                "format": output_info.get("format", "delta"),
+                "table_name": output_info.get("register_table"),
+                "last_run": datetime.now(),
+                "row_count": row_count,
+            }
 
-        return {
-            "pipeline_name": self.pipeline_name,
-            "node_name": config.name,
-            "output_type": output_type,
-            "connection_name": write_cfg.connection,
-            "path": write_cfg.path,
-            "format": write_cfg.format,
-            "table_name": write_cfg.register_table or write_cfg.table,
-            "last_run": datetime.now(),
-            "row_count": row_count,
-        }
+        return None
+
+    def _extract_output_from_transform_steps(self, config: NodeConfig) -> Optional[Dict[str, Any]]:
+        """
+        Extract output location from merge/scd2 used as transformer or in transform steps.
+
+        These functions write data internally but don't use a write block,
+        so we need to extract their output info for cross-pipeline references.
+
+        Checks in order:
+        1. Transform steps (last merge/scd2 in chain)
+        2. Top-level transformer with params
+
+        Args:
+            config: Node configuration
+
+        Returns:
+            Dict with connection, path, format, register_table or None
+        """
+        output_functions = {"merge", "scd2"}
+
+        if config.transform and config.transform.steps:
+            for step in reversed(config.transform.steps):
+                if isinstance(step, str):
+                    continue
+
+                if hasattr(step, "function") and step.function in output_functions:
+                    params = step.params or {}
+                    connection = params.get("connection")
+                    path = params.get("path") or params.get("target")
+                    register_table = params.get("register_table")
+
+                    if connection and path:
+                        return {
+                            "connection": connection,
+                            "path": path,
+                            "format": "delta",
+                            "register_table": register_table,
+                            "output_type": "managed_table" if register_table else "external_table",
+                        }
+
+        if config.transformer in output_functions and config.params:
+            params = config.params
+            connection = params.get("connection")
+            path = params.get("path") or params.get("target")
+            register_table = params.get("register_table")
+
+            if connection and path:
+                return {
+                    "connection": connection,
+                    "path": path,
+                    "format": "delta",
+                    "register_table": register_table,
+                    "output_type": "managed_table" if register_table else "external_table",
+                }
+
+        return None
 
     def _get_schema(self, df: Any) -> Any:
         return self.engine.get_schema(df)

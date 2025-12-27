@@ -459,3 +459,300 @@ class TestCrossPipelineIntegration:
         with pytest.raises(Exception):
             # This should fail because catalog is None
             resolve_input_reference("$pipeline.node", mock_catalog)
+
+
+# ============================================================================
+# NodeExecutor: _extract_output_from_transform_steps Tests
+# ============================================================================
+
+
+class TestExtractOutputFromTransformSteps:
+    """Tests for extracting output info from merge/scd2 transform steps."""
+
+    def test_extract_merge_output(self):
+        """Test extracting output info from merge function in transform steps."""
+        from odibi.config import TransformConfig, TransformStep
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            transform=TransformConfig(
+                steps=[
+                    TransformStep(sql="SELECT * FROM df"),
+                    TransformStep(
+                        function="merge",
+                        params={
+                            "connection": "goat_prod",
+                            "path": "OEE/silver/cleaned_data",
+                            "register_table": "test.cleaned_data",
+                            "keys": ["id"],
+                        },
+                    ),
+                ]
+            ),
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        result = executor._extract_output_from_transform_steps(config)
+
+        assert result is not None
+        assert result["connection"] == "goat_prod"
+        assert result["path"] == "OEE/silver/cleaned_data"
+        assert result["register_table"] == "test.cleaned_data"
+        assert result["format"] == "delta"
+        assert result["output_type"] == "managed_table"
+
+    def test_extract_scd2_output(self):
+        """Test extracting output info from scd2 function using target param."""
+        from odibi.config import TransformConfig, TransformStep
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            transform=TransformConfig(
+                steps=[
+                    TransformStep(
+                        function="scd2",
+                        params={
+                            "connection": "goat_prod",
+                            "target": "OEE/silver/dim_product",
+                            "keys": ["id"],
+                            "track_cols": ["name", "status"],
+                            "effective_time_col": "_extracted_at",
+                        },
+                    ),
+                ]
+            ),
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        result = executor._extract_output_from_transform_steps(config)
+
+        assert result is not None
+        assert result["connection"] == "goat_prod"
+        assert result["path"] == "OEE/silver/dim_product"
+        assert result["format"] == "delta"
+        assert result["output_type"] == "external_table"
+
+    def test_no_output_when_no_merge_scd2(self):
+        """Test that no output is extracted when there's no merge/scd2 step."""
+        from odibi.config import TransformConfig, TransformStep
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            transform=TransformConfig(
+                steps=[
+                    TransformStep(sql="SELECT * FROM df"),
+                    TransformStep(function="deduplicate", params={"keys": ["id"]}),
+                ]
+            ),
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        result = executor._extract_output_from_transform_steps(config)
+
+        assert result is None
+
+    def test_no_output_when_no_transform(self):
+        """Test that no output is extracted when there's no transform config."""
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            write=WriteConfig(connection="conn", path="path", format="delta"),
+        )
+        config.transform = None
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        result = executor._extract_output_from_transform_steps(config)
+
+        assert result is None
+
+    def test_uses_last_merge_in_chain(self):
+        """Test that the last merge/scd2 in the chain is used for output."""
+        from odibi.config import TransformConfig, TransformStep
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            transform=TransformConfig(
+                steps=[
+                    TransformStep(
+                        function="merge",
+                        params={
+                            "connection": "conn1",
+                            "path": "first/path",
+                            "keys": ["id"],
+                        },
+                    ),
+                    TransformStep(sql="SELECT * FROM df"),
+                    TransformStep(
+                        function="merge",
+                        params={
+                            "connection": "conn2",
+                            "path": "second/path",
+                            "register_table": "final.table",
+                            "keys": ["id"],
+                        },
+                    ),
+                ]
+            ),
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        result = executor._extract_output_from_transform_steps(config)
+
+        assert result is not None
+        assert result["connection"] == "conn2"
+        assert result["path"] == "second/path"
+        assert result["register_table"] == "final.table"
+
+    def test_create_output_record_with_merge(self):
+        """Test _create_output_record uses merge params when no write block."""
+        from odibi.config import TransformConfig, TransformStep
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="cleaned_data",
+            transform=TransformConfig(
+                steps=[
+                    TransformStep(
+                        function="merge",
+                        params={
+                            "connection": "goat_prod",
+                            "path": "OEE/silver/cleaned_data",
+                            "register_table": "test.cleaned_data",
+                            "keys": ["id"],
+                        },
+                    ),
+                ]
+            ),
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        executor.pipeline_name = "silver"
+
+        result = executor._create_output_record(config, row_count=1000)
+
+        assert result is not None
+        assert result["pipeline_name"] == "silver"
+        assert result["node_name"] == "cleaned_data"
+        assert result["connection_name"] == "goat_prod"
+        assert result["path"] == "OEE/silver/cleaned_data"
+        assert result["table_name"] == "test.cleaned_data"
+        assert result["row_count"] == 1000
+
+    def test_write_block_takes_precedence(self):
+        """Test that explicit write block takes precedence over merge params."""
+        from odibi.config import TransformConfig, TransformStep, WriteConfig
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            transform=TransformConfig(
+                steps=[
+                    TransformStep(
+                        function="merge",
+                        params={
+                            "connection": "merge_conn",
+                            "path": "merge/path",
+                            "keys": ["id"],
+                        },
+                    ),
+                ]
+            ),
+            write=WriteConfig(
+                connection="write_conn",
+                path="write/path",
+                format="delta",
+            ),
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        executor.pipeline_name = "test"
+
+        result = executor._create_output_record(config, row_count=500)
+
+        assert result["connection_name"] == "write_conn"
+        assert result["path"] == "write/path"
+
+    def test_extract_toplevel_merge_transformer(self):
+        """Test extracting output from top-level merge transformer."""
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            transformer="merge",
+            params={
+                "connection": "goat_prod",
+                "path": "OEE/silver/merged_data",
+                "register_table": "test.merged_data",
+                "keys": ["id"],
+                "strategy": "upsert",
+            },
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        result = executor._extract_output_from_transform_steps(config)
+
+        assert result is not None
+        assert result["connection"] == "goat_prod"
+        assert result["path"] == "OEE/silver/merged_data"
+        assert result["register_table"] == "test.merged_data"
+
+    def test_extract_toplevel_scd2_transformer(self):
+        """Test extracting output from top-level scd2 transformer."""
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            transformer="scd2",
+            params={
+                "connection": "goat_prod",
+                "target": "OEE/silver/dim_customer",
+                "keys": ["customer_id"],
+                "track_cols": ["name", "address"],
+                "effective_time_col": "_extracted_at",
+            },
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        result = executor._extract_output_from_transform_steps(config)
+
+        assert result is not None
+        assert result["connection"] == "goat_prod"
+        assert result["path"] == "OEE/silver/dim_customer"
+
+    def test_transform_step_takes_precedence_over_transformer(self):
+        """Test that merge in transform steps takes precedence over top-level transformer."""
+        from odibi.config import TransformConfig, TransformStep
+        from odibi.node import NodeExecutor
+
+        config = NodeConfig(
+            name="test_node",
+            transformer="merge",
+            params={
+                "connection": "toplevel_conn",
+                "path": "toplevel/path",
+                "keys": ["id"],
+            },
+            transform=TransformConfig(
+                steps=[
+                    TransformStep(
+                        function="merge",
+                        params={
+                            "connection": "step_conn",
+                            "path": "step/path",
+                            "keys": ["id"],
+                        },
+                    ),
+                ]
+            ),
+        )
+
+        executor = NodeExecutor.__new__(NodeExecutor)
+        result = executor._extract_output_from_transform_steps(config)
+
+        assert result["connection"] == "step_conn"
+        assert result["path"] == "step/path"
