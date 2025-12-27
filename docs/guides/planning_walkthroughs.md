@@ -117,6 +117,20 @@ Silver_Walkthrough.xlsx
 - **YES** → Silver ✓
 - **NO** → Probably Gold
 
+!!! note "Reference Tables Are Allowed"
+    The One-Source Test refers to *business source systems*, not reference data.
+    
+    **Silver CAN join with:**
+    
+    - Reference/lookup tables (code mappings, static lists)
+    - Dimension lookups for enrichment (product_code → product_name)
+    - Self-joins within the same source
+    
+    **Silver should NOT join:**
+    
+    - Multiple business source systems (SAP + Salesforce → Gold)
+    - Cross-source conformed dimensions → Gold
+
 **Odibi Patterns:** `deduplicate`, `merge`, `clean_text`, `validate_and_flag`
 
 ---

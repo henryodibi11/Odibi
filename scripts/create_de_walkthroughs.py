@@ -607,6 +607,12 @@ def create_silver_walkthrough(output_dir):
     ws.cell(row=7, column=1, value='"Could this node run if only ONE source system existed?"')
     ws.cell(row=8, column=1, value="YES → Silver ✓    NO → Probably Gold")
     ws.cell(row=8, column=1).font = Font(bold=True)
+    ws.cell(
+        row=9,
+        column=1,
+        value="Note: Reference/lookup table joins ARE allowed (code mappings, enrichment). Only cross-SOURCE-SYSTEM joins go to Gold.",
+    )
+    ws.cell(row=9, column=1).font = Font(italic=True, size=10)
 
     steps = [
         "1. Fill S1_Domain_Overview - Business context per domain",
@@ -614,20 +620,20 @@ def create_silver_walkthrough(output_dir):
         "3. Fill S3_Column_Mapping - Source → Target with transformations",
         "4. Plan validations in S4_Validation",
     ]
-    for i, step in enumerate(steps, 10):
+    for i, step in enumerate(steps, 11):
         ws.cell(row=i, column=1, value=step)
 
     add_encouragement(
-        ws, "Silver is where data becomes trustworthy. Take pride in this work.", 15, span=6
+        ws, "Silver is where data becomes trustworthy. Take pride in this work.", 16, span=6
     )
     add_tip(
         ws,
         "Silver operations: Deduplicate, Clean text, Cast types, Standardize codes, Enrich via lookups",
-        17,
+        18,
         span=6,
     )
-    add_warning(ws, "Do NOT combine multiple source systems here - that's Gold", 19, span=5)
-    add_warning(ws, "Do NOT build dimensions/SCD2 here - that's Gold", 21, span=5)
+    add_warning(ws, "Do NOT combine multiple source systems here - that's Gold", 20, span=5)
+    add_warning(ws, "Do NOT build dimensions/SCD2 here - that's Gold", 22, span=5)
 
     ws.cell(row=24, column=1, value="Who Fills What")
     ws.cell(row=24, column=1).font = SECTION_FONT
