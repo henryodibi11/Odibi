@@ -78,6 +78,9 @@ def register_standard_library():
         advanced.generate_surrogate_key, "generate_surrogate_key", advanced.SurrogateKeyParams
     )
     registry.register(
+        advanced.generate_numeric_key, "generate_numeric_key", advanced.NumericKeyParams
+    )
+    registry.register(
         advanced.validate_and_flag, "validate_and_flag", advanced.ValidateAndFlagParams
     )
     registry.register(

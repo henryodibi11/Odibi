@@ -475,6 +475,54 @@ def test_generate_surrogate_key(pandas_context):
     assert sk != sk2
 
 
+def test_generate_numeric_key(pandas_context):
+    """Test generate_numeric_key creates deterministic BIGINT keys."""
+    import numpy as np
+
+    params = advanced.NumericKeyParams(
+        columns=["dept", "name"], separator="|", output_col="numeric_id"
+    )
+
+    result = advanced.generate_numeric_key(pandas_context, params).df
+
+    assert "numeric_id" in result.columns
+    nk = result.iloc[0]["numeric_id"]
+
+    # Should be a large integer (BIGINT) - includes numpy integer types
+    assert isinstance(nk, (int, float, np.integer))
+    assert nk > 0
+
+    # Should be deterministic: same data = same key
+    nk2 = result.iloc[1]["numeric_id"]
+    assert nk != nk2  # Different rows = different keys
+
+
+def test_generate_numeric_key_with_coalesce(pandas_context):
+    """Test generate_numeric_key with coalesce_with keeps existing values."""
+    # Add an ID column with some values
+    df = pandas_context.df.copy()
+    df["existing_id"] = [100, None, 300, None, 500]
+    pandas_context.df = df
+
+    params = advanced.NumericKeyParams(
+        columns=["dept", "name"],
+        output_col="final_id",
+        coalesce_with="existing_id",
+    )
+
+    result = advanced.generate_numeric_key(pandas_context, params).df
+
+    assert "final_id" in result.columns
+
+    # Row 0 should keep existing value (100)
+    assert result.iloc[0]["final_id"] == 100
+    # Row 1 should have generated value (was None)
+    assert result.iloc[1]["final_id"] != 100  # Generated, not 100
+    assert result.iloc[1]["final_id"] > 0  # Should be positive BIGINT
+    # Row 2 should keep existing value (300)
+    assert result.iloc[2]["final_id"] == 300
+
+
 def test_parse_json(pandas_context):
     # We need a JSON string column first
     df = pandas_context.df.copy()
