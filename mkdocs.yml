@@ -13,6 +13,7 @@ theme:
     - navigation.tabs
     - navigation.sections
     - navigation.top
+    - navigation.expand
     - toc.integrate
     - content.code.copy
   palette:
@@ -43,15 +44,14 @@ nav:
   - Home: README.md
   - Playbook: playbook/README.md
 
-  - Getting Started:
-      - Quickstart: tutorials/getting_started.md
-      - Bronze Layer: tutorials/bronze_layer.md
-      - Silver Layer: tutorials/silver_layer.md
-      - Gold Layer: tutorials/gold_layer.md
-      - Spark Engine: tutorials/spark_engine.md
-      - Azure Connections: tutorials/azure_connections.md
-
-  - Tutorials:
+  - Learn:
+      - Getting Started:
+          - Quickstart: tutorials/getting_started.md
+          - Bronze Layer: tutorials/bronze_layer.md
+          - Silver Layer: tutorials/silver_layer.md
+          - Gold Layer: tutorials/gold_layer.md
+          - Spark Engine: tutorials/spark_engine.md
+          - Azure Connections: tutorials/azure_connections.md
       - Dimensional Modeling:
           - Introduction: tutorials/dimensional_modeling/01_introduction.md
           - Dimension Pattern: tutorials/dimensional_modeling/02_dimension_pattern.md
@@ -66,8 +66,12 @@ nav:
           - Materializing Metrics: tutorials/dimensional_modeling/11_materializing_metrics.md
           - Semantic Full Example: tutorials/dimensional_modeling/12_semantic_full_example.md
           - FK Validation: tutorials/dimensional_modeling/13_fk_validation.md
+      - Learning Resources:
+          - Curriculum: learning/curriculum.md
+          - Data Engineering 101: learning/data_engineering_101.md
+          - Glossary: learning/glossary.md
 
-  - Core Concepts:
+  - Concepts:
       - Pipelines & Nodes: features/pipelines.md
       - Connections: features/connections.md
       - Engines: features/engines.md
@@ -78,6 +82,8 @@ nav:
       - Stories: features/stories.md
       - Orchestration: features/orchestration.md
       - Cross-Pipeline Dependencies: features/cross-pipeline-dependencies.md
+      - Architecture: explanation/architecture.md
+      - Case Studies: explanation/case_studies.md
 
   - Patterns:
       - Overview: patterns/README.md
@@ -95,6 +101,11 @@ nav:
           - Fact Pattern: patterns/fact.md
           - Aggregation Pattern: patterns/aggregation.md
           - SCD2 Pattern: patterns/scd2.md
+      - Semantic Layer:
+          - Overview: semantics/index.md
+          - Defining Metrics: semantics/metrics.md
+          - Querying: semantics/query.md
+          - Materializing: semantics/materialize.md
       - Anti-Patterns: patterns/anti_patterns.md
 
   - Data Quality:
@@ -106,13 +117,7 @@ nav:
       - FK Validation: validation/fk.md
       - Performance: features/validation_performance.md
 
-  - Semantic Layer:
-      - Overview: semantics/index.md
-      - Defining Metrics: semantics/metrics.md
-      - Querying: semantics/query.md
-      - Materializing: semantics/materialize.md
-
-  - Monitoring:
+  - Operations:
       - Alerting: features/alerting.md
       - Observability: features/observability.md
       - Diagnostics: features/diagnostics.md
@@ -120,6 +125,7 @@ nav:
       - Schema Tracking: features/schema_tracking.md
       - Catalog: features/catalog.md
       - Web UI: features/ui.md
+      - Troubleshooting: troubleshooting.md
 
   - Guides:
       - The Definitive Guide: guides/the_definitive_guide.md
@@ -160,14 +166,3 @@ nav:
           - Config: reference/api/config.md
           - Connections: reference/api/connections.md
           - CLI: reference/api/cli.md
-
-  - Learning:
-      - Curriculum: learning/curriculum.md
-      - Data Engineering 101: learning/data_engineering_101.md
-      - Glossary: learning/glossary.md
-
-  - Troubleshooting: troubleshooting.md
-
-  - Explanation:
-      - Architecture: explanation/architecture.md
-      - Case Studies: explanation/case_studies.md
