@@ -2660,6 +2660,39 @@ class PipelineConfig(BaseModel):
             raise ValueError(f"Duplicate node names found: {set(duplicates)}")
         return nodes
 
+    @model_validator(mode="after")
+    def auto_populate_depends_on_from_inputs(self):
+        """
+        Auto-populate depends_on for same-pipeline references in inputs.
+
+        If a node has inputs like $silver.other_node and this is the silver pipeline,
+        automatically add 'other_node' to depends_on for correct execution order.
+        """
+        node_names = {node.name for node in self.nodes}
+
+        for node in self.nodes:
+            if not node.inputs:
+                continue
+
+            for input_name, ref in node.inputs.items():
+                if not isinstance(ref, str) or not ref.startswith("$"):
+                    continue
+
+                # Parse $pipeline.node reference
+                parts = ref[1:].split(".", 1)
+                if len(parts) != 2:
+                    continue
+
+                ref_pipeline, ref_node = parts
+
+                # Check if reference is to same pipeline
+                if ref_pipeline == self.pipeline and ref_node in node_names:
+                    # Add to depends_on if not already there
+                    if ref_node not in node.depends_on:
+                        node.depends_on.append(ref_node)
+
+        return self
+
 
 # ============================================
 # Project Configuration
