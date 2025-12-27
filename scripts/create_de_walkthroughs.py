@@ -543,36 +543,51 @@ def create_bronze_walkthrough(output_dir):
 
     # Reference
     ws = wb.create_sheet("Reference")
-    add_title(ws, "REFERENCE - BRONZE PATTERNS")
+    add_title(ws, "REFERENCE - BRONZE LAYER RULES")
 
     row = 3
-    ws.cell(row=row, column=1, value="ANTI-PATTERNS")
-    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="C00000")
+    ws.cell(row=row, column=1, value="BRONZE = YOUR UNDO BUTTON")
+    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="1F4E79")
     row += 1
-    for ap in [
-        "Transforming or cleaning data",
-        "Filtering business rows",
-        "Joining tables",
-        "Using Merge pattern",
-        "Not adding _extracted_at",
-    ]:
-        ws.cell(row=row, column=1, value=f"❌ {ap}")
-        ws.cell(row=row, column=1).font = Font(color="C00000")
-        row += 1
+    ws.cell(
+        row=row,
+        column=1,
+        value="If something goes wrong downstream, you can always reprocess from Bronze.",
+    )
+    ws.cell(row=row, column=1).font = Font(italic=True)
+    row += 2
 
-    row += 1
-    ws.cell(row=row, column=1, value="BEST PRACTICES")
+    ws.cell(row=row, column=1, value="✅ ALLOWED IN BRONZE")
     ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="006100")
     row += 1
     for bp in [
-        "Land data as-is",
-        "Always APPEND mode",
-        "Add _extracted_at metadata",
-        "Use Smart Read for incremental",
-        "Let Silver deduplicate",
+        "Land data exactly as-is from source",
+        "Append mode only (accumulate history)",
+        "Add metadata columns (_extracted_at, _batch_id, _source_file)",
+        "Schema evolution (allow new columns)",
+        "Smart Read (rolling_window, stateful) for incremental",
+        "Route bad records to quarantine path",
+        "Duplicates are expected - Silver handles them",
     ]:
         ws.cell(row=row, column=1, value=f"✅ {bp}")
         ws.cell(row=row, column=1).font = Font(color="006100")
+        row += 1
+
+    row += 1
+    ws.cell(row=row, column=1, value="❌ NOT ALLOWED IN BRONZE")
+    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="C00000")
+    row += 1
+    for ap in [
+        "Any data transformation",
+        "Merge, upsert, or overwrite modes",
+        "Filter or remove rows",
+        "Clean or standardize data",
+        "Join any tables",
+        "Apply business logic",
+        "Deduplicate",
+    ]:
+        ws.cell(row=row, column=1, value=f"❌ {ap}")
+        ws.cell(row=row, column=1).font = Font(color="C00000")
         row += 1
 
     set_column_widths(ws, [80])
@@ -880,36 +895,69 @@ def create_silver_walkthrough(output_dir):
 
     # Reference
     ws = wb.create_sheet("Reference")
-    add_title(ws, "REFERENCE - SILVER PATTERNS")
+    add_title(ws, "REFERENCE - SILVER LAYER RULES")
 
     row = 3
-    ws.cell(row=row, column=1, value="WHAT BELONGS IN SILVER")
+    ws.cell(row=row, column=1, value="THE ONE-SOURCE TEST")
+    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="1F4E79")
+    row += 1
+    ws.cell(
+        row=row,
+        column=1,
+        value='"Could this node run if only ONE business source system existed?"',
+    )
+    ws.cell(row=row, column=1).font = Font(italic=True)
+    row += 1
+    ws.cell(
+        row=row,
+        column=1,
+        value="Reference/lookup tables don't count - they're supporting data, not source systems.",
+    )
+    ws.cell(row=row, column=1).font = Font(italic=True, size=10)
+    row += 2
+
+    ws.cell(row=row, column=1, value="✅ ALLOWED IN SILVER")
     ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="006100")
     row += 1
     for op in [
-        "Deduplication",
-        "Remove bad characters",
-        "Handle nulls",
-        "Type casting",
-        "Code mapping",
-        "Lookup enrichment",
+        "Deduplicate (remove exact duplicates)",
+        "Clean text (trim, case, remove bad chars)",
+        "Cast data types",
+        "Standardize codes (M1 → Machine 1)",
+        "Join with reference/lookup tables",
+        "Enrich via dimension lookups (code → name)",
+        "Validate and flag bad data",
+        "Self-joins within the same source",
     ]:
         ws.cell(row=row, column=1, value=f"✅ {op}")
+        ws.cell(row=row, column=1).font = Font(color="006100")
         row += 1
 
     row += 1
-    ws.cell(row=row, column=1, value="WHAT DOES NOT BELONG")
+    ws.cell(row=row, column=1, value="❌ NOT ALLOWED IN SILVER")
     ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="C00000")
     row += 1
     for ap in [
-        "UNION multiple sources",
-        "Business KPIs",
-        "Building dimensions with SKs",
-        "SCD2 tracking",
-        "Cross-fact joins",
+        "Join multiple business source systems (SAP + Salesforce → Gold)",
+        "UNION multiple source systems",
+        "Build dimensions with surrogate keys",
+        "SCD2 history tracking",
+        "Cross-source conformed dimensions",
+        "Business KPIs or aggregations",
     ]:
         ws.cell(row=row, column=1, value=f"❌ {ap}")
+        ws.cell(row=row, column=1).font = Font(color="C00000")
         row += 1
+
+    row += 2
+    ws.cell(row=row, column=1, value="EXAMPLES")
+    ws.cell(row=row, column=1).font = Font(bold=True, size=11)
+    row += 1
+    ws.cell(row=row, column=1, value="✅ orders JOIN product_codes (lookup) = Silver")
+    ws.cell(row=row, column=1).font = Font(color="006100")
+    row += 1
+    ws.cell(row=row, column=1, value="❌ sap_orders JOIN salesforce_customers = Gold")
+    ws.cell(row=row, column=1).font = Font(color="C00000")
 
     set_column_widths(ws, [80])
     wb.save(output_dir / "Silver_Walkthrough.xlsx")
@@ -1653,40 +1701,62 @@ def create_gold_walkthrough(output_dir):
 
     # Reference
     ws = wb.create_sheet("Reference")
-    add_title(ws, "REFERENCE - GOLD PATTERNS")
+    add_title(ws, "REFERENCE - GOLD LAYER RULES")
 
     row = 3
-    ws.cell(row=row, column=1, value="WHAT BELONGS IN GOLD")
+    ws.cell(row=row, column=1, value="THE MULTI-SOURCE TEST")
+    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="1F4E79")
+    row += 1
+    ws.cell(
+        row=row,
+        column=1,
+        value='"Does this require MULTIPLE source systems OR business modeling (dimensions/facts)?"',
+    )
+    ws.cell(row=row, column=1).font = Font(italic=True)
+    row += 2
+
+    ws.cell(row=row, column=1, value="✅ ALLOWED IN GOLD")
     ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="006100")
     row += 1
     for op in [
         "Dimensions with surrogate keys",
         "SCD2 history tracking",
         "DateDimension generation",
-        "Fact tables with SK lookups",
-        "UNION multiple sources",
-        "Business KPIs",
-        "Aggregations",
+        "Fact tables with dimension lookups",
+        "UNION multiple source systems",
+        "JOIN across source systems",
+        "Business KPIs and calculated metrics",
+        "Aggregations (daily, monthly, etc.)",
+        "Semantic layer metrics",
     ]:
         ws.cell(row=row, column=1, value=f"✅ {op}")
+        ws.cell(row=row, column=1).font = Font(color="006100")
         row += 1
 
     row += 1
-    ws.cell(row=row, column=1, value="ANTI-PATTERNS")
+    ws.cell(row=row, column=1, value="❌ NOT ALLOWED IN GOLD")
     ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="C00000")
     row += 1
     for ap in [
-        "Silver-level cleaning",
-        "SCD2 on facts",
-        "SCD2 without prior dedup",
-        "Undefined grain",
+        "Silver-level cleaning (data should arrive clean)",
+        "SCD2 on fact tables",
+        "Undefined grain on fact tables",
+        "SCD2 without prior deduplication",
     ]:
         ws.cell(row=row, column=1, value=f"❌ {ap}")
+        ws.cell(row=row, column=1).font = Font(color="C00000")
         row += 1
 
     row += 2
-    ws.cell(row=row, column=1, value="GRAIN CHECKLIST")
-    ws.cell(row=row, column=1).font = Font(bold=True, size=12)
+    ws.cell(row=row, column=1, value="GRAIN CHECKLIST (CRITICAL)")
+    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="1F4E79")
+    row += 1
+    ws.cell(
+        row=row,
+        column=1,
+        value="Every fact table MUST have a grain statement: 'One row = one ___ per ___'",
+    )
+    ws.cell(row=row, column=1).font = Font(italic=True)
     row += 1
     for gc in [
         "☐ 'One row = one ___' statement defined",

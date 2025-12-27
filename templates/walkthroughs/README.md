@@ -26,6 +26,42 @@ Walkthrough approach: Answer hard questions upfront → document decisions → w
 
 ---
 
+## Layer Rules (Definitive)
+
+### Bronze: Land Raw Data
+
+| ✅ ALLOWED | ❌ NOT ALLOWED |
+|-----------|----------------|
+| Land data exactly as-is | Any transformation |
+| Append mode only | Merge, upsert, overwrite |
+| Add metadata (`_extracted_at`) | Filter or remove rows |
+| Smart Read for incremental | Join any tables |
+| Duplicates (expected) | Deduplicate |
+
+### Silver: Clean One Source
+
+| ✅ ALLOWED | ❌ NOT ALLOWED |
+|-----------|----------------|
+| Deduplicate | Join multiple source systems |
+| Clean text, cast types | UNION multiple sources |
+| Standardize codes | Build dimensions with SKs |
+| Join with reference/lookup tables | SCD2 history tracking |
+| Enrich via lookups | Business KPIs |
+
+**Reference tables don't count as a "source system"** - they're supporting data.
+
+### Gold: Combine & Model
+
+| ✅ ALLOWED | ❌ NOT ALLOWED |
+|-----------|----------------|
+| Dimensions with surrogate keys | Silver-level cleaning |
+| SCD2 history tracking | SCD2 on fact tables |
+| UNION/JOIN across sources | Undefined grain on facts |
+| Business KPIs | SCD2 without prior dedup |
+| Aggregations | |
+
+---
+
 ## How to Use: Step by Step
 
 ### Step 1: Bronze Layer

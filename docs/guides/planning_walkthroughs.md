@@ -52,6 +52,67 @@ python scripts/create_de_walkthroughs.py
 
 ---
 
+## Layer Rules (Definitive)
+
+### Bronze Layer Rules
+
+| ✅ ALLOWED | ❌ NOT ALLOWED |
+|-----------|----------------|
+| Land data exactly as-is from source | Any data transformation |
+| Append mode only (accumulate history) | Merge, upsert, or overwrite |
+| Add metadata columns (`_extracted_at`, `_batch_id`, `_source_file`) | Filter or remove rows |
+| Schema evolution (allow new columns) | Clean or standardize data |
+| Smart Read (rolling_window, stateful) for incremental | Join any tables |
+| Route bad records to quarantine path | Apply business logic |
+| Duplicates (expected - Silver handles them) | Deduplicate |
+
+**Bronze is your undo button.** If something goes wrong downstream, you can always reprocess from Bronze.
+
+---
+
+### Silver Layer Rules
+
+| ✅ ALLOWED | ❌ NOT ALLOWED |
+|-----------|----------------|
+| Deduplicate (remove exact duplicates) | Join multiple business source systems |
+| Clean text (trim, case, remove bad chars) | UNION multiple source systems |
+| Cast data types | Build dimensions with surrogate keys |
+| Standardize codes (M1 → Machine 1) | SCD2 history tracking |
+| Join with reference/lookup tables | Cross-source conformed dimensions |
+| Enrich via dimension lookups (code → name) | Business KPIs or aggregations |
+| Validate and flag bad data | |
+| Self-joins within the same source | |
+
+**The One-Source Test:** "Could this node run if only ONE business source system existed?"
+
+- **Reference tables don't count as a "source system"** - they're supporting data
+- Joining `orders` with `product_codes` lookup table = ✅ Silver
+- Joining `sap_orders` with `salesforce_customers` = ❌ Gold
+
+---
+
+### Gold Layer Rules
+
+| ✅ ALLOWED | ❌ NOT ALLOWED |
+|-----------|----------------|
+| Dimensions with surrogate keys | Silver-level cleaning (data should arrive clean) |
+| SCD2 history tracking | SCD2 on fact tables |
+| DateDimension generation | Undefined grain on facts |
+| Fact tables with dimension lookups | SCD2 without prior deduplication |
+| UNION multiple source systems | |
+| JOIN across source systems | |
+| Business KPIs and calculated metrics | |
+| Aggregations (daily, monthly, etc.) | |
+| Semantic layer metrics | |
+
+**The Multi-Source Test:** "Does this require MULTIPLE source systems OR business modeling?"
+
+- If combining SAP + Salesforce + Excel → Gold
+- If building a dimension with surrogate keys → Gold
+- If creating business KPIs → Gold
+
+---
+
 ## Who Fills What
 
 ### Business Stakeholders
