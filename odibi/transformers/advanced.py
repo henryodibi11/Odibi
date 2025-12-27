@@ -531,7 +531,8 @@ def generate_numeric_key(context: EngineContext, params: NumericKeyParams) -> En
     from odibi.enums import EngineType
 
     def safe_col(col, quote_char):
-        return f"COALESCE(CAST({quote_char}{col}{quote_char} AS STRING), '')"
+        # Normalize: TRIM whitespace, then treat empty string and NULL as equivalent
+        return f"COALESCE(NULLIF(TRIM(CAST({quote_char}{col}{quote_char} AS STRING)), ''), '')"
 
     # Check if we need to replace the original column
     replace_column = params.coalesce_with and params.output_col == params.coalesce_with
