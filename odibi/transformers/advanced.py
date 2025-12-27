@@ -567,14 +567,13 @@ def generate_numeric_key(context: EngineContext, params: NumericKeyParams) -> En
     if replace_column:
         # Replace the original column by selecting all columns except the original,
         # then adding the new computed column
-        # Get column names from dataframe
         df = context.df
-        if hasattr(df, "columns"):
-            # Pandas/DuckDB
-            all_cols = [f'"{c}"' for c in df.columns if c != params.coalesce_with]
+        col_names = list(df.columns)
+        if context.engine_type == EngineType.SPARK:
+            all_cols = [f"`{c}`" for c in col_names if c != params.coalesce_with]
         else:
-            # Spark
-            all_cols = [f"`{c}`" for c in df.columns if c != params.coalesce_with]
+            # Pandas/DuckDB
+            all_cols = [f'"{c}"' for c in col_names if c != params.coalesce_with]
         cols_select = ", ".join(all_cols)
         sql_query = f"SELECT {cols_select}, {final_expr} AS {output_col} FROM df"
     else:
