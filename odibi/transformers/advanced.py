@@ -526,11 +526,15 @@ def generate_numeric_key(context: EngineContext, params: NumericKeyParams) -> En
     3. Converting first 15 hex chars to BIGINT
 
     If coalesce_with is specified, keeps the existing value when not null.
+    If output_col == coalesce_with, the original column is replaced.
     """
     from odibi.enums import EngineType
 
     def safe_col(col, quote_char):
         return f"COALESCE(CAST({quote_char}{col}{quote_char} AS STRING), '')"
+
+    # Check if we need to replace the original column
+    replace_column = params.coalesce_with and params.output_col == params.coalesce_with
 
     if context.engine_type == EngineType.SPARK:
         quote_char = "`"
@@ -560,7 +564,22 @@ def generate_numeric_key(context: EngineContext, params: NumericKeyParams) -> En
 
         output_col = f'"{params.output_col}"'
 
-    sql_query = f"SELECT *, {final_expr} AS {output_col} FROM df"
+    if replace_column:
+        # Replace the original column by selecting all columns except the original,
+        # then adding the new computed column
+        # Get column names from dataframe
+        df = context.df
+        if hasattr(df, "columns"):
+            # Pandas/DuckDB
+            all_cols = [f'"{c}"' for c in df.columns if c != params.coalesce_with]
+        else:
+            # Spark
+            all_cols = [f"`{c}`" for c in df.columns if c != params.coalesce_with]
+        cols_select = ", ".join(all_cols)
+        sql_query = f"SELECT {cols_select}, {final_expr} AS {output_col} FROM df"
+    else:
+        sql_query = f"SELECT *, {final_expr} AS {output_col} FROM df"
+
     return context.sql(sql_query)
 
 

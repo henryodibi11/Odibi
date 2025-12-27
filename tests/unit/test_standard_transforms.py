@@ -523,6 +523,30 @@ def test_generate_numeric_key_with_coalesce(pandas_context):
     assert result.iloc[2]["final_id"] == 300
 
 
+def test_generate_numeric_key_replace_column(pandas_context):
+    """Test generate_numeric_key replaces column when output_col == coalesce_with."""
+    # Add a row_key column with some values (avoid 'ID' which might conflict with 'id')
+    df = pandas_context.df.copy()
+    df["row_key"] = [100, None, 300, None, 500]
+    pandas_context.df = df
+
+    params = advanced.NumericKeyParams(
+        columns=["dept", "name"],
+        output_col="row_key",
+        coalesce_with="row_key",  # Same as output_col - should replace
+    )
+
+    result = advanced.generate_numeric_key(pandas_context, params).df
+
+    # Should have exactly one row_key column (replaced, not duplicated)
+    assert list(result.columns).count("row_key") == 1
+
+    # Values should be coalesced correctly
+    assert result.iloc[0]["row_key"] == 100  # Kept existing
+    assert result.iloc[1]["row_key"] > 0  # Generated (was None)
+    assert result.iloc[2]["row_key"] == 300  # Kept existing
+
+
 def test_parse_json(pandas_context):
     # We need a JSON string column first
     df = pandas_context.df.copy()
