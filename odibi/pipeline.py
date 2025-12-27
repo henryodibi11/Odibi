@@ -241,6 +241,30 @@ class Pipeline:
         # Delegate to PipelineManager
         return PipelineManager.from_yaml(yaml_path)
 
+    def register_outputs(self) -> int:
+        """
+        Pre-register node outputs from pipeline config without running the pipeline.
+
+        Scans pipeline nodes for output locations (write blocks, merge/scd2 params)
+        and registers them to meta_outputs. This enables cross-pipeline references
+        without requiring the source pipeline to have run first.
+
+        Returns:
+            Number of outputs registered
+
+        Example:
+            >>> pipeline = Pipeline(config, engine="spark", catalog_manager=catalog)
+            >>> count = pipeline.register_outputs()
+            >>> print(f"Registered {count} outputs")
+        """
+        if not self.catalog_manager:
+            self._ctx.warning("No catalog_manager configured, cannot register outputs")
+            return 0
+
+        count = self.catalog_manager.register_outputs_from_config(self.config)
+        self._ctx.info(f"Pre-registered {count} outputs from pipeline config")
+        return count
+
     def run(
         self,
         parallel: bool = False,
@@ -1491,6 +1515,49 @@ class PipelineManager:
         logger.info(f"Built {len(connections)} connections successfully")
 
         return connections
+
+    def register_outputs(
+        self,
+        pipelines: Optional[Union[str, List[str]]] = None,
+    ) -> Dict[str, int]:
+        """
+        Pre-register node outputs from pipeline configs without running them.
+
+        Scans pipeline nodes for output locations (write blocks, merge/scd2 params)
+        and registers them to meta_outputs. This enables cross-pipeline references
+        without requiring the source pipelines to have run first.
+
+        Args:
+            pipelines: Pipeline name(s) to register. If None, registers all pipelines.
+
+        Returns:
+            Dict mapping pipeline name to number of outputs registered
+
+        Example:
+            >>> manager = PipelineManager.from_yaml("pipelines.yaml")
+            >>> counts = manager.register_outputs("silver")  # Register just silver
+            >>> counts = manager.register_outputs()  # Register all pipelines
+        """
+        if pipelines is None:
+            pipeline_names = list(self._pipelines.keys())
+        elif isinstance(pipelines, str):
+            pipeline_names = [pipelines]
+        else:
+            pipeline_names = pipelines
+
+        results = {}
+        for name in pipeline_names:
+            if name not in self._pipelines:
+                self._ctx.warning(f"Pipeline not found: {name}")
+                continue
+
+            pipeline = self._pipelines[name]
+            count = pipeline.register_outputs()
+            results[name] = count
+
+        total = sum(results.values())
+        self._ctx.info(f"Pre-registered {total} outputs from {len(results)} pipelines")
+        return results
 
     def run(
         self,

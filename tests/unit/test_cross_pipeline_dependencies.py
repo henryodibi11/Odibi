@@ -756,3 +756,177 @@ class TestExtractOutputFromTransformSteps:
 
         assert result["connection"] == "step_conn"
         assert result["path"] == "step/path"
+
+
+# ============================================================================
+# CatalogManager: register_outputs_from_config Tests
+# ============================================================================
+
+
+class TestRegisterOutputsFromConfig:
+    """Tests for pre-registering outputs from pipeline config."""
+
+    def test_register_outputs_with_write_block(self, catalog_manager):
+        """Test registering outputs from nodes with write blocks."""
+        from odibi.config import PipelineConfig, WriteConfig
+
+        catalog_manager.bootstrap()
+
+        pipeline_config = PipelineConfig(
+            pipeline="test_pipeline",
+            nodes=[
+                NodeConfig(
+                    name="node_with_write",
+                    write=WriteConfig(
+                        connection="goat_prod",
+                        path="silver/data",
+                        format="delta",
+                        register_table="test.silver_data",
+                    ),
+                ),
+            ],
+        )
+
+        count = catalog_manager.register_outputs_from_config(pipeline_config)
+
+        assert count == 1
+        output = catalog_manager.get_node_output("test_pipeline", "node_with_write")
+        assert output is not None
+        assert output["path"] == "silver/data"
+        assert output["table_name"] == "test.silver_data"
+
+    def test_register_outputs_with_merge_step(self, catalog_manager):
+        """Test registering outputs from nodes with merge in transform steps."""
+        from odibi.config import PipelineConfig, TransformConfig, TransformStep
+
+        catalog_manager.bootstrap()
+
+        pipeline_config = PipelineConfig(
+            pipeline="silver",
+            nodes=[
+                NodeConfig(
+                    name="cleaned_data",
+                    transform=TransformConfig(
+                        steps=[
+                            TransformStep(sql="SELECT * FROM df"),
+                            TransformStep(
+                                function="merge",
+                                params={
+                                    "connection": "goat_prod",
+                                    "path": "OEE/silver/cleaned_data",
+                                    "register_table": "test.cleaned_data",
+                                    "keys": ["id"],
+                                },
+                            ),
+                        ]
+                    ),
+                ),
+            ],
+        )
+
+        count = catalog_manager.register_outputs_from_config(pipeline_config)
+
+        assert count == 1
+        output = catalog_manager.get_node_output("silver", "cleaned_data")
+        assert output is not None
+        assert output["path"] == "OEE/silver/cleaned_data"
+        assert output["table_name"] == "test.cleaned_data"
+
+    def test_register_outputs_with_scd2_transformer(self, catalog_manager):
+        """Test registering outputs from nodes with scd2 as top-level transformer."""
+        from odibi.config import PipelineConfig
+
+        catalog_manager.bootstrap()
+
+        pipeline_config = PipelineConfig(
+            pipeline="silver",
+            nodes=[
+                NodeConfig(
+                    name="dim_product",
+                    transformer="scd2",
+                    params={
+                        "connection": "goat_prod",
+                        "target": "OEE/silver/dim_product",
+                        "keys": ["product_id"],
+                        "track_cols": ["name", "status"],
+                        "effective_time_col": "_extracted_at",
+                    },
+                ),
+            ],
+        )
+
+        count = catalog_manager.register_outputs_from_config(pipeline_config)
+
+        assert count == 1
+        output = catalog_manager.get_node_output("silver", "dim_product")
+        assert output is not None
+        assert output["path"] == "OEE/silver/dim_product"
+
+    def test_register_multiple_nodes(self, catalog_manager):
+        """Test registering outputs from multiple nodes in one pipeline."""
+        from odibi.config import PipelineConfig, TransformConfig, TransformStep, WriteConfig
+
+        catalog_manager.bootstrap()
+
+        pipeline_config = PipelineConfig(
+            pipeline="silver",
+            nodes=[
+                NodeConfig(
+                    name="node1",
+                    write=WriteConfig(connection="conn", path="path1", format="delta"),
+                ),
+                NodeConfig(
+                    name="node2",
+                    transform=TransformConfig(
+                        steps=[
+                            TransformStep(
+                                function="merge",
+                                params={"connection": "conn", "path": "path2", "keys": ["id"]},
+                            ),
+                        ]
+                    ),
+                ),
+                NodeConfig(
+                    name="node3",
+                    transformer="scd2",
+                    params={
+                        "connection": "conn",
+                        "target": "path3",
+                        "keys": ["id"],
+                        "track_cols": ["name"],
+                        "effective_time_col": "ts",
+                    },
+                ),
+            ],
+        )
+
+        count = catalog_manager.register_outputs_from_config(pipeline_config)
+
+        assert count == 3
+        assert catalog_manager.get_node_output("silver", "node1") is not None
+        assert catalog_manager.get_node_output("silver", "node2") is not None
+        assert catalog_manager.get_node_output("silver", "node3") is not None
+
+    def test_skip_nodes_without_output(self, catalog_manager):
+        """Test that nodes without output locations are skipped."""
+        from odibi.config import PipelineConfig, TransformConfig, TransformStep
+
+        catalog_manager.bootstrap()
+
+        pipeline_config = PipelineConfig(
+            pipeline="test",
+            nodes=[
+                NodeConfig(
+                    name="no_output_node",
+                    transform=TransformConfig(
+                        steps=[
+                            TransformStep(sql="SELECT * FROM df"),
+                            TransformStep(function="deduplicate", params={"keys": ["id"]}),
+                        ]
+                    ),
+                ),
+            ],
+        )
+
+        count = catalog_manager.register_outputs_from_config(pipeline_config)
+        assert count == 0

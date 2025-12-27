@@ -1093,6 +1093,118 @@ class CatalogManager:
         key = f"{pipeline_name}.{node_name}"
         return outputs_cache.get(key)
 
+    def register_outputs_from_config(
+        self,
+        pipeline_config: Any,
+    ) -> int:
+        """
+        Pre-register node outputs from pipeline config without running the pipeline.
+
+        Scans pipeline nodes for output locations (write blocks, merge/scd2 params)
+        and registers them to meta_outputs. This enables cross-pipeline references
+        without requiring the source pipeline to have run first.
+
+        Args:
+            pipeline_config: Pipeline configuration object with nodes
+
+        Returns:
+            Number of outputs registered
+        """
+        from datetime import datetime
+
+        records = []
+        pipeline_name = pipeline_config.pipeline
+
+        for node in pipeline_config.nodes:
+            output_info = self._extract_node_output_info(node)
+            if output_info:
+                records.append(
+                    {
+                        "pipeline_name": pipeline_name,
+                        "node_name": node.name,
+                        "output_type": output_info.get("output_type", "external_table"),
+                        "connection_name": output_info.get("connection"),
+                        "path": output_info.get("path"),
+                        "format": output_info.get("format", "delta"),
+                        "table_name": output_info.get("register_table"),
+                        "last_run": datetime.now(),
+                        "row_count": None,
+                    }
+                )
+
+        if records:
+            self.register_outputs_batch(records)
+            self._outputs_cache = None
+
+        return len(records)
+
+    def _extract_node_output_info(self, node_config: Any) -> Optional[Dict[str, Any]]:
+        """
+        Extract output location from a node config.
+
+        Checks in order of precedence:
+        1. Explicit write block
+        2. merge/scd2 in transform steps
+        3. Top-level merge/scd2 transformer
+
+        Args:
+            node_config: Node configuration object
+
+        Returns:
+            Dict with connection, path, format, register_table or None
+        """
+        if node_config.write:
+            write_cfg = node_config.write
+            output_type = (
+                "managed_table" if write_cfg.table and not write_cfg.path else "external_table"
+            )
+            return {
+                "connection": write_cfg.connection,
+                "path": write_cfg.path,
+                "format": write_cfg.format or "delta",
+                "register_table": write_cfg.register_table or write_cfg.table,
+                "output_type": output_type,
+            }
+
+        output_functions = {"merge", "scd2"}
+
+        if node_config.transform and node_config.transform.steps:
+            for step in reversed(node_config.transform.steps):
+                if isinstance(step, str):
+                    continue
+
+                if hasattr(step, "function") and step.function in output_functions:
+                    params = step.params or {}
+                    connection = params.get("connection")
+                    path = params.get("path") or params.get("target")
+                    register_table = params.get("register_table")
+
+                    if connection and path:
+                        return {
+                            "connection": connection,
+                            "path": path,
+                            "format": "delta",
+                            "register_table": register_table,
+                            "output_type": "managed_table" if register_table else "external_table",
+                        }
+
+        if node_config.transformer in output_functions and node_config.params:
+            params = node_config.params
+            connection = params.get("connection")
+            path = params.get("path") or params.get("target")
+            register_table = params.get("register_table")
+
+            if connection and path:
+                return {
+                    "connection": connection,
+                    "path": path,
+                    "format": "delta",
+                    "register_table": register_table,
+                    "output_type": "managed_table" if register_table else "external_table",
+                }
+
+        return None
+
     def _prepare_pipeline_record(self, pipeline_config: Any) -> Dict[str, Any]:
         """Prepare a pipeline record for batch registration."""
         from odibi.utils.hashing import calculate_pipeline_hash
