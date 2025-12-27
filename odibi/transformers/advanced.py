@@ -535,7 +535,12 @@ def generate_numeric_key(context: EngineContext, params: NumericKeyParams) -> En
         return f"COALESCE(NULLIF(TRIM(CAST({quote_char}{col}{quote_char} AS STRING)), ''), '')"
 
     # Check if we need to replace the original column
-    replace_column = params.coalesce_with and params.output_col == params.coalesce_with
+    # Replace if: coalesce_with == output_col, OR output_col already exists in dataframe
+    col_names = list(context.df.columns)
+    output_exists = params.output_col in col_names
+    replace_column = (
+        params.coalesce_with and params.output_col == params.coalesce_with
+    ) or output_exists
 
     if context.engine_type == EngineType.SPARK:
         quote_char = "`"
@@ -568,13 +573,12 @@ def generate_numeric_key(context: EngineContext, params: NumericKeyParams) -> En
     if replace_column:
         # Replace the original column by selecting all columns except the original,
         # then adding the new computed column
-        df = context.df
-        col_names = list(df.columns)
+        col_to_exclude = params.coalesce_with if params.coalesce_with else params.output_col
         if context.engine_type == EngineType.SPARK:
-            all_cols = [f"`{c}`" for c in col_names if c != params.coalesce_with]
+            all_cols = [f"`{c}`" for c in col_names if c != col_to_exclude]
         else:
             # Pandas/DuckDB
-            all_cols = [f'"{c}"' for c in col_names if c != params.coalesce_with]
+            all_cols = [f'"{c}"' for c in col_names if c != col_to_exclude]
         cols_select = ", ".join(all_cols)
         sql_query = f"SELECT {cols_select}, {final_expr} AS {output_col} FROM df"
     else:
