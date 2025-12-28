@@ -169,6 +169,7 @@ class NodeExecutor:
         dry_run: bool = False,
         hwm_state: Optional[Tuple[str, Any]] = None,
         suppress_error_log: bool = False,
+        current_pipeline: Optional[str] = None,
     ) -> NodeResult:
         """Execute the node logic.
 
@@ -178,10 +179,12 @@ class NodeExecutor:
             dry_run: Whether to simulate execution
             hwm_state: Current High Water Mark state (key, value)
             suppress_error_log: If True, suppress error logging (used during retries)
+            current_pipeline: Name of current pipeline (for same-pipeline cache lookup)
 
         Returns:
             NodeResult
         """
+        self._current_pipeline = current_pipeline
         start_time = time.time()
 
         # Reset ephemeral state
@@ -226,7 +229,9 @@ class NodeExecutor:
                 if config.inputs:
                     # Multi-input mode for cross-pipeline dependencies
                     with phase_timer.phase("inputs"):
-                        input_dataframes = self._execute_inputs_phase(config, ctx)
+                        input_dataframes = self._execute_inputs_phase(
+                            config, ctx, current_pipeline=self._current_pipeline
+                        )
                         # For transform phase, use first input as primary (or "df" if named)
                         if "df" in input_dataframes:
                             result_df = input_dataframes["df"]
@@ -575,11 +580,15 @@ class NodeExecutor:
         self,
         config: NodeConfig,
         ctx: Optional["LoggingContext"] = None,
+        current_pipeline: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute inputs block for cross-pipeline dependencies.
 
         Returns a dict of {input_name: DataFrame} for use in transforms.
+
+        For same-pipeline references, checks context cache first before catalog lookup.
+        This enables first-run scenarios where Delta tables don't exist yet.
         """
         if ctx is None:
             ctx = get_logging_context()
@@ -593,6 +602,32 @@ class NodeExecutor:
 
         for name, ref in config.inputs.items():
             if is_pipeline_reference(ref):
+                # Parse the reference to check if it's same-pipeline
+                parts = ref[1:].split(".", 1)  # Remove $ and split
+                ref_pipeline = parts[0] if len(parts) == 2 else None
+                ref_node = parts[1] if len(parts) == 2 else None
+
+                # Check context cache first for same-pipeline references
+                # This enables first-run when Delta tables don't exist yet
+                if ref_node and current_pipeline and ref_pipeline == current_pipeline:
+                    cached_df = self.context.get(ref_node)
+                    if cached_df is not None:
+                        ctx.debug(
+                            f"Using cached data for same-pipeline reference '{ref}'",
+                            input_name=name,
+                            source_node=ref_node,
+                        )
+                        dataframes[name] = cached_df
+                        row_count = self._count_rows(cached_df)
+                        ctx.info(
+                            f"Loaded input '{name}' (from cache)",
+                            rows=row_count,
+                            source=ref,
+                        )
+                        self._execution_steps.append(f"Loaded input '{name}' ({row_count} rows)")
+                        continue
+
+                # Fall back to catalog lookup for cross-pipeline or if not in cache
                 if not self.catalog_manager:
                     raise ValueError(
                         f"Cannot resolve cross-pipeline reference '{ref}' without catalog manager. "
@@ -3003,6 +3038,7 @@ class Node:
                     dry_run=self.dry_run,
                     hwm_state=hwm_state,
                     suppress_error_log=not is_last_attempt,
+                    current_pipeline=self.pipeline_name,
                 )
 
                 attempt_duration = time.time() - attempt_start
