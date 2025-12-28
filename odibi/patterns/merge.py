@@ -19,20 +19,24 @@ class MergePattern(Pattern):
 
     def validate(self) -> None:
         ctx = get_logging_context()
+
+        # Support both 'target' and 'path' for compatibility with merge transformer
+        target = self.params.get("target") or self.params.get("path")
+
         ctx.debug(
             "MergePattern validation starting",
             pattern="MergePattern",
-            target=self.params.get("target"),
+            target=target,
             keys=self.params.get("keys"),
             strategy=self.params.get("strategy"),
         )
 
-        if not self.params.get("target"):
+        if not target:
             ctx.error(
-                "MergePattern validation failed: 'target' is required",
+                "MergePattern validation failed: 'target' or 'path' is required",
                 pattern="MergePattern",
             )
-            raise ValueError("MergePattern: 'target' is required.")
+            raise ValueError("MergePattern: 'target' or 'path' is required.")
         if not self.params.get("keys"):
             ctx.error(
                 "MergePattern validation failed: 'keys' is required",
@@ -52,7 +56,8 @@ class MergePattern(Pattern):
         ctx = get_logging_context()
         start_time = time.time()
 
-        target = self.params.get("target")
+        # Support both 'target' and 'path' for compatibility
+        target = self.params.get("target") or self.params.get("path")
         keys = self.params.get("keys")
         strategy = self.params.get("strategy", "upsert")
 
