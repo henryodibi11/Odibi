@@ -607,63 +607,77 @@ class NodeExecutor:
                 ref_pipeline = parts[0] if len(parts) == 2 else None
                 ref_node = parts[1] if len(parts) == 2 else None
 
-                # Check context cache first for same-pipeline references
-                # This enables first-run when Delta tables don't exist yet
-                if ref_node and current_pipeline and ref_pipeline == current_pipeline:
+                # Try catalog lookup first (read from Delta table - the canonical source)
+                df = None
+                read_from_catalog = False
+
+                if self.catalog_manager:
+                    try:
+                        read_config = resolve_input_reference(ref, self.catalog_manager)
+                        ctx.debug(
+                            f"Resolved reference '{ref}'",
+                            input_name=name,
+                            resolved_config=read_config,
+                        )
+
+                        connection = None
+                        if "connection" in read_config and read_config["connection"]:
+                            connection = self.connections.get(read_config["connection"])
+                            if connection is None:
+                                raise ValueError(
+                                    f"Connection '{read_config['connection']}' not found for input '{name}'. "
+                                    f"Available: {', '.join(self.connections.keys())}"
+                                )
+
+                        # Check if table/path exists before reading
+                        table_or_path = read_config.get("table") or read_config.get("path")
+                        if table_or_path and self.engine.table_exists(
+                            connection, read_config.get("table"), read_config.get("path")
+                        ):
+                            df = self.engine.read(
+                                connection=connection,
+                                format=read_config.get("format"),
+                                table=read_config.get("table"),
+                                path=read_config.get("path"),
+                            )
+                            read_from_catalog = True
+                    except Exception as e:
+                        # Catalog lookup failed - will try cache fallback
+                        ctx.debug(
+                            f"Catalog lookup failed for '{ref}': {e}",
+                            input_name=name,
+                        )
+
+                # Fallback to context cache for same-pipeline refs (first run scenario)
+                if (
+                    df is None
+                    and ref_node
+                    and current_pipeline
+                    and ref_pipeline == current_pipeline
+                ):
                     cached_df = self.context.get(ref_node)
                     if cached_df is not None:
                         ctx.debug(
-                            f"Using cached data for same-pipeline reference '{ref}'",
+                            f"Using cached data for same-pipeline reference '{ref}' (Delta not available)",
                             input_name=name,
                             source_node=ref_node,
                         )
-                        dataframes[name] = cached_df
-                        row_count = self._count_rows(cached_df)
-                        ctx.info(
-                            f"Loaded input '{name}' (from cache)",
-                            rows=row_count,
-                            source=ref,
-                        )
-                        self._execution_steps.append(f"Loaded input '{name}' ({row_count} rows)")
-                        continue
+                        df = cached_df
 
-                # Fall back to catalog lookup for cross-pipeline or if not in cache
-                if not self.catalog_manager:
+                if df is None:
                     raise ValueError(
-                        f"Cannot resolve cross-pipeline reference '{ref}' without catalog manager. "
-                        "Ensure system catalog is configured."
+                        f"Cannot resolve reference '{ref}': not found in catalog and not in context cache. "
+                        f"Ensure the referenced node has run and written its output."
                     )
 
-                read_config = resolve_input_reference(ref, self.catalog_manager)
-                ctx.debug(
-                    f"Resolved reference '{ref}'",
-                    input_name=name,
-                    resolved_config=read_config,
-                )
-
-                connection = None
-                if "connection" in read_config and read_config["connection"]:
-                    connection = self.connections.get(read_config["connection"])
-                    if connection is None:
-                        raise ValueError(
-                            f"Connection '{read_config['connection']}' not found for input '{name}'. "
-                            f"Available: {', '.join(self.connections.keys())}"
-                        )
-
-                df = self.engine.read(
-                    connection=connection,
-                    format=read_config.get("format"),
-                    table=read_config.get("table"),
-                    path=read_config.get("path"),
-                )
-
                 # Store input source path for transforms that need it (e.g., detect_deletes)
-                # Resolve to absolute path using connection if available
-                input_path = read_config.get("path") or read_config.get("table")
-                if input_path:
-                    if connection and hasattr(connection, "get_path"):
-                        input_path = connection.get_path(input_path)
-                    self.engine._current_input_path = input_path
+                # Only if we read from catalog (read_config was set)
+                if read_from_catalog:
+                    input_path = read_config.get("path") or read_config.get("table")
+                    if input_path:
+                        if connection and hasattr(connection, "get_path"):
+                            input_path = connection.get_path(input_path)
+                        self.engine._current_input_path = input_path
 
             elif isinstance(ref, dict):
                 conn_name = ref.get("connection")
