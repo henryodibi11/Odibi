@@ -299,6 +299,15 @@ class Pipeline:
         # Set global logging context for this pipeline run
         set_logging_context(self._ctx)
 
+        # Pre-register outputs so cross-pipeline references can resolve on first run
+        if self.catalog_manager:
+            try:
+                count = self.register_outputs()
+                if count > 0:
+                    self._ctx.debug(f"Pre-registered {count} outputs for reference resolution")
+            except Exception as e:
+                self._ctx.debug(f"Output pre-registration skipped: {e}")
+
         # Get execution plan info for logging
         layers = self.graph.get_execution_layers()
         execution_order = self.graph.topological_sort()
