@@ -139,7 +139,7 @@ def _snapshot_diff_spark(
 
     deleted_keys = prev_keys.exceptAll(curr_keys)
 
-    return _apply_deletes(context, deleted_keys, config)
+    return _apply_deletes(context, deleted_keys, config, prev_df=prev_df)
 
 
 def _snapshot_diff_pandas(
@@ -221,7 +221,7 @@ def _snapshot_diff_pandas(
     merged = prev_keys.merge(curr_keys, on=keys, how="left", indicator=True)
     deleted_keys = merged[merged["_merge"] == "left_only"][keys].copy()
 
-    return _apply_deletes(context, deleted_keys, config)
+    return _apply_deletes(context, deleted_keys, config, prev_df=prev_df)
 
 
 def _detect_deletes_sql_compare(
@@ -299,6 +299,7 @@ def _apply_deletes(
     context: EngineContext,
     deleted_keys: Any,
     config: DeleteDetectionConfig,
+    prev_df: Any = None,
 ) -> EngineContext:
     """Apply soft or hard delete based on config."""
     deleted_count = _get_row_count(deleted_keys, context.engine_type)
@@ -335,7 +336,7 @@ def _apply_deletes(
     )
 
     if config.soft_delete_col:
-        return _apply_soft_delete(context, deleted_keys, config)
+        return _apply_soft_delete(context, deleted_keys, config, prev_df=prev_df)
     else:
         return _apply_hard_delete(context, deleted_keys, config)
 
@@ -344,32 +345,92 @@ def _apply_soft_delete(
     context: EngineContext,
     deleted_keys: Any,
     config: DeleteDetectionConfig,
+    prev_df: Any = None,
 ) -> EngineContext:
-    """Add soft delete flag column."""
+    """
+    Add soft delete flag column and optionally UNION deleted rows from target.
+
+    For snapshot_diff mode with merge delete_condition, deleted rows must BE IN
+    the source DataFrame with _is_deleted=true. This function:
+    1. Flags existing source rows based on whether their keys are in deleted_keys
+    2. If prev_df is provided (snapshot_diff), fetches deleted rows from target
+       and adds them with _is_deleted=true
+    3. Returns the result (union if prev_df provided, otherwise just flagged source)
+
+    For sql_compare mode (no prev_df), deleted keys are already in context.df,
+    so we just flag them.
+    """
     keys = config.keys
     soft_delete_col = config.soft_delete_col
 
     if context.engine_type == EngineType.SPARK:
         from pyspark.sql.functions import col, lit, when
 
-        deleted_keys_flagged = deleted_keys.withColumn("_del_flag", lit(True))
+        if prev_df is not None:
+            # snapshot_diff mode: deleted rows are NOT in source, need to union them
+            # Mark existing source rows as not deleted
+            source_with_flag = context.df.withColumn(soft_delete_col, lit(False))
 
-        result = context.df.join(deleted_keys_flagged, on=keys, how="left").withColumn(
-            soft_delete_col,
-            when(col("_del_flag").isNotNull(), True).otherwise(False),
-        )
+            # Get full deleted rows from target, mark as deleted
+            deleted_rows = prev_df.join(deleted_keys, on=keys, how="inner")
 
-        result = result.drop("_del_flag")
+            # Align schema: select only columns that exist in source
+            source_cols = source_with_flag.columns
+            deleted_cols_to_select = []
+            for col_name in source_cols:
+                if col_name == soft_delete_col:
+                    deleted_cols_to_select.append(lit(True).alias(soft_delete_col))
+                elif col_name in deleted_rows.columns:
+                    deleted_cols_to_select.append(deleted_rows[col_name])
+                else:
+                    deleted_cols_to_select.append(lit(None).alias(col_name))
+
+            deleted_rows_aligned = deleted_rows.select(deleted_cols_to_select)
+
+            # Union source rows with deleted rows
+            result = source_with_flag.unionByName(deleted_rows_aligned, allowMissingColumns=True)
+        else:
+            # sql_compare mode: deleted rows ARE in source, just flag them
+            deleted_keys_flagged = deleted_keys.withColumn("_del_flag", lit(True))
+
+            result = context.df.join(deleted_keys_flagged, on=keys, how="left").withColumn(
+                soft_delete_col,
+                when(col("_del_flag").isNotNull(), True).otherwise(False),
+            )
+            result = result.drop("_del_flag")
 
     else:
-        df = context.df.copy()
-        deleted_keys_df = deleted_keys.copy()
-        deleted_keys_df["_del_flag"] = True
+        import pandas as pd
 
-        df = df.merge(deleted_keys_df, on=keys, how="left")
-        df[soft_delete_col] = df["_del_flag"].notna()
-        df = df.drop(columns=["_del_flag"])
-        result = df
+        df = context.df.copy()
+
+        if prev_df is not None:
+            # snapshot_diff mode: deleted rows are NOT in source, need to union them
+            df[soft_delete_col] = False
+
+            # Get full deleted rows from target
+            deleted_rows = prev_df.merge(deleted_keys, on=keys, how="inner")
+            deleted_rows[soft_delete_col] = True
+
+            # Align columns to match source schema
+            for col_name in df.columns:
+                if col_name not in deleted_rows.columns:
+                    deleted_rows[col_name] = None
+
+            # Keep only columns that exist in source
+            deleted_rows = deleted_rows[df.columns]
+
+            # Union source with deleted rows
+            result = pd.concat([df, deleted_rows], ignore_index=True)
+        else:
+            # sql_compare mode: deleted rows ARE in source, just flag them
+            deleted_keys_df = deleted_keys.copy()
+            deleted_keys_df["_del_flag"] = True
+
+            df = df.merge(deleted_keys_df, on=keys, how="left")
+            df[soft_delete_col] = df["_del_flag"].notna()
+            df = df.drop(columns=["_del_flag"])
+            result = df
 
     return context.with_df(result)
 

@@ -264,12 +264,16 @@ class TestDetectDeletesTransformerPandas:
                 soft_delete_col="_is_deleted",
             )
 
-        # All rows in current_df should have _is_deleted column
-        # None should be marked as deleted (since deleted row id=4 is not in current_df)
+        # Result should include all source rows + deleted row from target
+        # - Source rows (id=1,2,3) have _is_deleted=False
+        # - Deleted row (id=4) is UNIONED back with _is_deleted=True
         assert "_is_deleted" in result.df.columns
         result_df = result.df.sort_values("id").reset_index(drop=True)
-        assert len(result_df) == 3
-        assert all(result_df["_is_deleted"] == False)  # noqa: E712
+        assert len(result_df) == 4  # 3 source rows + 1 deleted row
+        assert not bool(result_df.loc[result_df["id"] == 1, "_is_deleted"].iloc[0])
+        assert not bool(result_df.loc[result_df["id"] == 2, "_is_deleted"].iloc[0])
+        assert not bool(result_df.loc[result_df["id"] == 3, "_is_deleted"].iloc[0])
+        assert bool(result_df.loc[result_df["id"] == 4, "_is_deleted"].iloc[0])
 
     @patch("odibi.transformers.delete_detection._get_sqlalchemy_engine")
     @patch("odibi.transformers.delete_detection._get_connection")
