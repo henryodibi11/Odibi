@@ -210,6 +210,53 @@
             animation: flash-highlight 1.5s ease-out;
         }
 
+        /* Keyboard navigation focus indicator */
+        .node-card.keyboard-focus {
+            outline: 3px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        /* Print-friendly styles */
+        @media print {
+            body { background: white; padding: 10px; }
+            .node-card { break-inside: avoid; page-break-inside: avoid; }
+            .node-body { display: block !important; max-height: none !important; }
+            .node-body.open { max-height: none !important; }
+            #pipeline-graph-card { display: none; }
+            .filter-bar, .stats-bar button, #dark-mode-btn, #view-mode-btn { display: none !important; }
+            .header { border-left: 5px solid #333; }
+            pre { white-space: pre-wrap; word-wrap: break-word; }
+            .copy-btn { display: none !important; }
+        }
+
+        /* Execution Timeline styles */
+        .timeline-container {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .timeline-bar {
+            height: 24px;
+            border-radius: 4px;
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: white;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .timeline-bar:hover { opacity: 0.8; }
+        .timeline-bar.success { background: var(--success-color); }
+        .timeline-bar.failed { background: var(--error-color); }
+        .timeline-bar.skipped { background: var(--skipped-color); }
+
         /* Run Health Header */
         .health-header {
             background: var(--card-bg);
@@ -372,6 +419,7 @@
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
             <button class="copy-btn" onclick="toggleDarkMode()" id="dark-mode-btn">🌙 Dark Mode</button>
+            <button class="copy-btn" onclick="alert('Keyboard Shortcuts:\n\nF - Jump to first failed node\nN - Next node\nP - Previous node\nEnter - Toggle current node\nEsc - Collapse all nodes\n\nCtrl+P - Print/PDF')" title="Keyboard shortcuts">⌨️ Shortcuts</button>
         </div>
     </div>
 
@@ -556,6 +604,15 @@
         {% endif %}
     </div>
 
+    <!-- Execution Timeline -->
+    <div class="timeline-container" id="execution-timeline">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0; color: var(--primary-color);">Execution Timeline</h3>
+            <span style="font-size: 0.8em; color: #666;">Total: {{ "%.2f"|format(metadata.total_duration) }}s</span>
+        </div>
+        <div id="timeline-chart" style="position: relative; height: 200px; background: var(--bg-color); border-radius: 4px; border: 1px solid var(--border-color);"></div>
+    </div>
+
     <!-- Node List -->
     <div class="node-list">
 
@@ -645,6 +702,19 @@
 
                 <!-- Tab: Info -->
                 <div id="info-{{ loop.index }}" class="tab-content active">
+                    <!-- Quick Actions -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+                        <button class="copy-btn" onclick="copyToClipboard(this, 'odibi run {{ metadata.config_file or 'pipeline.yaml' }} --node {{ node.node_name }}'); event.stopPropagation();" title="Copy CLI command to re-run this node">
+                            🔄 Copy Re-run Command
+                        </button>
+                        <button class="copy-btn" onclick="copyToClipboard(this, 'spark.sql(\"SELECT * FROM {{ node.node_name }} LIMIT 10\").show()'); event.stopPropagation();" title="Copy Spark debug query">
+                            🔍 Copy Debug Query
+                        </button>
+                        <button class="copy-btn" onclick="copyNodeLink(this, '{{ node.node_name }}'); event.stopPropagation();" title="Copy link to this node">
+                            🔗 Copy Link
+                        </button>
+                    </div>
+
                     {% if node.validation_warnings %}
                     <div style="background: #fff9db; color: #e0a800; padding: 15px; border-radius: 4px; border: 1px solid #ffe066; margin-bottom: 20px;">
                         <strong>Validation Warnings:</strong>
@@ -1919,7 +1989,215 @@
         highlightNodeInGraph(nodeId);
     }
 
+    // Copy node deep link to clipboard
+    function copyNodeLink(btn, nodeName) {
+        const url = window.location.href.split('#')[0] + '#node-' + nodeName;
+        copyToClipboard(btn, url);
+    }
+
+    // ========================================
+    // Keyboard Navigation
+    // ========================================
+    let currentFocusedIndex = -1;
+    const nodeCards = [];
+
+    function initKeyboardNavigation() {
+        // Collect all node cards (excluding pipeline-graph-card)
+        document.querySelectorAll('.node-card[data-status]').forEach(card => {
+            nodeCards.push(card);
+        });
+
+        document.addEventListener('keydown', function(e) {
+            // Ignore if typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            switch(e.key.toLowerCase()) {
+                case 'f': // Jump to first failed node
+                    e.preventDefault();
+                    jumpToFirstFailed();
+                    break;
+                case 'n': // Next node
+                    e.preventDefault();
+                    navigateNodes(1);
+                    break;
+                case 'p': // Previous node
+                    e.preventDefault();
+                    navigateNodes(-1);
+                    break;
+                case 'escape': // Collapse all nodes
+                    e.preventDefault();
+                    collapseAllNodes();
+                    break;
+                case 'enter': // Toggle current node
+                    if (currentFocusedIndex >= 0) {
+                        e.preventDefault();
+                        const card = nodeCards[currentFocusedIndex];
+                        const header = card.querySelector('.node-header');
+                        if (header) toggleNode(header);
+                    }
+                    break;
+            }
+        });
+    }
+
+    function jumpToFirstFailed() {
+        for (let i = 0; i < nodeCards.length; i++) {
+            if (nodeCards[i].dataset.status === 'failed') {
+                focusNodeCard(i);
+                return;
+            }
+        }
+    }
+
+    function navigateNodes(direction) {
+        const newIndex = currentFocusedIndex + direction;
+        if (newIndex >= 0 && newIndex < nodeCards.length) {
+            focusNodeCard(newIndex);
+        } else if (newIndex < 0) {
+            focusNodeCard(nodeCards.length - 1);
+        } else {
+            focusNodeCard(0);
+        }
+    }
+
+    function focusNodeCard(index) {
+        // Remove previous focus
+        nodeCards.forEach(card => card.classList.remove('keyboard-focus'));
+        
+        currentFocusedIndex = index;
+        const card = nodeCards[index];
+        card.classList.add('keyboard-focus');
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function collapseAllNodes() {
+        document.querySelectorAll('.node-body.open').forEach(body => {
+            body.classList.remove('open');
+        });
+        // Remove keyboard focus
+        nodeCards.forEach(card => card.classList.remove('keyboard-focus'));
+        currentFocusedIndex = -1;
+    }
+
+    // ========================================
+    // Deep Links (URL Hash Navigation)
+    // ========================================
+    function handleHashNavigation() {
+        const hash = window.location.hash;
+        if (hash && hash.startsWith('#node-')) {
+            const nodeName = hash.substring(6); // Remove '#node-'
+            setTimeout(() => {
+                window.scrollToNode(nodeName);
+            }, 500); // Delay to ensure DOM is ready
+        }
+    }
+
+    // ========================================
+    // Execution Timeline
+    // ========================================
+    function renderExecutionTimeline() {
+        const container = document.getElementById('timeline-chart');
+        if (!container || !graphData.nodes || graphData.nodes.length === 0) return;
+
+        // Get nodes with timing data
+        const nodesWithTiming = graphData.nodes.filter(n => n.duration > 0 && !n.is_external);
+        if (nodesWithTiming.length === 0) {
+            container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">No timing data available</div>';
+            return;
+        }
+
+        // Calculate total duration for scaling
+        const totalDuration = nodesWithTiming.reduce((sum, n) => sum + n.duration, 0);
+        const containerWidth = container.offsetWidth - 20;
+        const rowHeight = 28;
+        const padding = 4;
+
+        // Sort by duration descending for better visualization
+        nodesWithTiming.sort((a, b) => b.duration - a.duration);
+
+        let html = '';
+        nodesWithTiming.forEach((node, index) => {
+            const widthPct = Math.max((node.duration / totalDuration) * 100, 5); // Min 5% width
+            const width = (widthPct / 100) * containerWidth;
+            const top = index * (rowHeight + padding) + padding;
+            const statusClass = node.status || 'unknown';
+            const label = node.label.length > 20 ? node.label.substring(0, 17) + '...' : node.label;
+
+            html += `<div class="timeline-bar ${statusClass}" 
+                         style="width: ${width}px; top: ${top}px; left: 10px;"
+                         onclick="window.scrollToNode('${node.id}')"
+                         title="${node.label}: ${node.duration.toFixed(3)}s">
+                        ${label} (${node.duration.toFixed(2)}s)
+                     </div>`;
+        });
+
+        // Adjust container height
+        container.style.height = (nodesWithTiming.length * (rowHeight + padding) + padding * 2) + 'px';
+        container.innerHTML = html;
+    }
+
+    // ========================================
+    // Failed Path Trace (Auto-highlight)
+    // ========================================
+    function highlightFailedPaths() {
+        if (!graphData.nodes || !graphData.edges) return;
+
+        const failedNodes = graphData.nodes.filter(n => n.status === 'failed').map(n => n.id);
+        if (failedNodes.length === 0) return;
+
+        // Build reverse edge map (target -> sources)
+        const upstreamMap = {};
+        graphData.edges.forEach(e => {
+            if (!upstreamMap[e.target]) upstreamMap[e.target] = [];
+            upstreamMap[e.target].push(e.source);
+        });
+
+        // Find all nodes in failed paths (trace upstream from failed nodes)
+        const failedPathNodes = new Set(failedNodes);
+        const queue = [...failedNodes];
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const upstream = upstreamMap[current] || [];
+            upstream.forEach(u => {
+                if (!failedPathNodes.has(u)) {
+                    failedPathNodes.add(u);
+                    queue.push(u);
+                }
+            });
+        }
+
+        // Highlight these nodes in the SVG with red border
+        const container = document.getElementById('graphviz-container');
+        if (!container) return;
+
+        container.querySelectorAll('.node').forEach(nodeEl => {
+            const titleEl = nodeEl.querySelector('title');
+            if (titleEl) {
+                const nodeId = titleEl.textContent.trim();
+                if (failedNodes.includes(nodeId)) {
+                    // Failed node - thick red border
+                    const shape = nodeEl.querySelector('polygon, path, ellipse');
+                    if (shape) {
+                        shape.style.strokeWidth = '4';
+                        shape.style.stroke = '#e03131';
+                    }
+                } else if (failedPathNodes.has(nodeId)) {
+                    // Upstream of failed - orange dashed
+                    const shape = nodeEl.querySelector('polygon, path, ellipse');
+                    if (shape) {
+                        shape.style.strokeWidth = '2';
+                        shape.style.stroke = '#f59f00';
+                        shape.style.strokeDasharray = '5,3';
+                    }
+                }
+            }
+        });
+    }
+
+    // ========================================
     // Initialize on page load
+    // ========================================
     document.addEventListener('DOMContentLoaded', function() {
         const viewTypeSelect = document.getElementById('graph-view-type');
         if (viewTypeSelect && viewTypeSelect.value === 'list') {
@@ -1927,7 +2205,20 @@
         } else {
             initGraphvizGraph();
         }
+
+        // Initialize new features
+        initKeyboardNavigation();
+        handleHashNavigation();
+        
+        // Render timeline after a short delay to ensure container has width
+        setTimeout(renderExecutionTimeline, 100);
+        
+        // Highlight failed paths after graph renders
+        setTimeout(highlightFailedPaths, 500);
     });
+
+    // Also handle hash changes for deep linking
+    window.addEventListener('hashchange', handleHashNavigation);
 </script>
 
 </body>
