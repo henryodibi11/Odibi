@@ -229,33 +229,54 @@
             .copy-btn { display: none !important; }
         }
 
-        /* Execution Timeline styles */
+        /* Execution Timeline styles - horizontal bar chart */
         .timeline-container {
             background: var(--card-bg);
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 20px;
-            overflow-x: auto;
         }
-        .timeline-bar {
-            height: 24px;
-            border-radius: 4px;
-            position: absolute;
+        .timeline-row {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            color: white;
+            margin-bottom: 4px;
+            height: 24px;
+        }
+        .timeline-label {
+            width: 180px;
+            min-width: 180px;
+            font-size: 11px;
+            text-align: right;
+            padding-right: 10px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            color: var(--text-color);
+        }
+        .timeline-bar-container {
+            flex: 1;
+            height: 20px;
+            background: var(--bg-color);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .timeline-bar {
+            height: 100%;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            padding-left: 6px;
+            font-size: 10px;
+            color: white;
             cursor: pointer;
             transition: opacity 0.2s;
+            min-width: 30px;
         }
         .timeline-bar:hover { opacity: 0.8; }
         .timeline-bar.success { background: var(--success-color); }
         .timeline-bar.failed { background: var(--error-color); }
         .timeline-bar.skipped { background: var(--skipped-color); }
+        .timeline-bar.unknown { background: var(--skipped-color); }
 
         /* Run Health Header */
         .health-header {
@@ -610,7 +631,7 @@
             <h3 style="margin: 0; color: var(--primary-color);">Execution Timeline</h3>
             <span style="font-size: 0.8em; color: #666;">Total: {{ "%.2f"|format(metadata.duration) }}s</span>
         </div>
-        <div id="timeline-chart" style="position: relative; height: 200px; background: var(--bg-color); border-radius: 4px; border: 1px solid var(--border-color);"></div>
+        <div id="timeline-chart"></div>
     </div>
 
     <!-- Node List -->
@@ -2106,33 +2127,41 @@
             return;
         }
 
-        // Calculate total duration for scaling
-        const totalDuration = nodesWithTiming.reduce((sum, n) => sum + n.duration, 0);
-        const containerWidth = container.offsetWidth - 20;
-        const rowHeight = 28;
-        const padding = 4;
+        // Find max duration for scaling
+        const maxDuration = Math.max(...nodesWithTiming.map(n => n.duration));
 
-        // Sort by duration descending for better visualization
+        // Sort by duration descending (slowest first)
         nodesWithTiming.sort((a, b) => b.duration - a.duration);
 
-        let html = '';
-        nodesWithTiming.forEach((node, index) => {
-            const widthPct = Math.max((node.duration / totalDuration) * 100, 5); // Min 5% width
-            const width = (widthPct / 100) * containerWidth;
-            const top = index * (rowHeight + padding) + padding;
-            const statusClass = node.status || 'unknown';
-            const label = node.label.length > 20 ? node.label.substring(0, 17) + '...' : node.label;
+        // Limit to top 20 for readability
+        const nodesToShow = nodesWithTiming.slice(0, 20);
+        const hasMore = nodesWithTiming.length > 20;
 
-            html += `<div class="timeline-bar ${statusClass}" 
-                         style="width: ${width}px; top: ${top}px; left: 10px;"
+        let html = '';
+        nodesToShow.forEach((node, index) => {
+            const widthPct = (node.duration / maxDuration) * 100;
+            const statusClass = node.status || 'unknown';
+
+            html += `<div class="timeline-row">
+                <div class="timeline-label" title="${node.label}">${node.label}</div>
+                <div class="timeline-bar-container">
+                    <div class="timeline-bar ${statusClass}" 
+                         style="width: ${widthPct}%;"
                          onclick="window.scrollToNode('${node.id}')"
                          title="${node.label}: ${node.duration.toFixed(3)}s">
-                        ${label} (${node.duration.toFixed(2)}s)
-                     </div>`;
+                        ${node.duration.toFixed(2)}s
+                    </div>
+                </div>
+            </div>`;
         });
 
-        // Adjust container height
-        container.style.height = (nodesWithTiming.length * (rowHeight + padding) + padding * 2) + 'px';
+        if (hasMore) {
+            html += `<div style="text-align: center; font-size: 12px; color: #666; margin-top: 8px;">
+                ... and ${nodesWithTiming.length - 20} more nodes
+            </div>`;
+        }
+
+        container.style.height = 'auto';
         container.innerHTML = html;
     }
 
