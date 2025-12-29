@@ -1444,14 +1444,15 @@
         // Handle both 'node-xxx' and 'xxx' formats
         const cleanName = nodeName && nodeName.startsWith('node-') ? nodeName.substring(5) : nodeName;
         const targetId = 'node-' + cleanName;
-        console.log('Looking for element with id:', targetId);
+        console.log('Looking for node-card with id:', targetId);
         
-        const nodeCard = document.getElementById(targetId);
-        console.log('Found element:', nodeCard);
+        // Use querySelector with .node-card class to avoid matching SVG elements
+        const nodeCard = document.querySelector('div.node-card#' + CSS.escape(targetId));
+        console.log('Found node-card:', nodeCard);
         
         // Debug: list all node-card IDs
         if (!nodeCard) {
-            const allCards = document.querySelectorAll('.node-card[id]');
+            const allCards = document.querySelectorAll('div.node-card[id]');
             console.log('Available node cards:', Array.from(allCards).map(c => c.id));
         }
         
@@ -1735,7 +1736,7 @@
             const shape = node.is_external ? 'ellipse' : 'box';
             const style = node.is_external ? 'filled,dashed' : 'filled,rounded';
             const externalLabel = node.is_external ? `↗ ${displayLabel}` : displayLabel;
-            dot += `    "${node.id}" [label="${externalLabel}", shape=${shape}, style="${style}", fillcolor="${colors.fill}", color="${colors.border}", penwidth=2, tooltip="${label}", id="node-${node.id}", class="dag-node"];\n`;
+            dot += `    "${node.id}" [label="${externalLabel}", shape=${shape}, style="${style}", fillcolor="${colors.fill}", color="${colors.border}", penwidth=2, tooltip="${label}", id="dag-${node.id}", class="dag-node"];\n`;
         });
 
         // Add edges
