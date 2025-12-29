@@ -556,8 +556,14 @@ class StoryGenerator:
                         if isinstance(input_val, str) and input_val.startswith("$"):
                             ref = input_val[1:]
                             if "." in ref:
-                                _, node_ref = ref.split(".", 1)
-                                edges.append({"source": node_ref, "target": node_cfg["name"]})
+                                pipeline_name, node_ref = ref.split(".", 1)
+                                edges.append(
+                                    {
+                                        "source": node_ref,
+                                        "target": node_cfg["name"],
+                                        "source_pipeline": pipeline_name,
+                                    }
+                                )
                             else:
                                 edges.append({"source": ref, "target": node_cfg["name"]})
         else:
@@ -600,10 +606,19 @@ class StoryGenerator:
                             # Format: $pipeline_name.node_name
                             ref = input_val[1:]  # Remove $
                             if "." in ref:
-                                _, node_ref = ref.split(".", 1)
-                                edges.append({"source": node_ref, "target": n.node_name})
+                                pipeline_name, node_ref = ref.split(".", 1)
+                                edges.append(
+                                    {
+                                        "source": node_ref,
+                                        "target": n.node_name,
+                                        "source_pipeline": pipeline_name,
+                                    }
+                                )
                                 ctx.debug(
-                                    "Added cross-pipeline edge", source=node_ref, target=n.node_name
+                                    "Added cross-pipeline edge",
+                                    source=node_ref,
+                                    target=n.node_name,
+                                    source_pipeline=pipeline_name,
                                 )
                             else:
                                 edges.append({"source": ref, "target": n.node_name})
@@ -617,10 +632,15 @@ class StoryGenerator:
         existing_node_ids = {node["id"] for node in nodes}
 
         # Find cross-pipeline dependencies (edge sources that don't exist as nodes)
+        # Build a map of node_ref -> pipeline_name for labeling
+        external_node_pipelines = {}
         cross_pipeline_deps = set()
         for edge in edges:
             if edge["source"] not in existing_node_ids:
                 cross_pipeline_deps.add(edge["source"])
+                # Track the pipeline name if available
+                if "source_pipeline" in edge:
+                    external_node_pipelines[edge["source"]] = edge["source_pipeline"]
 
         # Debug: Log summary before adding external nodes
         ctx.debug(
@@ -634,14 +654,34 @@ class StoryGenerator:
 
         # Add placeholder nodes for cross-pipeline dependencies
         for dep_id in cross_pipeline_deps:
-            ctx.debug("Adding external node for cross-pipeline dependency", dep_id=dep_id)
+            pipeline_name = external_node_pipelines.get(dep_id)
+            label = f"{pipeline_name}.{dep_id}" if pipeline_name else dep_id
+            ctx.debug(
+                "Adding external node for cross-pipeline dependency",
+                dep_id=dep_id,
+                pipeline_name=pipeline_name,
+                label=label,
+            )
             nodes.append(
                 {
                     "id": dep_id,
-                    "label": dep_id,
+                    "label": label,
                     "type": "external",
+                    "source_pipeline": pipeline_name,
                 }
             )
+
+        # Build dependency lookup: node_id -> list of source nodes (with pipeline info)
+        node_dependencies = {}
+        for edge in edges:
+            target = edge["target"]
+            source = edge["source"]
+            source_pipeline = edge.get("source_pipeline")
+            dep_label = f"{source_pipeline}.{source}" if source_pipeline else source
+
+            if target not in node_dependencies:
+                node_dependencies[target] = []
+            node_dependencies[target].append(dep_label)
 
         # Enrich nodes with runtime execution data
         enriched_nodes = []
@@ -663,6 +703,8 @@ class StoryGenerator:
                 "error_message": runtime.error_message if runtime else None,
                 "validation_count": len(runtime.validation_warnings) if runtime else 0,
                 "is_external": is_external,
+                "source_pipeline": node.get("source_pipeline"),
+                "dependencies": node_dependencies.get(node_id, []),
             }
             enriched_nodes.append(enriched)
 

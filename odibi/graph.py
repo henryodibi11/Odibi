@@ -379,29 +379,44 @@ class DependencyGraph:
                 )
 
             # Add edges from inputs block (cross-pipeline dependencies)
+            # Track full reference for external node labels
             if node_config.inputs:
                 for input_name, input_val in node_config.inputs.items():
                     if isinstance(input_val, str) and input_val.startswith("$"):
                         ref = input_val[1:]  # Remove $
                         if "." in ref:
-                            _, node_ref = ref.split(".", 1)
-                            edges.append({"source": node_ref, "target": node_name})
+                            pipeline_name, node_ref = ref.split(".", 1)
+                            edges.append(
+                                {
+                                    "source": node_ref,
+                                    "target": node_name,
+                                    "source_pipeline": pipeline_name,
+                                }
+                            )
                         else:
                             edges.append({"source": ref, "target": node_name})
 
         # Find cross-pipeline dependencies (edge sources that don't exist as nodes)
+        # Build a map of node_ref -> pipeline_name for labeling
+        external_node_pipelines: Dict[str, str] = {}
         cross_pipeline_deps = set()
         for edge in edges:
             if edge["source"] not in existing_node_ids:
                 cross_pipeline_deps.add(edge["source"])
+                # Track the pipeline name if available
+                if "source_pipeline" in edge:
+                    external_node_pipelines[edge["source"]] = edge["source_pipeline"]
 
         # Add placeholder nodes for cross-pipeline dependencies
         for dep_id in cross_pipeline_deps:
+            pipeline_name = external_node_pipelines.get(dep_id)
+            label = f"{pipeline_name}.{dep_id}" if pipeline_name else dep_id
             nodes.append(
                 {
                     "id": dep_id,
-                    "label": dep_id,
+                    "label": label,
                     "type": "external",
+                    "source_pipeline": pipeline_name,
                 }
             )
 

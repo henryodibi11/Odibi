@@ -125,10 +125,24 @@ class TestBuildGraphDataCrossPipeline:
         assert "raw_events" in external_ids
         assert "calendar_data" in external_ids
 
+        # Check external nodes have pipeline.node format labels
+        external_labels = {n["label"] for n in external_nodes}
+        assert "bronze_pipeline.raw_events" in external_labels
+        assert "bronze_pipeline.calendar_data" in external_labels
+
+        # Check source_pipeline is set
+        for ext_node in external_nodes:
+            assert ext_node["source_pipeline"] == "bronze_pipeline"
+
         # Check edges include cross-pipeline references
         edge_sources = {e["source"] for e in result["edges"]}
         assert "raw_events" in edge_sources
         assert "calendar_data" in edge_sources
+
+        # Check dependencies are populated for process_events node
+        process_node = next(n for n in result["nodes"] if n["id"] == "process_events")
+        assert "bronze_pipeline.raw_events" in process_node["dependencies"]
+        assert "bronze_pipeline.calendar_data" in process_node["dependencies"]
 
     def test_fallback_path_handles_depends_on(self, generator, metadata_with_inputs):
         """Fallback path should handle depends_on for intra-pipeline edges."""

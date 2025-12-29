@@ -1812,7 +1812,18 @@
             const shape = node.is_external ? 'ellipse' : 'box';
             const style = node.is_external ? 'filled,dashed' : 'filled,rounded';
             const externalLabel = node.is_external ? `↗ ${displayLabel}` : displayLabel;
-            dot += `    "${node.id}" [label="${externalLabel}", shape=${shape}, style="${style}", fillcolor="${colors.fill}", color="${colors.border}", penwidth=2, tooltip="${label}", id="dag-${node.id}", class="dag-node"];\n`;
+
+            // Build tooltip with dependencies info
+            let tooltipText = label;
+            if (node.dependencies && node.dependencies.length > 0) {
+                const depsStr = node.dependencies.join(', ');
+                tooltipText += `\\nDepends on: ${depsStr}`;
+            }
+            if (node.is_external && node.source_pipeline) {
+                tooltipText += `\\nFrom: ${node.source_pipeline}`;
+            }
+
+            dot += `    "${node.id}" [label="${externalLabel}", shape=${shape}, style="${style}", fillcolor="${colors.fill}", color="${colors.border}", penwidth=2, tooltip="${tooltipText}", id="dag-${node.id}", class="dag-node"];\n`;
         });
 
         // Add edges

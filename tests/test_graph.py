@@ -415,6 +415,15 @@ class TestVisualization:
         assert "raw_events" in external_ids
         assert "calendar_data" in external_ids
 
+        # Check external nodes have pipeline.node format labels
+        external_labels = {n["label"] for n in external_nodes}
+        assert "bronze_pipeline.raw_events" in external_labels
+        assert "bronze_pipeline.calendar_data" in external_labels
+
+        # Check source_pipeline is set
+        for ext_node in external_nodes:
+            assert ext_node["source_pipeline"] == "bronze_pipeline"
+
         # Check edges include cross-pipeline references
         edge_sources = {e["source"] for e in result["edges"]}
         assert "raw_events" in edge_sources
