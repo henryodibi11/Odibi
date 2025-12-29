@@ -358,17 +358,21 @@ class DependencyGraph:
         edges = []
 
         for node_name, node_config in self.nodes.items():
-            nodes.append({
-                "id": node_name,
-                "label": node_name,
-                "type": node_config.type if hasattr(node_config, 'type') else "transform",
-            })
+            nodes.append(
+                {
+                    "id": node_name,
+                    "label": node_name,
+                    "type": node_config.type if hasattr(node_config, "type") else "transform",
+                }
+            )
 
             for dependency in node_config.depends_on:
-                edges.append({
-                    "source": dependency,
-                    "target": node_name,
-                })
+                edges.append(
+                    {
+                        "source": dependency,
+                        "target": node_name,
+                    }
+                )
 
         return {
             "nodes": nodes,
