@@ -528,16 +528,43 @@ class StoryGenerator:
                         "type": node_cfg.get("type", "transform"),
                     }
                 )
+                # Check depends_on for intra-pipeline dependencies
                 for dep in node_cfg.get("depends_on", []):
                     edges.append({"source": dep, "target": node_cfg["name"]})
+
+                # Check inputs block for cross-pipeline dependencies
+                inputs = node_cfg.get("inputs", {})
+                if inputs:
+                    for input_name, input_val in inputs.items():
+                        if isinstance(input_val, str) and input_val.startswith("$"):
+                            ref = input_val[1:]
+                            if "." in ref:
+                                _, node_ref = ref.split(".", 1)
+                                edges.append({"source": node_ref, "target": node_cfg["name"]})
+                            else:
+                                edges.append({"source": ref, "target": node_cfg["name"]})
         else:
             # Fallback: build from metadata nodes
             nodes = [{"id": n.node_name, "label": n.node_name} for n in metadata.nodes]
             edges = []
             for n in metadata.nodes:
+                # Check depends_on for intra-pipeline dependencies
                 if n.config_snapshot and n.config_snapshot.get("depends_on"):
                     for dep in n.config_snapshot["depends_on"]:
                         edges.append({"source": dep, "target": n.node_name})
+
+                # Check inputs block for cross-pipeline dependencies
+                if n.config_snapshot and n.config_snapshot.get("inputs"):
+                    for input_name, input_val in n.config_snapshot["inputs"].items():
+                        # Handle $pipeline.node reference format
+                        if isinstance(input_val, str) and input_val.startswith("$"):
+                            # Format: $pipeline_name.node_name
+                            ref = input_val[1:]  # Remove $
+                            if "." in ref:
+                                _, node_ref = ref.split(".", 1)
+                                edges.append({"source": node_ref, "target": n.node_name})
+                            else:
+                                edges.append({"source": ref, "target": n.node_name})
 
         # Collect all node IDs that exist in the current pipeline
         existing_node_ids = {node["id"] for node in nodes}
