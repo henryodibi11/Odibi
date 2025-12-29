@@ -23,32 +23,98 @@
             --code-text: #f8f8f2;
         }
 
-        /* Dark Mode */
-        [data-theme="dark"] {
-            --primary-color: #4da6ff;
-            --bg-color: #1a1a2e;
-            --card-bg: #16213e;
-            --text-color: #e8e8e8;
-            --border-color: #2a2a4a;
-            --success-color: #4ade80;
-            --error-color: #f87171;
-            --warning-color: #fbbf24;
-            --skipped-color: #9ca3af;
-            --code-bg: #0f0f1a;
-            --code-text: #e8e8e8;
+        /* Collapsible sections */
+        .collapsible-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 8px 8px 0 0;
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .collapsible-header:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        }
+        .collapsible-header h3 {
+            margin: 0;
+            color: var(--primary-color);
+            font-size: 1.1em;
+        }
+        .collapsible-header .toggle-icon {
+            font-size: 1.2em;
+            color: #666;
+            transition: transform 0.3s;
+        }
+        .collapsible-header.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+        .collapsible-content {
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .collapsible-content.collapsed {
+            max-height: 0 !important;
+            border: none !important;
         }
 
-        [data-theme="dark"] .header { border-left-color: var(--primary-color); }
-        [data-theme="dark"] pre { background: var(--code-bg); color: var(--code-text); }
-        [data-theme="dark"] th { background: #1e1e3f; }
-        [data-theme="dark"] .schema-box { background: #1e1e3f; }
-        [data-theme="dark"] .node-header:hover { background: #1e1e3f; }
-        [data-theme="dark"] .tabs { background: #1e1e3f; }
-        [data-theme="dark"] .tab-btn.active { background: var(--card-bg); }
-        [data-theme="dark"] #cy-graph { background: #1e1e3f !important; }
-        [data-theme="dark"] #pipeline-list-view { background: #1e1e3f !important; }
-        [data-theme="dark"] #pipeline-list-view > div > div:not(:first-child) { background: var(--card-bg) !important; border-color: var(--border-color) !important; }
-        [data-theme="dark"] #pipeline-list-view > div > div:not(:first-child) > div:last-child > div:first-child { color: var(--text-color) !important; }
+        /* Custom tooltip for DAG nodes */
+        .dag-tooltip {
+            position: fixed;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            max-width: 350px;
+            font-size: 13px;
+            pointer-events: none;
+            display: none;
+        }
+        .dag-tooltip.visible {
+            display: block;
+        }
+        .dag-tooltip h4 {
+            margin: 0 0 8px 0;
+            color: var(--primary-color);
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 6px;
+        }
+        .dag-tooltip .tooltip-row {
+            display: flex;
+            margin: 4px 0;
+        }
+        .dag-tooltip .tooltip-label {
+            font-weight: 500;
+            color: #666;
+            min-width: 80px;
+        }
+        .dag-tooltip .tooltip-value {
+            color: #333;
+        }
+        .dag-tooltip .deps-list {
+            margin: 4px 0 0 0;
+            padding-left: 20px;
+        }
+        .dag-tooltip .deps-list li {
+            margin: 2px 0;
+            color: #555;
+        }
+        .dag-tooltip .external-badge {
+            display: inline-block;
+            background: #e7f5ff;
+            color: #1c7ed6;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
 
         body {
             font-family: var(--font-family);
@@ -385,6 +451,9 @@
 </head>
 <body>
 
+<!-- Custom tooltip for DAG nodes -->
+<div class="dag-tooltip" id="dag-tooltip"></div>
+
 <div class="container">
     <!-- Header -->
     <div class="header">
@@ -424,12 +493,6 @@
     <div class="filter-bar" style="justify-content: space-between;">
         <div style="display: flex; gap: 15px; align-items: center;">
             <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-weight: 500;">🔍</label>
-                <input type="text" id="node-search" placeholder="Search nodes..." 
-                       style="padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 20px; font-size: 0.9em; width: 180px; background: var(--card-bg); color: var(--text-color);"
-                       oninput="searchNodes(this.value)">
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
                 <label style="font-weight: 500;">View:</label>
                 <select id="view-mode" onchange="setViewMode(this.value)" 
                         style="padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em; background: var(--card-bg); color: var(--text-color);">
@@ -439,7 +502,6 @@
             </div>
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
-            <button class="copy-btn" onclick="toggleDarkMode()" id="dark-mode-btn">🌙 Dark Mode</button>
             <button class="copy-btn" onclick="alert('Keyboard Shortcuts:\n\nF - Jump to first failed node\nN - Next node\nP - Previous node\nEnter - Toggle current node\nEsc - Collapse all nodes\n\nCtrl+P - Print/PDF')" title="Keyboard shortcuts">⌨️ Shortcuts</button>
         </div>
     </div>
@@ -625,35 +687,43 @@
         {% endif %}
     </div>
 
-    <!-- Execution Timeline -->
-    <div class="timeline-container" id="execution-timeline">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h3 style="margin: 0; color: var(--primary-color);">Execution Timeline</h3>
-            <span style="font-size: 0.8em; color: #666;">Total: {{ "%.2f"|format(metadata.duration) }}s</span>
+    <!-- Execution Timeline (Collapsible - default collapsed) -->
+    <div class="timeline-container" id="execution-timeline" style="padding: 0; border: none;">
+        <div class="collapsible-header collapsed" onclick="toggleSection('timeline')">
+            <h3>Execution Timeline <span style="font-weight: normal; font-size: 0.8em; color: #666;">Total: {{ "%.2f"|format(metadata.duration) }}s</span></h3>
+            <span class="toggle-icon">▼</span>
         </div>
-        <div id="timeline-chart"></div>
+        <div class="collapsible-content collapsed" id="timeline-content" style="border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 8px 8px; padding: 16px; background: var(--card-bg);">
+            <div id="timeline-chart"></div>
+        </div>
     </div>
 
     <!-- Node List -->
     <div class="node-list">
 
         <!-- Pipeline Graph (Graphviz) -->
+        <!-- Pipeline Flow (Collapsible - default expanded) -->
         {% set node_count = metadata.nodes|length %}
-        <div class="node-card" id="pipeline-graph-card" style="padding: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-                <h3 style="margin: 0; color: var(--primary-color);">Pipeline Flow <span style="font-weight: normal; font-size: 0.7em; color: #666;">({{ node_count }} nodes)</span></h3>
-                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <div id="pipeline-graph-card" style="margin-bottom: 20px;">
+            <div class="collapsible-header" onclick="toggleSection('pipeline')">
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <h3>Pipeline Flow <span style="font-weight: normal; font-size: 0.8em; color: #666;">({{ node_count }} nodes)</span></h3>
                     <span style="font-size: 0.8em; color: #666;">Click node for details</span>
-                    <select id="graph-view-type" onchange="changeGraphViewType(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <select id="graph-view-type" onchange="event.stopPropagation(); changeGraphViewType(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
                         <option value="dag" selected>DAG View</option>
                         <option value="list">List View</option>
                     </select>
-                    <!-- Layout fixed to Left→Right for optimal readability -->
-                    <input type="hidden" id="graph-layout" value="LR">
+                    <span class="toggle-icon">▼</span>
                 </div>
             </div>
-            <div id="graphviz-container" style="min-height: 400px; max-height: 800px; overflow: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;"></div>
-            <div id="pipeline-list-view" style="display: none; max-height: 600px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;"></div>
+            <div class="collapsible-content" id="pipeline-content" style="border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 8px 8px; padding: 16px; background: var(--card-bg);">
+                <!-- Layout fixed to Left→Right for optimal readability -->
+                <input type="hidden" id="graph-layout" value="LR">
+                <div id="graphviz-container" style="min-height: 400px; max-height: 800px; overflow: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;"></div>
+                <div id="pipeline-list-view" style="display: none; max-height: 600px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;"></div>
+            </div>
         </div>
 
         {% for node in metadata.nodes %}
@@ -1669,23 +1739,59 @@
     // Dark Mode (Phase 4)
     function initDarkMode() {
         const savedTheme = localStorage.getItem('odibi-story-theme');
-        if (savedTheme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            document.getElementById('dark-mode-btn').textContent = '☀️ Light Mode';
+    }
+
+    // Collapsible Sections
+    function toggleSection(sectionId) {
+        const header = document.querySelector(`#${sectionId === 'timeline' ? 'execution-timeline' : 'pipeline-graph-card'} .collapsible-header`);
+        const content = document.getElementById(`${sectionId}-content`);
+        
+        if (header && content) {
+            const isCollapsed = header.classList.toggle('collapsed');
+            content.classList.toggle('collapsed', isCollapsed);
+            
+            // Save state to localStorage
+            localStorage.setItem(`odibi-section-${sectionId}`, isCollapsed ? 'collapsed' : 'expanded');
+            
+            // If expanding pipeline, re-render graph to fix sizing
+            if (sectionId === 'pipeline' && !isCollapsed) {
+                setTimeout(() => renderGraphviz('LR'), 100);
+            }
+            // If expanding timeline, re-render timeline
+            if (sectionId === 'timeline' && !isCollapsed) {
+                setTimeout(renderExecutionTimeline, 100);
+            }
         }
     }
 
-    function toggleDarkMode() {
-        const html = document.documentElement;
-        const btn = document.getElementById('dark-mode-btn');
-        if (html.getAttribute('data-theme') === 'dark') {
-            html.removeAttribute('data-theme');
-            localStorage.setItem('odibi-story-theme', 'light');
-            btn.textContent = '🌙 Dark Mode';
-        } else {
-            html.setAttribute('data-theme', 'dark');
-            localStorage.setItem('odibi-story-theme', 'dark');
-            btn.textContent = '☀️ Light Mode';
+    function initCollapsibleSections() {
+        // Timeline: default collapsed, Pipeline: default expanded
+        const timelineState = localStorage.getItem('odibi-section-timeline') || 'collapsed';
+        const pipelineState = localStorage.getItem('odibi-section-pipeline') || 'expanded';
+        
+        const timelineHeader = document.querySelector('#execution-timeline .collapsible-header');
+        const timelineContent = document.getElementById('timeline-content');
+        const pipelineHeader = document.querySelector('#pipeline-graph-card .collapsible-header');
+        const pipelineContent = document.getElementById('pipeline-content');
+        
+        if (timelineHeader && timelineContent) {
+            if (timelineState === 'collapsed') {
+                timelineHeader.classList.add('collapsed');
+                timelineContent.classList.add('collapsed');
+            } else {
+                timelineHeader.classList.remove('collapsed');
+                timelineContent.classList.remove('collapsed');
+            }
+        }
+        
+        if (pipelineHeader && pipelineContent) {
+            if (pipelineState === 'collapsed') {
+                pipelineHeader.classList.add('collapsed');
+                pipelineContent.classList.add('collapsed');
+            } else {
+                pipelineHeader.classList.remove('collapsed');
+                pipelineContent.classList.remove('collapsed');
+            }
         }
     }
 
@@ -1705,38 +1811,6 @@
                 }
             }
         });
-    }
-
-    // Node Search (Phase 4)
-    function searchNodes(query) {
-        const lowerQuery = query.toLowerCase().trim();
-        const nodeCards = document.querySelectorAll('.node-card[data-status]');
-
-        nodeCards.forEach(card => {
-            const nodeName = card.id.replace('node-', '').toLowerCase();
-            if (!lowerQuery || nodeName.includes(lowerQuery)) {
-                card.style.display = '';
-                if (lowerQuery && nodeName.includes(lowerQuery)) {
-                    card.style.boxShadow = '0 0 0 2px var(--primary-color)';
-                } else {
-                    card.style.boxShadow = '';
-                }
-            } else {
-                card.style.display = 'none';
-            }
-        });
-
-        // Also highlight in graph
-        if (cy && lowerQuery) {
-            cy.elements().removeClass('highlighted dimmed');
-            const matchingNodes = cy.nodes().filter(n => n.id().toLowerCase().includes(lowerQuery));
-            if (matchingNodes.length > 0) {
-                cy.elements().not(matchingNodes).addClass('dimmed');
-                matchingNodes.addClass('highlighted');
-            }
-        } else if (cy) {
-            cy.elements().removeClass('highlighted dimmed');
-        }
     }
 
     // View Mode (Phase 4)
@@ -1860,17 +1934,35 @@
                 svgEl.style.height = 'auto';
                 svgEl.style.minHeight = '400px';
                 
-                // Add click handlers to nodes (Graphviz uses .node class for node groups)
+                // Add click and hover handlers to nodes (Graphviz uses .node class for node groups)
                 container.querySelectorAll('.node').forEach(nodeEl => {
                     nodeEl.style.cursor = 'pointer';
+                    
+                    // Click to navigate
                     nodeEl.addEventListener('click', function(e) {
-                        // Get node ID from the title element (Graphviz puts node name there)
                         const titleEl = this.querySelector('title');
                         if (titleEl) {
                             const nodeId = titleEl.textContent.trim();
                             window.scrollToNode(nodeId);
                             highlightNodeInGraph(nodeId);
                         }
+                    });
+                    
+                    // Hover to show tooltip
+                    nodeEl.addEventListener('mouseenter', function(e) {
+                        const titleEl = this.querySelector('title');
+                        if (titleEl) {
+                            const nodeId = titleEl.textContent.trim();
+                            showDagTooltip(nodeId, e);
+                        }
+                    });
+                    
+                    nodeEl.addEventListener('mousemove', function(e) {
+                        moveDagTooltip(e);
+                    });
+                    
+                    nodeEl.addEventListener('mouseleave', function(e) {
+                        hideDagTooltip();
                     });
                 });
             }
@@ -1902,6 +1994,103 @@
                 }
             }
         });
+    }
+
+    // Tooltip functions for DAG nodes
+    function showDagTooltip(nodeId, event) {
+        const tooltip = document.getElementById('dag-tooltip');
+        if (!tooltip || !graphData.nodes) return;
+        
+        // Find node data
+        const node = graphData.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        
+        // Build tooltip HTML
+        let html = `<h4>${node.label || node.id}`;
+        if (node.is_external) {
+            html += `<span class="external-badge">External</span>`;
+        }
+        html += `</h4>`;
+        
+        // Status
+        const statusColors = {
+            success: '#0ca678',
+            failed: '#e03131',
+            skipped: '#adb5bd',
+            external: '#1c7ed6'
+        };
+        const statusColor = statusColors[node.status] || '#666';
+        html += `<div class="tooltip-row">
+            <span class="tooltip-label">Status:</span>
+            <span class="tooltip-value" style="color: ${statusColor}; font-weight: 500;">${node.status}</span>
+        </div>`;
+        
+        // Duration (if not external)
+        if (!node.is_external && node.duration !== undefined) {
+            html += `<div class="tooltip-row">
+                <span class="tooltip-label">Duration:</span>
+                <span class="tooltip-value">${node.duration.toFixed(2)}s</span>
+            </div>`;
+        }
+        
+        // Rows (if available)
+        if (node.rows_out !== null && node.rows_out !== undefined) {
+            html += `<div class="tooltip-row">
+                <span class="tooltip-label">Rows:</span>
+                <span class="tooltip-value">${node.rows_out.toLocaleString()}</span>
+            </div>`;
+        }
+        
+        // Source pipeline (for external nodes)
+        if (node.is_external && node.source_pipeline) {
+            html += `<div class="tooltip-row">
+                <span class="tooltip-label">From:</span>
+                <span class="tooltip-value">${node.source_pipeline}</span>
+            </div>`;
+        }
+        
+        // Dependencies
+        if (node.dependencies && node.dependencies.length > 0) {
+            html += `<div class="tooltip-row" style="flex-direction: column;">
+                <span class="tooltip-label">Depends on:</span>
+                <ul class="deps-list">`;
+            node.dependencies.forEach(dep => {
+                html += `<li>${dep}</li>`;
+            });
+            html += `</ul></div>`;
+        }
+        
+        tooltip.innerHTML = html;
+        tooltip.classList.add('visible');
+        moveDagTooltip(event);
+    }
+    
+    function moveDagTooltip(event) {
+        const tooltip = document.getElementById('dag-tooltip');
+        if (!tooltip) return;
+        
+        // Position tooltip near cursor but not overlapping
+        let x = event.clientX + 15;
+        let y = event.clientY + 15;
+        
+        // Keep tooltip within viewport
+        const rect = tooltip.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth - 10) {
+            x = event.clientX - rect.width - 15;
+        }
+        if (y + rect.height > window.innerHeight - 10) {
+            y = event.clientY - rect.height - 15;
+        }
+        
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+    }
+    
+    function hideDagTooltip() {
+        const tooltip = document.getElementById('dag-tooltip');
+        if (tooltip) {
+            tooltip.classList.remove('visible');
+        }
     }
 
     // Initialize Graphviz graph on page load
@@ -2258,19 +2447,31 @@
     // Initialize on page load
     // ========================================
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize collapsible sections first
+        initCollapsibleSections();
+
         const viewTypeSelect = document.getElementById('graph-view-type');
-        if (viewTypeSelect && viewTypeSelect.value === 'list') {
-            changeGraphViewType('list');
-        } else {
-            initGraphvizGraph();
+        const pipelineContent = document.getElementById('pipeline-content');
+        const isPipelineExpanded = pipelineContent && !pipelineContent.classList.contains('collapsed');
+        
+        // Only render graph if pipeline section is expanded
+        if (isPipelineExpanded) {
+            if (viewTypeSelect && viewTypeSelect.value === 'list') {
+                changeGraphViewType('list');
+            } else {
+                initGraphvizGraph();
+            }
         }
 
-        // Initialize new features
+        // Initialize other features
         initKeyboardNavigation();
         handleHashNavigation();
         
-        // Render timeline after a short delay to ensure container has width
-        setTimeout(renderExecutionTimeline, 100);
+        // Render timeline only if expanded
+        const timelineContent = document.getElementById('timeline-content');
+        if (timelineContent && !timelineContent.classList.contains('collapsed')) {
+            setTimeout(renderExecutionTimeline, 100);
+        }
         
         // Highlight failed paths after graph renders
         setTimeout(highlightFailedPaths, 500);
