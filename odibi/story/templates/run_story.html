@@ -970,7 +970,7 @@
                         </summary>
                         <div style="position: relative; margin-top: 10px;">
                             <button class="copy-btn" style="position: absolute; top: 8px; right: 8px;" onclick="copyToClipboard(this, `{{ sql|e }}`); event.stopPropagation();">📋 Copy</button>
-                            <pre style="border-left: 3px solid var(--primary-color); padding-right: 80px;" id="sql-{{ loop.parent.loop.index }}-{{ loop.index }}">{{ sql }}</pre>
+                            <pre style="border-left: 3px solid var(--primary-color); padding-right: 80px;" id="sql-{{ node.node_name }}-{{ loop.index }}">{{ sql }}</pre>
                         </div>
                     </details>
                     {% endfor %}
