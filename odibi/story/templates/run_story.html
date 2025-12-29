@@ -1737,12 +1737,14 @@
         const isLargePipeline = nodeCount >= 25;
         const isVeryLargePipeline = nodeCount >= 40;
         
-        // Adjust spacing dynamically for large pipelines
-        const nodeSep = isLargePipeline ? 120 : 100;
-        const rankSep = isLargePipeline ? 140 : 120;
-        const fontSize = isVeryLargePipeline ? '14px' : (isLargePipeline ? '15px' : '16px');
-        const nodeHeight = isVeryLargePipeline ? 44 : 50;
-        const nodePadding = isVeryLargePipeline ? '16px' : '20px';
+        // For large pipelines, use tighter but still readable spacing
+        const nodeSep = isVeryLargePipeline ? 60 : (isLargePipeline ? 80 : 100);
+        const rankSep = isVeryLargePipeline ? 80 : (isLargePipeline ? 100 : 120);
+        
+        // Keep fonts readable - minimum 14px
+        const fontSize = '14px';
+        const nodeHeight = 40;
+        const nodeWidth = 160;
 
         // Initialize Cytoscape
         cy = cytoscape({
@@ -1760,13 +1762,13 @@
                         'border-width': 2,
                         'font-size': fontSize,
                         'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                        'width': 'label',
+                        'width': nodeWidth,
                         'height': nodeHeight,
-                        'padding': nodePadding,
+                        'padding': '10px',
                         'shape': 'round-rectangle',
-                        'text-wrap': 'wrap',
-                        'text-max-width': '220px',
-                        'min-zoomed-font-size': 12
+                        'text-wrap': 'ellipsis',
+                        'text-max-width': nodeWidth - 20,
+                        'min-zoomed-font-size': 10
                     }
                 },
                 {
@@ -1855,19 +1857,37 @@
                 rankDir: 'TB',
                 nodeSep: nodeSep,
                 rankSep: rankSep,
-                padding: 50,
-                spacingFactor: isLargePipeline ? 1.3 : 1.1
+                padding: 30
             },
-            minZoom: 0.15,
-            maxZoom: 3,
-            wheelSensitivity: 0.2,
-            boxSelectionEnabled: false
+            minZoom: 0.3,
+            maxZoom: 2,
+            wheelSensitivity: 0.3,
+            boxSelectionEnabled: false,
+            userPanningEnabled: true,
+            userZoomingEnabled: true
         });
 
-        // Auto-fit after layout completes and adjust container height
+        // After layout, zoom to a readable level and center
         cy.on('layoutstop', function() {
-            cy.fit(50);
-            // Adjust height if content is larger than container
+            // Calculate ideal zoom: ensure nodes are readable (at least 100px wide on screen)
+            const bb = cy.elements().boundingBox();
+            const containerWidth = cy.width();
+            const containerHeight = cy.height();
+            
+            // For readable nodes, we want zoom level where 160px node = ~120px on screen minimum
+            // That means zoom should be at least 0.75
+            const fitZoom = Math.min(
+                containerWidth / (bb.w + 60),
+                containerHeight / (bb.h + 60)
+            );
+            
+            // Use readable zoom (min 0.5 for readability), but don't zoom in too much
+            const readableZoom = Math.max(0.5, Math.min(fitZoom, 1.0));
+            
+            cy.zoom(readableZoom);
+            cy.center();
+            
+            // Adjust container height if content overflows
             setTimeout(adjustGraphHeight, 50);
         });
 
@@ -1959,10 +1979,23 @@
         cy.elements().removeClass('highlighted highlighted-edge dimmed');
     }
 
-    // Fit graph to view
+    // Fit graph to view with readable zoom
     function fitGraph() {
         if (!cy) return;
-        cy.fit(50);
+        
+        const bb = cy.elements().boundingBox();
+        const containerWidth = cy.width();
+        const containerHeight = cy.height();
+        
+        const fitZoom = Math.min(
+            containerWidth / (bb.w + 60),
+            containerHeight / (bb.h + 60)
+        );
+        
+        // Clamp to readable range
+        const readableZoom = Math.max(0.5, Math.min(fitZoom, 1.0));
+        cy.zoom(readableZoom);
+        cy.center();
     }
 
     // Switch between DAG and List view
@@ -2093,9 +2126,9 @@
         // Calculate dynamic spacing based on node count
         const nodeCount = cy.nodes().length;
         const isLarge = nodeCount >= 25;
-        const baseNodeSep = isLarge ? 120 : 100;
-        const baseRankSep = isLarge ? 140 : 120;
-        const spacingFactor = isLarge ? 1.3 : 1.1;
+        const isVeryLarge = nodeCount >= 40;
+        const baseNodeSep = isVeryLarge ? 60 : (isLarge ? 80 : 100);
+        const baseRankSep = isVeryLarge ? 80 : (isLarge ? 100 : 120);
         
         let layoutConfig;
         if (layoutType === 'dagre-TB') {
@@ -2104,24 +2137,21 @@
                 rankDir: 'TB', 
                 nodeSep: baseNodeSep, 
                 rankSep: baseRankSep, 
-                padding: 50,
-                spacingFactor: spacingFactor
+                padding: 30
             };
         } else if (layoutType === 'dagre-LR') {
             layoutConfig = { 
                 name: 'dagre', 
                 rankDir: 'LR', 
                 nodeSep: baseNodeSep, 
-                rankSep: baseRankSep + 30, 
-                padding: 50,
-                spacingFactor: spacingFactor
+                rankSep: baseRankSep + 40, 
+                padding: 30
             };
         } else if (layoutType === 'tiered') {
-            // For tiered layout, we rearrange with more vertical spacing by tier
             applyTieredLayout();
             return;
         } else {
-            layoutConfig = { name: layoutType, padding: 50 };
+            layoutConfig = { name: layoutType, padding: 30 };
         }
         
         cy.layout(layoutConfig).run();
@@ -2137,24 +2167,18 @@
             node.data('tier', tier);
         });
 
-        // Use dagre but with custom rank assignment based on tier
-        const tierRank = { bronze: 0, silver: 1, gold: 2, other: 3 };
+        const nodeCount = cy.nodes().length;
+        const isVeryLarge = nodeCount >= 40;
         
         // Apply layout with tier consideration
         cy.layout({
             name: 'dagre',
             rankDir: 'TB',
-            nodeSep: 100,
-            rankSep: 180,
-            padding: 60,
-            spacingFactor: 1.4,
+            nodeSep: isVeryLarge ? 50 : 80,
+            rankSep: isVeryLarge ? 70 : 100,
+            padding: 30,
             ranker: 'tight-tree'
         }).run();
-        
-        // Adjust graph container height after layout
-        setTimeout(() => {
-            adjustGraphHeight();
-        }, 100);
     }
 
     // Dynamically adjust graph container height based on content
@@ -2162,14 +2186,18 @@
         if (!cy) return;
         
         const bb = cy.elements().boundingBox();
-        const contentHeight = bb.h + 100;
+        const currentZoom = cy.zoom();
+        // Calculate required height at current zoom
+        const requiredHeight = (bb.h * currentZoom) + 100;
         const container = document.getElementById('cy-graph');
         const currentHeight = container.clientHeight;
         
-        if (contentHeight > currentHeight) {
-            container.style.height = Math.min(contentHeight, 3000) + 'px';
+        // Only expand if content would overflow at readable zoom
+        if (requiredHeight > currentHeight && currentHeight < 2000) {
+            const newHeight = Math.min(Math.max(requiredHeight, currentHeight), 2000);
+            container.style.height = newHeight + 'px';
             cy.resize();
-            cy.fit(50);
+            cy.center();
         }
     }
 
