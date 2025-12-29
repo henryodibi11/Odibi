@@ -559,7 +559,7 @@
     <!-- Node List -->
     <div class="node-list">
 
-        <!-- Pipeline Graph (Cytoscape.js) -->
+        <!-- Pipeline Graph (Graphviz) -->
         {% set node_count = metadata.nodes|length %}
         <div class="node-card" id="pipeline-graph-card" style="padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
@@ -1573,8 +1573,8 @@
             }
         });
 
-        // Initialize Cytoscape graph
-        initCytoscapeGraph();
+        // Initialize Graphviz graph
+        initGraphvizGraph();
 
         // Initialize dark mode from localStorage
         initDarkMode();
