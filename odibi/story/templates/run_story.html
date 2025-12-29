@@ -1439,22 +1439,12 @@
 
     // Scroll to a specific node card - exposed on window for dynamic onclick handlers
     window.scrollToNode = function(nodeName) {
-        console.log('scrollToNode called with:', nodeName, 'type:', typeof nodeName);
-        
         // Handle both 'node-xxx' and 'xxx' formats
         const cleanName = nodeName && nodeName.startsWith('node-') ? nodeName.substring(5) : nodeName;
         const targetId = 'node-' + cleanName;
-        console.log('Looking for node-card with id:', targetId);
         
         // Use querySelector with .node-card class to avoid matching SVG elements
         const nodeCard = document.querySelector('div.node-card#' + CSS.escape(targetId));
-        console.log('Found node-card:', nodeCard);
-        
-        // Debug: list all node-card IDs
-        if (!nodeCard) {
-            const allCards = document.querySelectorAll('div.node-card[id]');
-            console.log('Available node cards:', Array.from(allCards).map(c => c.id));
-        }
         
         if (nodeCard) {
             nodeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1466,13 +1456,8 @@
             if (body && !body.classList.contains('open')) {
                 body.classList.add('open');
             }
-        } else {
-            console.warn('scrollToNode: Could not find node card for:', nodeName, '(cleaned:', cleanName, ')');
         }
     };
-    // Also keep local reference
-    const scrollToNode = window.scrollToNode;
-    console.log('scrollToNode function registered on window:', typeof window.scrollToNode);
 
     // Filter nodes by status
     function filterNodes(filter, btn) {
@@ -1781,8 +1766,7 @@
                         const titleEl = this.querySelector('title');
                         if (titleEl) {
                             const nodeId = titleEl.textContent.trim();
-                            console.log('DAG node clicked:', nodeId);
-                            scrollToNode(nodeId);
+                            window.scrollToNode(nodeId);
                             highlightNodeInGraph(nodeId);
                         }
                     });
@@ -1924,14 +1908,8 @@
             e.preventDefault();
             e.stopPropagation();
             const nodeId = link.dataset.nodeId;
-            console.log('List view link clicked:', nodeId, 'element:', link);
-            if (nodeId) {
-                console.log('Calling window.scrollToNode...');
-                if (typeof window.scrollToNode === 'function') {
-                    window.scrollToNode(nodeId);
-                } else {
-                    console.error('window.scrollToNode is not a function:', typeof window.scrollToNode);
-                }
+            if (nodeId && typeof window.scrollToNode === 'function') {
+                window.scrollToNode(nodeId);
             }
         }
     });
