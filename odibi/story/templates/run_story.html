@@ -1437,8 +1437,8 @@
         evt.stopPropagation();
     }
 
-    // Scroll to a specific node card
-    function scrollToNode(nodeName) {
+    // Scroll to a specific node card - exposed on window for dynamic onclick handlers
+    window.scrollToNode = function(nodeName) {
         // Handle both 'node-xxx' and 'xxx' formats
         const cleanName = nodeName.startsWith('node-') ? nodeName.substring(5) : nodeName;
         const nodeCard = document.getElementById('node-' + cleanName);
@@ -1455,7 +1455,9 @@
         } else {
             console.warn('scrollToNode: Could not find node card for:', nodeName, '(cleaned:', cleanName, ')');
         }
-    }
+    };
+    // Also keep local reference
+    const scrollToNode = window.scrollToNode;
 
     // Filter nodes by status
     function filterNodes(filter, btn) {
@@ -1763,7 +1765,8 @@
                         // Get node ID from the title element (Graphviz puts node name there)
                         const titleEl = this.querySelector('title');
                         if (titleEl) {
-                            const nodeId = titleEl.textContent;
+                            const nodeId = titleEl.textContent.trim();
+                            console.log('DAG node clicked:', nodeId);
                             scrollToNode(nodeId);
                             highlightNodeInGraph(nodeId);
                         }
@@ -1854,9 +1857,9 @@
             external: '#1c7ed6'
         };
 
-        // Helper to create clickable dependency links
+        // Helper to create clickable dependency links - use data attributes for event delegation
         const makeDepLinks = (deps, color) => {
-            return deps.map(d => `<a href="#" onclick="event.stopPropagation(); scrollToNode('${d}'); return false;" style="color: ${color}; text-decoration: none; border-bottom: 1px dashed ${color};">${d}</a>`).join(', ');
+            return deps.map(d => `<a href="#node-${encodeURIComponent(d)}" class="dep-link" data-node-id="${d.replace(/"/g, '&quot;')}" style="color: ${color}; text-decoration: none; border-bottom: 1px dashed ${color};">${d}</a>`).join(', ');
         };
 
         let html = `<div style="font-size: 13px; color: #666; margin-bottom: 16px;">
@@ -1883,7 +1886,7 @@
                 </div>
                 <div style="flex: 1; min-width: 0;">
                     <div style="font-size: 15px; font-weight: 600; color: #333; margin-bottom: 4px; word-break: break-word;">
-                        ${isExternal ? `<span style="color: ${statusColor};">${labelPrefix}${node.label || node.id}</span> <span style="font-size: 11px; color: #666; font-weight: normal;">(cross-pipeline)</span>` : `<a href="#" onclick="scrollToNode('${node.id}'); return false;" style="color: #333; text-decoration: none;">${node.label || node.id}</a>`}
+                        ${isExternal ? `<span style="color: ${statusColor};">${labelPrefix}${node.label || node.id}</span> <span style="font-size: 11px; color: #666; font-weight: normal;">(cross-pipeline)</span>` : `<a href="#node-${encodeURIComponent(node.id)}" class="node-link" data-node-id="${(node.id || '').replace(/"/g, '&quot;')}" style="color: #333; text-decoration: none;">${node.label || node.id}</a>`}
                     </div>
                     <div style="font-size: 13px; color: #666; display: flex; flex-wrap: wrap; gap: 12px;">
                         ${!isExternal && node.duration !== undefined ? `<span>⏱ ${node.duration.toFixed(3)}s</span>` : ''}
@@ -1898,6 +1901,20 @@
 
         listView.innerHTML = html;
     }
+    
+    // Set up event delegation for list view links (once, on document level)
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('.node-link, .dep-link');
+        if (link) {
+            e.preventDefault();
+            e.stopPropagation();
+            const nodeId = link.dataset.nodeId;
+            console.log('List view link clicked:', nodeId, 'element:', link);
+            if (nodeId) {
+                scrollToNode(nodeId);
+            }
+        }
+    });
     
     // Focus on a node in the graph from list view
     function focusGraphNode(nodeId) {
