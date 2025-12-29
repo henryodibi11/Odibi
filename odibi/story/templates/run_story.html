@@ -8,6 +8,9 @@
     <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
     <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
     <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+    <!-- ELK.js for better edge routing -->
+    <script src="https://unpkg.com/elkjs@0.9.3/lib/elk.bundled.js"></script>
+    <script src="https://unpkg.com/cytoscape-elk@2.2.0/dist/cytoscape-elk.min.js"></script>
     <style>
         :root {
             --primary-color: #0066cc;
@@ -563,8 +566,10 @@
                         <option value="list">List View</option>
                     </select>
                     <select id="graph-layout" onchange="changeGraphLayout(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
-                        <option value="dagre-TB">Top → Bottom</option>
-                        <option value="dagre-LR">Left → Right</option>
+                        <option value="elk-LR" selected>Left → Right (clean)</option>
+                        <option value="elk-TB">Top → Bottom (clean)</option>
+                        <option value="dagre-LR">Left → Right (fast)</option>
+                        <option value="dagre-TB">Top → Bottom (fast)</option>
                     </select>
                     <button class="copy-btn" onclick="fitGraph()">Fit All</button>
                     <button class="copy-btn" onclick="zoomReadable()">Zoom 100%</button>
@@ -1807,45 +1812,42 @@
                 {
                     selector: 'edge',
                     style: {
-                        'width': 2,
-                        'line-color': '#adb5bd',
-                        'target-arrow-color': '#adb5bd',
+                        'width': 1,
+                        'line-color': '#ccd0d5',
+                        'target-arrow-color': '#ccd0d5',
                         'target-arrow-shape': 'triangle',
                         'curve-style': 'bezier',
-                        'arrow-scale': 1.0
+                        'arrow-scale': 0.8,
+                        'opacity': 0.4
                     }
                 },
                 {
                     selector: '.highlighted',
                     style: {
-                        'border-width': 4,
+                        'border-width': 3,
                         'border-color': '#0066cc',
-                        'z-index': 999
+                        'z-index': 999,
+                        'opacity': 1
                     }
                 },
                 {
                     selector: '.highlighted-edge',
                     style: {
-                        'width': 3,
+                        'width': 2,
                         'line-color': '#0066cc',
                         'target-arrow-color': '#0066cc',
-                        'z-index': 999
+                        'z-index': 999,
+                        'opacity': 1
                     }
                 },
                 {
                     selector: '.dimmed',
                     style: {
-                        'opacity': 0.3
+                        'opacity': 0.15
                     }
                 }
             ],
-            layout: {
-                name: 'dagre',
-                rankDir: 'TB',
-                nodeSep: 40,
-                rankSep: 50,
-                padding: 20
-            },
+            layout: getLayoutConfig('elk-LR'),
             minZoom: 0.3,
             maxZoom: 2.5,
             wheelSensitivity: 0.5,
@@ -1869,15 +1871,17 @@
             }
         });
 
-        // Click handler - scroll to node card
+        // Click handler - focus on node (highlight lineage) and scroll to card
         cy.on('tap', 'node', function(evt) {
-            const nodeId = evt.target.id();
-            if (evt.originalEvent.shiftKey) {
-                // Shift+click: highlight lineage
-                highlightLineage(nodeId);
-            } else {
-                // Normal click: scroll to card
-                scrollToNode(nodeId);
+            const node = evt.target;
+            focusOnNode(node);
+            scrollToNode(node.id());
+        });
+        
+        // Double-click to reset
+        cy.on('dblclick', function(evt) {
+            if (evt.target === cy) {
+                resetGraphHighlight();
             }
         });
 
@@ -1928,15 +1932,12 @@
         });
     }
 
-    // Highlight upstream and downstream lineage
-    function highlightLineage(nodeId) {
-        if (!cy) return;
+    // Focus on a node: highlight its upstream/downstream, dim everything else
+    function focusOnNode(node) {
+        if (!cy || !node) return;
 
-        // Reset all styles
+        // Reset all styles first
         cy.elements().removeClass('highlighted highlighted-edge dimmed');
-
-        const node = cy.getElementById(nodeId);
-        if (!node || node.empty()) return;
 
         // Get upstream (predecessors) and downstream (successors)
         const upstream = node.predecessors();
@@ -2000,14 +2001,7 @@
             return;
         }
 
-        // Group nodes by tier
-        const tiers = { bronze: [], silver: [], gold: [], other: [] };
-        graphData.nodes.forEach(node => {
-            const tier = detectTier(node.id);
-            tiers[tier].push(node);
-        });
-
-        // Build edge lookup
+        // Build edge lookup for dependencies
         const edgesByTarget = {};
         const edgesBySource = {};
         graphData.edges.forEach(edge => {
@@ -2030,81 +2024,93 @@
             unknown: '#868e96'
         };
 
-        let html = '';
+        let html = `<div style="font-size: 13px; color: #666; margin-bottom: 16px;">
+            ${graphData.nodes.length} nodes • Click to scroll to details
+        </div>`;
         
-        const renderTierSection = (tierName, nodes, color) => {
-            if (nodes.length === 0) return '';
-            let section = `<div style="margin-bottom: 24px;">
-                <div style="font-size: 14px; font-weight: 600; color: ${color}; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid ${color};">
-                    ${tierName} Layer (${nodes.length} nodes)
-                </div>`;
+        // Render nodes in order (no tier grouping - dependencies define structure)
+        graphData.nodes.forEach(node => {
+            const upstream = edgesByTarget[node.id] || [];
+            const downstream = edgesBySource[node.id] || [];
+            const statusIcon = statusIcons[node.status] || statusIcons.unknown;
+            const statusColor = statusColors[node.status] || statusColors.unknown;
             
-            nodes.forEach(node => {
-                const upstream = edgesByTarget[node.id] || [];
-                const downstream = edgesBySource[node.id] || [];
-                const statusIcon = statusIcons[node.status] || statusIcons.unknown;
-                const statusColor = statusColors[node.status] || statusColors.unknown;
-                
-                section += `
-                <div style="display: flex; align-items: flex-start; padding: 12px 16px; margin-bottom: 8px; background: white; border-radius: 8px; border: 1px solid #e1e4e8; cursor: pointer; transition: all 0.15s;" 
-                     onclick="scrollToNode('${node.id}')" 
-                     onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'; this.style.borderColor='${statusColor}';"
-                     onmouseout="this.style.boxShadow='none'; this.style.borderColor='#e1e4e8';">
-                    <div style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: ${statusColor}20; color: ${statusColor}; border-radius: 6px; font-weight: bold; margin-right: 14px;">
-                        ${statusIcon}
+            html += `
+            <div style="display: flex; align-items: flex-start; padding: 12px 16px; margin-bottom: 8px; background: white; border-radius: 8px; border: 1px solid #e1e4e8; cursor: pointer; transition: all 0.15s;" 
+                 onclick="scrollToNode('${node.id}'); focusGraphNode('${node.id}');" 
+                 onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'; this.style.borderColor='${statusColor}';"
+                 onmouseout="this.style.boxShadow='none'; this.style.borderColor='#e1e4e8';">
+                <div style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: ${statusColor}20; color: ${statusColor}; border-radius: 6px; font-weight: bold; margin-right: 14px;">
+                    ${statusIcon}
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 15px; font-weight: 600; color: #333; margin-bottom: 4px; word-break: break-word;">
+                        ${node.label || node.id}
                     </div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 15px; font-weight: 600; color: #333; margin-bottom: 4px; word-break: break-word;">
-                            ${node.label || node.id}
-                        </div>
-                        <div style="font-size: 13px; color: #666; display: flex; flex-wrap: wrap; gap: 12px;">
-                            ${node.duration !== undefined ? `<span>⏱ ${node.duration.toFixed(3)}s</span>` : ''}
-                            ${node.rows_out !== null && node.rows_out !== undefined ? `<span>📊 ${node.rows_out.toLocaleString()} rows</span>` : ''}
-                        </div>
-                        ${upstream.length > 0 ? `<div style="font-size: 12px; color: #999; margin-top: 6px;">← from: ${upstream.slice(0, 3).join(', ')}${upstream.length > 3 ? ` +${upstream.length - 3} more` : ''}</div>` : ''}
-                        ${downstream.length > 0 ? `<div style="font-size: 12px; color: #999; margin-top: 2px;">→ to: ${downstream.slice(0, 3).join(', ')}${downstream.length > 3 ? ` +${downstream.length - 3} more` : ''}</div>` : ''}
+                    <div style="font-size: 13px; color: #666; display: flex; flex-wrap: wrap; gap: 12px;">
+                        ${node.duration !== undefined ? `<span>⏱ ${node.duration.toFixed(3)}s</span>` : ''}
+                        ${node.rows_out !== null && node.rows_out !== undefined ? `<span>📊 ${node.rows_out.toLocaleString()} rows</span>` : ''}
                     </div>
-                </div>`;
-            });
-            section += '</div>';
-            return section;
-        };
-
-        html += renderTierSection('Bronze', tiers.bronze, '#cd7f32');
-        html += renderTierSection('Silver', tiers.silver, '#808080');
-        html += renderTierSection('Gold', tiers.gold, '#daa520');
-        html += renderTierSection('Other', tiers.other, '#6c757d');
+                    ${upstream.length > 0 ? `<div style="font-size: 12px; color: #0066cc; margin-top: 6px;">← ${upstream.length} upstream: ${upstream.slice(0, 2).join(', ')}${upstream.length > 2 ? ` +${upstream.length - 2} more` : ''}</div>` : '<div style="font-size: 12px; color: #999; margin-top: 6px;">← No dependencies (source)</div>'}
+                    ${downstream.length > 0 ? `<div style="font-size: 12px; color: #0ca678; margin-top: 2px;">→ ${downstream.length} downstream: ${downstream.slice(0, 2).join(', ')}${downstream.length > 2 ? ` +${downstream.length - 2} more` : ''}</div>` : ''}
+                </div>
+            </div>`;
+        });
 
         listView.innerHTML = html;
     }
-
-    // Detect tier from node name
-    function detectTier(nodeId) {
-        const id = nodeId.toLowerCase();
-        if (id.startsWith('bronze') || id.includes('_bronze') || id.includes('raw_') || id.startsWith('raw')) {
-            return 'bronze';
-        } else if (id.startsWith('silver') || id.includes('_silver') || id.includes('clean_') || id.startsWith('clean') || id.includes('staging')) {
-            return 'silver';
-        } else if (id.startsWith('gold') || id.includes('_gold') || id.includes('dim_') || id.includes('fact_') || id.includes('agg_') || id.startsWith('dim') || id.startsWith('fact')) {
-            return 'gold';
+    
+    // Focus on a node in the graph from list view
+    function focusGraphNode(nodeId) {
+        if (!cy) return;
+        const node = cy.getElementById(nodeId);
+        if (node && node.nonempty()) {
+            focusOnNode(node);
         }
-        return 'other';
+    }
+
+    // Get layout configuration by name
+    function getLayoutConfig(layoutName) {
+        if (layoutName === 'elk-LR') {
+            return {
+                name: 'elk',
+                elk: {
+                    algorithm: 'layered',
+                    'elk.direction': 'RIGHT',
+                    'elk.layered.spacing.nodeNodeBetweenLayers': 60,
+                    'elk.spacing.nodeNode': 30,
+                    'elk.edgeRouting': 'ORTHOGONAL',
+                    'elk.layered.mergeEdges': true
+                },
+                fit: true,
+                padding: 30
+            };
+        } else if (layoutName === 'elk-TB') {
+            return {
+                name: 'elk',
+                elk: {
+                    algorithm: 'layered',
+                    'elk.direction': 'DOWN',
+                    'elk.layered.spacing.nodeNodeBetweenLayers': 50,
+                    'elk.spacing.nodeNode': 30,
+                    'elk.edgeRouting': 'ORTHOGONAL',
+                    'elk.layered.mergeEdges': true
+                },
+                fit: true,
+                padding: 30
+            };
+        } else if (layoutName === 'dagre-TB') {
+            return { name: 'dagre', rankDir: 'TB', nodeSep: 40, rankSep: 50, padding: 20 };
+        } else if (layoutName === 'dagre-LR') {
+            return { name: 'dagre', rankDir: 'LR', nodeSep: 40, rankSep: 70, padding: 20 };
+        }
+        return { name: 'dagre', rankDir: 'LR', nodeSep: 40, rankSep: 70, padding: 20 };
     }
 
     // Change graph layout
     function changeGraphLayout(layoutType) {
         if (!cy) return;
-        
-        let layoutConfig;
-        if (layoutType === 'dagre-TB') {
-            layoutConfig = { name: 'dagre', rankDir: 'TB', nodeSep: 50, rankSep: 60, padding: 20 };
-        } else if (layoutType === 'dagre-LR') {
-            layoutConfig = { name: 'dagre', rankDir: 'LR', nodeSep: 50, rankSep: 80, padding: 20 };
-        } else {
-            layoutConfig = { name: layoutType, padding: 20 };
-        }
-        
-        cy.layout(layoutConfig).run();
+        cy.layout(getLayoutConfig(layoutType)).run();
     }
 
     // Initialize view type on page load
