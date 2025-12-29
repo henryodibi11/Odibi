@@ -510,8 +510,25 @@ class StoryGenerator:
 
         Combines static graph structure with runtime execution metadata.
         """
+        ctx = get_logging_context()
+
         # Build node lookup for runtime data
         node_lookup = {n.node_name: n for n in metadata.nodes}
+
+        # Debug: Log which path we're taking
+        path_taken = (
+            "graph_data"
+            if graph_data
+            else ("config" if config and "nodes" in config else "fallback")
+        )
+        ctx.debug(
+            "Building graph data",
+            path=path_taken,
+            has_graph_data=bool(graph_data),
+            has_config=bool(config),
+            config_has_nodes=bool(config and "nodes" in config),
+            metadata_node_count=len(metadata.nodes),
+        )
 
         # Start with provided graph_data or build from config
         if graph_data:
@@ -548,6 +565,19 @@ class StoryGenerator:
             nodes = [{"id": n.node_name, "label": n.node_name} for n in metadata.nodes]
             edges = []
             for n in metadata.nodes:
+                # Debug: Log config_snapshot contents for each node
+                ctx.debug(
+                    "Fallback path: checking node config_snapshot",
+                    node_name=n.node_name,
+                    has_config_snapshot=bool(n.config_snapshot),
+                    config_snapshot_keys=(
+                        list(n.config_snapshot.keys()) if n.config_snapshot else []
+                    ),
+                    has_inputs=bool(n.config_snapshot and n.config_snapshot.get("inputs")),
+                    inputs_value=n.config_snapshot.get("inputs") if n.config_snapshot else None,
+                    has_depends_on=bool(n.config_snapshot and n.config_snapshot.get("depends_on")),
+                )
+
                 # Check depends_on for intra-pipeline dependencies
                 if n.config_snapshot and n.config_snapshot.get("depends_on"):
                     for dep in n.config_snapshot["depends_on"]:
@@ -556,6 +586,15 @@ class StoryGenerator:
                 # Check inputs block for cross-pipeline dependencies
                 if n.config_snapshot and n.config_snapshot.get("inputs"):
                     for input_name, input_val in n.config_snapshot["inputs"].items():
+                        ctx.debug(
+                            "Processing input reference",
+                            node_name=n.node_name,
+                            input_name=input_name,
+                            input_val=input_val,
+                            is_string=isinstance(input_val, str),
+                            starts_with_dollar=isinstance(input_val, str)
+                            and input_val.startswith("$"),
+                        )
                         # Handle $pipeline.node reference format
                         if isinstance(input_val, str) and input_val.startswith("$"):
                             # Format: $pipeline_name.node_name
@@ -563,8 +602,16 @@ class StoryGenerator:
                             if "." in ref:
                                 _, node_ref = ref.split(".", 1)
                                 edges.append({"source": node_ref, "target": n.node_name})
+                                ctx.debug(
+                                    "Added cross-pipeline edge", source=node_ref, target=n.node_name
+                                )
                             else:
                                 edges.append({"source": ref, "target": n.node_name})
+                                ctx.debug(
+                                    "Added same-pipeline edge from inputs",
+                                    source=ref,
+                                    target=n.node_name,
+                                )
 
         # Collect all node IDs that exist in the current pipeline
         existing_node_ids = {node["id"] for node in nodes}
@@ -575,8 +622,19 @@ class StoryGenerator:
             if edge["source"] not in existing_node_ids:
                 cross_pipeline_deps.add(edge["source"])
 
+        # Debug: Log summary before adding external nodes
+        ctx.debug(
+            "Graph data summary",
+            total_nodes=len(nodes),
+            total_edges=len(edges),
+            existing_node_ids=list(existing_node_ids),
+            edge_sources=[e["source"] for e in edges],
+            cross_pipeline_deps=list(cross_pipeline_deps),
+        )
+
         # Add placeholder nodes for cross-pipeline dependencies
         for dep_id in cross_pipeline_deps:
+            ctx.debug("Adding external node for cross-pipeline dependency", dep_id=dep_id)
             nodes.append(
                 {
                     "id": dep_id,

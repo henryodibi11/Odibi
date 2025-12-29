@@ -363,6 +363,84 @@ class TestVisualization:
         assert "transform" in viz
         assert "depends on" in viz
 
+    def test_to_dict_basic(self):
+        """Test to_dict produces nodes and edges."""
+        nodes = [
+            NodeConfig(
+                name="load", read=ReadConfig(connection="local", format="csv", path="a.csv")
+            ),
+            NodeConfig(
+                name="transform",
+                depends_on=["load"],
+                transform=TransformConfig(steps=["SELECT * FROM load"]),
+            ),
+        ]
+
+        graph = DependencyGraph(nodes)
+        result = graph.to_dict()
+
+        assert len(result["nodes"]) == 2
+        assert len(result["edges"]) == 1
+        assert result["edges"][0] == {"source": "load", "target": "transform"}
+
+    def test_to_dict_cross_pipeline_inputs(self):
+        """Test to_dict includes cross-pipeline dependencies from inputs block."""
+        nodes = [
+            NodeConfig(
+                name="process_events",
+                inputs={
+                    "events": "$bronze_pipeline.raw_events",
+                    "calendar": "$bronze_pipeline.calendar_data",
+                },
+                transform=TransformConfig(steps=["SELECT * FROM events"]),
+            ),
+            NodeConfig(
+                name="aggregate",
+                depends_on=["process_events"],
+                transform=TransformConfig(steps=["SELECT * FROM process_events"]),
+            ),
+        ]
+
+        graph = DependencyGraph(nodes)
+        result = graph.to_dict()
+
+        # Should have 4 nodes: 2 internal + 2 external (raw_events, calendar_data)
+        assert len(result["nodes"]) == 4
+
+        # Find external nodes
+        external_nodes = [n for n in result["nodes"] if n.get("type") == "external"]
+        assert len(external_nodes) == 2
+
+        external_ids = {n["id"] for n in external_nodes}
+        assert "raw_events" in external_ids
+        assert "calendar_data" in external_ids
+
+        # Check edges include cross-pipeline references
+        edge_sources = {e["source"] for e in result["edges"]}
+        assert "raw_events" in edge_sources
+        assert "calendar_data" in edge_sources
+        assert "process_events" in edge_sources  # for aggregate -> process_events
+
+    def test_to_dict_inputs_no_dot(self):
+        """Test to_dict handles inputs without dots (same pipeline refs)."""
+        nodes = [
+            NodeConfig(
+                name="process",
+                inputs={"data": "$upstream_node"},
+                transform=TransformConfig(steps=["SELECT * FROM data"]),
+            ),
+        ]
+
+        graph = DependencyGraph(nodes)
+        result = graph.to_dict()
+
+        # Should have 2 nodes: 1 internal + 1 external (upstream_node)
+        assert len(result["nodes"]) == 2
+
+        external_nodes = [n for n in result["nodes"] if n.get("type") == "external"]
+        assert len(external_nodes) == 1
+        assert external_nodes[0]["id"] == "upstream_node"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

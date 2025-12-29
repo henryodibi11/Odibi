@@ -352,12 +352,15 @@ class DependencyGraph:
         """Export graph as a dictionary for JSON serialization.
 
         Returns:
-            Dictionary with nodes and edges suitable for visualization libraries
+            Dictionary with nodes and edges suitable for visualization libraries.
+            Includes cross-pipeline dependencies from inputs block.
         """
         nodes = []
         edges = []
+        existing_node_ids = set()
 
         for node_name, node_config in self.nodes.items():
+            existing_node_ids.add(node_name)
             nodes.append(
                 {
                     "id": node_name,
@@ -366,6 +369,7 @@ class DependencyGraph:
                 }
             )
 
+            # Add edges from depends_on (intra-pipeline dependencies)
             for dependency in node_config.depends_on:
                 edges.append(
                     {
@@ -373,6 +377,33 @@ class DependencyGraph:
                         "target": node_name,
                     }
                 )
+
+            # Add edges from inputs block (cross-pipeline dependencies)
+            if node_config.inputs:
+                for input_name, input_val in node_config.inputs.items():
+                    if isinstance(input_val, str) and input_val.startswith("$"):
+                        ref = input_val[1:]  # Remove $
+                        if "." in ref:
+                            _, node_ref = ref.split(".", 1)
+                            edges.append({"source": node_ref, "target": node_name})
+                        else:
+                            edges.append({"source": ref, "target": node_name})
+
+        # Find cross-pipeline dependencies (edge sources that don't exist as nodes)
+        cross_pipeline_deps = set()
+        for edge in edges:
+            if edge["source"] not in existing_node_ids:
+                cross_pipeline_deps.add(edge["source"])
+
+        # Add placeholder nodes for cross-pipeline dependencies
+        for dep_id in cross_pipeline_deps:
+            nodes.append(
+                {
+                    "id": dep_id,
+                    "label": dep_id,
+                    "type": "external",
+                }
+            )
 
         return {
             "nodes": nodes,
