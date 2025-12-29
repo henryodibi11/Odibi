@@ -553,26 +553,26 @@
 
         <!-- Pipeline Graph (Cytoscape.js) -->
         {% set node_count = metadata.nodes|length %}
-        {% set is_large_pipeline = node_count >= 15 %}
         <div class="node-card" id="pipeline-graph-card" style="padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                 <h3 style="margin: 0; color: var(--primary-color);">Pipeline Flow <span style="font-weight: normal; font-size: 0.7em; color: #666;">({{ node_count }} nodes)</span></h3>
                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                    <span style="font-size: 0.8em; color: #666;">Click node to scroll • Shift+click for lineage</span>
+                    <span style="font-size: 0.8em; color: #666;">Drag to pan • Scroll to zoom • Click node for details</span>
                     <select id="graph-view-type" onchange="changeGraphViewType(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
-                        <option value="dag" {% if not is_large_pipeline %}selected{% endif %}>DAG View</option>
-                        <option value="list" {% if is_large_pipeline %}selected{% endif %}>List View</option>
+                        <option value="dag" selected>DAG View</option>
+                        <option value="list">List View</option>
                     </select>
                     <select id="graph-layout" onchange="changeGraphLayout(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
                         <option value="dagre-TB">Top → Bottom</option>
                         <option value="dagre-LR">Left → Right</option>
                     </select>
-                    <button class="copy-btn" onclick="fitGraph()">Fit View</button>
+                    <button class="copy-btn" onclick="fitGraph()">Fit All</button>
+                    <button class="copy-btn" onclick="zoomReadable()">Zoom 100%</button>
                     <button class="copy-btn" onclick="resetGraphHighlight()">Reset</button>
                 </div>
             </div>
-            <div id="cy-graph" style="height: 500px; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); {% if is_large_pipeline %}display: none;{% endif %}"></div>
-            <div id="pipeline-list-view" style="{% if not is_large_pipeline %}display: none;{% endif %} max-height: 700px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;"></div>
+            <div id="cy-graph" style="height: 500px; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); cursor: grab;"></div>
+            <div id="pipeline-list-view" style="display: none; max-height: 600px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;"></div>
             <div id="cy-tooltip" style="display: none; position: absolute; background: #333; color: #fff; padding: 10px 14px; border-radius: 6px; font-size: 0.85em; z-index: 1000; max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);"></div>
         </div>
 
@@ -1842,23 +1842,31 @@
             layout: {
                 name: 'dagre',
                 rankDir: 'TB',
-                nodeSep: 50,
-                rankSep: 60,
+                nodeSep: 40,
+                rankSep: 50,
                 padding: 20
             },
-            minZoom: 0.5,
-            maxZoom: 2,
-            wheelSensitivity: 0.3,
+            minZoom: 0.3,
+            maxZoom: 2.5,
+            wheelSensitivity: 0.5,
             boxSelectionEnabled: false,
             userPanningEnabled: true,
-            userZoomingEnabled: true,
-            zoom: 1,
-            pan: { x: 0, y: 0 }
+            userZoomingEnabled: true
         });
 
-        // After layout, fit to container
+        // After layout, set readable zoom and position at top-left
         cy.on('layoutstop', function() {
-            cy.fit(20);
+            const nodeCount = cy.nodes().length;
+            
+            if (nodeCount <= 12) {
+                // Small graph - fit everything
+                cy.fit(30);
+            } else {
+                // Large graph - show at readable zoom, position at top
+                cy.zoom(0.8);
+                const bb = cy.elements().boundingBox();
+                cy.pan({ x: 50, y: 50 - bb.y1 * 0.8 });
+            }
         });
 
         // Click handler - scroll to node card
@@ -1949,10 +1957,17 @@
         cy.elements().removeClass('highlighted highlighted-edge dimmed');
     }
 
-    // Fit graph to view
+    // Fit entire graph to view (may zoom out for large graphs)
     function fitGraph() {
         if (!cy) return;
-        cy.fit(20);
+        cy.fit(30);
+    }
+
+    // Zoom to 100% (readable) and center
+    function zoomReadable() {
+        if (!cy) return;
+        cy.zoom(1.0);
+        cy.center();
     }
 
     // Switch between DAG and List view
