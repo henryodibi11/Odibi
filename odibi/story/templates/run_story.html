@@ -2116,6 +2116,8 @@
     // ========================================
     // Execution Timeline
     // ========================================
+    let timelineExpanded = false;
+
     function renderExecutionTimeline() {
         const container = document.getElementById('timeline-chart');
         if (!container || !graphData.nodes || graphData.nodes.length === 0) return;
@@ -2133,9 +2135,10 @@
         // Sort by duration descending (slowest first)
         nodesWithTiming.sort((a, b) => b.duration - a.duration);
 
-        // Limit to top 20 for readability
-        const nodesToShow = nodesWithTiming.slice(0, 20);
-        const hasMore = nodesWithTiming.length > 20;
+        // Show top 15 collapsed, all when expanded
+        const initialCount = 15;
+        const hasMore = nodesWithTiming.length > initialCount;
+        const nodesToShow = timelineExpanded ? nodesWithTiming : nodesWithTiming.slice(0, initialCount);
 
         let html = '';
         nodesToShow.forEach((node, index) => {
@@ -2156,13 +2159,29 @@
         });
 
         if (hasMore) {
-            html += `<div style="text-align: center; font-size: 12px; color: #666; margin-top: 8px;">
-                ... and ${nodesWithTiming.length - 20} more nodes
-            </div>`;
+            const remaining = nodesWithTiming.length - initialCount;
+            if (timelineExpanded) {
+                html += `<div style="text-align: center; margin-top: 10px;">
+                    <button onclick="toggleTimeline()" style="background: none; border: 1px solid var(--border-color); padding: 6px 16px; border-radius: 4px; cursor: pointer; color: var(--text-color); font-size: 12px;">
+                        ▲ Show less
+                    </button>
+                </div>`;
+            } else {
+                html += `<div style="text-align: center; margin-top: 10px;">
+                    <button onclick="toggleTimeline()" style="background: none; border: 1px solid var(--border-color); padding: 6px 16px; border-radius: 4px; cursor: pointer; color: var(--text-color); font-size: 12px;">
+                        ▼ Show ${remaining} more nodes
+                    </button>
+                </div>`;
+            }
         }
 
         container.style.height = 'auto';
         container.innerHTML = html;
+    }
+
+    function toggleTimeline() {
+        timelineExpanded = !timelineExpanded;
+        renderExecutionTimeline();
     }
 
     // ========================================
