@@ -301,6 +301,7 @@
         .sparkline-container { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
         .sparkline { display: inline-block; }
         .sparkline-tooltip { font-size: 0.75em; color: #666; }
+
     </style>
 </head>
 <body>
@@ -548,15 +549,23 @@
     <div class="node-list">
 
         <!-- Pipeline Graph (Cytoscape.js) -->
-        <div class="node-card" style="padding: 20px;">
+        {% set node_count = metadata.nodes|length %}
+        {% set graph_height = [600, node_count * 50]|max %}
+        {% set graph_height = [graph_height, 1200]|min %}
+        <div class="node-card" id="pipeline-graph-card" style="padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin: 0; color: var(--primary-color);">Pipeline Flow</h3>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <span style="font-size: 0.8em; color: #666;">Click node to scroll • Shift+click to highlight lineage</span>
-                    <button class="copy-btn" onclick="resetGraphHighlight()">Reset View</button>
+                <h3 style="margin: 0; color: var(--primary-color);">Pipeline Flow <span style="font-weight: normal; font-size: 0.7em; color: #666;">({{ node_count }} nodes)</span></h3>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <span style="font-size: 0.8em; color: #666;">Click node to scroll • Shift+click for lineage</span>
+                    <select id="graph-layout" onchange="changeGraphLayout(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
+                        <option value="dagre-TB">Top → Bottom</option>
+                        <option value="dagre-LR">Left → Right</option>
+                    </select>
+                    <button class="copy-btn" onclick="fitGraph()">Fit View</button>
+                    <button class="copy-btn" onclick="resetGraphHighlight()">Reset</button>
                 </div>
             </div>
-            <div id="cy-graph" style="height: 350px; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color);"></div>
+            <div id="cy-graph" style="height: {{ graph_height }}px; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color);"></div>
             <div id="cy-tooltip" style="display: none; position: absolute; background: #333; color: #fff; padding: 10px 14px; border-radius: 6px; font-size: 0.85em; z-index: 1000; max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);"></div>
         </div>
 
@@ -1726,14 +1735,14 @@
                         'background-color': 'data(bgColor)',
                         'border-color': 'data(borderColor)',
                         'border-width': 2,
-                        'font-size': '11px',
+                        'font-size': '14px',
                         'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                         'width': 'label',
-                        'height': 30,
-                        'padding': '10px',
+                        'height': 36,
+                        'padding': '14px',
                         'shape': 'round-rectangle',
                         'text-wrap': 'wrap',
-                        'text-max-width': '120px'
+                        'text-max-width': '200px'
                     }
                 },
                 {
@@ -1786,14 +1795,20 @@
             ],
             layout: {
                 name: 'dagre',
-                rankDir: 'LR',
-                nodeSep: 50,
-                rankSep: 80,
-                padding: 20
+                rankDir: 'TB',
+                nodeSep: 80,
+                rankSep: 100,
+                padding: 40
             },
-            minZoom: 0.3,
-            maxZoom: 2,
-            wheelSensitivity: 0.3
+            minZoom: 0.2,
+            maxZoom: 3,
+            wheelSensitivity: 0.2,
+            boxSelectionEnabled: false
+        });
+
+        // Auto-fit after layout completes
+        cy.on('layoutstop', function() {
+            cy.fit(40);
         });
 
         // Click handler - scroll to node card
@@ -1882,6 +1897,28 @@
     function resetGraphHighlight() {
         if (!cy) return;
         cy.elements().removeClass('highlighted highlighted-edge dimmed');
+    }
+
+    // Fit graph to view
+    function fitGraph() {
+        if (!cy) return;
+        cy.fit(40);
+    }
+
+    // Change graph layout
+    function changeGraphLayout(layoutType) {
+        if (!cy) return;
+        
+        let layoutConfig;
+        if (layoutType === 'dagre-TB') {
+            layoutConfig = { name: 'dagre', rankDir: 'TB', nodeSep: 80, rankSep: 100, padding: 40 };
+        } else if (layoutType === 'dagre-LR') {
+            layoutConfig = { name: 'dagre', rankDir: 'LR', nodeSep: 80, rankSep: 120, padding: 40 };
+        } else {
+            layoutConfig = { name: layoutType, padding: 40 };
+        }
+        
+        cy.layout(layoutConfig).run();
     }
 </script>
 
