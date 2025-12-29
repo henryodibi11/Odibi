@@ -8,9 +8,6 @@
     <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
     <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
     <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-    <!-- ELK.js for better edge routing -->
-    <script src="https://unpkg.com/elkjs@0.9.3/lib/elk.bundled.js"></script>
-    <script src="https://unpkg.com/cytoscape-elk@2.2.0/dist/cytoscape-elk.min.js"></script>
     <style>
         :root {
             --primary-color: #0066cc;
@@ -566,10 +563,8 @@
                         <option value="list">List View</option>
                     </select>
                     <select id="graph-layout" onchange="changeGraphLayout(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
-                        <option value="elk-LR" selected>Left → Right (clean)</option>
-                        <option value="elk-TB">Top → Bottom (clean)</option>
-                        <option value="dagre-LR">Left → Right (fast)</option>
-                        <option value="dagre-TB">Top → Bottom (fast)</option>
+                        <option value="dagre-LR" selected>Left → Right</option>
+                        <option value="dagre-TB">Top → Bottom</option>
                     </select>
                     <button class="copy-btn" onclick="fitGraph()">Fit All</button>
                     <button class="copy-btn" onclick="zoomReadable()">Zoom 100%</button>
@@ -1847,7 +1842,7 @@
                     }
                 }
             ],
-            layout: getLayoutConfig('elk-LR'),
+            layout: getLayoutConfig('dagre-LR'),
             minZoom: 0.3,
             maxZoom: 2.5,
             wheelSensitivity: 0.5,
@@ -2071,40 +2066,12 @@
 
     // Get layout configuration by name
     function getLayoutConfig(layoutName) {
-        if (layoutName === 'elk-LR') {
-            return {
-                name: 'elk',
-                elk: {
-                    algorithm: 'layered',
-                    'elk.direction': 'RIGHT',
-                    'elk.layered.spacing.nodeNodeBetweenLayers': 60,
-                    'elk.spacing.nodeNode': 30,
-                    'elk.edgeRouting': 'ORTHOGONAL',
-                    'elk.layered.mergeEdges': true
-                },
-                fit: true,
-                padding: 30
-            };
-        } else if (layoutName === 'elk-TB') {
-            return {
-                name: 'elk',
-                elk: {
-                    algorithm: 'layered',
-                    'elk.direction': 'DOWN',
-                    'elk.layered.spacing.nodeNodeBetweenLayers': 50,
-                    'elk.spacing.nodeNode': 30,
-                    'elk.edgeRouting': 'ORTHOGONAL',
-                    'elk.layered.mergeEdges': true
-                },
-                fit: true,
-                padding: 30
-            };
-        } else if (layoutName === 'dagre-TB') {
-            return { name: 'dagre', rankDir: 'TB', nodeSep: 40, rankSep: 50, padding: 20 };
+        if (layoutName === 'dagre-TB') {
+            return { name: 'dagre', rankDir: 'TB', nodeSep: 40, rankSep: 50, padding: 20, fit: true };
         } else if (layoutName === 'dagre-LR') {
-            return { name: 'dagre', rankDir: 'LR', nodeSep: 40, rankSep: 70, padding: 20 };
+            return { name: 'dagre', rankDir: 'LR', nodeSep: 40, rankSep: 70, padding: 20, fit: true };
         }
-        return { name: 'dagre', rankDir: 'LR', nodeSep: 40, rankSep: 70, padding: 20 };
+        return { name: 'dagre', rankDir: 'LR', nodeSep: 40, rankSep: 70, padding: 20, fit: true };
     }
 
     // Change graph layout
