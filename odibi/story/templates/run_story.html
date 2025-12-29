@@ -1439,9 +1439,22 @@
 
     // Scroll to a specific node card - exposed on window for dynamic onclick handlers
     window.scrollToNode = function(nodeName) {
+        console.log('scrollToNode called with:', nodeName, 'type:', typeof nodeName);
+        
         // Handle both 'node-xxx' and 'xxx' formats
-        const cleanName = nodeName.startsWith('node-') ? nodeName.substring(5) : nodeName;
-        const nodeCard = document.getElementById('node-' + cleanName);
+        const cleanName = nodeName && nodeName.startsWith('node-') ? nodeName.substring(5) : nodeName;
+        const targetId = 'node-' + cleanName;
+        console.log('Looking for element with id:', targetId);
+        
+        const nodeCard = document.getElementById(targetId);
+        console.log('Found element:', nodeCard);
+        
+        // Debug: list all node-card IDs
+        if (!nodeCard) {
+            const allCards = document.querySelectorAll('.node-card[id]');
+            console.log('Available node cards:', Array.from(allCards).map(c => c.id));
+        }
+        
         if (nodeCard) {
             nodeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
             // Flash highlight effect
@@ -1458,6 +1471,7 @@
     };
     // Also keep local reference
     const scrollToNode = window.scrollToNode;
+    console.log('scrollToNode function registered on window:', typeof window.scrollToNode);
 
     // Filter nodes by status
     function filterNodes(filter, btn) {
