@@ -1736,13 +1736,17 @@
                 svgEl.style.height = 'auto';
                 svgEl.style.minHeight = '400px';
                 
-                // Add click handlers to nodes
-                container.querySelectorAll('.dag-node').forEach(nodeEl => {
+                // Add click handlers to nodes (Graphviz uses .node class for node groups)
+                container.querySelectorAll('.node').forEach(nodeEl => {
                     nodeEl.style.cursor = 'pointer';
                     nodeEl.addEventListener('click', function(e) {
-                        const nodeId = this.id.replace('node-', '');
-                        scrollToNode(nodeId);
-                        highlightNodeInGraph(nodeId);
+                        // Get node ID from the title element (Graphviz puts node name there)
+                        const titleEl = this.querySelector('title');
+                        if (titleEl) {
+                            const nodeId = titleEl.textContent;
+                            scrollToNode(nodeId);
+                            highlightNodeInGraph(nodeId);
+                        }
                     });
                 });
             }
@@ -1758,19 +1762,22 @@
         if (!container) return;
 
         // Reset all nodes
-        container.querySelectorAll('.dag-node polygon, .dag-node path').forEach(el => {
-            el.style.strokeWidth = '2';
+        container.querySelectorAll('.node polygon, .node path, .node ellipse').forEach(el => {
+            el.style.strokeWidth = '';
+            el.style.stroke = '';
         });
 
-        // Highlight selected node
-        const selectedNode = container.querySelector(`#node-${CSS.escape(nodeId)}`);
-        if (selectedNode) {
-            const shape = selectedNode.querySelector('polygon, path');
-            if (shape) {
-                shape.style.strokeWidth = '4';
-                shape.style.stroke = '#0066cc';
+        // Find and highlight selected node by matching title content
+        container.querySelectorAll('.node').forEach(nodeEl => {
+            const titleEl = nodeEl.querySelector('title');
+            if (titleEl && titleEl.textContent === nodeId) {
+                const shape = nodeEl.querySelector('polygon, path, ellipse');
+                if (shape) {
+                    shape.style.strokeWidth = '4';
+                    shape.style.stroke = '#0066cc';
+                }
             }
-        }
+        });
     }
 
     // Initialize Graphviz graph on page load
@@ -1828,11 +1835,16 @@
             unknown: '#868e96'
         };
 
+        // Helper to create clickable dependency links
+        const makeDepLinks = (deps, color) => {
+            return deps.map(d => `<a href="#" onclick="event.stopPropagation(); scrollToNode('${d}'); return false;" style="color: ${color}; text-decoration: none; border-bottom: 1px dashed ${color};">${d}</a>`).join(', ');
+        };
+
         let html = `<div style="font-size: 13px; color: #666; margin-bottom: 16px;">
-            ${graphData.nodes.length} nodes • Click to scroll to details
+            ${graphData.nodes.length} nodes • Click node name for details • Click dependency to navigate
         </div>`;
         
-        // Render nodes in order (no tier grouping - dependencies define structure)
+        // Render nodes in order
         graphData.nodes.forEach(node => {
             const upstream = edgesByTarget[node.id] || [];
             const downstream = edgesBySource[node.id] || [];
@@ -1840,8 +1852,7 @@
             const statusColor = statusColors[node.status] || statusColors.unknown;
             
             html += `
-            <div style="display: flex; align-items: flex-start; padding: 12px 16px; margin-bottom: 8px; background: white; border-radius: 8px; border: 1px solid #e1e4e8; cursor: pointer; transition: all 0.15s;" 
-                 onclick="scrollToNode('${node.id}'); focusGraphNode('${node.id}');" 
+            <div style="display: flex; align-items: flex-start; padding: 12px 16px; margin-bottom: 8px; background: white; border-radius: 8px; border: 1px solid #e1e4e8; transition: all 0.15s;" 
                  onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'; this.style.borderColor='${statusColor}';"
                  onmouseout="this.style.boxShadow='none'; this.style.borderColor='#e1e4e8';">
                 <div style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: ${statusColor}20; color: ${statusColor}; border-radius: 6px; font-weight: bold; margin-right: 14px;">
@@ -1849,14 +1860,14 @@
                 </div>
                 <div style="flex: 1; min-width: 0;">
                     <div style="font-size: 15px; font-weight: 600; color: #333; margin-bottom: 4px; word-break: break-word;">
-                        ${node.label || node.id}
+                        <a href="#" onclick="scrollToNode('${node.id}'); return false;" style="color: #333; text-decoration: none;">${node.label || node.id}</a>
                     </div>
                     <div style="font-size: 13px; color: #666; display: flex; flex-wrap: wrap; gap: 12px;">
                         ${node.duration !== undefined ? `<span>⏱ ${node.duration.toFixed(3)}s</span>` : ''}
                         ${node.rows_out !== null && node.rows_out !== undefined ? `<span>📊 ${node.rows_out.toLocaleString()} rows</span>` : ''}
                     </div>
-                    ${upstream.length > 0 ? `<div style="font-size: 12px; color: #0066cc; margin-top: 6px;">← ${upstream.length} upstream: ${upstream.slice(0, 2).join(', ')}${upstream.length > 2 ? ` +${upstream.length - 2} more` : ''}</div>` : '<div style="font-size: 12px; color: #999; margin-top: 6px;">← No dependencies (source)</div>'}
-                    ${downstream.length > 0 ? `<div style="font-size: 12px; color: #0ca678; margin-top: 2px;">→ ${downstream.length} downstream: ${downstream.slice(0, 2).join(', ')}${downstream.length > 2 ? ` +${downstream.length - 2} more` : ''}</div>` : ''}
+                    ${upstream.length > 0 ? `<div style="font-size: 12px; margin-top: 6px;">← <span style="color: #666;">${upstream.length} upstream:</span> ${makeDepLinks(upstream, '#0066cc')}</div>` : '<div style="font-size: 12px; color: #999; margin-top: 6px;">← No dependencies (source)</div>'}
+                    ${downstream.length > 0 ? `<div style="font-size: 12px; margin-top: 2px;">→ <span style="color: #666;">${downstream.length} downstream:</span> ${makeDepLinks(downstream, '#0ca678')}</div>` : ''}
                 </div>
             </div>`;
         });
