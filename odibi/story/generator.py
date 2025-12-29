@@ -93,6 +93,7 @@ class StoryGenerator:
         end_time: str,
         context: Any = None,
         config: Optional[Dict[str, Any]] = None,
+        graph_data: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Generate story HTML and JSON.
 
@@ -106,6 +107,7 @@ class StoryGenerator:
             end_time: ISO timestamp of end
             context: Optional context to access intermediate DataFrames
             config: Optional pipeline configuration snapshot
+            graph_data: Optional graph data dict with nodes/edges for DAG visualization
 
         Returns:
             Path to generated HTML story file
@@ -183,6 +185,9 @@ class StoryGenerator:
 
                     current_node.historical_avg_rows = avg_rows
                     current_node.historical_avg_duration = avg_duration
+
+                    # Compute anomalies (Phase 1 - Triage)
+                    self._compute_anomalies(current_node)
                 except Exception as e:
                     ctx = get_logging_context()
                     ctx.debug(
@@ -191,7 +196,16 @@ class StoryGenerator:
                         error=str(e),
                     )
 
-        # 2. Render outputs
+        # 2. Build graph data for interactive DAG (Phase 2)
+        metadata.graph_data = self._build_graph_data(metadata, graph_data, config)
+
+        # 3. Compare with last successful run (Phase 3)
+        self._compare_with_last_success(metadata)
+
+        # 4. Add git info (Phase 3)
+        metadata.git_info = self._get_git_info()
+
+        # 5. Render outputs
         timestamp_obj = datetime.now()
         date_str = timestamp_obj.strftime("%Y-%m-%d")
         time_str = timestamp_obj.strftime("%H-%M-%S")
@@ -256,8 +270,9 @@ class StoryGenerator:
         self._last_story_path = html_path
         self._last_metadata = metadata
 
-        # Cleanup
+        # Cleanup and generate index
         self.cleanup()
+        self._generate_pipeline_index()
 
         ctx.info(
             "Story generated",
@@ -280,6 +295,310 @@ class StoryGenerator:
         summary = self._last_metadata.get_alert_summary()
         summary["story_path"] = self._last_story_path
         return summary
+
+    def _get_duration_history(self, node_name: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get duration history for a node across recent runs.
+
+        Args:
+            node_name: The node name to get history for
+            limit: Maximum number of runs to include
+
+        Returns:
+            List of {"run_id": "...", "duration": 1.5, "started_at": "..."} dicts
+        """
+        import json
+
+        ctx = get_logging_context()
+
+        if self.is_remote:
+            ctx.debug("Duration history not yet supported for remote storage")
+            return []
+
+        if self.output_path is None:
+            return []
+
+        pipeline_dir = self.output_path / self.pipeline_name
+        if not pipeline_dir.exists():
+            return []
+
+        json_files = sorted(
+            pipeline_dir.glob("**/*.json"),
+            key=lambda p: str(p),
+            reverse=True,
+        )
+
+        history = []
+        for json_path in json_files[: limit + 1]:  # +1 to skip current run if it exists
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                for node_data in data.get("nodes", []):
+                    if node_data.get("node_name") == node_name:
+                        history.append(
+                            {
+                                "run_id": data.get("run_id", "unknown"),
+                                "duration": node_data.get("duration", 0),
+                                "started_at": data.get("started_at", ""),
+                            }
+                        )
+                        break
+            except Exception as e:
+                ctx.debug(f"Failed to load run for duration history: {json_path}, error: {e}")
+                continue
+
+        return history[:limit]
+
+    def _find_last_successful_run(self) -> Optional[Dict[str, Any]]:
+        """Find the most recent successful run's JSON data.
+
+        Returns:
+            Dictionary of the last successful run metadata, or None
+        """
+        import json
+
+        ctx = get_logging_context()
+
+        if self.is_remote:
+            ctx.debug("Cross-run comparison not yet supported for remote storage")
+            return None
+
+        if self.output_path is None:
+            return None
+
+        pipeline_dir = self.output_path / self.pipeline_name
+        if not pipeline_dir.exists():
+            return None
+
+        # Find all JSON files, sorted by path (date/time order) descending
+        json_files = sorted(
+            pipeline_dir.glob("**/*.json"),
+            key=lambda p: str(p),
+            reverse=True,
+        )
+
+        # Find the most recent successful run
+        for json_path in json_files:
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                # Check if this run was successful (no failed nodes)
+                if data.get("failed_nodes", 0) == 0:
+                    ctx.debug(
+                        "Found last successful run",
+                        path=str(json_path),
+                        run_id=data.get("run_id"),
+                    )
+                    return data
+            except Exception as e:
+                ctx.debug(f"Failed to load story JSON: {json_path}, error: {e}")
+                continue
+
+        return None
+
+    def _compare_with_last_success(self, metadata: PipelineStoryMetadata) -> None:
+        """Compare current run with last successful run and populate change_summary."""
+        ctx = get_logging_context()
+
+        # Collect duration history for all nodes (before comparison)
+        for node in metadata.nodes:
+            history = self._get_duration_history(node.node_name, limit=10)
+            if history:
+                node.duration_history = history
+
+        last_success = self._find_last_successful_run()
+        if not last_success:
+            ctx.debug("No previous successful run found for comparison")
+            return
+
+        metadata.compared_to_run_id = last_success.get("run_id")
+
+        # Build lookup for previous run's nodes
+        prev_nodes = {n["node_name"]: n for n in last_success.get("nodes", [])}
+
+        # Track changes
+        sql_changed = []
+        schema_changed = []
+        rows_changed = []
+        newly_failing = []
+        duration_changed = []
+
+        for node in metadata.nodes:
+            prev = prev_nodes.get(node.node_name)
+            if not prev:
+                # New node, not in previous run
+                continue
+
+            changes = []
+
+            # Compare SQL hash
+            if node.sql_hash and prev.get("sql_hash"):
+                if node.sql_hash != prev["sql_hash"]:
+                    changes.append("sql")
+                    sql_changed.append(node.node_name)
+                    node.previous_sql_hash = prev["sql_hash"]
+
+            # Compare schema (output)
+            curr_schema = set(node.schema_out or [])
+            prev_schema = set(prev.get("schema_out") or [])
+            if curr_schema != prev_schema:
+                changes.append("schema")
+                schema_changed.append(node.node_name)
+
+            # Compare row counts (significant change = >20%)
+            if node.rows_out is not None and prev.get("rows_out") is not None:
+                prev_rows = prev["rows_out"]
+                if prev_rows > 0:
+                    pct_change = abs(node.rows_out - prev_rows) / prev_rows
+                    if pct_change > 0.2:
+                        changes.append("rows")
+                        rows_changed.append(node.node_name)
+                        node.previous_rows_out = prev_rows
+
+            # Compare duration (significant change = 2x slower)
+            if node.duration and prev.get("duration"):
+                prev_dur = prev["duration"]
+                if prev_dur > 0 and node.duration >= prev_dur * 2:
+                    changes.append("duration")
+                    duration_changed.append(node.node_name)
+                    node.previous_duration = prev_dur
+
+            # Check if newly failing
+            if node.status == "failed" and prev.get("status") == "success":
+                newly_failing.append(node.node_name)
+
+            # Capture previous config snapshot for diff viewer
+            if prev.get("config_snapshot"):
+                node.previous_config_snapshot = prev["config_snapshot"]
+
+            if changes:
+                node.changed_from_last_success = True
+                node.changes_detected = changes
+
+        # Build summary
+        metadata.change_summary = {
+            "has_changes": bool(sql_changed or schema_changed or rows_changed or newly_failing),
+            "sql_changed_count": len(sql_changed),
+            "sql_changed_nodes": sql_changed,
+            "schema_changed_count": len(schema_changed),
+            "schema_changed_nodes": schema_changed,
+            "rows_changed_count": len(rows_changed),
+            "rows_changed_nodes": rows_changed,
+            "duration_changed_count": len(duration_changed),
+            "duration_changed_nodes": duration_changed,
+            "newly_failing_count": len(newly_failing),
+            "newly_failing_nodes": newly_failing,
+            "compared_to_run_id": metadata.compared_to_run_id,
+        }
+
+        ctx.debug(
+            "Cross-run comparison complete",
+            compared_to=metadata.compared_to_run_id,
+            sql_changed=len(sql_changed),
+            schema_changed=len(schema_changed),
+            newly_failing=len(newly_failing),
+        )
+
+    def _build_graph_data(
+        self,
+        metadata: PipelineStoryMetadata,
+        graph_data: Optional[Dict[str, Any]],
+        config: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Build enriched graph data for interactive DAG visualization.
+
+        Combines static graph structure with runtime execution metadata.
+        """
+        # Build node lookup for runtime data
+        node_lookup = {n.node_name: n for n in metadata.nodes}
+
+        # Start with provided graph_data or build from config
+        if graph_data:
+            nodes = graph_data.get("nodes", [])
+            edges = graph_data.get("edges", [])
+        elif config and "nodes" in config:
+            nodes = []
+            edges = []
+            for node_cfg in config["nodes"]:
+                nodes.append(
+                    {
+                        "id": node_cfg["name"],
+                        "label": node_cfg["name"],
+                        "type": node_cfg.get("type", "transform"),
+                    }
+                )
+                for dep in node_cfg.get("depends_on", []):
+                    edges.append({"source": dep, "target": node_cfg["name"]})
+        else:
+            # Fallback: build from metadata nodes
+            nodes = [{"id": n.node_name, "label": n.node_name} for n in metadata.nodes]
+            edges = []
+            for n in metadata.nodes:
+                if n.config_snapshot and n.config_snapshot.get("depends_on"):
+                    for dep in n.config_snapshot["depends_on"]:
+                        edges.append({"source": dep, "target": n.node_name})
+
+        # Enrich nodes with runtime execution data
+        enriched_nodes = []
+        for node in nodes:
+            node_id = node["id"]
+            runtime = node_lookup.get(node_id)
+
+            enriched = {
+                "id": node_id,
+                "label": node.get("label", node_id),
+                "type": node.get("type", "transform"),
+                "status": runtime.status if runtime else "unknown",
+                "duration": runtime.duration if runtime else 0,
+                "rows_out": runtime.rows_out if runtime else None,
+                "is_anomaly": runtime.is_anomaly if runtime else False,
+                "is_slow": runtime.is_slow if runtime else False,
+                "has_row_anomaly": runtime.has_row_anomaly if runtime else False,
+                "error_message": runtime.error_message if runtime else None,
+                "validation_count": len(runtime.validation_warnings) if runtime else 0,
+            }
+            enriched_nodes.append(enriched)
+
+        return {
+            "nodes": enriched_nodes,
+            "edges": edges,
+        }
+
+    def _compute_anomalies(self, node: NodeExecutionMetadata) -> None:
+        """Compute anomaly flags for a node based on historical data.
+
+        Anomaly rules:
+        - is_slow: node duration is 3x or more than historical avg
+        - has_row_anomaly: rows_out deviates ±50% from historical avg
+        """
+        anomaly_reasons = []
+
+        # Check for slow execution (3x threshold)
+        if node.historical_avg_duration and node.historical_avg_duration > 0:
+            if node.duration >= node.historical_avg_duration * 3:
+                node.is_slow = True
+                ratio = node.duration / node.historical_avg_duration
+                avg_dur = node.historical_avg_duration
+                anomaly_reasons.append(
+                    f"Slow: {node.duration:.2f}s vs avg {avg_dur:.2f}s ({ratio:.1f}x)"
+                )
+
+        # Check for row count anomaly (±50% threshold)
+        if node.historical_avg_rows and node.historical_avg_rows > 0 and node.rows_out is not None:
+            pct_change = abs(node.rows_out - node.historical_avg_rows) / node.historical_avg_rows
+            if pct_change >= 0.5:
+                node.has_row_anomaly = True
+                direction = "+" if node.rows_out > node.historical_avg_rows else "-"
+                avg_rows = node.historical_avg_rows
+                pct_str = f"{pct_change * 100:.0f}"
+                anomaly_reasons.append(
+                    f"Rows: {node.rows_out:,} vs avg {avg_rows:,.0f} ({direction}{pct_str}%)"
+                )
+
+        if anomaly_reasons:
+            node.is_anomaly = True
+            node.anomaly_reasons = anomaly_reasons
 
     def _convert_result_to_metadata(
         self, result: NodeResult, node_name: str
@@ -622,6 +941,153 @@ class StoryGenerator:
             ctx.debug("fsspec not available for remote cleanup")
         except Exception as e:
             ctx.warning(f"Remote story cleanup failed: {e}")
+
+    def _generate_pipeline_index(self) -> None:
+        """Generate an index.html with a table of recent runs (Phase 3)."""
+        import json
+
+        ctx = get_logging_context()
+
+        if self.is_remote:
+            ctx.debug("Pipeline index not yet supported for remote storage")
+            return
+
+        if self.output_path is None:
+            return
+
+        pipeline_dir = self.output_path / self.pipeline_name
+        if not pipeline_dir.exists():
+            return
+
+        # Find all JSON files
+        json_files = sorted(
+            pipeline_dir.glob("**/*.json"),
+            key=lambda p: str(p),
+            reverse=True,
+        )
+
+        if not json_files:
+            return
+
+        # Load metadata from each run
+        runs = []
+        for json_path in json_files[:50]:  # Limit to 50 most recent
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                html_path = json_path.with_suffix(".html")
+                relative_html = html_path.relative_to(pipeline_dir)
+
+                runs.append(
+                    {
+                        "run_id": data.get("run_id", "unknown"),
+                        "started_at": data.get("started_at", ""),
+                        "duration": data.get("duration", 0),
+                        "total_nodes": data.get("total_nodes", 0),
+                        "completed_nodes": data.get("completed_nodes", 0),
+                        "failed_nodes": data.get("failed_nodes", 0),
+                        "success_rate": data.get("success_rate", 0),
+                        "html_path": str(relative_html).replace("\\", "/"),
+                        "status": "failed" if data.get("failed_nodes", 0) > 0 else "success",
+                    }
+                )
+            except Exception as e:
+                ctx.debug(f"Failed to load run metadata: {json_path}, error: {e}")
+                continue
+
+        if not runs:
+            return
+
+        # Generate index HTML
+        index_html = self._render_index_html(runs)
+        index_path = pipeline_dir / "index.html"
+
+        try:
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write(index_html)
+            ctx.debug("Pipeline index generated", path=str(index_path), runs=len(runs))
+        except Exception as e:
+            ctx.warning(f"Failed to write pipeline index: {e}")
+
+    def _render_index_html(self, runs: List[Dict[str, Any]]) -> str:
+        """Render the pipeline history index HTML."""
+        rows_html = ""
+        for run in runs:
+            status_class = "success" if run["status"] == "success" else "failed"
+            status_icon = "✓" if run["status"] == "success" else "✗"
+            rows_html += f"""
+            <tr class="{status_class}">
+                <td><a href="{run["html_path"]}">{run["run_id"]}</a></td>
+                <td>{run["started_at"]}</td>
+                <td>{run["duration"]:.2f}s</td>
+                <td>{run["total_nodes"]}</td>
+                <td class="status-cell {status_class}">{status_icon} {run["completed_nodes"]}/{run["total_nodes"]}</td>
+                <td>{run["success_rate"]:.1f}%</td>
+            </tr>
+            """
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline History: {self.pipeline_name}</title>
+    <style>
+        :root {{
+            --primary-color: #0066cc;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f4f7f9;
+            margin: 0;
+            padding: 20px;
+        }}
+        .container {{ max-width: 1200px; margin: 0 auto; }}
+        h1 {{ color: var(--primary-color); margin-bottom: 20px; }}
+        table {{
+            width: 100%;
+            background: #fff;
+            border-collapse: collapse;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        th, td {{ padding: 12px 16px; text-align: left; border-bottom: 1px solid #e1e4e8; }}
+        th {{ background: #f8f9fa; font-weight: 600; }}
+        tr:hover {{ background: #f8f9fa; }}
+        a {{ color: var(--primary-color); text-decoration: none; }}
+        a:hover {{ text-decoration: underline; }}
+        .status-cell.success {{ color: var(--success-color); font-weight: 600; }}
+        .status-cell.failed {{ color: var(--error-color); font-weight: 600; }}
+        tr.failed {{ background: #fff5f5; }}
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📊 Pipeline History: {self.pipeline_name}</h1>
+    <p style="color: #666; margin-bottom: 20px;">Showing {len(runs)} most recent runs</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Run ID</th>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Nodes</th>
+                <th>Status</th>
+                <th>Success Rate</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rows_html}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
+"""
 
     # Legacy methods removed as they are now handled by renderers
     # _generate_node_section, _sample_to_markdown, _dataframe_to_markdown

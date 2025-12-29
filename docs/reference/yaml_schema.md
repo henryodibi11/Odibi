@@ -372,6 +372,7 @@ These are the built-in functions you can use in two ways:
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique node name |
 | **description** | Optional[str] | No | - | Human-readable description |
+| **runbook_url** | Optional[str] | No | - | URL to troubleshooting guide or runbook. Shown as 'Troubleshooting guide →' link on failures. |
 | **enabled** | bool | No | `True` | If False, node is skipped during execution |
 | **tags** | List[str] | No | `PydanticUndefined` | Operational tags for selective execution (e.g., 'daily', 'critical'). Use with `odibi run --tag`. |
 | **depends_on** | List[str] | No | `PydanticUndefined` | List of parent nodes that must complete before this node runs. The output of these nodes is available for reading. |

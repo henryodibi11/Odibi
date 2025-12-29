@@ -101,13 +101,15 @@ class TestStoryRetention:
 
         # Check files
         # Since generate creates a new file, cleanup runs AFTER generation
-        # Total HTML files should be retention_count (5)
+        # Total HTML files should be retention_count (5) + 1 for index.html
 
         # Note: generator.generate() creates the file AND then runs cleanup()
-        # So we expect exactly retention_count files
+        # So we expect exactly retention_count files + 1 index.html
+        # (Phase 3 added pipeline history index generation)
 
         all_files = list(tmp_path.glob("**/*.html"))
-        assert len(all_files) == 5
+        run_files = [f for f in all_files if f.name != "index.html"]
+        assert len(run_files) == 5
 
 
 class TestStoryGeneratorAlertSummary:

@@ -93,9 +93,32 @@ class NodeExecutionMetadata:
     historical_avg_rows: Optional[float] = None
     historical_avg_duration: Optional[float] = None
 
+    # Anomaly Flags (Phase 1 - Triage)
+    is_anomaly: bool = False
+    anomaly_reasons: List[str] = field(default_factory=list)
+    is_slow: bool = False  # 3x slower than historical avg
+    has_row_anomaly: bool = False  # ±50% rows vs historical avg
+
+    # Cross-run changes (Phase 3)
+    changed_from_last_success: bool = False
+    changes_detected: List[str] = field(default_factory=list)  # e.g. ["sql", "schema", "rows"]
+    previous_sql_hash: Optional[str] = None
+    previous_rows_out: Optional[int] = None
+    previous_duration: Optional[float] = None
+    previous_config_snapshot: Optional[Dict[str, Any]] = None  # For config diff viewer
+
+    # Duration history for sparkline (last N runs)
+    # Format: [{"run_id": "...", "duration": 1.5}, ...]
+    duration_history: Optional[List[Dict[str, Any]]] = None
+
     # Timestamps
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+
+    # Phase 5: Quality & Documentation
+    description: Optional[str] = None  # From NodeConfig.description
+    runbook_url: Optional[str] = None  # From NodeConfig.runbook_url
+    column_statistics: Optional[Dict[str, Dict[str, Any]]] = None  # min/max/mean/stddev per column
 
     def calculate_row_change(self):
         """Calculate row count change metrics."""
@@ -173,6 +196,20 @@ class NodeExecutionMetadata:
             "environment": self.environment,
             "source_files": self.source_files,
             "null_profile": self.null_profile,
+            "is_anomaly": self.is_anomaly,
+            "anomaly_reasons": self.anomaly_reasons,
+            "is_slow": self.is_slow,
+            "has_row_anomaly": self.has_row_anomaly,
+            "changed_from_last_success": self.changed_from_last_success,
+            "changes_detected": self.changes_detected,
+            "previous_sql_hash": self.previous_sql_hash,
+            "previous_rows_out": self.previous_rows_out,
+            "previous_duration": self.previous_duration,
+            "previous_config_snapshot": self.previous_config_snapshot,
+            "duration_history": self.duration_history,
+            "description": self.description,
+            "runbook_url": self.runbook_url,
+            "column_statistics": self.column_statistics,
         }
 
         if self.delta_info:
@@ -280,6 +317,14 @@ class PipelineStoryMetadata:
     include_samples: bool = True
     max_sample_rows: int = 10
 
+    # Graph data for interactive DAG (Phase 2)
+    graph_data: Optional[Dict[str, Any]] = None
+
+    # Cross-run comparison (Phase 3)
+    change_summary: Optional[Dict[str, Any]] = None
+    compared_to_run_id: Optional[str] = None
+    git_info: Optional[Dict[str, str]] = None
+
     def add_node(self, node_metadata: NodeExecutionMetadata):
         """
         Add node execution metadata.
@@ -362,6 +407,152 @@ class PipelineStoryMetadata:
             "skipped_nodes": self.skipped_nodes,
         }
 
+    def get_failed_node_names(self) -> List[str]:
+        """Get names of all failed nodes."""
+        return [n.node_name for n in self.nodes if n.status == "failed"]
+
+    def get_first_failure(self) -> Optional["NodeExecutionMetadata"]:
+        """Get the first failed node (by execution order)."""
+        for node in self.nodes:
+            if node.status == "failed":
+                return node
+        return None
+
+    def get_anomalous_nodes(self) -> List["NodeExecutionMetadata"]:
+        """Get all nodes with anomalies (slow or row count deviation)."""
+        return [n for n in self.nodes if n.is_anomaly]
+
+    def get_run_health_summary(self) -> Dict[str, Any]:
+        """Get run health summary for triage header.
+
+        Returns:
+            Dictionary with health info for quick triage
+        """
+        failed_names = self.get_failed_node_names()
+        first_failure = self.get_first_failure()
+        anomalous = self.get_anomalous_nodes()
+
+        return {
+            "has_failures": len(failed_names) > 0,
+            "failed_count": len(failed_names),
+            "failed_nodes": failed_names,
+            "first_failure_node": first_failure.node_name if first_failure else None,
+            "first_failure_error": first_failure.error_message if first_failure else None,
+            "first_failure_type": first_failure.error_type if first_failure else None,
+            "anomaly_count": len(anomalous),
+            "anomalous_nodes": [n.node_name for n in anomalous],
+            "overall_status": "failed" if failed_names else "success",
+        }
+
+    def get_data_quality_summary(self) -> Dict[str, Any]:
+        """Get data quality summary across all nodes.
+
+        Returns:
+            Dictionary with quality metrics for Phase 5 Data Quality Summary card
+        """
+        total_validations_failed = 0
+        total_failed_rows = 0
+        top_null_columns: List[Dict[str, Any]] = []
+        nodes_with_warnings = []
+
+        for node in self.nodes:
+            # Count validation warnings
+            if node.validation_warnings:
+                total_validations_failed += len(node.validation_warnings)
+                nodes_with_warnings.append(node.node_name)
+
+            # Sum failed rows
+            if node.failed_rows_counts:
+                for count in node.failed_rows_counts.values():
+                    total_failed_rows += count
+
+            # Collect null profile data
+            if node.null_profile:
+                for col, null_pct in node.null_profile.items():
+                    if null_pct and null_pct > 0:
+                        top_null_columns.append(
+                            {
+                                "node": node.node_name,
+                                "column": col,
+                                "null_pct": null_pct,
+                            }
+                        )
+
+        # Sort by null percentage descending and take top 10
+        top_null_columns.sort(key=lambda x: x["null_pct"], reverse=True)
+        top_null_columns = top_null_columns[:10]
+
+        return {
+            "total_validations_failed": total_validations_failed,
+            "total_failed_rows": total_failed_rows,
+            "top_null_columns": top_null_columns,
+            "nodes_with_warnings": nodes_with_warnings,
+            "has_quality_issues": total_validations_failed > 0 or total_failed_rows > 0,
+        }
+
+    def get_freshness_info(self) -> Optional[Dict[str, Any]]:
+        """Get data freshness indicator from date columns.
+
+        Looks for max timestamp in date/timestamp columns from sample data.
+
+        Returns:
+            Dictionary with freshness info or None if not available
+        """
+        latest_timestamp = None
+        latest_column = None
+        latest_node = None
+
+        date_patterns = ["date", "time", "timestamp", "created", "updated", "modified", "_at"]
+
+        for node in reversed(self.nodes):  # Start from last node (output)
+            if node.status != "success" or not node.sample_data:
+                continue
+
+            if not node.sample_data:
+                continue
+
+            for sample_row in node.sample_data:
+                for col, val in sample_row.items():
+                    # Check if column name suggests date/time
+                    col_lower = col.lower()
+                    if not any(p in col_lower for p in date_patterns):
+                        continue
+
+                    if val is None:
+                        continue
+
+                    # Try to parse as datetime
+                    try:
+                        from datetime import datetime as dt
+
+                        if isinstance(val, str):
+                            # Try common formats
+                            for fmt in [
+                                "%Y-%m-%d %H:%M:%S",
+                                "%Y-%m-%dT%H:%M:%S",
+                                "%Y-%m-%d",
+                            ]:
+                                try:
+                                    parsed = dt.strptime(val[:19], fmt)
+                                    if latest_timestamp is None or parsed > latest_timestamp:
+                                        latest_timestamp = parsed
+                                        latest_column = col
+                                        latest_node = node.node_name
+                                    break
+                                except (ValueError, TypeError):
+                                    continue
+                    except Exception:
+                        pass
+
+        if latest_timestamp:
+            return {
+                "timestamp": latest_timestamp.isoformat(),
+                "column": latest_column,
+                "node": latest_node,
+                "formatted": latest_timestamp.strftime("%Y-%m-%d %H:%M"),
+            }
+        return None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -383,6 +574,10 @@ class PipelineStoryMetadata:
             "asset": self.asset,
             "business_unit": self.business_unit,
             "theme": self.theme,
+            "graph_data": self.graph_data,
+            "change_summary": self.change_summary,
+            "compared_to_run_id": self.compared_to_run_id,
+            "git_info": self.git_info,
         }
 
     @classmethod

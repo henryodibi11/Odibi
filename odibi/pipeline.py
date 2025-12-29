@@ -908,6 +908,9 @@ class Pipeline:
 
             def generate_story():
                 try:
+                    # Get graph data for interactive DAG visualization
+                    graph_data_dict = self.graph.to_dict() if self.graph else None
+
                     return self.story_generator.generate(
                         node_results=results.node_results,
                         completed=results.completed,
@@ -918,6 +921,7 @@ class Pipeline:
                         end_time=results.end_time,
                         context=self.context,
                         config=config_dump,
+                        graph_data=graph_data_dict,
                     )
                 except Exception as e:
                     self._ctx.warning(f"Story generation failed: {e}")

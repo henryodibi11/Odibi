@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipeline Story: {{ metadata.pipeline_name }}</title>
+    <!-- Cytoscape.js for interactive DAG -->
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
     <style>
         :root {
             --primary-color: #0066cc;
@@ -17,7 +21,33 @@
             --skipped-color: #6c757d;
             --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            --code-bg: #2d2d2d;
+            --code-text: #f8f8f2;
         }
+
+        /* Dark Mode */
+        [data-theme="dark"] {
+            --primary-color: #4da6ff;
+            --bg-color: #1a1a2e;
+            --card-bg: #16213e;
+            --text-color: #e8e8e8;
+            --border-color: #2a2a4a;
+            --success-color: #4ade80;
+            --error-color: #f87171;
+            --warning-color: #fbbf24;
+            --skipped-color: #9ca3af;
+            --code-bg: #0f0f1a;
+            --code-text: #e8e8e8;
+        }
+
+        [data-theme="dark"] .header { border-left-color: var(--primary-color); }
+        [data-theme="dark"] pre { background: var(--code-bg); color: var(--code-text); }
+        [data-theme="dark"] th { background: #1e1e3f; }
+        [data-theme="dark"] .schema-box { background: #1e1e3f; }
+        [data-theme="dark"] .node-header:hover { background: #1e1e3f; }
+        [data-theme="dark"] .tabs { background: #1e1e3f; }
+        [data-theme="dark"] .tab-btn.active { background: var(--card-bg); }
+        [data-theme="dark"] #cy-graph { background: #1e1e3f !important; }
 
         body {
             font-family: var(--font-family);
@@ -151,6 +181,100 @@
         .badge-red { background: #fff5f5; color: #e03131; }
         .badge-orange { background: #fff9db; color: #f08c00; }
         .badge-gray { background: #f1f3f5; color: #868e96; }
+        .badge-purple { background: #f3e8ff; color: #7c3aed; }
+
+        /* Anomaly Badge */
+        .anomaly-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+        }
+        .anomaly-badge.slow { background: #fee2e2; color: #991b1b; border-color: #f87171; }
+        .anomaly-badge.rows { background: #dbeafe; color: #1e40af; border-color: #60a5fa; }
+
+        /* Run Health Header */
+        .health-header {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            border-left: 5px solid var(--error-color);
+        }
+        .health-header.success { border-left-color: var(--success-color); }
+        .health-header h2 { margin: 0 0 15px 0; display: flex; align-items: center; gap: 10px; }
+        .health-header .failed-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+        .health-header .failed-chip {
+            background: #fff5f5;
+            border: 1px solid #ffa8a8;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.9em;
+            color: var(--error-color);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .health-header .failed-chip:hover { background: #ffe3e3; }
+        .health-header .first-error {
+            background: #fff5f5;
+            border: 1px solid #ffa8a8;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: var(--mono-font);
+            font-size: 0.9em;
+            color: #c92a2a;
+            margin-top: 10px;
+        }
+        .health-header .first-error .error-type { font-weight: 600; margin-bottom: 5px; }
+
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            align-items: center;
+        }
+        .filter-bar label { font-weight: 600; color: #666; font-size: 0.9em; }
+        .filter-btn {
+            padding: 6px 16px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover { background: #f8f9fa; }
+        .filter-btn.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .filter-btn .count { opacity: 0.7; font-size: 0.85em; margin-left: 4px; }
+
+        /* Copy Button */
+        .copy-btn {
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            background: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            color: #666;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .copy-btn:hover { background: #e9ecef; color: #333; }
+        .copy-btn.copied { background: var(--success-color); color: #fff; border-color: var(--success-color); }
 
         /* Schema Diff */
         .schema-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -159,6 +283,24 @@
         .schema-list li { padding: 4px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
         .col-added { color: var(--success-color); font-weight: bold; }
         .col-removed { color: var(--error-color); text-decoration: line-through; }
+
+        /* Config Diff Viewer */
+        .config-diff-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .config-diff-pane { background: var(--code-bg); border-radius: 6px; overflow: hidden; }
+        .config-diff-header { padding: 8px 12px; font-weight: 600; font-size: 0.85em; border-bottom: 1px solid var(--border-color); }
+        .config-diff-header.previous { background: #fff5f5; color: #c92a2a; }
+        .config-diff-header.current { background: #e6fffa; color: #0ca678; }
+        [data-theme="dark"] .config-diff-header.previous { background: #3b1a1a; color: #f87171; }
+        [data-theme="dark"] .config-diff-header.current { background: #1a2f2a; color: #4ade80; }
+        .config-diff-content { padding: 12px; font-family: var(--mono-font); font-size: 0.85em; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+        .diff-line-added { background: rgba(40, 167, 69, 0.15); color: var(--success-color); }
+        .diff-line-removed { background: rgba(220, 53, 69, 0.15); color: var(--error-color); }
+        .diff-line-changed { background: rgba(255, 193, 7, 0.15); }
+
+        /* Duration Sparkline */
+        .sparkline-container { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+        .sparkline { display: inline-block; }
+        .sparkline-tooltip { font-size: 0.75em; color: #666; }
     </style>
 </head>
 <body>
@@ -174,7 +316,7 @@
             </div>
             <div class="meta-item">
                 <label>Started</label>
-                <span>{{ metadata.started_at }}</span>
+                <span class="timestamp" data-utc="{{ metadata.started_at }}">{{ metadata.started_at }}</span>
             </div>
             <div class="meta-item">
                 <label>Duration</label>
@@ -187,6 +329,37 @@
                     {% if metadata.plant %} / {{ metadata.plant }}{% endif %}
                 </span>
             </div>
+            {% if metadata.git_info %}
+            <div class="meta-item">
+                <label>Git</label>
+                <span style="font-family: var(--mono-font); font-size: 0.9em;">
+                    {{ metadata.git_info.branch }} @ {{ metadata.git_info.commit }}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Toolbar (Phase 4 - Polish & UX) -->
+    <div class="filter-bar" style="justify-content: space-between;">
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-weight: 500;">🔍</label>
+                <input type="text" id="node-search" placeholder="Search nodes..." 
+                       style="padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 20px; font-size: 0.9em; width: 180px; background: var(--card-bg); color: var(--text-color);"
+                       oninput="searchNodes(this.value)">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-weight: 500;">View:</label>
+                <select id="view-mode" onchange="setViewMode(this.value)" 
+                        style="padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em; background: var(--card-bg); color: var(--text-color);">
+                    <option value="developer">👨‍💻 Developer</option>
+                    <option value="stakeholder">📊 Stakeholder</option>
+                </select>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="copy-btn" onclick="toggleDarkMode()" id="dark-mode-btn">🌙 Dark Mode</button>
         </div>
     </div>
 
@@ -214,86 +387,207 @@
         </div>
     </div>
 
-    <!-- Node List -->
-    <div class="node-list">
+    <!-- Run Health Header (Phase 1 - Triage) -->
+    {% set health = metadata.get_run_health_summary() %}
+    {% if health.has_failures %}
+    <div class="health-header">
+        <h2>
+            <span style="font-size: 1.2em;">⚠️</span>
+            Run Failed - {{ health.failed_count }} node{% if health.failed_count > 1 %}s{% endif %} failed
+        </h2>
+        <div class="failed-list">
+            {% for node_name in health.failed_nodes %}
+            <span class="failed-chip" onclick="scrollToNode('{{ node_name }}')">{{ node_name }}</span>
+            {% endfor %}
+        </div>
+        {% if health.first_failure_error %}
+        <div class="first-error">
+            <div class="error-type">{{ health.first_failure_type }}: {{ health.first_failure_node }}</div>
+            <div>{{ health.first_failure_error }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% elif health.anomaly_count > 0 %}
+    <div class="health-header" style="border-left-color: var(--warning-color);">
+        <h2>
+            <span style="font-size: 1.2em;">⚡</span>
+            Run Succeeded with {{ health.anomaly_count }} Anomal{% if health.anomaly_count > 1 %}ies{% else %}y{% endif %}
+        </h2>
+        <div class="failed-list">
+            {% for node_name in health.anomalous_nodes %}
+            <span class="failed-chip" style="background: #fff9db; border-color: #ffe066; color: #e0a800;" onclick="scrollToNode('{{ node_name }}')">{{ node_name }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="health-header success">
+        <h2>
+            <span style="font-size: 1.2em;">✅</span>
+            Run Completed Successfully
+        </h2>
+    </div>
+    {% endif %}
 
-        <!-- Pipeline Graph -->
-        <div class="node-card" style="padding: 20px;">
-            <h3 style="margin-top: 0; margin-bottom: 15px; color: var(--primary-color);">Pipeline Flow</h3>
-            <div class="mermaid" style="background: #f8f9fa; padding: 20px; border-radius: 8px; display: flex; justify-content: center;">
-            graph LR
-                %% Styles
-                classDef success fill:#e6fffa,stroke:#0ca678,stroke-width:2px;
-                classDef failed fill:#fff5f5,stroke:#e03131,stroke-width:2px;
-                classDef skipped fill:#f8f9fa,stroke:#adb5bd,stroke-width:2px,stroke-dasharray: 5 5;
-                classDef external fill:#fff8e6,stroke:#f59f00,stroke-width:2px,stroke-dasharray: 3 3;
+    <!-- Changes Summary Card (Phase 3 - Cross-Run Context) -->
+    {% if metadata.change_summary and metadata.change_summary.has_changes %}
+    <div class="node-card" style="padding: 20px; border-left: 4px solid #7c3aed;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0; color: #7c3aed;">📊 Changes vs Last Success</h3>
+            <span style="font-size: 0.85em; color: #666;">Compared to: {{ metadata.compared_to_run_id }}</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+            {% if metadata.change_summary.newly_failing_count > 0 %}
+            <div style="background: #fff5f5; border: 1px solid #ffa8a8; padding: 12px 16px; border-radius: 8px; min-width: 150px;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--error-color);">{{ metadata.change_summary.newly_failing_count }}</div>
+                <div style="font-size: 0.85em; color: #666;">Newly Failing</div>
+                <div style="font-size: 0.8em; color: #999; margin-top: 4px;">{{ metadata.change_summary.newly_failing_nodes | join(', ') }}</div>
+            </div>
+            {% endif %}
+            {% if metadata.change_summary.sql_changed_count > 0 %}
+            <div style="background: #f3e8ff; border: 1px solid #c4b5fd; padding: 12px 16px; border-radius: 8px; min-width: 150px;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #7c3aed;">{{ metadata.change_summary.sql_changed_count }}</div>
+                <div style="font-size: 0.85em; color: #666;">SQL Changed</div>
+                <div style="font-size: 0.8em; color: #999; margin-top: 4px;">{{ metadata.change_summary.sql_changed_nodes | join(', ') }}</div>
+            </div>
+            {% endif %}
+            {% if metadata.change_summary.schema_changed_count > 0 %}
+            <div style="background: #dbeafe; border: 1px solid #93c5fd; padding: 12px 16px; border-radius: 8px; min-width: 150px;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #1e40af;">{{ metadata.change_summary.schema_changed_count }}</div>
+                <div style="font-size: 0.85em; color: #666;">Schema Changed</div>
+                <div style="font-size: 0.8em; color: #999; margin-top: 4px;">{{ metadata.change_summary.schema_changed_nodes | join(', ') }}</div>
+            </div>
+            {% endif %}
+            {% if metadata.change_summary.rows_changed_count > 0 %}
+            <div style="background: #fef3c7; border: 1px solid #fcd34d; padding: 12px 16px; border-radius: 8px; min-width: 150px;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #92400e;">{{ metadata.change_summary.rows_changed_count }}</div>
+                <div style="font-size: 0.85em; color: #666;">Row Count Changed</div>
+                <div style="font-size: 0.8em; color: #999; margin-top: 4px;">{{ metadata.change_summary.rows_changed_nodes | join(', ') }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% elif metadata.compared_to_run_id %}
+    <div class="node-card" style="padding: 15px; border-left: 4px solid var(--success-color);">
+        <span style="color: var(--success-color); font-weight: 600;">✓ No significant changes</span>
+        <span style="color: #666; font-size: 0.9em; margin-left: 10px;">vs {{ metadata.compared_to_run_id }}</span>
+    </div>
+    {% endif %}
 
-                {%- set external_refs = namespace(items=[]) %}
-                {%- set external_layers = namespace(items=[]) %}
-                {%- for node in metadata.nodes %}
-                    {%- if node.config_snapshot and node.config_snapshot.inputs %}
-                        {%- for input_name, input_val in node.config_snapshot.inputs.items() %}
-                            {%- if input_val is string and input_val.startswith('$') %}
-                                {%- set parts = input_val[1:].split('.') %}
-                                {%- if parts | length >= 2 %}
-                                    {%- set layer = parts[0] %}
-                                    {%- set ref_node = parts[1:] | join('_') %}
-                                    {%- set ref_id = layer ~ '_' ~ ref_node %}
-                                    {%- set ref_entry = {'id': ref_id, 'layer': layer, 'node': ref_node, 'display': input_val, 'target': node.node_name} %}
-                                    {%- set external_refs.items = external_refs.items + [ref_entry] %}
-                                    {%- if layer not in external_layers.items %}
-                                        {%- set external_layers.items = external_layers.items + [layer] %}
-                                    {%- endif %}
-                                {%- endif %}
-                            {%- endif %}
-                        {%- endfor %}
-                    {%- endif %}
-                {%- endfor %}
-
-                %% External Layer Subgraphs
-                {%- for layer in external_layers.items %}
-                subgraph {{ layer }}_layer["{{ layer | upper }} Layer"]
-                    {%- for ref in external_refs.items %}
-                        {%- if ref.layer == layer %}
-                    {{ ref.id }}["{{ ref.display }}"]:::external
-                        {%- endif %}
-                    {%- endfor %}
-                end
-                {%- endfor %}
-
-                %% Current Pipeline Subgraph
-                subgraph current_layer["{{ metadata.pipeline_layer | default('Current', true) | upper }} Layer"]
-                    %% Nodes
-                    {% for node in metadata.nodes %}
-                    {{ node.node_name }}[{{ node.node_name }}]:::{{ node.status }}
-                    {% endfor %}
-                end
-
-                %% Cross-layer Dependencies (from external inputs)
-                {%- for ref in external_refs.items %}
-                {{ ref.id }} -->|input| {{ ref.target }}
-                {%- endfor %}
-
-                %% Internal Dependencies
-                {% for node in metadata.nodes %}
-                    {% if node.config_snapshot.depends_on %}
-                        {% for parent in node.config_snapshot.depends_on %}
-                        {{ parent }} --> {{ node.node_name }}
-                        {% endfor %}
-                    {% endif %}
+    <!-- Data Quality Summary Card (Phase 5 - Quality & Documentation) -->
+    {% set quality = metadata.get_data_quality_summary() %}
+    {% set freshness = metadata.get_freshness_info() %}
+    {% if quality.has_quality_issues or quality.top_null_columns %}
+    <div class="node-card" style="padding: 20px; border-left: 4px solid #f59e0b;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0; color: #f59e0b;">🔍 Data Quality Summary</h3>
+            {% if freshness %}
+            <span style="font-size: 0.85em; color: #666;">
+                📅 Data as of: <strong>{{ freshness.formatted }}</strong>
+                <span style="color: #999;">({{ freshness.column }} in {{ freshness.node }})</span>
+            </span>
+            {% endif %}
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
+            {% if quality.total_validations_failed > 0 %}
+            <div style="background: #fff5f5; border: 1px solid #ffa8a8; padding: 12px 16px; border-radius: 8px; min-width: 120px;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--error-color);">{{ quality.total_validations_failed }}</div>
+                <div style="font-size: 0.85em; color: #666;">Validations Failed</div>
+            </div>
+            {% endif %}
+            {% if quality.total_failed_rows > 0 %}
+            <div style="background: #fff5f5; border: 1px solid #ffa8a8; padding: 12px 16px; border-radius: 8px; min-width: 120px;">
+                <div style="font-size: 1.5em; font-weight: bold; color: var(--error-color);">{{ "{:,}".format(quality.total_failed_rows) }}</div>
+                <div style="font-size: 0.85em; color: #666;">Total Failed Rows</div>
+            </div>
+            {% endif %}
+            {% if quality.nodes_with_warnings %}
+            <div style="background: #fff9db; border: 1px solid #ffe066; padding: 12px 16px; border-radius: 8px; min-width: 150px;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #e0a800;">{{ quality.nodes_with_warnings|length }}</div>
+                <div style="font-size: 0.85em; color: #666;">Nodes with Warnings</div>
+                <div style="font-size: 0.8em; color: #999; margin-top: 4px;">{{ quality.nodes_with_warnings[:3] | join(', ') }}{% if quality.nodes_with_warnings|length > 3 %}...{% endif %}</div>
+            </div>
+            {% endif %}
+        </div>
+        {% if quality.top_null_columns %}
+        <div style="margin-top: 15px;">
+            <h4 style="margin: 0 0 10px 0; font-size: 0.9em; color: #666;">Top Columns by Null %</h4>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                {% for col in quality.top_null_columns[:5] %}
+                <span style="background: {% if col.null_pct > 0.9 %}#fff5f5; border-color: #ffa8a8; color: #c92a2a;{% elif col.null_pct > 0.5 %}#fff9db; border-color: #ffe066; color: #e0a800;{% else %}#f8f9fa; border-color: #e1e4e8; color: #666;{% endif %} border: 1px solid; padding: 4px 10px; border-radius: 16px; font-size: 0.85em;">
+                    <strong>{{ col.column }}</strong> {{ "%.0f"|format(col.null_pct * 100) }}%
+                    <span style="color: #999; font-size: 0.85em;">({{ col.node }})</span>
+                </span>
                 {% endfor %}
             </div>
         </div>
+        {% endif %}
+    </div>
+    {% elif freshness %}
+    <!-- Show freshness indicator even without quality issues -->
+    <div class="node-card" style="padding: 15px; border-left: 4px solid var(--success-color);">
+        <span style="color: var(--success-color); font-weight: 600;">✓ Data Quality: No issues detected</span>
+        <span style="color: #666; font-size: 0.9em; margin-left: 15px;">
+            📅 Data as of: <strong>{{ freshness.formatted }}</strong>
+        </span>
+    </div>
+    {% endif %}
+
+    <!-- Filter Bar (Phase 1 - Triage) -->
+    {% set changed_count = metadata.change_summary.sql_changed_count + metadata.change_summary.schema_changed_count if metadata.change_summary else 0 %}
+    <div class="filter-bar">
+        <label>Show:</label>
+        <button class="filter-btn active" onclick="filterNodes('all', this)">All <span class="count">({{ metadata.total_nodes }})</span></button>
+        <button class="filter-btn" onclick="filterNodes('failed', this)">Failed <span class="count">({{ metadata.failed_nodes }})</span></button>
+        <button class="filter-btn" onclick="filterNodes('anomalous', this)">Anomalous <span class="count">({{ health.anomaly_count }})</span></button>
+        {% if changed_count > 0 %}
+        <button class="filter-btn" onclick="filterNodes('changed', this)">Changed <span class="count">({{ changed_count }})</span></button>
+        {% endif %}
+    </div>
+
+    <!-- Node List -->
+    <div class="node-list">
+
+        <!-- Pipeline Graph (Cytoscape.js) -->
+        <div class="node-card" style="padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: var(--primary-color);">Pipeline Flow</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="font-size: 0.8em; color: #666;">Click node to scroll • Shift+click to highlight lineage</span>
+                    <button class="copy-btn" onclick="resetGraphHighlight()">Reset View</button>
+                </div>
+            </div>
+            <div id="cy-graph" style="height: 350px; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color);"></div>
+            <div id="cy-tooltip" style="display: none; position: absolute; background: #333; color: #fff; padding: 10px 14px; border-radius: 6px; font-size: 0.85em; z-index: 1000; max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);"></div>
+        </div>
 
         {% for node in metadata.nodes %}
-        <div class="node-card" id="node-{{ node.node_name }}">
+        <div class="node-card" id="node-{{ node.node_name }}" data-status="{{ node.status }}" data-anomaly="{{ 'true' if node.is_anomaly else 'false' }}" data-changed="{{ 'true' if node.changed_from_last_success else 'false' }}">
             <div class="node-header" onclick="toggleNode(this)">
                 <div class="node-title">
                     <div class="status-icon status-{{ node.status }}">
                         {% if node.status == 'success' %}✓{% elif node.status == 'failed' %}!{% else %}-{% endif %}
                     </div>
-                    {{ node.node_name }}
+                    <div>
+                        {{ node.node_name }}
+                        {% if node.description %}
+                        <div style="font-size: 0.75em; color: #666; font-weight: normal; margin-top: 2px;">{{ node.description }}</div>
+                        {% endif %}
+                    </div>
                     <span class="badge badge-blue">{{ node.operation }}</span>
+                    {% if node.is_anomaly %}
+                        {% if node.is_slow %}
+                        <span class="anomaly-badge slow" title="{{ node.anomaly_reasons|join(', ') }}">🐢 Slow</span>
+                        {% endif %}
+                        {% if node.has_row_anomaly %}
+                        <span class="anomaly-badge rows" title="{{ node.anomaly_reasons|join(', ') }}">📊 Row Δ</span>
+                        {% endif %}
+                    {% endif %}
+                    {% if node.changed_from_last_success %}
+                    <span class="badge badge-purple" title="Changed: {{ node.changes_detected|join(', ') }}">Δ {{ node.changes_detected|join(', ') }}</span>
+                    {% endif %}
+                    {% if node.runbook_url and node.status == 'failed' %}
+                    <a href="{{ node.runbook_url }}" target="_blank" style="font-size: 0.8em; color: var(--primary-color); text-decoration: none; margin-left: 8px;" onclick="event.stopPropagation();">Troubleshooting guide →</a>
+                    {% endif %}
                 </div>
                 <div class="node-metrics">
                     {% if node.rows_out is not none %}
@@ -306,7 +600,14 @@
                     </span>
                     {% endif %}
 
-                    <span>{{ "%.4f"|format(node.duration) }}s</span>
+                    <span class="sparkline-container">
+                        {{ "%.4f"|format(node.duration) }}s
+                        {% if node.duration_history and node.duration_history|length > 1 %}
+                        <span class="sparkline" id="sparkline-{{ loop.index }}" 
+                              data-history="{{ node.duration_history | tojson | e }}"
+                              title="Duration trend (last {{ node.duration_history|length }} runs)"></span>
+                        {% endif %}
+                    </span>
                 </div>
             </div>
 
@@ -338,21 +639,22 @@
                     {% endif %}
 
                     {% if node.error_message %}
-                    <div style="background: #fff5f5; color: #c92a2a; padding: 15px; border-radius: 4px; border: 1px solid #ffa8a8; margin-bottom: 20px;">
+                    <div style="background: #fff5f5; color: #c92a2a; padding: 15px; border-radius: 4px; border: 1px solid #ffa8a8; margin-bottom: 20px; position: relative;">
+                        <button class="copy-btn" style="position: absolute; top: 10px; right: 10px;" onclick="copyError(this, '{{ node.node_name }}'); event.stopPropagation();">📋 Copy Error</button>
                         <strong>Error: {{ node.error_type }}</strong>
-                        <pre style="background: none; color: #c92a2a; padding: 0; margin-top: 10px;">{{ node.error_message }}</pre>
+                        <pre style="background: none; color: #c92a2a; padding: 0; margin-top: 10px; padding-right: 80px;" id="error-{{ loop.index }}">{{ node.error_message }}</pre>
 
                         {% if node.error_traceback_cleaned %}
                         <details style="margin-top: 15px;">
                             <summary style="cursor: pointer; font-weight: 600; color: #c92a2a;">Show Traceback (Cleaned)</summary>
-                            <pre style="background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; margin-top: 10px; overflow-x: auto; font-size: 0.85em;">{{ node.error_traceback_cleaned }}</pre>
+                            <pre style="background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; margin-top: 10px; overflow-x: auto; font-size: 0.85em;" id="traceback-cleaned-{{ loop.index }}">{{ node.error_traceback_cleaned }}</pre>
                         </details>
                         {% endif %}
 
                         {% if node.error_traceback %}
                         <details style="margin-top: 10px;">
                             <summary style="cursor: pointer; font-weight: 500; color: #999; font-size: 0.9em;">Show Full Traceback (Raw)</summary>
-                            <pre style="background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; margin-top: 10px; overflow-x: auto; font-size: 0.8em; max-height: 400px; overflow-y: auto;">{{ node.error_traceback }}</pre>
+                            <pre style="background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; margin-top: 10px; overflow-x: auto; font-size: 0.8em; max-height: 400px; overflow-y: auto;" id="traceback-full-{{ loop.index }}">{{ node.error_traceback }}</pre>
                         </details>
                         {% endif %}
                     </div>
@@ -554,6 +856,40 @@
                         </div>
                     </div>
 
+                    {% if node.column_statistics %}
+                    <div style="margin-top: 20px; border: 1px solid #e1e4e8; border-radius: 6px; overflow: hidden;">
+                        <details>
+                            <summary style="background: #f8f9fa; padding: 10px 15px; cursor: pointer; font-weight: 600; color: #333;">
+                                📊 Column Statistics ({{ node.column_statistics|length }} columns)
+                            </summary>
+                            <div style="padding: 15px; overflow-x: auto;">
+                                <table style="width: 100%; margin: 0; font-size: 0.85em;">
+                                    <thead>
+                                        <tr>
+                                            <th style="padding: 6px 10px;">Column</th>
+                                            <th style="padding: 6px 10px; text-align: right;">Min</th>
+                                            <th style="padding: 6px 10px; text-align: right;">Max</th>
+                                            <th style="padding: 6px 10px; text-align: right;">Mean</th>
+                                            <th style="padding: 6px 10px; text-align: right;">Std Dev</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for col_name, stats in node.column_statistics.items() %}
+                                        <tr>
+                                            <td style="padding: 6px 10px; font-weight: 500;">{{ col_name }}</td>
+                                            <td style="padding: 6px 10px; text-align: right; font-family: var(--mono-font);">{{ stats.min if stats.min is not none else '-' }}</td>
+                                            <td style="padding: 6px 10px; text-align: right; font-family: var(--mono-font);">{{ stats.max if stats.max is not none else '-' }}</td>
+                                            <td style="padding: 6px 10px; text-align: right; font-family: var(--mono-font);">{{ "%.2f"|format(stats.mean) if stats.mean is not none else '-' }}</td>
+                                            <td style="padding: 6px 10px; text-align: right; font-family: var(--mono-font);">{{ "%.2f"|format(stats.stddev) if stats.stddev is not none else '-' }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    </div>
+                    {% endif %}
+
                     {% if node.delta_info %}
                     <div style="margin-top: 20px; border: 1px solid #b8daff; background: #f1f8ff; border-radius: 6px; overflow: hidden;">
                         <div style="background: #e7f5ff; padding: 10px 15px; border-bottom: 1px solid #b8daff; display: flex; justify-content: space-between; align-items: center;">
@@ -616,18 +952,26 @@
                 <!-- Tab: SQL -->
                 {% if node.executed_sql %}
                 <div id="sql-{{ loop.index }}" class="tab-content">
-                    <h4 style="margin: 0 0 15px 0; color: #333;">
-                        💾 Executed SQL ({{ node.executed_sql|length }} statement{% if node.executed_sql|length > 1 %}s{% endif %})
-                    </h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4 style="margin: 0; color: #333;">
+                            💾 Executed SQL ({{ node.executed_sql|length }} statement{% if node.executed_sql|length > 1 %}s{% endif %})
+                        </h4>
+                        <button class="copy-btn" onclick="copyAllSQL(this, '{{ node.node_name }}')">📋 Copy All SQL</button>
+                    </div>
                     {% for sql in node.executed_sql %}
                     <details {% if loop.first %}open{% endif %} style="margin-bottom: 15px;">
-                        <summary style="cursor: pointer; padding: 8px; background: #f8f9fa; border: 1px solid #e1e4e8; border-radius: 4px; font-weight: 500; font-size: 0.9em;">
-                            Statement #{{ loop.index }}
-                            {% if sql|length > 100 %}
-                            <span style="color: #666; font-weight: normal;"> - {{ sql[:50]|replace('\n', ' ') }}...</span>
-                            {% endif %}
+                        <summary style="cursor: pointer; padding: 8px; background: #f8f9fa; border: 1px solid #e1e4e8; border-radius: 4px; font-weight: 500; font-size: 0.9em; display: flex; justify-content: space-between; align-items: center;">
+                            <span>
+                                Statement #{{ loop.index }}
+                                {% if sql|length > 100 %}
+                                <span style="color: #666; font-weight: normal;"> - {{ sql[:50]|replace('\n', ' ') }}...</span>
+                                {% endif %}
+                            </span>
                         </summary>
-                        <pre style="margin-top: 10px; border-left: 3px solid var(--primary-color);">{{ sql }}</pre>
+                        <div style="position: relative; margin-top: 10px;">
+                            <button class="copy-btn" style="position: absolute; top: 8px; right: 8px;" onclick="copyToClipboard(this, `{{ sql|e }}`); event.stopPropagation();">📋 Copy</button>
+                            <pre style="border-left: 3px solid var(--primary-color); padding-right: 80px;" id="sql-{{ loop.parent.loop.index }}-{{ loop.index }}">{{ sql }}</pre>
+                        </div>
                     </details>
                     {% endfor %}
                     {% if node.sql_hash %}
@@ -836,7 +1180,59 @@
                         </div>
                     </div>
                     {% endif %}
-                    <pre>{{ node.config_snapshot | to_yaml }}</pre>
+
+                    {% if node.previous_config_snapshot %}
+                    <!-- Config Diff Viewer -->
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="margin: 0; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                <span>📋</span> Config Changes vs Last Run
+                            </h4>
+                            <button class="copy-btn" onclick="toggleConfigDiffView({{ loop.index }})" id="config-diff-toggle-{{ loop.index }}">
+                                Show Side-by-Side
+                            </button>
+                        </div>
+                        
+                        <!-- Inline Diff View (default) -->
+                        <div id="config-diff-inline-{{ loop.index }}" class="config-diff-inline">
+                            <pre id="config-diff-output-{{ loop.index }}" style="padding: 15px; max-height: 400px; overflow-y: auto;"></pre>
+                        </div>
+                        
+                        <!-- Side-by-Side View (hidden by default) -->
+                        <div id="config-diff-sidebyside-{{ loop.index }}" class="config-diff-container" style="display: none;">
+                            <div class="config-diff-pane">
+                                <div class="config-diff-header previous">Previous Run</div>
+                                <div class="config-diff-content">
+                                    <pre style="margin: 0; background: none; padding: 0;">{{ node.previous_config_snapshot | to_yaml }}</pre>
+                                </div>
+                            </div>
+                            <div class="config-diff-pane">
+                                <div class="config-diff-header current">Current Run</div>
+                                <div class="config-diff-content">
+                                    <pre style="margin: 0; background: none; padding: 0;">{{ node.config_snapshot | to_yaml }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <script>
+                            (function() {
+                                const prev = {{ node.previous_config_snapshot | tojson | safe }};
+                                const curr = {{ node.config_snapshot | tojson | safe }};
+                                const outputEl = document.getElementById('config-diff-output-{{ loop.index }}');
+                                if (outputEl) {
+                                    outputEl.innerHTML = generateConfigDiff(prev, curr);
+                                }
+                            })();
+                        </script>
+                    </div>
+                    <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
+                    <h4 style="margin: 0 0 10px 0; color: #666;">Current Configuration</h4>
+                    {% endif %}
+
+                    <div style="position: relative;">
+                        <button class="copy-btn" style="position: absolute; top: 8px; right: 8px; z-index: 1;" onclick="copyConfig(this, '{{ node.node_name }}'); event.stopPropagation();">📋 Copy YAML</button>
+                        <pre style="padding-right: 90px;" id="config-yaml-{{ loop.index }}">{{ node.config_snapshot | to_yaml }}</pre>
+                    </div>
                 </div>
                 {% endif %}
 
@@ -851,38 +1247,642 @@
 </div>
 
 <script>
+    // ========================================
+    // Config Diff Functions
+    // ========================================
+    
+    function generateConfigDiff(prev, curr) {
+        const prevYaml = objectToYamlLines(prev);
+        const currYaml = objectToYamlLines(curr);
+        
+        const diff = computeLineDiff(prevYaml, currYaml);
+        return diff.map(line => {
+            if (line.type === 'added') {
+                return `<span class="diff-line-added">+ ${escapeHtml(line.text)}</span>`;
+            } else if (line.type === 'removed') {
+                return `<span class="diff-line-removed">- ${escapeHtml(line.text)}</span>`;
+            } else {
+                return `  ${escapeHtml(line.text)}`;
+            }
+        }).join('\n');
+    }
+    
+    function objectToYamlLines(obj, indent = 0) {
+        const lines = [];
+        const prefix = '  '.repeat(indent);
+        
+        if (obj === null || obj === undefined) {
+            return ['null'];
+        }
+        
+        if (typeof obj !== 'object') {
+            return [String(obj)];
+        }
+        
+        if (Array.isArray(obj)) {
+            obj.forEach(item => {
+                if (typeof item === 'object' && item !== null) {
+                    lines.push(`${prefix}-`);
+                    objectToYamlLines(item, indent + 1).forEach(l => lines.push(l));
+                } else {
+                    lines.push(`${prefix}- ${item}`);
+                }
+            });
+        } else {
+            Object.keys(obj).sort().forEach(key => {
+                const val = obj[key];
+                if (val === null || val === undefined) {
+                    lines.push(`${prefix}${key}: null`);
+                } else if (typeof val === 'object') {
+                    lines.push(`${prefix}${key}:`);
+                    objectToYamlLines(val, indent + 1).forEach(l => lines.push(l));
+                } else {
+                    lines.push(`${prefix}${key}: ${val}`);
+                }
+            });
+        }
+        return lines;
+    }
+    
+    function computeLineDiff(oldLines, newLines) {
+        const result = [];
+        const oldSet = new Set(oldLines);
+        const newSet = new Set(newLines);
+        
+        // Find removed lines
+        oldLines.forEach(line => {
+            if (!newSet.has(line)) {
+                result.push({ type: 'removed', text: line });
+            }
+        });
+        
+        // Find added and unchanged lines
+        newLines.forEach(line => {
+            if (!oldSet.has(line)) {
+                result.push({ type: 'added', text: line });
+            } else {
+                result.push({ type: 'unchanged', text: line });
+            }
+        });
+        
+        // Sort: removed first, then unchanged/added in order
+        const removed = result.filter(r => r.type === 'removed');
+        const rest = result.filter(r => r.type !== 'removed');
+        return [...removed, ...rest];
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function toggleConfigDiffView(index) {
+        const inline = document.getElementById('config-diff-inline-' + index);
+        const sideBySide = document.getElementById('config-diff-sidebyside-' + index);
+        const btn = document.getElementById('config-diff-toggle-' + index);
+        
+        if (inline && sideBySide && btn) {
+            if (sideBySide.style.display === 'none') {
+                sideBySide.style.display = 'grid';
+                inline.style.display = 'none';
+                btn.textContent = 'Show Inline Diff';
+            } else {
+                sideBySide.style.display = 'none';
+                inline.style.display = 'block';
+                btn.textContent = 'Show Side-by-Side';
+            }
+        }
+    }
+    
+    // ========================================
+    // Duration Sparkline Functions
+    // ========================================
+    
+    function renderSparkline(data, width = 60, height = 16) {
+        if (!data || data.length < 2) return '';
+        
+        const durations = data.map(d => d.duration).reverse(); // Oldest to newest
+        const min = Math.min(...durations);
+        const max = Math.max(...durations);
+        const range = max - min || 1;
+        
+        const points = durations.map((d, i) => {
+            const x = (i / (durations.length - 1)) * width;
+            const y = height - ((d - min) / range) * (height - 2) - 1;
+            return `${x},${y}`;
+        }).join(' ');
+        
+        const lastDuration = durations[durations.length - 1];
+        const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+        const trend = lastDuration > avgDuration * 1.5 ? '#dc3545' : 
+                      lastDuration < avgDuration * 0.5 ? '#28a745' : '#6c757d';
+        
+        return `<svg width="${width}" height="${height}" style="vertical-align: middle;">
+            <polyline points="${points}" fill="none" stroke="${trend}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="${width}" cy="${height - ((lastDuration - min) / range) * (height - 2) - 1}" r="2" fill="${trend}"/>
+        </svg>`;
+    }
+    
+    function initSparklines() {
+        document.querySelectorAll('.sparkline[data-history]').forEach(el => {
+            try {
+                const history = JSON.parse(el.dataset.history);
+                if (history && history.length > 1) {
+                    el.innerHTML = renderSparkline(history);
+                }
+            } catch (e) {
+                console.debug('Failed to render sparkline:', e);
+            }
+        });
+    }
+
+    // Toggle node card open/closed
     function toggleNode(header) {
         const body = header.nextElementSibling;
         body.classList.toggle('open');
     }
 
+    // Tab switching within a node
     function openTab(evt, tabId) {
-        // Find the parent .node-body
         var nodeBody = evt.currentTarget.closest('.node-body');
-
-        // Hide all tab contents in this node
         var tabContents = nodeBody.getElementsByClassName("tab-content");
         for (var i = 0; i < tabContents.length; i++) {
             tabContents[i].classList.remove("active");
         }
-
-        // Deactivate all buttons in this node
         var tabBtns = nodeBody.getElementsByClassName("tab-btn");
         for (var i = 0; i < tabBtns.length; i++) {
             tabBtns[i].classList.remove("active");
         }
-
-        // Activate selected tab and button
         document.getElementById(tabId).classList.add("active");
         evt.currentTarget.classList.add("active");
-
-        // Stop propagation to prevent closing the node card
         evt.stopPropagation();
     }
-</script>
-<script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true });
+
+    // Scroll to a specific node card
+    function scrollToNode(nodeName) {
+        const nodeCard = document.getElementById('node-' + nodeName);
+        if (nodeCard) {
+            nodeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Auto-expand the node
+            const body = nodeCard.querySelector('.node-body');
+            if (body && !body.classList.contains('open')) {
+                body.classList.add('open');
+            }
+        }
+    }
+
+    // Filter nodes by status
+    function filterNodes(filter, btn) {
+        // Update active button
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Get all node cards (skip the pipeline graph card)
+        const nodeCards = document.querySelectorAll('.node-card[data-status]');
+        nodeCards.forEach(card => {
+            const status = card.dataset.status;
+            const isAnomaly = card.dataset.anomaly === 'true';
+
+            const isChanged = card.dataset.changed === 'true';
+
+            if (filter === 'all') {
+                card.style.display = '';
+            } else if (filter === 'failed') {
+                card.style.display = status === 'failed' ? '' : 'none';
+            } else if (filter === 'anomalous') {
+                card.style.display = isAnomaly ? '' : 'none';
+            } else if (filter === 'changed') {
+                card.style.display = isChanged ? '' : 'none';
+            }
+        });
+    }
+
+    // Copy text to clipboard with button feedback
+    function copyToClipboard(btn, text) {
+        navigator.clipboard.writeText(text).then(() => {
+            btn.classList.add('copied');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '✓ Copied!';
+            setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.innerHTML = originalText;
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy to clipboard');
+        });
+    }
+
+    // Copy all SQL for a node
+    function copyAllSQL(btn, nodeName) {
+        const nodeCard = document.getElementById('node-' + nodeName);
+        const sqlBlocks = nodeCard.querySelectorAll('[id^="sql-"][id$="-"]');
+        let allSQL = [];
+        sqlBlocks.forEach(block => {
+            if (block.tagName === 'PRE') {
+                allSQL.push(block.textContent);
+            }
+        });
+        // Fallback: get from details > pre
+        if (allSQL.length === 0) {
+            nodeCard.querySelectorAll('.tab-content details pre').forEach(pre => {
+                allSQL.push(pre.textContent);
+            });
+        }
+        copyToClipboard(btn, allSQL.join('\n\n-- Next Statement --\n\n'));
+    }
+
+    // Copy error info for a node
+    function copyError(btn, nodeName) {
+        const nodeCard = document.getElementById('node-' + nodeName);
+        const errorPre = nodeCard.querySelector('[id^="error-"]');
+        const tracebackCleaned = nodeCard.querySelector('[id^="traceback-cleaned-"]');
+        let errorText = errorPre ? errorPre.textContent : '';
+        if (tracebackCleaned) {
+            errorText += '\n\n--- Traceback ---\n' + tracebackCleaned.textContent;
+        }
+        copyToClipboard(btn, errorText);
+    }
+
+    // Copy config YAML for a node
+    function copyConfig(btn, nodeName) {
+        const nodeCard = document.getElementById('node-' + nodeName);
+        const configPre = nodeCard.querySelector('[id^="config-yaml-"]');
+        if (configPre) {
+            copyToClipboard(btn, configPre.textContent);
+        }
+    }
+
+    // Auto-expand failed nodes on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Find all failed node cards and expand them
+        document.querySelectorAll('.node-card[data-status="failed"]').forEach(card => {
+            const body = card.querySelector('.node-body');
+            if (body) {
+                body.classList.add('open');
+            }
+        });
+
+        // Also expand anomalous nodes
+        document.querySelectorAll('.node-card[data-anomaly="true"]').forEach(card => {
+            const body = card.querySelector('.node-body');
+            if (body) {
+                body.classList.add('open');
+            }
+        });
+
+        // Initialize Cytoscape graph
+        initCytoscapeGraph();
+
+        // Initialize dark mode from localStorage
+        initDarkMode();
+
+        // Localize timestamps
+        localizeTimestamps();
+
+        // Initialize view mode from localStorage
+        initViewMode();
+
+        // Initialize duration sparklines
+        initSparklines();
+    });
+
+    // Dark Mode (Phase 4)
+    function initDarkMode() {
+        const savedTheme = localStorage.getItem('odibi-story-theme');
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.getElementById('dark-mode-btn').textContent = '☀️ Light Mode';
+        }
+    }
+
+    function toggleDarkMode() {
+        const html = document.documentElement;
+        const btn = document.getElementById('dark-mode-btn');
+        if (html.getAttribute('data-theme') === 'dark') {
+            html.removeAttribute('data-theme');
+            localStorage.setItem('odibi-story-theme', 'light');
+            btn.textContent = '🌙 Dark Mode';
+        } else {
+            html.setAttribute('data-theme', 'dark');
+            localStorage.setItem('odibi-story-theme', 'dark');
+            btn.textContent = '☀️ Light Mode';
+        }
+    }
+
+    // Timestamp Localizer (Phase 4)
+    function localizeTimestamps() {
+        document.querySelectorAll('.timestamp').forEach(el => {
+            const utc = el.dataset.utc;
+            if (utc) {
+                try {
+                    const date = new Date(utc);
+                    if (!isNaN(date.getTime())) {
+                        el.textContent = date.toLocaleString();
+                        el.title = utc + ' (UTC)';
+                    }
+                } catch (e) {
+                    console.debug('Could not parse timestamp:', utc);
+                }
+            }
+        });
+    }
+
+    // Node Search (Phase 4)
+    function searchNodes(query) {
+        const lowerQuery = query.toLowerCase().trim();
+        const nodeCards = document.querySelectorAll('.node-card[data-status]');
+
+        nodeCards.forEach(card => {
+            const nodeName = card.id.replace('node-', '').toLowerCase();
+            if (!lowerQuery || nodeName.includes(lowerQuery)) {
+                card.style.display = '';
+                if (lowerQuery && nodeName.includes(lowerQuery)) {
+                    card.style.boxShadow = '0 0 0 2px var(--primary-color)';
+                } else {
+                    card.style.boxShadow = '';
+                }
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        // Also highlight in graph
+        if (cy && lowerQuery) {
+            cy.elements().removeClass('highlighted dimmed');
+            const matchingNodes = cy.nodes().filter(n => n.id().toLowerCase().includes(lowerQuery));
+            if (matchingNodes.length > 0) {
+                cy.elements().not(matchingNodes).addClass('dimmed');
+                matchingNodes.addClass('highlighted');
+            }
+        } else if (cy) {
+            cy.elements().removeClass('highlighted dimmed');
+        }
+    }
+
+    // View Mode (Phase 4)
+    function initViewMode() {
+        const savedMode = localStorage.getItem('odibi-story-view-mode') || 'developer';
+        document.getElementById('view-mode').value = savedMode;
+        applyViewMode(savedMode);
+    }
+
+    function setViewMode(mode) {
+        localStorage.setItem('odibi-story-view-mode', mode);
+        applyViewMode(mode);
+    }
+
+    function applyViewMode(mode) {
+        const developerElements = document.querySelectorAll('.tab-btn[onclick*="sql-"], .tab-btn[onclick*="config-"], details:has(pre), .error-traceback');
+        const tracebackDetails = document.querySelectorAll('details:has([id^="traceback"])');
+
+        if (mode === 'stakeholder') {
+            // Hide SQL tabs, config tabs, and tracebacks
+            document.querySelectorAll('.tabs').forEach(tabs => {
+                tabs.querySelectorAll('.tab-btn').forEach(btn => {
+                    const onclick = btn.getAttribute('onclick') || '';
+                    if (onclick.includes('sql-') || onclick.includes('config-')) {
+                        btn.style.display = 'none';
+                    }
+                });
+            });
+            tracebackDetails.forEach(el => el.style.display = 'none');
+        } else {
+            // Show all tabs
+            document.querySelectorAll('.tabs .tab-btn').forEach(btn => {
+                btn.style.display = '';
+            });
+            tracebackDetails.forEach(el => el.style.display = '');
+        }
+    }
+
+    // Cytoscape.js graph instance
+    let cy = null;
+
+    // Graph data from template
+    const graphData = {{ metadata.graph_data | tojson | safe if metadata.graph_data else '{"nodes":[],"edges":[]}' }};
+
+    function initCytoscapeGraph() {
+        if (!graphData.nodes || graphData.nodes.length === 0) {
+            document.getElementById('cy-graph').innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">No graph data available</div>';
+            return;
+        }
+
+        // Status colors
+        const statusColors = {
+            success: { bg: '#e6fffa', border: '#0ca678' },
+            failed: { bg: '#fff5f5', border: '#e03131' },
+            skipped: { bg: '#f8f9fa', border: '#adb5bd' },
+            unknown: { bg: '#f8f9fa', border: '#868e96' }
+        };
+
+        // Build Cytoscape elements
+        const elements = [];
+
+        // Add nodes
+        graphData.nodes.forEach(node => {
+            const colors = statusColors[node.status] || statusColors.unknown;
+            elements.push({
+                data: {
+                    id: node.id,
+                    label: node.label || node.id,
+                    status: node.status,
+                    duration: node.duration,
+                    rows_out: node.rows_out,
+                    is_anomaly: node.is_anomaly,
+                    is_slow: node.is_slow,
+                    has_row_anomaly: node.has_row_anomaly,
+                    error_message: node.error_message,
+                    validation_count: node.validation_count,
+                    bgColor: colors.bg,
+                    borderColor: colors.border
+                }
+            });
+        });
+
+        // Add edges
+        graphData.edges.forEach(edge => {
+            elements.push({
+                data: {
+                    id: edge.source + '->' + edge.target,
+                    source: edge.source,
+                    target: edge.target
+                }
+            });
+        });
+
+        // Initialize Cytoscape
+        cy = cytoscape({
+            container: document.getElementById('cy-graph'),
+            elements: elements,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'label': 'data(label)',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'background-color': 'data(bgColor)',
+                        'border-color': 'data(borderColor)',
+                        'border-width': 2,
+                        'font-size': '11px',
+                        'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        'width': 'label',
+                        'height': 30,
+                        'padding': '10px',
+                        'shape': 'round-rectangle',
+                        'text-wrap': 'wrap',
+                        'text-max-width': '120px'
+                    }
+                },
+                {
+                    selector: 'node[?is_anomaly]',
+                    style: {
+                        'border-width': 3,
+                        'border-style': 'double'
+                    }
+                },
+                {
+                    selector: 'node[status="failed"]',
+                    style: {
+                        'font-weight': 'bold'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 2,
+                        'line-color': '#adb5bd',
+                        'target-arrow-color': '#adb5bd',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'arrow-scale': 0.8
+                    }
+                },
+                {
+                    selector: '.highlighted',
+                    style: {
+                        'border-width': 4,
+                        'border-color': '#0066cc',
+                        'z-index': 999
+                    }
+                },
+                {
+                    selector: '.highlighted-edge',
+                    style: {
+                        'width': 3,
+                        'line-color': '#0066cc',
+                        'target-arrow-color': '#0066cc',
+                        'z-index': 999
+                    }
+                },
+                {
+                    selector: '.dimmed',
+                    style: {
+                        'opacity': 0.3
+                    }
+                }
+            ],
+            layout: {
+                name: 'dagre',
+                rankDir: 'LR',
+                nodeSep: 50,
+                rankSep: 80,
+                padding: 20
+            },
+            minZoom: 0.3,
+            maxZoom: 2,
+            wheelSensitivity: 0.3
+        });
+
+        // Click handler - scroll to node card
+        cy.on('tap', 'node', function(evt) {
+            const nodeId = evt.target.id();
+            if (evt.originalEvent.shiftKey) {
+                // Shift+click: highlight lineage
+                highlightLineage(nodeId);
+            } else {
+                // Normal click: scroll to card
+                scrollToNode(nodeId);
+            }
+        });
+
+        // Hover tooltip
+        const tooltip = document.getElementById('cy-tooltip');
+        cy.on('mouseover', 'node', function(evt) {
+            const node = evt.target;
+            const data = node.data();
+
+            let html = `<strong>${data.label}</strong>`;
+            html += `<div style="margin-top: 6px; font-size: 0.9em;">`;
+            html += `<div>Status: <span style="font-weight: 600;">${data.status}</span></div>`;
+            if (data.duration !== undefined) {
+                html += `<div>Duration: ${data.duration.toFixed(3)}s</div>`;
+            }
+            if (data.rows_out !== null && data.rows_out !== undefined) {
+                html += `<div>Rows: ${data.rows_out.toLocaleString()}</div>`;
+            }
+            if (data.validation_count > 0) {
+                html += `<div style="color: #f59f00;">⚠ ${data.validation_count} validation warning(s)</div>`;
+            }
+            if (data.is_slow) {
+                html += `<div style="color: #e03131;">🐢 Slow execution</div>`;
+            }
+            if (data.has_row_anomaly) {
+                html += `<div style="color: #1971c2;">📊 Row count anomaly</div>`;
+            }
+            if (data.error_message) {
+                html += `<div style="color: #e03131; margin-top: 4px;">${data.error_message.substring(0, 100)}${data.error_message.length > 100 ? '...' : ''}</div>`;
+            }
+            html += `</div>`;
+
+            tooltip.innerHTML = html;
+            tooltip.style.display = 'block';
+            tooltip.style.left = evt.originalEvent.pageX + 10 + 'px';
+            tooltip.style.top = evt.originalEvent.pageY + 10 + 'px';
+        });
+
+        cy.on('mouseout', 'node', function() {
+            tooltip.style.display = 'none';
+        });
+
+        cy.on('mousemove', function(evt) {
+            if (tooltip.style.display === 'block') {
+                tooltip.style.left = evt.originalEvent.pageX + 10 + 'px';
+                tooltip.style.top = evt.originalEvent.pageY + 10 + 'px';
+            }
+        });
+    }
+
+    // Highlight upstream and downstream lineage
+    function highlightLineage(nodeId) {
+        if (!cy) return;
+
+        // Reset all styles
+        cy.elements().removeClass('highlighted highlighted-edge dimmed');
+
+        const node = cy.getElementById(nodeId);
+        if (!node || node.empty()) return;
+
+        // Get upstream (predecessors) and downstream (successors)
+        const upstream = node.predecessors();
+        const downstream = node.successors();
+        const lineage = upstream.union(downstream).union(node);
+
+        // Dim everything else
+        cy.elements().not(lineage).addClass('dimmed');
+
+        // Highlight the lineage
+        lineage.nodes().addClass('highlighted');
+        lineage.edges().addClass('highlighted-edge');
+    }
+
+    // Reset graph highlighting
+    function resetGraphHighlight() {
+        if (!cy) return;
+        cy.elements().removeClass('highlighted highlighted-edge dimmed');
+    }
 </script>
 
 </body>

@@ -347,3 +347,30 @@ class DependencyGraph:
             lines.append("")
 
         return "\n".join(lines)
+
+    def to_dict(self) -> Dict[str, any]:
+        """Export graph as a dictionary for JSON serialization.
+
+        Returns:
+            Dictionary with nodes and edges suitable for visualization libraries
+        """
+        nodes = []
+        edges = []
+
+        for node_name, node_config in self.nodes.items():
+            nodes.append({
+                "id": node_name,
+                "label": node_name,
+                "type": node_config.type if hasattr(node_config, 'type') else "transform",
+            })
+
+            for dependency in node_config.depends_on:
+                edges.append({
+                    "source": dependency,
+                    "target": node_name,
+                })
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+        }

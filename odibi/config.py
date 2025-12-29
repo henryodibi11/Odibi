@@ -2488,6 +2488,10 @@ class NodeConfig(BaseModel):
 
     name: str = Field(description="Unique node name")
     description: Optional[str] = Field(default=None, description="Human-readable description")
+    runbook_url: Optional[str] = Field(
+        default=None,
+        description="URL to troubleshooting guide or runbook. Shown as 'Troubleshooting guide →' link on failures.",
+    )
     enabled: bool = Field(default=True, description="If False, node is skipped during execution")
     tags: List[str] = Field(
         default_factory=list,
