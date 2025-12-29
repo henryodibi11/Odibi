@@ -553,30 +553,26 @@
 
         <!-- Pipeline Graph (Cytoscape.js) -->
         {% set node_count = metadata.nodes|length %}
-        {% set is_large_pipeline = node_count >= 25 %}
-        {% set is_very_large_pipeline = node_count >= 40 %}
-        {% set graph_height = 100 * node_count if node_count <= 20 else (80 * node_count if node_count <= 40 else 60 * node_count) %}
-        {% set graph_height = [graph_height, 600]|max %}
+        {% set is_large_pipeline = node_count >= 15 %}
         <div class="node-card" id="pipeline-graph-card" style="padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                 <h3 style="margin: 0; color: var(--primary-color);">Pipeline Flow <span style="font-weight: normal; font-size: 0.7em; color: #666;">({{ node_count }} nodes)</span></h3>
                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                     <span style="font-size: 0.8em; color: #666;">Click node to scroll • Shift+click for lineage</span>
                     <select id="graph-view-type" onchange="changeGraphViewType(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
-                        <option value="dag">DAG View</option>
-                        <option value="list" {% if is_very_large_pipeline %}selected{% endif %}>List View</option>
+                        <option value="dag" {% if not is_large_pipeline %}selected{% endif %}>DAG View</option>
+                        <option value="list" {% if is_large_pipeline %}selected{% endif %}>List View</option>
                     </select>
                     <select id="graph-layout" onchange="changeGraphLayout(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
                         <option value="dagre-TB">Top → Bottom</option>
                         <option value="dagre-LR">Left → Right</option>
-                        <option value="tiered">Tiered (bronze/silver/gold)</option>
                     </select>
                     <button class="copy-btn" onclick="fitGraph()">Fit View</button>
                     <button class="copy-btn" onclick="resetGraphHighlight()">Reset</button>
                 </div>
             </div>
-            <div id="cy-graph" style="height: {{ graph_height }}px; min-height: 600px; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color);"></div>
-            <div id="pipeline-list-view" style="display: none; max-height: {{ graph_height }}px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;"></div>
+            <div id="cy-graph" style="height: 500px; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); {% if is_large_pipeline %}display: none;{% endif %}"></div>
+            <div id="pipeline-list-view" style="{% if not is_large_pipeline %}display: none;{% endif %} max-height: 700px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;"></div>
             <div id="cy-tooltip" style="display: none; position: absolute; background: #333; color: #fff; padding: 10px 14px; border-radius: 6px; font-size: 0.85em; z-index: 1000; max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);"></div>
         </div>
 
@@ -1732,19 +1728,10 @@
             });
         });
 
-        // Calculate layout parameters based on node count
-        const nodeCount = elements.filter(e => e.data && !e.data.source).length;
-        const isLargePipeline = nodeCount >= 25;
-        const isVeryLargePipeline = nodeCount >= 40;
-        
-        // For large pipelines, use tighter but still readable spacing
-        const nodeSep = isVeryLargePipeline ? 60 : (isLargePipeline ? 80 : 100);
-        const rankSep = isVeryLargePipeline ? 80 : (isLargePipeline ? 100 : 120);
-        
-        // Keep fonts readable - minimum 14px
-        const fontSize = '14px';
-        const nodeHeight = 40;
-        const nodeWidth = 160;
+        // Fixed readable node dimensions
+        const fontSize = '12px';
+        const nodeHeight = 32;
+        const nodeWidth = 140;
 
         // Initialize Cytoscape
         cy = cytoscape({
@@ -1855,40 +1842,23 @@
             layout: {
                 name: 'dagre',
                 rankDir: 'TB',
-                nodeSep: nodeSep,
-                rankSep: rankSep,
-                padding: 30
+                nodeSep: 50,
+                rankSep: 60,
+                padding: 20
             },
-            minZoom: 0.3,
+            minZoom: 0.5,
             maxZoom: 2,
             wheelSensitivity: 0.3,
             boxSelectionEnabled: false,
             userPanningEnabled: true,
-            userZoomingEnabled: true
+            userZoomingEnabled: true,
+            zoom: 1,
+            pan: { x: 0, y: 0 }
         });
 
-        // After layout, zoom to a readable level and center
+        // After layout, fit to container
         cy.on('layoutstop', function() {
-            // Calculate ideal zoom: ensure nodes are readable (at least 100px wide on screen)
-            const bb = cy.elements().boundingBox();
-            const containerWidth = cy.width();
-            const containerHeight = cy.height();
-            
-            // For readable nodes, we want zoom level where 160px node = ~120px on screen minimum
-            // That means zoom should be at least 0.75
-            const fitZoom = Math.min(
-                containerWidth / (bb.w + 60),
-                containerHeight / (bb.h + 60)
-            );
-            
-            // Use readable zoom (min 0.5 for readability), but don't zoom in too much
-            const readableZoom = Math.max(0.5, Math.min(fitZoom, 1.0));
-            
-            cy.zoom(readableZoom);
-            cy.center();
-            
-            // Adjust container height if content overflows
-            setTimeout(adjustGraphHeight, 50);
+            cy.fit(20);
         });
 
         // Click handler - scroll to node card
@@ -1979,23 +1949,10 @@
         cy.elements().removeClass('highlighted highlighted-edge dimmed');
     }
 
-    // Fit graph to view with readable zoom
+    // Fit graph to view
     function fitGraph() {
         if (!cy) return;
-        
-        const bb = cy.elements().boundingBox();
-        const containerWidth = cy.width();
-        const containerHeight = cy.height();
-        
-        const fitZoom = Math.min(
-            containerWidth / (bb.w + 60),
-            containerHeight / (bb.h + 60)
-        );
-        
-        // Clamp to readable range
-        const readableZoom = Math.max(0.5, Math.min(fitZoom, 1.0));
-        cy.zoom(readableZoom);
-        cy.center();
+        cy.fit(20);
     }
 
     // Switch between DAG and List view
@@ -2123,82 +2080,16 @@
     function changeGraphLayout(layoutType) {
         if (!cy) return;
         
-        // Calculate dynamic spacing based on node count
-        const nodeCount = cy.nodes().length;
-        const isLarge = nodeCount >= 25;
-        const isVeryLarge = nodeCount >= 40;
-        const baseNodeSep = isVeryLarge ? 60 : (isLarge ? 80 : 100);
-        const baseRankSep = isVeryLarge ? 80 : (isLarge ? 100 : 120);
-        
         let layoutConfig;
         if (layoutType === 'dagre-TB') {
-            layoutConfig = { 
-                name: 'dagre', 
-                rankDir: 'TB', 
-                nodeSep: baseNodeSep, 
-                rankSep: baseRankSep, 
-                padding: 30
-            };
+            layoutConfig = { name: 'dagre', rankDir: 'TB', nodeSep: 50, rankSep: 60, padding: 20 };
         } else if (layoutType === 'dagre-LR') {
-            layoutConfig = { 
-                name: 'dagre', 
-                rankDir: 'LR', 
-                nodeSep: baseNodeSep, 
-                rankSep: baseRankSep + 40, 
-                padding: 30
-            };
-        } else if (layoutType === 'tiered') {
-            applyTieredLayout();
-            return;
+            layoutConfig = { name: 'dagre', rankDir: 'LR', nodeSep: 50, rankSep: 80, padding: 20 };
         } else {
-            layoutConfig = { name: layoutType, padding: 30 };
+            layoutConfig = { name: layoutType, padding: 20 };
         }
         
         cy.layout(layoutConfig).run();
-    }
-
-    // Apply tiered layout grouping by bronze/silver/gold
-    function applyTieredLayout() {
-        if (!cy) return;
-        
-        // Assign tiers to nodes
-        cy.nodes().forEach(node => {
-            const tier = detectTier(node.id());
-            node.data('tier', tier);
-        });
-
-        const nodeCount = cy.nodes().length;
-        const isVeryLarge = nodeCount >= 40;
-        
-        // Apply layout with tier consideration
-        cy.layout({
-            name: 'dagre',
-            rankDir: 'TB',
-            nodeSep: isVeryLarge ? 50 : 80,
-            rankSep: isVeryLarge ? 70 : 100,
-            padding: 30,
-            ranker: 'tight-tree'
-        }).run();
-    }
-
-    // Dynamically adjust graph container height based on content
-    function adjustGraphHeight() {
-        if (!cy) return;
-        
-        const bb = cy.elements().boundingBox();
-        const currentZoom = cy.zoom();
-        // Calculate required height at current zoom
-        const requiredHeight = (bb.h * currentZoom) + 100;
-        const container = document.getElementById('cy-graph');
-        const currentHeight = container.clientHeight;
-        
-        // Only expand if content would overflow at readable zoom
-        if (requiredHeight > currentHeight && currentHeight < 2000) {
-            const newHeight = Math.min(Math.max(requiredHeight, currentHeight), 2000);
-            container.style.height = newHeight + 'px';
-            cy.resize();
-            cy.center();
-        }
     }
 
     // Initialize view type on page load
