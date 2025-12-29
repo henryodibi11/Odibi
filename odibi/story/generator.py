@@ -539,17 +539,37 @@ class StoryGenerator:
                     for dep in n.config_snapshot["depends_on"]:
                         edges.append({"source": dep, "target": n.node_name})
 
+        # Collect all node IDs that exist in the current pipeline
+        existing_node_ids = {node["id"] for node in nodes}
+
+        # Find cross-pipeline dependencies (edge sources that don't exist as nodes)
+        cross_pipeline_deps = set()
+        for edge in edges:
+            if edge["source"] not in existing_node_ids:
+                cross_pipeline_deps.add(edge["source"])
+
+        # Add placeholder nodes for cross-pipeline dependencies
+        for dep_id in cross_pipeline_deps:
+            nodes.append(
+                {
+                    "id": dep_id,
+                    "label": dep_id,
+                    "type": "external",
+                }
+            )
+
         # Enrich nodes with runtime execution data
         enriched_nodes = []
         for node in nodes:
             node_id = node["id"]
             runtime = node_lookup.get(node_id)
+            is_external = node.get("type") == "external"
 
             enriched = {
                 "id": node_id,
                 "label": node.get("label", node_id),
                 "type": node.get("type", "transform"),
-                "status": runtime.status if runtime else "unknown",
+                "status": runtime.status if runtime else ("external" if is_external else "unknown"),
                 "duration": runtime.duration if runtime else 0,
                 "rows_out": runtime.rows_out if runtime else None,
                 "is_anomaly": runtime.is_anomaly if runtime else False,
@@ -557,6 +577,7 @@ class StoryGenerator:
                 "has_row_anomaly": runtime.has_row_anomaly if runtime else False,
                 "error_message": runtime.error_message if runtime else None,
                 "validation_count": len(runtime.validation_warnings) if runtime else 0,
+                "is_external": is_external,
             }
             enriched_nodes.append(enriched)
 

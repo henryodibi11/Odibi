@@ -200,6 +200,16 @@
         .anomaly-badge.slow { background: #fee2e2; color: #991b1b; border-color: #f87171; }
         .anomaly-badge.rows { background: #dbeafe; color: #1e40af; border-color: #60a5fa; }
 
+        /* Flash highlight animation for scrolled-to nodes */
+        @keyframes flash-highlight {
+            0% { box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.6); }
+            50% { box-shadow: 0 0 0 8px rgba(0, 102, 204, 0.3); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 102, 204, 0); }
+        }
+        .node-card.flash {
+            animation: flash-highlight 1.5s ease-out;
+        }
+
         /* Run Health Header */
         .health-header {
             background: var(--card-bg);
@@ -560,10 +570,8 @@
                         <option value="dag" selected>DAG View</option>
                         <option value="list">List View</option>
                     </select>
-                    <select id="graph-layout" onchange="renderGraphviz(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
-                        <option value="LR" selected>Left → Right</option>
-                        <option value="TB">Top → Bottom</option>
-                    </select>
+                    <!-- Layout fixed to Left→Right for optimal readability -->
+                    <input type="hidden" id="graph-layout" value="LR">
                 </div>
             </div>
             <div id="graphviz-container" style="min-height: 400px; max-height: 800px; overflow: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;"></div>
@@ -1431,14 +1439,21 @@
 
     // Scroll to a specific node card
     function scrollToNode(nodeName) {
-        const nodeCard = document.getElementById('node-' + nodeName);
+        // Handle both 'node-xxx' and 'xxx' formats
+        const cleanName = nodeName.startsWith('node-') ? nodeName.substring(5) : nodeName;
+        const nodeCard = document.getElementById('node-' + cleanName);
         if (nodeCard) {
             nodeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Flash highlight effect
+            nodeCard.classList.add('flash');
+            setTimeout(() => nodeCard.classList.remove('flash'), 1500);
             // Auto-expand the node
             const body = nodeCard.querySelector('.node-body');
             if (body && !body.classList.contains('open')) {
                 body.classList.add('open');
             }
+        } else {
+            console.warn('scrollToNode: Could not find node card for:', nodeName, '(cleaned:', cleanName, ')');
         }
     }
 
@@ -1675,7 +1690,8 @@
         success: { fill: '#e6fffa', border: '#0ca678' },
         failed: { fill: '#fff5f5', border: '#e03131' },
         skipped: { fill: '#f8f9fa', border: '#adb5bd' },
-        unknown: { fill: '#f8f9fa', border: '#868e96' }
+        unknown: { fill: '#f8f9fa', border: '#868e96' },
+        external: { fill: '#e7f5ff', border: '#1c7ed6' }  // Blue for cross-pipeline dependencies
     };
 
     // Generate DOT syntax from graph data
@@ -1699,7 +1715,11 @@
             const label = (node.label || node.id).replace(/"/g, '\\"');
             // Truncate long names
             const displayLabel = label.length > 25 ? label.substring(0, 22) + '...' : label;
-            dot += `    "${node.id}" [label="${displayLabel}", fillcolor="${colors.fill}", color="${colors.border}", penwidth=2, tooltip="${label}", id="node-${node.id}", class="dag-node"];\n`;
+            // Use different shape for external (cross-pipeline) nodes
+            const shape = node.is_external ? 'ellipse' : 'box';
+            const style = node.is_external ? 'filled,dashed' : 'filled,rounded';
+            const externalLabel = node.is_external ? `↗ ${displayLabel}` : displayLabel;
+            dot += `    "${node.id}" [label="${externalLabel}", shape=${shape}, style="${style}", fillcolor="${colors.fill}", color="${colors.border}", penwidth=2, tooltip="${label}", id="node-${node.id}", class="dag-node"];\n`;
         });
 
         // Add edges
@@ -1789,18 +1809,15 @@
     function changeGraphViewType(viewType) {
         const graphContainer = document.getElementById('graphviz-container');
         const listView = document.getElementById('pipeline-list-view');
-        const layoutSelect = document.getElementById('graph-layout');
         
         if (viewType === 'list') {
             graphContainer.style.display = 'none';
             listView.style.display = 'block';
-            layoutSelect.disabled = true;
             renderListView();
         } else {
             graphContainer.style.display = 'block';
             listView.style.display = 'none';
-            layoutSelect.disabled = false;
-            renderGraphviz(layoutSelect.value);
+            renderGraphviz('LR');
         }
     }
 
@@ -1826,13 +1843,15 @@
             success: '✓',
             failed: '✗',
             skipped: '○',
-            unknown: '?'
+            unknown: '?',
+            external: '↗'
         };
         const statusColors = {
             success: '#0ca678',
             failed: '#e03131',
             skipped: '#adb5bd',
-            unknown: '#868e96'
+            unknown: '#868e96',
+            external: '#1c7ed6'
         };
 
         // Helper to create clickable dependency links
@@ -1850,23 +1869,28 @@
             const downstream = edgesBySource[node.id] || [];
             const statusIcon = statusIcons[node.status] || statusIcons.unknown;
             const statusColor = statusColors[node.status] || statusColors.unknown;
+            const isExternal = node.is_external === true;
+            const borderStyle = isExternal ? '2px dashed' : '1px solid';
+            const bgColor = isExternal ? '#f0f9ff' : 'white';
+            const labelPrefix = isExternal ? '↗ ' : '';
             
             html += `
-            <div style="display: flex; align-items: flex-start; padding: 12px 16px; margin-bottom: 8px; background: white; border-radius: 8px; border: 1px solid #e1e4e8; transition: all 0.15s;" 
+            <div style="display: flex; align-items: flex-start; padding: 12px 16px; margin-bottom: 8px; background: ${bgColor}; border-radius: 8px; border: ${borderStyle} #e1e4e8; transition: all 0.15s;" 
                  onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'; this.style.borderColor='${statusColor}';"
                  onmouseout="this.style.boxShadow='none'; this.style.borderColor='#e1e4e8';">
-                <div style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: ${statusColor}20; color: ${statusColor}; border-radius: 6px; font-weight: bold; margin-right: 14px;">
+                <div style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: ${statusColor}20; color: ${statusColor}; border-radius: ${isExternal ? '50%' : '6px'}; font-weight: bold; margin-right: 14px;">
                     ${statusIcon}
                 </div>
                 <div style="flex: 1; min-width: 0;">
                     <div style="font-size: 15px; font-weight: 600; color: #333; margin-bottom: 4px; word-break: break-word;">
-                        <a href="#" onclick="scrollToNode('${node.id}'); return false;" style="color: #333; text-decoration: none;">${node.label || node.id}</a>
+                        ${isExternal ? `<span style="color: ${statusColor};">${labelPrefix}${node.label || node.id}</span> <span style="font-size: 11px; color: #666; font-weight: normal;">(cross-pipeline)</span>` : `<a href="#" onclick="scrollToNode('${node.id}'); return false;" style="color: #333; text-decoration: none;">${node.label || node.id}</a>`}
                     </div>
                     <div style="font-size: 13px; color: #666; display: flex; flex-wrap: wrap; gap: 12px;">
-                        ${node.duration !== undefined ? `<span>⏱ ${node.duration.toFixed(3)}s</span>` : ''}
-                        ${node.rows_out !== null && node.rows_out !== undefined ? `<span>📊 ${node.rows_out.toLocaleString()} rows</span>` : ''}
+                        ${!isExternal && node.duration !== undefined ? `<span>⏱ ${node.duration.toFixed(3)}s</span>` : ''}
+                        ${!isExternal && node.rows_out !== null && node.rows_out !== undefined ? `<span>📊 ${node.rows_out.toLocaleString()} rows</span>` : ''}
+                        ${isExternal ? '<span style="font-style: italic;">External dependency</span>' : ''}
                     </div>
-                    ${upstream.length > 0 ? `<div style="font-size: 12px; margin-top: 6px;">← <span style="color: #666;">${upstream.length} upstream:</span> ${makeDepLinks(upstream, '#0066cc')}</div>` : '<div style="font-size: 12px; color: #999; margin-top: 6px;">← No dependencies (source)</div>'}
+                    ${upstream.length > 0 ? `<div style="font-size: 12px; margin-top: 6px;">← <span style="color: #666;">${upstream.length} upstream:</span> ${makeDepLinks(upstream, '#0066cc')}</div>` : (isExternal ? '' : '<div style="font-size: 12px; color: #999; margin-top: 6px;">← No dependencies (source)</div>')}
                     ${downstream.length > 0 ? `<div style="font-size: 12px; margin-top: 2px;">→ <span style="color: #666;">${downstream.length} downstream:</span> ${makeDepLinks(downstream, '#0ca678')}</div>` : ''}
                 </div>
             </div>`;
