@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipeline Story: {{ metadata.pipeline_name }}</title>
-    <!-- Cytoscape.js for interactive DAG -->
-    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
-    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
-    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+    <!-- Graphviz via @hpcc-js/wasm for DAG visualization -->
+    <script src="https://unpkg.com/@hpcc-js/wasm@2.13.0/dist/graphviz.umd.js"></script>
     <style>
         :root {
             --primary-color: #0066cc;
@@ -557,23 +555,19 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                 <h3 style="margin: 0; color: var(--primary-color);">Pipeline Flow <span style="font-weight: normal; font-size: 0.7em; color: #666;">({{ node_count }} nodes)</span></h3>
                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                    <span style="font-size: 0.8em; color: #666;">Drag to pan • Scroll to zoom • Click node for details</span>
+                    <span style="font-size: 0.8em; color: #666;">Click node for details</span>
                     <select id="graph-view-type" onchange="changeGraphViewType(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
                         <option value="dag" selected>DAG View</option>
                         <option value="list">List View</option>
                     </select>
-                    <select id="graph-layout" onchange="changeGraphLayout(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
-                        <option value="dagre-LR" selected>Left → Right</option>
-                        <option value="dagre-TB">Top → Bottom</option>
+                    <select id="graph-layout" onchange="renderGraphviz(this.value)" style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85em; background: var(--card-bg); color: var(--text-color);">
+                        <option value="LR" selected>Left → Right</option>
+                        <option value="TB">Top → Bottom</option>
                     </select>
-                    <button class="copy-btn" onclick="fitGraph()">Fit All</button>
-                    <button class="copy-btn" onclick="zoomReadable()">Zoom 100%</button>
-                    <button class="copy-btn" onclick="resetGraphHighlight()">Reset</button>
                 </div>
             </div>
-            <div id="cy-graph" style="height: 500px; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); cursor: grab;"></div>
+            <div id="graphviz-container" style="min-height: 400px; max-height: 800px; overflow: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;"></div>
             <div id="pipeline-list-view" style="display: none; max-height: 600px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;"></div>
-            <div id="cy-tooltip" style="display: none; position: absolute; background: #333; color: #fff; padding: 10px 14px; border-radius: 6px; font-size: 0.85em; z-index: 1000; max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);"></div>
         </div>
 
         {% for node in metadata.nodes %}
@@ -1673,318 +1667,133 @@
         }
     }
 
-    // Cytoscape.js graph instance
-    let cy = null;
-
     // Graph data from template
     const graphData = {{ metadata.graph_data | tojson | safe if metadata.graph_data else '{"nodes":[],"edges":[]}' }};
 
-    function initCytoscapeGraph() {
+    // Status colors for Graphviz nodes
+    const statusColors = {
+        success: { fill: '#e6fffa', border: '#0ca678' },
+        failed: { fill: '#fff5f5', border: '#e03131' },
+        skipped: { fill: '#f8f9fa', border: '#adb5bd' },
+        unknown: { fill: '#f8f9fa', border: '#868e96' }
+    };
+
+    // Generate DOT syntax from graph data
+    function generateDOT(rankdir = 'LR') {
         if (!graphData.nodes || graphData.nodes.length === 0) {
-            document.getElementById('cy-graph').innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">No graph data available</div>';
-            return;
+            return 'digraph { node [label="No data"] }';
         }
 
-        // Status colors
-        const statusColors = {
-            success: { bg: '#e6fffa', border: '#0ca678' },
-            failed: { bg: '#fff5f5', border: '#e03131' },
-            skipped: { bg: '#f8f9fa', border: '#adb5bd' },
-            unknown: { bg: '#f8f9fa', border: '#868e96' }
-        };
+        let dot = `digraph pipeline {
+            rankdir=${rankdir};
+            bgcolor="transparent";
+            node [shape=box, style="filled,rounded", fontname="Segoe UI, Arial", fontsize=11, margin="0.2,0.1"];
+            edge [color="#adb5bd", arrowsize=0.7];
+            nodesep=0.4;
+            ranksep=0.6;
+        `;
 
-        // Build Cytoscape elements
-        const elements = [];
-
-        // Add nodes
+        // Add nodes with status-based colors
         graphData.nodes.forEach(node => {
             const colors = statusColors[node.status] || statusColors.unknown;
-            elements.push({
-                data: {
-                    id: node.id,
-                    label: node.label || node.id,
-                    status: node.status,
-                    duration: node.duration,
-                    rows_out: node.rows_out,
-                    is_anomaly: node.is_anomaly,
-                    is_slow: node.is_slow,
-                    has_row_anomaly: node.has_row_anomaly,
-                    error_message: node.error_message,
-                    validation_count: node.validation_count,
-                    bgColor: colors.bg,
-                    borderColor: colors.border
-                }
-            });
+            const label = (node.label || node.id).replace(/"/g, '\\"');
+            // Truncate long names
+            const displayLabel = label.length > 25 ? label.substring(0, 22) + '...' : label;
+            dot += `    "${node.id}" [label="${displayLabel}", fillcolor="${colors.fill}", color="${colors.border}", penwidth=2, tooltip="${label}", id="node-${node.id}", class="dag-node"];\n`;
         });
 
         // Add edges
         graphData.edges.forEach(edge => {
-            elements.push({
-                data: {
-                    id: edge.source + '->' + edge.target,
-                    source: edge.source,
-                    target: edge.target
-                }
-            });
+            dot += `    "${edge.source}" -> "${edge.target}";\n`;
         });
 
-        // Fixed readable node dimensions
-        const fontSize = '12px';
-        const nodeHeight = 32;
-        const nodeWidth = 140;
-
-        // Initialize Cytoscape
-        cy = cytoscape({
-            container: document.getElementById('cy-graph'),
-            elements: elements,
-            style: [
-                {
-                    selector: 'node',
-                    style: {
-                        'label': 'data(label)',
-                        'text-valign': 'center',
-                        'text-halign': 'center',
-                        'background-color': 'data(bgColor)',
-                        'border-color': 'data(borderColor)',
-                        'border-width': 2,
-                        'font-size': fontSize,
-                        'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                        'width': nodeWidth,
-                        'height': nodeHeight,
-                        'padding': '10px',
-                        'shape': 'round-rectangle',
-                        'text-wrap': 'ellipsis',
-                        'text-max-width': nodeWidth - 20,
-                        'min-zoomed-font-size': 10
-                    }
-                },
-                {
-                    selector: 'node:parent',
-                    style: {
-                        'label': 'data(label)',
-                        'text-valign': 'top',
-                        'text-halign': 'center',
-                        'background-opacity': 0.15,
-                        'border-width': 2,
-                        'border-style': 'dashed',
-                        'font-size': '18px',
-                        'font-weight': 'bold',
-                        'padding': '30px',
-                        'text-margin-y': -10
-                    }
-                },
-                {
-                    selector: 'node[tier="bronze"]',
-                    style: {
-                        'border-color': '#cd7f32'
-                    }
-                },
-                {
-                    selector: 'node[tier="silver"]',
-                    style: {
-                        'border-color': '#c0c0c0'
-                    }
-                },
-                {
-                    selector: 'node[tier="gold"]',
-                    style: {
-                        'border-color': '#ffd700'
-                    }
-                },
-                {
-                    selector: 'node[?is_anomaly]',
-                    style: {
-                        'border-width': 3,
-                        'border-style': 'double'
-                    }
-                },
-                {
-                    selector: 'node[status="failed"]',
-                    style: {
-                        'font-weight': 'bold'
-                    }
-                },
-                {
-                    selector: 'edge',
-                    style: {
-                        'width': 1,
-                        'line-color': '#ccd0d5',
-                        'target-arrow-color': '#ccd0d5',
-                        'target-arrow-shape': 'triangle',
-                        'curve-style': 'bezier',
-                        'arrow-scale': 0.8,
-                        'opacity': 0.4
-                    }
-                },
-                {
-                    selector: '.highlighted',
-                    style: {
-                        'border-width': 3,
-                        'border-color': '#0066cc',
-                        'z-index': 999,
-                        'opacity': 1
-                    }
-                },
-                {
-                    selector: '.highlighted-edge',
-                    style: {
-                        'width': 2,
-                        'line-color': '#0066cc',
-                        'target-arrow-color': '#0066cc',
-                        'z-index': 999,
-                        'opacity': 1
-                    }
-                },
-                {
-                    selector: '.dimmed',
-                    style: {
-                        'opacity': 0.15
-                    }
-                }
-            ],
-            layout: getLayoutConfig('dagre-LR'),
-            minZoom: 0.3,
-            maxZoom: 2.5,
-            wheelSensitivity: 0.5,
-            boxSelectionEnabled: false,
-            userPanningEnabled: true,
-            userZoomingEnabled: true
-        });
-
-        // After layout, set readable zoom and position at top-left
-        cy.on('layoutstop', function() {
-            const nodeCount = cy.nodes().length;
-            
-            if (nodeCount <= 12) {
-                // Small graph - fit everything
-                cy.fit(30);
-            } else {
-                // Large graph - show at readable zoom, position at top
-                cy.zoom(0.8);
-                const bb = cy.elements().boundingBox();
-                cy.pan({ x: 50, y: 50 - bb.y1 * 0.8 });
-            }
-        });
-
-        // Click handler - focus on node (highlight lineage) and scroll to card
-        cy.on('tap', 'node', function(evt) {
-            const node = evt.target;
-            focusOnNode(node);
-            scrollToNode(node.id());
-        });
-        
-        // Double-click to reset
-        cy.on('dblclick', function(evt) {
-            if (evt.target === cy) {
-                resetGraphHighlight();
-            }
-        });
-
-        // Hover tooltip
-        const tooltip = document.getElementById('cy-tooltip');
-        cy.on('mouseover', 'node', function(evt) {
-            const node = evt.target;
-            const data = node.data();
-
-            let html = `<strong>${data.label}</strong>`;
-            html += `<div style="margin-top: 6px; font-size: 0.9em;">`;
-            html += `<div>Status: <span style="font-weight: 600;">${data.status}</span></div>`;
-            if (data.duration !== undefined) {
-                html += `<div>Duration: ${data.duration.toFixed(3)}s</div>`;
-            }
-            if (data.rows_out !== null && data.rows_out !== undefined) {
-                html += `<div>Rows: ${data.rows_out.toLocaleString()}</div>`;
-            }
-            if (data.validation_count > 0) {
-                html += `<div style="color: #f59f00;">⚠ ${data.validation_count} validation warning(s)</div>`;
-            }
-            if (data.is_slow) {
-                html += `<div style="color: #e03131;">🐢 Slow execution</div>`;
-            }
-            if (data.has_row_anomaly) {
-                html += `<div style="color: #1971c2;">📊 Row count anomaly</div>`;
-            }
-            if (data.error_message) {
-                html += `<div style="color: #e03131; margin-top: 4px;">${data.error_message.substring(0, 100)}${data.error_message.length > 100 ? '...' : ''}</div>`;
-            }
-            html += `</div>`;
-
-            tooltip.innerHTML = html;
-            tooltip.style.display = 'block';
-            tooltip.style.left = evt.originalEvent.pageX + 10 + 'px';
-            tooltip.style.top = evt.originalEvent.pageY + 10 + 'px';
-        });
-
-        cy.on('mouseout', 'node', function() {
-            tooltip.style.display = 'none';
-        });
-
-        cy.on('mousemove', function(evt) {
-            if (tooltip.style.display === 'block') {
-                tooltip.style.left = evt.originalEvent.pageX + 10 + 'px';
-                tooltip.style.top = evt.originalEvent.pageY + 10 + 'px';
-            }
-        });
+        dot += '}';
+        return dot;
     }
 
-    // Focus on a node: highlight its upstream/downstream, dim everything else
-    function focusOnNode(node) {
-        if (!cy || !node) return;
+    // Render graph using Graphviz
+    async function renderGraphviz(rankdir = 'LR') {
+        const container = document.getElementById('graphviz-container');
+        if (!container) return;
 
-        // Reset all styles first
-        cy.elements().removeClass('highlighted highlighted-edge dimmed');
+        if (!graphData.nodes || graphData.nodes.length === 0) {
+            container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 300px; color: #666;">No graph data available</div>';
+            return;
+        }
 
-        // Get upstream (predecessors) and downstream (successors)
-        const upstream = node.predecessors();
-        const downstream = node.successors();
-        const lineage = upstream.union(downstream).union(node);
+        container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 300px; color: #666;">Loading graph...</div>';
 
-        // Dim everything else
-        cy.elements().not(lineage).addClass('dimmed');
+        try {
+            const graphviz = await window["@hpcc-js/wasm"].Graphviz.load();
+            const dot = generateDOT(rankdir);
+            const svg = graphviz.dot(dot);
+            container.innerHTML = svg;
 
-        // Highlight the lineage
-        lineage.nodes().addClass('highlighted');
-        lineage.edges().addClass('highlighted-edge');
+            // Make SVG responsive
+            const svgEl = container.querySelector('svg');
+            if (svgEl) {
+                svgEl.style.maxWidth = '100%';
+                svgEl.style.height = 'auto';
+                svgEl.style.minHeight = '400px';
+                
+                // Add click handlers to nodes
+                container.querySelectorAll('.dag-node').forEach(nodeEl => {
+                    nodeEl.style.cursor = 'pointer';
+                    nodeEl.addEventListener('click', function(e) {
+                        const nodeId = this.id.replace('node-', '');
+                        scrollToNode(nodeId);
+                        highlightNodeInGraph(nodeId);
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('Graphviz error:', error);
+            container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 300px; color: #e03131;">Error rendering graph: ' + error.message + '</div>';
+        }
     }
 
-    // Reset graph highlighting
-    function resetGraphHighlight() {
-        if (!cy) return;
-        cy.elements().removeClass('highlighted highlighted-edge dimmed');
+    // Highlight a node in the SVG graph
+    function highlightNodeInGraph(nodeId) {
+        const container = document.getElementById('graphviz-container');
+        if (!container) return;
+
+        // Reset all nodes
+        container.querySelectorAll('.dag-node polygon, .dag-node path').forEach(el => {
+            el.style.strokeWidth = '2';
+        });
+
+        // Highlight selected node
+        const selectedNode = container.querySelector(`#node-${CSS.escape(nodeId)}`);
+        if (selectedNode) {
+            const shape = selectedNode.querySelector('polygon, path');
+            if (shape) {
+                shape.style.strokeWidth = '4';
+                shape.style.stroke = '#0066cc';
+            }
+        }
     }
 
-    // Fit entire graph to view (may zoom out for large graphs)
-    function fitGraph() {
-        if (!cy) return;
-        cy.fit(30);
-    }
-
-    // Zoom to 100% (readable) and center
-    function zoomReadable() {
-        if (!cy) return;
-        cy.zoom(1.0);
-        cy.center();
+    // Initialize Graphviz graph on page load
+    function initGraphvizGraph() {
+        renderGraphviz('LR');
     }
 
     // Switch between DAG and List view
     function changeGraphViewType(viewType) {
-        const cyGraph = document.getElementById('cy-graph');
+        const graphContainer = document.getElementById('graphviz-container');
         const listView = document.getElementById('pipeline-list-view');
         const layoutSelect = document.getElementById('graph-layout');
         
         if (viewType === 'list') {
-            cyGraph.style.display = 'none';
+            graphContainer.style.display = 'none';
             listView.style.display = 'block';
             layoutSelect.disabled = true;
             renderListView();
         } else {
-            cyGraph.style.display = 'block';
+            graphContainer.style.display = 'block';
             listView.style.display = 'none';
             layoutSelect.disabled = false;
-            if (cy) {
-                cy.resize();
-                cy.fit(50);
-            }
+            renderGraphviz(layoutSelect.value);
         }
     }
 
@@ -2057,34 +1866,16 @@
     
     // Focus on a node in the graph from list view
     function focusGraphNode(nodeId) {
-        if (!cy) return;
-        const node = cy.getElementById(nodeId);
-        if (node && node.nonempty()) {
-            focusOnNode(node);
-        }
+        highlightNodeInGraph(nodeId);
     }
 
-    // Get layout configuration by name
-    function getLayoutConfig(layoutName) {
-        if (layoutName === 'dagre-TB') {
-            return { name: 'dagre', rankDir: 'TB', nodeSep: 40, rankSep: 50, padding: 20, fit: true };
-        } else if (layoutName === 'dagre-LR') {
-            return { name: 'dagre', rankDir: 'LR', nodeSep: 40, rankSep: 70, padding: 20, fit: true };
-        }
-        return { name: 'dagre', rankDir: 'LR', nodeSep: 40, rankSep: 70, padding: 20, fit: true };
-    }
-
-    // Change graph layout
-    function changeGraphLayout(layoutType) {
-        if (!cy) return;
-        cy.layout(getLayoutConfig(layoutType)).run();
-    }
-
-    // Initialize view type on page load
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
         const viewTypeSelect = document.getElementById('graph-view-type');
         if (viewTypeSelect && viewTypeSelect.value === 'list') {
             changeGraphViewType('list');
+        } else {
+            initGraphvizGraph();
         }
     });
 </script>
