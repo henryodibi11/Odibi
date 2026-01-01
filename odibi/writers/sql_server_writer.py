@@ -778,12 +778,46 @@ class SqlServerMergeWriter:
         options = options or SqlServerMergeOptions()
         jdbc_options = jdbc_options or {}
 
+        # Auto-create schema if needed
+        if options.auto_create_schema:
+            schema, _ = self.parse_table_name(target_table)
+            if not self.check_schema_exists(schema):
+                self.create_schema(schema)
+
+        # Check if table exists, auto-create if configured
         if not self.check_table_exists(target_table):
-            raise ValueError(
-                f"Target table '{target_table}' does not exist. "
-                "SQL Server MERGE mode requires the target table to exist. "
-                "Create the table first or use mode='overwrite' for initial load."
-            )
+            if options.auto_create_table:
+                self.ctx.info(
+                    "Auto-creating target table from Spark DataFrame",
+                    target_table=target_table,
+                )
+                # Get column info from Spark DataFrame
+                columns = df.columns
+                exclude_cols = set(options.exclude_columns)
+                write_cols = [c for c in columns if c not in exclude_cols]
+
+                # Create table using JDBC write with overwrite mode (initial load)
+                staging_jdbc_options = {**jdbc_options, "dbtable": target_table}
+                if exclude_cols:
+                    df_to_write = df.select(*write_cols)
+                else:
+                    df_to_write = df
+                df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode(
+                    "overwrite"
+                ).save()
+                self.ctx.info(
+                    "Target table created and initial data loaded",
+                    target_table=target_table,
+                    rows=df.count(),
+                )
+                # Return as if merge completed (all inserts)
+                return MergeResult(inserted=df.count(), updated=0, deleted=0)
+            else:
+                raise ValueError(
+                    f"Target table '{target_table}' does not exist. "
+                    "SQL Server MERGE mode requires the target table to exist. "
+                    "Set auto_create_table=true or use mode='overwrite' for initial load."
+                )
 
         if options.validations:
             validation_result = self.validate_keys_spark(df, merge_keys, options.validations)
