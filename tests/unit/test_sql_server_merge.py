@@ -1118,3 +1118,90 @@ class TestWriteConfigPhase4:
         assert config.overwrite_options.auto_create_schema is True
         assert config.overwrite_options.auto_create_table is True
         assert config.overwrite_options.batch_size == 10000
+
+
+class TestPrimaryKeyAndIndexCreation:
+    """Tests for primary key and index creation on merge keys."""
+
+    @pytest.fixture
+    def mock_connection(self):
+        """Create a mock connection object."""
+        conn = MagicMock()
+        conn.execute_sql = MagicMock(return_value=None)
+        return conn
+
+    @pytest.fixture
+    def writer(self, mock_connection):
+        """Create a writer instance with mock connection."""
+        return SqlServerMergeWriter(mock_connection)
+
+    def test_merge_options_primary_key_on_merge_keys_default(self):
+        """Should default to False for primary_key_on_merge_keys."""
+        options = SqlServerMergeOptions()
+        assert options.primary_key_on_merge_keys is False
+
+    def test_merge_options_index_on_merge_keys_default(self):
+        """Should default to False for index_on_merge_keys."""
+        options = SqlServerMergeOptions()
+        assert options.index_on_merge_keys is False
+
+    def test_merge_options_with_primary_key_enabled(self):
+        """Should accept primary_key_on_merge_keys=True."""
+        options = SqlServerMergeOptions(
+            primary_key_on_merge_keys=True,
+            auto_create_table=True,
+        )
+        assert options.primary_key_on_merge_keys is True
+
+    def test_merge_options_with_index_enabled(self):
+        """Should accept index_on_merge_keys=True."""
+        options = SqlServerMergeOptions(
+            index_on_merge_keys=True,
+        )
+        assert options.index_on_merge_keys is True
+
+    def test_create_primary_key_sql(self, writer, mock_connection):
+        """Should generate correct CREATE PRIMARY KEY SQL."""
+        writer.create_primary_key("oee.oee_fact", ["DateId", "P_ID"])
+
+        mock_connection.execute_sql.assert_called_once()
+        sql = mock_connection.execute_sql.call_args[0][0]
+        assert "ALTER TABLE [oee].[oee_fact]" in sql
+        assert "PRIMARY KEY CLUSTERED" in sql
+        assert "[DateId]" in sql
+        assert "[P_ID]" in sql
+        assert "PK_oee_fact" in sql
+
+    def test_create_index_sql(self, writer, mock_connection):
+        """Should generate correct CREATE INDEX SQL."""
+        writer.create_index("oee.oee_fact", ["DateId", "P_ID"])
+
+        mock_connection.execute_sql.assert_called_once()
+        sql = mock_connection.execute_sql.call_args[0][0]
+        assert "CREATE NONCLUSTERED INDEX" in sql
+        assert "[oee].[oee_fact]" in sql
+        assert "[DateId]" in sql
+        assert "[P_ID]" in sql
+        assert "IX_oee_fact_DateId_P_ID" in sql
+
+    def test_create_index_custom_name(self, writer, mock_connection):
+        """Should use custom index name if provided."""
+        writer.create_index("oee.oee_fact", ["DateId", "P_ID"], index_name="MyCustomIndex")
+
+        sql = mock_connection.execute_sql.call_args[0][0]
+        assert "[MyCustomIndex]" in sql
+
+    def test_write_config_with_primary_key_option(self):
+        """Should accept primary_key_on_merge_keys in WriteConfig."""
+        config = WriteConfig(
+            connection="azure_sql",
+            format="sql_server",
+            table="oee.oee_fact",
+            mode=WriteMode.MERGE,
+            merge_keys=["DateId", "P_ID"],
+            merge_options=SqlServerMergeOptions(
+                auto_create_table=True,
+                primary_key_on_merge_keys=True,
+            ),
+        )
+        assert config.merge_options.primary_key_on_merge_keys is True

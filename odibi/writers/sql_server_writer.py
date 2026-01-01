@@ -449,6 +449,61 @@ class SqlServerMergeWriter:
             self.ctx.info("Adding column to table", table=table, column=col_name)
             self.connection.execute_sql(sql)
 
+    def create_primary_key(self, table: str, columns: List[str]) -> None:
+        """
+        Create a clustered primary key on the specified columns.
+
+        Args:
+            table: Table name (e.g., 'oee.oee_fact')
+            columns: List of column names for the primary key
+        """
+        escaped_table = self.get_escaped_table_name(table)
+        schema, table_name = self.parse_table_name(table)
+        pk_name = f"PK_{table_name}"
+        escaped_cols = ", ".join([self.escape_column(c) for c in columns])
+
+        sql = f"""
+        ALTER TABLE {escaped_table}
+        ADD CONSTRAINT [{pk_name}] PRIMARY KEY CLUSTERED ({escaped_cols})
+        """
+        self.ctx.info(
+            "Creating primary key",
+            table=table,
+            constraint=pk_name,
+            columns=columns,
+        )
+        self.connection.execute_sql(sql)
+
+    def create_index(self, table: str, columns: List[str], index_name: str = None) -> None:
+        """
+        Create a nonclustered index on the specified columns.
+
+        Args:
+            table: Table name (e.g., 'oee.oee_fact')
+            columns: List of column names for the index
+            index_name: Optional custom index name (auto-generated if not provided)
+        """
+        escaped_table = self.get_escaped_table_name(table)
+        schema, table_name = self.parse_table_name(table)
+
+        if index_name is None:
+            col_suffix = "_".join(columns[:3])  # Use first 3 columns in name
+            index_name = f"IX_{table_name}_{col_suffix}"
+
+        escaped_cols = ", ".join([self.escape_column(c) for c in columns])
+
+        sql = f"""
+        CREATE NONCLUSTERED INDEX [{index_name}]
+        ON {escaped_table} ({escaped_cols})
+        """
+        self.ctx.info(
+            "Creating index",
+            table=table,
+            index=index_name,
+            columns=columns,
+        )
+        self.connection.execute_sql(sql)
+
     def handle_schema_evolution_pandas(
         self, df: Any, table: str, evolution_config: Any
     ) -> List[str]:
@@ -805,13 +860,22 @@ class SqlServerMergeWriter:
                 df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode(
                     "overwrite"
                 ).save()
+
+                row_count = df.count()
+
+                # Create primary key or index on merge keys if configured
+                if options.primary_key_on_merge_keys:
+                    self.create_primary_key(target_table, merge_keys)
+                elif options.index_on_merge_keys:
+                    self.create_index(target_table, merge_keys)
+
                 self.ctx.info(
                     "Target table created and initial data loaded",
                     target_table=target_table,
-                    rows=df.count(),
+                    rows=row_count,
                 )
                 # Return as if merge completed (all inserts)
-                return MergeResult(inserted=df.count(), updated=0, deleted=0)
+                return MergeResult(inserted=row_count, updated=0, deleted=0)
             else:
                 raise ValueError(
                     f"Target table '{target_table}' does not exist. "

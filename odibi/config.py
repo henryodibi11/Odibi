@@ -1914,6 +1914,14 @@ class SqlServerMergeOptions(BaseModel):
         default=None,
         description="Batch size for staging table writes (Phase 4). Chunks large DataFrames for memory efficiency.",
     )
+    primary_key_on_merge_keys: bool = Field(
+        default=False,
+        description="Create a clustered primary key on merge_keys when auto-creating table. Enforces uniqueness.",
+    )
+    index_on_merge_keys: bool = Field(
+        default=False,
+        description="Create a nonclustered index on merge_keys. Use if primary key already exists elsewhere.",
+    )
 
 
 class SqlServerOverwriteStrategy(str, Enum):
