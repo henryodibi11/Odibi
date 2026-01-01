@@ -1048,21 +1048,7 @@ quarantine:
 
 ---
 ### `GateConfig`
-> *Used in: [EnvironmentConfig](#environmentconfig), [ValidationConfig](#validationconfig)*
-
-Gate requirements for promoting changes to Master.
-
-All gates must pass before changes can be promoted.
-| Field | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| **require_ruff_clean** | bool | No | `True` | Require ruff linting to pass with no errors |
-| **require_pytest_pass** | bool | No | `True` | Require all pytest tests to pass |
-| **require_odibi_validate** | bool | No | `True` | Require odibi validate to pass on modified configs |
-| **require_golden_projects** | bool | No | `True` | Require all learning harness configs to pass |
-
----
-### `GateConfig`
-> *Used in: [EnvironmentConfig](#environmentconfig), [ValidationConfig](#validationconfig)*
+> *Used in: [ValidationConfig](#validationconfig)*
 
 Quality gate configuration for batch-level validation.
 

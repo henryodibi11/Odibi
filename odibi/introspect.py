@@ -639,10 +639,15 @@ def discover_modules(root_dir: str = "odibi") -> List[str]:
             print(f"Warning: Could not find root directory '{root_dir}'", file=sys.stderr)
             return []
 
+    # Directories to skip (experimental/archived, or with optional deps like gradio)
+    skip_dirs = {"agents", "ui", "_archive"}
+
     for file_path in path.rglob("*.py"):
         if "introspect.py" in str(file_path):  # Avoid self
             continue
         if "tests" in file_path.parts or "test_" in file_path.name:  # Skip test files
+            continue
+        if skip_dirs.intersection(file_path.parts):  # Skip experimental directories
             continue
 
         # Convert path to module notation
