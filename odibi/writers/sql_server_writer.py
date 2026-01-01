@@ -830,6 +830,11 @@ class SqlServerMergeWriter:
 
         staging_table = self.get_staging_table_name(target_table, options.staging_schema)
 
+        # Auto-create staging schema if needed
+        if options.auto_create_schema:
+            if not self.check_schema_exists(options.staging_schema):
+                self.create_schema(options.staging_schema)
+
         self.ctx.info(
             "Starting SQL Server MERGE",
             target_table=target_table,
