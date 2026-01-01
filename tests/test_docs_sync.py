@@ -8,8 +8,8 @@ from odibi.introspect import generate_docs
 
 
 @pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Type hint rendering differs between Python versions; docs generated with 3.11+",
+    sys.version_info[:2] != (3, 11),
+    reason="Type hint rendering differs between Python versions; docs generated with 3.11 only",
 )
 def test_docs_are_synced():
     """
