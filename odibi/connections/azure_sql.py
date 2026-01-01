@@ -519,6 +519,24 @@ class AzureSQL(BaseConnection):
                 suggestions=self._get_error_suggestions(str(e)),
             )
 
+    def execute_sql(self, sql: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        """
+        Execute SQL statement (INSERT, UPDATE, DELETE, etc.).
+
+        Alias for execute() - used by SqlServerMergeWriter.
+
+        Args:
+            sql: SQL statement
+            params: Optional parameters for parameterized query
+
+        Returns:
+            Result from execution
+
+        Raises:
+            ConnectionError: If execution fails
+        """
+        return self.execute(sql, params)
+
     def execute(self, sql: str, params: Optional[Dict[str, Any]] = None) -> Any:
         """
         Execute SQL statement (INSERT, UPDATE, DELETE, etc.).
