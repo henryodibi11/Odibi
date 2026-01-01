@@ -48,6 +48,9 @@ write:
     staging_schema: staging
     cleanup_staging: true
     
+    # Schema
+    auto_create_schema: true     # CREATE SCHEMA IF NOT EXISTS
+    
     # Batching
     batch_size: 100000
     
@@ -112,27 +115,35 @@ write:
    - Create deterministic integer from merge_keys hash
    - Add as column to DataFrame
 
-3. **Create target table** (if not exists)
+3. **Create schema** (if `auto_create_schema: true` and schema doesn't exist)
+   ```sql
+   IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'oee')
+   BEGIN
+       EXEC('CREATE SCHEMA [oee]')
+   END
+   ```
+
+4. **Create target table** (if not exists)
    - Infer schema from DataFrame
    - Apply column_mapping
    - Exclude columns in exclude_columns
    - Add audit columns
    - Create clustered index on PK
 
-4. **Schema evolution** (if target exists)
+5. **Schema evolution** (if target exists)
    - Compare source vs target schemas
    - Add new columns if `add_columns: true`
    - Widen types if `widen_types: true`
    - Fail on incompatible changes if `fail_on_incompatible: true`
 
-5. **Create staging table**
+6. **Create staging table**
    - `{staging_schema}.{table_name}_staging`
-   - Mirror target schema
+   - Auto-create staging schema if needed
 
-6. **Write to staging**
+7. **Write to staging**
    - Use existing JDBC write with `mode: overwrite`
 
-7. **Generate T-SQL MERGE**
+8. **Generate T-SQL MERGE**
    ```sql
    BEGIN TRANSACTION;
    
@@ -249,6 +260,9 @@ class MergeOptions(BaseModel):
     # Staging
     staging_schema: str = "staging"
     cleanup_staging: bool = True
+    
+    # Schema creation
+    auto_create_schema: bool = True  # CREATE SCHEMA IF NOT EXISTS
     
     # Batching
     batch_size: Optional[int] = None
