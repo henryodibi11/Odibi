@@ -1162,15 +1162,31 @@ class TestPrimaryKeyAndIndexCreation:
 
     def test_create_primary_key_sql(self, writer, mock_connection):
         """Should generate correct CREATE PRIMARY KEY SQL."""
+        # Mock get_table_columns to return column types
+        mock_connection.execute_sql.return_value = [
+            ("DateId", "int"),
+            ("P_ID", "int"),
+        ]
         writer.create_primary_key("oee.oee_fact", ["DateId", "P_ID"])
 
-        mock_connection.execute_sql.assert_called_once()
-        sql = mock_connection.execute_sql.call_args[0][0]
+        # Should be called 3 times: get_table_columns, ALTER DateId, ALTER P_ID, CREATE PK
+        assert mock_connection.execute_sql.call_count == 4
+
+        # Last call should be the CREATE PRIMARY KEY
+        sql = mock_connection.execute_sql.call_args_list[-1][0][0]
         assert "ALTER TABLE [oee].[oee_fact]" in sql
         assert "PRIMARY KEY CLUSTERED" in sql
         assert "[DateId]" in sql
         assert "[P_ID]" in sql
         assert "PK_oee_fact" in sql
+
+        # Check that ALTER COLUMN NOT NULL was called
+        alter_calls = [
+            call[0][0]
+            for call in mock_connection.execute_sql.call_args_list
+            if "NOT NULL" in call[0][0]
+        ]
+        assert len(alter_calls) == 2  # One for each column
 
     def test_create_index_sql(self, writer, mock_connection):
         """Should generate correct CREATE INDEX SQL."""

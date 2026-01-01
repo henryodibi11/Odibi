@@ -453,6 +453,8 @@ class SqlServerMergeWriter:
         """
         Create a clustered primary key on the specified columns.
 
+        First makes columns NOT NULL (required for PK), then adds the constraint.
+
         Args:
             table: Table name (e.g., 'oee.oee_fact')
             columns: List of column names for the primary key
@@ -460,8 +462,22 @@ class SqlServerMergeWriter:
         escaped_table = self.get_escaped_table_name(table)
         schema, table_name = self.parse_table_name(table)
         pk_name = f"PK_{table_name}"
-        escaped_cols = ", ".join([self.escape_column(c) for c in columns])
 
+        # Get column types so we can ALTER to NOT NULL
+        existing_cols = self.get_table_columns(table)
+
+        # First, make PK columns NOT NULL (required for primary key)
+        for col in columns:
+            escaped_col = self.escape_column(col)
+            col_type = existing_cols.get(col, "NVARCHAR(MAX)")
+            alter_sql = (
+                f"ALTER TABLE {escaped_table} ALTER COLUMN {escaped_col} {col_type} NOT NULL"
+            )
+            self.ctx.debug(f"Setting column NOT NULL: {col}")
+            self.connection.execute_sql(alter_sql)
+
+        # Now create the primary key
+        escaped_cols = ", ".join([self.escape_column(c) for c in columns])
         sql = f"""
         ALTER TABLE {escaped_table}
         ADD CONSTRAINT [{pk_name}] PRIMARY KEY CLUSTERED ({escaped_cols})
