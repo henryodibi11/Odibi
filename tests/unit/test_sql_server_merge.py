@@ -1221,3 +1221,129 @@ class TestPrimaryKeyAndIndexCreation:
             ),
         )
         assert config.merge_options.primary_key_on_merge_keys is True
+
+
+class TestAuditColumnCreation:
+    """Tests for audit column auto-creation during merge/table creation."""
+
+    @pytest.fixture
+    def mock_connection(self):
+        """Create a mock SQL Server connection."""
+        conn = MagicMock()
+        conn.execute_sql = MagicMock(return_value=[])
+        return conn
+
+    @pytest.fixture
+    def writer(self, mock_connection):
+        """Create a writer with mock connection."""
+        return SqlServerMergeWriter(mock_connection)
+
+    def test_create_table_from_pandas_with_audit_cols(self, writer, mock_connection):
+        """Should add audit columns to CREATE TABLE when audit_cols config provided."""
+        df = pd.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+        audit_cols = SqlServerAuditColsConfig(
+            created_col="created_ts",
+            updated_col="updated_ts",
+        )
+
+        writer.create_table_from_pandas(df, "test.my_table", audit_cols=audit_cols)
+
+        mock_connection.execute_sql.assert_called_once()
+        sql = mock_connection.execute_sql.call_args[0][0]
+        assert "[created_ts] DATETIME2 NULL" in sql
+        assert "[updated_ts] DATETIME2 NULL" in sql
+        assert "[id]" in sql
+        assert "[name]" in sql
+
+    def test_create_table_from_pandas_without_audit_cols(self, writer, mock_connection):
+        """Should NOT add audit columns when audit_cols is None."""
+        df = pd.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+
+        writer.create_table_from_pandas(df, "test.my_table", audit_cols=None)
+
+        mock_connection.execute_sql.assert_called_once()
+        sql = mock_connection.execute_sql.call_args[0][0]
+        assert "created_ts" not in sql
+        assert "updated_ts" not in sql
+
+    def test_create_table_from_pandas_audit_cols_not_duplicated(self, writer, mock_connection):
+        """Should NOT duplicate audit columns if already in DataFrame."""
+        df = pd.DataFrame({"id": [1, 2], "created_ts": [None, None], "updated_ts": [None, None]})
+        audit_cols = SqlServerAuditColsConfig(
+            created_col="created_ts",
+            updated_col="updated_ts",
+        )
+
+        writer.create_table_from_pandas(df, "test.my_table", audit_cols=audit_cols)
+
+        mock_connection.execute_sql.assert_called_once()
+        sql = mock_connection.execute_sql.call_args[0][0]
+        # Count occurrences - should only appear once each
+        assert sql.count("[created_ts]") == 1
+        assert sql.count("[updated_ts]") == 1
+
+    def test_merge_pandas_adds_audit_cols_to_columns_list(self, writer, mock_connection):
+        """Audit columns should be included in MERGE SQL even if not in DataFrame."""
+        mock_connection.execute_sql.side_effect = [
+            [(1,)],  # check_table_exists - table exists
+            [{"inserted": 2, "updated": 0, "deleted": 0}],  # execute_merge
+        ]
+        mock_connection.write_table = MagicMock()
+
+        df = pd.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+        options = SqlServerMergeOptions(
+            audit_cols=SqlServerAuditColsConfig(
+                created_col="created_ts",
+                updated_col="updated_ts",
+            ),
+        )
+
+        writer.merge_pandas(df, "test.my_table", merge_keys=["id"], options=options)
+
+        # Find the MERGE SQL call
+        merge_sql = None
+        for call in mock_connection.execute_sql.call_args_list:
+            sql = call[0][0]
+            if "MERGE" in sql:
+                merge_sql = sql
+                break
+
+        assert merge_sql is not None, "MERGE SQL should have been executed"
+        assert "[created_ts]" in merge_sql
+        assert "[updated_ts]" in merge_sql
+        assert "GETUTCDATE()" in merge_sql
+
+    def test_merge_pandas_auto_create_table_with_audit_cols(self, writer, mock_connection):
+        """Auto-created table should include audit columns."""
+        mock_connection.execute_sql.side_effect = [
+            [],  # create_schema
+            [],  # check_table_exists - table does not exist
+            [],  # create_table
+            [],  # write_table
+            [{"inserted": 2, "updated": 0, "deleted": 0}],  # execute_merge
+        ]
+        mock_connection.write_table = MagicMock()
+
+        df = pd.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+        options = SqlServerMergeOptions(
+            auto_create_schema=True,
+            auto_create_table=True,
+            audit_cols=SqlServerAuditColsConfig(
+                created_col="created_ts",
+                updated_col="updated_ts",
+            ),
+        )
+
+        writer.merge_pandas(df, "test.my_table", merge_keys=["id"], options=options)
+
+        # Find the CREATE TABLE call
+        create_sql = None
+        for call in mock_connection.execute_sql.call_args_list:
+            sql = call[0][0]
+            if "CREATE TABLE" in sql:
+                create_sql = sql
+                break
+
+        assert create_sql is not None, "CREATE TABLE should have been called"
+        assert "[created_ts] DATETIME2 NULL" in create_sql
+        assert "[updated_ts] DATETIME2 NULL" in create_sql

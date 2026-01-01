@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from odibi.config import (
+    SqlServerAuditColsConfig,
     SqlServerMergeOptions,
     SqlServerMergeValidationConfig,
     SqlServerOverwriteOptions,
@@ -398,22 +399,58 @@ class SqlServerMergeWriter:
                 return sql_type
         return "NVARCHAR(MAX)"
 
-    def create_table_from_pandas(self, df: Any, table: str) -> None:
-        """Create a SQL Server table from Pandas DataFrame schema."""
+    def create_table_from_pandas(
+        self,
+        df: Any,
+        table: str,
+        audit_cols: Optional[SqlServerAuditColsConfig] = None,
+    ) -> None:
+        """
+        Create a SQL Server table from Pandas DataFrame schema.
+
+        Args:
+            df: Pandas DataFrame
+            table: Target table name
+            audit_cols: Optional audit column config to add created_ts/updated_ts columns
+        """
         schema, table_name = self.parse_table_name(table)
         columns = []
+        existing_cols = set()
         for col_name, dtype in df.dtypes.items():
             sql_type = self.infer_sql_type_pandas(dtype)
             escaped_col = self.escape_column(col_name)
             columns.append(f"{escaped_col} {sql_type} NULL")
+            existing_cols.add(col_name)
+
+        if audit_cols:
+            if audit_cols.created_col and audit_cols.created_col not in existing_cols:
+                escaped_col = self.escape_column(audit_cols.created_col)
+                columns.append(f"{escaped_col} DATETIME2 NULL")
+                self.ctx.debug(f"Adding audit column: {audit_cols.created_col}")
+            if audit_cols.updated_col and audit_cols.updated_col not in existing_cols:
+                escaped_col = self.escape_column(audit_cols.updated_col)
+                columns.append(f"{escaped_col} DATETIME2 NULL")
+                self.ctx.debug(f"Adding audit column: {audit_cols.updated_col}")
 
         columns_sql = ",\n    ".join(columns)
         sql = f"CREATE TABLE [{schema}].[{table_name}] (\n    {columns_sql}\n)"
         self.ctx.info("Creating table from DataFrame", table=table)
         self.connection.execute_sql(sql)
 
-    def create_table_from_polars(self, df: Any, table: str) -> None:
-        """Create a SQL Server table from Polars DataFrame schema."""
+    def create_table_from_polars(
+        self,
+        df: Any,
+        table: str,
+        audit_cols: Optional[SqlServerAuditColsConfig] = None,
+    ) -> None:
+        """
+        Create a SQL Server table from Polars DataFrame schema.
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            table: Target table name
+            audit_cols: Optional audit column config to add created_ts/updated_ts columns
+        """
         try:
             import polars as pl
         except ImportError:
@@ -427,10 +464,22 @@ class SqlServerMergeWriter:
             df_schema = df.schema
 
         columns = []
+        existing_cols = set()
         for col_name, dtype in df_schema.items():
             sql_type = self.infer_sql_type_polars(dtype)
             escaped_col = self.escape_column(col_name)
             columns.append(f"{escaped_col} {sql_type} NULL")
+            existing_cols.add(col_name)
+
+        if audit_cols:
+            if audit_cols.created_col and audit_cols.created_col not in existing_cols:
+                escaped_col = self.escape_column(audit_cols.created_col)
+                columns.append(f"{escaped_col} DATETIME2 NULL")
+                self.ctx.debug(f"Adding audit column: {audit_cols.created_col}")
+            if audit_cols.updated_col and audit_cols.updated_col not in existing_cols:
+                escaped_col = self.escape_column(audit_cols.updated_col)
+                columns.append(f"{escaped_col} DATETIME2 NULL")
+                self.ctx.debug(f"Adding audit column: {audit_cols.updated_col}")
 
         columns_sql = ",\n    ".join(columns)
         sql = f"CREATE TABLE [{schema_name}].[{table_name}] (\n    {columns_sql}\n)"
@@ -969,12 +1018,24 @@ class SqlServerMergeWriter:
         """
         options = options or SqlServerMergeOptions()
 
-        if not self.check_table_exists(target_table):
-            raise ValueError(
-                f"Target table '{target_table}' does not exist. "
-                "SQL Server MERGE mode requires the target table to exist. "
-                "Create the table first or use mode='overwrite' for initial load."
-            )
+        schema, _ = self.parse_table_name(target_table)
+        if options.auto_create_schema:
+            self.create_schema(schema)
+
+        table_exists = self.check_table_exists(target_table)
+        if not table_exists:
+            if options.auto_create_table:
+                self.create_table_from_pandas(df, target_table, audit_cols=options.audit_cols)
+                if options.primary_key_on_merge_keys:
+                    self.create_primary_key(target_table, merge_keys)
+                elif options.index_on_merge_keys:
+                    self.create_index(target_table, merge_keys)
+            else:
+                raise ValueError(
+                    f"Target table '{target_table}' does not exist. "
+                    "SQL Server MERGE mode requires the target table to exist. "
+                    "Set auto_create_table=true or use mode='overwrite' for initial load."
+                )
 
         if options.validations:
             validation_result = self.validate_keys_pandas(df, merge_keys, options.validations)
@@ -995,11 +1056,19 @@ class SqlServerMergeWriter:
         )
 
         columns = list(df.columns)
+
+        if options.audit_cols:
+            if options.audit_cols.created_col and options.audit_cols.created_col not in columns:
+                columns.append(options.audit_cols.created_col)
+            if options.audit_cols.updated_col and options.audit_cols.updated_col not in columns:
+                columns.append(options.audit_cols.updated_col)
+
         exclude_cols = set(options.exclude_columns)
         write_cols = [c for c in columns if c not in exclude_cols]
 
+        df_write_cols = [c for c in df.columns if c not in exclude_cols]
         if exclude_cols:
-            df_to_write = df[write_cols]
+            df_to_write = df[df_write_cols]
         else:
             df_to_write = df
 
@@ -1213,7 +1282,7 @@ class SqlServerMergeWriter:
         table_exists = self.check_table_exists(target_table)
         if not table_exists:
             if options.auto_create_table:
-                self.create_table_from_polars(df, target_table)
+                self.create_table_from_polars(df, target_table, audit_cols=options.audit_cols)
             else:
                 raise ValueError(
                     f"Target table '{target_table}' does not exist. "
@@ -1227,6 +1296,12 @@ class SqlServerMergeWriter:
             )
         else:
             columns = list(df.columns)
+
+        if options.audit_cols:
+            if options.audit_cols.created_col and options.audit_cols.created_col not in columns:
+                columns.append(options.audit_cols.created_col)
+            if options.audit_cols.updated_col and options.audit_cols.updated_col not in columns:
+                columns.append(options.audit_cols.updated_col)
 
         if options.validations:
             validation_result = self.validate_keys_polars(df, merge_keys, options.validations)
