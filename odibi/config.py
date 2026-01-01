@@ -36,6 +36,7 @@ class WriteMode(str, Enum):
     APPEND = "append"
     UPSERT = "upsert"
     APPEND_ONCE = "append_once"
+    MERGE = "merge"  # SQL Server MERGE (staging table + T-SQL MERGE)
 
 
 class DeleteDetectionMode(str, Enum):
@@ -1810,6 +1811,242 @@ class AutoOptimizeConfig(BaseModel):
     )
 
 
+class SqlServerAuditColsConfig(BaseModel):
+    """
+    Audit column configuration for SQL Server merge operations.
+
+    These columns are automatically populated with GETUTCDATE() during merge:
+    - `created_col`: Set on INSERT only
+    - `updated_col`: Set on INSERT and UPDATE
+
+    Example:
+    ```yaml
+    audit_cols:
+      created_col: created_ts
+      updated_col: updated_ts
+    ```
+    """
+
+    created_col: Optional[str] = Field(
+        default=None,
+        description="Column name for creation timestamp (set on INSERT)",
+    )
+    updated_col: Optional[str] = Field(
+        default=None,
+        description="Column name for update timestamp (set on INSERT and UPDATE)",
+    )
+
+
+class SqlServerMergeOptions(BaseModel):
+    """
+    Options for SQL Server MERGE operations (Phase 1).
+
+    Enables incremental sync from Spark to SQL Server using T-SQL MERGE.
+    Data is written to a staging table, then merged into the target.
+
+    ### Basic Usage
+    ```yaml
+    write:
+      connection: azure_sql
+      format: sql_server
+      table: oee.oee_fact
+      mode: merge
+      merge_keys: [DateId, P_ID]
+      merge_options:
+        update_condition: "source._hash_diff != target._hash_diff"
+        exclude_columns: [_hash_diff]
+        audit_cols:
+          created_col: created_ts
+          updated_col: updated_ts
+    ```
+
+    ### Conditions
+    - `update_condition`: Only update rows matching this condition (e.g., hash diff)
+    - `delete_condition`: Delete rows matching this condition (soft delete pattern)
+    - `insert_condition`: Only insert rows matching this condition
+    """
+
+    update_condition: Optional[str] = Field(
+        default=None,
+        description=(
+            "SQL condition for WHEN MATCHED UPDATE. "
+            "Use 'source.' and 'target.' prefixes. "
+            "Example: 'source._hash_diff != target._hash_diff'"
+        ),
+    )
+    delete_condition: Optional[str] = Field(
+        default=None,
+        description=("SQL condition for WHEN MATCHED DELETE. Example: 'source._is_deleted = 1'"),
+    )
+    insert_condition: Optional[str] = Field(
+        default=None,
+        description=("SQL condition for WHEN NOT MATCHED INSERT. Example: 'source.is_valid = 1'"),
+    )
+    exclude_columns: List[str] = Field(
+        default_factory=list,
+        description="Columns to exclude from MERGE (not written to target table)",
+    )
+    staging_schema: str = Field(
+        default="staging",
+        description="Schema for staging table. Table name: {staging_schema}.{table}_staging",
+    )
+    audit_cols: Optional[SqlServerAuditColsConfig] = Field(
+        default=None,
+        description="Audit columns for created/updated timestamps",
+    )
+    validations: Optional["SqlServerMergeValidationConfig"] = Field(
+        default=None,
+        description="Validation checks before merge (null keys, duplicate keys)",
+    )
+    auto_create_schema: bool = Field(
+        default=False,
+        description="Auto-create schema if it doesn't exist (Phase 4). Runs CREATE SCHEMA IF NOT EXISTS.",
+    )
+    auto_create_table: bool = Field(
+        default=False,
+        description="Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame.",
+    )
+    schema_evolution: Optional["SqlServerSchemaEvolutionConfig"] = Field(
+        default=None,
+        description="Schema evolution configuration (Phase 4). Controls handling of schema differences.",
+    )
+    batch_size: Optional[int] = Field(
+        default=None,
+        description="Batch size for staging table writes (Phase 4). Chunks large DataFrames for memory efficiency.",
+    )
+
+
+class SqlServerOverwriteStrategy(str, Enum):
+    """Strategies for SQL Server overwrite operations."""
+
+    TRUNCATE_INSERT = "truncate_insert"  # TRUNCATE then INSERT (fastest, needs permission)
+    DROP_CREATE = "drop_create"  # DROP TABLE, CREATE, INSERT (schema refresh)
+    DELETE_INSERT = "delete_insert"  # DELETE FROM then INSERT (no special permissions)
+
+
+class SqlServerSchemaEvolutionMode(str, Enum):
+    """
+    Schema evolution modes for SQL Server writes (Phase 4).
+
+    Controls how schema differences between DataFrame and target table are handled.
+    """
+
+    STRICT = "strict"  # Fail if schemas don't match (default, no auto DDL)
+    EVOLVE = "evolve"  # Add new columns via ALTER TABLE (additive only)
+    IGNORE = "ignore"  # Ignore schema differences, write matching columns only
+
+
+class SqlServerSchemaEvolutionConfig(BaseModel):
+    """
+    Schema evolution configuration for SQL Server operations (Phase 4).
+
+    Controls automatic schema changes when DataFrame schema differs from target table.
+
+    Example:
+    ```yaml
+    merge_options:
+      schema_evolution:
+        mode: evolve
+        add_columns: true
+    ```
+    """
+
+    mode: SqlServerSchemaEvolutionMode = Field(
+        default=SqlServerSchemaEvolutionMode.STRICT,
+        description="Schema evolution mode: strict (fail), evolve (add columns), ignore (skip mismatched)",
+    )
+    add_columns: bool = Field(
+        default=False,
+        description="If mode='evolve', automatically add new columns via ALTER TABLE ADD COLUMN",
+    )
+
+
+class SqlServerMergeValidationConfig(BaseModel):
+    """
+    Validation configuration for SQL Server merge/overwrite operations.
+
+    Validates source data before writing to SQL Server.
+
+    Example:
+    ```yaml
+    merge_options:
+      validations:
+        check_null_keys: true
+        check_duplicate_keys: true
+        fail_on_validation_error: true
+    ```
+    """
+
+    check_null_keys: bool = Field(
+        default=True,
+        description="Fail if merge_keys contain NULL values",
+    )
+    check_duplicate_keys: bool = Field(
+        default=True,
+        description="Fail if merge_keys have duplicate combinations",
+    )
+    fail_on_validation_error: bool = Field(
+        default=True,
+        description="If False, log warning instead of failing on validation errors",
+    )
+
+
+class SqlServerOverwriteOptions(BaseModel):
+    """
+    Options for SQL Server overwrite operations (Phase 2).
+
+    Enhanced overwrite with multiple strategies for different use cases.
+
+    ### Strategies
+    - `truncate_insert`: TRUNCATE TABLE then INSERT (fastest, requires TRUNCATE permission)
+    - `drop_create`: DROP TABLE, CREATE TABLE, INSERT (refreshes schema)
+    - `delete_insert`: DELETE FROM then INSERT (works with limited permissions)
+
+    ### Example
+    ```yaml
+    write:
+      connection: azure_sql
+      format: sql_server
+      table: fact.combined_downtime
+      mode: overwrite
+      overwrite_options:
+        strategy: truncate_insert
+        audit_cols:
+          created_col: created_ts
+          updated_col: updated_ts
+    ```
+    """
+
+    strategy: SqlServerOverwriteStrategy = Field(
+        default=SqlServerOverwriteStrategy.TRUNCATE_INSERT,
+        description="Overwrite strategy: truncate_insert, drop_create, delete_insert",
+    )
+    audit_cols: Optional[SqlServerAuditColsConfig] = Field(
+        default=None,
+        description="Audit columns for created/updated timestamps",
+    )
+    validations: Optional[SqlServerMergeValidationConfig] = Field(
+        default=None,
+        description="Validation checks before overwrite",
+    )
+    auto_create_schema: bool = Field(
+        default=False,
+        description="Auto-create schema if it doesn't exist (Phase 4). Runs CREATE SCHEMA IF NOT EXISTS.",
+    )
+    auto_create_table: bool = Field(
+        default=False,
+        description="Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame.",
+    )
+    schema_evolution: Optional[SqlServerSchemaEvolutionConfig] = Field(
+        default=None,
+        description="Schema evolution configuration (Phase 4). Controls handling of schema differences.",
+    )
+    batch_size: Optional[int] = Field(
+        default=None,
+        description="Batch size for writes (Phase 4). Chunks large DataFrames for memory efficiency.",
+    )
+
+
 class TriggerConfig(BaseModel):
     """
     Configuration for streaming trigger intervals.
@@ -2072,6 +2309,21 @@ class WriteConfig(BaseModel):
             "Requires a streaming DataFrame from a streaming read source."
         ),
     )
+    merge_keys: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Key columns for SQL Server MERGE operations. Required when mode='merge'. "
+            "These columns form the ON clause of the MERGE statement."
+        ),
+    )
+    merge_options: Optional[SqlServerMergeOptions] = Field(
+        default=None,
+        description="Options for SQL Server MERGE operations (conditions, staging, audit cols)",
+    )
+    overwrite_options: Optional[SqlServerOverwriteOptions] = Field(
+        default=None,
+        description="Options for SQL Server overwrite operations (strategy, audit cols)",
+    )
 
     @model_validator(mode="after")
     def check_table_or_path(self):
@@ -2080,6 +2332,16 @@ class WriteConfig(BaseModel):
             raise ValueError("Either 'table' or 'path' must be provided for write config")
         if self.table and self.path:
             raise ValueError("WriteConfig: 'table' and 'path' are mutually exclusive.")
+        return self
+
+    @model_validator(mode="after")
+    def check_merge_keys(self):
+        """Ensure merge_keys is provided when mode is merge."""
+        if self.mode == WriteMode.MERGE and not self.merge_keys:
+            raise ValueError(
+                "WriteConfig: 'merge_keys' is required when mode='merge'. "
+                "Specify the key columns for the MERGE ON clause."
+            )
         return self
 
 

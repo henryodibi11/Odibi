@@ -1203,6 +1203,9 @@ write:
 | **skip_hash_columns** | Optional[List[str]] | No | - | Columns to include in hash computation for skip_if_unchanged. If None, all columns are used. Specify a subset to ignore volatile columns like timestamps. |
 | **skip_hash_sort_columns** | Optional[List[str]] | No | - | Columns to sort by before hashing for deterministic comparison. Required if row order may vary between runs. Typically your business key columns. |
 | **streaming** | Optional[[StreamingWriteConfig](#streamingwriteconfig)] | No | - | Streaming write configuration for Spark Structured Streaming. When set, uses writeStream instead of batch write. Requires a streaming DataFrame from a streaming read source. |
+| **merge_keys** | Optional[List[str]] | No | - | Key columns for SQL Server MERGE operations. Required when mode='merge'. These columns form the ON clause of the MERGE statement. |
+| **merge_options** | Optional[[SqlServerMergeOptions](#sqlservermergeoptions)] | No | - | Options for SQL Server MERGE operations (conditions, staging, audit cols) |
+| **overwrite_options** | Optional[[SqlServerOverwriteOptions](#sqlserveroverwriteoptions)] | No | - | Options for SQL Server overwrite operations (strategy, audit cols) |
 
 ---
 ### `WriteMetadataConfig`
@@ -1387,6 +1390,148 @@ privacy:
 | **method** | PrivacyMethod | Yes | - | Anonymization method: 'hash' (SHA256), 'mask' (show last 4), or 'redact' ([REDACTED]) |
 | **salt** | Optional[str] | No | - | Salt for hashing (optional but recommended). Appended before hashing to create unique hashes. Example: 'company_secret_key_2025' |
 | **declassify** | List[str] | No | `PydanticUndefined` | List of columns to remove from PII protection (stops inheritance from upstream). Example: ['customer_id'] |
+
+---
+### `SqlServerAuditColsConfig`
+> *Used in: [SqlServerMergeOptions](#sqlservermergeoptions), [SqlServerOverwriteOptions](#sqlserveroverwriteoptions)*
+
+Audit column configuration for SQL Server merge operations.
+
+These columns are automatically populated with GETUTCDATE() during merge:
+- `created_col`: Set on INSERT only
+- `updated_col`: Set on INSERT and UPDATE
+
+Example:
+```yaml
+audit_cols:
+  created_col: created_ts
+  updated_col: updated_ts
+```
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **created_col** | Optional[str] | No | - | Column name for creation timestamp (set on INSERT) |
+| **updated_col** | Optional[str] | No | - | Column name for update timestamp (set on INSERT and UPDATE) |
+
+---
+### `SqlServerMergeOptions`
+> *Used in: [WriteConfig](#writeconfig)*
+
+Options for SQL Server MERGE operations (Phase 1).
+
+Enables incremental sync from Spark to SQL Server using T-SQL MERGE.
+Data is written to a staging table, then merged into the target.
+
+### Basic Usage
+```yaml
+write:
+  connection: azure_sql
+  format: sql_server
+  table: oee.oee_fact
+  mode: merge
+  merge_keys: [DateId, P_ID]
+  merge_options:
+    update_condition: "source._hash_diff != target._hash_diff"
+    exclude_columns: [_hash_diff]
+    audit_cols:
+      created_col: created_ts
+      updated_col: updated_ts
+```
+
+### Conditions
+- `update_condition`: Only update rows matching this condition (e.g., hash diff)
+- `delete_condition`: Delete rows matching this condition (soft delete pattern)
+- `insert_condition`: Only insert rows matching this condition
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **update_condition** | Optional[str] | No | - | SQL condition for WHEN MATCHED UPDATE. Use 'source.' and 'target.' prefixes. Example: 'source._hash_diff != target._hash_diff' |
+| **delete_condition** | Optional[str] | No | - | SQL condition for WHEN MATCHED DELETE. Example: 'source._is_deleted = 1' |
+| **insert_condition** | Optional[str] | No | - | SQL condition for WHEN NOT MATCHED INSERT. Example: 'source.is_valid = 1' |
+| **exclude_columns** | List[str] | No | `PydanticUndefined` | Columns to exclude from MERGE (not written to target table) |
+| **staging_schema** | str | No | `staging` | Schema for staging table. Table name: {staging_schema}.{table}_staging |
+| **audit_cols** | Optional[[SqlServerAuditColsConfig](#sqlserverauditcolsconfig)] | No | - | Audit columns for created/updated timestamps |
+| **validations** | Optional[[SqlServerMergeValidationConfig](#sqlservermergevalidationconfig)] | No | - | Validation checks before merge (null keys, duplicate keys) |
+| **auto_create_schema** | bool | No | `False` | Auto-create schema if it doesn't exist (Phase 4). Runs CREATE SCHEMA IF NOT EXISTS. |
+| **auto_create_table** | bool | No | `False` | Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame. |
+| **schema_evolution** | Optional[[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
+| **batch_size** | Optional[int] | No | - | Batch size for staging table writes (Phase 4). Chunks large DataFrames for memory efficiency. |
+
+---
+### `SqlServerMergeValidationConfig`
+> *Used in: [SqlServerMergeOptions](#sqlservermergeoptions), [SqlServerOverwriteOptions](#sqlserveroverwriteoptions)*
+
+Validation configuration for SQL Server merge/overwrite operations.
+
+Validates source data before writing to SQL Server.
+
+Example:
+```yaml
+merge_options:
+  validations:
+    check_null_keys: true
+    check_duplicate_keys: true
+    fail_on_validation_error: true
+```
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **check_null_keys** | bool | No | `True` | Fail if merge_keys contain NULL values |
+| **check_duplicate_keys** | bool | No | `True` | Fail if merge_keys have duplicate combinations |
+| **fail_on_validation_error** | bool | No | `True` | If False, log warning instead of failing on validation errors |
+
+---
+### `SqlServerOverwriteOptions`
+> *Used in: [WriteConfig](#writeconfig)*
+
+Options for SQL Server overwrite operations (Phase 2).
+
+Enhanced overwrite with multiple strategies for different use cases.
+
+### Strategies
+- `truncate_insert`: TRUNCATE TABLE then INSERT (fastest, requires TRUNCATE permission)
+- `drop_create`: DROP TABLE, CREATE TABLE, INSERT (refreshes schema)
+- `delete_insert`: DELETE FROM then INSERT (works with limited permissions)
+
+### Example
+```yaml
+write:
+  connection: azure_sql
+  format: sql_server
+  table: fact.combined_downtime
+  mode: overwrite
+  overwrite_options:
+    strategy: truncate_insert
+    audit_cols:
+      created_col: created_ts
+      updated_col: updated_ts
+```
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **strategy** | SqlServerOverwriteStrategy | No | `SqlServerOverwriteStrategy.TRUNCATE_INSERT` | Overwrite strategy: truncate_insert, drop_create, delete_insert |
+| **audit_cols** | Optional[[SqlServerAuditColsConfig](#sqlserverauditcolsconfig)] | No | - | Audit columns for created/updated timestamps |
+| **validations** | Optional[[SqlServerMergeValidationConfig](#sqlservermergevalidationconfig)] | No | - | Validation checks before overwrite |
+| **auto_create_schema** | bool | No | `False` | Auto-create schema if it doesn't exist (Phase 4). Runs CREATE SCHEMA IF NOT EXISTS. |
+| **auto_create_table** | bool | No | `False` | Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame. |
+| **schema_evolution** | Optional[[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
+| **batch_size** | Optional[int] | No | - | Batch size for writes (Phase 4). Chunks large DataFrames for memory efficiency. |
+
+---
+### `SqlServerSchemaEvolutionConfig`
+> *Used in: [SqlServerMergeOptions](#sqlservermergeoptions), [SqlServerOverwriteOptions](#sqlserveroverwriteoptions)*
+
+Schema evolution configuration for SQL Server operations (Phase 4).
+
+Controls automatic schema changes when DataFrame schema differs from target table.
+
+Example:
+```yaml
+merge_options:
+  schema_evolution:
+    mode: evolve
+    add_columns: true
+```
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **mode** | SqlServerSchemaEvolutionMode | No | `SqlServerSchemaEvolutionMode.STRICT` | Schema evolution mode: strict (fail), evolve (add columns), ignore (skip mismatched) |
+| **add_columns** | bool | No | `False` | If mode='evolve', automatically add new columns via ALTER TABLE ADD COLUMN |
 
 ---
 ### `TransformStep`

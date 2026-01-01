@@ -811,6 +811,116 @@ class SparkEngine(Engine):
                 ctx.error("SQL format requires 'table' config or 'dbtable' option")
                 raise ValueError("SQL format requires 'table' config or 'dbtable' option")
 
+            # Handle MERGE mode for SQL Server
+            if mode == "merge":
+                merge_keys = options.get("merge_keys")
+                merge_options = options.get("merge_options")
+
+                if not merge_keys:
+                    ctx.error("MERGE mode requires 'merge_keys' in options")
+                    raise ValueError(
+                        "MERGE mode requires 'merge_keys' in options. "
+                        "Specify the key columns for the MERGE ON clause."
+                    )
+
+                from odibi.writers.sql_server_writer import SqlServerMergeWriter
+
+                writer = SqlServerMergeWriter(connection)
+                ctx.debug(
+                    "Executing SQL Server MERGE",
+                    target=table,
+                    merge_keys=merge_keys,
+                )
+
+                try:
+                    result = writer.merge(
+                        df=df,
+                        spark_engine=self,
+                        target_table=table,
+                        merge_keys=merge_keys,
+                        options=merge_options,
+                        jdbc_options=jdbc_options,
+                    )
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.log_file_io(path=target_identifier, format=format, mode="write")
+                    ctx.info(
+                        "SQL Server MERGE completed",
+                        target=target_identifier,
+                        mode=mode,
+                        inserted=result.inserted,
+                        updated=result.updated,
+                        deleted=result.deleted,
+                        elapsed_ms=round(elapsed, 2),
+                    )
+                    return {
+                        "mode": "merge",
+                        "inserted": result.inserted,
+                        "updated": result.updated,
+                        "deleted": result.deleted,
+                        "total_affected": result.total_affected,
+                    }
+
+                except Exception as e:
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.error(
+                        "SQL Server MERGE failed",
+                        target=target_identifier,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        elapsed_ms=round(elapsed, 2),
+                    )
+                    raise
+
+            # Handle enhanced overwrite with strategies
+            if mode == "overwrite" and options.get("overwrite_options"):
+                from odibi.writers.sql_server_writer import SqlServerMergeWriter
+
+                overwrite_options = options.get("overwrite_options")
+                writer = SqlServerMergeWriter(connection)
+
+                ctx.debug(
+                    "Executing SQL Server enhanced overwrite",
+                    target=table,
+                    strategy=(
+                        overwrite_options.strategy.value
+                        if hasattr(overwrite_options, "strategy")
+                        else "truncate_insert"
+                    ),
+                )
+
+                try:
+                    result = writer.overwrite_spark(
+                        df=df,
+                        target_table=table,
+                        options=overwrite_options,
+                        jdbc_options=jdbc_options,
+                    )
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.log_file_io(path=target_identifier, format=format, mode="write")
+                    ctx.info(
+                        "SQL Server enhanced overwrite completed",
+                        target=target_identifier,
+                        strategy=result.strategy,
+                        rows_written=result.rows_written,
+                        elapsed_ms=round(elapsed, 2),
+                    )
+                    return {
+                        "mode": "overwrite",
+                        "strategy": result.strategy,
+                        "rows_written": result.rows_written,
+                    }
+
+                except Exception as e:
+                    elapsed = (time.time() - start_time) * 1000
+                    ctx.error(
+                        "SQL Server enhanced overwrite failed",
+                        target=target_identifier,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        elapsed_ms=round(elapsed, 2),
+                    )
+                    raise
+
             if mode not in ["overwrite", "append", "ignore", "error"]:
                 if mode == "fail":
                     mode = "error"

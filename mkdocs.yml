@@ -91,6 +91,7 @@ nav:
           - Append-Only Raw: patterns/append_only_raw.md
           - Incremental Stateful: patterns/incremental_stateful.md
           - Merge/Upsert: patterns/merge_upsert.md
+          - SQL Server Merge: patterns/sql_server_merge.md
           - Windowed Reprocess: patterns/windowed_reprocess.md
           - Smart Read: patterns/smart_read.md
           - Skip If Unchanged: patterns/skip_if_unchanged.md

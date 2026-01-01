@@ -12,144 +12,135 @@ Syncing Delta tables from Databricks to Azure SQL Server for Power BI consumptio
 
 ---
 
-## Proposed Solution
+## Phased Implementation
 
-### 1. New Write Mode: `merge`
+### Phase 1: Minimal Spark → SQL Server MERGE (MVP) ✅ COMPLETE
 
+**Scope:**
+- **Engine:** Spark only
+- **Target:** SQL Server connections
+- **Assumptions:** Target table and schema already exist (no DDL)
+
+**Features:**
+- New `write.mode: "merge"` for Spark→SQL Server
+- `merge_keys` (required) - composite key support
+- `update_condition` (optional) - e.g., `"source._hash_diff != target._hash_diff"`
+- `delete_condition` (optional) - e.g., `"source._is_deleted = true"`
+- `insert_condition` (optional) - e.g., `"source.is_valid = 1"`
+- `exclude_columns` - columns to exclude from merge
+- `audit_cols` - created/updated timestamp columns
+- Staging table: `{staging_schema}.{table}_staging`, truncate before write
+- Transaction-wrapped MERGE execution with count logging
+
+**Config (Phase 1):**
 ```yaml
 write:
   connection: my_azure_sql
-  format: azure_sql
+  format: sql_server
   table: oee.oee_fact
   mode: merge
   merge_keys: [DateId, P_ID]
   merge_options:
-    # Conditions
     update_condition: "source._hash_diff != target._hash_diff"
     delete_condition: "source._is_deleted = true"
-    insert_condition: "source.is_valid = 1"
-    
-    # Columns
     exclude_columns: [_hash_diff, _is_deleted]
-    column_mapping:
-      source_col_name: target_col_name
-    
-    # Audit
-    audit_cols:
-      created_col: created_ts
-      updated_col: updated_ts
-    
-    # Keys & Indexing
-    auto_generate_pk: true
-    pk_column: oee_fact_id
-    create_clustered_index: true
-    
-    # Staging
     staging_schema: staging
-    truncate_staging: true       # TRUNCATE before write (default: true)
-    cleanup_staging: false       # Keep staging table for efficiency
-    
-    # Schema
-    auto_create_schema: true     # CREATE SCHEMA IF NOT EXISTS
-    
-    # Batching
-    batch_size: 100000
-    
-    # Schema Evolution
-    schema_evolution:
-      mode: evolve                # strict | evolve | ignore
-      add_columns: true
-      widen_types: true
-      drop_columns: false
-      fail_on_incompatible: true
-    
-    # Validations
-    validations:
-      require_layer: gold
-      check_null_keys: true
-      check_duplicate_keys: true
-      check_schema_match: true
-```
-
-### 2. Enhanced Write Mode: `overwrite`
-
-```yaml
-write:
-  connection: my_azure_sql
-  format: azure_sql
-  table: oee.oee_fact
-  mode: overwrite
-  overwrite_options:
-    strategy: truncate_insert    # truncate_insert | drop_create | delete_insert
-    
-    # Shared with merge
-    auto_generate_pk: true
-    pk_column: oee_fact_id
-    create_clustered_index: true
-    
     audit_cols:
       created_col: created_ts
       updated_col: updated_ts
-    
-    schema_evolution:
-      mode: evolve
-      add_columns: true
-    
-    validations:
-      require_layer: gold
-      check_schema_match: true
 ```
+
+**Files to Modify:**
+| File | Changes |
+|------|---------|
+| `odibi/config.py` | Add `MERGE` to `WriteMode`, add `MergeOptions`, `AuditColsConfig` |
+| `odibi/writers/sql_server_writer.py` | New file: MERGE logic |
+| `odibi/writers/__init__.py` | Export new writer |
+| `odibi/engine/spark_engine.py` | Route `merge` mode to SQL Server writer |
+
+**Estimated Effort:** 1-3 days
 
 ---
 
-## Implementation Details
+### Phase 2: Overwrite Strategies + Validations ✅ COMPLETE
+
+**Scope:**
+- Enhanced `overwrite` with strategies: `truncate_insert`, `drop_create`, `delete_insert`
+- Key validations: null checks, duplicate checks
+- `SqlServerOverwriteOptions` and `SqlServerMergeValidationConfig` models
+
+**Files Modified:**
+| File | Changes |
+|------|---------|
+| `odibi/config.py` | Added `SqlServerOverwriteStrategy`, `SqlServerMergeValidationConfig`, `SqlServerOverwriteOptions` |
+| `odibi/writers/sql_server_writer.py` | Added `OverwriteResult`, `ValidationResult`, overwrite strategies, validation methods |
+| `odibi/engine/spark_engine.py` | Added enhanced overwrite handling |
+
+---
+
+### Phase 3: Pandas Engine Support ✅ COMPLETE
+
+**Scope:**
+- Reuse `SqlServerMergeWriter` from Pandas engine
+- `merge_pandas()` and `overwrite_pandas()` methods
+- Full parity with Spark for SQL Server operations
+
+**Files Modified:**
+| File | Changes |
+|------|---------|
+| `odibi/engine/pandas_engine.py` | Added merge and enhanced overwrite support in `_write_sql()` |
+
+---
+
+### Phase 4: Advanced Features ✅ COMPLETE
+
+**Scope:**
+- Polars engine support (`merge_polars`, `overwrite_polars`)
+- Auto schema creation (`auto_create_schema: true`)
+- Auto table creation (`auto_create_table: true`)
+- Schema evolution (modes: `strict`, `evolve`, `ignore`)
+- Batch processing (`batch_size` option)
+
+**Files Modified:**
+| File | Changes |
+|------|---------|
+| `odibi/config.py` | Added `SqlServerSchemaEvolutionMode`, `SqlServerSchemaEvolutionConfig`; Phase 4 fields in `SqlServerMergeOptions` and `SqlServerOverwriteOptions` |
+| `odibi/writers/sql_server_writer.py` | Added `validate_keys_polars`, `merge_polars`, `overwrite_polars`, schema/table creation, schema evolution handling, batch processing |
+| `odibi/engine/polars_engine.py` | Added SQL Server format support with `_write_sql()` method |
+| `odibi/introspect.py` | Added Phase 4 config classes to GROUP_MAPPING |
+| `docs/patterns/sql_server_merge.md` | New comprehensive documentation |
+| `docs/reference/PARITY_TABLE.md` | Updated with SQL Server feature parity |
+| `tests/unit/test_sql_server_merge.py` | 39 new Phase 4 tests (86 total)
+
+**Future (not in scope):**
+- Auto PK generation from hash
+- Clustered index creation
+- Type widening in schema evolution
+
+---
+
+## Phase 1 Implementation Details
 
 ### Merge Flow
 
-1. **Validate source data**
-   - Check merge_keys exist in DataFrame
-   - Check for null keys (fail if `check_null_keys: true`)
-   - Check for duplicate keys (fail if `check_duplicate_keys: true`)
-   - Check layer if `require_layer` is set
+1. **Validate inputs**
+   - Check `merge_keys` provided
+   - Check connection is SQL Server type
+   - Check target table exists (fail with clear error if not)
 
-2. **Generate PK** (if `auto_generate_pk: true`)
-   - Create deterministic integer from merge_keys hash
-   - Add as column to DataFrame
-
-3. **Create schema** (if `auto_create_schema: true` and schema doesn't exist)
-   ```sql
-   IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'oee')
-   BEGIN
-       EXEC('CREATE SCHEMA [oee]')
-   END
-   ```
-
-4. **Create target table** (if not exists)
-   - Infer schema from DataFrame
-   - Apply column_mapping
-   - Exclude columns in exclude_columns
-   - Add audit columns
-   - Create clustered index on PK
-
-5. **Schema evolution** (if target exists)
-   - Compare source vs target schemas
-   - Add new columns if `add_columns: true`
-   - Widen types if `widen_types: true`
-   - Fail on incompatible changes if `fail_on_incompatible: true`
-
-6. **Create staging table** (if not exists)
+2. **Prepare staging table name**
    - `{staging_schema}.{table_name}_staging`
-   - Auto-create staging schema if needed
 
-7. **Truncate staging** (if `truncate_staging: true` and table exists)
+3. **Truncate staging** (if exists)
    ```sql
-   TRUNCATE TABLE [staging].[oee_fact_staging]
+   IF OBJECT_ID('[staging].[oee_fact_staging]', 'U') IS NOT NULL
+       TRUNCATE TABLE [staging].[oee_fact_staging]
    ```
 
-8. **Write to staging**
-   - Use existing JDBC write with `mode: append` (table already truncated)
+4. **Write to staging**
+   - Use existing Spark JDBC write with `mode: overwrite`
 
-9. **Generate T-SQL MERGE**
+5. **Build MERGE T-SQL**
    ```sql
    BEGIN TRANSACTION;
    
@@ -168,84 +159,37 @@ write:
      VALUES (source.[col1], GETUTCDATE(), GETUTCDATE(), ...)
    
    WHEN MATCHED AND source._is_deleted = 1 THEN
-     DELETE
+     DELETE;
    
-   OUTPUT $action, inserted.*, deleted.*;
+   -- Capture counts
+   DECLARE @inserted INT, @updated INT, @deleted INT;
+   -- (counts captured via OUTPUT INTO temp table)
    
    COMMIT TRANSACTION;
    ```
 
-10. **Log results**
-    - Count inserts, updates, deletes from OUTPUT
-    - Log to odibi structured logging
+6. **Execute and log results**
+   - Log insert/update/delete counts via structured logging
 
-11. **Cleanup** (if `cleanup_staging: true`)
-    - Drop staging table
+### Error Handling
 
-### Overwrite Strategies
-
-| Strategy | SQL Generated |
-|----------|---------------|
-| `truncate_insert` | `TRUNCATE TABLE [schema].[table]; INSERT INTO ...` |
-| `drop_create` | `DROP TABLE IF EXISTS [schema].[table]; CREATE TABLE ...; INSERT INTO ...` |
-| `delete_insert` | `DELETE FROM [schema].[table]; INSERT INTO ...` |
-
-### Schema Evolution Modes
-
-| Mode | New Column | Missing Column | Type Widening | Incompatible Type |
-|------|------------|----------------|---------------|-------------------|
-| `strict` | Fail | Fail | Fail | Fail |
-| `evolve` | ALTER ADD | Ignore | ALTER COLUMN | Fail |
-| `ignore` | Skip | Skip | Use target | Use target |
-
-### Validations
-
-| Check | Default | Behavior |
-|-------|---------|----------|
-| `require_layer` | None | Warn if layer doesn't match |
-| `check_null_keys` | true | Fail if merge_keys contain nulls |
-| `check_duplicate_keys` | true | Fail if duplicate merge_keys |
-| `check_schema_match` | warn | Log warning on mismatch |
+- If `mode == "merge"` and connection is not SQL Server → raise clear error
+- If target table doesn't exist → fail with actionable message
+- Transaction rollback on any failure
 
 ---
 
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `odibi/engine/spark_engine.py` | Add `merge` mode handling, call new merge logic |
-| `odibi/engine/pandas_engine.py` | Add `merge` mode handling (Pandas → SQL support) |
-| `odibi/connections/azure_sql.py` | Add `execute_merge()`, `execute_schema_evolution()`, `create_table()` |
-| `odibi/config.py` | Add `MergeOptions`, `OverwriteOptions`, `SchemaEvolutionConfig`, `ValidationConfig` |
-| `odibi/writers/sql_server_writer.py` | New file: SQL Server write logic |
-| `odibi/writers/__init__.py` | Export new writer |
-
----
-
-## Config Schema (Pydantic)
+## Phase 1 Config Schema (Pydantic)
 
 ```python
-class SchemaEvolutionConfig(BaseModel):
-    mode: Literal["strict", "evolve", "ignore"] = "evolve"
-    add_columns: bool = True
-    widen_types: bool = True
-    drop_columns: bool = False
-    fail_on_incompatible: bool = True
-
-
-class ValidationConfig(BaseModel):
-    require_layer: Optional[str] = None
-    check_null_keys: bool = True
-    check_duplicate_keys: bool = True
-    check_schema_match: Literal["fail", "warn", "ignore"] = "warn"
-
-
 class AuditColsConfig(BaseModel):
+    """Audit column configuration for merge operations."""
     created_col: Optional[str] = None
     updated_col: Optional[str] = None
 
 
 class MergeOptions(BaseModel):
+    """Options for SQL Server MERGE operations (Phase 1)."""
     # Conditions
     update_condition: Optional[str] = None
     delete_condition: Optional[str] = None
@@ -253,224 +197,55 @@ class MergeOptions(BaseModel):
     
     # Columns
     exclude_columns: List[str] = Field(default_factory=list)
-    column_mapping: Dict[str, str] = Field(default_factory=dict)
-    
-    # Audit
-    audit_cols: Optional[AuditColsConfig] = None
-    
-    # Keys & Indexing
-    auto_generate_pk: bool = False
-    pk_column: str = "id"
-    create_clustered_index: bool = True
     
     # Staging
     staging_schema: str = "staging"
-    truncate_staging: bool = True    # TRUNCATE before write
-    cleanup_staging: bool = False    # Keep staging table for efficiency
     
-    # Schema creation
-    auto_create_schema: bool = True  # CREATE SCHEMA IF NOT EXISTS
-    
-    # Batching
-    batch_size: Optional[int] = None
-    
-    # Schema & Validation
-    schema_evolution: SchemaEvolutionConfig = Field(default_factory=SchemaEvolutionConfig)
-    validations: ValidationConfig = Field(default_factory=ValidationConfig)
-
-
-class OverwriteOptions(BaseModel):
-    strategy: Literal["truncate_insert", "drop_create", "delete_insert"] = "truncate_insert"
-    
-    # Shared with merge
-    auto_generate_pk: bool = False
-    pk_column: str = "id"
-    create_clustered_index: bool = True
+    # Audit
     audit_cols: Optional[AuditColsConfig] = None
-    schema_evolution: SchemaEvolutionConfig = Field(default_factory=SchemaEvolutionConfig)
-    validations: ValidationConfig = Field(default_factory=ValidationConfig)
 
 
-class WriteConfig(BaseModel):
-    # ... existing fields ...
-    mode: Literal["overwrite", "append", "ignore", "error", "merge", "upsert"]
-    merge_keys: Optional[List[str]] = None
-    merge_options: Optional[MergeOptions] = None
-    overwrite_options: Optional[OverwriteOptions] = None
+# Extend WriteMode enum
+class WriteMode(str, Enum):
+    OVERWRITE = "overwrite"
+    APPEND = "append"
+    UPSERT = "upsert"
+    APPEND_ONCE = "append_once"
+    MERGE = "merge"  # New for SQL Server
 ```
 
 ---
 
-## Edge Cases
-
-1. **No matching rows** - Pure insert (MERGE handles this)
-2. **All rows match** - Pure update (MERGE handles this)
-3. **Empty source** - Skip or warn? (Configurable)
-4. **Large tables** - Batch processing with configurable batch_size
-5. **Transaction timeout** - Set appropriate timeout, log progress
-6. **Column name escaping** - Handle spaces/special chars with `[]`
-7. **Null in non-nullable column** - Fail with clear error
-8. **Type coercion** - Spark types → SQL Server types mapping
-9. **Unicode/encoding** - Ensure proper NVARCHAR handling
-10. **Concurrent writes** - Table locking during MERGE
-11. **Identity columns** - Skip in INSERT, let SQL auto-generate
-
----
-
-## Example Usage
-
-### Sync dimension with SCD (current values only)
-```yaml
-- name: sync_dim_plantprocess
-  inputs:
-    source: $silver.dim_plantprocess
-  transform:
-    steps:
-      - sql: "SELECT * FROM df WHERE is_current = true"
-  write:
-    connection: azure_sql_prod
-    format: azure_sql
-    table: dim.plantprocess
-    mode: merge
-    merge_keys: [P_ID]
-    merge_options:
-      audit_cols:
-        created_col: created_ts
-        updated_col: updated_ts
-```
-
-### Sync fact table with hash diff
-```yaml
-- name: sync_oee_fact
-  inputs:
-    source: $gold.oee_fact
-  write:
-    connection: azure_sql_prod
-    format: azure_sql
-    table: fact.oee
-    mode: merge
-    merge_keys: [DateId, P_ID]
-    merge_options:
-      update_condition: "source._hash_diff != target._hash_diff"
-      exclude_columns: [_hash_diff]
-      auto_generate_pk: true
-      pk_column: oee_fact_id
-      audit_cols:
-        created_col: created_ts
-        updated_col: updated_ts
-```
-
-### Full overwrite with schema evolution
-```yaml
-- name: sync_combined_downtime
-  inputs:
-    source: $gold.combined_downtime
-  write:
-    connection: azure_sql_prod
-    format: azure_sql
-    table: fact.combined_downtime
-    mode: overwrite
-    overwrite_options:
-      strategy: truncate_insert
-      schema_evolution:
-        mode: evolve
-        add_columns: true
-```
-
----
-
-## Documentation Updates
-
-After implementation, update the following:
-
-| Doc | Changes |
-|-----|---------|
-| `docs/patterns/sql_server_merge.md` | New file: comprehensive guide |
-| `docs/reference/yaml_schema.md` | Add MergeOptions, OverwriteOptions schemas |
-| `docs/guides/dimensional_modeling_guide.md` | Add section on syncing to SQL Server |
-| `docs/guides/production_deployment.md` | Add SQL Server sync patterns |
-| `CHANGELOG.md` | Document new feature |
-| `mkdocs.yml` | Add new doc to nav |
-
-### New Doc: `docs/patterns/sql_server_merge.md`
-
-```markdown
-# SQL Server Merge Pattern
-
-Sync Delta tables to SQL Server with merge/upsert semantics.
-
-## When to Use
-- Syncing gold tables to Azure SQL for Power BI
-- Incremental updates without full table overwrites
-- Maintaining audit trails in SQL Server
-
-## Basic Usage
-[examples...]
-
-## Configuration Reference
-[full options...]
-
-## Best Practices
-- Use merge for incremental, overwrite for full refresh
-- Always set audit_cols for traceability
-- Use hash_diff for efficient change detection
-- Set appropriate batch_size for large tables
-```
-
----
-
-## Testing
+## Phase 1 Testing
 
 | Test | Description |
 |------|-------------|
-| `tests/unit/test_sql_server_merge.py` | Unit tests with mocked JDBC |
-| `tests/unit/test_sql_server_overwrite.py` | Unit tests for overwrite strategies |
-| `tests/unit/test_merge_config.py` | Config validation tests |
-| `tests/integration/test_sql_server_merge.py` | Integration tests (requires SQL Server) |
+| `tests/unit/test_sql_server_writer.py` | MERGE SQL generation, staging logic |
+| `tests/unit/test_merge_config.py` | Config validation |
 
-### Test Cases
+### Test Cases (Phase 1)
 - [ ] Merge with composite keys
 - [ ] Merge with single key
 - [ ] Update condition filtering
 - [ ] Delete condition (soft deletes)
 - [ ] Insert condition filtering
 - [ ] Exclude columns
-- [ ] Column mapping
-- [ ] Audit column population
-- [ ] Auto PK generation
-- [ ] Clustered index creation
-- [ ] Schema evolution - add columns
-- [ ] Schema evolution - widen types
-- [ ] Schema evolution - incompatible type fails
-- [ ] Null key validation
-- [ ] Duplicate key validation
-- [ ] Layer validation
-- [ ] Overwrite truncate_insert
-- [ ] Overwrite drop_create
-- [ ] Overwrite delete_insert
-- [ ] Batch processing
-- [ ] Transaction rollback on failure
-- [ ] Column name with spaces
-- [ ] Empty source handling
+- [ ] Audit column population in generated SQL
+- [ ] Error when connection is not SQL Server
+- [ ] Error when target table doesn't exist
+- [ ] Column name escaping (spaces, special chars)
 
 ---
 
-## Acceptance Criteria
+## Phase 1 Acceptance Criteria
 
 - [ ] `mode: merge` works for Spark engine → SQL Server
-- [ ] `mode: merge` works for Pandas engine → SQL Server
-- [ ] All merge_options are implemented and tested
-- [ ] All overwrite_options are implemented and tested
-- [ ] Schema evolution works correctly
-- [ ] Validations work correctly
-- [ ] Audit columns are populated
-- [ ] Row counts are logged (inserts/updates/deletes)
-- [ ] Error handling with transaction rollback
-- [ ] Works with column names containing spaces
-- [ ] Documentation complete
-- [ ] mkdocs builds successfully
-- [ ] All unit tests pass
-- [ ] Integration tests pass (optional)
+- [ ] All Phase 1 merge_options implemented
+- [ ] Staging table truncated before write
+- [ ] MERGE executed in transaction
+- [ ] Row counts logged (inserts/updates/deletes)
+- [ ] Clear error messages for unsupported scenarios
+- [ ] Unit tests pass
 
 ---
 
@@ -482,10 +257,9 @@ Sync Delta tables to SQL Server with merge/upsert semantics.
 
 `enhancement`, `sql-server`, `write-modes`, `high-priority`
 
-## Estimated Effort
+## Estimated Total Effort
 
-4-5 days
-- Day 1-2: Core merge implementation
-- Day 2-3: Overwrite enhancements, schema evolution
-- Day 3-4: Validations, edge cases, testing
-- Day 4-5: Documentation, integration testing
+- Phase 1: 1-3 days ← **Current Focus**
+- Phase 2: 2-3 days
+- Phase 3: 1-2 days
+- Phase 4: TBD

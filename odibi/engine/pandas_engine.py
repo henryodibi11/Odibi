@@ -731,8 +731,10 @@ class PandasEngine(Engine):
         table: Optional[str],
         mode: str,
         options: Dict[str, Any],
-    ) -> None:
-        """Handle SQL writing."""
+    ) -> Optional[Dict[str, Any]]:
+        """Handle SQL writing including merge and enhanced overwrite."""
+        ctx = get_logging_context().with_context(engine="pandas")
+
         if not hasattr(connection, "write_table"):
             raise ValueError(
                 f"Connection type '{type(connection).__name__}' does not support SQL operations"
@@ -740,6 +742,85 @@ class PandasEngine(Engine):
 
         if not table:
             raise ValueError("SQL format requires 'table' config")
+
+        # Handle MERGE mode for SQL Server
+        if mode == "merge":
+            merge_keys = options.get("merge_keys")
+            merge_options = options.get("merge_options")
+
+            if not merge_keys:
+                raise ValueError(
+                    "MERGE mode requires 'merge_keys' in options. "
+                    "Specify the key columns for the MERGE ON clause."
+                )
+
+            from odibi.writers.sql_server_writer import SqlServerMergeWriter
+
+            writer = SqlServerMergeWriter(connection)
+            ctx.debug(
+                "Executing SQL Server MERGE (Pandas)",
+                target=table,
+                merge_keys=merge_keys,
+            )
+
+            result = writer.merge_pandas(
+                df=df,
+                target_table=table,
+                merge_keys=merge_keys,
+                options=merge_options,
+            )
+
+            ctx.info(
+                "SQL Server MERGE completed (Pandas)",
+                target=table,
+                inserted=result.inserted,
+                updated=result.updated,
+                deleted=result.deleted,
+            )
+
+            return {
+                "mode": "merge",
+                "inserted": result.inserted,
+                "updated": result.updated,
+                "deleted": result.deleted,
+                "total_affected": result.total_affected,
+            }
+
+        # Handle enhanced overwrite with strategies
+        if mode == "overwrite" and options.get("overwrite_options"):
+            from odibi.writers.sql_server_writer import SqlServerMergeWriter
+
+            overwrite_options = options.get("overwrite_options")
+            writer = SqlServerMergeWriter(connection)
+
+            ctx.debug(
+                "Executing SQL Server enhanced overwrite (Pandas)",
+                target=table,
+                strategy=(
+                    overwrite_options.strategy.value
+                    if hasattr(overwrite_options, "strategy")
+                    else "truncate_insert"
+                ),
+            )
+
+            result = writer.overwrite_pandas(
+                df=df,
+                target_table=table,
+                options=overwrite_options,
+            )
+
+            ctx.info(
+                "SQL Server enhanced overwrite completed (Pandas)",
+                target=table,
+                strategy=result.strategy,
+                rows_written=result.rows_written,
+            )
+
+            return {
+                "mode": "overwrite",
+                "strategy": result.strategy,
+                "rows_written": result.rows_written,
+            }
 
         # Extract schema from table name if present
         if "." in table:

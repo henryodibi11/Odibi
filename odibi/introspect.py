@@ -128,6 +128,12 @@ GROUP_MAPPING = {
     "FactPattern": "Pattern",
     "AggregationPattern": "Pattern",
     "AuditConfig": "Pattern",
+    # SQL Server Merge (Phase 4)
+    "SqlServerMergeOptions": "Operation",
+    "SqlServerOverwriteOptions": "Operation",
+    "SqlServerAuditColsConfig": "Operation",
+    "SqlServerMergeValidationConfig": "Operation",
+    "SqlServerSchemaEvolutionConfig": "Operation",
 }
 
 # Map modules to readable Categories

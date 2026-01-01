@@ -139,9 +139,12 @@ class PolarsEngine(Engine):
         mode: str = "overwrite",
         options: Optional[Dict[str, Any]] = None,
         streaming_config: Optional[Any] = None,
-    ) -> None:
+    ) -> Optional[Dict[str, Any]]:
         """Write data using Polars."""
         options = options or {}
+
+        if format in ["sql", "sql_server", "azure_sql"]:
+            return self._write_sql(df, connection, table, mode, options)
 
         if path:
             if connection:
@@ -156,15 +159,14 @@ class PolarsEngine(Engine):
         else:
             raise ValueError("Either path or table must be provided")
 
-        # Polars sink (streaming write) is preferred for LazyFrames
         is_lazy = isinstance(df, pl.LazyFrame)
 
-        # Create directory if needed
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        parent_dir = os.path.dirname(full_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
 
         if format == "parquet":
             if is_lazy:
-                # sink_parquet is efficient
                 df.sink_parquet(full_path, **options)
             else:
                 df.write_parquet(full_path, **options)
@@ -182,11 +184,6 @@ class PolarsEngine(Engine):
                 df.write_ndjson(full_path, **options)
 
         elif format == "delta":
-            # Polars write_delta / sink_delta might be experimental or require specific setup
-            # For now, we might need to materialize and use write_delta if sink not available
-            # Or use deltalake library directly if polars doesn't support writing yet
-
-            # As of recent polars, write_delta exists for DataFrame
             if is_lazy:
                 df = df.collect()
 
@@ -201,6 +198,132 @@ class PolarsEngine(Engine):
 
         else:
             raise ValueError(f"Unsupported write format for Polars: {format}")
+
+        return None
+
+    def _write_sql(
+        self,
+        df: Any,
+        connection: Any,
+        table: Optional[str],
+        mode: str,
+        options: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Handle SQL writing including merge and enhanced overwrite for Polars (Phase 4)."""
+        from odibi.utils.logging_context import get_logging_context
+
+        ctx = get_logging_context().with_context(engine="polars")
+
+        if not hasattr(connection, "write_table"):
+            raise ValueError(
+                f"Connection type '{type(connection).__name__}' does not support SQL operations"
+            )
+
+        if not table:
+            raise ValueError("SQL format requires 'table' config")
+
+        if mode == "merge":
+            merge_keys = options.get("merge_keys")
+            merge_options = options.get("merge_options")
+
+            if not merge_keys:
+                raise ValueError(
+                    "MERGE mode requires 'merge_keys' in options. "
+                    "Specify the key columns for the MERGE ON clause."
+                )
+
+            from odibi.writers.sql_server_writer import SqlServerMergeWriter
+
+            writer = SqlServerMergeWriter(connection)
+            ctx.debug(
+                "Executing SQL Server MERGE (Polars)",
+                target=table,
+                merge_keys=merge_keys,
+            )
+
+            result = writer.merge_polars(
+                df=df,
+                target_table=table,
+                merge_keys=merge_keys,
+                options=merge_options,
+            )
+
+            ctx.info(
+                "SQL Server MERGE completed (Polars)",
+                target=table,
+                inserted=result.inserted,
+                updated=result.updated,
+                deleted=result.deleted,
+            )
+
+            return {
+                "mode": "merge",
+                "inserted": result.inserted,
+                "updated": result.updated,
+                "deleted": result.deleted,
+                "total_affected": result.total_affected,
+            }
+
+        if mode == "overwrite" and options.get("overwrite_options"):
+            from odibi.writers.sql_server_writer import SqlServerMergeWriter
+
+            overwrite_options = options.get("overwrite_options")
+            writer = SqlServerMergeWriter(connection)
+
+            ctx.debug(
+                "Executing SQL Server enhanced overwrite (Polars)",
+                target=table,
+                strategy=(
+                    overwrite_options.strategy.value
+                    if hasattr(overwrite_options, "strategy")
+                    else "truncate_insert"
+                ),
+            )
+
+            result = writer.overwrite_polars(
+                df=df,
+                target_table=table,
+                options=overwrite_options,
+            )
+
+            ctx.info(
+                "SQL Server enhanced overwrite completed (Polars)",
+                target=table,
+                strategy=result.strategy,
+                rows_written=result.rows_written,
+            )
+
+            return {
+                "mode": "overwrite",
+                "strategy": result.strategy,
+                "rows_written": result.rows_written,
+            }
+
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+
+        if "." in table:
+            schema, table_name = table.split(".", 1)
+        else:
+            schema, table_name = "dbo", table
+
+        if_exists = "replace"
+        if mode == "append":
+            if_exists = "append"
+        elif mode == "fail":
+            if_exists = "fail"
+
+        df_pandas = df.to_pandas()
+        chunksize = options.get("chunksize", 1000)
+
+        connection.write_table(
+            df=df_pandas,
+            table_name=table_name,
+            schema=schema,
+            if_exists=if_exists,
+            chunksize=chunksize,
+        )
+        return None
 
     def execute_sql(self, sql: str, context: Context) -> Any:
         """Execute SQL query using Polars SQLContext.
