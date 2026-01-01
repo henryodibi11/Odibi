@@ -565,6 +565,11 @@ class AzureSQL(BaseConnection):
 
             with engine.connect() as conn:
                 result = conn.execute(text(sql), params or {})
+                # Fetch all results before commit to avoid cursor invalidation
+                if result.returns_rows:
+                    rows = result.fetchall()
+                else:
+                    rows = None
                 conn.commit()
 
                 ctx.info(
@@ -572,7 +577,7 @@ class AzureSQL(BaseConnection):
                     server=self.server,
                     database=self.database,
                 )
-                return result
+                return rows
         except Exception as e:
             if isinstance(e, ConnectionError):
                 raise

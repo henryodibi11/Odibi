@@ -186,10 +186,8 @@ class SqlServerMergeWriter:
         WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
         """
         result = self.connection.execute_sql(sql)
-        if hasattr(result, "fetchone"):
-            row = result.fetchone()
-        else:
-            row = result[0] if result else None
+        # Result is now a list of rows (fetchall already called in AzureSQL.execute)
+        row = result[0] if result else None
         return row is not None
 
     def validate_keys_spark(
@@ -350,10 +348,8 @@ class SqlServerMergeWriter:
         """Check if a schema exists in SQL Server."""
         sql = f"SELECT 1 FROM sys.schemas WHERE name = '{schema}'"
         result = self.connection.execute_sql(sql)
-        if hasattr(result, "fetchone"):
-            row = result.fetchone()
-        else:
-            row = result[0] if result else None
+        # Result is now a list of rows (fetchall already called in AzureSQL.execute)
+        row = result[0] if result else None
         return row is not None
 
     def create_schema(self, schema: str) -> None:
@@ -571,7 +567,8 @@ class SqlServerMergeWriter:
         sql = f"DELETE FROM {escaped}; SELECT @@ROWCOUNT AS deleted_count;"
         self.ctx.debug("Deleting from table", table=table)
         result = self.connection.execute_sql(sql)
-        row = result.fetchone() if hasattr(result, "fetchone") else (result[0] if result else None)
+        # Result is now a list of rows (fetchall already called in AzureSQL.execute)
+        row = result[0] if result else None
         if row:
             return row.get("deleted_count", 0) if isinstance(row, dict) else row[0]
         return 0
@@ -717,11 +714,8 @@ class SqlServerMergeWriter:
         try:
             result = self.connection.execute_sql(sql)
 
-            row = (
-                result.fetchone()
-                if hasattr(result, "fetchone")
-                else (result[0] if result else None)
-            )
+            # Result is now a list of rows (fetchall already called in AzureSQL.execute)
+            row = result[0] if result else None
             if row:
                 if isinstance(row, dict):
                     merge_result = MergeResult(
