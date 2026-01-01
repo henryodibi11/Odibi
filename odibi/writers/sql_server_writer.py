@@ -186,7 +186,11 @@ class SqlServerMergeWriter:
         WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
         """
         result = self.connection.execute_sql(sql)
-        return len(result) > 0
+        if hasattr(result, "fetchone"):
+            row = result.fetchone()
+        else:
+            row = result[0] if result else None
+        return row is not None
 
     def validate_keys_spark(
         self,
@@ -346,7 +350,11 @@ class SqlServerMergeWriter:
         """Check if a schema exists in SQL Server."""
         sql = f"SELECT 1 FROM sys.schemas WHERE name = '{schema}'"
         result = self.connection.execute_sql(sql)
-        return len(result) > 0
+        if hasattr(result, "fetchone"):
+            row = result.fetchone()
+        else:
+            row = result[0] if result else None
+        return row is not None
 
     def create_schema(self, schema: str) -> None:
         """Create a schema if it doesn't exist."""
@@ -563,8 +571,8 @@ class SqlServerMergeWriter:
         sql = f"DELETE FROM {escaped}; SELECT @@ROWCOUNT AS deleted_count;"
         self.ctx.debug("Deleting from table", table=table)
         result = self.connection.execute_sql(sql)
-        if result and len(result) > 0:
-            row = result[0]
+        row = result.fetchone() if hasattr(result, "fetchone") else (result[0] if result else None)
+        if row:
             return row.get("deleted_count", 0) if isinstance(row, dict) else row[0]
         return 0
 
@@ -709,8 +717,12 @@ class SqlServerMergeWriter:
         try:
             result = self.connection.execute_sql(sql)
 
-            if result and len(result) > 0:
-                row = result[0]
+            row = (
+                result.fetchone()
+                if hasattr(result, "fetchone")
+                else (result[0] if result else None)
+            )
+            if row:
                 if isinstance(row, dict):
                     merge_result = MergeResult(
                         inserted=row.get("inserted", 0) or 0,
