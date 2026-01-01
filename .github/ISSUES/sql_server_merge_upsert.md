@@ -46,7 +46,8 @@ write:
     
     # Staging
     staging_schema: staging
-    cleanup_staging: true
+    truncate_staging: true       # TRUNCATE before write (default: true)
+    cleanup_staging: false       # Keep staging table for efficiency
     
     # Schema
     auto_create_schema: true     # CREATE SCHEMA IF NOT EXISTS
@@ -136,14 +137,19 @@ write:
    - Widen types if `widen_types: true`
    - Fail on incompatible changes if `fail_on_incompatible: true`
 
-6. **Create staging table**
+6. **Create staging table** (if not exists)
    - `{staging_schema}.{table_name}_staging`
    - Auto-create staging schema if needed
 
-7. **Write to staging**
-   - Use existing JDBC write with `mode: overwrite`
+7. **Truncate staging** (if `truncate_staging: true` and table exists)
+   ```sql
+   TRUNCATE TABLE [staging].[oee_fact_staging]
+   ```
 
-8. **Generate T-SQL MERGE**
+8. **Write to staging**
+   - Use existing JDBC write with `mode: append` (table already truncated)
+
+9. **Generate T-SQL MERGE**
    ```sql
    BEGIN TRANSACTION;
    
@@ -169,12 +175,12 @@ write:
    COMMIT TRANSACTION;
    ```
 
-8. **Log results**
-   - Count inserts, updates, deletes from OUTPUT
-   - Log to odibi structured logging
+10. **Log results**
+    - Count inserts, updates, deletes from OUTPUT
+    - Log to odibi structured logging
 
-9. **Cleanup**
-   - Drop staging table if `cleanup_staging: true`
+11. **Cleanup** (if `cleanup_staging: true`)
+    - Drop staging table
 
 ### Overwrite Strategies
 
@@ -259,7 +265,8 @@ class MergeOptions(BaseModel):
     
     # Staging
     staging_schema: str = "staging"
-    cleanup_staging: bool = True
+    truncate_staging: bool = True    # TRUNCATE before write
+    cleanup_staging: bool = False    # Keep staging table for efficiency
     
     # Schema creation
     auto_create_schema: bool = True  # CREATE SCHEMA IF NOT EXISTS
