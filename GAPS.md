@@ -128,6 +128,23 @@ This document captures improvement opportunities identified during the Stability
 
 ---
 
+## Priority 5: Future Enhancements
+
+### GAP-011: Incremental SQL Server Merge
+
+**Context:** Current SQL Server merge pushes full gold table to staging every run
+**Issue:** Works fine for small tables, but won't scale for large datasets
+**Future-proofing Strategy:**
+1. Add `_modified_at` column to gold tables now (cheap, no pipeline changes)
+2. When needed, implement watermark-based filtering to merge only changed rows
+3. Alternative: Use Delta Change Data Feed (CDF) for automatic change tracking
+
+**Current State:** Full merge is fine for now - tables are small
+**Trigger to Implement:** When gold tables exceed ~100K rows or merge times become noticeable
+**Prep Work:** Ensure gold tables have `_modified_at` column populated
+
+---
+
 ## Roadmap Recommendations
 
 ### Short Term (Next Sprint) ✅ COMPLETED
@@ -145,6 +162,7 @@ This document captures improvement opportunities identified during the Stability
 1. [x] Spark integration tests - Stability Campaign confirmed Spark functionality works
 2. [ ] Add Polars parity tests (nice-to-have, Polars engine works)
 3. [ ] Performance benchmarking suite (nice-to-have)
+4. [ ] Incremental SQL Server Merge (GAP-011) - Future-proofing for large tables
 
 ---
 

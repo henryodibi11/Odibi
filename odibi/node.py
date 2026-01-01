@@ -1843,6 +1843,14 @@ class NodeExecutor:
                     ctx.debug("Schema merge mode enabled")
                     self._execution_steps.append("Schema merge mode enabled")
 
+            # Extract merge_keys and merge_options from WriteConfig (SQL Server MERGE)
+            if write_config.merge_keys:
+                write_options["merge_keys"] = write_config.merge_keys
+                ctx.debug("Merge keys configured", keys=write_config.merge_keys)
+            if write_config.merge_options:
+                write_options["merge_options"] = write_config.merge_options
+                ctx.debug("Merge options configured")
+
             if write_config.format == "delta":
                 merged_props = {}
                 if self.performance_config and hasattr(
