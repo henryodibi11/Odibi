@@ -51,7 +51,6 @@ jobs:
 
       # Step 6: Regenerate docs to ensure sync test passes
       - name: Regenerate docs
-        if: matrix.python-version == '3.11'
         run: python odibi/introspect.py
 
       # Step 7: Run all base tests with coverage
