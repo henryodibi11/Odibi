@@ -336,6 +336,72 @@ SELECT SUM(daily_revenue) FROM agg_daily_sales WHERE month = 'January'
 
 ---
 
+## When to Use Natural Keys vs Surrogate Keys (Practical Decision)
+
+The theory says "always use surrogate keys in gold." Reality is more nuanced.
+
+### Use Natural Keys When:
+
+- **Source system IDs are stable** — e.g., `P_ID` from opsvisdata, `LID` from reference tables
+- **You're a solo DE and simplicity matters** — fewer moving parts = fewer bugs
+- **No multi-source integration with conflicting IDs** — one source per entity
+- **No need for unknown member (SK=0) handling** — your FKs always resolve
+
+**Example:** OEE project uses `P_ID`, `LID`, `F_ID` as natural keys because they're system-generated and never change.
+
+### Use Surrogate Keys When:
+
+- **Natural keys might change or get recycled** — e.g., product codes reassigned
+- **Joining on composite keys (3+ columns) is unwieldy** — `JOIN ON a=a AND b=b AND c=c AND d=d`
+- **Integrating same entity from multiple sources** — same `customer_id` means different things in CRM vs ERP
+- **Need unknown member rows for orphan FK handling** — SK=0 catches missing references
+
+---
+
+## When to Use `scd2` Function vs `DimensionPattern`
+
+Both handle SCD Type 2, but they serve different purposes.
+
+| Scenario | Use | Why |
+|----------|-----|-----|
+| Need custom SQL transforms before SCD | `scd2` function | Pattern doesn't support mid-pipeline SQL |
+| All-in-one with surrogate keys + unknown member | `DimensionPattern` | Handles everything declaratively |
+| Natural keys sufficient, no surrogates needed | `scd2` function | Lighter weight, less overhead |
+| Building classic Kimball star schema from scratch | `DimensionPattern` | Full feature set |
+
+### `scd2` Function Example (Custom SQL + SCD)
+
+```yaml
+transform:
+  steps:
+    - sql_file: "sql/cleaned_vw_dim_plantprocess.sql"  # Custom transform first
+    - function: scd2
+      params:
+        connection: goat_prod
+        path: "OEE/silver/cleaned_vw_dim_plantprocess"
+        keys: [P_ID]
+        track_cols: [PlantCode, Region, Site, Department]
+        effective_time_col: _extracted_at
+```
+
+### `DimensionPattern` Example (All-in-One)
+
+```yaml
+transformer: dimension
+params:
+  natural_key: customer_id
+  surrogate_key: customer_sk
+  scd_type: 2
+  track_cols: [name, email, address]
+  target: warehouse.dim_customer
+  unknown_member: true
+  audit:
+    load_timestamp: true
+    source_system: "crm"
+```
+
+---
+
 ## Common Mistakes to Avoid
 
 ### ❌ Using RANK() to Generate IDs
