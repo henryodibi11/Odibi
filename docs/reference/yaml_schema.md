@@ -1440,6 +1440,8 @@ write:
 | **auto_create_table** | bool | No | `False` | Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame. |
 | **schema_evolution** | Optional[[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
 | **batch_size** | Optional[int] | No | - | Batch size for staging table writes (Phase 4). Chunks large DataFrames for memory efficiency. |
+| **primary_key_on_merge_keys** | bool | No | `False` | Create a clustered primary key on merge_keys when auto-creating table. Enforces uniqueness. |
+| **index_on_merge_keys** | bool | No | `False` | Create a nonclustered index on merge_keys. Use if primary key already exists elsewhere. |
 
 ---
 ### `SqlServerMergeValidationConfig`

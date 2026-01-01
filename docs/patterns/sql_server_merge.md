@@ -66,6 +66,7 @@ write:
     # Phase 4 options:
     auto_create_schema: true
     auto_create_table: true
+    primary_key_on_merge_keys: true  # Create PK on merge keys for performance
     batch_size: 10000
     schema_evolution:
       mode: evolve
@@ -160,6 +161,8 @@ merge_keys: [DateId, P_ID, Shift]         # Multi-column
 | `validations` | object | None | Pre-merge validation checks |
 | `auto_create_schema` | bool | false | Auto-create schema if missing |
 | `auto_create_table` | bool | false | Auto-create target table from DataFrame |
+| `primary_key_on_merge_keys` | bool | false | Create clustered PK on merge keys (with auto_create_table) |
+| `index_on_merge_keys` | bool | false | Create nonclustered index on merge keys |
 | `schema_evolution` | object | None | Handle schema differences |
 | `batch_size` | int | None | Chunk large writes for memory efficiency |
 
@@ -215,6 +218,30 @@ Create the target table from DataFrame schema if missing:
 merge_options:
   auto_create_table: true
 ```
+
+#### Primary Key on Merge Keys
+
+Automatically create a clustered primary key on your merge keys when auto-creating the table. This:
+- Enforces uniqueness (prevents duplicate key combinations)
+- Improves MERGE performance (SQL Server uses the PK for the ON clause)
+- Creates a clustered index (physically orders data by these columns)
+
+```yaml
+merge_options:
+  auto_create_table: true
+  primary_key_on_merge_keys: true  # Creates: PK_oee_fact PRIMARY KEY CLUSTERED ([DateId], [P_ID])
+```
+
+#### Index on Merge Keys
+
+If you already have a primary key elsewhere but want to speed up merges, create a nonclustered index instead:
+
+```yaml
+merge_options:
+  index_on_merge_keys: true  # Creates: IX_oee_fact_DateId_P_ID NONCLUSTERED ([DateId], [P_ID])
+```
+
+**Note:** Use `primary_key_on_merge_keys` OR `index_on_merge_keys`, not both. Primary key takes precedence if both are set.
 
 Type mapping from DataFrame to SQL Server:
 
@@ -346,7 +373,7 @@ write:
 
 ### Example 3: First Load with Auto-Create
 
-Auto-create schema and table on first load:
+Auto-create schema, table, and primary key on first load:
 
 ```yaml
 write:
@@ -358,6 +385,7 @@ write:
   merge_options:
     auto_create_schema: true
     auto_create_table: true
+    primary_key_on_merge_keys: true  # Creates PK for better performance
 ```
 
 ### Example 4: Schema Evolution
