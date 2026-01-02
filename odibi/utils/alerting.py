@@ -442,12 +442,48 @@ def _build_teams_workflow_payload(
             }
         )
 
+    # Handle @mentions for failures
+    mention_users = config.metadata.get("mention_on_failure", [])
+    if isinstance(mention_users, str):
+        mention_users = [mention_users]
+
+    entities = []
+    mention_text = ""
+
+    if mention_users and event_type in (
+        AlertEvent.ON_FAILURE.value,
+        AlertEvent.ON_GATE_BLOCK.value,
+        AlertEvent.ON_QUARANTINE.value,
+    ):
+        mentions = []
+        for i, user_email in enumerate(mention_users):
+            mention_id = f"mention{i}"
+            mentions.append(f"<at>{mention_id}</at>")
+            entities.append(
+                {
+                    "type": "mention",
+                    "text": f"<at>{mention_id}</at>",
+                    "mentioned": {"id": user_email, "name": user_email},
+                }
+            )
+        mention_text = " ".join(mentions)
+        body_items.append(
+            {
+                "type": "TextBlock",
+                "text": f"🔔 {mention_text}",
+                "wrap": True,
+            }
+        )
+
     adaptive_card = {
         "type": "AdaptiveCard",
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
         "version": "1.4",
         "body": body_items,
     }
+
+    if entities:
+        adaptive_card["msteams"] = {"entities": entities}
 
     # Power Automate workflow expects 'attachments' array with the card
     return {

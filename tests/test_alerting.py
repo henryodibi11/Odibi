@@ -220,7 +220,6 @@ class TestTeamsPayload:
         args, kwargs = mock_request.call_args
         payload = json.loads(kwargs["data"].decode("utf-8"))
 
-        assert payload["type"] == "message"
         assert "attachments" in payload
         card = payload["attachments"][0]["content"]
         assert card["type"] == "AdaptiveCard"

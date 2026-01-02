@@ -53,9 +53,9 @@ class TestCatalogPathNaming:
         """Verify all tables in CatalogManager use meta_ prefix."""
         for table_name, table_path in catalog_manager.tables.items():
             assert table_name.startswith("meta_"), f"Table '{table_name}' should start with 'meta_'"
-            assert f"/{table_name}" in table_path or table_path.endswith(
-                table_name
-            ), f"Path for '{table_name}' should end with the table name: {table_path}"
+            assert f"/{table_name}" in table_path or table_path.endswith(table_name), (
+                f"Path for '{table_name}' should end with the table name: {table_path}"
+            )
 
     def test_expected_tables_exist(self, catalog_manager):
         """Verify all 9 expected meta tables are defined."""
@@ -91,12 +91,12 @@ class TestStateBackendPathConsistency:
         backend = create_state_backend(config, project_root=str(tmp_path))
 
         assert isinstance(backend, CatalogStateBackend)
-        assert (
-            "meta_state" in backend.meta_state_path
-        ), f"meta_state_path should contain 'meta_state': {backend.meta_state_path}"
-        assert (
-            "meta_runs" in backend.meta_runs_path
-        ), f"meta_runs_path should contain 'meta_runs': {backend.meta_runs_path}"
+        assert "meta_state" in backend.meta_state_path, (
+            f"meta_state_path should contain 'meta_state': {backend.meta_state_path}"
+        )
+        assert "meta_runs" in backend.meta_runs_path, (
+            f"meta_runs_path should contain 'meta_runs': {backend.meta_runs_path}"
+        )
 
     def test_state_backend_paths_match_catalog(self, tmp_catalog_path):
         """Test that StateBackend paths match CatalogManager paths."""
