@@ -797,17 +797,19 @@ class LineageGenerator:
         return new_edges
 
     def _inherit_layers_from_matches(self, all_nodes: Dict[str, "LineageNode"]) -> None:
-        """Fix node layers by inheriting from matching nodes with known layers.
+        """Fix node layers by inheriting from matching nodes with definitive layers.
 
-        If oee.oee_fact has unknown/raw layer but oee_fact is gold,
-        update oee.oee_fact to gold since they represent the same table.
+        A table belongs to the layer where it is WRITTEN (output), not where it is read.
+        If oee.oee_fact and oee_fact both exist, they should have the same layer.
         """
         ctx = get_logging_context()
 
-        # Build normalized name -> highest known layer (excluding raw/unknown)
+        # Build normalized name -> best known layer
+        # Priority: gold > silver > bronze (where the data is actually written)
+        # Exclude raw/unknown as these are uncertain
         known_layers: Dict[str, str] = {}
         for node in all_nodes.values():
-            if node.layer and node.layer not in ("unknown", "raw"):
+            if node.layer and node.layer not in ("unknown", "raw", "semantic"):
                 norm_name = self._normalize_node_name(node.id)
                 # Prefer later layers (gold > silver > bronze)
                 if norm_name not in known_layers or self._layer_sort_key(
@@ -815,12 +817,16 @@ class LineageGenerator:
                 ) > self._layer_sort_key(known_layers[norm_name]):
                     known_layers[norm_name] = node.layer
 
-        # Update nodes with unknown/raw layer if they match a known higher layer
+        # Update nodes that match a known layer
         updated = 0
         for node_id, node in all_nodes.items():
-            if node.layer in ("unknown", "raw"):
-                norm_name = self._normalize_node_name(node_id)
-                if norm_name in known_layers:
+            norm_name = self._normalize_node_name(node_id)
+            if norm_name in known_layers and node.layer != known_layers[norm_name]:
+                # Only update if current layer is less definitive
+                if node.layer in ("unknown", "raw") or (
+                    node.layer == "semantic"
+                    and known_layers[norm_name] in ("bronze", "silver", "gold")
+                ):
                     all_nodes[node_id] = LineageNode(
                         id=node.id,
                         type=node.type,
