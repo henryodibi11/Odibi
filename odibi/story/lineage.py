@@ -179,6 +179,11 @@ class LineageGenerator:
                     edge_set.add(edge_key)
 
         layers.sort(key=lambda x: self._layer_sort_key(x.pipeline_layer or x.name))
+
+        # Stitch cross-layer edges by matching normalized node names
+        stitched_edges = self._stitch_cross_layer_edges(all_nodes, all_edges, edge_set)
+        all_edges.extend(stitched_edges)
+
         nodes_list = sorted(
             all_nodes.values(),
             key=lambda x: (self._layer_sort_key(x.layer), x.id),
@@ -648,6 +653,72 @@ class LineageGenerator:
             return "semantic"
         else:
             return "unknown"
+
+    def _normalize_node_name(self, node_id: str) -> str:
+        """Normalize node ID for cross-layer matching.
+
+        Handles variations like:
+        - OEE/gold/oee_fact -> oee_fact
+        - oee.oee_fact -> oee_fact
+        - test.oee_fact -> oee_fact
+        """
+        name = node_id.lower()
+        if "/" in name:
+            name = name.split("/")[-1]
+        if "." in name:
+            name = name.split(".")[-1]
+        return name
+
+    def _stitch_cross_layer_edges(
+        self,
+        all_nodes: Dict[str, "LineageNode"],
+        existing_edges: List["LineageEdge"],
+        edge_set: set,
+    ) -> List["LineageEdge"]:
+        """Create edges between layers by matching normalized node names.
+
+        When a node in one layer (e.g., gold output "OEE/gold/oee_fact")
+        matches a node in another layer (e.g., semantic source "oee.oee_fact"),
+        create an edge connecting them.
+        """
+        ctx = get_logging_context()
+        new_edges: List[LineageEdge] = []
+
+        normalized_to_nodes: Dict[str, List[LineageNode]] = {}
+        for node in all_nodes.values():
+            norm_name = self._normalize_node_name(node.id)
+            if norm_name not in normalized_to_nodes:
+                normalized_to_nodes[norm_name] = []
+            normalized_to_nodes[norm_name].append(node)
+
+        for norm_name, nodes in normalized_to_nodes.items():
+            if len(nodes) < 2:
+                continue
+
+            nodes_by_layer = sorted(nodes, key=lambda x: self._layer_sort_key(x.layer))
+
+            for i in range(len(nodes_by_layer) - 1):
+                from_node = nodes_by_layer[i]
+                to_node = nodes_by_layer[i + 1]
+
+                if from_node.layer == to_node.layer:
+                    continue
+
+                edge_key = (from_node.id, to_node.id)
+                if edge_key not in edge_set:
+                    new_edges.append(LineageEdge(from_node=from_node.id, to_node=to_node.id))
+                    edge_set.add(edge_key)
+                    ctx.debug(
+                        "Stitched cross-layer edge",
+                        from_node=from_node.id,
+                        from_layer=from_node.layer,
+                        to_node=to_node.id,
+                        to_layer=to_node.layer,
+                        normalized_name=norm_name,
+                    )
+
+        ctx.info("Cross-layer edges stitched", count=len(new_edges))
+        return new_edges
 
     def _layer_sort_key(self, layer: str) -> int:
         """Get sort key for layer ordering."""

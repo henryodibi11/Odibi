@@ -567,6 +567,7 @@ class StoryGenerator:
                         "id": node_name,
                         "label": node_name,
                         "type": node_cfg.get("type", "transform"),
+                        "layer": metadata.pipeline_layer or "unknown",
                     }
                 )
                 # Check depends_on for intra-pipeline dependencies
@@ -632,7 +633,14 @@ class StoryGenerator:
                     )
         else:
             # Fallback: build from metadata nodes
-            nodes = [{"id": n.node_name, "label": n.node_name} for n in metadata.nodes]
+            nodes = [
+                {
+                    "id": n.node_name,
+                    "label": n.node_name,
+                    "layer": metadata.pipeline_layer or "unknown",
+                }
+                for n in metadata.nodes
+            ]
             edges = []
             source_nodes = set()
             target_nodes = set()
