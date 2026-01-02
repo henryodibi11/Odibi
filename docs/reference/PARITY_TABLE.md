@@ -28,6 +28,7 @@ Comparison of Pandas, Spark, and Polars engine capabilities as of V3.
 | Auto Table Creation | ✅ | ✅ | ✅ | Infer schema from DataFrame. |
 | Schema Evolution | ✅ | ✅ | ✅ | strict, evolve, ignore modes. |
 | Batch Processing | ✅ | ✅ | ✅ | Chunk large writes for memory efficiency. |
+| Incremental Merge | ✅ | ✅ | ✅ | Compare hashes, only write changed rows to staging. |
 
 ## Core Features
 

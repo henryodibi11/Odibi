@@ -1442,6 +1442,9 @@ write:
 | **batch_size** | Optional[int] | No | - | Batch size for staging table writes (Phase 4). Chunks large DataFrames for memory efficiency. |
 | **primary_key_on_merge_keys** | bool | No | `False` | Create a clustered primary key on merge_keys when auto-creating table. Enforces uniqueness. |
 | **index_on_merge_keys** | bool | No | `False` | Create a nonclustered index on merge_keys. Use if primary key already exists elsewhere. |
+| **incremental** | bool | No | `False` | Enable incremental merge optimization. When True, reads target table's keys and hashes to determine which rows changed, then only writes changed rows to staging. Significantly faster when few rows change between runs. |
+| **hash_column** | Optional[str] | No | - | Name of pre-computed hash column in DataFrame for change detection. Used when incremental=True. If not specified, will auto-detect '_hash_diff' column. |
+| **change_detection_columns** | Optional[List[str]] | No | - | Columns to use for computing change detection hash. Used when incremental=True and no hash_column is specified. If None, uses all non-key columns. |
 
 ---
 ### `SqlServerMergeValidationConfig`

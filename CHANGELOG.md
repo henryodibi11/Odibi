@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-01-01
+
+### Added - SQL Server Merge Enhancements
+
+- **Incremental Merge Optimization** (`merge_options.incremental`):
+  - `incremental: true` - Reads target hashes, compares in Spark/Pandas/Polars, only writes changed rows to staging
+  - `hash_column: _hash_diff` - Use existing hash column for change detection
+  - `change_detection_columns: [col1, col2]` - Compute hash from specified columns
+  - Auto-detects `_hash_diff` if present, otherwise computes from all non-key columns
+
+- **Audit Columns** (`merge_options.audit_cols`):
+  - `created_col` - Set to GETUTCDATE() on INSERT only
+  - `updated_col` - Set to GETUTCDATE() on INSERT and UPDATE
+  - Auto-added to table on `auto_create_table`
+
+- **Spark Engine Parity**:
+  - `merge_pandas` now supports `auto_create_schema`, `auto_create_table`, `primary_key_on_merge_keys`
+  - All engines (Spark, Pandas, Polars) now have feature parity for SQL Server merge
+
 ## [2.1.1] - 2025-12-10
 
 ### Performance - Delta Write Optimization

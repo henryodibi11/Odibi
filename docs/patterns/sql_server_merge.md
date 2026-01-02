@@ -165,6 +165,9 @@ merge_keys: [DateId, P_ID, Shift]         # Multi-column
 | `index_on_merge_keys` | bool | false | Create nonclustered index on merge keys |
 | `schema_evolution` | object | None | Handle schema differences |
 | `batch_size` | int | None | Chunk large writes for memory efficiency |
+| `incremental` | bool | false | Read target hashes, compare in engine, only write changed rows to staging |
+| `hash_column` | string | None | Pre-computed hash column for change detection (auto-detects `_hash_diff`) |
+| `change_detection_columns` | list | None | Columns to compute hash from (defaults to all non-key columns) |
 
 ### Conditions
 
@@ -280,6 +283,63 @@ Chunk large DataFrames for memory efficiency:
 ```yaml
 merge_options:
   batch_size: 10000   # Write 10k rows at a time to staging
+```
+
+### Incremental Merge Optimization
+
+When most rows haven't changed between runs, use incremental merge to dramatically reduce staging table writes:
+
+```yaml
+merge_options:
+  incremental: true   # Only write changed rows to staging
+```
+
+**How it works:**
+1. Reads target table's merge keys and hash column
+2. Compares in Spark/Pandas/Polars to determine which rows changed
+3. Only writes changed rows to staging table
+4. Runs MERGE only on the changed subset
+
+**Performance benefit:** If only 100 of 1M rows changed, staging table has 100 rows instead of 1M.
+
+#### Change Detection Options
+
+**Option 1: Use existing hash column**
+
+If your DataFrame already has a hash column (e.g., from SCD2 transformer):
+
+```yaml
+merge_options:
+  incremental: true
+  hash_column: _hash_diff   # Use pre-computed hash
+```
+
+**Option 2: Auto-detect `_hash_diff`**
+
+Odibi auto-detects a column named `_hash_diff` if present:
+
+```yaml
+merge_options:
+  incremental: true   # Auto-uses _hash_diff if present
+```
+
+**Option 3: Specify columns for hash computation**
+
+If no hash column exists, specify which columns to use for change detection:
+
+```yaml
+merge_options:
+  incremental: true
+  change_detection_columns: [value, quantity, status]  # Only hash these columns
+```
+
+**Option 4: Hash all non-key columns (default)**
+
+If no hash column or change_detection_columns specified, computes hash from all non-key columns:
+
+```yaml
+merge_options:
+  incremental: true   # Hashes all columns except merge_keys
 ```
 
 ---
@@ -404,6 +464,29 @@ write:
       mode: evolve
       add_columns: true
 ```
+
+### Example 5: Incremental Merge Optimization
+
+Optimize large table syncs when only a small percentage of rows change:
+
+```yaml
+write:
+  connection: azure_sql
+  format: sql_server
+  table: gold.oee_fact
+  mode: merge
+  merge_keys: [DateId, P_ID]
+  merge_options:
+    incremental: true                           # Only write changed rows
+    hash_column: _hash_diff                     # Use existing hash column
+    update_condition: "source._hash_diff != target._hash_diff"
+    exclude_columns: [_hash_diff]
+    audit_cols:
+      created_col: created_ts
+      updated_col: updated_ts
+```
+
+**Result:** If syncing 1M rows daily but only 1K changed, staging table contains 1K rows instead of 1M—10x faster writes.
 
 ---
 
