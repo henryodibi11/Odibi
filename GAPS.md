@@ -130,18 +130,22 @@ This document captures improvement opportunities identified during the Stability
 
 ## Priority 5: Future Enhancements
 
-### GAP-011: Incremental SQL Server Merge
+### GAP-011: Incremental SQL Server Merge ✅ IMPLEMENTED
 
 **Context:** Current SQL Server merge pushes full gold table to staging every run
 **Issue:** Works fine for small tables, but won't scale for large datasets
-**Future-proofing Strategy:**
-1. Add `_modified_at` column to gold tables now (cheap, no pipeline changes)
-2. When needed, implement watermark-based filtering to merge only changed rows
-3. Alternative: Use Delta Change Data Feed (CDF) for automatic change tracking
+**Status:** Implemented in v2.2.0 with `merge_options.incremental: true`
+- Reads target hashes, compares in Spark/Pandas/Polars
+- Only writes changed rows to staging
+- Auto-detects `_hash_diff` column or computes from specified columns
 
-**Current State:** Full merge is fine for now - tables are small
-**Trigger to Implement:** When gold tables exceed ~100K rows or merge times become noticeable
-**Prep Work:** Ensure gold tables have `_modified_at` column populated
+### GAP-012: Story/Metrics Show Input Rows vs Rows Affected
+
+**Context:** Node summary shows input row count (e.g., 188.7K) even when incremental merge writes 0 rows
+**Issue:** When `incremental: true` detects no changes, staging is empty but summary still shows 188.7K
+**Impact:** Low - cosmetic/UX only, logs show correct info
+**Suggestion:** Add separate metrics for "rows read" vs "rows written/affected" in story output
+**Priority:** Low - nice-to-have for better observability
 
 ---
 
