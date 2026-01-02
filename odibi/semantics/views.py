@@ -27,6 +27,20 @@ from odibi.semantics.metrics import (
 from odibi.utils.logging_context import get_logging_context
 
 
+def generate_ensure_schema_sql(schema: str) -> str:
+    """
+    Generate SQL to create schema if it doesn't exist.
+
+    Uses SQL Server's conditional execution pattern since
+    CREATE SCHEMA must be the first statement in a batch.
+    """
+    return f"""\
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = '{schema}')
+BEGIN
+    EXEC('CREATE SCHEMA [{schema}]')
+END"""
+
+
 @dataclass
 class ViewExecutionResult:
     """Result of executing multiple views."""
@@ -311,6 +325,11 @@ class ViewGenerator:
         ctx.info("Executing view", view=view_config.name)
 
         try:
+            if view_config.ensure_schema:
+                schema_sql = generate_ensure_schema_sql(view_config.db_schema)
+                ctx.debug("Ensuring schema exists", schema=view_config.db_schema)
+                execute_sql(schema_sql)
+
             ddl = self.generate_view_ddl(view_config)
 
             execute_sql(ddl)

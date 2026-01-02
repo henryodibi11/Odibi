@@ -231,7 +231,9 @@ class TestViewExecution:
         assert result.success
         assert result.name == "vw_test"
         assert "CREATE OR ALTER VIEW" in result.sql
-        assert len(executed_sql) == 1
+        assert len(executed_sql) == 2  # schema creation + view DDL
+        assert "CREATE SCHEMA" in executed_sql[0]
+        assert "CREATE OR ALTER VIEW" in executed_sql[1]
 
     def test_execute_view_with_save(self, simple_config):
         """Test view execution with SQL file save."""

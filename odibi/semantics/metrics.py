@@ -202,6 +202,7 @@ class ViewConfig(BaseModel):
         metrics: List of metric names to include
         dimensions: List of dimension names (determines grain)
         db_schema: Database schema for the view (default: semantic)
+        ensure_schema: Auto-create schema if it doesn't exist (default: True)
         source_file: Optional reference to source config file for documentation
     """
 
@@ -210,6 +211,7 @@ class ViewConfig(BaseModel):
     metrics: List[str] = Field(..., description="Metrics to include")
     dimensions: List[str] = Field(..., description="Dimensions for grouping")
     db_schema: str = Field(default="semantic", description="Database schema")
+    ensure_schema: bool = Field(default=True, description="Auto-create schema if it doesn't exist")
     source_file: Optional[str] = Field(None, description="Source config file reference")
 
     @field_validator("name")
