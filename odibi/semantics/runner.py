@@ -332,39 +332,64 @@ class SemanticLayerRunner:
         ctx = get_logging_context()
         storage_options = self._get_storage_options()
 
-        if not storage_options:
-            ctx.debug("No storage options available for write_file")
-            return None
-
         story_conn_name = self.project_config.story.connection
         story_conn = self.project_config.connections.get(story_conn_name)
 
         if not story_conn:
+            ctx.debug("No story connection found", connection=story_conn_name)
             return None
 
-        base_path = getattr(story_conn, "path", None) or getattr(story_conn, "container", None)
-        if not base_path:
-            ctx.debug("Story connection has no base path")
+        conn_type = getattr(story_conn, "type", None)
+        if conn_type is None:
+            ctx.debug("Story connection has no type")
             return None
 
-        def write_file(path: str, content: str) -> None:
-            import fsspec
+        conn_type_value = conn_type.value if hasattr(conn_type, "value") else str(conn_type)
 
-            full_path = path
-            if not path.startswith(("abfs://", "az://", "s3://", "gs://", "/")):
-                account_name = getattr(story_conn, "account_name", None)
-                container = getattr(story_conn, "container", None)
-                if account_name and container:
-                    full_path = f"abfs://{container}@{account_name}.dfs.core.windows.net/{path}"
-                else:
+        if conn_type_value == "local":
+            base_path = getattr(story_conn, "base_path", "./data")
+
+            def write_file_local(path: str, content: str) -> None:
+                import os
+
+                full_path = os.path.join(base_path, path)
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                ctx.debug("Writing SQL file locally", path=full_path)
+                with open(full_path, "w") as f:
+                    f.write(content)
+
+            return write_file_local
+
+        elif conn_type_value in ("azure_blob", "delta"):
+            if not storage_options:
+                ctx.debug("No storage options available for Azure write_file")
+                return None
+
+            account_name = getattr(story_conn, "account_name", None)
+            container = getattr(story_conn, "container", None)
+
+            if not account_name or not container:
+                ctx.debug("Azure connection missing account_name or container")
+                return None
+
+            def write_file_azure(path: str, content: str) -> None:
+                import fsspec
+
+                if path.startswith(("abfs://", "az://")):
                     full_path = path
+                else:
+                    full_path = f"abfs://{container}@{account_name}.dfs.core.windows.net/{path}"
 
-            fs = fsspec.filesystem("abfs", **storage_options)
-            ctx.debug("Writing SQL file via story connection", path=full_path)
-            with fs.open(full_path, "w") as f:
-                f.write(content)
+                fs = fsspec.filesystem("abfs", **storage_options)
+                ctx.debug("Writing SQL file via Azure", path=full_path)
+                with fs.open(full_path, "w") as f:
+                    f.write(content)
 
-        return write_file
+            return write_file_azure
+
+        else:
+            ctx.debug("Unsupported connection type for write_file", type=conn_type_value)
+            return None
 
     @property
     def metadata(self) -> Optional[SemanticStoryMetadata]:
