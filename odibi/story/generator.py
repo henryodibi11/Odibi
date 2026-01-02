@@ -500,6 +500,26 @@ class StoryGenerator:
             newly_failing=len(newly_failing),
         )
 
+    def _infer_layer_from_path(self, path: str) -> str:
+        """Infer the data layer from a path string.
+
+        Uses common naming patterns to identify bronze/silver/gold/raw layers.
+        """
+        path_lower = path.lower()
+        if "bronze" in path_lower:
+            return "bronze"
+        elif "silver" in path_lower:
+            return "silver"
+        elif "gold" in path_lower:
+            return "gold"
+        elif "raw" in path_lower:
+            return "raw"
+        elif "staging" in path_lower:
+            return "staging"
+        elif "semantic" in path_lower:
+            return "semantic"
+        return "source"
+
     def _build_graph_data(
         self,
         metadata: PipelineStoryMetadata,
@@ -537,17 +557,21 @@ class StoryGenerator:
         elif config and "nodes" in config:
             nodes = []
             edges = []
+            source_nodes = set()  # Track source tables for lineage
+            target_nodes = set()  # Track target tables for lineage
+
             for node_cfg in config["nodes"]:
+                node_name = node_cfg["name"]
                 nodes.append(
                     {
-                        "id": node_cfg["name"],
-                        "label": node_cfg["name"],
+                        "id": node_name,
+                        "label": node_name,
                         "type": node_cfg.get("type", "transform"),
                     }
                 )
                 # Check depends_on for intra-pipeline dependencies
                 for dep in node_cfg.get("depends_on", []):
-                    edges.append({"source": dep, "target": node_cfg["name"]})
+                    edges.append({"source": dep, "target": node_name})
 
                 # Check inputs block for cross-pipeline dependencies
                 inputs = node_cfg.get("inputs", {})
@@ -560,16 +584,59 @@ class StoryGenerator:
                                 edges.append(
                                     {
                                         "source": node_ref,
-                                        "target": node_cfg["name"],
+                                        "target": node_name,
                                         "source_pipeline": pipeline_name,
                                     }
                                 )
                             else:
-                                edges.append({"source": ref, "target": node_cfg["name"]})
+                                edges.append({"source": ref, "target": node_name})
+
+                # Add read path as source for lineage
+                read_cfg = node_cfg.get("read", {})
+                if read_cfg:
+                    read_path = read_cfg.get("path") or read_cfg.get("table")
+                    if read_path:
+                        source_nodes.add(read_path)
+                        edges.append({"from": read_path, "to": node_name})
+
+                # Add write path as target for lineage
+                write_cfg = node_cfg.get("write", {})
+                if write_cfg:
+                    write_path = write_cfg.get("path") or write_cfg.get("table")
+                    if write_path:
+                        target_nodes.add(write_path)
+                        edges.append({"from": node_name, "to": write_path})
+
+            # Add source table nodes (inputs)
+            for source in source_nodes:
+                if not any(n["id"] == source for n in nodes):
+                    nodes.append(
+                        {
+                            "id": source,
+                            "label": source,
+                            "type": "source",
+                            "layer": self._infer_layer_from_path(source),
+                        }
+                    )
+
+            # Add target table nodes (outputs)
+            for target in target_nodes:
+                if not any(n["id"] == target for n in nodes):
+                    nodes.append(
+                        {
+                            "id": target,
+                            "label": target,
+                            "type": "table",
+                            "layer": metadata.pipeline_layer or "unknown",
+                        }
+                    )
         else:
             # Fallback: build from metadata nodes
             nodes = [{"id": n.node_name, "label": n.node_name} for n in metadata.nodes]
             edges = []
+            source_nodes = set()
+            target_nodes = set()
+
             for n in metadata.nodes:
                 # Debug: Log config_snapshot contents for each node
                 ctx.debug(
@@ -627,6 +694,46 @@ class StoryGenerator:
                                     source=ref,
                                     target=n.node_name,
                                 )
+
+                # Add read/write paths for lineage from config_snapshot
+                if n.config_snapshot:
+                    read_cfg = n.config_snapshot.get("read", {})
+                    if read_cfg:
+                        read_path = read_cfg.get("path") or read_cfg.get("table")
+                        if read_path:
+                            source_nodes.add(read_path)
+                            edges.append({"from": read_path, "to": n.node_name})
+
+                    write_cfg = n.config_snapshot.get("write", {})
+                    if write_cfg:
+                        write_path = write_cfg.get("path") or write_cfg.get("table")
+                        if write_path:
+                            target_nodes.add(write_path)
+                            edges.append({"from": n.node_name, "to": write_path})
+
+            # Add source table nodes
+            for source in source_nodes:
+                if not any(n["id"] == source for n in nodes):
+                    nodes.append(
+                        {
+                            "id": source,
+                            "label": source,
+                            "type": "source",
+                            "layer": self._infer_layer_from_path(source),
+                        }
+                    )
+
+            # Add target table nodes
+            for target in target_nodes:
+                if not any(n["id"] == target for n in nodes):
+                    nodes.append(
+                        {
+                            "id": target,
+                            "label": target,
+                            "type": "table",
+                            "layer": metadata.pipeline_layer or "unknown",
+                        }
+                    )
 
         # Collect all node IDs that exist in the current pipeline
         existing_node_ids = {node["id"] for node in nodes}

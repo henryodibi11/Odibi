@@ -170,8 +170,9 @@ class LineageGenerator:
                     )
 
             for edge_data in edges_data:
-                from_node = edge_data.get("from", "")
-                to_node = edge_data.get("to", "")
+                # Support both "from"/"to" and "source"/"target" formats
+                from_node = edge_data.get("from") or edge_data.get("source", "")
+                to_node = edge_data.get("to") or edge_data.get("target", "")
                 edge_key = (from_node, to_node)
                 if from_node and to_node and edge_key not in edge_set:
                     all_edges.append(LineageEdge(from_node=from_node, to_node=to_node))
