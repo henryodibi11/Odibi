@@ -769,20 +769,48 @@ class LineageGenerator:
             "unknown": "fill:#f1f5f9,stroke:#94a3b8,color:#475569",
         }
 
+        layer_labels = {
+            "raw": "📥 Raw Sources",
+            "bronze": "🥉 Bronze Layer",
+            "silver": "🥈 Silver Layer",
+            "gold": "🥇 Gold Layer",
+            "semantic": "📊 Semantic Views",
+            "unknown": "❓ Other",
+        }
+
+        # Group nodes by layer
+        nodes_by_layer: Dict[str, List[LineageNode]] = {}
         for node in result.nodes:
-            node_id = self._sanitize_id(node.id)
-            label = node.id
+            layer = node.layer if node.layer in layer_styles else "unknown"
+            if layer not in nodes_by_layer:
+                nodes_by_layer[layer] = []
+            nodes_by_layer[layer].append(node)
 
-            if node.type == "view":
-                lines.append(f'    {node_id}["{label}"]')
-            else:
-                lines.append(f'    {node_id}[("{label}")]')
+        # Generate subgraphs for each layer (in order)
+        for layer in self.LAYER_ORDER + ["unknown"]:
+            if layer not in nodes_by_layer:
+                continue
+            nodes = nodes_by_layer[layer]
+            label = layer_labels.get(layer, layer.title())
+            count = len(nodes)
 
+            lines.append(f'    subgraph {layer}["{label} ({count})"]')
+            for node in nodes:
+                node_id = self._sanitize_id(node.id)
+                node_label = node.id
+                if node.type == "view":
+                    lines.append(f'        {node_id}["{node_label}"]')
+                else:
+                    lines.append(f'        {node_id}[("{node_label}")]')
+            lines.append("    end")
+
+        # Add edges
         for edge in result.edges:
             from_id = self._sanitize_id(edge.from_node)
             to_id = self._sanitize_id(edge.to_node)
             lines.append(f"    {from_id} --> {to_id}")
 
+        # Add styles
         for layer, style in layer_styles.items():
             lines.append(f"    classDef {layer}Style {style}")
 
