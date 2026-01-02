@@ -156,8 +156,13 @@ class LineageGenerator:
             layer_info = self._extract_layer_info(story_data, story_path)
             layers.append(layer_info)
 
-            # Get pipeline_layer from story for fallback layer assignment
-            story_layer = story_data.get("pipeline_layer") or "unknown"
+            # Get pipeline_layer from story, or infer from path
+            story_layer = story_data.get("pipeline_layer")
+            if not story_layer:
+                # Try to infer layer from story path (e.g., .../semantic/2026-01-02/...)
+                story_layer = self._infer_layer_from_path(story_path)
+            if not story_layer or story_layer == "unknown":
+                story_layer = "unknown"
 
             graph_data = story_data.get("graph_data", {})
             nodes_data = graph_data.get("nodes", [])
@@ -729,6 +734,17 @@ class LineageGenerator:
             return "semantic"
         else:
             return "unknown"
+
+    def _infer_layer_from_path(self, path: str) -> str:
+        """Infer layer from a file/directory path.
+
+        Checks if path contains layer names like /bronze/, /silver/, etc.
+        """
+        path_lower = path.lower()
+        for layer in self.LAYER_ORDER:
+            if f"/{layer}/" in path_lower or f"\\{layer}\\" in path_lower:
+                return layer
+        return "unknown"
 
     def _normalize_node_name(self, node_id: str) -> str:
         """Normalize node ID for cross-layer matching.
