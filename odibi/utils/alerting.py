@@ -190,8 +190,8 @@ def _build_payload(
             final_rows=final_rows,
         )
 
-    elif config.type == AlertType.TEAMS:
-        return _build_teams_payload(
+    elif config.type in (AlertType.TEAMS, AlertType.TEAMS_WORKFLOW):
+        return _build_teams_workflow_payload(
             pipeline=pipeline,
             project_name=project_name,
             status=status,
@@ -336,7 +336,7 @@ def _build_slack_payload(
     return payload
 
 
-def _build_teams_payload(
+def _build_teams_workflow_payload(
     pipeline: str,
     project_name: str,
     status: str,
@@ -353,13 +353,17 @@ def _build_teams_payload(
     rows_dropped: int = 0,
     final_rows: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Build Teams Adaptive Card payload with event-specific content."""
+    """Build payload for Power Automate Teams Workflow trigger.
+
+    Power Automate's 'When a Teams webhook request is received' expects
+    just the Adaptive Card content wrapped in an 'attachments' array,
+    not the full message envelope used by classic webhooks.
+    """
     facts = [
         {"title": "⏱ Duration", "value": f"{duration:.2f}s"},
         {"title": "📅 Time", "value": timestamp},
     ]
 
-    # Add row summary for success/failure events (not start)
     if total_rows > 0 or final_rows is not None:
         row_text = f"{final_rows:,}" if final_rows else f"{total_rows:,}"
         facts.append({"title": "📊 Rows Processed", "value": row_text})
@@ -379,12 +383,7 @@ def _build_teams_payload(
         )
         failed_tests = qd.get("failed_tests", [])
         if failed_tests:
-            facts.append(
-                {
-                    "title": "❌ Failed Tests",
-                    "value": ", ".join(failed_tests[:5]),
-                }
-            )
+            facts.append({"title": "❌ Failed Tests", "value": ", ".join(failed_tests[:5])})
 
     elif event_type == AlertEvent.ON_GATE_BLOCK.value:
         gd = context.get("gate_details", {})
@@ -405,11 +404,6 @@ def _build_teams_payload(
                 {"title": "📊 Metric", "value": td.get("metric", "N/A")},
             ]
         )
-
-    if config.metadata:
-        for k, v in config.metadata.items():
-            if k not in ["throttle_minutes", "max_per_hour"]:
-                facts.append({"title": f"📎 {k}", "value": str(v)})
 
     body_items = [
         {
@@ -455,14 +449,15 @@ def _build_teams_payload(
         "body": body_items,
     }
 
-    payload = {
-        "type": "message",
+    # Power Automate workflow expects 'attachments' array with the card
+    return {
         "attachments": [
-            {"contentType": "application/vnd.microsoft.card.adaptive", "content": adaptive_card}
-        ],
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": adaptive_card,
+            }
+        ]
     }
-
-    return payload
 
 
 def _build_generic_payload(

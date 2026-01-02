@@ -68,7 +68,8 @@ class AlertType(str, Enum):
 
     WEBHOOK = "webhook"
     SLACK = "slack"
-    TEAMS = "teams"
+    TEAMS = "teams"  # Uses Power Automate workflow format (classic webhooks retired Dec 2025)
+    TEAMS_WORKFLOW = "teams_workflow"  # Alias for teams (explicit Power Automate)
 
 
 class AlertEvent(str, Enum):
