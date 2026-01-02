@@ -450,7 +450,14 @@ class LineageGenerator:
     <script>
         mermaid.initialize({{
             startOnLoad: true,
-            theme: 'neutral',
+            theme: 'base',
+            themeVariables: {{
+                primaryColor: '#f1f5f9',
+                primaryBorderColor: '#94a3b8',
+                primaryTextColor: '#1e293b',
+                lineColor: '#64748b',
+                fontSize: '14px'
+            }},
             flowchart: {{
                 useMaxWidth: true,
                 htmlLabels: true,
@@ -517,17 +524,52 @@ class LineageGenerator:
                 return []
 
             story_files = []
-            for item in fs.ls(path_prefix, detail=False):
-                if fs.isdir(item) and not item.endswith(("lineage", "__pycache__")):
-                    date_path = f"{item}/{date}"
-                    if fs.exists(date_path):
+            all_items = fs.ls(path_prefix, detail=False)
+            ctx.debug("Scanning remote stories path", path=path_prefix, items_found=len(all_items))
+
+            for item in all_items:
+                item_name = item.rstrip("/").split("/")[-1]
+                is_dir = fs.isdir(item)
+                is_excluded = item_name in ("lineage", "__pycache__")
+
+                ctx.debug(
+                    "Checking pipeline directory",
+                    item=item,
+                    item_name=item_name,
+                    is_dir=is_dir,
+                    is_excluded=is_excluded,
+                )
+
+                if is_dir and not is_excluded:
+                    date_path = f"{item.rstrip('/')}/{date}"
+                    date_exists = fs.exists(date_path)
+                    ctx.debug(
+                        "Checking date directory",
+                        pipeline=item_name,
+                        date_path=date_path,
+                        exists=date_exists,
+                    )
+
+                    if date_exists:
                         json_files = sorted(
                             [f for f in fs.ls(date_path, detail=False) if f.endswith(".json")],
                             reverse=True,
                         )
                         if json_files:
                             story_files.append(json_files[0])
+                            ctx.debug(
+                                "Found story file",
+                                pipeline=item_name,
+                                file=json_files[0],
+                            )
+                        else:
+                            ctx.debug("No JSON files in date directory", pipeline=item_name)
 
+            ctx.info(
+                "Remote story files found",
+                count=len(story_files),
+                pipelines=[f.split("/")[-3] for f in story_files],
+            )
             return story_files
 
         except ImportError:
