@@ -119,9 +119,12 @@ class DimensionDefinition(BaseModel):
             - `connection.path`: e.g., `gold.dim_customer` or `gold.dims/customer`
             - `table_name`: Uses default connection
         column: Column name in source (defaults to name)
+        expr: Custom SQL expression. If provided, overrides column and grain.
+            Example: "YEAR(DATEADD(month, 6, Date))" for fiscal year
         hierarchy: Optional ordered list of columns for drill-down
         description: Human-readable description
-        grain: Time grain transformation (day, week, month, quarter, year)
+        grain: Time grain transformation (day, week, month, quarter, year).
+            Ignored if expr is provided.
     """
 
     name: str = Field(..., description="Unique dimension identifier")
@@ -135,6 +138,13 @@ class DimensionDefinition(BaseModel):
         ),
     )
     column: Optional[str] = Field(None, description="Column name (defaults to name)")
+    expr: Optional[str] = Field(
+        None,
+        description=(
+            "Custom SQL expression. Overrides column and grain. "
+            "Example: YEAR(DATEADD(month, 6, Date)) for fiscal year"
+        ),
+    )
     hierarchy: List[str] = Field(default_factory=list, description="Drill-down hierarchy")
     description: Optional[str] = Field(None, description="Human-readable description")
     grain: Optional[TimeGrain] = Field(None, description="Time grain transformation")

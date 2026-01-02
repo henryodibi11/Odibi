@@ -354,3 +354,68 @@ class TestTimeGrainTransformations:
         ddl = generator.generate_view_ddl(view)
 
         assert "DATETRUNC(year, ts) AS year" in ddl
+
+
+class TestCustomDimensionExpressions:
+    """Test custom dimension expressions."""
+
+    def test_custom_expr_overrides_grain(self):
+        """Test that custom expr takes priority over grain."""
+        config = SemanticLayerConfig(
+            metrics=[
+                MetricDefinition(name="count", expr="COUNT(*)", source="fact"),
+            ],
+            dimensions=[
+                DimensionDefinition(
+                    name="fiscal_year",
+                    column="order_date",
+                    expr="YEAR(DATEADD(month, 6, order_date))",
+                    grain=TimeGrain.YEAR,  # should be ignored
+                ),
+            ],
+        )
+        view = ViewConfig(name="vw", metrics=["count"], dimensions=["fiscal_year"])
+        generator = ViewGenerator(config)
+        ddl = generator.generate_view_ddl(view)
+
+        assert "YEAR(DATEADD(month, 6, order_date)) AS fiscal_year" in ddl
+        assert "DATETRUNC" not in ddl
+
+    def test_custom_expr_without_column(self):
+        """Test custom expr works without column defined."""
+        config = SemanticLayerConfig(
+            metrics=[
+                MetricDefinition(name="count", expr="COUNT(*)", source="fact"),
+            ],
+            dimensions=[
+                DimensionDefinition(
+                    name="iso_week",
+                    expr="DATEPART(iso_week, created_at)",
+                ),
+            ],
+        )
+        view = ViewConfig(name="vw", metrics=["count"], dimensions=["iso_week"])
+        generator = ViewGenerator(config)
+        ddl = generator.generate_view_ddl(view)
+
+        assert "DATEPART(iso_week, created_at) AS iso_week" in ddl
+
+    def test_custom_expr_monday_week_start(self):
+        """Test custom week start (Monday instead of Sunday)."""
+        config = SemanticLayerConfig(
+            metrics=[
+                MetricDefinition(name="revenue", expr="SUM(amount)", source="sales"),
+            ],
+            dimensions=[
+                DimensionDefinition(
+                    name="week_monday",
+                    expr="DATEADD(day, 1 - DATEPART(weekday, DATEADD(day, -1, sale_date)), DATEADD(day, -1, sale_date))",
+                ),
+            ],
+        )
+        view = ViewConfig(name="vw", metrics=["revenue"], dimensions=["week_monday"])
+        generator = ViewGenerator(config)
+        ddl = generator.generate_view_ddl(view)
+
+        assert "week_monday" in ddl
+        assert "DATEADD" in ddl

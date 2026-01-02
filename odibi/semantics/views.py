@@ -206,8 +206,13 @@ class ViewGenerator:
         if dim_def is None:
             return dim_name, dim_name
 
+        # Custom expression takes priority
+        if dim_def.expr:
+            return dim_def.expr, dim_name
+
         col = dim_def.get_column()
 
+        # Then check for grain preset
         if dim_def.grain:
             sql_template = self.GRAIN_SQL_MAP.get(dim_def.grain)
             if sql_template:
