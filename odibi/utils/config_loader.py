@@ -152,12 +152,13 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
             )
             raise ValueError(f"Missing environment variable: {var_name}")
         # Check for problematic characters that could break YAML
-        if any(c in value for c in ["\n", "\r", ":", "#"]):
+        # Note: Colons are NOT checked because URLs (https://) are common and safe
+        # when the value is substituted into a quoted YAML string
+        if any(c in value for c in ["\n", "\r", "#"]):
             logger.warning(
                 "Environment variable contains YAML-sensitive characters",
                 variable=var_name,
                 has_newline="\n" in value or "\r" in value,
-                has_colon=":" in value,
                 has_hash="#" in value,
             )
         logger.debug("Environment variable substituted", variable=var_name, length=len(value))

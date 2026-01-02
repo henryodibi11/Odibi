@@ -994,7 +994,8 @@ class Pipeline:
             results: Pipeline results
         """
         for alert_config in self.alerts:
-            if event in alert_config.on_events:
+            event_values = [e.value if hasattr(e, "value") else e for e in alert_config.on_events]
+            if event in event_values:
                 status = "FAILED" if results.failed else "SUCCESS"
                 if event == "on_start":
                     status = "STARTED"

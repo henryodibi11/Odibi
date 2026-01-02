@@ -42,6 +42,34 @@ alerts:
 | `on_gate_block` | Quality gate blocked the pipeline |
 | `on_threshold_breach` | A threshold was exceeded |
 
+## Metadata Reference
+
+The `metadata` field accepts the following options:
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `throttle_minutes` | int | `15` | Minimum minutes between repeated alerts for the same pipeline+event |
+| `max_per_hour` | int | `10` | Maximum alerts of the same type per hour |
+| `channel` | string | — | Target channel override (Slack only, e.g., `#data-alerts`) |
+
+!!! note "All metadata keys are optional"
+    If not specified, defaults are applied automatically.
+
+### Example with All Metadata Options
+
+```yaml
+alerts:
+  - type: slack
+    url: "${SLACK_WEBHOOK_URL}"
+    on_events:
+      - on_failure
+      - on_quarantine
+    metadata:
+      throttle_minutes: 15   # Min 15 minutes between same alerts
+      max_per_hour: 10       # Max 10 alerts per hour
+      channel: "#data-alerts" # Slack channel override
+```
+
 ## Throttling
 
 Prevent alert spam with time-based and rate-based throttling:
