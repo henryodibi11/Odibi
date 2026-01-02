@@ -658,11 +658,14 @@ class LineageGenerator:
             status_class = "success" if layer.status == "success" else "failed"
             layer_class = self._get_layer_class(layer.pipeline_layer or layer.name)
 
+            # Convert story_path to relative path for portable HTML links
+            relative_path = self._to_relative_story_path(layer.story_path)
+
             rows.append(
                 f"""
             <tr>
                 <td>
-                    <a href="{layer.story_path}">{layer.name}</a>
+                    <a href="{relative_path}">{layer.name}</a>
                 </td>
                 <td><span class="layer-badge {layer_class}">{layer.pipeline_layer or "-"}</span></td>
                 <td><span class="status-badge {status_class}">{layer.status}</span></td>
@@ -701,6 +704,44 @@ class LineageGenerator:
         elif "semantic" in layer_lower:
             return "layer-semantic"
         return ""
+
+    def _to_relative_story_path(self, story_path: str) -> str:
+        """
+        Convert absolute or remote story path to a relative path for HTML links.
+
+        This makes the lineage HTML portable - links work whether opened
+        from ADLS, local download, or served via web server.
+
+        Examples:
+            abfs://container@account.dfs.../stories/OEE/2026-01-02/run.html
+            -> OEE/2026-01-02/run.html
+
+            /home/user/stories/OEE/2026-01-02/run.html
+            -> OEE/2026-01-02/run.html
+        """
+        # Handle ADLS paths
+        if "://" in story_path:
+            # Extract path after the base container/account
+            # abfs://container@account.dfs.core.windows.net/stories/...
+            parts = story_path.split("/")
+            # Find 'stories' and take everything after it
+            try:
+                stories_idx = parts.index("stories")
+                return "/".join(parts[stories_idx + 1 :])
+            except ValueError:
+                # If no 'stories' folder, try to extract just the filename portion
+                # Take last 3 parts: pipeline/date/run.html
+                if len(parts) >= 3:
+                    return "/".join(parts[-3:])
+                return story_path.split("/")[-1]
+
+        # Handle local paths - make relative to stories_path
+        if self.stories_path and story_path.startswith(self.stories_path):
+            rel = story_path[len(self.stories_path) :].lstrip("/\\")
+            return rel.replace("\\", "/")
+
+        # Fallback: just use the filename
+        return story_path.replace("\\", "/").split("/")[-1]
 
     def _sanitize_id(self, node_id: str) -> str:
         """Sanitize node ID for Mermaid compatibility."""
