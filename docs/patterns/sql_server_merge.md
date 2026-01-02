@@ -8,6 +8,32 @@
 
 ---
 
+## What is This? (For Beginners)
+
+**The Problem You're Solving:**
+
+You have data in Databricks/Delta Lake (your "data lake") and need to sync it to Azure SQL Server (your "reporting database" for Power BI, apps, etc.).
+
+**Why Not Just Overwrite?**
+
+Imagine you have 1 million customer records. Every day, only 100 customers change their address. With `overwrite`, you'd delete all 1 million rows and re-insert them—slow and wasteful. With `merge`, you only update those 100 changed rows.
+
+**What is a MERGE?**
+
+A MERGE (also called "upsert") does three things in one operation:
+- **INSERT** new rows that don't exist in the target
+- **UPDATE** existing rows that have changed
+- **DELETE** rows that should be removed (optional)
+
+**What is a "Staging Table"?**
+
+A staging table is a temporary holding area. Odibi:
+1. Writes your data to `[staging].[your_table_staging]`
+2. Runs a MERGE from staging → target table
+3. Leaves the staging table for debugging (it gets overwritten next run)
+
+---
+
 ## Problem
 
 Syncing data from Databricks/Delta Lake to Azure SQL Server for Power BI or operational systems.
@@ -29,6 +55,47 @@ This provides **incremental upsert** with full control over conditions.
 ---
 
 ## Quick Start
+
+### Your First Merge (Complete Example)
+
+If you're new to SQL Server merge, start here. This is a complete, working example:
+
+```yaml
+# 1. First, define your SQL Server connection
+connections:
+  azure_sql:
+    type: sql_server
+    host: your-server.database.windows.net
+    database: your-database
+    username: ${SQL_USER}        # Use environment variable
+    password: ${SQL_PASSWORD}    # Never hardcode passwords!
+    driver: "ODBC Driver 18 for SQL Server"
+
+# 2. Then, create a node that syncs data to SQL Server
+nodes:
+  - name: sync_orders_to_sql
+    read:
+      connection: delta_lake     # Read from your data lake
+      format: delta
+      table: silver.orders
+    write:
+      connection: azure_sql      # Write to SQL Server
+      format: sql_server
+      table: dbo.orders          # Target table (schema.table)
+      mode: merge                # Use MERGE instead of overwrite
+      merge_keys: [order_id]     # Column(s) that identify each row
+      merge_options:
+        auto_create_table: true  # Create table on first run
+        audit_cols:
+          created_col: created_at
+          updated_col: updated_at
+```
+
+**What this does:**
+1. Reads orders from your Delta Lake silver layer
+2. Creates `dbo.orders` table in SQL Server (first run only)
+3. Inserts new orders, updates changed orders
+4. Automatically tracks when each row was created/updated
 
 ### Minimal Config
 
@@ -140,13 +207,25 @@ FROM @MergeActions;
 
 ### `merge_keys` (Required)
 
-Columns that form the `ON` clause of the MERGE. Can be single or composite.
+**What are merge keys?**
+
+Merge keys tell SQL Server how to match rows between your source data and the target table. They answer the question: "Is this row new, or does it already exist?"
+
+**Example:** If your table has customers identified by `customer_id`, then `customer_id` is your merge key. When Odibi sees `customer_id = 123` in the source, it checks if `customer_id = 123` exists in the target:
+- If yes → UPDATE that row
+- If no → INSERT a new row
+
+**Single vs Composite Keys:**
 
 ```yaml
-merge_keys: [order_id]                    # Single key
-merge_keys: [plant_id, material_id]       # Composite key
-merge_keys: [DateId, P_ID, Shift]         # Multi-column
+merge_keys: [order_id]                    # Single key - one column identifies a row
+merge_keys: [plant_id, material_id]       # Composite key - two columns together identify a row
+merge_keys: [DateId, P_ID, Shift]         # Multi-column - all three must match
 ```
+
+**How do I know what my merge keys are?**
+
+Ask yourself: "What columns make each row unique?" This is usually your primary key or business key.
 
 ### `merge_options`
 
@@ -171,25 +250,70 @@ merge_keys: [DateId, P_ID, Shift]         # Multi-column
 
 ### Conditions
 
-Use `source.` and `target.` prefixes in conditions:
+**What are conditions?**
+
+Conditions let you control WHEN to update, insert, or delete. They're optional but powerful.
+
+**Why use `update_condition`?**
+
+Without a condition, MERGE updates EVERY matched row—even if nothing changed. This is wasteful. With `update_condition`, you only update rows that actually changed:
 
 ```yaml
 update_condition: "source._hash_diff != target._hash_diff"
+```
+
+This says: "Only update if the hash (a fingerprint of the data) is different."
+
+**Why use `delete_condition`?**
+
+Soft deletes: Instead of removing rows from your source, you flag them with `_is_deleted = 1`. The MERGE then deletes them from the target:
+
+```yaml
 delete_condition: "source._is_deleted = 1"
+```
+
+**Why use `insert_condition`?**
+
+Skip invalid rows: Only insert rows that meet quality criteria:
+
+```yaml
 insert_condition: "source.is_valid = 1"
 ```
 
+**Important:** Use `source.` and `target.` prefixes to refer to columns in your conditions.
+
 ### Audit Columns
 
-Auto-populate timestamp columns with `GETUTCDATE()`:
+**What are audit columns?**
+
+Audit columns automatically track WHEN rows were created or last updated. This is essential for debugging and compliance.
 
 ```yaml
 audit_cols:
-  created_col: created_ts   # Set on INSERT only
-  updated_col: updated_ts   # Set on INSERT and UPDATE
+  created_col: created_ts   # Set to current time on INSERT only
+  updated_col: updated_ts   # Set to current time on INSERT and UPDATE
 ```
 
+**What happens:**
+- When a NEW row is inserted: both `created_ts` and `updated_ts` are set to now
+- When an EXISTING row is updated: only `updated_ts` is set to now (created_ts stays the same)
+
+**Do I need to add these columns to my DataFrame?**
+
+No! Odibi automatically:
+1. Adds these columns to the target table (if using `auto_create_table`)
+2. Populates them with `GETUTCDATE()` during the MERGE
+
 ### Validations
+
+**What are validations?**
+
+Validations check your data BEFORE the merge runs, catching problems early.
+
+**Why use them?**
+
+- NULL keys cause MERGE failures (SQL Server can't match NULL = NULL)
+- Duplicate keys cause unpredictable results (which duplicate wins?)
 
 Check data quality before merge:
 
@@ -287,7 +411,28 @@ merge_options:
 
 ### Incremental Merge Optimization
 
-When most rows haven't changed between runs, use incremental merge to dramatically reduce staging table writes:
+**What is incremental merge?**
+
+Without `incremental`, Odibi writes ALL your source rows to the staging table, then runs MERGE. If you have 1 million rows but only 100 changed, you're still writing 1 million rows to staging—wasteful!
+
+With `incremental: true`, Odibi:
+1. Reads the existing data from your target table (just the keys and hash)
+2. Compares it with your source data IN MEMORY (Spark/Pandas/Polars)
+3. Filters to only the rows that are NEW or CHANGED
+4. Writes only those rows to staging
+5. Runs MERGE on the smaller set
+
+**When to use it:**
+
+- Large tables (100K+ rows)
+- Daily syncs where most data doesn't change
+- When staging writes are slow
+
+**When NOT to use it:**
+
+- Small tables (just write everything, it's fast)
+- Full refreshes where everything changes
+- First-time loads (there's nothing to compare against)
 
 ```yaml
 merge_options:
@@ -300,7 +445,7 @@ merge_options:
 3. Only writes changed rows to staging table
 4. Runs MERGE only on the changed subset
 
-**Performance benefit:** If only 100 of 1M rows changed, staging table has 100 rows instead of 1M.
+**Performance benefit:** If only 100 of 1M rows changed, staging table has 100 rows instead of 1M—10x faster!
 
 #### Change Detection Options
 
@@ -559,6 +704,69 @@ connections:
     database: your-database
     authentication: ActiveDirectoryInteractive
 ```
+
+---
+
+## FAQ (Frequently Asked Questions)
+
+### Q: Should I use `merge` or `overwrite`?
+
+**Use `merge` when:**
+- You want to keep existing data and only add/update changes
+- Your table is large and only a small portion changes
+- You need to track created/updated timestamps
+
+**Use `overwrite` when:**
+- You want to replace all data every time
+- Your table is small (overwrite is simpler)
+- You're doing a full refresh/rebuild
+
+### Q: What happens on the first run?
+
+If the table doesn't exist and you have `auto_create_table: true`:
+1. Odibi creates the table from your DataFrame schema
+2. Adds audit columns if configured
+3. Creates primary key/index if configured
+4. Inserts all rows (everything is "new")
+
+### Q: How do I know if my merge is working?
+
+Check the logs! You'll see:
+```
+Starting SQL Server MERGE, target_table=oee.oee_fact, merge_keys=[DateId, P_ID]
+MERGE completed: inserted=50, updated=10, deleted=0
+```
+
+### Q: Why are my audit columns NULL?
+
+This was a bug fixed in v2.2.0. If you created tables before this fix, run:
+```sql
+UPDATE [schema].[table] 
+SET created_ts = GETUTCDATE(), updated_ts = GETUTCDATE() 
+WHERE created_ts IS NULL
+```
+
+### Q: How do I handle deletes?
+
+Two options:
+
+**Soft delete (recommended):** Add an `_is_deleted` flag to your source, then use:
+```yaml
+delete_condition: "source._is_deleted = 1"
+```
+
+**Hard delete:** Not supported via MERGE. Use a separate DELETE statement after the merge.
+
+### Q: Can I merge to multiple tables?
+
+Yes! Create multiple nodes, each with its own `write` block targeting different tables.
+
+### Q: What's the difference between `primary_key_on_merge_keys` and `index_on_merge_keys`?
+
+- **Primary key**: Enforces uniqueness, creates clustered index, only one per table
+- **Index**: Speeds up queries, allows duplicates, can have many per table
+
+Use primary key if your merge keys ARE your primary key. Use index if you already have a different primary key.
 
 ---
 
