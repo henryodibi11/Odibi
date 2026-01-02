@@ -544,7 +544,8 @@ class LineageGenerator:
             if self.is_remote:
                 import fsspec
 
-                fs, _ = fsspec.core.url_to_fs(story_path, **self.storage_options)
+                # Use the base stories_path to get the filesystem, then open the specific file
+                fs, _ = fsspec.core.url_to_fs(self.stories_path, **self.storage_options)
                 with fs.open(story_path, "r") as f:
                     return json.load(f)
             else:
