@@ -477,7 +477,6 @@ class LineageGenerator:
             <h2>📊 Lineage Graph</h2>
             <div class="export-buttons">
                 <button onclick="exportSVG()" class="export-btn">📥 Export SVG</button>
-                <button onclick="exportPDF()" class="export-btn">📄 Export PDF</button>
             </div>
         </div>
         <div class="lineage" id="lineage-container">
@@ -545,10 +544,7 @@ class LineageGenerator:
             URL.revokeObjectURL(url);
         }}
 
-        function exportPDF() {{
-            // Use browser's print dialog to save as PDF
-            window.print();
-        }}
+
     </script>
 </body>
 </html>"""
