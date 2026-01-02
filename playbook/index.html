@@ -1,0 +1,6456 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/playbook/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../tutorials/getting_started/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Playbook - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-odibi-playbook" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Playbook
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Playbook
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../tutorials/getting_started/" class="md-tabs__link">
+          
+  
+  
+  Learn
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../features/pipelines/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../patterns/" class="md-tabs__link">
+          
+  
+  
+  Patterns
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../validation/" class="md-tabs__link">
+          
+  
+  
+  Data Quality
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../features/alerting/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/the_definitive_guide/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/cheatsheet/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Playbook
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Playbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#new-to-odibi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New to Odibi?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-use-this-playbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Use This Playbook
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bronze-layer-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bronze Layer: Ingestion
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bronze Layer: Ingestion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#file-based-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File-Based Ingestion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database Ingestion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ingestion-quality-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ingestion Quality (Contracts)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#silver-layer-transformation-conforming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Silver Layer: Transformation &amp; Conforming
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Silver Layer: Transformation &amp; Conforming">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deduplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deduplication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slowly-changing-dimensions-scd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slowly Changing Dimensions (SCD)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-quality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Quality
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merge-upsert" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge &amp; Upsert
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Transformations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#built-in-transformers-40" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Built-in Transformers (40+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gold-layer-consumption-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gold Layer: Consumption &amp; Analytics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gold Layer: Consumption &amp; Analytics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fact-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fact Tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aggregations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reference-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantic-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantic Layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-cutting-concerns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-Cutting Concerns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cross-Cutting Concerns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation-observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation &amp; Observability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#orchestration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Orchestration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Decision Tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#developer-experience" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Developer Experience
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Developer Experience">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugins-extensibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugins &amp; Extensibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-internals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Internals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Internals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#state-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#context-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gaps-coming-soon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gaps / Coming Soon
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learn
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Learn
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/bronze_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bronze Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/silver_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silver Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/gold_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/spark_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/azure_connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimensional Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dimensional Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/01_introduction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/02_dimension_pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/03_date_dimension_pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Date Dimension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/04_fact_pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/05_aggregation_pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregation Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/06_full_star_schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Star Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/07_semantic_layer_intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semantic Layer Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/08_defining_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/09_defining_dimensions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Dimensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/10_querying_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Querying Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/11_materializing_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Materializing Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/12_semantic_full_example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semantic Full Example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/dimensional_modeling/13_fk_validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learning Resources
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Learning Resources
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../learning/curriculum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curriculum
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../learning/data_engineering_101/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Engineering 101
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../learning/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines & Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/transformers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transformers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loading Patterns (SCD2, Merge)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/stories/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stories
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orchestration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/cross-pipeline-dependencies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Pipeline Dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explanation/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explanation/case_studies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case Studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Patterns
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Loading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Loading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/append_only_raw/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Append-Only Raw
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/incremental_stateful/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Stateful
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/merge_upsert/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge/Upsert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/sql_server_merge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQL Server Merge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/windowed_reprocess/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windowed Reprocess
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/smart_read/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Smart Read
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/skip_if_unchanged/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skip If Unchanged
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/legacy_hwm_manual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Legacy HWM (Manual)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimensional Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dimensional Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/dimension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/date_dimension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Date Dimension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/fact/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/aggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregation Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/scd2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCD2 Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semantic Layer
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Semantic Layer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../semantics/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../semantics/query/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Querying
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../semantics/materialize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Materializing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../semantics/runner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../semantics/lineage_stitcher/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage Stitcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/anti_patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Quality
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/quality_gates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Gates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/quarantine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quarantine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/fk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/validation_performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/alerting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alerting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/schema_tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/the_definitive_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Definitive Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/planning_walkthroughs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning Walkthroughs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook (Recipes)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/medallion_architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Medallion Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/writing_transformations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/cli_master_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Master Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/python_api_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins & Extensibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/production_deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/secrets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/setup_azure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/performance_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/wsl_setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/best_practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/avoiding_the_builder_trap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Avoiding the Builder Trap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/dimensional_modeling_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimensional Modeling Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/dogfooding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dogfooding (Meta)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/MIGRATION_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/cheatsheet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/yaml_schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/supported_formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/PARITY_TABLE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Parity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_8" id="__nav_9_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="the-odibi-playbook">The Odibi Playbook</h1>
+<p>A problem-first guide to data engineering with Odibi. Find your problem, get the solution.</p>
+<hr />
+<h2 id="new-to-odibi">New to Odibi?</h2>
+<p>If you're just getting started:</p>
+<ol>
+<li><strong><a href="../tutorials/getting_started/">Getting Started Tutorial</a></strong> — Build your first pipeline in 10 minutes</li>
+<li><strong><a href="../tutorials/bronze_layer/">Bronze Layer Tutorial</a></strong> — Common ingestion problems solved</li>
+<li><strong><a href="../tutorials/silver_layer/">Silver Layer Tutorial</a></strong> — Cleaning and deduplication</li>
+<li><strong><a href="../tutorials/gold_layer/">Gold Layer Tutorial</a></strong> — Building star schemas</li>
+</ol>
+<p>Then come back here when you need to solve a specific problem.</p>
+<hr />
+<h2 id="how-to-use-this-playbook">How to Use This Playbook</h2>
+<ol>
+<li><strong>Find your layer</strong> (Bronze → Silver → Gold)</li>
+<li><strong>Find your problem</strong></li>
+<li><strong>Follow the link</strong> to implementation details</li>
+</ol>
+<hr />
+<h2 id="bronze-layer-ingestion">Bronze Layer: Ingestion</h2>
+<p><em>"Get data from sources into your lakehouse reliably."</em></p>
+<h3 id="file-based-ingestion">File-Based Ingestion</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Load all files from a folder</td>
+<td>Append-only raw ingestion</td>
+<td><code>read</code> → <code>write</code></td>
+<td><a href="../patterns/append_only_raw/">Append-Only Raw</a></td>
+</tr>
+<tr>
+<td>Only process new files since last run</td>
+<td>Time-based lookback</td>
+<td><code>incremental.mode: rolling_window</code></td>
+<td><a href="../patterns/incremental_stateful/">Incremental Loading</a></td>
+</tr>
+<tr>
+<td>Track exact high-water mark</td>
+<td>Stateful HWM tracking</td>
+<td><code>incremental.mode: stateful</code></td>
+<td><a href="../patterns/incremental_stateful/">Incremental Loading</a></td>
+</tr>
+<tr>
+<td>Files have inconsistent schemas</td>
+<td>Schema evolution handling</td>
+<td><code>write.options.mergeSchema: true</code></td>
+<td><a href="../features/schema_tracking/">Schema Tracking</a></td>
+</tr>
+<tr>
+<td>Malformed records break the pipeline</td>
+<td>Bad record archiving</td>
+<td><code>read.options.badRecordsPath</code></td>
+<td><a href="../reference/yaml_schema/#readconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Need to reprocess a time window</td>
+<td>Windowed reprocessing</td>
+<td>Rolling window config</td>
+<td><a href="../patterns/windowed_reprocess/">Windowed Reprocess</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="database-ingestion">Database Ingestion</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full table extract from SQL</td>
+<td>SQL read</td>
+<td><code>read.format: jdbc</code></td>
+<td><a href="../tutorials/getting_started/">Getting Started</a></td>
+</tr>
+<tr>
+<td>Only extract new/changed rows</td>
+<td>Stateful HWM incremental</td>
+<td><code>incremental.mode: stateful</code></td>
+<td><a href="../patterns/incremental_stateful/">Incremental Loading</a></td>
+</tr>
+<tr>
+<td>CDC / change data capture</td>
+<td>Merge incoming changes</td>
+<td><code>transformer: merge</code></td>
+<td><a href="../patterns/merge_upsert/">Merge/Upsert</a></td>
+</tr>
+<tr>
+<td>Source sends duplicates</td>
+<td>Deduplicate on ingest</td>
+<td><code>transformer: deduplicate</code></td>
+<td><a href="../reference/yaml_schema/#deduplicateparams">YAML Reference</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="ingestion-quality-contracts">Ingestion Quality (Contracts)</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fail fast if source is empty</td>
+<td>Row count contract</td>
+<td><code>contracts: [{type: row_count, min: 1}]</code></td>
+<td><a href="../reference/yaml_schema/#rowcounttest">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Detect unexpected volume drops</td>
+<td>Volume drop check</td>
+<td><code>contracts: [{type: volume_drop, threshold: 0.5}]</code></td>
+<td><a href="../reference/yaml_schema/#volumedroptest">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Ensure required columns exist</td>
+<td>Schema contract</td>
+<td><code>contracts: [{type: schema, strict: true}]</code></td>
+<td><a href="../reference/yaml_schema/#schemacontract">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Ensure no NULL values</td>
+<td>Not-null check</td>
+<td><code>contracts: [{type: not_null, columns: [...]}]</code></td>
+<td><a href="../reference/yaml_schema/#notnulltest">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Ensure unique keys</td>
+<td>Uniqueness check</td>
+<td><code>contracts: [{type: unique, columns: [...]}]</code></td>
+<td><a href="../reference/yaml_schema/#uniquetest">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Validate enum values</td>
+<td>Accepted values</td>
+<td><code>contracts: [{type: accepted_values, column: status, values: [A,B,C]}]</code></td>
+<td><a href="../reference/yaml_schema/#acceptedvaluestest">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Validate numeric range</td>
+<td>Range check</td>
+<td><code>contracts: [{type: range, column: age, min: 0, max: 150}]</code></td>
+<td><a href="../reference/yaml_schema/#rangetest">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Validate format (email, ID)</td>
+<td>Regex match</td>
+<td><code>contracts: [{type: regex_match, column: email, pattern: "..."}]</code></td>
+<td><a href="../reference/yaml_schema/#regexmatchtest">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Custom SQL validation</td>
+<td>Custom SQL</td>
+<td><code>contracts: [{type: custom_sql, condition: "amount &gt; 0"}]</code></td>
+<td><a href="../reference/yaml_schema/#customsqltest">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Detect data drift</td>
+<td>Distribution check</td>
+<td><code>contracts: [{type: distribution, column: price, metric: mean}]</code></td>
+<td><a href="../reference/yaml_schema/#distributioncontract">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Ensure data freshness</td>
+<td>Freshness check</td>
+<td><code>contracts: [{type: freshness, column: updated_at, max_age: "24h"}]</code></td>
+<td><a href="../reference/yaml_schema/#freshnesscontract">YAML Reference</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="silver-layer-transformation-conforming">Silver Layer: Transformation &amp; Conforming</h2>
+<p><em>"Clean, deduplicate, and model your data."</em></p>
+<h3 id="deduplication">Deduplication</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Remove duplicates within a batch</td>
+<td>Deduplicate transformer</td>
+<td><code>transformer: deduplicate</code></td>
+<td><a href="../reference/yaml_schema/#deduplicateparams">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Keep latest record per key</td>
+<td>Dedupe with ordering</td>
+<td><code>params: {keys: [...], order_by: "updated_at DESC"}</code></td>
+<td><a href="../reference/yaml_schema/#deduplicateparams">YAML Reference</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="slowly-changing-dimensions-scd">Slowly Changing Dimensions (SCD)</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Overwrite dimension changes (no history)</td>
+<td>SCD Type 1</td>
+<td><code>transformer: dimension</code> + <code>params.scd_type: 1</code></td>
+<td><a href="../patterns/dimension/">Dimension Pattern</a></td>
+</tr>
+<tr>
+<td>Track dimension changes over time</td>
+<td>SCD Type 2</td>
+<td><code>transformer: dimension</code> + <code>params.scd_type: 2</code></td>
+<td><a href="../patterns/scd2/">SCD2 Pattern</a></td>
+</tr>
+<tr>
+<td>Generate surrogate keys</td>
+<td>Dimension pattern</td>
+<td><code>params.surrogate_key: customer_sk</code></td>
+<td><a href="../patterns/dimension/">Dimension Pattern</a></td>
+</tr>
+<tr>
+<td>Handle unknown dimension members</td>
+<td>Unknown member row</td>
+<td><code>params.unknown_member: true</code></td>
+<td><a href="../patterns/dimension/">Dimension Pattern</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="data-quality">Data Quality</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Validate data after transformation</td>
+<td>Validation tests</td>
+<td><code>validation.tests: [...]</code></td>
+<td><a href="../features/quality_gates/">Quality Gates</a></td>
+</tr>
+<tr>
+<td>Route bad rows for review</td>
+<td>Quarantine</td>
+<td><code>validation.quarantine: {...}</code></td>
+<td><a href="../features/quarantine/">Quarantine</a></td>
+</tr>
+<tr>
+<td>Require 95% pass rate</td>
+<td>Quality gate threshold</td>
+<td><code>validation.gate.require_pass_rate: 0.95</code></td>
+<td><a href="../features/quality_gates/">Quality Gates</a></td>
+</tr>
+<tr>
+<td>Check referential integrity</td>
+<td>FK validation</td>
+<td>FK Validator API</td>
+<td><a href="../validation/fk/">FK Validation</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="merge-upsert">Merge &amp; Upsert</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Upsert into target table</td>
+<td>Merge transformer</td>
+<td><code>transformer: merge</code></td>
+<td><a href="../patterns/merge_upsert/">Merge/Upsert</a></td>
+</tr>
+<tr>
+<td>Detect deleted records</td>
+<td>Delete detection</td>
+<td><code>delete_detection.mode: sql_compare</code></td>
+<td><a href="../reference/yaml_schema/#deletedetectionconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Soft delete instead of hard delete</td>
+<td>Soft delete flag</td>
+<td><code>delete_detection.soft_delete_col: is_deleted</code></td>
+<td><a href="../reference/yaml_schema/#deletedetectionconfig">YAML Reference</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="custom-transformations">Custom Transformations</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Apply SQL transformations</td>
+<td>SQL steps</td>
+<td><code>transform.steps: [{sql: "..."}]</code></td>
+<td><a href="../guides/writing_transformations/">Writing Transformations</a></td>
+</tr>
+<tr>
+<td>Apply Python functions</td>
+<td>Function steps</td>
+<td><code>transform.steps: [{function: "..."}]</code></td>
+<td><a href="../guides/writing_transformations/">Writing Transformations</a></td>
+</tr>
+<tr>
+<td>Chain multiple operations</td>
+<td>Transform pipeline</td>
+<td>Multiple steps in sequence</td>
+<td><a href="../guides/writing_transformations/">Writing Transformations</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="built-in-transformers-40">Built-in Transformers (40+)</h3>
+<p>Odibi has 40+ built-in transformers. Use them in <code>transform.steps</code>:</p>
+<pre><code class="language-yaml">transform:
+  steps:
+    - transformer: filter_rows
+      params: {condition: &quot;amount &gt; 0&quot;}
+    - transformer: derive_columns
+      params: {columns: {total: &quot;qty * price&quot;}}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Transformers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Filtering</strong></td>
+<td><code>filter_rows</code>, <code>distinct</code>, <code>sample</code>, <code>limit</code></td>
+</tr>
+<tr>
+<td><strong>Columns</strong></td>
+<td><code>derive_columns</code>, <code>select_columns</code>, <code>drop_columns</code>, <code>rename_columns</code>, <code>cast_columns</code></td>
+</tr>
+<tr>
+<td><strong>Text</strong></td>
+<td><code>clean_text</code>, <code>trim_whitespace</code>, <code>regex_replace</code>, <code>split_part</code>, <code>concat_columns</code></td>
+</tr>
+<tr>
+<td><strong>Dates</strong></td>
+<td><code>extract_date_parts</code>, <code>date_add</code>, <code>date_trunc</code>, <code>date_diff</code>, <code>convert_timezone</code></td>
+</tr>
+<tr>
+<td><strong>Nulls</strong></td>
+<td><code>fill_nulls</code>, <code>coalesce_columns</code></td>
+</tr>
+<tr>
+<td><strong>Relational</strong></td>
+<td><code>join</code>, <code>union</code>, <code>aggregate</code>, <code>pivot</code>, <code>unpivot</code></td>
+</tr>
+<tr>
+<td><strong>Window</strong></td>
+<td><code>window_calculation</code> (rank, sum, lag, lead, etc.)</td>
+</tr>
+<tr>
+<td><strong>JSON/Nested</strong></td>
+<td><code>parse_json</code>, <code>normalize_json</code>, <code>explode_list_column</code>, <code>unpack_struct</code></td>
+</tr>
+<tr>
+<td><strong>Keys/Hashing</strong></td>
+<td><code>generate_surrogate_key</code>, <code>hash_columns</code></td>
+</tr>
+<tr>
+<td><strong>Advanced</strong></td>
+<td><code>sessionize</code>, <code>validate_and_flag</code>, <code>dict_based_mapping</code>, <code>split_events_by_period</code></td>
+</tr>
+<tr>
+<td><strong>Validation</strong></td>
+<td><code>cross_check</code> (compare two DataFrames)</td>
+</tr>
+<tr>
+<td><strong>Schema</strong></td>
+<td><code>normalize_schema</code>, <code>normalize_column_names</code>, <code>add_prefix</code>, <code>add_suffix</code></td>
+</tr>
+<tr>
+<td><strong>Sorting</strong></td>
+<td><code>sort</code></td>
+</tr>
+<tr>
+<td><strong>Values</strong></td>
+<td><code>replace_values</code>, <code>case_when</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Full reference:</strong> <a href="../reference/yaml_schema/#transformer-catalog">YAML Schema - Transformers</a></p>
+<hr />
+<h2 id="gold-layer-consumption-analytics">Gold Layer: Consumption &amp; Analytics</h2>
+<p><em>"Build fact tables, aggregations, and semantic layers for BI."</em></p>
+<h3 id="fact-tables">Fact Tables</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Build fact table with SK lookups</td>
+<td>Fact pattern</td>
+<td><code>transformer: fact</code></td>
+<td><a href="../patterns/fact/">Fact Pattern</a></td>
+</tr>
+<tr>
+<td>Handle orphan records (missing dims)</td>
+<td>Orphan handling</td>
+<td><code>params.orphan_handling: unknown</code></td>
+<td><a href="../patterns/fact/">Fact Pattern</a></td>
+</tr>
+<tr>
+<td>Quarantine orphans for review</td>
+<td>Orphan quarantine</td>
+<td><code>params.orphan_handling: quarantine</code></td>
+<td><a href="../patterns/fact/">Fact Pattern</a></td>
+</tr>
+<tr>
+<td>Validate grain (no duplicates)</td>
+<td>Grain validation</td>
+<td><code>params.grain: [order_id]</code></td>
+<td><a href="../patterns/fact/">Fact Pattern</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="aggregations">Aggregations</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-aggregate metrics</td>
+<td>Aggregation pattern</td>
+<td><code>transformer: aggregation</code></td>
+<td><a href="../patterns/aggregation/">Aggregation Pattern</a></td>
+</tr>
+<tr>
+<td>Incremental aggregation</td>
+<td>Merge aggregates</td>
+<td><code>params.incremental: true</code></td>
+<td><a href="../patterns/aggregation/">Aggregation Pattern</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reference-data">Reference Data</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generate date dimension</td>
+<td>Date dimension pattern</td>
+<td><code>transformer: date_dimension</code></td>
+<td><a href="../patterns/date_dimension/">Date Dimension</a></td>
+</tr>
+<tr>
+<td>Skip unchanged reference data</td>
+<td>Skip-if-unchanged</td>
+<td><code>write.skip_if_unchanged: true</code></td>
+<td><a href="../patterns/skip_if_unchanged/">Skip If Unchanged</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="semantic-layer">Semantic Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Define reusable metrics</td>
+<td>Semantic config</td>
+<td><code>semantic.metrics: [...]</code></td>
+<td><a href="../semantics/">Semantics</a></td>
+</tr>
+<tr>
+<td>Define dimensions for BI</td>
+<td>Semantic config</td>
+<td><code>semantic.dimensions: [...]</code></td>
+<td><a href="../semantics/">Semantics</a></td>
+</tr>
+<tr>
+<td>Query metrics dynamically</td>
+<td>Semantic Query</td>
+<td><code>SemanticQuery.execute("revenue BY region")</code></td>
+<td><a href="../semantics/query/">Query API</a></td>
+</tr>
+<tr>
+<td>Pre-compute aggregations</td>
+<td>Materialization</td>
+<td><code>Materializer.execute("monthly_revenue")</code></td>
+<td><a href="../semantics/materialize/">Materialization</a></td>
+</tr>
+<tr>
+<td>Incremental materialization</td>
+<td>Incremental materializer</td>
+<td><code>IncrementalMaterializer</code></td>
+<td><a href="../semantics/materialize/">Materialization</a></td>
+</tr>
+<tr>
+<td>Schedule materializations</td>
+<td>Materialization schedules</td>
+<td><code>materializations[].schedule: "@daily"</code></td>
+<td><a href="../semantics/materialize/">Materialization</a></td>
+</tr>
+<tr>
+<td>List defined materializations</td>
+<td>Materializer API</td>
+<td><code>materializer.list_materializations()</code></td>
+<td><a href="../semantics/materialize/">Materialization</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="cross-cutting-concerns">Cross-Cutting Concerns</h2>
+<h3 id="performance">Performance</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pipeline is slow</td>
+<td>Performance tuning</td>
+<td><code>performance</code> config</td>
+<td><a href="../guides/performance_tuning/">Performance Tuning</a></td>
+</tr>
+<tr>
+<td>Cache hot DataFrames</td>
+<td>Caching</td>
+<td><code>cache: true</code></td>
+<td><a href="../reference/yaml_schema/#nodeconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Skip expensive profiling</td>
+<td>Skip null profiling</td>
+<td><code>skip_null_profiling: true</code></td>
+<td><a href="../guides/performance_tuning/">Performance Tuning</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations">Operations</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Run only specific nodes</td>
+<td>Tag-based execution</td>
+<td><code>tags: [daily]</code> + <code>odibi run --tag daily</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Retry on transient failures</td>
+<td>Retry config</td>
+<td><code>retry: {enabled: true}</code></td>
+<td><a href="../reference/yaml_schema/#retryconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Alert on failure</td>
+<td>Alerting</td>
+<td><code>alerts: [{type: slack, ...}]</code></td>
+<td><a href="../features/alerting/">Alerting</a></td>
+</tr>
+<tr>
+<td>Track data lineage</td>
+<td>OpenLineage</td>
+<td><code>lineage: {url: "..."}</code></td>
+<td><a href="../features/lineage/">Lineage</a></td>
+</tr>
+<tr>
+<td>Export traces to observability platform</td>
+<td>OpenTelemetry</td>
+<td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code> env var</td>
+<td><a href="../features/observability/">Observability</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="multi-pipeline">Multi-Pipeline</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reference output from another pipeline</td>
+<td>Cross-pipeline deps</td>
+<td><code>$pipeline.node</code> syntax</td>
+<td><a href="../features/cross-pipeline-dependencies/">Cross-Pipeline Dependencies</a></td>
+</tr>
+<tr>
+<td>Environment-specific config</td>
+<td>Environments</td>
+<td><code>environments: {prod: {...}}</code></td>
+<td><a href="../guides/environments/">Environments</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="documentation-observability">Documentation &amp; Observability</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Track pipeline execution history</td>
+<td>Stories</td>
+<td><code>story: {connection: ..., path: stories/}</code></td>
+<td><a href="../features/stories/">Stories</a></td>
+</tr>
+<tr>
+<td>Generate HTML/JSON/Markdown reports</td>
+<td>Story renderers</td>
+<td>Automatic after each run</td>
+<td><a href="../features/stories/">Stories</a></td>
+</tr>
+<tr>
+<td>See row counts, duration, schema changes</td>
+<td>Story metadata</td>
+<td>Auto-captured metrics</td>
+<td><a href="../features/stories/">Stories</a></td>
+</tr>
+<tr>
+<td>Track schema evolution over time</td>
+<td>System Catalog</td>
+<td><code>system: {connection: ..., path: _system}</code></td>
+<td><a href="../features/catalog/">Catalog</a></td>
+</tr>
+<tr>
+<td>Query run history and stats</td>
+<td>Catalog API</td>
+<td><code>odibi catalog runs</code>, <code>odibi catalog stats</code></td>
+<td><a href="../features/catalog/">Catalog</a></td>
+</tr>
+<tr>
+<td>View HWM state</td>
+<td>Catalog state</td>
+<td><code>odibi catalog state config.yaml</code></td>
+<td><a href="../features/catalog/">Catalog</a></td>
+</tr>
+<tr>
+<td>Audit config changes</td>
+<td>Version hashing</td>
+<td>Auto-detects config drift</td>
+<td><a href="../features/catalog/">Catalog</a></td>
+</tr>
+<tr>
+<td>Compare Delta table versions</td>
+<td>Delta diagnostics</td>
+<td><code>get_delta_diff(table, v1, v2)</code></td>
+<td><a href="../features/diagnostics/">Diagnostics</a></td>
+</tr>
+<tr>
+<td>Detect data/schema drift</td>
+<td>Drift detection</td>
+<td><code>detect_drift(table, threshold)</code></td>
+<td><a href="../features/diagnostics/">Diagnostics</a></td>
+</tr>
+<tr>
+<td>Compare pipeline runs</td>
+<td>Run comparison</td>
+<td><code>diff_runs(run_a, run_b)</code></td>
+<td><a href="../features/diagnostics/">Diagnostics</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="orchestration">Orchestration</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Export to Airflow</td>
+<td>Airflow DAG generation</td>
+<td><code>AirflowExporter</code></td>
+<td><a href="../features/orchestration/">Orchestration</a></td>
+</tr>
+<tr>
+<td>Export to Dagster</td>
+<td>Dagster asset generation</td>
+<td><code>DagsterExporter</code></td>
+<td><a href="../features/orchestration/">Orchestration</a></td>
+</tr>
+<tr>
+<td>CLI for orchestration export</td>
+<td>Export command</td>
+<td><code>odibi export airflow config.yaml</code></td>
+<td><a href="../features/orchestration/">Orchestration</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cli-commands">CLI Commands</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Command</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Scaffold &amp; Setup</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Create new project</td>
+<td>Init wizard</td>
+<td><code>odibi init-pipeline my_project</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Use a template</td>
+<td>Template init</td>
+<td><code>odibi init-pipeline my_project --template local-medallion</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Generate API docs</td>
+<td>Docs generator</td>
+<td><code>odibi docs</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td><strong>Execution</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Run a pipeline</td>
+<td>Execute nodes</td>
+<td><code>odibi run config.yaml</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Run specific pipeline</td>
+<td>Filter by name</td>
+<td><code>odibi run config.yaml --pipeline orders</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Run specific node</td>
+<td>Single node</td>
+<td><code>odibi run config.yaml --node transform_orders</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Dry run (no writes)</td>
+<td>Simulate</td>
+<td><code>odibi run config.yaml --dry-run</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Resume from failure</td>
+<td>Skip successful nodes</td>
+<td><code>odibi run config.yaml --resume</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Run nodes in parallel</td>
+<td>Parallel execution</td>
+<td><code>odibi run config.yaml --parallel --workers 8</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td><strong>Validation &amp; Testing</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Validate config syntax</td>
+<td>Config check</td>
+<td><code>odibi validate config.yaml</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Run transform unit tests</td>
+<td>Test runner</td>
+<td><code>odibi test tests/</code></td>
+<td><a href="../guides/testing/">Testing</a></td>
+</tr>
+<tr>
+<td>Update test snapshots</td>
+<td>Snapshot mode</td>
+<td><code>odibi test --snapshot</code></td>
+<td><a href="../guides/testing/">Testing</a></td>
+</tr>
+<tr>
+<td>Diagnose issues</td>
+<td>Doctor check</td>
+<td><code>odibi doctor config.yaml</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td><strong>Visualization &amp; Inspection</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Visualize dependencies</td>
+<td>DAG graph</td>
+<td><code>odibi graph config.yaml</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>Output as Mermaid</td>
+<td>Mermaid format</td>
+<td><code>odibi graph config.yaml --format mermaid</code></td>
+<td><a href="../guides/cli_master_guide/">CLI Guide</a></td>
+</tr>
+<tr>
+<td>View schema history</td>
+<td>Schema diff</td>
+<td><code>odibi schema history table --config config.yaml</code></td>
+<td><a href="../features/schema_tracking/">Schema Tracking</a></td>
+</tr>
+<tr>
+<td>Compare schema versions</td>
+<td>Schema diff</td>
+<td><code>odibi schema diff table --from-version 3 --to-version 5</code></td>
+<td><a href="../features/schema_tracking/">Schema Tracking</a></td>
+</tr>
+<tr>
+<td><strong>Stories &amp; Reporting</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Generate story report</td>
+<td>Story gen</td>
+<td><code>odibi story generate config.yaml</code></td>
+<td><a href="../features/stories/">Stories</a></td>
+</tr>
+<tr>
+<td>Compare two runs</td>
+<td>Story diff</td>
+<td><code>odibi story diff run1.json run2.json</code></td>
+<td><a href="../features/stories/">Stories</a></td>
+</tr>
+<tr>
+<td>List story files</td>
+<td>Story list</td>
+<td><code>odibi story list</code></td>
+<td><a href="../features/stories/">Stories</a></td>
+</tr>
+<tr>
+<td><strong>Lineage</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Emit OpenLineage events</td>
+<td>Lineage emit</td>
+<td><code>odibi lineage emit config.yaml</code></td>
+<td><a href="../features/lineage/">Lineage</a></td>
+</tr>
+<tr>
+<td>View lineage graph</td>
+<td>Lineage view</td>
+<td><code>odibi lineage view config.yaml</code></td>
+<td><a href="../features/lineage/">Lineage</a></td>
+</tr>
+<tr>
+<td><strong>Deployment &amp; Export</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Deploy to System Catalog</td>
+<td>Catalog deploy</td>
+<td><code>odibi deploy config.yaml</code></td>
+<td><a href="../features/catalog/">Catalog</a></td>
+</tr>
+<tr>
+<td>Export to Airflow</td>
+<td>Airflow DAG</td>
+<td><code>odibi export airflow config.yaml</code></td>
+<td><a href="../features/orchestration/">Orchestration</a></td>
+</tr>
+<tr>
+<td>Export to Dagster</td>
+<td>Dagster assets</td>
+<td><code>odibi export dagster config.yaml</code></td>
+<td><a href="../features/orchestration/">Orchestration</a></td>
+</tr>
+<tr>
+<td><strong>Secrets &amp; Config</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Manage secrets</td>
+<td>Secret commands</td>
+<td><code>odibi secrets set KEY VALUE</code></td>
+<td><a href="../guides/secrets/">Secrets</a></td>
+</tr>
+<tr>
+<td>List secrets</td>
+<td>Secret list</td>
+<td><code>odibi secrets list</code></td>
+<td><a href="../guides/secrets/">Secrets</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="connections">Connections</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Connection Type</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read/write local files</td>
+<td>Local filesystem</td>
+<td><code>type: local</code></td>
+<td><a href="../features/connections/">Connections</a></td>
+</tr>
+<tr>
+<td>Read/write Azure Blob/ADLS</td>
+<td>Azure storage</td>
+<td><code>type: azure_blob</code></td>
+<td><a href="../guides/setup_azure/">Azure Setup</a></td>
+</tr>
+<tr>
+<td>Read/write Delta tables</td>
+<td>Delta Lake</td>
+<td><code>type: delta</code></td>
+<td><a href="../features/connections/">Connections</a></td>
+</tr>
+<tr>
+<td>Read from SQL Server</td>
+<td>JDBC connection</td>
+<td><code>type: sql_server</code></td>
+<td><a href="../features/connections/">Connections</a></td>
+</tr>
+<tr>
+<td>Call HTTP APIs</td>
+<td>REST endpoints</td>
+<td><code>type: http</code></td>
+<td><a href="../features/connections/">Connections</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="advanced-features">Advanced Features</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query old data versions</td>
+<td>Delta Time Travel</td>
+<td><code>read.time_travel.version</code> or <code>timestamp</code></td>
+<td><a href="../reference/yaml_schema/#timetravelconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Add load metadata columns</td>
+<td>Write metadata</td>
+<td><code>write.add_metadata: true</code></td>
+<td><a href="../reference/yaml_schema/#writemetadataconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Add _extracted_at, _source_file</td>
+<td>Selective metadata</td>
+<td><code>write.add_metadata: {extracted_at: true}</code></td>
+<td><a href="../reference/yaml_schema/#writemetadataconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Partition output for performance</td>
+<td>Partition by columns</td>
+<td><code>write.partition_by: [year, month]</code></td>
+<td><a href="../reference/yaml_schema/#writeconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Run SQL before transform</td>
+<td>Pre-SQL hooks</td>
+<td><code>pre_sql: ["CREATE TEMP VIEW..."]</code></td>
+<td><a href="../reference/yaml_schema/#nodeconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Run SQL after write</td>
+<td>Post-SQL hooks</td>
+<td><code>post_sql: ["OPTIMIZE table", "VACUUM"]</code></td>
+<td><a href="../reference/yaml_schema/#nodeconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Control error handling</td>
+<td>Error strategy</td>
+<td><code>on_error: fail_fast|fail_later|ignore</code></td>
+<td><a href="../reference/yaml_schema/#nodeconfig">YAML Reference</a></td>
+</tr>
+<tr>
+<td>Depend on other nodes</td>
+<td>Node dependencies</td>
+<td><code>depends_on: [node1, node2]</code></td>
+<td><a href="../features/pipelines/">Pipelines</a></td>
+</tr>
+<tr>
+<td>Enable/disable nodes</td>
+<td>Conditional execution</td>
+<td><code>enabled: false</code></td>
+<td><a href="../features/pipelines/">Pipelines</a></td>
+</tr>
+<tr>
+<td>Route bad rows to quarantine</td>
+<td>Quarantine config</td>
+<td><code>validation.quarantine: {connection: ..., path: ...}</code></td>
+<td><a href="../features/quarantine/">Quarantine</a></td>
+</tr>
+<tr>
+<td>Compare two DataFrames</td>
+<td>Cross-check validation</td>
+<td><code>transformer: cross_check</code></td>
+<td><a href="../reference/yaml_schema/">YAML Reference</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="quick-decision-tree">Quick Decision Tree</h2>
+<pre><code>I need to...
+│
+├─► INGEST data
+│   ├─► From files → read + write (append mode)
+│   ├─► From database → read.format: jdbc
+│   ├─► Only new data → incremental.mode: stateful
+│   └─► Skip if unchanged → write.skip_if_unchanged: true
+│
+├─► CLEAN/TRANSFORM data
+│   ├─► Remove duplicates → transformer: deduplicate
+│   ├─► Track history → transformer: dimension (scd_type: 2)
+│   ├─► Upsert/merge → transformer: merge
+│   ├─► Validate quality → validation.tests: [...]
+│   ├─► Custom logic → transform.steps: [{sql: ...}]
+│   └─► Built-in ops → filter_rows, derive_columns, join, etc.
+│
+├─► BUILD ANALYTICS
+│   ├─► Fact table → transformer: fact
+│   ├─► Aggregation → transformer: aggregation
+│   ├─► Date table → transformer: date_dimension
+│   └─► Metrics layer → semantic.metrics: [...]
+│
+├─► MONITOR &amp; DEBUG
+│   ├─► Execution history → story config (auto HTML reports)
+│   ├─► Compare runs → odibi story diff run1.json run2.json
+│   ├─► Schema history → system catalog (auto tracking)
+│   ├─► Run stats → odibi catalog stats
+│   ├─► Diagnose → odibi doctor
+│   └─► View lineage → odibi lineage view
+│
+├─► OPERATE
+│   ├─► Run subset → odibi run --tag daily
+│   ├─► Resume → odibi run --resume
+│   ├─► Parallelize → odibi run --parallel
+│   ├─► Handle failures → retry + alerts
+│   ├─► Deploy to catalog → odibi deploy config.yaml
+│   └─► Export to Airflow → odibi export airflow
+│
+├─► EXTEND
+│   ├─► Custom connection → register_connection_factory()
+│   ├─► Custom transform → @transform decorator
+│   └─► Package plugins → pyproject.toml entry points
+│
+├─► TEST
+│   ├─► Unit test node → pipeline.run_node(mock_data=...)
+│   ├─► CLI test runner → odibi test tests/
+│   ├─► Assert equality → assert_frame_equal()
+│   ├─► Generate data → generate_sample_data()
+│   └─► Deterministic tests → SourcePoolConfig
+│
+├─► AUTOMATE
+│   ├─► Python API → PipelineManager.from_yaml()
+│   ├─► Web dashboard → odibi ui config.yaml
+│   └─► Access state → StateManager API
+│
+└─► GET STARTED
+    ├─► New project → odibi init-pipeline my_project
+    ├─► From template → odibi init-pipeline --template local-medallion
+    └─► Generate docs → odibi docs
+</code></pre>
+<hr />
+<h2 id="developer-experience">Developer Experience</h2>
+<p><em>"Extend, test, and automate Odibi."</em></p>
+<h3 id="python-api">Python API</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Run pipelines programmatically</td>
+<td>Python execution</td>
+<td><code>PipelineManager.from_yaml()</code></td>
+<td><a href="../guides/python_api_guide/">Python API</a></td>
+</tr>
+<tr>
+<td>Run a specific pipeline</td>
+<td>Select pipeline</td>
+<td><code>manager.run("pipeline_name")</code></td>
+<td><a href="../guides/python_api_guide/">Python API</a></td>
+</tr>
+<tr>
+<td>Dry run without writing</td>
+<td>Simulation</td>
+<td><code>manager.run(dry_run=True)</code></td>
+<td><a href="../guides/python_api_guide/">Python API</a></td>
+</tr>
+<tr>
+<td>Resume from failure</td>
+<td>Skip completed</td>
+<td><code>manager.run(resume_from_failure=True)</code></td>
+<td><a href="../guides/python_api_guide/">Python API</a></td>
+</tr>
+<tr>
+<td>Access story metadata in code</td>
+<td>Story API</td>
+<td><code>result.story_path</code></td>
+<td><a href="../guides/python_api_guide/">Python API</a></td>
+</tr>
+<tr>
+<td>Compare pipeline runs</td>
+<td>Diff API</td>
+<td><code>diff_runs(run_a, run_b)</code></td>
+<td><a href="../guides/python_api_guide/">Python API</a></td>
+</tr>
+<tr>
+<td>Compare Delta table versions</td>
+<td>Delta diff</td>
+<td><code>get_delta_diff(path, v1, v2)</code></td>
+<td><a href="../guides/python_api_guide/">Python API</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="plugins-extensibility">Plugins &amp; Extensibility</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Need custom connection (Snowflake, Postgres)</td>
+<td>Connection plugin</td>
+<td><code>register_connection_factory()</code></td>
+<td><a href="../features/plugins/">Plugins</a></td>
+</tr>
+<tr>
+<td>Need custom transformation</td>
+<td>Transform plugin</td>
+<td><code>@transform</code> decorator</td>
+<td><a href="../features/plugins/">Plugins</a></td>
+</tr>
+<tr>
+<td>Validate transform parameters</td>
+<td>Pydantic models</td>
+<td><code>@transform(param_model=MyParams)</code></td>
+<td><a href="../features/plugins/">Plugins</a></td>
+</tr>
+<tr>
+<td>Auto-load custom code</td>
+<td>Auto-discovery</td>
+<td><code>transforms.py</code>, <code>plugins.py</code> files</td>
+<td><a href="../features/plugins/">Plugins</a></td>
+</tr>
+<tr>
+<td>Package plugins for distribution</td>
+<td>Entry points</td>
+<td><code>pyproject.toml</code> entry points</td>
+<td><a href="../features/plugins/">Plugins</a></td>
+</tr>
+<tr>
+<td>List registered functions</td>
+<td>Registry API</td>
+<td><code>FunctionRegistry.list_functions()</code></td>
+<td><a href="../features/plugins/">Plugins</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="testing">Testing</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unit test a single node</td>
+<td>Mock input data</td>
+<td><code>pipeline.run_node(mock_data=...)</code></td>
+<td><a href="../guides/python_api_guide/#unit-testing-nodes">Python API</a></td>
+</tr>
+<tr>
+<td>Assert DataFrame equality</td>
+<td>Test assertions</td>
+<td><code>assert_frame_equal(left, right)</code></td>
+<td><a href="../guides/testing/">Testing</a></td>
+</tr>
+<tr>
+<td>Assert schema match</td>
+<td>Schema assertions</td>
+<td><code>assert_schema_equal(left, right)</code></td>
+<td><a href="../guides/testing/">Testing</a></td>
+</tr>
+<tr>
+<td>Generate sample test data</td>
+<td>Fixtures</td>
+<td><code>generate_sample_data(rows=100)</code></td>
+<td><a href="../guides/testing/">Testing</a></td>
+</tr>
+<tr>
+<td>Create temp directories</td>
+<td>Fixtures</td>
+<td><code>with temp_directory() as d:</code></td>
+<td><a href="../guides/testing/">Testing</a></td>
+</tr>
+<tr>
+<td>Deterministic replay tests</td>
+<td>Source Pools</td>
+<td><code>SourcePoolConfig</code></td>
+<td><a href="../source_pools_design/">Source Pools</a></td>
+</tr>
+<tr>
+<td>Test data with nulls/unicode</td>
+<td>Data quality pools</td>
+<td><code>DataQuality.MESSY</code></td>
+<td><a href="../source_pools_design/">Source Pools</a></td>
+</tr>
+<tr>
+<td>Hash-verify frozen test data</td>
+<td>Integrity manifest</td>
+<td><code>IntegrityManifest</code></td>
+<td><a href="../source_pools_design/">Source Pools</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="web-ui">Web UI</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>View pipeline status in browser</td>
+<td>Web dashboard</td>
+<td><code>odibi ui config.yaml</code></td>
+<td><a href="../features/ui/">UI</a></td>
+</tr>
+<tr>
+<td>Browse story reports visually</td>
+<td>Stories viewer</td>
+<td><code>/stories</code> endpoint</td>
+<td><a href="../features/ui/">UI</a></td>
+</tr>
+<tr>
+<td>View current config</td>
+<td>Config viewer</td>
+<td><code>/config</code> endpoint</td>
+<td><a href="../features/ui/">UI</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="advanced-internals">Advanced Internals</h2>
+<p><em>"Low-level APIs for power users and contributors."</em></p>
+<h3 id="state-management">State Management</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Choose state backend</td>
+<td>Backend config</td>
+<td><code>LocalJSONStateBackend</code> vs <code>CatalogStateBackend</code></td>
+<td><a href="../features/state/">State</a></td>
+</tr>
+<tr>
+<td>Access HWM programmatically</td>
+<td>State API</td>
+<td><code>state_mgr.get_hwm(key)</code></td>
+<td><a href="../features/state/">State</a></td>
+</tr>
+<tr>
+<td>Set HWM programmatically</td>
+<td>State API</td>
+<td><code>state_mgr.set_hwm(key, value)</code></td>
+<td><a href="../features/state/">State</a></td>
+</tr>
+<tr>
+<td>Batch HWM updates (parallel pipelines)</td>
+<td>Efficient writes</td>
+<td><code>state_mgr.set_hwm_batch(updates)</code></td>
+<td><a href="../features/state/">State</a></td>
+</tr>
+<tr>
+<td>Handle Delta concurrent writes</td>
+<td>Retry logic</td>
+<td>Auto-retry with exponential backoff</td>
+<td><a href="../features/state/">State</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="context-api">Context API</h3>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Solution</th>
+<th>Odibi Feature</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Access engine-specific context</td>
+<td>Context classes</td>
+<td><code>PandasContext</code>, <code>SparkContext</code>, <code>PolarsContext</code></td>
+<td><a href="../api/context/">Context API</a></td>
+</tr>
+<tr>
+<td>Get current DataFrame in transform</td>
+<td>Context get</td>
+<td><code>context.get("node_name")</code></td>
+<td><a href="../api/context/">Context API</a></td>
+</tr>
+<tr>
+<td>Register DataFrame for downstream</td>
+<td>Context set</td>
+<td><code>context.set("name", df)</code></td>
+<td><a href="../api/context/">Context API</a></td>
+</tr>
+<tr>
+<td>Access Spark session</td>
+<td>Engine context</td>
+<td><code>context.engine_context.spark</code></td>
+<td><a href="../api/context/">Context API</a></td>
+</tr>
+<tr>
+<td>Execute SQL in context</td>
+<td>SQL execution</td>
+<td><code>context.sql("SELECT ...")</code></td>
+<td><a href="../api/context/">Context API</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="engines">Engines</h2>
+<p>Odibi supports 3 execution engines with feature parity:</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Best For</th>
+<th>Config</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pandas</code></td>
+<td>Small data (&lt;1GB), local dev</td>
+<td><code>engine: pandas</code></td>
+</tr>
+<tr>
+<td><code>polars</code></td>
+<td>Medium data (1-10GB), fast local</td>
+<td><code>engine: polars</code></td>
+</tr>
+<tr>
+<td><code>spark</code></td>
+<td>Big data (&gt;10GB), Delta Lake, Databricks</td>
+<td><code>engine: spark</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>All patterns and transformers work on all engines.</strong></p>
+<p>See: <a href="../reference/PARITY_TABLE/">Engine Parity Table</a>, <a href="../tutorials/spark_engine/">Spark Tutorial</a></p>
+<hr />
+<h2 id="gaps-coming-soon">Gaps / Coming Soon</h2>
+<!-- TODO: Add docs for these -->
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Streaming ingestion</td>
+<td>Partial</td>
+<td>See <a href="../tutorials/spark_engine/#streaming-ingestion">Spark Tutorial</a></td>
+</tr>
+<tr>
+<td>Full CDC patterns</td>
+<td>Partial</td>
+<td>Merge covers basics, need CDC-specific guide</td>
+</tr>
+<tr>
+<td>Data vault patterns</td>
+<td>Not yet</td>
+<td>Hub/Link/Satellite patterns</td>
+</tr>
+<tr>
+<td>Slowly Changing Dimension Type 3</td>
+<td>Not yet</td>
+<td>Current + previous value</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="../tutorials/getting_started/">Getting Started</a> — First pipeline tutorial</li>
+<li><a href="../reference/yaml_schema/">YAML Reference</a> — Full configuration options</li>
+<li><a href="../guides/python_api_guide/">Python API Guide</a> — Programmatic usage</li>
+<li><a href="../features/plugins/">Plugins &amp; Extensibility</a> — Custom connections &amp; transforms</li>
+<li><a href="../source_pools_design/">Source Pools Design</a> — Deterministic test data</li>
+<li><a href="../reference/glossary/">Glossary</a> — Terminology reference</li>
+<li><a href="../guides/best_practices/">Best Practices</a> — Production patterns</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "toc.integrate", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
