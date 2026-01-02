@@ -21,6 +21,7 @@ from odibi.enums import EngineType
 from odibi.semantics.metrics import (
     DimensionDefinition,
     MetricDefinition,
+    MetricType,
     SemanticLayerConfig,
 )
 from odibi.utils.logging_context import get_logging_context
@@ -158,7 +159,24 @@ class SemanticQuery:
             raise ValueError("At least one metric is required")
 
         metric_defs = [self._metric_cache[m] for m in parsed.metrics]
-        sources = {m.source for m in metric_defs if m.source}
+
+        all_component_metrics = set()
+        for metric_def in metric_defs:
+            if metric_def.type == MetricType.DERIVED and metric_def.components:
+                for comp_name in metric_def.components:
+                    comp_metric = self._metric_cache.get(comp_name.lower())
+                    if comp_metric:
+                        all_component_metrics.add(comp_name.lower())
+
+        sources = set()
+        for m in metric_defs:
+            if m.source:
+                sources.add(m.source)
+        for comp_name in all_component_metrics:
+            comp_metric = self._metric_cache.get(comp_name)
+            if comp_metric and comp_metric.source:
+                sources.add(comp_metric.source)
+
         if not sources:
             raise ValueError("No source table found for metrics")
 
@@ -174,8 +192,17 @@ class SemanticQuery:
             else:
                 select_parts.append(dim_name)
 
+        for comp_name in all_component_metrics:
+            comp_metric = self._metric_cache.get(comp_name)
+            if comp_metric and comp_metric.expr:
+                select_parts.append(f"{comp_metric.expr} AS {comp_name}")
+
         for metric_def in metric_defs:
-            select_parts.append(f"{metric_def.expr} AS {metric_def.name}")
+            if metric_def.type == MetricType.DERIVED:
+                formula_sql = self._build_derived_formula_sql(metric_def)
+                select_parts.append(f"{formula_sql} AS {metric_def.name}")
+            elif metric_def.name not in all_component_metrics:
+                select_parts.append(f"{metric_def.expr} AS {metric_def.name}")
 
         select_clause = ", ".join(select_parts) if select_parts else "*"
 
@@ -202,6 +229,67 @@ class SemanticQuery:
         sql = f"SELECT {select_clause} FROM {source_table}{where_clause}{group_by_clause}"
 
         return sql, source_table
+
+    def _build_derived_formula_sql(self, metric_def: MetricDefinition) -> str:
+        """
+        Build SQL for a derived metric formula.
+
+        Replaces component names with their aggregation expressions
+        and wraps divisors with NULLIF to prevent division by zero.
+
+        Args:
+            metric_def: The derived metric definition
+
+        Returns:
+            SQL expression string
+        """
+        if not metric_def.formula or not metric_def.components:
+            raise ValueError(f"Derived metric '{metric_def.name}' missing formula or components")
+
+        formula = metric_def.formula
+
+        component_exprs = {}
+        for comp_name in metric_def.components:
+            comp_metric = self._metric_cache.get(comp_name.lower())
+            if comp_metric and comp_metric.expr:
+                component_exprs[comp_name.lower()] = comp_metric.expr
+
+        sorted_names = sorted(component_exprs.keys(), key=len, reverse=True)
+        result = formula
+        for name in sorted_names:
+            result = result.replace(name, component_exprs[name])
+
+        result = self._wrap_divisors_with_nullif(result)
+
+        return result
+
+    def _wrap_divisors_with_nullif(self, expr: str) -> str:
+        """
+        Wrap division operands with NULLIF to prevent division by zero.
+
+        Handles patterns like:
+        - expr / SUM(x) -> expr / NULLIF(SUM(x), 0)
+        - (a - b) / SUM(x) -> (a - b) / NULLIF(SUM(x), 0)
+
+        Args:
+            expr: SQL expression string
+
+        Returns:
+            Expression with NULLIF wrapping divisors
+        """
+        import re
+
+        pattern = r"/\s*(\([^)]+\)|SUM\([^)]+\)|COUNT\([^)]+\)|AVG\([^)]+\)|[A-Za-z_][A-Za-z0-9_]*)"
+        matches = list(re.finditer(pattern, expr, re.IGNORECASE))
+
+        for match in reversed(matches):
+            divisor = match.group(1)
+            if not divisor.upper().startswith("NULLIF"):
+                start, end = match.span()
+                new_text = f"/ NULLIF({divisor}, 0)"
+                expr = expr[:start] + new_text + expr[end:]
+
+        return expr
 
     def execute(
         self,
@@ -273,6 +361,8 @@ class SemanticQuery:
         """Execute the query using the appropriate engine."""
         if context.engine_type == EngineType.SPARK:
             return self._execute_spark(context, source_df, parsed)
+        elif context.engine_type == EngineType.POLARS:
+            return self._execute_polars(source_df, parsed)
         else:
             return self._execute_pandas(source_df, parsed)
 
@@ -305,18 +395,156 @@ class SemanticQuery:
             else:
                 group_cols.append(F.col(dim_name))
 
-        agg_exprs = []
+        component_metrics = set()
+        derived_metrics = []
+        simple_metrics = []
+
         for metric_name in parsed.metrics:
             metric_def = self._metric_cache.get(metric_name)
             if metric_def:
-                agg_exprs.append(F.expr(metric_def.expr).alias(metric_name))
+                if metric_def.type == MetricType.DERIVED:
+                    derived_metrics.append(metric_def)
+                    if metric_def.components:
+                        for comp in metric_def.components:
+                            component_metrics.add(comp.lower())
+                else:
+                    simple_metrics.append(metric_def)
+
+        agg_exprs = []
+        for comp_name in component_metrics:
+            comp_def = self._metric_cache.get(comp_name)
+            if comp_def and comp_def.expr:
+                agg_exprs.append(F.expr(comp_def.expr).alias(comp_name))
+
+        for metric_def in simple_metrics:
+            if metric_def.name not in component_metrics and metric_def.expr:
+                agg_exprs.append(F.expr(metric_def.expr).alias(metric_def.name))
 
         if group_cols:
             result = df.groupBy(group_cols).agg(*agg_exprs)
         else:
             result = df.agg(*agg_exprs)
 
+        for derived in derived_metrics:
+            formula_expr = self._build_pandas_derived_formula(derived)
+            result = result.withColumn(derived.name, F.expr(formula_expr))
+
         return result
+
+    def _execute_polars(self, source_df: Any, parsed: ParsedQuery) -> Any:
+        """Execute query using Polars."""
+        import polars as pl
+
+        df = source_df
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+
+        all_filters = []
+        for metric_name in parsed.metrics:
+            metric_def = self._metric_cache.get(metric_name)
+            if metric_def:
+                all_filters.extend(metric_def.filters)
+        all_filters.extend(parsed.filters)
+
+        for filter_expr in all_filters:
+            df = df.filter(pl.sql_expr(filter_expr))
+
+        group_cols = []
+        for dim_name in parsed.dimensions:
+            dim_def = self._dimension_cache.get(dim_name)
+            if dim_def:
+                group_cols.append(dim_def.get_column())
+            else:
+                group_cols.append(dim_name)
+
+        component_metrics = set()
+        derived_metrics = []
+        simple_metrics = []
+
+        for metric_name in parsed.metrics:
+            metric_def = self._metric_cache.get(metric_name)
+            if metric_def:
+                if metric_def.type == MetricType.DERIVED:
+                    derived_metrics.append(metric_def)
+                    if metric_def.components:
+                        for comp in metric_def.components:
+                            component_metrics.add(comp.lower())
+                else:
+                    simple_metrics.append(metric_def)
+
+        agg_exprs = []
+        for comp_name in component_metrics:
+            comp_def = self._metric_cache.get(comp_name)
+            if comp_def and comp_def.expr:
+                col, func = self._parse_pandas_agg(comp_def.expr)
+                agg_exprs.append(self._polars_agg_expr(col, func, comp_name))
+
+        for metric_def in simple_metrics:
+            if metric_def.name not in component_metrics and metric_def.expr:
+                col, func = self._parse_pandas_agg(metric_def.expr)
+                agg_exprs.append(self._polars_agg_expr(col, func, metric_def.name))
+
+        if group_cols:
+            result = df.group_by(group_cols).agg(agg_exprs)
+        else:
+            result = df.select(agg_exprs)
+
+        for derived in derived_metrics:
+            result = self._apply_polars_derived_formula(result, derived)
+
+        return result
+
+    def _polars_agg_expr(self, col: str, func: str, alias: str) -> Any:
+        """Build a Polars aggregation expression."""
+        import polars as pl
+
+        if col == "*":
+            return pl.len().alias(alias)
+
+        if func == "sum":
+            return pl.col(col).sum().alias(alias)
+        elif func == "mean":
+            return pl.col(col).mean().alias(alias)
+        elif func == "count":
+            return pl.col(col).count().alias(alias)
+        elif func == "min":
+            return pl.col(col).min().alias(alias)
+        elif func == "max":
+            return pl.col(col).max().alias(alias)
+        else:
+            return pl.col(col).sum().alias(alias)
+
+    def _apply_polars_derived_formula(self, df: Any, metric_def: MetricDefinition) -> Any:
+        """
+        Apply a derived metric formula to a Polars DataFrame.
+
+        Args:
+            df: DataFrame with component metrics already calculated
+            metric_def: The derived metric definition
+
+        Returns:
+            DataFrame with the derived metric column added
+        """
+        import polars as pl
+
+        if not metric_def.formula or not metric_def.components:
+            raise ValueError(f"Derived metric '{metric_def.name}' missing formula or components")
+
+        formula = metric_def.formula
+
+        expr_parts = {}
+        for comp_name in metric_def.components:
+            comp_lower = comp_name.lower()
+            if comp_lower in df.columns:
+                expr_parts[comp_lower] = pl.col(comp_lower)
+
+        try:
+            result_expr = eval(formula, {"__builtins__": {}}, expr_parts)
+            df = df.with_columns(result_expr.alias(metric_def.name))
+        except ZeroDivisionError:
+            df = df.with_columns(pl.lit(float("nan")).alias(metric_def.name))
+
+        return df
 
     def _execute_pandas(self, source_df: Any, parsed: ParsedQuery) -> Any:
         """Execute query using Pandas."""
@@ -341,16 +569,82 @@ class SemanticQuery:
             else:
                 group_cols.append(dim_name)
 
-        agg_dict = {}
+        component_metrics = set()
+        derived_metrics = []
+        simple_metric_names = []
+
         for metric_name in parsed.metrics:
             metric_def = self._metric_cache.get(metric_name)
             if metric_def:
-                agg_dict[metric_name] = self._parse_pandas_agg(metric_def.expr)
+                if metric_def.type == MetricType.DERIVED:
+                    derived_metrics.append(metric_def)
+                    if metric_def.components:
+                        for comp in metric_def.components:
+                            component_metrics.add(comp.lower())
+                else:
+                    simple_metric_names.append(metric_name)
+
+        all_metrics_to_agg = list(component_metrics)
+        for name in simple_metric_names:
+            if name not in component_metrics:
+                all_metrics_to_agg.append(name)
 
         if group_cols:
-            result = self._pandas_groupby_agg(df, group_cols, parsed.metrics)
+            result = self._pandas_groupby_agg(df, group_cols, all_metrics_to_agg)
         else:
-            result = self._pandas_agg_all(df, parsed.metrics)
+            result = self._pandas_agg_all(df, all_metrics_to_agg)
+
+        for derived in derived_metrics:
+            result = self._apply_pandas_derived_formula(result, derived)
+
+        return result
+
+    def _apply_pandas_derived_formula(self, df: Any, metric_def: MetricDefinition) -> Any:
+        """
+        Apply a derived metric formula to a pandas DataFrame.
+
+        Args:
+            df: DataFrame with component metrics already calculated
+            metric_def: The derived metric definition
+
+        Returns:
+            DataFrame with the derived metric column added
+        """
+        if not metric_def.formula or not metric_def.components:
+            raise ValueError(f"Derived metric '{metric_def.name}' missing formula or components")
+
+        formula = metric_def.formula
+
+        local_vars = {}
+        for comp_name in metric_def.components:
+            comp_lower = comp_name.lower()
+            if comp_lower in df.columns:
+                local_vars[comp_lower] = df[comp_lower]
+
+        try:
+            df[metric_def.name] = eval(formula, {"__builtins__": {}}, local_vars)
+        except ZeroDivisionError:
+            df[metric_def.name] = float("nan")
+
+        return df
+
+    def _build_pandas_derived_formula(self, metric_def: MetricDefinition) -> str:
+        """
+        Build a formula expression for pandas/spark using column names.
+
+        Wraps divisors with null protection for Spark SQL.
+
+        Args:
+            metric_def: The derived metric definition
+
+        Returns:
+            Formula expression string using column names with NULLIF protection
+        """
+        if not metric_def.formula:
+            raise ValueError(f"Derived metric '{metric_def.name}' missing formula")
+
+        formula = metric_def.formula
+        result = self._wrap_divisors_with_nullif(formula)
 
         return result
 

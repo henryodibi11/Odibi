@@ -21,6 +21,16 @@ class MetricType(str, Enum):
     DERIVED = "derived"
 
 
+class TimeGrain(str, Enum):
+    """Time grain for dimension transformations."""
+
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    QUARTER = "quarter"
+    YEAR = "year"
+
+
 class MetricDefinition(BaseModel):
     """
     Definition of a semantic metric.
@@ -31,18 +41,24 @@ class MetricDefinition(BaseModel):
     Attributes:
         name: Unique metric identifier
         description: Human-readable description
-        expr: SQL aggregation expression (e.g., "SUM(total_amount)")
+        expr: SQL aggregation expression (e.g., "SUM(total_amount)").
+            Optional for derived metrics.
         source: Source table reference. Supports three formats:
             - `$pipeline.node` (recommended): e.g., `$build_warehouse.fact_orders`
             - `connection.path`: e.g., `gold.fact_orders` or `gold.oee/plant_a/metrics`
             - `table_name`: Uses default connection
         filters: Optional WHERE conditions to apply
         type: "simple" (direct aggregation) or "derived" (references other metrics)
+        components: List of component metric names (required for derived metrics).
+            These metrics must be additive (e.g., SUM-based) for correct
+            recalculation at different grains.
+        formula: Calculation formula using component names (required for derived).
+            Example: "(total_revenue - total_cost) / total_revenue"
     """
 
     name: str = Field(..., description="Unique metric identifier")
     description: Optional[str] = Field(None, description="Human-readable description")
-    expr: str = Field(..., description="SQL aggregation expression")
+    expr: Optional[str] = Field(None, description="SQL aggregation expression")
     source: Optional[str] = Field(
         None,
         description=(
@@ -54,6 +70,10 @@ class MetricDefinition(BaseModel):
     )
     filters: List[str] = Field(default_factory=list, description="WHERE conditions")
     type: MetricType = Field(default=MetricType.SIMPLE, description="Metric type")
+    components: Optional[List[str]] = Field(
+        None, description="Component metric names for derived metrics"
+    )
+    formula: Optional[str] = Field(None, description="Calculation formula using component names")
 
     @field_validator("name")
     @classmethod
@@ -68,10 +88,21 @@ class MetricDefinition(BaseModel):
 
     @field_validator("expr")
     @classmethod
-    def validate_expr(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("Metric expression cannot be empty")
-        return v.strip()
+    def validate_expr(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("Metric expression cannot be empty if provided")
+        return v.strip() if v else None
+
+    def model_post_init(self, __context) -> None:
+        """Validate derived metric requirements after model initialization."""
+        if self.type == MetricType.DERIVED:
+            if not self.components:
+                raise ValueError(f"Derived metric '{self.name}' requires 'components' list")
+            if not self.formula:
+                raise ValueError(f"Derived metric '{self.name}' requires 'formula'")
+        elif self.type == MetricType.SIMPLE:
+            if not self.expr:
+                raise ValueError(f"Simple metric '{self.name}' requires 'expr'")
 
 
 class DimensionDefinition(BaseModel):
@@ -90,11 +121,12 @@ class DimensionDefinition(BaseModel):
         column: Column name in source (defaults to name)
         hierarchy: Optional ordered list of columns for drill-down
         description: Human-readable description
+        grain: Time grain transformation (day, week, month, quarter, year)
     """
 
     name: str = Field(..., description="Unique dimension identifier")
-    source: str = Field(
-        ...,
+    source: Optional[str] = Field(
+        None,
         description=(
             "Source table reference. Formats: "
             "$pipeline.node (e.g., $build_warehouse.dim_customer), "
@@ -105,6 +137,7 @@ class DimensionDefinition(BaseModel):
     column: Optional[str] = Field(None, description="Column name (defaults to name)")
     hierarchy: List[str] = Field(default_factory=list, description="Drill-down hierarchy")
     description: Optional[str] = Field(None, description="Human-readable description")
+    grain: Optional[TimeGrain] = Field(None, description="Time grain transformation")
 
     @field_validator("name")
     @classmethod
@@ -156,17 +189,63 @@ class MaterializationConfig(BaseModel):
         return v
 
 
+class ViewConfig(BaseModel):
+    """
+    Configuration for a semantic view.
+
+    A view represents a pre-defined aggregation of metrics at a specific
+    grain, materialized as a SQL Server view for analyst consumption.
+
+    Attributes:
+        name: View name (will be created as db_schema.name in SQL Server)
+        description: Human-readable description of the view's purpose
+        metrics: List of metric names to include
+        dimensions: List of dimension names (determines grain)
+        db_schema: Database schema for the view (default: semantic)
+        source_file: Optional reference to source config file for documentation
+    """
+
+    name: str = Field(..., description="View name")
+    description: Optional[str] = Field(None, description="View description")
+    metrics: List[str] = Field(..., description="Metrics to include")
+    dimensions: List[str] = Field(..., description="Dimensions for grouping")
+    db_schema: str = Field(default="semantic", description="Database schema")
+    source_file: Optional[str] = Field(None, description="Source config file reference")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("View name cannot be empty")
+        return v.strip()
+
+    @field_validator("metrics")
+    @classmethod
+    def validate_metrics(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("At least one metric is required")
+        return v
+
+    @field_validator("dimensions")
+    @classmethod
+    def validate_dimensions_list(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("At least one dimension is required")
+        return v
+
+
 class SemanticLayerConfig(BaseModel):
     """
     Complete semantic layer configuration.
 
-    Contains all metrics, dimensions, and materializations
+    Contains all metrics, dimensions, materializations, and views
     for a semantic layer deployment.
 
     Attributes:
         metrics: List of metric definitions
         dimensions: List of dimension definitions
         materializations: List of materialization configurations
+        views: List of view configurations
     """
 
     metrics: List[MetricDefinition] = Field(default_factory=list, description="Metric definitions")
@@ -176,6 +255,7 @@ class SemanticLayerConfig(BaseModel):
     materializations: List[MaterializationConfig] = Field(
         default_factory=list, description="Materialization configs"
     )
+    views: List[ViewConfig] = Field(default_factory=list, description="View configurations")
 
     def get_metric(self, name: str) -> Optional[MetricDefinition]:
         """Get a metric by name."""
@@ -212,6 +292,15 @@ class SemanticLayerConfig(BaseModel):
         metric_names = {m.name for m in self.metrics}
         dimension_names = {d.name for d in self.dimensions}
 
+        for metric in self.metrics:
+            if metric.components:
+                for component_name in metric.components:
+                    if component_name.lower() not in metric_names:
+                        errors.append(
+                            f"Derived metric '{metric.name}' references "
+                            f"unknown component '{component_name}'"
+                        )
+
         for mat in self.materializations:
             for metric_name in mat.metrics:
                 if metric_name.lower() not in metric_names:
@@ -226,6 +315,25 @@ class SemanticLayerConfig(BaseModel):
                     )
 
         return errors
+
+
+class ViewResult(BaseModel):
+    """
+    Result of view generation/execution.
+
+    Attributes:
+        name: View name
+        success: Whether the operation succeeded
+        sql: Generated SQL DDL
+        error: Error message if failed
+        sql_file_path: Path where SQL was saved (if save requested)
+    """
+
+    name: str = Field(..., description="View name")
+    success: bool = Field(..., description="Whether operation succeeded")
+    sql: str = Field(..., description="Generated SQL DDL")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    sql_file_path: Optional[str] = Field(None, description="Path where SQL was saved")
 
 
 def parse_semantic_config(config_dict: Dict[str, Any]) -> SemanticLayerConfig:

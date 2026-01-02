@@ -60,11 +60,14 @@ class TestMetricDefinition:
         """Test derived metric type."""
         metric = MetricDefinition(
             name="avg_order_value",
-            expr="revenue / order_count",
             type=MetricType.DERIVED,
+            components=["revenue", "order_count"],
+            formula="revenue / order_count",
         )
         assert metric.type == MetricType.DERIVED
         assert metric.source is None
+        assert metric.components == ["revenue", "order_count"]
+        assert metric.formula == "revenue / order_count"
 
     def test_metric_name_validation(self):
         """Test that empty name raises error."""

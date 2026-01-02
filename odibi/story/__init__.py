@@ -12,6 +12,7 @@ Components:
 
 from odibi.story.doc_story import DocStoryGenerator
 from odibi.story.generator import StoryGenerator
+from odibi.story.lineage import LineageGenerator, LineageResult
 from odibi.story.metadata import (
     NodeExecutionMetadata,
     PipelineStoryMetadata,
@@ -41,6 +42,8 @@ __all__ = [
     "JSONStoryRenderer",
     "get_renderer",
     "DocStoryGenerator",
+    "LineageGenerator",
+    "LineageResult",
     "StoryTheme",
     "get_theme",
     "list_themes",
@@ -49,4 +52,4 @@ __all__ = [
     "DARK_THEME",
     "MINIMAL_THEME",
 ]
-__version__ = "1.3.0-alpha.5-phase3b"
+__version__ = "1.3.0-alpha.6-phase4"

@@ -26,24 +26,62 @@ def _tag_nodes_with_source(data: Dict[str, Any], source_path: str) -> None:
                     node["_source_yaml"] = source_path
 
 
+def _merge_semantic_config(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge semantic layer configs by appending lists.
+
+    Semantic configs have list fields (metrics, dimensions, views, materializations)
+    that should be accumulated from multiple imports.
+    """
+    result = base.copy()
+    list_keys = ["metrics", "dimensions", "views", "materializations"]
+
+    for key, value in override.items():
+        if key in list_keys and isinstance(value, list):
+            if key in result and isinstance(result[key], list):
+                logger.debug(
+                    "Appending semantic list",
+                    key=key,
+                    existing_count=len(result[key]),
+                    new_count=len(value),
+                )
+                result[key] = result[key] + value
+            else:
+                result[key] = value
+        elif isinstance(value, dict) and key in result and isinstance(result[key], dict):
+            result[key] = _merge_semantic_config(result[key], value)
+        else:
+            result[key] = value
+
+    return result
+
+
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """Merge override dictionary into base dictionary.
 
     Rules:
     1. Dicts are merged recursively.
     2. List 'pipelines' are appended.
-    3. Other types (and other lists) are overwritten by the override.
+    3. Semantic config lists (metrics, dimensions, views, materializations) are appended.
+    4. Other types (and other lists) are overwritten by the override.
     """
     result = base.copy()
     for key, value in override.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            logger.debug(
-                "Deep merging nested dictionary",
-                key=key,
-                base_keys=list(result[key].keys()),
-                override_keys=list(value.keys()),
-            )
-            result[key] = _deep_merge(result[key], value)
+            if key == "semantic":
+                logger.debug(
+                    "Merging semantic config",
+                    base_keys=list(result[key].keys()) if result[key] else [],
+                    override_keys=list(value.keys()),
+                )
+                result[key] = _merge_semantic_config(result[key], value)
+            else:
+                logger.debug(
+                    "Deep merging nested dictionary",
+                    key=key,
+                    base_keys=list(result[key].keys()),
+                    override_keys=list(value.keys()),
+                )
+                result[key] = _deep_merge(result[key], value)
         elif key == "pipelines" and isinstance(value, list) and isinstance(result.get(key), list):
             logger.debug(
                 "Appending pipelines list",

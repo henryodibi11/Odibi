@@ -3482,13 +3482,15 @@ Attributes:
     column: Column name in source (defaults to name)
     hierarchy: Optional ordered list of columns for drill-down
     description: Human-readable description
+    grain: Time grain transformation (day, week, month, quarter, year)
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique dimension identifier |
-| **source** | str | Yes | - | Source table reference. Formats: $pipeline.node (e.g., $build_warehouse.dim_customer), connection.path (e.g., gold.dim_customer or gold.dims/customer), or bare table_name |
+| **source** | Optional[str] | No | - | Source table reference. Formats: $pipeline.node (e.g., $build_warehouse.dim_customer), connection.path (e.g., gold.dim_customer or gold.dims/customer), or bare table_name |
 | **column** | Optional[str] | No | - | Column name (defaults to name) |
 | **hierarchy** | List[str] | No | `PydanticUndefined` | Drill-down hierarchy |
 | **description** | Optional[str] | No | - | Human-readable description |
+| **grain** | Optional[TimeGrain] | No | - | Time grain transformation |
 
 ---
 ### `MaterializationConfig`
@@ -3527,38 +3529,48 @@ across dimensions (e.g., revenue, order_count, avg_order_value).
 Attributes:
     name: Unique metric identifier
     description: Human-readable description
-    expr: SQL aggregation expression (e.g., "SUM(total_amount)")
+    expr: SQL aggregation expression (e.g., "SUM(total_amount)").
+        Optional for derived metrics.
     source: Source table reference. Supports three formats:
         - `$pipeline.node` (recommended): e.g., `$build_warehouse.fact_orders`
         - `connection.path`: e.g., `gold.fact_orders` or `gold.oee/plant_a/metrics`
         - `table_name`: Uses default connection
     filters: Optional WHERE conditions to apply
     type: "simple" (direct aggregation) or "derived" (references other metrics)
+    components: List of component metric names (required for derived metrics).
+        These metrics must be additive (e.g., SUM-based) for correct
+        recalculation at different grains.
+    formula: Calculation formula using component names (required for derived).
+        Example: "(total_revenue - total_cost) / total_revenue"
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique metric identifier |
 | **description** | Optional[str] | No | - | Human-readable description |
-| **expr** | str | Yes | - | SQL aggregation expression |
+| **expr** | Optional[str] | No | - | SQL aggregation expression |
 | **source** | Optional[str] | No | - | Source table reference. Formats: $pipeline.node (e.g., $build_warehouse.fact_orders), connection.path (e.g., gold.fact_orders or gold.oee/plant_a/table), or bare table_name |
 | **filters** | List[str] | No | `PydanticUndefined` | WHERE conditions |
 | **type** | MetricType | No | `MetricType.SIMPLE` | Metric type |
+| **components** | Optional[List[str]] | No | - | Component metric names for derived metrics |
+| **formula** | Optional[str] | No | - | Calculation formula using component names |
 
 ---
 ### `SemanticLayerConfig`
 Complete semantic layer configuration.
 
-Contains all metrics, dimensions, and materializations
+Contains all metrics, dimensions, materializations, and views
 for a semantic layer deployment.
 
 Attributes:
     metrics: List of metric definitions
     dimensions: List of dimension definitions
     materializations: List of materialization configurations
+    views: List of view configurations
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **metrics** | List[[MetricDefinition](#metricdefinition)] | No | `PydanticUndefined` | Metric definitions |
 | **dimensions** | List[[DimensionDefinition](#dimensiondefinition)] | No | `PydanticUndefined` | Dimension definitions |
 | **materializations** | List[[MaterializationConfig](#materializationconfig)] | No | `PydanticUndefined` | Materialization configs |
+| **views** | List[[ViewConfig](#viewconfig)] | No | `PydanticUndefined` | View configurations |
 
 ---
 ## FK Validation

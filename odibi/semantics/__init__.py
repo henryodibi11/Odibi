@@ -43,15 +43,29 @@ from odibi.semantics.metrics import (
     MaterializationConfig,
     MetricDefinition,
     SemanticLayerConfig,
+    ViewConfig,
+    parse_semantic_config,
 )
 from odibi.semantics.query import SemanticQuery
+from odibi.semantics.runner import SemanticLayerRunner, run_semantic_layer
+from odibi.semantics.story import SemanticStoryGenerator, SemanticStoryMetadata
+from odibi.semantics.views import ViewExecutionResult, ViewGenerator, ViewResult
 
 __all__ = [
     "MetricDefinition",
     "DimensionDefinition",
     "MaterializationConfig",
     "SemanticLayerConfig",
+    "ViewConfig",
+    "parse_semantic_config",
     "SemanticQuery",
     "Materializer",
+    "ViewGenerator",
+    "ViewResult",
+    "ViewExecutionResult",
+    "SemanticStoryGenerator",
+    "SemanticStoryMetadata",
+    "SemanticLayerRunner",
+    "run_semantic_layer",
 ]
-__version__ = "1.0.0"
+__version__ = "1.1.0"
