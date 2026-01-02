@@ -165,14 +165,35 @@ class LineageGenerator:
 
             for node_data in nodes_data:
                 node_id = node_data.get("id", "")
-                if node_id and node_id not in all_nodes:
-                    # Use node's layer if present, else story's pipeline_layer, else infer
-                    node_layer = node_data.get("layer")
+                if not node_id:
+                    continue
+
+                node_type = node_data.get("type", "table")
+                node_layer = node_data.get("layer")
+
+                # Determine the correct layer for this node:
+                # - "source"/"external" nodes are inputs from a PREVIOUS layer
+                # - "table"/"transform" nodes are outputs that BELONG to this layer
+                if node_type in ("source", "external"):
+                    # Input node - use its explicit layer or infer from path
+                    if not node_layer or node_layer == "unknown":
+                        node_layer = self._infer_layer(node_id)
+                else:
+                    # Output node - belongs to this story's pipeline layer
                     if not node_layer or node_layer == "unknown":
                         node_layer = story_layer
+
+                if node_id not in all_nodes:
                     all_nodes[node_id] = LineageNode(
                         id=node_id,
-                        type=node_data.get("type", "table"),
+                        type=node_type,
+                        layer=node_layer,
+                    )
+                elif node_type not in ("source", "external"):
+                    # Update layer if this story OWNS the node (it's an output here)
+                    all_nodes[node_id] = LineageNode(
+                        id=node_id,
+                        type=node_type,
                         layer=node_layer,
                     )
 
