@@ -477,7 +477,7 @@ class LineageGenerator:
             <h2>📊 Lineage Graph</h2>
             <div class="export-buttons">
                 <button onclick="exportSVG()" class="export-btn">📥 Export SVG</button>
-                <button onclick="exportPNG()" class="export-btn">🖼️ Export PNG</button>
+                <button onclick="exportPDF()" class="export-btn">📄 Export PDF</button>
             </div>
         </div>
         <div class="lineage" id="lineage-container">
@@ -545,35 +545,9 @@ class LineageGenerator:
             URL.revokeObjectURL(url);
         }}
 
-        function exportPNG() {{
-            const svg = document.querySelector('#mermaid-diagram svg');
-            if (!svg) {{
-                alert('Diagram not ready. Please wait and try again.');
-                return;
-            }}
-            const svgData = new XMLSerializer().serializeToString(svg);
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-
-            img.onload = function() {{
-                // High resolution export (2x scale)
-                const scale = 2;
-                canvas.width = img.width * scale;
-                canvas.height = img.height * scale;
-                ctx.fillStyle = 'white';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.scale(scale, scale);
-                ctx.drawImage(img, 0, 0);
-
-                const pngUrl = canvas.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = pngUrl;
-                a.download = 'lineage_{result.date}.png';
-                a.click();
-            }};
-
-            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        function exportPDF() {{
+            // Use browser's print dialog to save as PDF
+            window.print();
         }}
     </script>
 </body>
