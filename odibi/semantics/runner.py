@@ -312,10 +312,15 @@ class SemanticLayerRunner:
 
     def _get_full_stories_path(self) -> str:
         """
-        Build the full path to stories, including Azure URL if remote.
+        Build the full path to stories, including cloud URL if remote.
 
-        Converts relative paths like "OEE/Stories/" to full Azure URLs like
-        "abfs://container@account.dfs.core.windows.net/OEE/Stories/"
+        Converts relative paths like "OEE/Stories/" to full cloud URLs:
+        - Azure: abfs://container@account.dfs.core.windows.net/OEE/Stories/
+        - S3: s3://bucket/OEE/Stories/
+        - GCS: gs://bucket/OEE/Stories/
+
+        This enables fsspec to correctly identify remote storage and use
+        the appropriate filesystem implementation.
         """
         stories_path = self.project_config.story.path
 
@@ -336,15 +341,42 @@ class SemanticLayerRunner:
 
         conn_type_value = conn_type.value if hasattr(conn_type, "value") else str(conn_type)
 
-        # Build Azure URL for blob/delta connections
+        # Strip leading/trailing slashes for clean path construction
+        clean_path = stories_path.strip("/")
+
+        # Azure Blob Storage / Delta Lake
         if conn_type_value in ("azure_blob", "delta"):
             account_name = getattr(story_conn, "account_name", None)
             container = getattr(story_conn, "container", None)
 
             if account_name and container:
-                # Strip leading/trailing slashes for clean path construction
-                clean_path = stories_path.strip("/")
                 return f"abfs://{container}@{account_name}.dfs.core.windows.net/{clean_path}"
+
+        # AWS S3
+        elif conn_type_value in ("s3", "aws_s3"):
+            bucket = getattr(story_conn, "bucket", None)
+
+            if bucket:
+                return f"s3://{bucket}/{clean_path}"
+
+        # Google Cloud Storage
+        elif conn_type_value in ("gcs", "google_cloud_storage"):
+            bucket = getattr(story_conn, "bucket", None)
+
+            if bucket:
+                return f"gs://{bucket}/{clean_path}"
+
+        # HDFS
+        elif conn_type_value == "hdfs":
+            host = getattr(story_conn, "host", None)
+            port = getattr(story_conn, "port", 8020)
+
+            if host:
+                return f"hdfs://{host}:{port}/{clean_path}"
+
+        # DBFS (Databricks File System)
+        elif conn_type_value == "dbfs":
+            return f"dbfs:/{clean_path}"
 
         return stories_path
 
