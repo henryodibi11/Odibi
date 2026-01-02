@@ -75,11 +75,13 @@ class SemanticStoryMetadata:
     views_failed: int
     sql_files_saved: List[str]
     graph_data: Dict[str, Any]
+    pipeline_layer: str = "semantic"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "name": self.name,
+            "pipeline_layer": self.pipeline_layer,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "duration": self.duration,
@@ -237,12 +239,12 @@ class SemanticStoryGenerator:
             try:
                 source_table = self._view_generator._get_source_table(view_config)
                 if source_table not in seen_sources:
-                    layer = "gold" if "gold" in source_table.lower() else "source"
+                    # Source tables are inputs - mark as type "source"
+                    # Layer will be inferred by lineage stitcher from matching nodes
                     nodes.append(
                         {
                             "id": source_table,
-                            "type": "table",
-                            "layer": layer,
+                            "type": "source",
                         }
                     )
                     seen_sources.add(source_table)
