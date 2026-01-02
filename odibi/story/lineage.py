@@ -222,16 +222,18 @@ class LineageGenerator:
             raise ValueError("No lineage result. Call generate() first.")
 
         ctx = get_logging_context()
+        now = datetime.now()
+        time_str = now.strftime("run_%H-%M-%S")
 
         if self.is_remote:
-            base_path = f"{self.stories_path.rstrip('/')}/lineage"
+            base_path = f"{self.stories_path.rstrip('/')}/lineage/{result.date}"
         else:
-            base_path = Path(self.stories_path) / "lineage"
+            base_path = Path(self.stories_path) / "lineage" / result.date
             base_path.mkdir(parents=True, exist_ok=True)
             base_path = str(base_path)
 
-        json_path = f"{base_path}/{result.date}.json"
-        html_path = f"{base_path}/{result.date}.html"
+        json_path = f"{base_path}/{time_str}.json"
+        html_path = f"{base_path}/{time_str}.html"
 
         json_content = self.render_json(result)
         html_content = self.render_html(result)
