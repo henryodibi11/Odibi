@@ -336,23 +336,33 @@ class SemanticLayerRunner:
         # Check nested auth structure
         if hasattr(story_conn, "auth") and story_conn.auth:
             auth = story_conn.auth
-            auth_mode = getattr(auth, "mode", None)
+
+            # Helper to get value from auth (handles both dict and Pydantic model)
+            def get_auth_value(key: str):
+                if isinstance(auth, dict):
+                    return auth.get(key)
+                return getattr(auth, key, None)
+
+            auth_mode = get_auth_value("mode")
             if auth_mode:
                 mode_value = auth_mode.value if hasattr(auth_mode, "value") else str(auth_mode)
             else:
                 mode_value = None
 
             # account_key or direct_key mode
-            if hasattr(auth, "account_key") and auth.account_key:
-                return {"account_key": auth.account_key}
+            account_key = get_auth_value("account_key")
+            if account_key:
+                return {"account_key": account_key}
 
             # SAS token mode
-            if hasattr(auth, "sas_token") and auth.sas_token:
-                return {"sas_token": auth.sas_token}
+            sas_token = get_auth_value("sas_token")
+            if sas_token:
+                return {"sas_token": sas_token}
 
             # Connection string mode
-            if hasattr(auth, "connection_string") and auth.connection_string:
-                return {"connection_string": auth.connection_string}
+            connection_string = get_auth_value("connection_string")
+            if connection_string:
+                return {"connection_string": connection_string}
 
             # MSI / managed identity - uses DefaultAzureCredential, no explicit creds needed
             if mode_value in ("aad_msi", "managed_identity"):
