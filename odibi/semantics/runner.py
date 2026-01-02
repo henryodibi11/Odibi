@@ -236,16 +236,25 @@ class SemanticLayerRunner:
 
         from odibi.connections.azure_sql import AzureSQL
 
-        auth_dict = {}
+        auth_mode = "aad_msi"
+        username = None
+        password = None
+
         if hasattr(conn_config, "auth") and conn_config.auth:
-            auth_dict = conn_config.auth.model_dump()
+            auth = conn_config.auth
+            mode = getattr(auth, "mode", None)
+            if mode:
+                auth_mode = mode.value if hasattr(mode, "value") else str(mode)
+            username = getattr(auth, "username", None)
+            password = getattr(auth, "password", None)
 
         sql_conn = AzureSQL(
-            name=self.connection_name,
-            host=conn_config.host,
+            server=conn_config.host,
             database=conn_config.database,
             port=getattr(conn_config, "port", 1433),
-            credentials=auth_dict,
+            auth_mode=auth_mode,
+            username=username,
+            password=password,
         )
 
         return sql_conn.execute
