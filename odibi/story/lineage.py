@@ -707,33 +707,41 @@ class LineageGenerator:
 
     def _to_relative_story_path(self, story_path: str) -> str:
         """
-        Convert absolute or remote story path to a relative path for HTML links.
+        Convert story path to a clickable URL for HTML links.
 
-        This makes the lineage HTML portable - links work whether opened
-        from ADLS, local download, or served via web server.
+        For ADLS paths, converts to HTTPS blob URLs that work with Azure AD auth.
+        For local paths, uses relative paths for portability.
 
         Examples:
-            abfs://container@account.dfs.../stories/OEE/2026-01-02/run.html
-            -> OEE/2026-01-02/run.html
+            abfs://container@account.dfs.core.windows.net/stories/OEE/run.html
+            -> https://account.blob.core.windows.net/container/stories/OEE/run.html
 
             /home/user/stories/OEE/2026-01-02/run.html
             -> OEE/2026-01-02/run.html
         """
-        # Handle ADLS paths
-        if "://" in story_path:
-            # Extract path after the base container/account
-            # abfs://container@account.dfs.core.windows.net/stories/...
-            parts = story_path.split("/")
-            # Find 'stories' and take everything after it
-            try:
-                stories_idx = parts.index("stories")
-                return "/".join(parts[stories_idx + 1 :])
-            except ValueError:
-                # If no 'stories' folder, try to extract just the filename portion
-                # Take last 3 parts: pipeline/date/run.html
-                if len(parts) >= 3:
-                    return "/".join(parts[-3:])
-                return story_path.split("/")[-1]
+        import re
+
+        # Handle ADLS paths - convert to HTTPS blob URL
+        if story_path.startswith(("abfs://", "abfss://")):
+            # Parse: abfs://container@account.dfs.core.windows.net/path
+            match = re.match(
+                r"abfss?://([^@]+)@([^.]+)\.dfs\.core\.windows\.net/(.+)",
+                story_path,
+            )
+            if match:
+                container, account, path = match.groups()
+                return f"https://{account}.blob.core.windows.net/{container}/{path}"
+
+            # Fallback for other abfs formats
+            return story_path
+
+        # Handle az:// paths similarly
+        if story_path.startswith("az://"):
+            match = re.match(r"az://([^/]+)/(.+)", story_path)
+            if match:
+                container, path = match.groups()
+                # Can't determine account from az://, use relative
+                return path
 
         # Handle local paths - make relative to stories_path
         if self.stories_path and story_path.startswith(self.stories_path):
