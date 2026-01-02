@@ -182,14 +182,12 @@ class TestBuildGraphDataCrossPipeline:
         # Check internal edge (using source/target format)
         edges = result["edges"]
         assert any(
-            (e.get("source") == "load_data" and e.get("target") == "transform_data")
-            for e in edges
+            (e.get("source") == "load_data" and e.get("target") == "transform_data") for e in edges
         )
 
         # Check read path edge (using from/to format for lineage)
         assert any(
-            (e.get("from") == "/data/input.csv" and e.get("to") == "load_data")
-            for e in edges
+            (e.get("from") == "/data/input.csv" and e.get("to") == "load_data") for e in edges
         )
 
     def test_config_path_detects_cross_pipeline_inputs(self, generator):
