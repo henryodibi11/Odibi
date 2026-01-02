@@ -309,17 +309,68 @@ class SemanticLayerRunner:
             return None
 
     def _get_storage_options(self) -> Dict[str, Any]:
-        """Get storage options from story connection."""
+        """
+        Get storage options from story connection for fsspec/adlfs.
+
+        Handles all Azure auth modes:
+        - account_key / direct_key: Returns account_key for fsspec
+        - sas: Returns sas_token for fsspec
+        - connection_string: Returns connection_string for fsspec
+        - aad_msi / managed_identity: Returns empty dict (uses default Azure credential)
+        - key_vault: Would need to fetch secret (not implemented here)
+        """
         story_conn_name = self.project_config.story.connection
         story_conn = self.project_config.connections.get(story_conn_name)
 
-        if story_conn:
-            if hasattr(story_conn, "credentials") and story_conn.credentials:
-                return dict(story_conn.credentials)
-            if hasattr(story_conn, "account_key"):
-                return {"account_key": story_conn.account_key}
-            if hasattr(story_conn, "sas_token"):
-                return {"sas_token": story_conn.sas_token}
+        if not story_conn:
+            return {}
+
+        # Check for direct credentials on connection
+        if hasattr(story_conn, "credentials") and story_conn.credentials:
+            return dict(story_conn.credentials)
+        if hasattr(story_conn, "account_key") and story_conn.account_key:
+            return {"account_key": story_conn.account_key}
+        if hasattr(story_conn, "sas_token") and story_conn.sas_token:
+            return {"sas_token": story_conn.sas_token}
+
+        # Check nested auth structure
+        if hasattr(story_conn, "auth") and story_conn.auth:
+            auth = story_conn.auth
+            auth_mode = getattr(auth, "mode", None)
+            if auth_mode:
+                mode_value = auth_mode.value if hasattr(auth_mode, "value") else str(auth_mode)
+            else:
+                mode_value = None
+
+            # account_key or direct_key mode
+            if hasattr(auth, "account_key") and auth.account_key:
+                return {"account_key": auth.account_key}
+
+            # SAS token mode
+            if hasattr(auth, "sas_token") and auth.sas_token:
+                return {"sas_token": auth.sas_token}
+
+            # Connection string mode
+            if hasattr(auth, "connection_string") and auth.connection_string:
+                return {"connection_string": auth.connection_string}
+
+            # MSI / managed identity - uses DefaultAzureCredential, no explicit creds needed
+            if mode_value in ("aad_msi", "managed_identity"):
+                # Return account_name for adlfs to use with DefaultAzureCredential
+                account_name = getattr(story_conn, "account_name", None)
+                if account_name:
+                    return {"account_name": account_name}
+                return {}
+
+            # Key Vault mode - would need to fetch from Key Vault
+            if mode_value == "key_vault":
+                ctx = get_logging_context()
+                ctx.warning(
+                    "Key Vault auth for SQL output not yet implemented. "
+                    "Consider using direct_key or aad_msi for story connection."
+                )
+                return {}
+
         return {}
 
     def _get_write_file_from_story_connection(self) -> Optional[Callable[[str, str], None]]:
