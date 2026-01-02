@@ -428,6 +428,25 @@ class LineageGenerator:
             height: 16px;
             border-radius: 4px;
         }}
+        .export-buttons {{
+            display: flex;
+            gap: 10px;
+        }}
+        .export-btn {{
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--card-bg);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }}
+        .export-btn:hover {{
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }}
     </style>
 </head>
 <body>
@@ -454,8 +473,14 @@ class LineageGenerator:
             </div>
         </div>
 
-        <h2>📊 Lineage Graph</h2>
-        <div class="lineage">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>📊 Lineage Graph</h2>
+            <div class="export-buttons">
+                <button onclick="exportSVG()" class="export-btn">📥 Export SVG</button>
+                <button onclick="exportPNG()" class="export-btn">🖼️ Export PNG</button>
+            </div>
+        </div>
+        <div class="lineage" id="lineage-container">
             <div class="legend">
                 <div class="legend-item">
                     <div class="legend-color" style="background: #f59e0b;"></div>
@@ -474,7 +499,7 @@ class LineageGenerator:
                     <span>Semantic (Views)</span>
                 </div>
             </div>
-            <div class="mermaid">
+            <div class="mermaid" id="mermaid-diagram">
 {mermaid_code}
             </div>
         </div>
@@ -503,6 +528,53 @@ class LineageGenerator:
                 curve: 'basis'
             }}
         }});
+
+        function exportSVG() {{
+            const svg = document.querySelector('#mermaid-diagram svg');
+            if (!svg) {{
+                alert('Diagram not ready. Please wait and try again.');
+                return;
+            }}
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const blob = new Blob([svgData], {{type: 'image/svg+xml'}});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'lineage_{result.date}.svg';
+            a.click();
+            URL.revokeObjectURL(url);
+        }}
+
+        function exportPNG() {{
+            const svg = document.querySelector('#mermaid-diagram svg');
+            if (!svg) {{
+                alert('Diagram not ready. Please wait and try again.');
+                return;
+            }}
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+
+            img.onload = function() {{
+                // High resolution export (2x scale)
+                const scale = 2;
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.scale(scale, scale);
+                ctx.drawImage(img, 0, 0);
+
+                const pngUrl = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = pngUrl;
+                a.download = 'lineage_{result.date}.png';
+                a.click();
+            }};
+
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
     </script>
 </body>
 </html>"""
