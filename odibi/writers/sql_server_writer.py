@@ -911,22 +911,29 @@ class SqlServerMergeWriter:
                     "Auto-creating target table from Spark DataFrame",
                     target_table=target_table,
                 )
-                # Get column info from Spark DataFrame
-                columns = df.columns
-                exclude_cols = set(options.exclude_columns)
-                write_cols = [c for c in columns if c not in exclude_cols]
 
                 # Create table using JDBC write with overwrite mode (initial load)
                 staging_jdbc_options = {**jdbc_options, "dbtable": target_table}
-                if exclude_cols:
-                    df_to_write = df.select(*write_cols)
-                else:
-                    df_to_write = df
-                df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode(
-                    "overwrite"
-                ).save()
+                df.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
 
                 row_count = df.count()
+
+                # Add audit columns if configured (JDBC doesn't create them automatically)
+                if options.audit_cols:
+                    audit_cols_to_add = {}
+                    existing_cols = self.get_table_columns(target_table)
+                    if (
+                        options.audit_cols.created_col
+                        and options.audit_cols.created_col not in existing_cols
+                    ):
+                        audit_cols_to_add[options.audit_cols.created_col] = "DATETIME2"
+                    if (
+                        options.audit_cols.updated_col
+                        and options.audit_cols.updated_col not in existing_cols
+                    ):
+                        audit_cols_to_add[options.audit_cols.updated_col] = "DATETIME2"
+                    if audit_cols_to_add:
+                        self.add_columns(target_table, audit_cols_to_add)
 
                 # Create primary key or index on merge keys if configured
                 if options.primary_key_on_merge_keys:
@@ -973,17 +980,16 @@ class SqlServerMergeWriter:
 
         self.truncate_staging(staging_table)
 
-        columns = df.columns
-        exclude_cols = set(options.exclude_columns)
-        write_cols = [c for c in columns if c not in exclude_cols]
+        columns = list(df.columns)
 
-        if exclude_cols:
-            df_to_write = df.select(*write_cols)
-        else:
-            df_to_write = df
+        if options.audit_cols:
+            if options.audit_cols.created_col and options.audit_cols.created_col not in columns:
+                columns.append(options.audit_cols.created_col)
+            if options.audit_cols.updated_col and options.audit_cols.updated_col not in columns:
+                columns.append(options.audit_cols.updated_col)
 
         staging_jdbc_options = {**jdbc_options, "dbtable": staging_table}
-        df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
+        df.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
 
         self.ctx.debug("Staging write completed", staging_table=staging_table)
 
@@ -991,7 +997,7 @@ class SqlServerMergeWriter:
             target_table=target_table,
             staging_table=staging_table,
             merge_keys=merge_keys,
-            columns=write_cols,
+            columns=columns,
             options=options,
         )
 
