@@ -797,16 +797,17 @@ class LineageGenerator:
         return new_edges
 
     def _inherit_layers_from_matches(self, all_nodes: Dict[str, "LineageNode"]) -> None:
-        """Fix 'unknown' layer nodes by inheriting from matching known-layer nodes.
+        """Fix node layers by inheriting from matching nodes with known layers.
 
-        If oee.oee_fact is unknown but oee_fact is gold, update oee.oee_fact to gold.
+        If oee.oee_fact has unknown/raw layer but oee_fact is gold,
+        update oee.oee_fact to gold since they represent the same table.
         """
         ctx = get_logging_context()
 
-        # Build normalized name -> nodes with known layers
+        # Build normalized name -> highest known layer (excluding raw/unknown)
         known_layers: Dict[str, str] = {}
         for node in all_nodes.values():
-            if node.layer and node.layer != "unknown":
+            if node.layer and node.layer not in ("unknown", "raw"):
                 norm_name = self._normalize_node_name(node.id)
                 # Prefer later layers (gold > silver > bronze)
                 if norm_name not in known_layers or self._layer_sort_key(
@@ -814,10 +815,10 @@ class LineageGenerator:
                 ) > self._layer_sort_key(known_layers[norm_name]):
                     known_layers[norm_name] = node.layer
 
-        # Update unknown nodes
+        # Update nodes with unknown/raw layer if they match a known higher layer
         updated = 0
         for node_id, node in all_nodes.items():
-            if node.layer == "unknown":
+            if node.layer in ("unknown", "raw"):
                 norm_name = self._normalize_node_name(node_id)
                 if norm_name in known_layers:
                     all_nodes[node_id] = LineageNode(
@@ -827,13 +828,14 @@ class LineageGenerator:
                     )
                     updated += 1
                     ctx.debug(
-                        "Inherited layer for unknown node",
+                        "Inherited layer for node",
                         node_id=node_id,
+                        old_layer=node.layer,
                         inherited_layer=known_layers[norm_name],
                     )
 
         if updated:
-            ctx.info("Updated unknown node layers", count=updated)
+            ctx.info("Updated node layers from matches", count=updated)
 
     def _layer_sort_key(self, layer: str) -> int:
         """Get sort key for layer ordering."""
