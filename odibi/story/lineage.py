@@ -665,24 +665,46 @@ class LineageGenerator:
             ctx.error(f"Error finding remote story files: {e}")
             return []
 
-    def _load_story(self, story_path: str) -> Optional[Dict[str, Any]]:
-        """Load a story JSON file."""
+    def _load_story(
+        self, story_path: str, max_retries: int = 3, retry_delay: float = 2.0
+    ) -> Optional[Dict[str, Any]]:
+        """Load a story JSON file with retry logic for eventual consistency.
+
+        Args:
+            story_path: Path to the story file
+            max_retries: Maximum number of retry attempts
+            retry_delay: Seconds to wait between retries
+        """
+        import time
+
         ctx = get_logging_context()
 
-        try:
-            if self.is_remote:
-                import fsspec
+        for attempt in range(max_retries):
+            try:
+                if self.is_remote:
+                    import fsspec
 
-                # Use the base stories_path to get the filesystem, then open the specific file
-                fs, _ = fsspec.core.url_to_fs(self.stories_path, **self.storage_options)
-                with fs.open(story_path, "r") as f:
-                    return json.load(f)
-            else:
-                with open(story_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        except Exception as e:
-            ctx.warning(f"Failed to load story: {story_path}", error=str(e))
-            return None
+                    fs, _ = fsspec.core.url_to_fs(self.stories_path, **self.storage_options)
+                    with fs.open(story_path, "r") as f:
+                        return json.load(f)
+                else:
+                    with open(story_path, "r", encoding="utf-8") as f:
+                        return json.load(f)
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    ctx.debug(
+                        f"Retry {attempt + 1}/{max_retries} loading story",
+                        path=story_path,
+                        error=str(e),
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    ctx.warning(
+                        f"Failed to load story after {max_retries} attempts: {story_path}",
+                        error=str(e),
+                    )
+                    return None
+        return None
 
     def _extract_layer_info(self, story_data: Dict[str, Any], story_path: str) -> LayerInfo:
         """Extract layer info from story data."""
