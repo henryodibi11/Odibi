@@ -117,8 +117,8 @@ class SemanticLayerRunner:
         execute_sql: Optional[Callable[[str], None]] = None,
         save_sql_to: Optional[str] = None,
         write_file: Optional[Callable[[str, str], None]] = None,
-        generate_story: bool = True,
-        generate_lineage: bool = False,
+        generate_story: Optional[bool] = None,
+        generate_lineage: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
         Execute the semantic layer.
@@ -147,6 +147,18 @@ class SemanticLayerRunner:
 
         if save_sql_to is None:
             save_sql_to = self.sql_output_path
+
+        # Auto-create write_file using story connection if sql_output_path is set
+        if write_file is None and save_sql_to:
+            write_file = self._get_write_file_from_story_connection()
+            if write_file:
+                ctx.info("Using story connection for SQL file output", path=save_sql_to)
+
+        # Read defaults from story config if not explicitly provided
+        if generate_story is None:
+            generate_story = self.project_config.story.auto_generate
+        if generate_lineage is None:
+            generate_lineage = self.project_config.story.generate_lineage
 
         ctx.info(
             "Starting semantic layer execution",
@@ -309,6 +321,50 @@ class SemanticLayerRunner:
             if hasattr(story_conn, "sas_token"):
                 return {"sas_token": story_conn.sas_token}
         return {}
+
+    def _get_write_file_from_story_connection(self) -> Optional[Callable[[str, str], None]]:
+        """
+        Create a write_file callback using the story connection.
+
+        Returns a callable that writes files to the story connection's storage,
+        or None if no valid connection is available.
+        """
+        ctx = get_logging_context()
+        storage_options = self._get_storage_options()
+
+        if not storage_options:
+            ctx.debug("No storage options available for write_file")
+            return None
+
+        story_conn_name = self.project_config.story.connection
+        story_conn = self.project_config.connections.get(story_conn_name)
+
+        if not story_conn:
+            return None
+
+        base_path = getattr(story_conn, "path", None) or getattr(story_conn, "container", None)
+        if not base_path:
+            ctx.debug("Story connection has no base path")
+            return None
+
+        def write_file(path: str, content: str) -> None:
+            import fsspec
+
+            full_path = path
+            if not path.startswith(("abfs://", "az://", "s3://", "gs://", "/")):
+                account_name = getattr(story_conn, "account_name", None)
+                container = getattr(story_conn, "container", None)
+                if account_name and container:
+                    full_path = f"abfs://{container}@{account_name}.dfs.core.windows.net/{path}"
+                else:
+                    full_path = path
+
+            fs = fsspec.filesystem("abfs", **storage_options)
+            ctx.debug("Writing SQL file via story connection", path=full_path)
+            with fs.open(full_path, "w") as f:
+                f.write(content)
+
+        return write_file
 
     @property
     def metadata(self) -> Optional[SemanticStoryMetadata]:

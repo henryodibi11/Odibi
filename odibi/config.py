@@ -3168,6 +3168,15 @@ class StoryConfig(BaseModel):
         ),
     )
 
+    # Lineage settings
+    generate_lineage: bool = Field(
+        default=True,
+        description=(
+            "Generate combined lineage graph from all stories. "
+            "Creates a unified view of data flow across pipelines."
+        ),
+    )
+
     @model_validator(mode="after")
     def check_retention_policy(self):
         if self.retention_days is None and self.retention_count is None:
