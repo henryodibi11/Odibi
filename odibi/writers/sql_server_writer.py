@@ -191,6 +191,269 @@ class SqlServerMergeWriter:
         row = result[0] if result else None
         return row is not None
 
+    def read_target_hashes(
+        self,
+        target_table: str,
+        merge_keys: List[str],
+        hash_column: str,
+    ) -> List[Dict[str, Any]]:
+        """
+        Read merge keys and hash column from target table for incremental comparison.
+
+        Args:
+            target_table: Target table name
+            merge_keys: Key columns
+            hash_column: Hash column name
+
+        Returns:
+            List of dicts with keys and hash values
+        """
+        escaped_table = self.get_escaped_table_name(target_table)
+        key_cols = ", ".join([self.escape_column(k) for k in merge_keys])
+        hash_col = self.escape_column(hash_column)
+
+        sql = f"SELECT {key_cols}, {hash_col} FROM {escaped_table}"
+        self.ctx.debug("Reading target hashes for incremental merge", table=target_table)
+
+        result = self.connection.execute_sql(sql)
+        return result if result else []
+
+    def get_hash_column_name(
+        self,
+        df_columns: List[str],
+        options_hash_column: Optional[str],
+    ) -> Optional[str]:
+        """
+        Determine which hash column to use for incremental merge.
+
+        Args:
+            df_columns: List of DataFrame column names
+            options_hash_column: Explicitly configured hash column
+
+        Returns:
+            Hash column name or None if not available
+        """
+        if options_hash_column:
+            if options_hash_column in df_columns:
+                return options_hash_column
+            else:
+                self.ctx.warning(
+                    f"Configured hash_column '{options_hash_column}' not found in DataFrame"
+                )
+                return None
+
+        # Auto-detect common hash column names
+        for candidate in ["_hash_diff", "_hash", "hash_diff", "row_hash"]:
+            if candidate in df_columns:
+                self.ctx.debug(f"Auto-detected hash column: {candidate}")
+                return candidate
+
+        return None
+
+    def compute_hash_spark(
+        self, df: Any, columns: List[str], hash_col_name: str = "_computed_hash"
+    ):
+        """
+        Compute hash column for Spark DataFrame.
+
+        Args:
+            df: Spark DataFrame
+            columns: Columns to include in hash
+            hash_col_name: Name for the computed hash column
+
+        Returns:
+            DataFrame with hash column added
+        """
+        from pyspark.sql import functions as F
+
+        # Concatenate columns and compute MD5 hash
+        concat_expr = F.concat_ws(
+            "||", *[F.coalesce(F.col(c).cast("string"), F.lit("NULL")) for c in columns]
+        )
+        return df.withColumn(hash_col_name, F.md5(concat_expr))
+
+    def compute_hash_pandas(
+        self, df: Any, columns: List[str], hash_col_name: str = "_computed_hash"
+    ):
+        """
+        Compute hash column for Pandas DataFrame.
+
+        Args:
+            df: Pandas DataFrame
+            columns: Columns to include in hash
+            hash_col_name: Name for the computed hash column
+
+        Returns:
+            DataFrame with hash column added
+        """
+        import hashlib
+
+        def row_hash(row):
+            concat = "||".join(str(row[c]) if row[c] is not None else "NULL" for c in columns)
+            return hashlib.md5(concat.encode()).hexdigest()
+
+        df = df.copy()
+        df[hash_col_name] = df.apply(row_hash, axis=1)
+        return df
+
+    def compute_hash_polars(
+        self, df: Any, columns: List[str], hash_col_name: str = "_computed_hash"
+    ):
+        """
+        Compute hash column for Polars DataFrame.
+
+        Args:
+            df: Polars DataFrame
+            columns: Columns to include in hash
+            hash_col_name: Name for the computed hash column
+
+        Returns:
+            DataFrame with hash column added
+        """
+        import polars as pl
+
+        # Concatenate columns and compute hash
+        concat_expr = pl.concat_str(
+            [pl.col(c).cast(pl.Utf8).fill_null("NULL") for c in columns],
+            separator="||",
+        )
+        return df.with_columns(concat_expr.hash().cast(pl.Utf8).alias(hash_col_name))
+
+    def filter_changed_rows_spark(
+        self,
+        source_df: Any,
+        target_hashes: List[Dict[str, Any]],
+        merge_keys: List[str],
+        hash_column: str,
+    ):
+        """
+        Filter Spark DataFrame to only rows that are new or changed.
+
+        Args:
+            source_df: Source Spark DataFrame
+            target_hashes: List of dicts with target keys and hashes
+            merge_keys: Key columns
+            hash_column: Hash column name
+
+        Returns:
+            Filtered DataFrame with only new/changed rows
+        """
+        from pyspark.sql import functions as F
+
+        if not target_hashes:
+            # No existing data, all rows are new
+            return source_df
+
+        # Get SparkSession from DataFrame
+        spark = source_df.sparkSession
+
+        # Create DataFrame from target hashes
+        target_df = spark.createDataFrame(target_hashes)
+
+        # Rename hash column in target to avoid collision
+        target_hash_col = f"_target_{hash_column}"
+        target_df = target_df.withColumnRenamed(hash_column, target_hash_col)
+
+        # Left join source with target on merge keys
+        join_condition = [source_df[k] == target_df[k] for k in merge_keys]
+        joined = source_df.join(target_df, join_condition, "left")
+
+        # Filter to rows where:
+        # 1. No match in target (new rows) - target hash is null
+        # 2. Hash differs (changed rows)
+        changed = joined.filter(
+            F.col(target_hash_col).isNull() | (F.col(hash_column) != F.col(target_hash_col))
+        )
+
+        # Drop the target columns
+        for k in merge_keys:
+            changed = changed.drop(target_df[k])
+        changed = changed.drop(target_hash_col)
+
+        return changed
+
+    def filter_changed_rows_pandas(
+        self,
+        source_df: Any,
+        target_hashes: List[Dict[str, Any]],
+        merge_keys: List[str],
+        hash_column: str,
+    ):
+        """
+        Filter Pandas DataFrame to only rows that are new or changed.
+
+        Args:
+            source_df: Source Pandas DataFrame
+            target_hashes: List of dicts with target keys and hashes
+            merge_keys: Key columns
+            hash_column: Hash column name
+
+        Returns:
+            Filtered DataFrame with only new/changed rows
+        """
+        import pandas as pd
+
+        if not target_hashes:
+            return source_df
+
+        target_df = pd.DataFrame(target_hashes)
+        target_hash_col = f"_target_{hash_column}"
+        target_df = target_df.rename(columns={hash_column: target_hash_col})
+
+        # Merge to find matching rows
+        merged = source_df.merge(target_df, on=merge_keys, how="left")
+
+        # Filter to new or changed rows
+        is_new = merged[target_hash_col].isna()
+        is_changed = merged[hash_column] != merged[target_hash_col]
+        changed = merged[is_new | is_changed].copy()
+
+        # Drop the target hash column
+        changed = changed.drop(columns=[target_hash_col])
+
+        return changed
+
+    def filter_changed_rows_polars(
+        self,
+        source_df: Any,
+        target_hashes: List[Dict[str, Any]],
+        merge_keys: List[str],
+        hash_column: str,
+    ):
+        """
+        Filter Polars DataFrame to only rows that are new or changed.
+
+        Args:
+            source_df: Source Polars DataFrame
+            target_hashes: List of dicts with target keys and hashes
+            merge_keys: Key columns
+            hash_column: Hash column name
+
+        Returns:
+            Filtered DataFrame with only new/changed rows
+        """
+        import polars as pl
+
+        if not target_hashes:
+            return source_df
+
+        target_df = pl.DataFrame(target_hashes)
+        target_hash_col = f"_target_{hash_column}"
+        target_df = target_df.rename({hash_column: target_hash_col})
+
+        # Join to find matching rows
+        joined = source_df.join(target_df, on=merge_keys, how="left")
+
+        # Filter to new or changed rows
+        changed = joined.filter(
+            pl.col(target_hash_col).is_null() | (pl.col(hash_column) != pl.col(target_hash_col))
+        )
+
+        # Drop the target hash column
+        changed = changed.drop(target_hash_col)
+
+        return changed
+
     def validate_keys_spark(
         self,
         df: Any,
@@ -976,11 +1239,13 @@ class SqlServerMergeWriter:
             target_table=target_table,
             staging_table=staging_table,
             merge_keys=merge_keys,
+            incremental=options.incremental,
         )
 
         self.truncate_staging(staging_table)
 
         columns = list(df.columns)
+        df_to_write = df
 
         if options.audit_cols:
             if options.audit_cols.created_col and options.audit_cols.created_col not in columns:
@@ -988,8 +1253,46 @@ class SqlServerMergeWriter:
             if options.audit_cols.updated_col and options.audit_cols.updated_col not in columns:
                 columns.append(options.audit_cols.updated_col)
 
+        # Incremental merge: filter to only changed rows before writing to staging
+        if options.incremental:
+            hash_column = self.get_hash_column_name(df.columns, options.hash_column)
+
+            if hash_column is None and options.change_detection_columns:
+                # Compute hash from specified columns
+                hash_column = "_computed_hash"
+                df_to_write = self.compute_hash_spark(
+                    df, options.change_detection_columns, hash_column
+                )
+                columns.append(hash_column)
+            elif hash_column is None:
+                # Compute hash from all non-key columns
+                non_key_cols = [c for c in df.columns if c not in merge_keys]
+                if non_key_cols:
+                    hash_column = "_computed_hash"
+                    df_to_write = self.compute_hash_spark(df, non_key_cols, hash_column)
+                    columns.append(hash_column)
+
+            if hash_column:
+                # Read target hashes and filter source
+                target_hashes = self.read_target_hashes(target_table, merge_keys, hash_column)
+                original_count = df_to_write.count()
+                df_to_write = self.filter_changed_rows_spark(
+                    df_to_write, target_hashes, merge_keys, hash_column
+                )
+                filtered_count = df_to_write.count()
+                self.ctx.info(
+                    "Incremental filter applied",
+                    original_rows=original_count,
+                    changed_rows=filtered_count,
+                    skipped_rows=original_count - filtered_count,
+                )
+
+                if filtered_count == 0:
+                    self.ctx.info("No changed rows detected, skipping merge")
+                    return MergeResult(inserted=0, updated=0, deleted=0)
+
         staging_jdbc_options = {**jdbc_options, "dbtable": staging_table}
-        df.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
+        df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
 
         self.ctx.debug("Staging write completed", staging_table=staging_table)
 
@@ -1059,9 +1362,11 @@ class SqlServerMergeWriter:
             target_table=target_table,
             staging_table=staging_table,
             merge_keys=merge_keys,
+            incremental=options.incremental,
         )
 
         columns = list(df.columns)
+        df_to_write = df
 
         if options.audit_cols:
             if options.audit_cols.created_col and options.audit_cols.created_col not in columns:
@@ -1069,12 +1374,47 @@ class SqlServerMergeWriter:
             if options.audit_cols.updated_col and options.audit_cols.updated_col not in columns:
                 columns.append(options.audit_cols.updated_col)
 
+        # Incremental merge: filter to only changed rows before writing to staging
+        if options.incremental and table_exists:
+            hash_column = self.get_hash_column_name(list(df.columns), options.hash_column)
+
+            if hash_column is None and options.change_detection_columns:
+                hash_column = "_computed_hash"
+                df_to_write = self.compute_hash_pandas(
+                    df, options.change_detection_columns, hash_column
+                )
+                columns.append(hash_column)
+            elif hash_column is None:
+                non_key_cols = [c for c in df.columns if c not in merge_keys]
+                if non_key_cols:
+                    hash_column = "_computed_hash"
+                    df_to_write = self.compute_hash_pandas(df, list(non_key_cols), hash_column)
+                    columns.append(hash_column)
+
+            if hash_column:
+                target_hashes = self.read_target_hashes(target_table, merge_keys, hash_column)
+                original_count = len(df_to_write)
+                df_to_write = self.filter_changed_rows_pandas(
+                    df_to_write, target_hashes, merge_keys, hash_column
+                )
+                filtered_count = len(df_to_write)
+                self.ctx.info(
+                    "Incremental filter applied (Pandas)",
+                    original_rows=original_count,
+                    changed_rows=filtered_count,
+                    skipped_rows=original_count - filtered_count,
+                )
+
+                if filtered_count == 0:
+                    self.ctx.info("No changed rows detected, skipping merge")
+                    return MergeResult(inserted=0, updated=0, deleted=0)
+
         schema, table_name = staging_table.strip("[]").split("].[")
         schema = schema.strip("[")
         table_name = table_name.strip("]")
 
         self.connection.write_table(
-            df=df,
+            df=df_to_write,
             table_name=table_name,
             schema=schema,
             if_exists="replace",
@@ -1322,9 +1662,47 @@ class SqlServerMergeWriter:
             target_table=target_table,
             staging_table=staging_table,
             merge_keys=merge_keys,
+            incremental=options.incremental,
         )
 
-        df_pandas = df.to_pandas()
+        df_to_write = df
+
+        # Incremental merge: filter to only changed rows before writing to staging
+        if options.incremental and table_exists:
+            hash_column = self.get_hash_column_name(df.columns, options.hash_column)
+
+            if hash_column is None and options.change_detection_columns:
+                hash_column = "_computed_hash"
+                df_to_write = self.compute_hash_polars(
+                    df, options.change_detection_columns, hash_column
+                )
+                columns.append(hash_column)
+            elif hash_column is None:
+                non_key_cols = [c for c in df.columns if c not in merge_keys]
+                if non_key_cols:
+                    hash_column = "_computed_hash"
+                    df_to_write = self.compute_hash_polars(df, non_key_cols, hash_column)
+                    columns.append(hash_column)
+
+            if hash_column:
+                target_hashes = self.read_target_hashes(target_table, merge_keys, hash_column)
+                original_count = len(df_to_write)
+                df_to_write = self.filter_changed_rows_polars(
+                    df_to_write, target_hashes, merge_keys, hash_column
+                )
+                filtered_count = len(df_to_write)
+                self.ctx.info(
+                    "Incremental filter applied (Polars)",
+                    original_rows=original_count,
+                    changed_rows=filtered_count,
+                    skipped_rows=original_count - filtered_count,
+                )
+
+                if filtered_count == 0:
+                    self.ctx.info("No changed rows detected, skipping merge")
+                    return MergeResult(inserted=0, updated=0, deleted=0)
+
+        df_pandas = df_to_write.to_pandas()
 
         batch_size = options.batch_size
         if batch_size and len(df_pandas) > batch_size:

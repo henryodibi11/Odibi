@@ -1922,6 +1922,28 @@ class SqlServerMergeOptions(BaseModel):
         default=False,
         description="Create a nonclustered index on merge_keys. Use if primary key already exists elsewhere.",
     )
+    incremental: bool = Field(
+        default=False,
+        description=(
+            "Enable incremental merge optimization. When True, reads target table's keys and hashes "
+            "to determine which rows changed, then only writes changed rows to staging. "
+            "Significantly faster when few rows change between runs."
+        ),
+    )
+    hash_column: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of pre-computed hash column in DataFrame for change detection. "
+            "Used when incremental=True. If not specified, will auto-detect '_hash_diff' column."
+        ),
+    )
+    change_detection_columns: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Columns to use for computing change detection hash. Used when incremental=True "
+            "and no hash_column is specified. If None, uses all non-key columns."
+        ),
+    )
 
 
 class SqlServerOverwriteStrategy(str, Enum):

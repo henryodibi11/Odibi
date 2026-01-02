@@ -1347,3 +1347,169 @@ class TestAuditColumnCreation:
         assert create_sql is not None, "CREATE TABLE should have been called"
         assert "[created_ts] DATETIME2 NULL" in create_sql
         assert "[updated_ts] DATETIME2 NULL" in create_sql
+
+
+class TestIncrementalMerge:
+    """Tests for incremental merge optimization."""
+
+    @pytest.fixture
+    def mock_connection(self):
+        """Create a mock SQL Server connection."""
+        conn = MagicMock()
+        conn.execute_sql = MagicMock(return_value=[])
+        conn.write_table = MagicMock()
+        return conn
+
+    @pytest.fixture
+    def writer(self, mock_connection):
+        """Create a writer with mock connection."""
+        return SqlServerMergeWriter(mock_connection)
+
+    def test_incremental_option_defaults(self):
+        """Incremental should be False by default."""
+        options = SqlServerMergeOptions()
+        assert options.incremental is False
+        assert options.hash_column is None
+        assert options.change_detection_columns is None
+
+    def test_incremental_with_hash_column(self):
+        """Should accept hash_column configuration."""
+        options = SqlServerMergeOptions(
+            incremental=True,
+            hash_column="_hash_diff",
+        )
+        assert options.incremental is True
+        assert options.hash_column == "_hash_diff"
+
+    def test_incremental_with_change_detection_columns(self):
+        """Should accept change_detection_columns configuration."""
+        options = SqlServerMergeOptions(
+            incremental=True,
+            change_detection_columns=["col1", "col2", "col3"],
+        )
+        assert options.incremental is True
+        assert options.change_detection_columns == ["col1", "col2", "col3"]
+
+    def test_get_hash_column_name_explicit(self, writer):
+        """Should return explicitly configured hash column."""
+        result = writer.get_hash_column_name(
+            df_columns=["id", "name", "_hash_diff"],
+            options_hash_column="_hash_diff",
+        )
+        assert result == "_hash_diff"
+
+    def test_get_hash_column_name_auto_detect(self, writer):
+        """Should auto-detect common hash column names."""
+        result = writer.get_hash_column_name(
+            df_columns=["id", "name", "_hash_diff"],
+            options_hash_column=None,
+        )
+        assert result == "_hash_diff"
+
+    def test_get_hash_column_name_not_found(self, writer):
+        """Should return None when no hash column found."""
+        result = writer.get_hash_column_name(
+            df_columns=["id", "name", "value"],
+            options_hash_column=None,
+        )
+        assert result is None
+
+    def test_compute_hash_pandas(self, writer):
+        """Should compute hash column for Pandas DataFrame."""
+        df = pd.DataFrame({"id": [1, 2], "name": ["a", "b"], "value": [10, 20]})
+        result = writer.compute_hash_pandas(df, ["name", "value"], "_computed_hash")
+
+        assert "_computed_hash" in result.columns
+        assert len(result) == 2
+        # Hashes should be different for different rows
+        assert result.iloc[0]["_computed_hash"] != result.iloc[1]["_computed_hash"]
+
+    def test_filter_changed_rows_pandas_all_new(self, writer):
+        """Should return all rows when target is empty."""
+        df = pd.DataFrame({"id": [1, 2], "name": ["a", "b"], "_hash": ["h1", "h2"]})
+        result = writer.filter_changed_rows_pandas(
+            source_df=df,
+            target_hashes=[],
+            merge_keys=["id"],
+            hash_column="_hash",
+        )
+        assert len(result) == 2
+
+    def test_filter_changed_rows_pandas_some_changed(self, writer):
+        """Should filter to only new/changed rows."""
+        df = pd.DataFrame(
+            {
+                "id": [1, 2, 3],
+                "name": ["a", "b", "c"],
+                "_hash": ["h1_new", "h2", "h3"],  # id=1 changed, id=3 is new
+            }
+        )
+        target_hashes = [
+            {"id": 1, "_hash": "h1_old"},  # Changed
+            {"id": 2, "_hash": "h2"},  # Unchanged
+        ]
+        result = writer.filter_changed_rows_pandas(
+            source_df=df,
+            target_hashes=target_hashes,
+            merge_keys=["id"],
+            hash_column="_hash",
+        )
+        assert len(result) == 2  # id=1 (changed) and id=3 (new)
+        assert set(result["id"].tolist()) == {1, 3}
+
+    def test_filter_changed_rows_pandas_none_changed(self, writer):
+        """Should return empty when no rows changed."""
+        df = pd.DataFrame(
+            {
+                "id": [1, 2],
+                "name": ["a", "b"],
+                "_hash": ["h1", "h2"],
+            }
+        )
+        target_hashes = [
+            {"id": 1, "_hash": "h1"},
+            {"id": 2, "_hash": "h2"},
+        ]
+        result = writer.filter_changed_rows_pandas(
+            source_df=df,
+            target_hashes=target_hashes,
+            merge_keys=["id"],
+            hash_column="_hash",
+        )
+        assert len(result) == 0
+
+    def test_read_target_hashes(self, writer, mock_connection):
+        """Should generate correct SQL for reading target hashes."""
+        mock_connection.execute_sql.return_value = [
+            {"id": 1, "_hash": "h1"},
+            {"id": 2, "_hash": "h2"},
+        ]
+
+        result = writer.read_target_hashes(
+            target_table="test.my_table",
+            merge_keys=["id"],
+            hash_column="_hash",
+        )
+
+        mock_connection.execute_sql.assert_called_once()
+        sql = mock_connection.execute_sql.call_args[0][0]
+        assert "[id]" in sql
+        assert "[_hash]" in sql
+        assert "[test].[my_table]" in sql
+        assert len(result) == 2
+
+    def test_write_config_with_incremental(self):
+        """Should accept incremental options in WriteConfig."""
+        config = WriteConfig(
+            connection="azure_sql",
+            format="sql_server",
+            table="oee.oee_fact",
+            mode=WriteMode.MERGE,
+            merge_keys=["DateId", "P_ID"],
+            merge_options=SqlServerMergeOptions(
+                incremental=True,
+                hash_column="_hash_diff",
+            ),
+        )
+        assert config.merge_options.incremental is True
+        assert config.merge_options.hash_column == "_hash_diff"
