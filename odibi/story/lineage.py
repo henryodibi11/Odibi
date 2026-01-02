@@ -110,6 +110,7 @@ class LineageGenerator:
         self,
         stories_path: str,
         storage_options: Optional[Dict[str, Any]] = None,
+        blob_base_url: Optional[str] = None,
     ):
         """
         Initialize lineage generator.
@@ -117,10 +118,13 @@ class LineageGenerator:
         Args:
             stories_path: Base path for story files (local or remote)
             storage_options: Credentials for remote storage (e.g., ADLS)
+            blob_base_url: Base HTTPS URL for blob storage links in HTML
+                (e.g., "https://account.blob.core.windows.net/container/stories")
         """
         self.stories_path = stories_path
         self.storage_options = storage_options or {}
         self.is_remote = "://" in stories_path
+        self.blob_base_url = blob_base_url
         self._result: Optional[LineageResult] = None
 
     def generate(self, date: Optional[str] = None) -> LineageResult:
@@ -709,17 +713,26 @@ class LineageGenerator:
         """
         Convert story path to a clickable URL for HTML links.
 
+        If blob_base_url is set, constructs full HTTPS URLs for Azure blob storage.
         For ADLS paths, converts to HTTPS blob URLs that work with Azure AD auth.
         For local paths, uses relative paths for portability.
 
         Examples:
+            With blob_base_url="https://account.blob.core.windows.net/container/stories":
+            OEE_semantic/2026-01-02/run.html
+            -> https://account.blob.core.windows.net/container/stories/OEE_semantic/2026-01-02/run.html
+
             abfs://container@account.dfs.core.windows.net/stories/OEE/run.html
             -> https://account.blob.core.windows.net/container/stories/OEE/run.html
-
-            /home/user/stories/OEE/2026-01-02/run.html
-            -> OEE/2026-01-02/run.html
         """
         import re
+
+        # If we have a blob_base_url and the path is relative, construct full HTTPS URL
+        if self.blob_base_url and not story_path.startswith(
+            ("abfs://", "abfss://", "az://", "http://", "https://", "/")
+        ):
+            base = self.blob_base_url.rstrip("/")
+            return f"{base}/{story_path}"
 
         # Handle ADLS paths - convert to HTTPS blob URL
         if story_path.startswith(("abfs://", "abfss://")):
@@ -748,8 +761,8 @@ class LineageGenerator:
             rel = story_path[len(self.stories_path) :].lstrip("/\\")
             return rel.replace("\\", "/")
 
-        # Fallback: just use the filename
-        return story_path.replace("\\", "/").split("/")[-1]
+        # Fallback: use the path as-is
+        return story_path.replace("\\", "/")
 
     def _sanitize_id(self, node_id: str) -> str:
         """Sanitize node ID for Mermaid compatibility."""

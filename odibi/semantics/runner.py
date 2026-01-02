@@ -295,11 +295,13 @@ class SemanticLayerRunner:
 
         stories_path = self.project_config.story.path
         storage_options = self._get_storage_options()
+        blob_base_url = self._get_blob_base_url()
 
         try:
             lineage_gen = LineageGenerator(
                 stories_path=stories_path,
                 storage_options=storage_options,
+                blob_base_url=blob_base_url,
             )
             result = lineage_gen.generate()
             lineage_gen.save(result, write_file=write_file)
@@ -307,6 +309,30 @@ class SemanticLayerRunner:
         except Exception as e:
             ctx.warning(f"Failed to generate lineage: {e}")
             return None
+
+    def _get_blob_base_url(self) -> Optional[str]:
+        """
+        Construct the HTTPS blob URL base for story links.
+
+        Returns URL like: https://account.blob.core.windows.net/container/stories
+        """
+        story_conn_name = self.project_config.story.connection
+        story_conn = self.project_config.connections.get(story_conn_name)
+
+        if not story_conn:
+            return None
+
+        account_name = getattr(story_conn, "account_name", None)
+        container = getattr(story_conn, "container", None)
+        stories_path = self.project_config.story.path
+
+        if account_name and container:
+            base = f"https://{account_name}.blob.core.windows.net/{container}"
+            if stories_path:
+                base = f"{base}/{stories_path.strip('/')}"
+            return base
+
+        return None
 
     def _get_storage_options(self) -> Dict[str, Any]:
         """
