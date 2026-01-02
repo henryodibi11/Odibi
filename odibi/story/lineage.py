@@ -212,6 +212,9 @@ class LineageGenerator:
         stitched_edges = self._stitch_cross_layer_edges(all_nodes, all_edges, edge_set)
         all_edges.extend(stitched_edges)
 
+        # Fix unknown layers by inheriting from matching nodes
+        self._inherit_layers_from_matches(all_nodes)
+
         nodes_list = sorted(
             all_nodes.values(),
             key=lambda x: (self._layer_sort_key(x.layer), x.id),
@@ -748,6 +751,45 @@ class LineageGenerator:
         ctx.info("Cross-layer edges stitched", count=len(new_edges))
         return new_edges
 
+    def _inherit_layers_from_matches(self, all_nodes: Dict[str, "LineageNode"]) -> None:
+        """Fix 'unknown' layer nodes by inheriting from matching known-layer nodes.
+
+        If oee.oee_fact is unknown but oee_fact is gold, update oee.oee_fact to gold.
+        """
+        ctx = get_logging_context()
+
+        # Build normalized name -> nodes with known layers
+        known_layers: Dict[str, str] = {}
+        for node in all_nodes.values():
+            if node.layer and node.layer != "unknown":
+                norm_name = self._normalize_node_name(node.id)
+                # Prefer later layers (gold > silver > bronze)
+                if norm_name not in known_layers or self._layer_sort_key(
+                    node.layer
+                ) > self._layer_sort_key(known_layers[norm_name]):
+                    known_layers[norm_name] = node.layer
+
+        # Update unknown nodes
+        updated = 0
+        for node_id, node in all_nodes.items():
+            if node.layer == "unknown":
+                norm_name = self._normalize_node_name(node_id)
+                if norm_name in known_layers:
+                    all_nodes[node_id] = LineageNode(
+                        id=node.id,
+                        type=node.type,
+                        layer=known_layers[norm_name],
+                    )
+                    updated += 1
+                    ctx.debug(
+                        "Inherited layer for unknown node",
+                        node_id=node_id,
+                        inherited_layer=known_layers[norm_name],
+                    )
+
+        if updated:
+            ctx.info("Updated unknown node layers", count=updated)
+
     def _layer_sort_key(self, layer: str) -> int:
         """Get sort key for layer ordering."""
         layer_lower = layer.lower() if layer else ""
@@ -776,6 +818,16 @@ class LineageGenerator:
             "gold": "🥇 Gold Layer",
             "semantic": "📊 Semantic Views",
             "unknown": "❓ Other",
+        }
+
+        # Subgraph border styles (stroke color matches layer theme)
+        subgraph_styles = {
+            "raw": "stroke:#f59e0b,stroke-width:2px,stroke-dasharray:5 5",
+            "bronze": "stroke:#f59e0b,stroke-width:2px,stroke-dasharray:5 5",
+            "silver": "stroke:#6b7280,stroke-width:2px,stroke-dasharray:5 5",
+            "gold": "stroke:#eab308,stroke-width:2px,stroke-dasharray:5 5",
+            "semantic": "stroke:#8b5cf6,stroke-width:2px,stroke-dasharray:5 5",
+            "unknown": "stroke:#94a3b8,stroke-width:2px,stroke-dasharray:5 5",
         }
 
         # Group nodes by layer
@@ -818,6 +870,11 @@ class LineageGenerator:
             node_id = self._sanitize_id(node.id)
             layer = node.layer if node.layer in layer_styles else "unknown"
             lines.append(f"    class {node_id} {layer}Style")
+
+        # Add subgraph/cluster styles for distinct borders
+        for layer in nodes_by_layer.keys():
+            if layer in subgraph_styles:
+                lines.append(f"    style {layer} {subgraph_styles[layer]}")
 
         return "\n".join(lines)
 
