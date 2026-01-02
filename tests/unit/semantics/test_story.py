@@ -132,7 +132,7 @@ class TestSemanticStoryGenerator:
         assert metadata.views_created == 2
         assert metadata.views_failed == 0
         assert len(metadata.views) == 2
-        assert len(executed_sqls) == 2
+        assert len(executed_sqls) == 4  # 2 schema + 2 views
 
     def test_execute_with_story_partial_failure(self, sample_config):
         """Test story generation with some view failures."""
@@ -141,7 +141,8 @@ class TestSemanticStoryGenerator:
 
         def mock_execute_with_failure(sql):
             call_count[0] += 1
-            if call_count[0] == 1:
+            # Fail on second call (first view DDL, after first schema creation)
+            if call_count[0] == 2:
                 raise Exception("Database error")
 
         metadata = generator.execute_with_story(mock_execute_with_failure)
