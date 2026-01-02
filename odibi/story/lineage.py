@@ -176,8 +176,11 @@ class LineageGenerator:
                 # - "table"/"transform" nodes are outputs that BELONG to this layer
                 if node_type in ("source", "external"):
                     # Input node - use its explicit layer or infer from path
+                    # Default to "raw" for external sources (SQL Server, etc.)
                     if not node_layer or node_layer == "unknown":
                         node_layer = self._infer_layer(node_id)
+                    if node_layer == "unknown":
+                        node_layer = "raw"  # External sources are raw layer
                 else:
                     # Output node - belongs to this story's pipeline layer
                     if not node_layer or node_layer == "unknown":
