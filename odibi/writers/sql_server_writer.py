@@ -1063,21 +1063,12 @@ class SqlServerMergeWriter:
             if options.audit_cols.updated_col and options.audit_cols.updated_col not in columns:
                 columns.append(options.audit_cols.updated_col)
 
-        exclude_cols = set(options.exclude_columns)
-        write_cols = [c for c in columns if c not in exclude_cols]
-
-        df_write_cols = [c for c in df.columns if c not in exclude_cols]
-        if exclude_cols:
-            df_to_write = df[df_write_cols]
-        else:
-            df_to_write = df
-
         schema, table_name = staging_table.strip("[]").split("].[")
         schema = schema.strip("[")
         table_name = table_name.strip("]")
 
         self.connection.write_table(
-            df=df_to_write,
+            df=df,
             table_name=table_name,
             schema=schema,
             if_exists="replace",
@@ -1089,7 +1080,7 @@ class SqlServerMergeWriter:
             target_table=target_table,
             staging_table=staging_table,
             merge_keys=merge_keys,
-            columns=write_cols,
+            columns=columns,
             options=options,
         )
 
@@ -1327,15 +1318,7 @@ class SqlServerMergeWriter:
             merge_keys=merge_keys,
         )
 
-        exclude_cols = set(options.exclude_columns)
-        write_cols = [c for c in columns if c not in exclude_cols]
-
-        if exclude_cols:
-            df_to_write = df.select(write_cols)
-        else:
-            df_to_write = df
-
-        df_pandas = df_to_write.to_pandas()
+        df_pandas = df.to_pandas()
 
         batch_size = options.batch_size
         if batch_size and len(df_pandas) > batch_size:
@@ -1363,7 +1346,7 @@ class SqlServerMergeWriter:
             target_table=target_table,
             staging_table=staging_table,
             merge_keys=merge_keys,
-            columns=write_cols,
+            columns=columns,
             options=options,
         )
 
