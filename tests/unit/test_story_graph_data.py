@@ -172,16 +172,25 @@ class TestBuildGraphDataCrossPipeline:
             config=None,
         )
 
-        # Should have 2 nodes only (no external dependencies)
-        assert len(result["nodes"]) == 2
+        # Should have 3 nodes: 2 pipeline nodes + 1 source table from read.path
+        assert len(result["nodes"]) == 3
 
-        # No external nodes
+        # No external nodes (cross-pipeline), but may have source nodes
         external_nodes = [n for n in result["nodes"] if n.get("is_external")]
         assert len(external_nodes) == 0
 
-        # Check internal edge
+        # Check internal edge (using source/target format)
         edges = result["edges"]
-        assert any(e["source"] == "load_data" and e["target"] == "transform_data" for e in edges)
+        assert any(
+            (e.get("source") == "load_data" and e.get("target") == "transform_data")
+            for e in edges
+        )
+
+        # Check read path edge (using from/to format for lineage)
+        assert any(
+            (e.get("from") == "/data/input.csv" and e.get("to") == "load_data")
+            for e in edges
+        )
 
     def test_config_path_detects_cross_pipeline_inputs(self, generator):
         """Config path should detect cross-pipeline dependencies from inputs block."""

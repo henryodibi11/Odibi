@@ -743,11 +743,13 @@ class StoryGenerator:
         external_node_pipelines = {}
         cross_pipeline_deps = set()
         for edge in edges:
-            if edge["source"] not in existing_node_ids:
-                cross_pipeline_deps.add(edge["source"])
+            # Support both "source"/"target" and "from"/"to" formats
+            edge_source = edge.get("source") or edge.get("from", "")
+            if edge_source and edge_source not in existing_node_ids:
+                cross_pipeline_deps.add(edge_source)
                 # Track the pipeline name if available
                 if "source_pipeline" in edge:
-                    external_node_pipelines[edge["source"]] = edge["source_pipeline"]
+                    external_node_pipelines[edge_source] = edge["source_pipeline"]
 
         # Debug: Log summary before adding external nodes
         ctx.debug(
@@ -755,7 +757,7 @@ class StoryGenerator:
             total_nodes=len(nodes),
             total_edges=len(edges),
             existing_node_ids=list(existing_node_ids),
-            edge_sources=[e["source"] for e in edges],
+            edge_sources=[e.get("source") or e.get("from", "") for e in edges],
             cross_pipeline_deps=list(cross_pipeline_deps),
         )
 
@@ -781,8 +783,11 @@ class StoryGenerator:
         # Build dependency lookup: node_id -> list of source nodes (with pipeline info)
         node_dependencies = {}
         for edge in edges:
-            target = edge["target"]
-            source = edge["source"]
+            # Support both "source"/"target" and "from"/"to" formats
+            target = edge.get("target") or edge.get("to", "")
+            source = edge.get("source") or edge.get("from", "")
+            if not target or not source:
+                continue
             source_pipeline = edge.get("source_pipeline")
             dep_label = f"{source_pipeline}.{source}" if source_pipeline else source
 
