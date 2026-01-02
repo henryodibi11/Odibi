@@ -107,6 +107,8 @@ nav:
           - Defining Metrics: semantics/metrics.md
           - Querying: semantics/query.md
           - Materializing: semantics/materialize.md
+          - Running Views: semantics/runner.md
+          - Lineage Stitcher: semantics/lineage_stitcher.md
       - Anti-Patterns: patterns/anti_patterns.md
 
   - Data Quality:

@@ -293,8 +293,10 @@ class SemanticLayerRunner:
         """Generate combined lineage from all stories."""
         ctx = get_logging_context()
 
-        stories_path = self.project_config.story.path
+        stories_path = self._get_full_stories_path()
         storage_options = self._get_storage_options()
+
+        ctx.debug("Generating lineage", stories_path=stories_path)
 
         try:
             lineage_gen = LineageGenerator(
@@ -307,6 +309,44 @@ class SemanticLayerRunner:
         except Exception as e:
             ctx.warning(f"Failed to generate lineage: {e}")
             return None
+
+    def _get_full_stories_path(self) -> str:
+        """
+        Build the full path to stories, including Azure URL if remote.
+
+        Converts relative paths like "OEE/Stories/" to full Azure URLs like
+        "abfs://container@account.dfs.core.windows.net/OEE/Stories/"
+        """
+        stories_path = self.project_config.story.path
+
+        # Already a full URL
+        if "://" in stories_path:
+            return stories_path
+
+        # Get story connection info
+        story_conn_name = self.project_config.story.connection
+        story_conn = self.project_config.connections.get(story_conn_name)
+
+        if not story_conn:
+            return stories_path
+
+        conn_type = getattr(story_conn, "type", None)
+        if conn_type is None:
+            return stories_path
+
+        conn_type_value = conn_type.value if hasattr(conn_type, "value") else str(conn_type)
+
+        # Build Azure URL for blob/delta connections
+        if conn_type_value in ("azure_blob", "delta"):
+            account_name = getattr(story_conn, "account_name", None)
+            container = getattr(story_conn, "container", None)
+
+            if account_name and container:
+                # Strip leading/trailing slashes for clean path construction
+                clean_path = stories_path.strip("/")
+                return f"abfs://{container}@{account_name}.dfs.core.windows.net/{clean_path}"
+
+        return stories_path
 
     def _get_storage_options(self) -> Dict[str, Any]:
         """

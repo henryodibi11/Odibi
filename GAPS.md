@@ -86,6 +86,30 @@ This document captures improvement opportunities identified during the Stability
 **Observation:** Patterns are powerful but examples are scattered
 **Suggestion:** Consolidate pattern examples in `docs/patterns/`
 
+### GAP-013: Semantic Layer Runner Documentation ✅ FIXED
+
+**Location:** `docs/semantics/runner.md`
+**Issue:** SemanticLayerRunner (view creation, story generation) was undocumented
+**Fix:** Created comprehensive beginner-friendly documentation covering:
+- What the runner does and why
+- Configuration reference
+- Python API usage
+- Generated SQL examples
+- Execution stories
+- Error handling and troubleshooting
+
+### GAP-014: Lineage Stitcher Documentation ✅ FIXED
+
+**Location:** `docs/semantics/lineage_stitcher.md`
+**Issue:** LineageGenerator (combined lineage from stories) was undocumented
+**Fix:** Created comprehensive beginner-friendly documentation covering:
+- What lineage is and why it matters
+- How the stitcher works
+- Configuration and usage
+- Output format (JSON and HTML)
+- Practical examples
+- API reference
+
 ---
 
 ## Priority 4: Technical Debt
@@ -121,7 +145,7 @@ This document captures improvement opportunities identified during the Stability
 
 ### Missing Test Areas
 
-1. **Real Spark Integration** - Most Spark tests use mocks
+1. ~~**Real Spark Integration** - Most Spark tests use mocks~~ ✅ Completed in Stability Campaign (WSL tests)
 2. **Azure SQL with Real Connection** - Requires SQLAlchemy + credentials
 3. **Polars Engine Full Coverage** - Less comprehensive than Pandas
 4. **Cross-Pipeline References** - More edge cases needed
@@ -163,10 +187,10 @@ This document captures improvement opportunities identified during the Stability
 2. [ ] Improve error messages (GAP-007)
 
 ### Long Term (Next Quarter)
-1. [x] Spark integration tests - Stability Campaign confirmed Spark functionality works
+1. [x] Spark integration tests - Stability Campaign confirmed Spark functionality works via WSL
 2. [ ] Add Polars parity tests (nice-to-have, Polars engine works)
 3. [ ] Performance benchmarking suite (nice-to-have)
-4. [ ] Incremental SQL Server Merge (GAP-011) - Future-proofing for large tables
+4. [x] Incremental SQL Server Merge (GAP-011) - Implemented in v2.2.0
 
 ---
 
