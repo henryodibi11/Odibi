@@ -110,7 +110,6 @@ class LineageGenerator:
         self,
         stories_path: str,
         storage_options: Optional[Dict[str, Any]] = None,
-        blob_base_url: Optional[str] = None,
     ):
         """
         Initialize lineage generator.
@@ -118,13 +117,10 @@ class LineageGenerator:
         Args:
             stories_path: Base path for story files (local or remote)
             storage_options: Credentials for remote storage (e.g., ADLS)
-            blob_base_url: Base HTTPS URL for blob storage links in HTML
-                (e.g., "https://account.blob.core.windows.net/container/stories")
         """
         self.stories_path = stories_path
         self.storage_options = storage_options or {}
         self.is_remote = "://" in stories_path
-        self.blob_base_url = blob_base_url
         self._result: Optional[LineageResult] = None
 
     def generate(self, date: Optional[str] = None) -> LineageResult:
@@ -662,15 +658,10 @@ class LineageGenerator:
             status_class = "success" if layer.status == "success" else "failed"
             layer_class = self._get_layer_class(layer.pipeline_layer or layer.name)
 
-            # Convert story_path to relative path for portable HTML links
-            relative_path = self._to_relative_story_path(layer.story_path)
-
             rows.append(
                 f"""
             <tr>
-                <td>
-                    <a href="{relative_path}">{layer.name}</a>
-                </td>
+                <td>{layer.name}</td>
                 <td><span class="layer-badge {layer_class}">{layer.pipeline_layer or "-"}</span></td>
                 <td><span class="status-badge {status_class}">{layer.status}</span></td>
                 <td>{layer.duration:.2f}s</td>
@@ -708,61 +699,6 @@ class LineageGenerator:
         elif "semantic" in layer_lower:
             return "layer-semantic"
         return ""
-
-    def _to_relative_story_path(self, story_path: str) -> str:
-        """
-        Convert story path to a clickable URL for HTML links.
-
-        If blob_base_url is set, constructs full HTTPS URLs for Azure blob storage.
-        For ADLS paths, converts to HTTPS blob URLs that work with Azure AD auth.
-        For local paths, uses relative paths for portability.
-
-        Examples:
-            With blob_base_url="https://account.blob.core.windows.net/container/stories":
-            OEE_semantic/2026-01-02/run.html
-            -> https://account.blob.core.windows.net/container/stories/OEE_semantic/2026-01-02/run.html
-
-            abfs://container@account.dfs.core.windows.net/stories/OEE/run.html
-            -> https://account.blob.core.windows.net/container/stories/OEE/run.html
-        """
-        import re
-
-        # If we have a blob_base_url and the path is relative, construct full HTTPS URL
-        if self.blob_base_url and not story_path.startswith(
-            ("abfs://", "abfss://", "az://", "http://", "https://", "/")
-        ):
-            base = self.blob_base_url.rstrip("/")
-            return f"{base}/{story_path}"
-
-        # Handle ADLS paths - convert to HTTPS blob URL
-        if story_path.startswith(("abfs://", "abfss://")):
-            # Parse: abfs://container@account.dfs.core.windows.net/path
-            match = re.match(
-                r"abfss?://([^@]+)@([^.]+)\.dfs\.core\.windows\.net/(.+)",
-                story_path,
-            )
-            if match:
-                container, account, path = match.groups()
-                return f"https://{account}.blob.core.windows.net/{container}/{path}"
-
-            # Fallback for other abfs formats
-            return story_path
-
-        # Handle az:// paths similarly
-        if story_path.startswith("az://"):
-            match = re.match(r"az://([^/]+)/(.+)", story_path)
-            if match:
-                container, path = match.groups()
-                # Can't determine account from az://, use relative
-                return path
-
-        # Handle local paths - make relative to stories_path
-        if self.stories_path and story_path.startswith(self.stories_path):
-            rel = story_path[len(self.stories_path) :].lstrip("/\\")
-            return rel.replace("\\", "/")
-
-        # Fallback: use the path as-is
-        return story_path.replace("\\", "/")
 
     def _sanitize_id(self, node_id: str) -> str:
         """Sanitize node ID for Mermaid compatibility."""
