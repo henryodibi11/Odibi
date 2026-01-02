@@ -441,7 +441,9 @@ class SemanticLayerRunner:
                 else:
                     full_path = f"abfs://{container}@{account_name}.dfs.core.windows.net/{path}"
 
-                fs = fsspec.filesystem("abfs", **storage_options)
+                # adlfs needs account_name along with credentials
+                fs_options = {"account_name": account_name, **storage_options}
+                fs = fsspec.filesystem("abfs", **fs_options)
                 ctx.debug("Writing SQL file via Azure", path=full_path)
                 with fs.open(full_path, "w") as f:
                     f.write(content)
