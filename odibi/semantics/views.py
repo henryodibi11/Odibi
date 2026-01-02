@@ -228,17 +228,65 @@ class ViewGenerator:
         """Wrap division operands with NULLIF to prevent division by zero."""
         import re
 
-        pattern = r"/\s*(\([^)]+\)|SUM\([^)]+\)|COUNT\([^)]+\)|AVG\([^)]+\)|[A-Za-z_][A-Za-z0-9_]*)"
-        matches = list(re.finditer(pattern, expr, re.IGNORECASE))
+        def find_balanced_paren(s: str, start: int) -> int:
+            """Find the closing paren index for a balanced parenthesized expression."""
+            if start >= len(s) or s[start] != "(":
+                return -1
+            depth = 1
+            i = start + 1
+            while i < len(s) and depth > 0:
+                if s[i] == "(":
+                    depth += 1
+                elif s[i] == ")":
+                    depth -= 1
+                i += 1
+            return i if depth == 0 else -1
 
-        for match in reversed(matches):
-            divisor = match.group(1)
-            if not divisor.upper().startswith("NULLIF"):
-                start, end = match.span()
-                new_text = f"/ NULLIF({divisor}, 0)"
-                expr = expr[:start] + new_text + expr[end:]
+        result = []
+        i = 0
+        while i < len(expr):
+            if expr[i] == "/":
+                result.append("/")
+                i += 1
+                while i < len(expr) and expr[i] in " \t":
+                    result.append(expr[i])
+                    i += 1
+                if i >= len(expr):
+                    break
 
-        return expr
+                if expr[i] == "(":
+                    end = find_balanced_paren(expr, i)
+                    if end > 0:
+                        divisor = expr[i:end]
+                        result.append(f"NULLIF({divisor}, 0)")
+                        i = end
+                    else:
+                        result.append(expr[i])
+                        i += 1
+                else:
+                    func_match = re.match(
+                        r"(SUM|COUNT|AVG|MIN|MAX)\s*\([^)]+\)",
+                        expr[i:],
+                        re.IGNORECASE,
+                    )
+                    if func_match:
+                        divisor = func_match.group(0)
+                        result.append(f"NULLIF({divisor}, 0)")
+                        i += len(divisor)
+                    else:
+                        ident_match = re.match(r"[A-Za-z_][A-Za-z0-9_]*", expr[i:])
+                        if ident_match:
+                            divisor = ident_match.group(0)
+                            result.append(f"NULLIF({divisor}, 0)")
+                            i += len(divisor)
+                        else:
+                            result.append(expr[i])
+                            i += 1
+            else:
+                result.append(expr[i])
+                i += 1
+
+        return "".join(result)
 
     def execute_view(
         self,
