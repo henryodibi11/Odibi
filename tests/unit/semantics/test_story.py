@@ -168,11 +168,11 @@ class TestSemanticStoryGenerator:
         edges = metadata.graph_data["edges"]
 
         view_nodes = [n for n in nodes if n["type"] == "view"]
-        table_nodes = [n for n in nodes if n["type"] == "table"]
+        source_nodes = [n for n in nodes if n["type"] == "source"]
 
         assert len(view_nodes) == 2
-        assert len(table_nodes) == 1
-        assert table_nodes[0]["id"] == "gold.sales_fact"
+        assert len(source_nodes) == 1
+        assert source_nodes[0]["id"] == "gold.sales_fact"
         assert len(edges) == 2
 
     def test_graph_data_edges_correct(self, sample_config):

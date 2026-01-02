@@ -442,19 +442,28 @@ def _build_teams_workflow_payload(
             }
         )
 
-    # Handle @mentions for failures
-    mention_users = config.metadata.get("mention_on_failure", [])
+    # Handle @mentions
+    # 'mention' applies to all events, 'mention_on_failure' only to failure events
+    mention_users = config.metadata.get("mention", [])
     if isinstance(mention_users, str):
         mention_users = [mention_users]
+
+    # Add failure-specific mentions for failure events
+    is_failure_event = event_type in (
+        AlertEvent.ON_FAILURE.value,
+        AlertEvent.ON_GATE_BLOCK.value,
+        AlertEvent.ON_QUARANTINE.value,
+    )
+    if is_failure_event:
+        failure_mentions = config.metadata.get("mention_on_failure", [])
+        if isinstance(failure_mentions, str):
+            failure_mentions = [failure_mentions]
+        mention_users = list(set(mention_users + failure_mentions))
 
     entities = []
     mention_text = ""
 
-    if mention_users and event_type in (
-        AlertEvent.ON_FAILURE.value,
-        AlertEvent.ON_GATE_BLOCK.value,
-        AlertEvent.ON_QUARANTINE.value,
-    ):
+    if mention_users:
         mentions = []
         for i, user_email in enumerate(mention_users):
             mention_id = f"mention{i}"

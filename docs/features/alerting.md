@@ -51,7 +51,8 @@ The `metadata` field accepts the following options:
 | `throttle_minutes` | int | `15` | Minimum minutes between repeated alerts for the same pipeline+event |
 | `max_per_hour` | int | `10` | Maximum alerts of the same type per hour |
 | `channel` | string | — | Target channel override (Slack only, e.g., `#data-alerts`) |
-| `mention_on_failure` | string or list | — | User email(s) to @mention on failure events (Teams only) |
+| `mention` | string or list | — | User email(s) to @mention on all events (Teams only) |
+| `mention_on_failure` | string or list | — | User email(s) to @mention on failure events only (Teams only) |
 
 !!! note "All metadata keys are optional"
     If not specified, defaults are applied automatically.
