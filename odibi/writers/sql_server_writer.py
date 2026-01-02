@@ -216,7 +216,22 @@ class SqlServerMergeWriter:
         self.ctx.debug("Reading target hashes for incremental merge", table=target_table)
 
         result = self.connection.execute_sql(sql)
-        return result if result else []
+        if not result:
+            return []
+
+        # Convert SQLAlchemy Row objects to dicts for Spark compatibility
+        # Row objects have _mapping attribute or can be accessed via _asdict()
+        dicts = []
+        for row in result:
+            if hasattr(row, "_asdict"):
+                dicts.append(row._asdict())
+            elif hasattr(row, "_mapping"):
+                dicts.append(dict(row._mapping))
+            else:
+                # Fallback: assume row is dict-like or tuple with known columns
+                columns = merge_keys + [hash_column]
+                dicts.append(dict(zip(columns, row)))
+        return dicts
 
     def get_hash_column_name(
         self,
