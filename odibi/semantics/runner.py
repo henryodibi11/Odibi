@@ -301,8 +301,13 @@ class SemanticLayerRunner:
         story_conn_name = self.project_config.story.connection
         story_conn = self.project_config.connections.get(story_conn_name)
 
-        if story_conn and story_conn.credentials:
-            return dict(story_conn.credentials)
+        if story_conn:
+            if hasattr(story_conn, "credentials") and story_conn.credentials:
+                return dict(story_conn.credentials)
+            if hasattr(story_conn, "account_key"):
+                return {"account_key": story_conn.account_key}
+            if hasattr(story_conn, "sas_token"):
+                return {"sas_token": story_conn.sas_token}
         return {}
 
     @property
