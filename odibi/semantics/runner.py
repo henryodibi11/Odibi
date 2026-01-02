@@ -236,6 +236,16 @@ class SemanticLayerRunner:
 
         from odibi.connections.azure_sql import AzureSQL
 
+        server = getattr(conn_config, "host", None) or getattr(conn_config, "server", None)
+        database = getattr(conn_config, "database", None)
+        port = getattr(conn_config, "port", 1433)
+
+        if not server or not database:
+            raise ValueError(
+                f"Connection '{self.connection_name}' missing required 'host' or 'database'. "
+                f"Available fields: {list(conn_config.model_fields_set) if hasattr(conn_config, 'model_fields_set') else 'unknown'}"
+            )
+
         auth_mode = "aad_msi"
         username = None
         password = None
@@ -247,11 +257,16 @@ class SemanticLayerRunner:
                 auth_mode = mode.value if hasattr(mode, "value") else str(mode)
             username = getattr(auth, "username", None)
             password = getattr(auth, "password", None)
+        else:
+            username = getattr(conn_config, "username", None)
+            password = getattr(conn_config, "password", None)
+            if username and password:
+                auth_mode = "sql_login"
 
         sql_conn = AzureSQL(
-            server=conn_config.host,
-            database=conn_config.database,
-            port=getattr(conn_config, "port", 1433),
+            server=server,
+            database=database,
+            port=port,
             auth_mode=auth_mode,
             username=username,
             password=password,
