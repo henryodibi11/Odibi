@@ -1198,6 +1198,20 @@ class SqlServerMergeWriter:
                     if audit_cols_to_add:
                         self.add_columns(target_table, audit_cols_to_add)
 
+                    # Populate audit columns for all rows on first load
+                    escaped_table = self.get_escaped_table_name(target_table)
+                    update_parts = []
+                    if options.audit_cols.created_col:
+                        escaped_col = self.escape_column(options.audit_cols.created_col)
+                        update_parts.append(f"{escaped_col} = GETUTCDATE()")
+                    if options.audit_cols.updated_col:
+                        escaped_col = self.escape_column(options.audit_cols.updated_col)
+                        update_parts.append(f"{escaped_col} = GETUTCDATE()")
+                    if update_parts:
+                        update_sql = f"UPDATE {escaped_table} SET {', '.join(update_parts)}"
+                        self.ctx.debug("Populating audit columns on initial load")
+                        self.connection.execute_sql(update_sql)
+
                 # Create primary key or index on merge keys if configured
                 if options.primary_key_on_merge_keys:
                     self.create_primary_key(target_table, merge_keys)
