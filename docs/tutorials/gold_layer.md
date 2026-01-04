@@ -273,10 +273,11 @@ nodes:
 ```yaml
 nodes:
   - name: dim_date
-    transformer: date_dimension
-    params:
-      start_date: "2020-01-01"
-      end_date: "2030-12-31"
+    pattern:
+      type: date_dimension
+      params:
+        start_date: "2020-01-01"
+        end_date: "2030-12-31"
     write:
       connection: gold
       table: dim_date

@@ -225,15 +225,16 @@ pipelines:
         read:
           connection: staging
           path: orders
-        transformer: fact
-        params:
-          grain: [order_id]
-          dimensions:
-            - source_column: customer_id
-              dimension_table: dim_customer
-              dimension_key: customer_id
-              surrogate_key: customer_sk
-          orphan_handling: unknown  # Assigns SK=0 to orphans
+        pattern:
+          type: fact
+          params:
+            grain: [order_id]
+            dimensions:
+              - source_column: customer_id
+                dimension_table: dim_customer
+                dimension_key: customer_id
+                surrogate_key: customer_sk
+            orphan_handling: unknown  # Assigns SK=0 to orphans
         write:
           connection: warehouse
           path: fact_orders
@@ -468,14 +469,15 @@ nodes:
     read:
       connection: staging
       path: orders
-    transformer: fact
-    params:
-      grain: [order_id]
-      dimensions:
-        - source_column: customer_id
-          dimension_table: dim_customer
-          dimension_key: customer_id
-          surrogate_key: customer_sk
+    pattern:
+      type: fact
+      params:
+        grain: [order_id]
+        dimensions:
+          - source_column: customer_id
+            dimension_table: dim_customer
+            dimension_key: customer_id
+            surrogate_key: customer_sk
     gate:
       - type: custom
         function: fk_validation_gate

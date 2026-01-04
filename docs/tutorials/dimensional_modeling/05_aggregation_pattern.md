@@ -107,18 +107,19 @@ pipelines:
           path: fact_orders
           format: parquet
         
-        transformer: aggregation
-        params:
-          grain: [date_sk, product_sk]
-          measures:
-            - name: total_revenue
-              expr: "SUM(line_total)"
-            - name: order_count
-              expr: "COUNT(*)"
-            - name: total_quantity
-              expr: "SUM(quantity)"
-          audit:
-            load_timestamp: true
+        pattern:
+          type: aggregation
+          params:
+            grain: [date_sk, product_sk]
+            measures:
+              - name: total_revenue
+                expr: "SUM(line_total)"
+              - name: order_count
+                expr: "COUNT(*)"
+              - name: total_quantity
+                expr: "SUM(quantity)"
+            audit:
+              load_timestamp: true
         
         write:
           connection: warehouse
@@ -426,23 +427,24 @@ pipelines:
           path: fact_orders
           format: parquet
         
-        transformer: aggregation
-        params:
-          grain:
-            - date_sk
-            - product_sk
-          measures:
-            - name: total_revenue
-              expr: "SUM(line_total)"
-            - name: order_count
-              expr: "COUNT(*)"
-            - name: total_quantity
-              expr: "SUM(quantity)"
-            - name: avg_order_value
-              expr: "AVG(line_total)"
-          having: "SUM(line_total) > 0"
-          audit:
-            load_timestamp: true
+        pattern:
+          type: aggregation
+          params:
+            grain:
+              - date_sk
+              - product_sk
+            measures:
+              - name: total_revenue
+                expr: "SUM(line_total)"
+              - name: order_count
+                expr: "COUNT(*)"
+              - name: total_quantity
+                expr: "SUM(quantity)"
+              - name: avg_order_value
+                expr: "AVG(line_total)"
+            having: "SUM(line_total) > 0"
+            audit:
+              load_timestamp: true
         
         write:
           connection: warehouse
@@ -458,22 +460,23 @@ pipelines:
           path: fact_orders
           format: parquet
         
-        transformer: aggregation
-        params:
-          grain: [date_sk]
-          measures:
-            - name: total_revenue
-              expr: "SUM(line_total)"
-            - name: order_count
-              expr: "COUNT(*)"
-            - name: unique_products
-              expr: "COUNT(DISTINCT product_sk)"
-            - name: unique_customers
-              expr: "COUNT(DISTINCT customer_sk)"
-            - name: avg_order_value
-              expr: "AVG(line_total)"
-          audit:
-            load_timestamp: true
+        pattern:
+          type: aggregation
+          params:
+            grain: [date_sk]
+            measures:
+              - name: total_revenue
+                expr: "SUM(line_total)"
+              - name: order_count
+                expr: "COUNT(*)"
+              - name: unique_products
+                expr: "COUNT(DISTINCT product_sk)"
+              - name: unique_customers
+                expr: "COUNT(DISTINCT customer_sk)"
+              - name: avg_order_value
+                expr: "AVG(line_total)"
+            audit:
+              load_timestamp: true
         
         write:
           connection: warehouse
@@ -489,20 +492,21 @@ pipelines:
           path: fact_orders
           format: parquet
         
-        transformer: aggregation
-        params:
-          grain: [product_sk]
-          measures:
-            - name: total_revenue
-              expr: "SUM(line_total)"
-            - name: order_count
-              expr: "COUNT(*)"
-            - name: total_quantity
-              expr: "SUM(quantity)"
-            - name: unique_customers
-              expr: "COUNT(DISTINCT customer_sk)"
-          audit:
-            load_timestamp: true
+        pattern:
+          type: aggregation
+          params:
+            grain: [product_sk]
+            measures:
+              - name: total_revenue
+                expr: "SUM(line_total)"
+              - name: order_count
+                expr: "COUNT(*)"
+              - name: total_quantity
+                expr: "SUM(quantity)"
+              - name: unique_customers
+                expr: "COUNT(DISTINCT customer_sk)"
+            audit:
+              load_timestamp: true
         
         write:
           connection: warehouse

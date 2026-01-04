@@ -59,9 +59,9 @@ flowchart TB
 
 | Use Case | Solution |
 |----------|----------|
-| Build dimension tables | Use `transformer: dimension` in pipeline YAML |
-| Build fact tables | Use `transformer: fact` in pipeline YAML |
-| Build scheduled aggregates | Use `transformer: aggregation` in pipeline YAML |
+| Build dimension tables | Use `pattern: type: dimension` in pipeline YAML |
+| Build fact tables | Use `pattern: type: fact` in pipeline YAML |
+| Build scheduled aggregates | Use `pattern: type: aggregation` in pipeline YAML |
 | Ad-hoc metric queries | Use Semantic Layer Python API |
 | Self-service BI metrics | Use Semantic Layer with materialization |
 
@@ -283,12 +283,13 @@ pipelines:
         read:
           connection: staging
           path: customers
-        transformer: dimension
-        params:
-          natural_key: customer_id
-          surrogate_key: customer_sk
-          scd_type: 2
-          track_cols: [name, region]
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols: [name, region]
         write:
           connection: warehouse
           path: dim_customer
@@ -298,14 +299,15 @@ pipelines:
         read:
           connection: staging
           path: orders
-        transformer: fact
-        params:
-          grain: [order_id]
-          dimensions:
-            - source_column: customer_id
-              dimension_table: dim_customer
-              dimension_key: customer_id
-              surrogate_key: customer_sk
+        pattern:
+          type: fact
+          params:
+            grain: [order_id]
+            dimensions:
+              - source_column: customer_id
+                dimension_table: dim_customer
+                dimension_key: customer_id
+                surrogate_key: customer_sk
         write:
           connection: warehouse
           path: fact_orders

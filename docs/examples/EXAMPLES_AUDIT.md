@@ -43,22 +43,16 @@ All primary example configurations have been validated and tested. Runnable conf
 2. `docs/examples/canonical/runnable/03_scd2_dimension.yaml` - SCD2 Dimension example
 3. `examples/tutorials/dimensional_modeling/dimension_tutorial.yaml` - Dimension pattern tutorial
 
-## Issues Found
+## Issues Found & Fixed
 
-### Documentation Inconsistency: `transformer:` vs `pattern:`
+### ✅ FIXED: Documentation Inconsistency: `transformer:` vs `pattern:`
 
-**Location:** Multiple files in `docs/tutorials/dimensional_modeling/` and `docs/patterns/`
+**Issue:** The documentation previously used incorrect `transformer: dimension` syntax.
 
-**Issue:** The documentation uses `transformer: dimension` syntax, but patterns like `dimension`, `fact`, `aggregation` should use the `pattern:` syntax:
+**Resolution:** All pattern documentation has been updated to use the correct syntax:
 
 ```yaml
-# Documented (incorrect for patterns):
-transformer: dimension
-params:
-  natural_key: customer_id
-  ...
-
-# Correct syntax:
+# Correct syntax (now used everywhere):
 pattern:
   type: dimension
   params:
@@ -66,22 +60,24 @@ pattern:
     ...
 ```
 
-**Affected Files:**
-- `docs/tutorials/dimensional_modeling/02_dimension_pattern.md` (5 occurrences)
-- `docs/tutorials/dimensional_modeling/06_full_star_schema.md` (2 occurrences)
-- `docs/patterns/dimension.md` (6 occurrences)
-- `docs/patterns/fact.md` (2 occurrences)
-- `docs/patterns/README.md` (2 occurrences)
-- `docs/semantics/index.md` (2 occurrences)
-- `docs/guides/dimensional_modeling_guide.md` (1 occurrence)
-
-**Note:** The canonical examples in `docs/examples/canonical/` correctly use `pattern: type: dimension`.
-
-**Impact:** Users following tutorials will get validation errors when running configs.
+**Files Fixed:**
+- `docs/tutorials/dimensional_modeling/02_dimension_pattern.md`
+- `docs/tutorials/dimensional_modeling/03_date_dimension_pattern.md`
+- `docs/tutorials/dimensional_modeling/04_fact_pattern.md`
+- `docs/tutorials/dimensional_modeling/05_aggregation_pattern.md`
+- `docs/tutorials/dimensional_modeling/06_full_star_schema.md`
+- `docs/patterns/dimension.md`
+- `docs/patterns/fact.md`
+- `docs/patterns/aggregation.md`
+- `docs/patterns/date_dimension.md`
+- `docs/patterns/README.md`
+- `docs/semantics/index.md`
+- `docs/tutorials/gold_layer.md`
+- `docs/validation/fk.md`
+- `docs/guides/dimensional_modeling_guide.md`
+- `docs/learning/curriculum.md`
 
 ## Recommendations
-
-1. **Fix Documentation** - Update all occurrences of `transformer: dimension` (and similar patterns) to use the correct `pattern: type: dimension` syntax.
 
 2. **Add README to runnable/** - Create a README explaining how to run the canonical examples.
 

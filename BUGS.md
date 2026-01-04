@@ -104,35 +104,28 @@
 
 ## Documentation Issues Found
 
-### DOC-001: Incorrect `transformer:` Syntax in Dimension/Fact Pattern Docs ⏳ OPEN
+### DOC-001: Incorrect `transformer:` Syntax in Dimension/Fact Pattern Docs ✅ FIXED
 
-**Issue:** Tutorial documentation uses incorrect syntax for patterns.
+**Issue:** Tutorial documentation used incorrect syntax for patterns.
 
-**Impact:** Users following tutorials get validation errors.
+**Fix:** Updated all 50+ occurrences across 15 files to use correct `pattern: type: X` syntax.
 
-**Incorrect (in docs):**
-```yaml
-transformer: dimension
-params:
-  natural_key: customer_id
-```
-
-**Correct:**
-```yaml
-pattern:
-  type: dimension
-  params:
-    natural_key: customer_id
-```
-
-**Affected Files (20+ occurrences):**
+**Files Fixed:**
 - `docs/tutorials/dimensional_modeling/02_dimension_pattern.md`
+- `docs/tutorials/dimensional_modeling/03_date_dimension_pattern.md`
+- `docs/tutorials/dimensional_modeling/04_fact_pattern.md`
+- `docs/tutorials/dimensional_modeling/05_aggregation_pattern.md`
 - `docs/tutorials/dimensional_modeling/06_full_star_schema.md`
 - `docs/patterns/dimension.md`
 - `docs/patterns/fact.md`
+- `docs/patterns/aggregation.md`
+- `docs/patterns/date_dimension.md`
 - `docs/patterns/README.md`
 - `docs/semantics/index.md`
+- `docs/tutorials/gold_layer.md`
+- `docs/validation/fk.md`
 - `docs/guides/dimensional_modeling_guide.md`
+- `docs/learning/curriculum.md`
 
 **Reference:** See `docs/examples/EXAMPLES_AUDIT.md` for full details.
 

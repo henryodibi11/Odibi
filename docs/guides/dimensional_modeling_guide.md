@@ -387,17 +387,18 @@ transform:
 ### `DimensionPattern` Example (All-in-One)
 
 ```yaml
-transformer: dimension
-params:
-  natural_key: customer_id
-  surrogate_key: customer_sk
-  scd_type: 2
-  track_cols: [name, email, address]
-  target: warehouse.dim_customer
-  unknown_member: true
-  audit:
-    load_timestamp: true
-    source_system: "crm"
+pattern:
+  type: dimension
+  params:
+    natural_key: customer_id
+    surrogate_key: customer_sk
+    scd_type: 2
+    track_cols: [name, email, address]
+    target: warehouse.dim_customer
+    unknown_member: true
+    audit:
+      load_timestamp: true
+      source_system: "crm"
 ```
 
 ---

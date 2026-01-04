@@ -4,7 +4,7 @@ The `dimension` pattern builds complete dimension tables with automatic surrogat
 
 ## Integration with Odibi YAML
 
-Patterns are used via the `transformer:` field in a node config. The pattern name goes in `transformer:` and configuration goes in `params:`.
+Patterns are used via the `pattern:` block in a node config. The pattern type goes in `pattern: type:` and configuration goes in `pattern: params:`.
 
 ```yaml
 project: my_warehouse
@@ -31,18 +31,19 @@ pipelines:
           path: customers
           format: delta
         
-        # Use dimension pattern via transformer
-        transformer: dimension
-        params:
-          natural_key: customer_id
-          surrogate_key: customer_sk
-          scd_type: 2
-          track_cols: [name, email, address]
-          target: warehouse.dim_customer
-          unknown_member: true
-          audit:
-            load_timestamp: true
-            source_system: "crm"
+        # Use dimension pattern
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols: [name, email, address]
+            target: warehouse.dim_customer
+            unknown_member: true
+            audit:
+              load_timestamp: true
+              source_system: "crm"
         
         write:
           connection: warehouse
@@ -100,12 +101,13 @@ nodes:
     read:
       connection: staging
       path: countries
-    transformer: dimension
-    params:
-      natural_key: country_code
-      surrogate_key: country_sk
-      scd_type: 0
-      target: warehouse.dim_country
+    pattern:
+      type: dimension
+      params:
+        natural_key: country_code
+        surrogate_key: country_sk
+        scd_type: 0
+        target: warehouse.dim_country
     write:
       connection: warehouse
       path: dim_country
@@ -126,15 +128,16 @@ nodes:
     read:
       connection: staging
       path: customers
-    transformer: dimension
-    params:
-      natural_key: customer_id
-      surrogate_key: customer_sk
-      scd_type: 1
-      track_cols: [name, email, address]
-      target: warehouse.dim_customer
-      audit:
-        load_timestamp: true
+    pattern:
+      type: dimension
+      params:
+        natural_key: customer_id
+        surrogate_key: customer_sk
+        scd_type: 1
+        track_cols: [name, email, address]
+        target: warehouse.dim_customer
+        audit:
+          load_timestamp: true
     write:
       connection: warehouse
       path: dim_customer
@@ -155,20 +158,21 @@ nodes:
     read:
       connection: staging
       path: customers
-    transformer: dimension
-    params:
-      natural_key: customer_id
-      surrogate_key: customer_sk
-      scd_type: 2
-      track_cols: [name, email, address, city, state]
-      target: warehouse.dim_customer
-      valid_from_col: valid_from     # Optional, default: valid_from
-      valid_to_col: valid_to         # Optional, default: valid_to
-      is_current_col: is_current     # Optional, default: is_current
-      unknown_member: true
-      audit:
-        load_timestamp: true
-        source_system: "crm"
+    pattern:
+      type: dimension
+      params:
+        natural_key: customer_id
+        surrogate_key: customer_sk
+        scd_type: 2
+        track_cols: [name, email, address, city, state]
+        target: warehouse.dim_customer
+        valid_from_col: valid_from     # Optional, default: valid_from
+        valid_to_col: valid_to         # Optional, default: valid_to
+        is_current_col: is_current     # Optional, default: is_current
+        unknown_member: true
+        audit:
+          load_timestamp: true
+          source_system: "crm"
     write:
       connection: warehouse
       path: dim_customer
@@ -227,24 +231,25 @@ pipelines:
           connection: staging
           path: customers
           format: delta
-        transformer: dimension
-        params:
-          natural_key: customer_id
-          surrogate_key: customer_sk
-          scd_type: 2
-          track_cols:
-            - name
-            - email
-            - phone
-            - address_line_1
-            - city
-            - state
-            - postal_code
-          target: warehouse.dim_customer
-          unknown_member: true
-          audit:
-            load_timestamp: true
-            source_system: "salesforce"
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols:
+              - name
+              - email
+              - phone
+              - address_line_1
+              - city
+              - state
+              - postal_code
+            target: warehouse.dim_customer
+            unknown_member: true
+            audit:
+              load_timestamp: true
+              source_system: "salesforce"
         write:
           connection: warehouse
           path: dim_customer
@@ -257,14 +262,15 @@ pipelines:
           connection: staging
           path: products
           format: delta
-        transformer: dimension
-        params:
-          natural_key: product_id
-          surrogate_key: product_sk
-          scd_type: 1
-          track_cols: [name, category, price, status]
-          target: warehouse.dim_product
-          unknown_member: true
+        pattern:
+          type: dimension
+          params:
+            natural_key: product_id
+            surrogate_key: product_sk
+            scd_type: 1
+            track_cols: [name, category, price, status]
+            target: warehouse.dim_product
+            unknown_member: true
         write:
           connection: warehouse
           path: dim_product
@@ -273,12 +279,13 @@ pipelines:
 
       # Date dimension (generated, no source read needed)
       - name: dim_date
-        transformer: date_dimension
-        params:
-          start_date: "2020-01-01"
-          end_date: "2030-12-31"
-          fiscal_year_start_month: 7
-          unknown_member: true
+        pattern:
+          type: date_dimension
+          params:
+            start_date: "2020-01-01"
+            end_date: "2030-12-31"
+            fiscal_year_start_month: 7
+            unknown_member: true
         write:
           connection: warehouse
           path: dim_date

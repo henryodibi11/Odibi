@@ -193,25 +193,26 @@ pipelines:
           path: customers.csv
           format: csv
         
-        transformer: dimension
-        params:
-          natural_key: customer_id
-          surrogate_key: customer_sk
-          scd_type: 2
-          track_cols:
-            - name
-            - email
-            - region
-            - city
-            - state
-          target: warehouse.dim_customer
-          valid_from_col: valid_from
-          valid_to_col: valid_to
-          is_current_col: is_current
-          unknown_member: true
-          audit:
-            load_timestamp: true
-            source_system: "crm"
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols:
+              - name
+              - email
+              - region
+              - city
+              - state
+            target: warehouse.dim_customer
+            valid_from_col: valid_from
+            valid_to_col: valid_to
+            is_current_col: is_current
+            unknown_member: true
+            audit:
+              load_timestamp: true
+              source_system: "crm"
         
         write:
           connection: warehouse
@@ -229,22 +230,23 @@ pipelines:
           path: products.csv
           format: csv
         
-        transformer: dimension
-        params:
-          natural_key: product_id
-          surrogate_key: product_sk
-          scd_type: 1
-          track_cols:
-            - name
-            - category
-            - subcategory
-            - price
-            - cost
-          target: warehouse.dim_product
-          unknown_member: true
-          audit:
-            load_timestamp: true
-            source_system: "inventory"
+        pattern:
+          type: dimension
+          params:
+            natural_key: product_id
+            surrogate_key: product_sk
+            scd_type: 1
+            track_cols:
+              - name
+              - category
+              - subcategory
+              - price
+              - cost
+            target: warehouse.dim_product
+            unknown_member: true
+            audit:
+              load_timestamp: true
+              source_system: "inventory"
         
         write:
           connection: warehouse
@@ -257,12 +259,13 @@ pipelines:
       # ------------------------------------------
       - name: dim_date
         description: "Date dimension covering Jan 2024"
-        transformer: date_dimension
-        params:
-          start_date: "2024-01-01"
-          end_date: "2024-01-31"
-          fiscal_year_start_month: 7
-          unknown_member: true
+        pattern:
+          type: date_dimension
+          params:
+            start_date: "2024-01-01"
+            end_date: "2024-01-31"
+            fiscal_year_start_month: 7
+            unknown_member: true
         
         write:
           connection: warehouse
@@ -306,31 +309,32 @@ pipelines:
           path: orders.csv
           format: csv
         
-        transformer: fact
-        params:
-          grain: [order_id]
-          dimensions:
-            - source_column: customer_id
-              dimension_table: dim_customer
-              dimension_key: customer_id
-              surrogate_key: customer_sk
-              scd2: true
-            - source_column: product_id
-              dimension_table: dim_product
-              dimension_key: product_id
-              surrogate_key: product_sk
-            - source_column: order_date
-              dimension_table: dim_date
-              dimension_key: full_date
-              surrogate_key: date_sk
-          orphan_handling: unknown
-          measures:
-            - quantity
-            - unit_price
-            - line_total: "quantity * unit_price"
-          audit:
-            load_timestamp: true
-            source_system: "pos"
+        pattern:
+          type: fact
+          params:
+            grain: [order_id]
+            dimensions:
+              - source_column: customer_id
+                dimension_table: dim_customer
+                dimension_key: customer_id
+                surrogate_key: customer_sk
+                scd2: true
+              - source_column: product_id
+                dimension_table: dim_product
+                dimension_key: product_id
+                surrogate_key: product_sk
+              - source_column: order_date
+                dimension_table: dim_date
+                dimension_key: full_date
+                surrogate_key: date_sk
+            orphan_handling: unknown
+            measures:
+              - quantity
+              - unit_price
+              - line_total: "quantity * unit_price"
+            audit:
+              load_timestamp: true
+              source_system: "pos"
         
         write:
           connection: warehouse
@@ -354,22 +358,23 @@ pipelines:
           path: fact_orders
           format: parquet
         
-        transformer: aggregation
-        params:
-          grain: [date_sk]
-          measures:
-            - name: total_revenue
-              expr: "SUM(line_total)"
-            - name: order_count
-              expr: "COUNT(*)"
-            - name: unique_customers
-              expr: "COUNT(DISTINCT customer_sk)"
-            - name: unique_products
-              expr: "COUNT(DISTINCT product_sk)"
-            - name: avg_order_value
-              expr: "AVG(line_total)"
-          audit:
-            load_timestamp: true
+        pattern:
+          type: aggregation
+          params:
+            grain: [date_sk]
+            measures:
+              - name: total_revenue
+                expr: "SUM(line_total)"
+              - name: order_count
+                expr: "COUNT(*)"
+              - name: unique_customers
+                expr: "COUNT(DISTINCT customer_sk)"
+              - name: unique_products
+                expr: "COUNT(DISTINCT product_sk)"
+              - name: avg_order_value
+                expr: "AVG(line_total)"
+            audit:
+              load_timestamp: true
         
         write:
           connection: warehouse

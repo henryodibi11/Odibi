@@ -82,12 +82,13 @@ pipelines:
     nodes:
       - name: dim_date
         # No read block needed - pattern generates data
-        transformer: date_dimension
-        params:
-          start_date: "2024-01-15"
-          end_date: "2024-01-28"
-          fiscal_year_start_month: 7
-          unknown_member: true
+        pattern:
+          type: date_dimension
+          params:
+            start_date: "2024-01-15"
+            end_date: "2024-01-28"
+            fiscal_year_start_month: 7
+            unknown_member: true
         
         write:
           connection: warehouse
@@ -299,17 +300,18 @@ pipelines:
     nodes:
       - name: dim_date
         description: "Standard date dimension with fiscal calendar"
-        transformer: date_dimension
-        params:
-          # 10-year range for typical warehouse
-          start_date: "2020-01-01"
-          end_date: "2030-12-31"
-          
-          # July fiscal year (education/government style)
-          fiscal_year_start_month: 7
-          
-          # Add unknown member for orphan handling
-          unknown_member: true
+        pattern:
+          type: date_dimension
+          params:
+            # 10-year range for typical warehouse
+            start_date: "2020-01-01"
+            end_date: "2030-12-31"
+            
+            # July fiscal year (education/government style)
+            fiscal_year_start_month: 7
+            
+            # Add unknown member for orphan handling
+            unknown_member: true
         
         write:
           connection: warehouse

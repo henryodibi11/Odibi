@@ -24,12 +24,13 @@ pipelines:
     nodes:
       - name: dim_date
         # No read block - pattern generates data
-        transformer: date_dimension
-        params:
-          start_date: "2020-01-01"
-          end_date: "2030-12-31"
-          fiscal_year_start_month: 7  # July fiscal year
-          unknown_member: true
+        pattern:
+          type: date_dimension
+          params:
+            start_date: "2020-01-01"
+            end_date: "2030-12-31"
+            fiscal_year_start_month: 7  # July fiscal year
+            unknown_member: true
         write:
           connection: warehouse
           path: dim_date
@@ -95,11 +96,12 @@ Configure fiscal year start month for companies with non-calendar fiscal years:
 ```yaml
 nodes:
   - name: dim_date
-    transformer: date_dimension
-    params:
-      start_date: "2020-01-01"
-      end_date: "2030-12-31"
-      fiscal_year_start_month: 7  # July 1st = FY start
+    pattern:
+      type: date_dimension
+      params:
+        start_date: "2020-01-01"
+        end_date: "2030-12-31"
+        fiscal_year_start_month: 7  # July 1st = FY start
     write:
       connection: warehouse
       path: dim_date
@@ -162,12 +164,13 @@ pipelines:
     nodes:
       - name: dim_date
         description: "Standard date dimension with fiscal calendar"
-        transformer: date_dimension
-        params:
-          start_date: "2015-01-01"
-          end_date: "2035-12-31"
-          fiscal_year_start_month: 10  # October fiscal year (retail)
-          unknown_member: true
+        pattern:
+          type: date_dimension
+          params:
+            start_date: "2015-01-01"
+            end_date: "2035-12-31"
+            fiscal_year_start_month: 10  # October fiscal year (retail)
+            unknown_member: true
         write:
           connection: warehouse
           path: dim_date
@@ -224,24 +227,25 @@ fiscal_year_start_month: 1  # Default
 ```yaml
 nodes:
   - name: dim_date
-    transformer: date_dimension
-    params:
-      # Required
-      start_date: "2015-01-01"
-      end_date: "2035-12-31"
-      
-      # Fiscal calendar
-      fiscal_year_start_month: 7      # July fiscal year
-      
-      # Unknown member
-      unknown_member: true            # Add SK=0 row for orphans
-      
-      # Week configuration
-      week_start_day: 1               # Monday (ISO standard)
-      
-      # Holiday support (if holidays package installed)
-      include_holidays: true
-      holiday_country: "US"
+    pattern:
+      type: date_dimension
+      params:
+        # Required
+        start_date: "2015-01-01"
+        end_date: "2035-12-31"
+        
+        # Fiscal calendar
+        fiscal_year_start_month: 7      # July fiscal year
+        
+        # Unknown member
+        unknown_member: true            # Add SK=0 row for orphans
+        
+        # Week configuration
+        week_start_day: 1               # Monday (ISO standard)
+        
+        # Holiday support (if holidays package installed)
+        include_holidays: true
+        holiday_country: "US"
     write:
       connection: warehouse
       path: dim_date
@@ -256,12 +260,13 @@ To customize output columns, add a SQL step after generation:
 ```yaml
 nodes:
   - name: dim_date_raw
-    transformer: date_dimension
-    params:
-      start_date: "2020-01-01"
-      end_date: "2030-12-31"
-      fiscal_year_start_month: 10
-      unknown_member: true
+    pattern:
+      type: date_dimension
+      params:
+        start_date: "2020-01-01"
+        end_date: "2030-12-31"
+        fiscal_year_start_month: 10
+        unknown_member: true
 
   - name: dim_date
     depends_on: [dim_date_raw]

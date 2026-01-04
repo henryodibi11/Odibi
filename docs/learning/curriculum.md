@@ -979,21 +979,22 @@ Aggregations pre-compute these summaries.
           path: gold/fact_orders
           format: parquet
         
-        transformer: aggregation
-        params:
-          group_by:
-            - customer_key
-          metrics:
-            - name: total_orders
-              expression: "count(*)"
-            - name: total_revenue
-              expression: "sum(amount)"
-            - name: avg_order_value
-              expression: "avg(amount)"
-            - name: first_order_date
-              expression: "min(order_date)"
-            - name: last_order_date
-              expression: "max(order_date)"
+        pattern:
+          type: aggregation
+          params:
+            group_by:
+              - customer_key
+            metrics:
+              - name: total_orders
+                expression: "count(*)"
+              - name: total_revenue
+                expression: "sum(amount)"
+              - name: avg_order_value
+                expression: "avg(amount)"
+              - name: first_order_date
+                expression: "min(order_date)"
+              - name: last_order_date
+                expression: "max(order_date)"
         
         write:
           connection: local

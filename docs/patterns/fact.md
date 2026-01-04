@@ -53,31 +53,32 @@ pipelines:
           path: orders
           format: delta
         
-        transformer: fact
-        params:
-          grain: [order_id, line_item_id]
-          dimensions:
-            - source_column: customer_id
-              dimension_table: dim_customer  # References node name
-              dimension_key: customer_id
-              surrogate_key: customer_sk
-              scd2: true
-            - source_column: product_id
-              dimension_table: dim_product
-              dimension_key: product_id
-              surrogate_key: product_sk
-            - source_column: order_date
-              dimension_table: dim_date
-              dimension_key: full_date
-              surrogate_key: date_sk
-          orphan_handling: unknown
-          measures:
-            - quantity
-            - unit_price
-            - line_total: "quantity * unit_price"
-          audit:
-            load_timestamp: true
-            source_system: "pos"
+        pattern:
+          type: fact
+          params:
+            grain: [order_id, line_item_id]
+            dimensions:
+              - source_column: customer_id
+                dimension_table: dim_customer  # References node name
+                dimension_key: customer_id
+                surrogate_key: customer_sk
+                scd2: true
+              - source_column: product_id
+                dimension_table: dim_product
+                dimension_key: product_id
+                surrogate_key: product_sk
+              - source_column: order_date
+                dimension_table: dim_date
+                dimension_key: full_date
+                surrogate_key: date_sk
+            orphan_handling: unknown
+            measures:
+              - quantity
+              - unit_price
+              - line_total: "quantity * unit_price"
+            audit:
+              load_timestamp: true
+              source_system: "pos"
         
         write:
           connection: warehouse
@@ -205,14 +206,15 @@ pipelines:
         read:
           connection: staging
           path: customers
-        transformer: dimension
-        params:
-          natural_key: customer_id
-          surrogate_key: customer_sk
-          scd_type: 2
-          track_cols: [name, email, region]
-          target: warehouse.dim_customer
-          unknown_member: true
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols: [name, email, region]
+            target: warehouse.dim_customer
+            unknown_member: true
         write:
           connection: warehouse
           path: dim_customer
@@ -222,25 +224,27 @@ pipelines:
         read:
           connection: staging
           path: products
-        transformer: dimension
-        params:
-          natural_key: product_id
-          surrogate_key: product_sk
-          scd_type: 1
-          track_cols: [name, category, price]
-          target: warehouse.dim_product
-          unknown_member: true
+        pattern:
+          type: dimension
+          params:
+            natural_key: product_id
+            surrogate_key: product_sk
+            scd_type: 1
+            track_cols: [name, category, price]
+            target: warehouse.dim_product
+            unknown_member: true
         write:
           connection: warehouse
           path: dim_product
           mode: overwrite
 
       - name: dim_date
-        transformer: date_dimension
-        params:
-          start_date: "2020-01-01"
-          end_date: "2030-12-31"
-          unknown_member: true
+        pattern:
+          type: date_dimension
+          params:
+            start_date: "2020-01-01"
+            end_date: "2030-12-31"
+            unknown_member: true
         write:
           connection: warehouse
           path: dim_date
@@ -271,33 +275,34 @@ pipelines:
         read:
           connection: staging
           path: orders
-        transformer: fact
-        params:
-          grain: [order_id, line_item_id]
-          dimensions:
-            - source_column: customer_id
-              dimension_table: dim_customer
-              dimension_key: customer_id
-              surrogate_key: customer_sk
-              scd2: true
-            - source_column: product_id
-              dimension_table: dim_product
-              dimension_key: product_id
-              surrogate_key: product_sk
-            - source_column: order_date
-              dimension_table: dim_date
-              dimension_key: full_date
-              surrogate_key: date_sk
-          orphan_handling: unknown
-          measures:
-            - quantity
-            - unit_price
-            - discount_amount
-            - line_total: "quantity * unit_price"
-            - net_amount: "quantity * unit_price - discount_amount"
-          audit:
-            load_timestamp: true
-            source_system: "pos"
+        pattern:
+          type: fact
+          params:
+            grain: [order_id, line_item_id]
+            dimensions:
+              - source_column: customer_id
+                dimension_table: dim_customer
+                dimension_key: customer_id
+                surrogate_key: customer_sk
+                scd2: true
+              - source_column: product_id
+                dimension_table: dim_product
+                dimension_key: product_id
+                surrogate_key: product_sk
+              - source_column: order_date
+                dimension_table: dim_date
+                dimension_key: full_date
+                surrogate_key: date_sk
+            orphan_handling: unknown
+            measures:
+              - quantity
+              - unit_price
+              - discount_amount
+              - line_total: "quantity * unit_price"
+              - net_amount: "quantity * unit_price - discount_amount"
+            audit:
+              load_timestamp: true
+              source_system: "pos"
         write:
           connection: warehouse
           path: fact_orders
