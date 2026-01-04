@@ -1,12 +1,12 @@
 # How I Taught Myself Data Engineering While Working in Operations
 
-*From night shifts to building data platforms-a self-taught journey*
+*5 years: from night shifts to leading data engineering*
 
 ---
 
 ## TL;DR
 
-I graduated during COVID, joined a rotational leadership program in operations, and taught myself data engineering through 1000+ hours of self-study. No CS degree. No formal training. Just real problems and the willingness to figure things out. Here's how it happened and what I learned.
+Today marks my 5-year anniversary at my company. I graduated during COVID, joined a rotational leadership program in operations, and taught myself data engineering through 1000+ hours of self-study. No CS degree. No formal training. Just real problems and the willingness to figure things out. Here's how it happened and what I learned.
 
 ---
 
@@ -119,9 +119,9 @@ The Azure admin who helped me became a key ally. That relationship opened doors.
 
 ## What I Do Now
 
-Today, I'm the go-to data person for global operations at my company.
+Today — exactly 5 years in — I'm the go-to data person for global operations at my company.
 
-I manage the data infrastructure for our team. I build pipelines, maintain data models, and support reporting across multiple regions.
+I manage the data infrastructure for our team. I build pipelines, maintain data models, and support reporting across multiple regions. I train my peers in SQL and engineering fundamentals.
 
 I'm not in IT. I'm in operations. Which gives me a unique perspective: I understand both the business problems and the technical solutions.
 

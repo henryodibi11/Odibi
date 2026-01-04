@@ -84,7 +84,7 @@ params:
 
 **Resolution:** Added `target: silver.dim_customer` to the params.
 
-### ✅ VERIFIED: Documentation Syntax is Correct
+### ✅ VEeRIFIED: Documentation Syntax is Correct
 
 The documentation correctly uses `pattern: type: X` syntax. The issue was the framework, not the docs.
 
