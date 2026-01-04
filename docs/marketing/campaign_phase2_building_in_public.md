@@ -94,9 +94,9 @@ No transforms. Just land it.
 
 The only thing I add: `_extracted_at` timestamp so I know when data arrived.
 
-Full article with complete config on Medium → [link]
+Full article with complete config on LinkedIn → [link]
 
-**CTA:** Link to Medium
+**CTA:** Link to LinkedIn article
 
 ---
 
@@ -144,9 +144,9 @@ Now I have:
 
 Next week: Start cleaning in Silver.
 
-Full YAML on Medium → [link]
+Full YAML on LinkedIn → [link]
 
-**CTA:** Link to Medium
+**CTA:** Link to LinkedIn article
 
 ---
 
@@ -234,7 +234,7 @@ Now I have visibility without losing data.
 
 Lesson: Not every null is a problem to fix. Some are problems to understand.
 
-I wrote a full guide on data quality contracts on Medium. Link in comments.
+I wrote a full guide on data quality contracts as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 4 + Engagement question
 
@@ -276,7 +276,7 @@ After: 100,000 rows
 
 This is why Bronze exists. It's my safety net.
 
-Full guide on setting up a Bronze layer with Delta Lake on Medium. Link in comments.
+Full guide on setting up a Bronze layer with Delta Lake as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 4 + Follow for more
 
@@ -412,7 +412,7 @@ Result:
 
 One table down. Time to do the same for customers, products, and the rest.
 
-Complete Silver layer configuration guide on Medium. Link in comments.
+Complete Silver layer configuration guide as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 5
 
@@ -547,7 +547,7 @@ Result: 99,442 rows (99,441 customers + 1 unknown member)
 
 Why unknown member? So fact tables can still join even when customer_id is null.
 
-Full guide on facts vs dimensions with code examples on Medium. Link in comments.
+Full guide on facts vs dimensions with code examples as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 6
 
@@ -649,7 +649,7 @@ This generates:
 
 Now fact tables can join on date_sk for any time-based analysis.
 
-I wrote a complete guide on building a date dimension from scratch on Medium. Link in comments.
+I wrote a complete guide on building a date dimension from scratch as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 7
 
@@ -817,7 +817,7 @@ Found 8 orphans. Now I can investigate without blocking the pipeline.
 
 This is why dim tables have unknown member rows-they catch orphans cleanly.
 
-Full guide on fact table patterns including lookups, orphans, and measures on Medium. Link in comments.
+Full guide on fact table patterns including lookups, orphans, and measures as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 8
 

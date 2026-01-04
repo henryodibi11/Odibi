@@ -572,4 +572,4 @@ Next article: **Production Data Pipelines: Monitoring, Retry, and Testing**.
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

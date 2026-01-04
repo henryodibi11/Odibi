@@ -86,7 +86,7 @@ GROUP BY month
 
 Define once. Query anywhere.
 
-Full guide on building a semantic layer that everyone can trust on Medium. Link in comments.
+Full guide on building a semantic layer that everyone can trust as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 23
 
@@ -239,7 +239,7 @@ validation:
 
 Tests catch bugs before production. Production catches bugs after damage.
 
-Full guide on production data pipelines covering monitoring, retry, and testing on Medium. Link in comments.
+Full guide on production data pipelines covering monitoring, retry, and testing as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 24
 
@@ -314,7 +314,7 @@ The hard parts nobody talks about:
 
 Building tools is humbling. Respect the maintainers.
 
-I wrote about everything I learned building an open source data framework on Medium. Link in comments.
+I wrote about everything I learned building an open source data framework as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 25
 
@@ -422,7 +422,7 @@ What's next?
 
 If you ever want to chat data engineering, DMs are open.
 
-I also published a complete index of all 6 months of content on Medium. Link in comments.
+I also published a complete index of all 6 months of content as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 26 + Genuine gratitude
 
@@ -467,7 +467,7 @@ Thank you for following along.
 
 ---
 
-## Medium Articles for Phase 5
+## LinkedIn Articles for Phase 5
 
 | Week | Article |
 |------|---------|
@@ -489,7 +489,7 @@ Thank you for following along.
 | 5 | 23-26 | 12 | Advanced & community |
 | **Total** | **26** | **78** | **6 months of content** |
 
-## Medium Articles Summary
+## LinkedIn Articles Summary
 
 ~24 articles total, roughly 1-2 per week.
 
@@ -500,7 +500,7 @@ Thank you for following along.
 3. **Engage**: Respond to every comment within 24 hours
 4. **Track**: Note which topics get most engagement
 5. **Iterate**: Double down on what works
-6. **Cross-post**: Share Medium articles on LinkedIn and Twitter
+6. **Cross-post**: Share LinkedIn articles on Twitter
 
 ## Final Notes
 

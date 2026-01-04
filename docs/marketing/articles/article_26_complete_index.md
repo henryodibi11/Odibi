@@ -325,7 +325,7 @@ Thank you for reading, sharing, and building with me.
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for future content
+- **LinkedIn:** Follow for future content
 
 ---
 

@@ -1,6 +1,6 @@
 # Odibi Marketing Campaign
 
-A 6-month LinkedIn + Medium content campaign to build visibility for Odibi and establish expertise.
+A 6-month LinkedIn content campaign to build visibility for Odibi and establish expertise.
 
 ## Campaign Overview
 
@@ -8,7 +8,7 @@ A 6-month LinkedIn + Medium content campaign to build visibility for Odibi and e
 |--------|-------|
 | Duration | 26 weeks (6 months) |
 | LinkedIn Posts | 78 total (3/week) |
-| Medium Articles | ~24 total (~1/week) |
+| LinkedIn Articles | ~24 total (~1/week) |
 | Start Date | Your choice |
 | End Goal | Credibility, job opportunities, Odibi users |
 
@@ -24,7 +24,7 @@ A 6-month LinkedIn + Medium content campaign to build visibility for Odibi and e
 | [campaign_phase4_antipatterns.md](./campaign_phase4_antipatterns.md) | Anti-Patterns | 17-22 | 18 |
 | [campaign_phase5_advanced_community.md](./campaign_phase5_advanced_community.md) | Advanced & Community | 23-26 | 12 |
 
-### Medium Articles (Full Content)
+### LinkedIn Articles (Full Content)
 
 | File | Topic |
 |------|-------|
@@ -32,7 +32,7 @@ A 6-month LinkedIn + Medium content campaign to build visibility for Odibi and e
 | [articles/article_02_bronze_layer_mistake.md](./articles/article_02_bronze_layer_mistake.md) | Why never to transform in Bronze |
 | [articles/article_03_bronze_layer_setup.md](./articles/article_03_bronze_layer_setup.md) | Complete Bronze layer walkthrough |
 | [articles/article_10_introducing_odibi.md](./articles/article_10_introducing_odibi.md) | Odibi launch article |
-| [medium_articles.md](./medium_articles.md) | Outlines for remaining articles |
+| [linkedin_articles.md](./linkedin_articles.md) | Outlines for remaining articles |
 
 More full articles can be generated as needed.
 

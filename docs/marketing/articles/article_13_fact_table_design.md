@@ -551,4 +551,4 @@ Next article: **Pre-Aggregation Strategies for Fast Dashboards**.
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

@@ -1,7 +1,7 @@
 # Publishing Calendar - Odibi Marketing Campaign
 
 Starting: **Monday, January 6, 2026**
-Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
+Schedule: **LinkedIn Mon/Wed/Fri, LinkedIn Article on Tuesdays**
 
 ---
 
@@ -11,7 +11,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jan 6 | Mon | LinkedIn | Post 1.1 - Origin Story |
-| Jan 7 | Tue | Medium | Article 1 - How I Taught Myself Data Engineering |
+| Jan 7 | Tue | LinkedIn Article | Article 1 - How I Taught Myself Data Engineering |
 | Jan 8 | Wed | LinkedIn | Post 1.2 - Biggest Mistake |
 | Jan 10 | Fri | LinkedIn | Post 1.3 - Learning Resources |
 
@@ -19,7 +19,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jan 13 | Mon | LinkedIn | Post 2.1 - Working with Constraints |
-| Jan 14 | Tue | Medium | Article 2 - The Bronze Layer Mistake |
+| Jan 14 | Tue | LinkedIn Article | Article 2 - The Bronze Layer Mistake |
 | Jan 15 | Wed | LinkedIn | Post 2.2 - Solo Data Engineer Life |
 | Jan 17 | Fri | LinkedIn | Post 2.3 - Building in Public Announcement |
 
@@ -27,7 +27,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jan 20 | Mon | LinkedIn | Post 3.1 - Medallion Architecture Intro |
-| Jan 21 | Tue | Medium | Article 3 - Setting Up a Bronze Layer |
+| Jan 21 | Tue | LinkedIn Article | Article 3 - Setting Up a Bronze Layer |
 | Jan 22 | Wed | LinkedIn | Post 3.2 - Bronze Layer Purpose |
 | Jan 24 | Fri | LinkedIn | Post 3.3 - Metadata in Bronze |
 
@@ -35,7 +35,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jan 27 | Mon | LinkedIn | Post 4.1 - Data Quality Intro |
-| Jan 28 | Tue | Medium | Article 4 - Data Quality Contracts |
+| Jan 28 | Tue | LinkedIn Article | Article 4 - Data Quality Contracts |
 | Jan 29 | Wed | LinkedIn | Post 4.2 - Contract Types |
 | Jan 31 | Fri | LinkedIn | Post 4.3 - Quarantine Pattern |
 
@@ -47,7 +47,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Feb 3 | Mon | LinkedIn | Post 5.1 - Silver Layer Purpose |
-| Feb 4 | Tue | Medium | Article 5 - Complete Silver Layer Guide |
+| Feb 4 | Tue | LinkedIn Article | Article 5 - Complete Silver Layer Guide |
 | Feb 5 | Wed | LinkedIn | Post 5.2 - Deduplication |
 | Feb 7 | Fri | LinkedIn | Post 5.3 - Type Casting |
 
@@ -55,7 +55,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Feb 10 | Mon | LinkedIn | Post 6.1 - Star Schema Intro |
-| Feb 11 | Tue | Medium | Article 6 - Facts vs Dimensions |
+| Feb 11 | Tue | LinkedIn Article | Article 6 - Facts vs Dimensions |
 | Feb 12 | Wed | LinkedIn | Post 6.2 - Surrogate Keys |
 | Feb 14 | Fri | LinkedIn | Post 6.3 - Grain Explained |
 
@@ -63,7 +63,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Feb 17 | Mon | LinkedIn | Post 7.1 - Why Date Dimension |
-| Feb 18 | Tue | Medium | Article 7 - Building a Date Dimension |
+| Feb 18 | Tue | LinkedIn Article | Article 7 - Building a Date Dimension |
 | Feb 19 | Wed | LinkedIn | Post 7.2 - Fiscal Calendars |
 | Feb 21 | Fri | LinkedIn | Post 7.3 - Unknown Member |
 
@@ -71,7 +71,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Feb 24 | Mon | LinkedIn | Post 8.1 - Fact Table Anatomy |
-| Feb 25 | Tue | Medium | Article 8 - Fact Table Patterns |
+| Feb 25 | Tue | LinkedIn Article | Article 8 - Fact Table Patterns |
 | Feb 26 | Wed | LinkedIn | Post 8.2 - Orphan Handling |
 | Feb 28 | Fri | LinkedIn | Post 8.3 - Measures |
 
@@ -83,7 +83,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Mar 3 | Mon | LinkedIn | Post 9.1 - CSV to Star Schema Intro |
-| Mar 4 | Tue | Medium | Article 9 - From CSV to Star Schema |
+| Mar 4 | Tue | LinkedIn Article | Article 9 - From CSV to Star Schema |
 | Mar 5 | Wed | LinkedIn | Post 9.2 - Pipeline Architecture |
 | Mar 7 | Fri | LinkedIn | Post 9.3 - Results Summary |
 
@@ -91,7 +91,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Mar 10 | Mon | LinkedIn | Post 10.1 - Framework Reveal |
-| Mar 11 | Tue | Medium | Article 10 - Introducing Odibi |
+| Mar 11 | Tue | LinkedIn Article | Article 10 - Introducing Odibi |
 | Mar 12 | Wed | LinkedIn | Post 10.2 - Core Concepts |
 | Mar 14 | Fri | LinkedIn | Post 10.3 - Getting Started |
 
@@ -99,7 +99,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Mar 17 | Mon | LinkedIn | Post 11.1 - SCD2 Intro |
-| Mar 18 | Tue | Medium | Article 11 - SCD2 Complete Guide |
+| Mar 18 | Tue | LinkedIn Article | Article 11 - SCD2 Complete Guide |
 | Mar 19 | Wed | LinkedIn | Post 11.2 - When to Use SCD2 |
 | Mar 21 | Fri | LinkedIn | Post 11.3 - SCD2 Gotchas |
 
@@ -107,7 +107,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Mar 24 | Mon | LinkedIn | Post 12.1 - Unknown Member Pattern |
-| Mar 25 | Tue | Medium | Article 12 - Dimension Table Patterns |
+| Mar 25 | Tue | LinkedIn Article | Article 12 - Dimension Table Patterns |
 | Mar 26 | Wed | LinkedIn | Post 12.2 - Conformed Dimensions |
 | Mar 28 | Fri | LinkedIn | Post 12.3 - Role-Playing Dimensions |
 
@@ -119,7 +119,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Mar 31 | Mon | LinkedIn | Post 13.1 - Grain Deep Dive |
-| Apr 1 | Tue | Medium | Article 13 - Fact Table Design |
+| Apr 1 | Tue | LinkedIn Article | Article 13 - Fact Table Design |
 | Apr 2 | Wed | LinkedIn | Post 13.2 - Measure Types |
 | Apr 4 | Fri | LinkedIn | Post 13.3 - Factless Facts |
 
@@ -127,7 +127,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Apr 7 | Mon | LinkedIn | Post 14.1 - Dashboard Performance |
-| Apr 8 | Tue | Medium | Article 14 - Pre-Aggregation Strategies |
+| Apr 8 | Tue | LinkedIn Article | Article 14 - Pre-Aggregation Strategies |
 | Apr 9 | Wed | LinkedIn | Post 14.2 - Aggregation Grain |
 | Apr 11 | Fri | LinkedIn | Post 14.3 - Incremental Aggregation |
 
@@ -135,7 +135,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Apr 14 | Mon | LinkedIn | Post 15.1 - Quality Framework |
-| Apr 15 | Tue | Medium | Article 15 - Data Quality Patterns |
+| Apr 15 | Tue | LinkedIn Article | Article 15 - Data Quality Patterns |
 | Apr 16 | Wed | LinkedIn | Post 15.2 - Layer Strategy |
 | Apr 18 | Fri | LinkedIn | Post 15.3 - Quality Metrics |
 
@@ -143,7 +143,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Apr 21 | Mon | LinkedIn | Post 16.1 - Full vs Incremental |
-| Apr 22 | Tue | Medium | Article 16 - Incremental Loading |
+| Apr 22 | Tue | LinkedIn Article | Article 16 - Incremental Loading |
 | Apr 23 | Wed | LinkedIn | Post 16.2 - Watermarks |
 | Apr 25 | Fri | LinkedIn | Post 16.3 - Merge Patterns |
 
@@ -155,7 +155,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Apr 28 | Mon | LinkedIn | Post 17.1 - Bronze Mistakes Intro |
-| Apr 29 | Tue | Medium | Article 17 - Bronze Layer Anti-Patterns |
+| Apr 29 | Tue | LinkedIn Article | Article 17 - Bronze Layer Anti-Patterns |
 | Apr 30 | Wed | LinkedIn | Post 17.2 - Overwriting Bronze |
 | May 2 | Fri | LinkedIn | Post 17.3 - Missing Metadata |
 
@@ -163,7 +163,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | May 5 | Mon | LinkedIn | Post 18.1 - Silver as SSOT |
-| May 6 | Tue | Medium | Article 18 - Silver Layer Best Practices |
+| May 6 | Tue | LinkedIn Article | Article 18 - Silver Layer Best Practices |
 | May 7 | Wed | LinkedIn | Post 18.2 - Validation Strategy |
 | May 9 | Fri | LinkedIn | Post 18.3 - Dedup Patterns |
 
@@ -171,7 +171,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | May 12 | Mon | LinkedIn | Post 19.1 - History Explosion |
-| May 13 | Tue | Medium | Article 19 - SCD2 Done Wrong |
+| May 13 | Tue | LinkedIn Article | Article 19 - SCD2 Done Wrong |
 | May 14 | Wed | LinkedIn | Post 19.2 - Volatile Columns |
 | May 16 | Fri | LinkedIn | Post 19.3 - Fixing Explosions |
 
@@ -179,7 +179,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | May 19 | Mon | LinkedIn | Post 20.1 - Pipeline Performance |
-| May 20 | Tue | Medium | Article 20 - Performance Anti-Patterns |
+| May 20 | Tue | LinkedIn Article | Article 20 - Performance Anti-Patterns |
 | May 21 | Wed | LinkedIn | Post 20.2 - Shuffle Problems |
 | May 23 | Fri | LinkedIn | Post 20.3 - File Format Choices |
 
@@ -187,7 +187,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | May 26 | Mon | LinkedIn | Post 21.1 - Multi-Environment |
-| May 27 | Tue | Medium | Article 21 - Configuration Patterns |
+| May 27 | Tue | LinkedIn Article | Article 21 - Configuration Patterns |
 | May 28 | Wed | LinkedIn | Post 21.2 - Secret Management |
 | May 30 | Fri | LinkedIn | Post 21.3 - Feature Flags |
 
@@ -199,7 +199,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jun 2 | Mon | LinkedIn | Post 22.1 - Debug Process |
-| Jun 3 | Tue | Medium | Article 22 - Debugging Data Pipelines |
+| Jun 3 | Tue | LinkedIn Article | Article 22 - Debugging Data Pipelines |
 | Jun 4 | Wed | LinkedIn | Post 22.2 - Common Errors |
 | Jun 6 | Fri | LinkedIn | Post 22.3 - Recovery Patterns |
 
@@ -207,7 +207,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jun 9 | Mon | LinkedIn | Post 23.1 - Metric Chaos |
-| Jun 10 | Tue | Medium | Article 23 - Building a Semantic Layer |
+| Jun 10 | Tue | LinkedIn Article | Article 23 - Building a Semantic Layer |
 | Jun 11 | Wed | LinkedIn | Post 23.2 - Metric Definitions |
 | Jun 13 | Fri | LinkedIn | Post 23.3 - Materializations |
 
@@ -215,7 +215,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jun 16 | Mon | LinkedIn | Post 24.1 - Production Checklist |
-| Jun 17 | Tue | Medium | Article 24 - Production Data Pipelines |
+| Jun 17 | Tue | LinkedIn Article | Article 24 - Production Data Pipelines |
 | Jun 18 | Wed | LinkedIn | Post 24.2 - Monitoring |
 | Jun 20 | Fri | LinkedIn | Post 24.3 - Retry & Alerting |
 
@@ -223,7 +223,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jun 23 | Mon | LinkedIn | Post 25.1 - Building in Public Reflections |
-| Jun 24 | Tue | Medium | Article 25 - What I Learned |
+| Jun 24 | Tue | LinkedIn Article | Article 25 - What I Learned |
 | Jun 25 | Wed | LinkedIn | Post 25.2 - Key Lessons |
 | Jun 27 | Fri | LinkedIn | Post 25.3 - Advice for Builders |
 
@@ -231,7 +231,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 | Date | Day | Platform | Content |
 |------|-----|----------|---------|
 | Jun 30 | Mon | LinkedIn | Post 26.1 - Series Recap |
-| Jul 1 | Tue | Medium | Article 26 - Complete Index |
+| Jul 1 | Tue | LinkedIn Article | Article 26 - Complete Index |
 | Jul 2 | Wed | LinkedIn | Post 26.2 - Thank You |
 | Jul 4 | Fri | LinkedIn | Post 26.3 - What's Next |
 
@@ -241,18 +241,18 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 
 ### Posting Times
 - **LinkedIn**: 8-10 AM your timezone
-- **Medium**: Any time Tuesday (aim for morning)
+- **LinkedIn Article**: Any time Tuesday (aim for morning)
 
 ### Weekly Checklist
 - [ ] Monday: Post LinkedIn teaser
-- [ ] Tuesday: Publish Medium article
+- [ ] Tuesday: Publish LinkedIn article
 - [ ] Wednesday: Post LinkedIn (reference article)
 - [ ] Friday: Post LinkedIn (engagement/recap)
 - [ ] Daily: Respond to all comments
 
 ### Tools
 - LinkedIn: Native scheduler or Buffer
-- Medium: Partner Program scheduler or manual
+- LinkedIn Articles: Native scheduler or manual
 - Calendar: Set reminders for each publish date
 
 ---
@@ -260,6 +260,6 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 ## Notes
 
 - All LinkedIn posts are in `docs/marketing/campaign_phase*.md`
-- All Medium articles are in `docs/marketing/articles/`
+- All LinkedIn articles are in `docs/marketing/articles/`
 - Adjust dates if holidays fall on posting days
 - Track engagement in a spreadsheet for optimization

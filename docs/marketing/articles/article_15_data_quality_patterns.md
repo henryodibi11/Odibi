@@ -633,4 +633,4 @@ Next article: **Incremental Loading: Watermarks, Merge, and Append**.
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

@@ -531,4 +531,4 @@ Next article: **SCD2 Done Wrong: History Explosion and How to Prevent It**.
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

@@ -72,7 +72,7 @@ Now I follow three rules:
 
 The goal isn't clever code. It's code your future self won't hate you for.
 
-I wrote about my full journey from night shifts to data engineering on Medium. Link in comments.
+I wrote about my full journey from night shifts to data engineering as a LinkedIn article. Link in comments.
 
 What's a shortcut that came back to haunt you?
 
@@ -196,7 +196,7 @@ I also wrote about the Bronze layer mistake that taught me to never transform ra
 
 ---
 
-## Medium Articles for Phase 1
+## LinkedIn Articles for Phase 1
 
 ### Article 1.1: "How I Taught Myself Data Engineering While Working Night Shifts"
 - Expanded version of Post 1.1
@@ -214,7 +214,7 @@ I also wrote about the Bronze layer mistake that taught me to never transform ra
 
 ## Posting Schedule
 
-| Week | Day | Post | Medium Article |
+| Week | Day | Post | LinkedIn Article |
 |------|-----|------|----------------|
 | 1 | Mon | 1.1 - Origin Story | Article 1.1 (later in week) |
 | 1 | Wed | 1.2 - Biggest Mistake | - |

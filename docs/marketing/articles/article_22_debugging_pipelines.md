@@ -470,4 +470,4 @@ Next article: **Building a Semantic Layer: Metrics Everyone Can Trust**.
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

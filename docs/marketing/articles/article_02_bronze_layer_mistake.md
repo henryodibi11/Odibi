@@ -339,4 +339,4 @@ If you're interested in how I approach these problems now, follow along. I'll be
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]  
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

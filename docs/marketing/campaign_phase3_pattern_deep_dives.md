@@ -84,7 +84,7 @@ The framework handles:
 
 You just declare what to track.
 
-I wrote a complete SCD2 guide on Medium covering when to use it, how it works, and common gotchas. Link in comments.
+I wrote a complete SCD2 guide as a LinkedIn article covering when to use it, how it works, and common gotchas. Link in comments.
 
 **CTA:** Link to Article 11
 
@@ -253,7 +253,7 @@ Why?
 
 Tiny addition. Massive debugging value.
 
-Full guide on dimension table patterns including unknown members, keys, and auditing on Medium. Link in comments.
+Full guide on dimension table patterns including unknown members, keys, and auditing as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 12
 
@@ -372,7 +372,7 @@ GrainValidationError: 23 duplicate grain rows found
 
 Better to fail loudly than silently corrupt reports.
 
-I wrote a complete guide on fact table design covering grain, measures, and validation on Medium. Link in comments.
+I wrote a complete guide on fact table design covering grain, measures, and validation as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 13
 
@@ -457,7 +457,7 @@ Queries on raw facts: 5-10 seconds
 
 10-100x faster for common questions.
 
-Full guide on pre-aggregation strategies for fast dashboards on Medium. Link in comments.
+Full guide on pre-aggregation strategies for fast dashboards as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 14
 
@@ -580,7 +580,7 @@ GROUP BY _rejection_reason
 
 Pipeline keeps running. You investigate at your pace.
 
-Complete guide on data quality patterns covering contracts, validation, and quarantine on Medium. Link in comments.
+Complete guide on data quality patterns covering contracts, validation, and quarantine as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 15
 
@@ -722,13 +722,13 @@ Dimensions are usually merge.
 
 Aggregates depend on your refresh strategy.
 
-Complete guide on incremental loading covering watermarks, merge, and append on Medium. Link in comments.
+Complete guide on incremental loading covering watermarks, merge, and append as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 16
 
 ---
 
-## Medium Articles for Phase 3
+## LinkedIn Articles for Phase 3
 
 | Week | Article |
 |------|---------|

@@ -592,4 +592,4 @@ Next article: **Fact Table Design: Grain, Measures, and Validation**.
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

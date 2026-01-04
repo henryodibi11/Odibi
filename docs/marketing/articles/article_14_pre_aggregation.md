@@ -529,4 +529,4 @@ Next article: **Data Quality Patterns: Contracts, Validation, and Quarantine**.
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

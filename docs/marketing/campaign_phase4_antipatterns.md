@@ -98,7 +98,7 @@ Now every row has:
 
 Debugging time: minutes instead of hours.
 
-I wrote about the 3 Bronze layer mistakes that will haunt you on Medium. Link in comments.
+I wrote about the 3 Bronze layer mistakes that will haunt you as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 17
 
@@ -262,7 +262,7 @@ gold_report_b:
 
 Silver = cleaned once, used everywhere.
 
-Full guide on Silver layer best practices on Medium. Link in comments.
+Full guide on Silver layer best practices as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 18
 
@@ -435,7 +435,7 @@ mode: append
 SCD2 = dimensions only.
 Facts = append or merge.
 
-I wrote about SCD2 done wrong and how to prevent history explosion on Medium. Link in comments.
+I wrote about SCD2 done wrong and how to prevent history explosion as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 19
 
@@ -527,7 +527,7 @@ Partition by:
 - Customer segment
 - Whatever you filter by most
 
-Full guide on performance anti-patterns and why your pipeline takes hours on Medium. Link in comments.
+Full guide on performance anti-patterns and why your pipeline takes hours as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 20
 
@@ -693,7 +693,7 @@ schema_policy:
 
 Sources change. Plan for it.
 
-Full guide on configuration patterns for multi-environment pipelines on Medium. Link in comments.
+Full guide on configuration patterns for multi-environment pipelines as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 21
 
@@ -784,7 +784,7 @@ Most errors are:
 - Column dropped upstream
 - Type mismatch
 
-Full guide on debugging data pipelines with a systematic approach on Medium. Link in comments.
+Full guide on debugging data pipelines with a systematic approach as a LinkedIn article. Link in comments.
 
 **CTA:** Link to Article 22
 
@@ -833,7 +833,7 @@ If duplicates exist, dedupe before join.
 
 ---
 
-## Medium Articles for Phase 4
+## LinkedIn Articles for Phase 4
 
 | Week | Article |
 |------|---------|

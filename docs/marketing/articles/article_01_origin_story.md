@@ -200,4 +200,4 @@ The path isn't linear. The learning never stops. But if you're hungry enough, yo
 
 - **LinkedIn:** [Your LinkedIn URL]
 - **GitHub:** [Odibi Repository URL]
-- **Medium:** Follow for more articles in this series
+- **LinkedIn:** Follow for more articles in this series

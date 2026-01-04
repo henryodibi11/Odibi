@@ -1,4 +1,4 @@
-# Medium Article Outlines
+# LinkedIn Article Outlines
 
 Companion articles for the LinkedIn campaign. Each article expands on LinkedIn posts with full code, diagrams, and deep explanations.
 
@@ -414,7 +414,7 @@ Companion articles for the LinkedIn campaign. Each article expands on LinkedIn p
 | ... | ... | ... |
 | 26 | Article 26 | 26.1, 26.2, 26.3 |
 
-## Medium Tips
+## LinkedIn Article Tips
 
 1. **Publish on Tuesday-Thursday** for best reach
 2. **Use code blocks** with syntax highlighting
