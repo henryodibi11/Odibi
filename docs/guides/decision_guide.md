@@ -195,6 +195,7 @@ retry:
 
 ## See Also
 
+- [THE_REFERENCE.md](../examples/canonical/THE_REFERENCE.md) — All patterns in one runnable example
 - [Playbook](../playbook/README.md) — Problem → solution lookup
 - [Best Practices](best_practices.md) — Code organization
 - [Production Deployment](production_deployment.md) — Going live

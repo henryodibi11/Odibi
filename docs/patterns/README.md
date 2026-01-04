@@ -175,6 +175,14 @@ These patterns are built on the **Odibi Architecture Manifesto**:
 
 ---
 
+---
+
+## See It All Together
+
+**[THE_REFERENCE.md](../examples/canonical/THE_REFERENCE.md)** — A complete star schema that combines dimension, date_dimension, and fact patterns in one runnable pipeline. This is the canonical example showing how all the patterns work together.
+
+---
+
 ## Further Reading
 
 - Databricks: "Incremental Processing" documentation

@@ -4,13 +4,15 @@
 
 ---
 
-## Start Here
+## 🎯 Start Here
+
+> **New to Odibi?** Follow the [Golden Path](golden_path.md) → Run [THE Reference Pipeline](examples/canonical/THE_REFERENCE.md) → You're done.
 
 | Goal | Go to |
 |------|-------|
 | **Get running in 10 minutes** | [Golden Path](golden_path.md) |
-| **Find a solution to a problem** | [Playbook](playbook/README.md) |
-| **Copy a working config** | [Canonical Examples](examples/canonical/README.md) |
+| **Copy THE working config** | [THE_REFERENCE.md](examples/canonical/THE_REFERENCE.md) ⭐ |
+| **Solve a specific problem** | [Playbook](playbook/README.md) |
 
 ---
 
@@ -20,38 +22,20 @@ Odibi is a framework for building data pipelines. You describe *what* you want i
 
 - **Declarative**: YAML over imperative Python
 - **Auditable**: Every run generates a "Data Story" (HTML report)
-- **Dual-engine**: Works with Pandas (local) or Spark (production)
+- **Dual-engine**: Pandas (local) → Spark (production) with zero config changes
 
 ---
 
-## Quick Example
+## The Canonical Example
 
-```yaml
-project: my_project
-
-connections:
-  raw:
-    type: local
-    base_path: ./data
-
-pipelines:
-  - pipeline: ingest
-    nodes:
-      - name: customers
-        read:
-          connection: raw
-          format: csv
-          path: customers.csv
-        write:
-          connection: raw
-          format: parquet
-          path: silver/customers
-```
+Every new user should run this first:
 
 ```bash
-pip install odibi
-odibi run odibi.yaml
+cd docs/examples/canonical/runnable
+odibi run 04_fact_table.yaml
 ```
+
+This builds a complete star schema with dimensions, facts, FK lookups, and orphan handling. **[See the full breakdown →](examples/canonical/THE_REFERENCE.md)**
 
 ---
 
@@ -60,14 +44,13 @@ odibi run odibi.yaml
 ### New to Odibi?
 
 1. [Golden Path](golden_path.md) — Zero to running in 10 minutes
-2. [Getting Started Tutorial](tutorials/getting_started.md) — Detailed first steps
-3. [Playbook](playbook/README.md) — Find solutions to problems
+2. [THE_REFERENCE.md](examples/canonical/THE_REFERENCE.md) — The one example to copy
 
 ### Building Pipelines?
 
-- [Canonical Examples](examples/canonical/README.md) — 5 copy-paste configs
 - [Patterns](patterns/README.md) — SCD2, Merge, Aggregation, etc.
 - [YAML Schema](reference/yaml_schema.md) — Complete configuration reference
+- [Canonical Examples](examples/canonical/README.md) — More runnable configs
 
 ### Going to Production?
 
