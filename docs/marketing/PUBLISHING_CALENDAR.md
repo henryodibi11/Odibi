@@ -1,11 +1,11 @@
 # Publishing Calendar - Odibi Marketing Campaign
 
-Starting: **Monday, January 6, 2025**
+Starting: **Monday, January 6, 2026**
 Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 
 ---
 
-## Month 1: January 2025
+## Month 1: January 2026
 
 ### Week 1 (Jan 6-10) - Credibility
 | Date | Day | Platform | Content |
@@ -41,7 +41,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 
 ---
 
-## Month 2: February 2025
+## Month 2: February 2026
 
 ### Week 5 (Feb 3-7) - Silver Layer
 | Date | Day | Platform | Content |
@@ -77,7 +77,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 
 ---
 
-## Month 3: March 2025
+## Month 3: March 2026
 
 ### Week 9 (Mar 3-7) - Complete Walkthrough
 | Date | Day | Platform | Content |
@@ -113,7 +113,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 
 ---
 
-## Month 4: April 2025
+## Month 4: April 2026
 
 ### Week 13 (Mar 31 - Apr 4) - Fact Table Design
 | Date | Day | Platform | Content |
@@ -149,7 +149,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 
 ---
 
-## Month 5: May 2025
+## Month 5: May 2026
 
 ### Week 17 (Apr 28 - May 2) - Bronze Anti-Patterns
 | Date | Day | Platform | Content |
@@ -193,7 +193,7 @@ Schedule: **LinkedIn Mon/Wed/Fri, Medium on Tuesdays**
 
 ---
 
-## Month 6: June 2025
+## Month 6: June 2026
 
 ### Week 22 (Jun 2-6) - Debugging
 | Date | Day | Platform | Content |

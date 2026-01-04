@@ -1,103 +1,148 @@
-# ODIBI Framework
-**Explicit over implicit. Stories over magic. Simple over clever.**
+# Odibi
+
+**Declarative data pipelines. YAML in, star schemas out.**
 
 [![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-ODIBI is a declarative data engineering framework that makes pipelines **transparent**, **traceable**, and **teachable**.
-
-Whether you are processing 10MB on your laptop or 10TB on Databricks, Odibi provides a unified "control plane" for your data.
+Odibi is a framework for building data pipelines. You describe *what* you want in YAML; Odibi handles *how*. Every run generates a "Data Story" — an audit report showing exactly what happened to your data.
 
 ---
 
-## ⚡ The 30-Second Demo
-
-Don't write boilerplate. Generate it.
+## ⚡ Quick Start
 
 ```bash
-# 1. Point Odibi at your messy data
-odibi generate-project --input ./raw_csvs --output ./my_project
-
-# 2. Run the generated pipeline
-cd my_project
-odibi run odibi.yaml
-
-# 3. View the "Data Story" (Audit Report)
-odibi story view --latest
+pip install odibi
 ```
 
-**What just happened?**
-*   Odibi analyzed your CSVs and inferred the schema.
-*   It built a **Bronze/Silver** architecture automatically.
-*   It ran the pipeline using the **Pandas** engine (or Spark, if configured).
-*   It generated an **interactive HTML report** showing exactly what happened to every row.
+Clone and run the reference example:
+
+```bash
+git clone https://github.com/henryodibi11/Odibi.git
+cd Odibi/docs/examples/canonical/runnable
+odibi run 04_fact_table.yaml
+```
+
+This builds a complete **star schema** in seconds:
+- 3 dimension tables (customer, product, date)
+- 1 fact table with FK lookups and orphan handling
+- HTML audit report
+
+**[See the full breakdown →](docs/examples/canonical/THE_REFERENCE.md)**
 
 ---
 
-## 📚 Documentation
+## 📖 The Canonical Example
 
-We have rebuilt our documentation to help you learn fast.
+```yaml
+pipelines:
+  - pipeline: build_dimensions
+    nodes:
+      - name: dim_customer
+        read:
+          connection: source
+          format: csv
+          path: customers.csv
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 1
+        write:
+          connection: gold
+          format: parquet
+          path: dim_customer
 
-### 🏁 Start Here
-*   **[Getting Started Tutorial](docs/tutorials/getting_started.md):** Go from zero to production in 10 minutes.
-*   **[Master CLI Guide](docs/guides/cli_master_guide.md):** Learn `run`, `stress`, `doctor`, and more.
+      - name: dim_date
+        pattern:
+          type: date_dimension
+          params:
+            start_date: "2025-01-01"
+            end_date: "2025-12-31"
+        write:
+          connection: gold
+          format: parquet
+          path: dim_date
 
-### 📘 Guides & How-To
-*   **[WSL Setup Guide](docs/guides/wsl_setup.md):** The definitive guide to Windows development.
-*   **[Production Deployment](docs/guides/production_deployment.md):** Moving from local to Azure/Databricks.
-*   **[Custom Transformations](docs/guides/writing_transformations.md):** Write your own Python logic.
+  - pipeline: build_facts
+    nodes:
+      - name: fact_sales
+        depends_on: [dim_customer, dim_date]
+        read:
+          connection: source
+          format: csv
+          path: orders.csv
+        pattern:
+          type: fact
+          params:
+            grain: [order_id, line_item_id]
+            dimensions:
+              - source_column: customer_id
+                dimension_table: dim_customer
+                dimension_key: customer_id
+                surrogate_key: customer_sk
+            orphan_handling: unknown
+        write:
+          connection: gold
+          format: parquet
+          path: fact_sales
+```
 
-### ⚙️ Reference
-*   **[Cheatsheet](docs/reference/cheatsheet.md):** Syntax and commands on one page.
-*   **[Configuration](docs/reference/configuration.md):** Every YAML option explained.
-*   **[Supported Formats](docs/reference/supported_formats.md):** CSV, Parquet, Delta, JSON, Avro.
-
-### 🧠 Concepts
-*   **[Architecture](docs/explanation/architecture.md):** How Odibi works under the hood.
-*   **[Case Studies](docs/explanation/case_studies.md):** Learn from reference projects (OdibiFlix, OdibiEats).
+**[Full runnable example →](docs/examples/canonical/runnable/04_fact_table.yaml)**
 
 ---
 
 ## 🚀 Key Features
 
-### 1. "Data Stories" (Auto-Documentation)
-Every time a pipeline runs, Odibi generates a "Story"—a JSON/HTML artifact capturing:
-*   **Row Counts:** "Dropped 50 rows (-5%) in filtering step."
-*   **Schema Changes:** "Column `user_id` cast from String to Int64."
-*   **Performance:** "Node `clean_data` took 12.4s."
+| Feature | Description |
+|---------|-------------|
+| **Data Stories** | Every run generates an HTML audit report |
+| **Dimensional Patterns** | SCD1/SCD2, date dimension, fact tables built-in |
+| **Validation & Contracts** | Fail-fast checks, quarantine bad rows |
+| **Dual Engine** | Pandas locally, Spark in production — same config |
+| **Production Ready** | Retry, alerting, secrets, Delta Lake support |
 
-### 2. Stress Testing ("Chaos Monkey")
-Proactively find bugs before production.
-```bash
-# Fuzz test your pipeline with random data
-odibi stress odibi.yaml --runs 10
-```
+---
 
-### 3. Production-Ready
-*   **Secrets:** Built-in redaction for logs and artifacts.
-*   **Delta Lake:** Full ACID transaction support (Time Travel, VACUUM).
-*   **Azure Native:** Seamless integration with ADLS Gen2 and Key Vault.
+## 📚 Documentation
+
+| Goal | Link |
+|------|------|
+| **Get running in 10 minutes** | [Golden Path](docs/golden_path.md) |
+| **Copy THE working example** | [THE_REFERENCE.md](docs/examples/canonical/THE_REFERENCE.md) |
+| **Solve a specific problem** | [Playbook](docs/playbook/README.md) |
+| **Understand when to use what** | [Decision Guide](docs/guides/decision_guide.md) |
+| **See all config options** | [YAML Schema](docs/reference/yaml_schema.md) |
 
 ---
 
 ## 📦 Installation
 
 ```bash
-# Standard (Pandas Engine)
+# Standard (Pandas engine)
 pip install odibi
 
-# Enterprise (Spark + Azure + Delta)
+# With Spark + Azure support
 pip install "odibi[spark,azure]"
 ```
 
 ---
 
-## 🤝 Contributing
+## 🎯 Who is this for?
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md).
+- **Solo data engineers** building pipelines without a team
+- **Analytics engineers** moving from dbt to Python-based pipelines
+- **Anyone** tired of writing the same boilerplate for every project
 
 ---
 
-**Maintainer:** Henry Odibi (@henryodibi11)
+## 🤝 Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+**Maintainer:** Henry Odibi ([@henryodibi11](https://github.com/henryodibi11))  
 **License:** MIT
