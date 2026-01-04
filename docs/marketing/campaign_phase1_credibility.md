@@ -16,7 +16,7 @@ Today marks 5 years at my company. I started on night shifts. Now I lead data en
 **Body:**
 In 2020, I graduated into a pandemic.
 
-I joined a rotational leadership program that started me in operations — 12-hour night shifts, 3 on, 3 off, supervising production lines.
+I joined a rotational leadership program that started me in operations. 12-hour night shifts, 3 on, 3 off, supervising production lines.
 
 It was hard, but it taught me how a business actually runs from the ground up.
 
@@ -31,7 +31,7 @@ So I learned:
 
 Excel → Power BI → Azure → Python → Databricks
 
-1000+ hours of self-study in one year. Not because I'm special — because I was hungry to learn.
+1000+ hours of self-study in one year. Not because I'm special. Because I was hungry to learn.
 
 5 years later, I'm the go-to data person for global operations. I train my peers in SQL. I build the pipelines everyone depends on.
 

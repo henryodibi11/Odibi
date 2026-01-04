@@ -7,7 +7,7 @@ A 20-week mastery plan built around 3 comprehensive courses. ~10 hours/week.
 **Deep Learning:** 3 extensive courses to build real, lasting skills.
 **Parallel Tracks:** Overlap courses to keep variety and momentum.
 **Weekly Projects:** Apply what you learn immediately.
-**Master the Tools:** By the end, you'll be genuinely proficient—not just "familiar."
+**Master the Tools:** By the end, you'll be genuinely proficient, not just "familiar."
 
 ---
 
@@ -378,10 +378,10 @@ Your creative curriculum ensures you have the **right skills at the right time**
 
 1. **Watch at 1.25x-1.5x speed** if you're comfortable
 2. **Take notes** on techniques you want to remember
-3. **Don't skip projects**—they're where real learning happens
+3. **Don't skip projects.** They're where real learning happens.
 4. **Save inspiration** (reels, motion graphics, styles you like)
-5. **Post imperfect work**—feedback accelerates learning
-6. **Revisit difficult sections**—mastery requires repetition
+5. **Post imperfect work.** Feedback accelerates learning.
+6. **Revisit difficult sections.** Mastery requires repetition.
 7. **Build a reference library** of your favorite effects and techniques
 
 ---
@@ -394,4 +394,4 @@ Your creative curriculum ensures you have the **right skills at the right time**
 | Premiere Pro Masterclass | [Udemy](https://www.udemy.com/course/adobe-premiere-pro-video-editing/) | ~$15-20 on sale |
 | After Effects Motion Graphics Masterclass | [Udemy](https://www.udemy.com/course/adobe-after-effects-essential-motion-graphics-training/) | ~$15-20 on sale |
 
-**Pro tip:** Udemy has sales constantly. Never pay full price—wait for a sale (usually $15-20 per course).
+**Pro tip:** Udemy has sales constantly. Never pay full price. Wait for a sale (usually $15-20 per course).

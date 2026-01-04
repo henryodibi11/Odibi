@@ -119,7 +119,7 @@ The Azure admin who helped me became a key ally. That relationship opened doors.
 
 ## What I Do Now
 
-Today — exactly 5 years in — I'm the go-to data person for global operations at my company.
+Today, exactly 5 years in, I'm the go-to data person for global operations at my company.
 
 I manage the data infrastructure for our team. I build pipelines, maintain data models, and support reporting across multiple regions. I train my peers in SQL and engineering fundamentals.
 
