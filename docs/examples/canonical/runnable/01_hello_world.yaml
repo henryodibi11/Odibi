@@ -1,0 +1,36 @@
+# Example 1: Hello World (CSV → Parquet)
+# Runnable version of docs/examples/canonical/01_hello_world.md
+project: hello_world
+
+connections:
+  landing:
+    type: local
+    base_path: ../sample_data
+  bronze:
+    type: local
+    base_path: ./data/bronze
+
+story:
+  connection: bronze
+  path: stories
+
+system:
+  connection: bronze
+  path: _system
+
+pipelines:
+  - pipeline: ingest
+    layer: bronze
+    nodes:
+      - name: ingest_customers
+        read:
+          connection: landing
+          format: csv
+          path: customers.csv
+          options:
+            header: true
+        write:
+          connection: bronze
+          format: parquet
+          path: customers
+          mode: overwrite

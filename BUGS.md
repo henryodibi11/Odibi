@@ -102,6 +102,42 @@
 
 ---
 
+## Documentation Issues Found
+
+### DOC-001: Incorrect `transformer:` Syntax in Dimension/Fact Pattern Docs ⏳ OPEN
+
+**Issue:** Tutorial documentation uses incorrect syntax for patterns.
+
+**Impact:** Users following tutorials get validation errors.
+
+**Incorrect (in docs):**
+```yaml
+transformer: dimension
+params:
+  natural_key: customer_id
+```
+
+**Correct:**
+```yaml
+pattern:
+  type: dimension
+  params:
+    natural_key: customer_id
+```
+
+**Affected Files (20+ occurrences):**
+- `docs/tutorials/dimensional_modeling/02_dimension_pattern.md`
+- `docs/tutorials/dimensional_modeling/06_full_star_schema.md`
+- `docs/patterns/dimension.md`
+- `docs/patterns/fact.md`
+- `docs/patterns/README.md`
+- `docs/semantics/index.md`
+- `docs/guides/dimensional_modeling_guide.md`
+
+**Reference:** See `docs/examples/EXAMPLES_AUDIT.md` for full details.
+
+---
+
 ## Files Modified
 
 1. `scripts/prepare_source_tiers.py` - Python 3.9 type hint compatibility
