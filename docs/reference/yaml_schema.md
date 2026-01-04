@@ -2032,6 +2032,7 @@ story:
 | **max_failure_samples** | int | No | `500` | Maximum total failed rows across all validations |
 | **max_sampled_validations** | int | No | `5` | After this many validations, show only counts (no samples) |
 | **async_generation** | bool | No | `False` | Generate stories asynchronously (fire-and-forget). Pipeline returns immediately while story writes in background. Improves multi-pipeline performance by ~5-10s per pipeline. |
+| **generate_lineage** | bool | No | `True` | Generate combined lineage graph from all stories. Creates a unified view of data flow across pipelines. |
 
 ---
 ## Transformation Reference
@@ -3480,14 +3481,18 @@ Attributes:
         - `connection.path`: e.g., `gold.dim_customer` or `gold.dims/customer`
         - `table_name`: Uses default connection
     column: Column name in source (defaults to name)
+    expr: Custom SQL expression. If provided, overrides column and grain.
+        Example: "YEAR(DATEADD(month, 6, Date))" for fiscal year
     hierarchy: Optional ordered list of columns for drill-down
     description: Human-readable description
-    grain: Time grain transformation (day, week, month, quarter, year)
+    grain: Time grain transformation (day, week, month, quarter, year).
+        Ignored if expr is provided.
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique dimension identifier |
 | **source** | Optional[str] | No | - | Source table reference. Formats: $pipeline.node (e.g., $build_warehouse.dim_customer), connection.path (e.g., gold.dim_customer or gold.dims/customer), or bare table_name |
 | **column** | Optional[str] | No | - | Column name (defaults to name) |
+| **expr** | Optional[str] | No | - | Custom SQL expression. Overrides column and grain. Example: YEAR(DATEADD(month, 6, Date)) for fiscal year |
 | **hierarchy** | List[str] | No | `PydanticUndefined` | Drill-down hierarchy |
 | **description** | Optional[str] | No | - | Human-readable description |
 | **grain** | Optional[TimeGrain] | No | - | Time grain transformation |

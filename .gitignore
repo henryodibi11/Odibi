@@ -119,6 +119,10 @@ examples/diagnostics_demo/output/
 examples/diagnostics_demo/output_*/
 examples/diagnostics_demo/stories_*/
 
+# Example pipeline outputs (keep raw/, ignore lake/)
+examples/**/data/lake/
+examples/**/data/_system/
+
 # Odibi Internal
 spark_catalog.*.stories/
 

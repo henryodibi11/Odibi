@@ -41,50 +41,38 @@ plugins:
             show_source: true
 
 nav:
+  # ─────────────────────────────────────────────
+  # GOLDEN PATH - Primary entry point
+  # ─────────────────────────────────────────────
   - Home: README.md
+  - Golden Path: golden_path.md
   - Playbook: playbook/README.md
 
-  - Learn:
-      - Getting Started:
-          - Quickstart: tutorials/getting_started.md
-          - Bronze Layer: tutorials/bronze_layer.md
-          - Silver Layer: tutorials/silver_layer.md
-          - Gold Layer: tutorials/gold_layer.md
-          - Spark Engine: tutorials/spark_engine.md
-          - Azure Connections: tutorials/azure_connections.md
-      - Dimensional Modeling:
-          - Introduction: tutorials/dimensional_modeling/01_introduction.md
-          - Dimension Pattern: tutorials/dimensional_modeling/02_dimension_pattern.md
-          - Date Dimension: tutorials/dimensional_modeling/03_date_dimension_pattern.md
-          - Fact Pattern: tutorials/dimensional_modeling/04_fact_pattern.md
-          - Aggregation Pattern: tutorials/dimensional_modeling/05_aggregation_pattern.md
-          - Full Star Schema: tutorials/dimensional_modeling/06_full_star_schema.md
-          - Semantic Layer Intro: tutorials/dimensional_modeling/07_semantic_layer_intro.md
-          - Defining Metrics: tutorials/dimensional_modeling/08_defining_metrics.md
-          - Defining Dimensions: tutorials/dimensional_modeling/09_defining_dimensions.md
-          - Querying Metrics: tutorials/dimensional_modeling/10_querying_metrics.md
-          - Materializing Metrics: tutorials/dimensional_modeling/11_materializing_metrics.md
-          - Semantic Full Example: tutorials/dimensional_modeling/12_semantic_full_example.md
-          - FK Validation: tutorials/dimensional_modeling/13_fk_validation.md
-      - Learning Resources:
-          - Curriculum: learning/curriculum.md
-          - Data Engineering 101: learning/data_engineering_101.md
-          - Glossary: learning/glossary.md
+  # ─────────────────────────────────────────────
+  # GETTING STARTED - For new users
+  # ─────────────────────────────────────────────
+  - Getting Started:
+      - Quickstart: tutorials/getting_started.md
+      - Bronze Layer: tutorials/bronze_layer.md
+      - Silver Layer: tutorials/silver_layer.md
+      - Gold Layer: tutorials/gold_layer.md
+      - Spark Engine: tutorials/spark_engine.md
+      - Azure Connections: tutorials/azure_connections.md
 
-  - Concepts:
-      - Pipelines & Nodes: features/pipelines.md
-      - Connections: features/connections.md
-      - Engines: features/engines.md
-      - Transformers: features/transformers.md
-      - Loading Patterns (SCD2, Merge): features/patterns.md
-      - Configuration: features/configuration.md
-      - State Management: features/state.md
-      - Stories: features/stories.md
-      - Orchestration: features/orchestration.md
-      - Cross-Pipeline Dependencies: features/cross-pipeline-dependencies.md
-      - Architecture: explanation/architecture.md
-      - Case Studies: explanation/case_studies.md
+  # ─────────────────────────────────────────────
+  # CANONICAL EXAMPLES - Copy-paste configs
+  # ─────────────────────────────────────────────
+  - Examples:
+      - Overview: examples/canonical/README.md
+      - 1. Hello World: examples/canonical/01_hello_world.md
+      - 2. Incremental SQL: examples/canonical/02_incremental_sql.md
+      - 3. SCD2 Dimension: examples/canonical/03_scd2_dimension.md
+      - 4. Fact Table: examples/canonical/04_fact_table.md
+      - 5. Full Pipeline: examples/canonical/05_full_pipeline.md
 
+  # ─────────────────────────────────────────────
+  # COMMON PATTERNS - Problem → Solution
+  # ─────────────────────────────────────────────
   - Patterns:
       - Overview: patterns/README.md
       - Data Loading:
@@ -95,22 +83,17 @@ nav:
           - Windowed Reprocess: patterns/windowed_reprocess.md
           - Smart Read: patterns/smart_read.md
           - Skip If Unchanged: patterns/skip_if_unchanged.md
-          - Legacy HWM (Manual): patterns/legacy_hwm_manual.md
       - Dimensional Modeling:
           - Dimension Pattern: patterns/dimension.md
           - Date Dimension: patterns/date_dimension.md
           - Fact Pattern: patterns/fact.md
           - Aggregation Pattern: patterns/aggregation.md
           - SCD2 Pattern: patterns/scd2.md
-      - Semantic Layer:
-          - Overview: semantics/index.md
-          - Defining Metrics: semantics/metrics.md
-          - Querying: semantics/query.md
-          - Materializing: semantics/materialize.md
-          - Running Views: semantics/runner.md
-          - Lineage Stitcher: semantics/lineage_stitcher.md
       - Anti-Patterns: patterns/anti_patterns.md
 
+  # ─────────────────────────────────────────────
+  # DATA QUALITY - Validation, contracts, gates
+  # ─────────────────────────────────────────────
   - Data Quality:
       - Overview: validation/README.md
       - Contracts: validation/contracts.md
@@ -118,8 +101,10 @@ nav:
       - Quality Gates: features/quality_gates.md
       - Quarantine: features/quarantine.md
       - FK Validation: validation/fk.md
-      - Performance: features/validation_performance.md
 
+  # ─────────────────────────────────────────────
+  # OPERATIONS - Production, observability
+  # ─────────────────────────────────────────────
   - Operations:
       - Alerting: features/alerting.md
       - Observability: features/observability.md
@@ -127,38 +112,18 @@ nav:
       - Lineage: features/lineage.md
       - Schema Tracking: features/schema_tracking.md
       - Catalog: features/catalog.md
-      - Web UI: features/ui.md
       - Troubleshooting: troubleshooting.md
 
-  - Guides:
-      - The Definitive Guide: guides/the_definitive_guide.md
-      - Planning Walkthroughs: guides/planning_walkthroughs.md
-      - Cookbook (Recipes): guides/recipes.md
-      - Medallion Architecture: guides/medallion_architecture.md
-      - Writing Transformations: guides/writing_transformations.md
-      - Testing Pipelines: guides/testing.md
-      - CLI Master Guide: guides/cli_master_guide.md
-      - Python API Guide: guides/python_api_guide.md
-      - Plugins & Extensibility: features/plugins.md
-      - Production Deployment: guides/production_deployment.md
-      - Environments: guides/environments.md
-      - Secrets Management: guides/secrets.md
-      - Azure Setup: guides/setup_azure.md
-      - Performance Tuning: guides/performance_tuning.md
-      - WSL Setup: guides/wsl_setup.md
-      - Best Practices: guides/best_practices.md
-      - Avoiding the Builder Trap: guides/avoiding_the_builder_trap.md
-      - Dimensional Modeling Guide: guides/dimensional_modeling_guide.md
-      - Dogfooding (Meta): guides/dogfooding.md
-      - Migration Guide: guides/MIGRATION_GUIDE.md
-
+  # ─────────────────────────────────────────────
+  # DEEP REFERENCE - Look up when needed
+  # ─────────────────────────────────────────────
   - Reference:
       - Cheatsheet: reference/cheatsheet.md
       - YAML Schema: reference/yaml_schema.md
       - Configuration Guide: reference/configuration.md
       - Supported Formats: reference/supported_formats.md
       - Engine Parity: reference/PARITY_TABLE.md
-      - Quick Glossary: reference/glossary.md
+      - Glossary: reference/glossary.md
       - CLI Reference: features/cli.md
       - API:
           - Pipeline: reference/api/pipeline.md
@@ -169,3 +134,63 @@ nav:
           - Config: reference/api/config.md
           - Connections: reference/api/connections.md
           - CLI: reference/api/cli.md
+
+  # ─────────────────────────────────────────────
+  # GUIDES - Task-oriented how-tos
+  # ─────────────────────────────────────────────
+  - Guides:
+      - Decision Guide: guides/decision_guide.md
+      - The Definitive Guide: guides/the_definitive_guide.md
+      - Cookbook (Recipes): guides/recipes.md
+      - Medallion Architecture: guides/medallion_architecture.md
+      - Writing Transformations: guides/writing_transformations.md
+      - Testing Pipelines: guides/testing.md
+      - CLI Master Guide: guides/cli_master_guide.md
+      - Python API Guide: guides/python_api_guide.md
+      - Production Deployment: guides/production_deployment.md
+      - Environments: guides/environments.md
+      - Secrets Management: guides/secrets.md
+      - Azure Setup: guides/setup_azure.md
+      - Performance Tuning: guides/performance_tuning.md
+      - WSL Setup: guides/wsl_setup.md
+      - Best Practices: guides/best_practices.md
+
+  # ─────────────────────────────────────────────
+  # CONCEPTS - Understanding-oriented
+  # ─────────────────────────────────────────────
+  - Concepts:
+      - Pipelines & Nodes: features/pipelines.md
+      - Connections: features/connections.md
+      - Engines: features/engines.md
+      - Transformers: features/transformers.md
+      - Loading Patterns: features/patterns.md
+      - Configuration: features/configuration.md
+      - State Management: features/state.md
+      - Stories: features/stories.md
+      - Orchestration: features/orchestration.md
+      - Architecture: explanation/architecture.md
+
+  # ─────────────────────────────────────────────
+  # SEMANTIC LAYER - Advanced analytics
+  # ─────────────────────────────────────────────
+  - Semantic Layer:
+      - Overview: semantics/index.md
+      - Defining Metrics: semantics/metrics.md
+      - Querying: semantics/query.md
+      - Materializing: semantics/materialize.md
+      - Running Views: semantics/runner.md
+
+  # ─────────────────────────────────────────────
+  # LEARNING - For newcomers to data engineering
+  # ─────────────────────────────────────────────
+  - Learning:
+      - Curriculum: learning/curriculum.md
+      - Data Engineering 101: learning/data_engineering_101.md
+      - Dimensional Modeling:
+          - Introduction: tutorials/dimensional_modeling/01_introduction.md
+          - Dimension Pattern: tutorials/dimensional_modeling/02_dimension_pattern.md
+          - Date Dimension: tutorials/dimensional_modeling/03_date_dimension_pattern.md
+          - Fact Pattern: tutorials/dimensional_modeling/04_fact_pattern.md
+          - Aggregation: tutorials/dimensional_modeling/05_aggregation_pattern.md
+          - Full Star Schema: tutorials/dimensional_modeling/06_full_star_schema.md
+      - Glossary: learning/glossary.md

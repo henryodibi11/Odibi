@@ -919,9 +919,9 @@ def setup_cycle_handlers(
                 chat_history_ref
             ):
                 # Use invisible placeholder instead of empty string to avoid visible gap
-                chat_history_ref[_running_banner_idx[0]][
-                    "content"
-                ] = '<div style="display:none"></div>'
+                chat_history_ref[_running_banner_idx[0]]["content"] = (
+                    '<div style="display:none"></div>'
+                )
             _running_banner_idx[0] = None
 
         def callback(event):
@@ -1007,9 +1007,9 @@ def setup_cycle_handlers(
                 if _live_message_idx[0] is not None and _live_message_idx[0] < len(
                     chat_history_ref
                 ):
-                    chat_history_ref[_live_message_idx[0]][
-                        "content"
-                    ] = '<div style="display:none"></div>'
+                    chat_history_ref[_live_message_idx[0]]["content"] = (
+                        '<div style="display:none"></div>'
+                    )
 
                 if event.is_error:
                     content = format_error_block(

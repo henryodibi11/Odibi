@@ -1,46 +1,88 @@
 # Odibi Documentation
 
-Welcome to the Odibi documentation. Odibi is a declarative data engineering framework designed to make data pipelines transparent, self-documenting, and easy to maintain.
-
-## 📚 How to use this documentation
-
-We follow the **Diátaxis** framework, organizing documentation by user needs:
-
-### 1. 🏁 Tutorials (Learning-Oriented)
-*Start here if you are new.*
-Step-by-step lessons that take you from "Zero" to "Running Pipeline".
-*   **[Getting Started](tutorials/getting_started.md):** Your first 10 minutes with Odibi.
-*   **[Spark Engine](tutorials/spark_engine.md):** Running Odibi on Spark clusters.
-
-### 2. 📘 How-To Guides (Task-Oriented)
-*Read these when you need to solve a specific problem.*
-Practical recipes for common tasks.
-*   **[Best Practices](guides/best_practices.md):** Project organization, naming, performance, and more.
-*   **[Writing Custom Transformations](guides/writing_transformations.md):** How to write Python logic for your pipeline.
-*   **[Using the CLI](guides/cli_master_guide.md):** Running, stress-testing, and debugging.
-*   **[Production Deployment](guides/production_deployment.md):** Moving from laptop to cloud.
-*   **[Performance Tuning](guides/performance_tuning.md):** Optimize for speed and scale.
-*   **[WSL Setup](guides/wsl_setup.md):** The definitive guide for Windows users.
-
-### 3. ⚙️ Reference (Information-Oriented)
-*Look here for technical specs and syntax.*
-*   **[Configuration Reference](reference/configuration.md):** Complete guide to `odibi.yaml`.
-*   **[Cheatsheet](reference/cheatsheet.md):** Quick lookup for commands and syntax.
-*   **[Supported Formats](reference/supported_formats.md):** CSV, Parquet, Delta, JSON details.
-
-### 4. 🧠 Explanation (Understanding-Oriented)
-*Read these to understand the "Why" and "How".*
-*   **[Architecture](explanation/architecture.md):** How Odibi works under the hood.
-*   **[Case Studies](explanation/case_studies.md):** Real-world patterns and examples.
+**Declarative data engineering. YAML in, pipelines out.**
 
 ---
 
-## 🚀 Quick Links
+## Start Here
 
-*   **Repository:** [GitHub](https://github.com/henryodibi11/Odibi)
-*   **Issues:** [Report a Bug](https://github.com/henryodibi11/Odibi/issues)
-*   **PyPI:** [View Package](https://pypi.org/project/odibi/)
+| Goal | Go to |
+|------|-------|
+| **Get running in 10 minutes** | [Golden Path](golden_path.md) |
+| **Find a solution to a problem** | [Playbook](playbook/README.md) |
+| **Copy a working config** | [Canonical Examples](examples/canonical/README.md) |
 
 ---
 
-*This documentation is versioned with the Odibi framework. Last updated: December 2025.*
+## What is Odibi?
+
+Odibi is a framework for building data pipelines. You describe *what* you want in YAML; Odibi handles *how*.
+
+- **Declarative**: YAML over imperative Python
+- **Auditable**: Every run generates a "Data Story" (HTML report)
+- **Dual-engine**: Works with Pandas (local) or Spark (production)
+
+---
+
+## Quick Example
+
+```yaml
+project: my_project
+
+connections:
+  raw:
+    type: local
+    base_path: ./data
+
+pipelines:
+  - pipeline: ingest
+    nodes:
+      - name: customers
+        read:
+          connection: raw
+          format: csv
+          path: customers.csv
+        write:
+          connection: raw
+          format: parquet
+          path: silver/customers
+```
+
+```bash
+pip install odibi
+odibi run odibi.yaml
+```
+
+---
+
+## Documentation Map
+
+### New to Odibi?
+
+1. [Golden Path](golden_path.md) — Zero to running in 10 minutes
+2. [Getting Started Tutorial](tutorials/getting_started.md) — Detailed first steps
+3. [Playbook](playbook/README.md) — Find solutions to problems
+
+### Building Pipelines?
+
+- [Canonical Examples](examples/canonical/README.md) — 5 copy-paste configs
+- [Patterns](patterns/README.md) — SCD2, Merge, Aggregation, etc.
+- [YAML Schema](reference/yaml_schema.md) — Complete configuration reference
+
+### Going to Production?
+
+- [Decision Guide](guides/decision_guide.md) — When to use what
+- [Production Deployment](guides/production_deployment.md) — Cloud setup
+- [Alerting](features/alerting.md) — Notifications on failure
+
+---
+
+## Quick Links
+
+- **Repository:** [GitHub](https://github.com/henryodibi11/Odibi)
+- **Issues:** [Report a Bug](https://github.com/henryodibi11/Odibi/issues)
+- **PyPI:** [View Package](https://pypi.org/project/odibi/)
+
+---
+
+*Last updated: January 2025*
