@@ -43,8 +43,8 @@ The most common use case for Smart Read is the **Ingestion Node**. This node act
 ### Why use this pattern?
 
 1.  **State Management**: The node uses the **Write Target** (e.g., `bronze_orders`) as its state.
-    *   *Target Empty?* $\rightarrow$ Run `SELECT *` (Full History)
-    *   *Target Exists?* $\rightarrow$ Run `SELECT * ... WHERE date > X` (Incremental)
+    *   *Target Empty?* → Run `SELECT *` (Full History)
+    *   *Target Exists?* → Run `SELECT * ... WHERE date > X` (Incremental)
 2.  **Efficiency**: Downstream nodes (e.g., "clean_orders") can simply depend on this node. They will receive the dataframe containing *only* the data that was just ingested (the incremental batch), allowing your entire pipeline to process only new data efficiently.
 
 ### Example Node

@@ -38,12 +38,12 @@ Enable it by setting `mode: stateful` in the `incremental` block.
 
 1.  **First Run (Bootstrap)**
     *   Odibi checks the state backend (Delta table or local JSON).
-    *   No state found? $\rightarrow$ **Full Load** (`SELECT * FROM table`).
+    *   No state found? → **Full Load** (`SELECT * FROM table`).
     *   After success, it saves `MAX(updated_at)` as the HWM.
 
 2.  **Subsequent Runs (Incremental)**
     *   Odibi retrieves the last HWM (e.g., `2023-10-25 10:00:00`).
-    *   It subtracts the `watermark_lag` (e.g., 30 mins) $\rightarrow$ `09:30:00`.
+    *   It subtracts the `watermark_lag` (e.g., 30 mins) → `09:30:00`.
     *   Generates query: `SELECT * FROM table WHERE updated_at > '2023-10-25 09:30:00'`.
     *   After success, it updates the HWM with the *new* maximum from the fetched batch.
 
