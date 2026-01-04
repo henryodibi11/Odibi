@@ -11,6 +11,41 @@ from odibi.utils.logging import logger
 ENV_PATTERN = re.compile(r"\$\{(?:env:)?([A-Za-z0-9_]+)\}")
 
 
+def _normalize_pattern_to_transformer(data: Dict[str, Any]) -> None:
+    """Normalize 'pattern:' block to 'transformer:' + 'params:' fields.
+
+    The documentation uses `pattern: type: X` syntax, but the node executor
+    reads `transformer:` and `params:`. This function converts the user-friendly
+    syntax to the internal representation.
+
+    Example:
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+
+        Becomes:
+          transformer: dimension
+          params:
+            natural_key: customer_id
+    """
+    pipelines = data.get("pipelines", [])
+    for pipeline in pipelines:
+        if isinstance(pipeline, dict):
+            nodes = pipeline.get("nodes", [])
+            for node in nodes:
+                if isinstance(node, dict) and "pattern" in node:
+                    pattern_block = node.pop("pattern")
+                    if isinstance(pattern_block, dict):
+                        pattern_type = pattern_block.get("type")
+                        pattern_params = pattern_block.get("params", {})
+                        if pattern_type:
+                            node["transformer"] = pattern_type
+                        if pattern_params:
+                            existing_params = node.get("params", {})
+                            node["params"] = {**existing_params, **pattern_params}
+
+
 def _tag_nodes_with_source(data: Dict[str, Any], source_path: str) -> None:
     """Tag all nodes in pipelines with their source YAML file path.
 
@@ -183,6 +218,9 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
         raise
 
     logger.debug("YAML parsed successfully", top_level_keys=list(data.keys()))
+
+    # Normalize pattern: blocks to transformer: + params: (user-friendly -> internal)
+    _normalize_pattern_to_transformer(data)
 
     # Tag all nodes in this file with their source YAML path (for sql_file resolution)
     _tag_nodes_with_source(data, abs_path)

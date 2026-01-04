@@ -1,21 +1,21 @@
-# Example 3: SCD2 Dimension (Track History)
-# Runnable version of docs/examples/canonical/03_scd2_dimension.md
-project: customer_dimension
+# SCD2 Demo - Step 1: Initial Load
+# Creates the dimension with initial customer data
+project: scd2_demo
 
 connections:
-  bronze:
+  source:
     type: local
-    base_path: ../sample_data
-  silver:
+    base_path: .
+  target:
     type: local
-    base_path: ./data/silver
+    base_path: ./data
 
 story:
-  connection: silver
+  connection: target
   path: stories
 
 system:
-  connection: silver
+  connection: target
   path: _system
 
 pipelines:
@@ -24,9 +24,9 @@ pipelines:
     nodes:
       - name: dim_customer
         read:
-          connection: bronze
+          connection: source
           format: csv
-          path: customers.csv
+          path: customers_v1.csv
         
         pattern:
           type: dimension
@@ -39,11 +39,11 @@ pipelines:
               - email
               - tier
               - city
-            target: silver.dim_customer
+            target: target.dim_customer
             unknown_member: true
         
         write:
-          connection: silver
+          connection: target
           format: delta
           path: dim_customer
           mode: overwrite

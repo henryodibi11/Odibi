@@ -50,3 +50,62 @@ def test_load_yaml_with_env_missing_var(monkeypatch):
 def test_load_yaml_with_env_file_not_found():
     with pytest.raises(FileNotFoundError):
         load_yaml_with_env("non_existent_file.yaml")
+
+
+def test_pattern_block_normalized_to_transformer():
+    """Test that pattern: block is normalized to transformer: + params:."""
+    content = """
+    pipelines:
+      - pipeline: test
+        nodes:
+          - name: dim_customer
+            pattern:
+              type: dimension
+              params:
+                natural_key: customer_id
+                surrogate_key: customer_sk
+    """
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as f:
+        f.write(content)
+        path = f.name
+
+    try:
+        config = load_yaml_with_env(path)
+        node = config["pipelines"][0]["nodes"][0]
+        assert "pattern" not in node, "pattern block should be removed"
+        assert node["transformer"] == "dimension"
+        assert node["params"]["natural_key"] == "customer_id"
+        assert node["params"]["surrogate_key"] == "customer_sk"
+    finally:
+        os.remove(path)
+
+
+def test_pattern_block_preserves_existing_params():
+    """Test that pattern.params merges with existing params."""
+    content = """
+    pipelines:
+      - pipeline: test
+        nodes:
+          - name: test_node
+            params:
+              existing_key: existing_value
+            pattern:
+              type: fact
+              params:
+                grain:
+                  - order_id
+    """
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as f:
+        f.write(content)
+        path = f.name
+
+    try:
+        config = load_yaml_with_env(path)
+        node = config["pipelines"][0]["nodes"][0]
+        assert node["transformer"] == "fact"
+        assert node["params"]["existing_key"] == "existing_value"
+        assert node["params"]["grain"] == ["order_id"]
+    finally:
+        os.remove(path)
