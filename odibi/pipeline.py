@@ -273,7 +273,7 @@ class Pipeline:
         max_workers: int = 4,
         on_error: Optional[str] = None,
         tag: Optional[str] = None,
-        node: Optional[str] = None,
+        node: Optional[Union[str, List[str]]] = None,
         console: bool = False,
     ) -> PipelineResults:
         """Execute the pipeline.
@@ -285,7 +285,7 @@ class Pipeline:
             max_workers: Maximum number of parallel threads (default: 4)
             on_error: Override error handling strategy
             tag: Filter nodes by tag (only nodes with this tag will run)
-            node: Run only the specific node by name
+            node: Run only specific node(s) by name - can be a string or list of strings
             console: Whether to show rich console output with progress
 
         Returns:
@@ -318,12 +318,15 @@ class Pipeline:
             filtered_nodes = {name for name in filtered_nodes if tag in self.graph.nodes[name].tags}
             self._ctx.info(f"Filtering by tag '{tag}': {len(filtered_nodes)} nodes match")
         if node:
-            if node in self.graph.nodes:
-                filtered_nodes = {node}
-                self._ctx.info(f"Running single node: {node}")
-            else:
+            # Normalize to list
+            node_list = [node] if isinstance(node, str) else node
+            # Validate all nodes exist
+            missing = [n for n in node_list if n not in self.graph.nodes]
+            if missing:
                 available = ", ".join(self.graph.nodes.keys())
-                raise ValueError(f"Node '{node}' not found. Available: {available}")
+                raise ValueError(f"Node(s) not found: {missing}. Available: {available}")
+            filtered_nodes = set(node_list)
+            self._ctx.info(f"Running specific node(s): {node_list}")
 
         # Update execution order to only include filtered nodes
         execution_order = [n for n in execution_order if n in filtered_nodes]
@@ -1580,7 +1583,7 @@ class PipelineManager:
         max_workers: int = 4,
         on_error: Optional[str] = None,
         tag: Optional[str] = None,
-        node: Optional[str] = None,
+        node: Optional[Union[str, List[str]]] = None,
         console: bool = False,
     ) -> Union[PipelineResults, Dict[str, PipelineResults]]:
         """Run one, multiple, or all pipelines.
@@ -1593,7 +1596,7 @@ class PipelineManager:
             max_workers: Maximum number of worker threads for parallel execution.
             on_error: Override error handling strategy (fail_fast, fail_later, ignore).
             tag: Filter nodes by tag (only nodes with this tag will run).
-            node: Run only the specific node by name.
+            node: Run only specific node(s) by name - can be a string or list of strings.
             console: Whether to show rich console output with progress.
 
         Returns:
