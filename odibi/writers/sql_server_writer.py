@@ -651,14 +651,19 @@ class SqlServerMergeWriter:
 
     def get_table_columns(self, table: str) -> Dict[str, str]:
         """
-        Get column names and types for a table.
+        Get column names and full types (with length/precision) for a table.
 
         Returns:
-            Dictionary mapping column names to SQL types
+            Dictionary mapping column names to full SQL types (e.g., 'nvarchar(255)')
         """
         schema, table_name = self.parse_table_name(table)
         sql = f"""
-        SELECT COLUMN_NAME, DATA_TYPE
+        SELECT 
+            COLUMN_NAME, 
+            DATA_TYPE,
+            CHARACTER_MAXIMUM_LENGTH,
+            NUMERIC_PRECISION,
+            NUMERIC_SCALE
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
         ORDER BY ORDINAL_POSITION
@@ -667,9 +672,35 @@ class SqlServerMergeWriter:
         columns = {}
         for row in result:
             if isinstance(row, dict):
-                columns[row["COLUMN_NAME"]] = row["DATA_TYPE"]
+                col_name = row["COLUMN_NAME"]
+                data_type = row["DATA_TYPE"]
+                char_len = row.get("CHARACTER_MAXIMUM_LENGTH")
+                num_prec = row.get("NUMERIC_PRECISION")
+                num_scale = row.get("NUMERIC_SCALE")
             else:
-                columns[row[0]] = row[1]
+                col_name = row[0]
+                data_type = row[1]
+                char_len = row[2] if len(row) > 2 else None
+                num_prec = row[3] if len(row) > 3 else None
+                num_scale = row[4] if len(row) > 4 else None
+
+            # Build full type with length/precision
+            if data_type.lower() in ("nvarchar", "varchar", "char", "nchar", "binary", "varbinary"):
+                if char_len == -1:
+                    full_type = f"{data_type}(MAX)"
+                elif char_len:
+                    full_type = f"{data_type}({char_len})"
+                else:
+                    full_type = f"{data_type}(MAX)"
+            elif data_type.lower() in ("decimal", "numeric"):
+                if num_prec and num_scale is not None:
+                    full_type = f"{data_type}({num_prec},{num_scale})"
+                else:
+                    full_type = data_type
+            else:
+                full_type = data_type
+
+            columns[col_name] = full_type
         return columns
 
     def infer_sql_type_pandas(self, dtype: Any) -> str:
