@@ -206,9 +206,20 @@ class SqlServerMergeWriter:
             hash_column: Hash column name
 
         Returns:
-            List of dicts with keys and hash values
+            List of dicts with keys and hash values, or empty list if hash column missing
         """
         escaped_table = self.get_escaped_table_name(target_table)
+
+        # Check if hash column exists in target table before querying
+        existing_columns = self.get_table_columns(target_table)
+        if existing_columns and hash_column not in existing_columns:
+            self.ctx.info(
+                "Hash column not found in target table, skipping incremental comparison",
+                hash_column=hash_column,
+                target_table=target_table,
+            )
+            return []
+
         key_cols = ", ".join([self.escape_column(k) for k in merge_keys])
         hash_col = self.escape_column(hash_column)
 
