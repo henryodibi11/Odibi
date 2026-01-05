@@ -1342,10 +1342,12 @@ class SqlServerMergeWriter:
             new_cols = [c for c in columns if c not in existing_cols]
             if new_cols:
                 new_cols_with_types = {}
+                staging_cols = self.get_table_columns(staging_table)
                 for col in new_cols:
-                    # Infer type from staging table which was just created
-                    staging_cols = self.get_table_columns(staging_table)
-                    if col in staging_cols:
+                    # Use appropriate type for hash columns (SHA256 = 64 chars)
+                    if col in ("_computed_hash", "_hash", "_hash_diff"):
+                        new_cols_with_types[col] = "NVARCHAR(256)"
+                    elif col in staging_cols:
                         new_cols_with_types[col] = staging_cols[col]
                     else:
                         new_cols_with_types[col] = "NVARCHAR(MAX)"
@@ -1488,10 +1490,12 @@ class SqlServerMergeWriter:
             new_cols = [c for c in columns if c not in existing_cols]
             if new_cols:
                 new_cols_with_types = {}
+                staging_cols = self.get_table_columns(staging_table)
                 for col in new_cols:
-                    # Infer type from staging table which was just created
-                    staging_cols = self.get_table_columns(staging_table)
-                    if col in staging_cols:
+                    # Use appropriate type for hash columns (SHA256 = 64 chars)
+                    if col in ("_computed_hash", "_hash", "_hash_diff"):
+                        new_cols_with_types[col] = "NVARCHAR(256)"
+                    elif col in staging_cols:
                         new_cols_with_types[col] = staging_cols[col]
                     else:
                         new_cols_with_types[col] = "NVARCHAR(MAX)"
@@ -1812,10 +1816,12 @@ class SqlServerMergeWriter:
             new_cols = [c for c in columns if c not in existing_cols]
             if new_cols:
                 new_cols_with_types = {}
+                staging_cols = self.get_table_columns(staging_table)
                 for col in new_cols:
-                    # Infer type from staging table which was just created
-                    staging_cols = self.get_table_columns(staging_table)
-                    if col in staging_cols:
+                    # Use appropriate type for hash columns (SHA256 = 64 chars)
+                    if col in ("_computed_hash", "_hash", "_hash_diff"):
+                        new_cols_with_types[col] = "NVARCHAR(256)"
+                    elif col in staging_cols:
                         new_cols_with_types[col] = staging_cols[col]
                     else:
                         new_cols_with_types[col] = "NVARCHAR(MAX)"
