@@ -1480,6 +1480,8 @@ class TestIncrementalMerge:
 
     def test_read_target_hashes(self, writer, mock_connection):
         """Should generate correct SQL for reading target hashes."""
+        # Mock get_table_columns to return columns including the hash column
+        writer.get_table_columns = MagicMock(return_value={"id": "INT", "_hash": "NVARCHAR"})
         mock_connection.execute_sql.return_value = [
             {"id": 1, "_hash": "h1"},
             {"id": 2, "_hash": "h2"},

@@ -1336,6 +1336,26 @@ class SqlServerMergeWriter:
 
         self.ctx.debug("Staging write completed", staging_table=staging_table)
 
+        # Handle schema evolution before MERGE - add any new columns to target table
+        if options.schema_evolution and options.schema_evolution.add_columns:
+            existing_cols = self.get_table_columns(target_table)
+            new_cols = [c for c in columns if c not in existing_cols]
+            if new_cols:
+                new_cols_with_types = {}
+                for col in new_cols:
+                    # Infer type from staging table which was just created
+                    staging_cols = self.get_table_columns(staging_table)
+                    if col in staging_cols:
+                        new_cols_with_types[col] = staging_cols[col]
+                    else:
+                        new_cols_with_types[col] = "NVARCHAR(MAX)"
+                self.ctx.info(
+                    "Adding new columns to target table via schema evolution",
+                    target_table=target_table,
+                    new_columns=list(new_cols_with_types.keys()),
+                )
+                self.add_columns(target_table, new_cols_with_types)
+
         result = self.execute_merge(
             target_table=target_table,
             staging_table=staging_table,
@@ -1461,6 +1481,26 @@ class SqlServerMergeWriter:
         )
 
         self.ctx.debug("Staging write completed (Pandas)", staging_table=staging_table)
+
+        # Handle schema evolution before MERGE - add any new columns to target table
+        if options.schema_evolution and options.schema_evolution.add_columns:
+            existing_cols = self.get_table_columns(target_table)
+            new_cols = [c for c in columns if c not in existing_cols]
+            if new_cols:
+                new_cols_with_types = {}
+                for col in new_cols:
+                    # Infer type from staging table which was just created
+                    staging_cols = self.get_table_columns(staging_table)
+                    if col in staging_cols:
+                        new_cols_with_types[col] = staging_cols[col]
+                    else:
+                        new_cols_with_types[col] = "NVARCHAR(MAX)"
+                self.ctx.info(
+                    "Adding new columns to target table via schema evolution",
+                    target_table=target_table,
+                    new_columns=list(new_cols_with_types.keys()),
+                )
+                self.add_columns(target_table, new_cols_with_types)
 
         result = self.execute_merge(
             target_table=target_table,
@@ -1765,6 +1805,26 @@ class SqlServerMergeWriter:
             )
 
         self.ctx.debug("Staging write completed (Polars)", staging_table=staging_table)
+
+        # Handle schema evolution before MERGE - add any new columns to target table
+        if options.schema_evolution and options.schema_evolution.add_columns:
+            existing_cols = self.get_table_columns(target_table)
+            new_cols = [c for c in columns if c not in existing_cols]
+            if new_cols:
+                new_cols_with_types = {}
+                for col in new_cols:
+                    # Infer type from staging table which was just created
+                    staging_cols = self.get_table_columns(staging_table)
+                    if col in staging_cols:
+                        new_cols_with_types[col] = staging_cols[col]
+                    else:
+                        new_cols_with_types[col] = "NVARCHAR(MAX)"
+                self.ctx.info(
+                    "Adding new columns to target table via schema evolution",
+                    target_table=target_table,
+                    new_columns=list(new_cols_with_types.keys()),
+                )
+                self.add_columns(target_table, new_cols_with_types)
 
         result = self.execute_merge(
             target_table=target_table,
