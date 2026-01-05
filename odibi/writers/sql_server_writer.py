@@ -877,11 +877,18 @@ class SqlServerMergeWriter:
 
         # Get column types so we can ALTER to NOT NULL
         existing_cols = self.get_table_columns(table)
+        # Build case-insensitive lookup for column types
+        existing_cols_lower = {k.lower(): v for k, v in existing_cols.items()}
 
         # First, make PK columns NOT NULL (required for primary key)
         for col in columns:
             escaped_col = self.escape_column(col)
-            col_type = existing_cols.get(col, "NVARCHAR(MAX)")
+            col_type = existing_cols_lower.get(col.lower())
+            if col_type is None:
+                raise ValueError(
+                    f"Cannot create primary key: column '{col}' not found in table '{table}'. "
+                    f"Available columns: {list(existing_cols.keys())}"
+                )
             alter_sql = (
                 f"ALTER TABLE {escaped_table} ALTER COLUMN {escaped_col} {col_type} NOT NULL"
             )
