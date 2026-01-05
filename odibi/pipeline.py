@@ -609,7 +609,7 @@ class Pipeline:
         if parallel:
             from concurrent.futures import ThreadPoolExecutor, as_completed
 
-            layers = self.graph.get_execution_layers()
+            # NOTE: 'layers' already filtered by node/tag above - don't re-fetch from graph
             self._ctx.info(
                 f"Starting parallel execution with {max_workers} workers",
                 total_layers=len(layers),
