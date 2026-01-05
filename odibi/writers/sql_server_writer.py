@@ -818,6 +818,49 @@ class SqlServerMergeWriter:
             self.ctx.info("Adding column to table", table=table, column=col_name)
             self.connection.execute_sql(sql)
 
+    def _fix_max_columns_for_indexing(self, table: str, columns: List[str]) -> None:
+        """
+        Convert MAX columns to sized types for indexing compatibility.
+
+        SQL Server cannot use nvarchar(MAX), varchar(MAX), or varbinary(MAX)
+        columns in primary keys or indexes. This method converts them to
+        sized equivalents (e.g., nvarchar(450) - max size for indexed columns).
+
+        Args:
+            table: Table name
+            columns: Columns that will be used in index/primary key
+        """
+        escaped_table = self.get_escaped_table_name(table)
+        existing_cols = self.get_table_columns(table)
+
+        for col in columns:
+            col_type = existing_cols.get(col, "")
+            col_type_upper = col_type.upper()
+
+            # Check if it's a MAX type that needs conversion
+            if "(MAX)" in col_type_upper:
+                # SQL Server max key length is 900 bytes for clustered index
+                # nvarchar uses 2 bytes per char, so max is 450 chars
+                if "NVARCHAR" in col_type_upper or "NCHAR" in col_type_upper:
+                    new_type = "NVARCHAR(450)"
+                elif "VARCHAR" in col_type_upper or "CHAR" in col_type_upper:
+                    new_type = "VARCHAR(900)"
+                elif "VARBINARY" in col_type_upper or "BINARY" in col_type_upper:
+                    new_type = "VARBINARY(900)"
+                else:
+                    continue  # Unknown MAX type, skip
+
+                escaped_col = self.escape_column(col)
+                alter_sql = f"ALTER TABLE {escaped_table} ALTER COLUMN {escaped_col} {new_type}"
+                self.ctx.info(
+                    "Converting MAX column to sized type for indexing",
+                    table=table,
+                    column=col,
+                    old_type=col_type,
+                    new_type=new_type,
+                )
+                self.connection.execute_sql(alter_sql)
+
     def create_primary_key(self, table: str, columns: List[str]) -> None:
         """
         Create a clustered primary key on the specified columns.
@@ -1270,6 +1313,10 @@ class SqlServerMergeWriter:
                         self.connection.execute_sql(update_sql)
 
                 # Create primary key or index on merge keys if configured
+                if options.primary_key_on_merge_keys or options.index_on_merge_keys:
+                    # Fix MAX columns in merge keys - SQL Server can't index MAX types
+                    self._fix_max_columns_for_indexing(target_table, merge_keys)
+
                 if options.primary_key_on_merge_keys:
                     self.create_primary_key(target_table, merge_keys)
                 elif options.index_on_merge_keys:
@@ -1428,6 +1475,9 @@ class SqlServerMergeWriter:
         if not table_exists:
             if options.auto_create_table:
                 self.create_table_from_pandas(df, target_table, audit_cols=options.audit_cols)
+                if options.primary_key_on_merge_keys or options.index_on_merge_keys:
+                    # Fix MAX columns in merge keys - SQL Server can't index MAX types
+                    self._fix_max_columns_for_indexing(target_table, merge_keys)
                 if options.primary_key_on_merge_keys:
                     self.create_primary_key(target_table, merge_keys)
                 elif options.index_on_merge_keys:
@@ -1735,6 +1785,13 @@ class SqlServerMergeWriter:
         if not table_exists:
             if options.auto_create_table:
                 self.create_table_from_polars(df, target_table, audit_cols=options.audit_cols)
+                if options.primary_key_on_merge_keys or options.index_on_merge_keys:
+                    # Fix MAX columns in merge keys - SQL Server can't index MAX types
+                    self._fix_max_columns_for_indexing(target_table, merge_keys)
+                if options.primary_key_on_merge_keys:
+                    self.create_primary_key(target_table, merge_keys)
+                elif options.index_on_merge_keys:
+                    self.create_index(target_table, merge_keys)
             else:
                 raise ValueError(
                     f"Target table '{target_table}' does not exist. "
