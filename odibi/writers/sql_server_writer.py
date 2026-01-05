@@ -832,9 +832,11 @@ class SqlServerMergeWriter:
         """
         escaped_table = self.get_escaped_table_name(table)
         existing_cols = self.get_table_columns(table)
+        # Build case-insensitive lookup
+        existing_cols_lower = {k.lower(): v for k, v in existing_cols.items()}
 
         for col in columns:
-            col_type = existing_cols.get(col, "")
+            col_type = existing_cols_lower.get(col.lower(), "")
             col_type_upper = col_type.upper()
 
             # Check if it's a MAX type that needs conversion
