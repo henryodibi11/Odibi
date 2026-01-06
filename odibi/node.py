@@ -751,11 +751,15 @@ class NodeExecutor:
         elif date_format == "oracle_sqlserver":
             cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
             col_expr = (
-                f"TRY_CONVERT(DATETIME, "
-                f"SUBSTRING({quoted_col}, 8, 2) + '-' + "
-                f"SUBSTRING({quoted_col}, 4, 3) + '-' + "
+                f"TRY_CAST("
+                f"RIGHT('20' + SUBSTRING({quoted_col}, 8, 2), 4) + '-' + "
+                f"CASE SUBSTRING({quoted_col}, 4, 3) "
+                f"WHEN 'JAN' THEN '01' WHEN 'FEB' THEN '02' WHEN 'MAR' THEN '03' "
+                f"WHEN 'APR' THEN '04' WHEN 'MAY' THEN '05' WHEN 'JUN' THEN '06' "
+                f"WHEN 'JUL' THEN '07' WHEN 'AUG' THEN '08' WHEN 'SEP' THEN '09' "
+                f"WHEN 'OCT' THEN '10' WHEN 'NOV' THEN '11' WHEN 'DEC' THEN '12' END + '-' + "
                 f"SUBSTRING({quoted_col}, 1, 2) + ' ' + "
-                f"SUBSTRING({quoted_col}, 11, 8), 120)"
+                f"SUBSTRING({quoted_col}, 11, 8) AS DATETIME)"
             )
             cutoff_expr = f"'{cutoff_str}'"
         elif date_format == "sql_server":
