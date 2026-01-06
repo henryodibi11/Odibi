@@ -122,6 +122,10 @@ class Pipeline:
         self._pending_hwm_updates: List[Dict[str, Any]] = []
         self._batch_mode_enabled: bool = True  # Enable batch mode by default
 
+        # Track async story futures for flush_stories()
+        self._story_future = None
+        self._story_executor = None
+
         # Create logging context for this pipeline
         self._ctx = create_logging_context(
             pipeline_id=pipeline_config.pipeline,
@@ -955,9 +959,10 @@ class Pipeline:
         # Handle story completion based on async_generation setting
         if story_future:
             if async_story:
-                # Fire-and-forget: don't wait, let it complete in background
-                self._ctx.debug("Story generation running async (fire-and-forget)")
-                # Don't shutdown executor - let thread complete on its own
+                # Store future and executor for flush_stories()
+                self._story_future = story_future
+                self._story_executor = story_executor
+                self._ctx.debug("Story generation running async (can be flushed later)")
             else:
                 # Wait for story generation to complete
                 try:
@@ -988,6 +993,34 @@ class Pipeline:
             self.lineage.emit_pipeline_complete(self.config, results)
 
         return results
+
+    def flush_stories(self, timeout: float = 60.0) -> Optional[str]:
+        """Wait for any pending async story generation to complete.
+
+        Call this before operations that need story files to be written,
+        such as lineage generation.
+
+        Args:
+            timeout: Maximum seconds to wait for story generation
+
+        Returns:
+            Story path if generated, None otherwise
+        """
+        if self._story_future is None:
+            return None
+
+        try:
+            story_path = self._story_future.result(timeout=timeout)
+            self._ctx.info("Async story generation completed", story_path=story_path)
+            return story_path
+        except Exception as e:
+            self._ctx.warning(f"Async story generation failed: {e}")
+            return None
+        finally:
+            if self._story_executor:
+                self._story_executor.shutdown(wait=False)
+            self._story_future = None
+            self._story_executor = None
 
     def _send_alerts(self, event: str, results: PipelineResults) -> None:
         """Send alerts for a specific event.
@@ -1677,6 +1710,33 @@ class PipelineManager:
             List of pipeline names
         """
         return list(self._pipelines.keys())
+
+    def flush_stories(self, timeout: float = 60.0) -> Dict[str, Optional[str]]:
+        """Wait for all pending async story generation to complete.
+
+        Call this before operations that need story files to be written,
+        such as lineage generation with SemanticLayerRunner.
+
+        Args:
+            timeout: Maximum seconds to wait per pipeline
+
+        Returns:
+            Dict mapping pipeline name to story path (or None if no pending story)
+
+        Example:
+            >>> manager.run(pipelines=['bronze', 'silver', 'gold'])
+            >>> manager.flush_stories()  # Wait for all stories to be written
+            >>> semantic_runner.run()    # Now lineage can read the stories
+        """
+        results = {}
+        for name, pipeline in self._pipelines.items():
+            story_path = pipeline.flush_stories(timeout=timeout)
+            if story_path:
+                results[name] = story_path
+                self._ctx.debug(f"Story flushed for {name}", path=story_path)
+        if results:
+            self._ctx.info(f"Flushed {len(results)} pending story writes")
+        return results
 
     def get_pipeline(self, name: str) -> Pipeline:
         """Get a specific pipeline instance.

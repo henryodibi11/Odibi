@@ -684,9 +684,21 @@ class LineageGenerator:
                 if self.is_remote:
                     import fsspec
 
-                    fs, _ = fsspec.core.url_to_fs(self.stories_path, **self.storage_options)
-                    with fs.open(story_path, "r") as f:
-                        return json.load(f)
+                    # Use fsspec.open with full URL for consistent path handling
+                    # story_path from fs.ls() may be relative to container root
+                    if not story_path.startswith(("abfs://", "az://", "abfss://", "http")):
+                        # Reconstruct full URL from stories_path base
+                        # stories_path: abfs://container@account.dfs.../OEE/Stories
+                        # story_path: container/OEE/Stories/bronze/date/file.json
+                        # We need: abfs://container@account.dfs.../OEE/Stories/bronze/date/file.json
+                        fs, base_path = fsspec.core.url_to_fs(
+                            self.stories_path, **self.storage_options
+                        )
+                        with fs.open(story_path, "r") as f:
+                            return json.load(f)
+                    else:
+                        with fsspec.open(story_path, "r", **self.storage_options) as f:
+                            return json.load(f)
                 else:
                     with open(story_path, "r", encoding="utf-8") as f:
                         return json.load(f)
