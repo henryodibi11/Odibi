@@ -255,6 +255,7 @@ pipelines:
 | `phase_metrics` | `Dict[str, str]` | No | - | Columns to aggregate within each phase |
 | `metadata` | `Dict[str, str]` | No | - | Batch-level columns with aggregation method |
 | `fill_null_minutes` | `bool` | No | `False` | If True, fill null numeric columns with 0. Timestamps remain null for skipped phases. |
+| `spark_native` | `bool` | No | `False` | If True, use native Spark window functions instead of applyInPandas. See Engine Support section. |
 
 ### Output Columns
 
@@ -347,10 +348,26 @@ transform:
 | Engine | Implementation | Scalability |
 |--------|----------------|-------------|
 | **Pandas** | Native loops | Single machine |
-| **Spark** | Native window functions | 5-20x faster, parallel across cluster |
+| **Spark** | `applyInPandas` (default) | Parallel per group across cluster |
 | **Polars** | Pandas fallback | Single machine |
 
-For Spark, the transformer uses native window functions (`lag`, `lead`, `row_number`) instead of `applyInPandas`, avoiding Python serialization overhead. This makes it efficient for large datasets (2M+ rows).
+### Spark Performance
+
+By default, Spark uses `applyInPandas` which:
+- Groups data once, then processes each batch in parallel
+- Works well for datasets with **many batches** (e.g., thousands of BatchIDs)
+
+For datasets with **few large batches**, you can try native Spark window functions:
+
+```yaml
+transform:
+  - detect_sequential_phases:
+      group_by: BatchID
+      phases: [LoadTime, CookTime]
+      spark_native: true  # Use window functions instead of applyInPandas
+```
+
+The native implementation uses `lag`, `lead`, and `row_number` window functions but requires multiple joins per phase, which can be slower when there are many phases or shuffles.
 
 ---
 
