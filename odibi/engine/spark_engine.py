@@ -2237,19 +2237,44 @@ class SparkEngine(Engine):
         """Filter DataFrame where column > value.
 
         Automatically casts string columns to timestamp for proper comparison.
+        Tries multiple date formats including Oracle-style (DD-MON-YY).
         """
         from pyspark.sql import functions as F
         from pyspark.sql.types import StringType
 
         col_type = df.schema[column].dataType
         if isinstance(col_type, StringType):
-            return df.filter(F.to_timestamp(F.col(column)) > value)
+            ts_col = self._parse_string_to_timestamp(F.col(column))
+            return df.filter(ts_col > value)
         return df.filter(F.col(column) > value)
+
+    def _parse_string_to_timestamp(self, col):
+        """Parse string column to timestamp, trying multiple formats.
+
+        Supports:
+        - ISO format: 2024-04-20 07:11:01
+        - Oracle format: 20-APR-24 07:11:01.0
+        """
+        from pyspark.sql import functions as F
+
+        formats = [
+            "dd-MMM-yy HH:mm:ss.S",
+            "dd-MMM-yy HH:mm:ss",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "MM/dd/yyyy HH:mm:ss",
+        ]
+
+        result = F.to_timestamp(col)
+        for fmt in formats:
+            result = F.coalesce(result, F.to_timestamp(col, fmt))
+        return result
 
     def filter_coalesce(self, df, col1: str, col2: str, op: str, value: Any) -> Any:
         """Filter using COALESCE(col1, col2) op value.
 
         Automatically casts string columns to timestamp for proper comparison.
+        Tries multiple date formats including Oracle-style (DD-MON-YY).
         """
         from pyspark.sql import functions as F
         from pyspark.sql.types import StringType
@@ -2258,12 +2283,12 @@ class SparkEngine(Engine):
         col2_type = df.schema[col2].dataType
 
         if isinstance(col1_type, StringType):
-            c1 = F.to_timestamp(F.col(col1))
+            c1 = self._parse_string_to_timestamp(F.col(col1))
         else:
             c1 = F.col(col1)
 
         if isinstance(col2_type, StringType):
-            c2 = F.to_timestamp(F.col(col2))
+            c2 = self._parse_string_to_timestamp(F.col(col2))
         else:
             c2 = F.col(col2)
 
