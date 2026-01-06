@@ -528,8 +528,12 @@ def _detect_phases_spark(spark_df, params: DetectSequentialPhasesParams):
                 output_fields.append(StructField(f"{phase}_{metric_col}", DoubleType(), True))
 
     if params.metadata:
-        for col in params.metadata.keys():
-            output_fields.append(StructField(col, StringType(), True))
+        numeric_aggs = {"max", "min", "mean", "sum"}
+        for col, method in params.metadata.items():
+            if method in numeric_aggs:
+                output_fields.append(StructField(col, DoubleType(), True))
+            else:
+                output_fields.append(StructField(col, StringType(), True))
 
     output_schema = StructType(output_fields)
 
