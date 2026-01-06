@@ -1184,14 +1184,17 @@
                         <div style="padding: 15px;">
                             <div style="display: flex; gap: 20px; margin-bottom: 15px; font-size: 0.95em;">
                             <div><strong>Net Change:</strong> {{ node.data_diff.rows_change }}</div>
-                            {% if node.data_diff.rows_added is not none %}
+                            {% if node.data_diff.rows_added is defined and node.data_diff.rows_added is not none %}
                             <div style="color: var(--success-color);"><strong>Added:</strong> {{ node.data_diff.rows_added }}</div>
                             {% endif %}
-                            {% if node.data_diff.rows_updated is not none %}
+                            {% if node.data_diff.rows_updated is defined and node.data_diff.rows_updated is not none %}
                             <div style="color: #f59f00;"><strong>Updated:</strong> {{ node.data_diff.rows_updated }}</div>
                             {% endif %}
-                            {% if node.data_diff.rows_removed is not none %}
+                            {% if node.data_diff.rows_removed is defined and node.data_diff.rows_removed is not none %}
                             <div style="color: var(--error-color);"><strong>Removed:</strong> {{ node.data_diff.rows_removed }}</div>
+                            {% endif %}
+                            {% if node.data_diff.rows_added is not defined and node.data_diff.rows_updated is not defined and node.data_diff.rows_removed is not defined %}
+                            <div style="color: #888; font-style: italic; font-size: 0.9em;">(Enable deep diff for detailed breakdown)</div>
                             {% endif %}
                         </div>
 
