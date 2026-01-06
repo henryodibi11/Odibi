@@ -80,9 +80,10 @@ class HTMLStoryRenderer:
 
             template = Template(template_content)
 
-            # Register custom filter
+            # Register custom filters
             # Note: Template creates its own environment, so we attach to that
             template.environment.filters["to_yaml"] = self._to_yaml
+            template.environment.filters["format_run_id"] = self._format_run_id
 
             # Render with metadata, theme, and version
             html = template.render(
@@ -114,6 +115,19 @@ class HTMLStoryRenderer:
         if not value:
             return ""
         return yaml.dump(value, sort_keys=False, default_flow_style=False).strip()
+
+    def _format_run_id(self, run_id: str) -> str:
+        """Format run_id (YYYYMMDD_HHMMSS) to human-readable format."""
+        from datetime import datetime
+
+        if not run_id or len(run_id) < 15:
+            return run_id or ""
+
+        try:
+            dt = datetime.strptime(run_id[:15], "%Y%m%d_%H%M%S")
+            return dt.strftime("%b %d, %I:%M %p UTC").replace(" 0", " ").lstrip("0")
+        except ValueError:
+            return run_id
 
     def render_to_file(self, metadata: PipelineStoryMetadata, output_path: str) -> str:
         """

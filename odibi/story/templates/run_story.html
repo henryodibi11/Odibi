@@ -580,7 +580,7 @@
     <div class="node-card" style="padding: 20px; border-left: 4px solid #7c3aed;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <h3 style="margin: 0; color: #7c3aed;">📊 Changes vs Last Success</h3>
-            <span style="font-size: 0.85em; color: #666;">Compared to: {{ metadata.compared_to_run_id }}</span>
+            <span style="font-size: 0.85em; color: #666;">Compared to previous run ({{ metadata.compared_to_run_id | format_run_id }})</span>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 15px;">
             {% if metadata.change_summary.newly_failing_count > 0 %}
@@ -616,7 +616,7 @@
     {% elif metadata.compared_to_run_id %}
     <div class="node-card" style="padding: 15px; border-left: 4px solid var(--success-color);">
         <span style="color: var(--success-color); font-weight: 600;">✓ No significant changes</span>
-        <span style="color: #666; font-size: 0.9em; margin-left: 10px;">vs {{ metadata.compared_to_run_id }}</span>
+        <span style="color: #666; font-size: 0.9em; margin-left: 10px;">vs previous run ({{ metadata.compared_to_run_id | format_run_id }})</span>
     </div>
     {% endif %}
 
