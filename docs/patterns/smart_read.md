@@ -160,6 +160,46 @@ If you are bypassing Bronze and merging directly into a Silver table, you can us
 | `month` | Looks back N * 30 days (approx) |
 | `year` | Looks back N * 365 days (approx) |
 
+## Date Format for String Columns
+
+If your date column is stored as a **string** (not a native timestamp), you must specify the `date_format` so Odibi can generate the correct SQL conversion.
+
+### Supported Formats
+
+| Format | Pattern | Example |
+|--------|---------|---------|
+| `oracle` | DD-MON-YY | `20-APR-24 07:11:01.0` |
+| `sql_server` | CONVERT style 120 | `2024-04-20 07:11:01` |
+| `us` | MM/DD/YYYY | `04/20/2024 07:11:01` |
+| `eu` | DD/MM/YYYY | `20/04/2024 07:11:01` |
+| `iso` | YYYY-MM-DDTHH:MM:SS | `2024-04-20T07:11:01` |
+
+### Example: Oracle Date Format
+
+```yaml
+read:
+  connection: "oracle_db"
+  format: "sql"
+  table: "PRODUCTION.EVENTS"
+  incremental:
+    column: "EVENT_START"
+    lookback: 3
+    unit: "day"
+    date_format: "oracle"  # Handles DD-MON-YY format
+
+write:
+  connection: "bronze"
+  format: "delta"
+  table: "events_raw"
+  mode: "append"
+```
+
+This generates SQL like:
+```sql
+SELECT * FROM PRODUCTION.EVENTS
+WHERE TO_TIMESTAMP(EVENT_START, 'DD-MON-RR HH24:MI:SS.FF') >= TO_TIMESTAMP('03-JAN-26 12:00:00', 'DD-MON-RR HH24:MI:SS')
+```
+
 ## Comparison with Legacy Pattern
 
 ### ❌ Old Way (Manual)

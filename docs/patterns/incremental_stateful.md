@@ -67,6 +67,19 @@ To reset the state and force a full reload:
 1.  Delete the target table/file.
 2.  Clear the state entry (manually or via CLI - *CLI command coming soon*).
 
+## Date Format for String Columns
+
+If your date column is stored as a **string** (e.g., Oracle DD-MON-YY format), use the `date_format` option:
+
+```yaml
+incremental:
+  mode: "stateful"
+  column: "EVENT_TIME"
+  date_format: "oracle"  # Handles '20-APR-24 07:11:01.0'
+```
+
+Supported values: `oracle`, `sql_server`, `us`, `eu`, `iso`. See [Smart Read](./smart_read.md#date-format-for-string-columns) for details.
+
 ## Comparison: Rolling Window vs. Stateful
 
 | Feature | Rolling Window (`smart_read`) | Stateful (`stateful`) |
