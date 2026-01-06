@@ -748,6 +748,16 @@ class NodeExecutor:
             cutoff_str = cutoff.strftime("%d-%b-%y %H:%M:%S").upper()
             col_expr = f"TO_TIMESTAMP({quoted_col}, 'DD-MON-RR HH24:MI:SS.FF')"
             cutoff_expr = f"TO_TIMESTAMP('{cutoff_str}', 'DD-MON-RR HH24:MI:SS')"
+        elif date_format == "oracle_sqlserver":
+            cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+            col_expr = (
+                f"TRY_CONVERT(DATETIME, "
+                f"SUBSTRING({quoted_col}, 8, 2) + '-' + "
+                f"SUBSTRING({quoted_col}, 4, 3) + '-' + "
+                f"SUBSTRING({quoted_col}, 1, 2) + ' ' + "
+                f"SUBSTRING({quoted_col}, 11, 8), 120)"
+            )
+            cutoff_expr = f"'{cutoff_str}'"
         elif date_format == "sql_server":
             cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
             col_expr = f"CONVERT(DATETIME, {quoted_col}, 120)"

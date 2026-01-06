@@ -166,13 +166,17 @@ If your date column is stored as a **string** (not a native timestamp), you must
 
 ### Supported Formats
 
-| Format | Pattern | Example |
-|--------|---------|---------|
-| `oracle` | DD-MON-YY | `20-APR-24 07:11:01.0` |
-| `sql_server` | CONVERT style 120 | `2024-04-20 07:11:01` |
-| `us` | MM/DD/YYYY | `04/20/2024 07:11:01` |
-| `eu` | DD/MM/YYYY | `20/04/2024 07:11:01` |
-| `iso` | YYYY-MM-DDTHH:MM:SS | `2024-04-20T07:11:01` |
+| Format | Pattern | Database | Example |
+|--------|---------|----------|---------|
+| `oracle` | DD-MON-YY | Oracle | `20-APR-24 07:11:01.0` |
+| `oracle_sqlserver` | DD-MON-YY | SQL Server | `20-APR-24 07:11:01.0` |
+| `sql_server` | CONVERT style 120 | SQL Server | `2024-04-20 07:11:01` |
+| `us` | MM/DD/YYYY | Any | `04/20/2024 07:11:01` |
+| `eu` | DD/MM/YYYY | Any | `20/04/2024 07:11:01` |
+| `iso` | YYYY-MM-DDTHH:MM:SS | Any | `2024-04-20T07:11:01` |
+
+!!! tip "Oracle dates in SQL Server"
+    If your SQL Server database has date columns stored as strings in Oracle format (DD-MON-YY like `20-APR-24`), use `oracle_sqlserver` instead of `oracle`.
 
 ### Example: Oracle Date Format
 

@@ -836,7 +836,8 @@ class IncrementalConfig(BaseModel):
     ```
 
     Supported date_format values:
-    - `oracle`: DD-MON-YY (e.g., '20-APR-24 07:11:01.0')
+    - `oracle`: DD-MON-YY for Oracle databases (uses TO_TIMESTAMP)
+    - `oracle_sqlserver`: DD-MON-YY format stored in SQL Server (uses TRY_CONVERT)
     - `sql_server`: Uses CONVERT with style 120
     - `us`: MM/DD/YYYY format
     - `eu`: DD/MM/YYYY format
@@ -889,7 +890,8 @@ class IncrementalConfig(BaseModel):
         default=None,
         description=(
             "Source date format when the column is stored as a string. "
-            "Options: 'oracle' (DD-MON-YY, e.g. '20-APR-24'), "
+            "Options: 'oracle' (DD-MON-YY for Oracle DB), "
+            "'oracle_sqlserver' (DD-MON-YY format in SQL Server), "
             "'sql_server' (uses CONVERT with style 120), "
             "'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DDTHH:MM:SS). "
             "When set, SQL pushdown will use appropriate CONVERT/TO_TIMESTAMP functions."

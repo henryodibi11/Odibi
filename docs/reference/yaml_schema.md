@@ -758,7 +758,8 @@ incremental:
 ```
 
 Supported date_format values:
-- `oracle`: DD-MON-YY (e.g., '20-APR-24 07:11:01.0')
+- `oracle`: DD-MON-YY for Oracle databases (uses TO_TIMESTAMP)
+- `oracle_sqlserver`: DD-MON-YY format stored in SQL Server (uses TRY_CONVERT)
 - `sql_server`: Uses CONVERT with style 120
 - `us`: MM/DD/YYYY format
 - `eu`: DD/MM/YYYY format
@@ -772,7 +773,7 @@ Supported date_format values:
 | **unit** | Optional[IncrementalUnit] | No | - | Time unit for lookback (Rolling Window only). Options: 'hour', 'day', 'month', 'year' |
 | **state_key** | Optional[str] | No | - | Unique ID for state tracking. Defaults to node name if not provided. |
 | **watermark_lag** | Optional[str] | No | - | Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency. |
-| **date_format** | Optional[str] | No | - | Source date format when the column is stored as a string. Options: 'oracle' (DD-MON-YY, e.g. '20-APR-24'), 'sql_server' (uses CONVERT with style 120), 'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DDTHH:MM:SS). When set, SQL pushdown will use appropriate CONVERT/TO_TIMESTAMP functions. |
+| **date_format** | Optional[str] | No | - | Source date format when the column is stored as a string. Options: 'oracle' (DD-MON-YY for Oracle DB), 'oracle_sqlserver' (DD-MON-YY format in SQL Server), 'sql_server' (uses CONVERT with style 120), 'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DDTHH:MM:SS). When set, SQL pushdown will use appropriate CONVERT/TO_TIMESTAMP functions. |
 
 ---
 ### `TimeTravelConfig`
