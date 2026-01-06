@@ -713,6 +713,16 @@ class NodeExecutor:
 
         return dataframes
 
+    def _quote_sql_column(self, column: str, format: Optional[str] = None) -> str:
+        """Quote a column name for SQL to handle spaces and special characters.
+
+        Uses [] for SQL Server dialects, backticks for others.
+        """
+        if format in ("sql_server", "azure_sql"):
+            return f"[{column}]"
+        else:
+            return f"`{column}`"
+
     def _generate_incremental_sql_filter(
         self,
         inc: IncrementalConfig,
@@ -737,6 +747,9 @@ class NodeExecutor:
                 ctx.debug("First run detected - skipping incremental SQL pushdown")
                 return None
 
+        # Get the SQL format for proper column quoting
+        sql_format = config.read.format if config.read else None
+
         if inc.mode == IncrementalMode.ROLLING_WINDOW:
             if not inc.lookback or not inc.unit:
                 return None
@@ -759,10 +772,12 @@ class NodeExecutor:
                 # Format for SQL Server: 'YYYY-MM-DD HH:MM:SS'
                 cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
 
+                quoted_col = self._quote_sql_column(inc.column, sql_format)
                 if inc.fallback_column:
-                    return f"COALESCE({inc.column}, {inc.fallback_column}) >= '{cutoff_str}'"
+                    quoted_fallback = self._quote_sql_column(inc.fallback_column, sql_format)
+                    return f"COALESCE({quoted_col}, {quoted_fallback}) >= '{cutoff_str}'"
                 else:
-                    return f"{inc.column} >= '{cutoff_str}'"
+                    return f"{quoted_col} >= '{cutoff_str}'"
 
         elif inc.mode == IncrementalMode.STATEFUL:
             # For stateful, we need to get the HWM from state
@@ -792,10 +807,12 @@ class NodeExecutor:
                         except ValueError:
                             hwm_str = last_hwm.replace("T", " ")
 
+                    quoted_col = self._quote_sql_column(inc.column, sql_format)
                     if inc.fallback_column:
-                        return f"COALESCE({inc.column}, {inc.fallback_column}) > '{hwm_str}'"
+                        quoted_fallback = self._quote_sql_column(inc.fallback_column, sql_format)
+                        return f"COALESCE({quoted_col}, {quoted_fallback}) > '{hwm_str}'"
                     else:
-                        return f"{inc.column} > '{hwm_str}'"
+                        return f"{quoted_col} > '{hwm_str}'"
 
         return None
 
