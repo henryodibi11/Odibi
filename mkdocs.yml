@@ -89,6 +89,8 @@ nav:
           - Fact Pattern: patterns/fact.md
           - Aggregation Pattern: patterns/aggregation.md
           - SCD2 Pattern: patterns/scd2.md
+      - Manufacturing:
+          - Phase Analysis: patterns/manufacturing.md
       - Anti-Patterns: patterns/anti_patterns.md
 
   # ─────────────────────────────────────────────

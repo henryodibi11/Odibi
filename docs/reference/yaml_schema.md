@@ -3036,6 +3036,97 @@ to persist the result (typically with `mode: overwrite` to the same location as 
 | **delete_col** | Optional[str] | No | - | Column indicating soft deletion (boolean) |
 
 ---
+### 📂 Manufacturing & IoT
+
+#### PhaseConfig
+Configuration for a single phase.
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **timer_col** | str | Yes | - | Timer column name for this phase |
+| **start_threshold** | Optional[int] | No | - | Override default start threshold for this phase (seconds) |
+
+---
+#### `detect_sequential_phases` (DetectSequentialPhasesParams)
+Detect and analyze sequential manufacturing phases.
+
+For each group (e.g., batch), this transformer:
+1. Processes phases sequentially (each starts after previous ends)
+2. Detects phase start by finding first valid timer reading and back-calculating
+3. Detects phase end by finding first repeated (plateaued) timer value
+4. Calculates time spent in each status during each phase
+5. Aggregates specified metrics within each phase window
+6. Outputs one summary row per group
+
+Output columns per phase:
+- {phase}_start: Phase start timestamp
+- {phase}_end: Phase end timestamp
+- {phase}_max_minutes: Maximum timer value converted to minutes
+- {phase}_{status}_minutes: Time in each status (if status_col provided)
+- {phase}_{metric}: Aggregated metrics (if phase_metrics provided)
+
+Detect and analyze sequential manufacturing phases from timer columns.
+
+This transformer processes raw sensor/PLC data where timer columns increment
+during each phase. It detects phase boundaries, calculates durations, and
+tracks time spent in each equipment status.
+
+Common use cases:
+- Batch reactor cycle analysis
+- CIP (Clean-in-Place) phase timing
+- Food processing (cook, cool, package cycles)
+- Any multi-step batch process with PLC timers
+
+Scenario: Analyze FBR cycle times
+```yaml
+detect_sequential_phases:
+  group_by: BatchID
+  timestamp_col: ts
+  phases:
+    - timer_col: LoadTime
+    - timer_col: AcidTime
+    - timer_col: DryTime
+    - timer_col: CookTime
+    - timer_col: CoolTime
+    - timer_col: UnloadTime
+  start_threshold: 240
+  status_col: Status
+  status_mapping:
+    1: idle
+    2: active
+    3: hold
+    4: faulted
+  phase_metrics:
+    Level: max
+  metadata:
+    ProductCode: first_after_start
+    Weight: max
+```
+
+Scenario: Group by multiple columns
+```yaml
+detect_sequential_phases:
+  group_by:
+    - BatchID
+    - AssetID
+  phases: [LoadTime, CookTime]
+```
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **group_by** | str \| List[str] | Yes | - | Column(s) to group by. Can be a single column name or list of columns. E.g., 'BatchID' or ['BatchID', 'AssetID'] |
+| **timestamp_col** | str | No | `ts` | Timestamp column for ordering events |
+| **phases** | List[str \| [PhaseConfig](#phaseconfig)] | Yes | - | List of phase timer columns (strings) or PhaseConfig objects. Phases are processed sequentially - each phase starts after the previous ends. |
+| **start_threshold** | int | No | `240` | Default max timer value (seconds) to consider as valid phase start. Filters out late readings where timer already shows large elapsed time. |
+| **status_col** | Optional[str] | No | - | Column containing equipment status codes |
+| **status_mapping** | Optional[Dict[int, str]] | No | - | Mapping of status codes to names. E.g., {1: 'idle', 2: 'active', 3: 'hold', 4: 'faulted'} |
+| **phase_metrics** | Optional[Dict[str, str]] | No | - | Columns to aggregate within each phase window. E.g., {Level: max, Pressure: max}. Outputs {Phase}_{Column} columns. |
+| **metadata** | Optional[Dict[str, str]] | No | - | Columns to include in output with aggregation method. Options: 'first', 'last', 'first_after_start', 'max', 'min', 'mean', 'sum'. E.g., {ProductCode: first_after_start, Weight: max} |
+| **output_time_format** | str | No | `%Y-%m-%d %H:%M:%S` | Format for output timestamp columns |
+
+---
 ### 📂 Advanced & Feature Engineering
 
 #### ShiftDefinition

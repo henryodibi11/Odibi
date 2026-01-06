@@ -4,6 +4,7 @@ from odibi.registry import FunctionRegistry
 from odibi.transformers import (
     advanced,
     delete_detection,
+    manufacturing,
     merge_transformer,
     relational,
     scd,
@@ -108,6 +109,13 @@ def register_standard_library():
     from odibi.config import DeleteDetectionConfig
 
     registry.register(delete_detection.detect_deletes, "detect_deletes", DeleteDetectionConfig)
+
+    # Manufacturing
+    registry.register(
+        manufacturing.detect_sequential_phases,
+        "detect_sequential_phases",
+        manufacturing.DetectSequentialPhasesParams,
+    )
 
 
 # Auto-register on import

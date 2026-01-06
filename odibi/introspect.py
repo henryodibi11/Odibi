@@ -145,6 +145,7 @@ TRANSFORM_CATEGORY_MAP = {
     "odibi.transformers.validation": "Data Quality",
     "odibi.transformers.merge_transformer": "Warehousing Patterns",
     "odibi.transformers.delete_detection": "Data Engineering Patterns",
+    "odibi.transformers.manufacturing": "Manufacturing & IoT",
 }
 
 CUSTOM_ORDER = [
@@ -1012,6 +1013,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                         "Data Quality",
                         "Warehousing Patterns",
                         "Data Engineering Patterns",
+                        "Manufacturing & IoT",
                         "Advanced & Feature Engineering",
                         "Other Transformers",
                     ]
