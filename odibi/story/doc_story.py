@@ -9,6 +9,7 @@ Automatically extracts explanations from registered operations.
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import odibi
 from odibi.config import NodeConfig, PipelineConfig, ProjectConfig
 from odibi.validation import ExplanationLinter
 
@@ -322,11 +323,11 @@ class DocStoryGenerator:
     </style>
 </head>
 <body>
-    <div style="text-align: right; color: #888; font-size: 11px; margin-bottom: 10px;">
-        Odibi v1.3.0
-    </div>
+    <!-- Nigerian accent bar -->
+    <div style="height: 4px; background: linear-gradient(to right, #008751 33%, #fff 33%, #fff 66%, #008751 66%); margin-bottom: 15px; border-radius: 2px;"></div>
+
+    <p style="color: #008751; font-size: 0.85em; margin: 0 0 5px 0; font-weight: 500;">Ndewo — Welcome to your data story</p>
     <h1>{{ doc.title }}</h1>
-    <p style="color: #666; font-style: italic; margin-top: -10px;">A Data Story by Odibi</p>
 
     <div class="overview">
         <h2>Overview</h2>
@@ -401,7 +402,7 @@ class DocStoryGenerator:
         "Where others saw gaps, I built bridges."
     </p>
     <p style="text-align: center; color: #888; font-size: 12px;">
-        Odibi v1.3.0 · Henry Odibi
+        Odibi v{{ odibi_version }} · Henry Odibi
         <svg style="vertical-align: middle; margin-left: 4px;" width="20" height="14" viewBox="0 0 3 2">
             <rect width="1" height="2" x="0" fill="#008751"/>
             <rect width="1" height="2" x="1" fill="#ffffff"/>
@@ -422,7 +423,7 @@ class DocStoryGenerator:
             )
 
         template = Template(template_str)
-        html = template.render(doc=doc_data, theme=theme)
+        html = template.render(doc=doc_data, theme=theme, odibi_version=odibi.__version__)
 
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -519,7 +520,7 @@ class DocStoryGenerator:
         lines.append("")
         lines.append('*"Where others saw gaps, I built bridges."*')
         lines.append("")
-        lines.append("Odibi v1.3.0 · Henry Odibi 🌍")
+        lines.append(f"Odibi v{odibi.__version__} · Henry Odibi 🌍")
 
         markdown = "\n".join(lines)
 

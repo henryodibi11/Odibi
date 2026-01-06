@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
+import odibi
 from odibi.story.metadata import PipelineStoryMetadata
 from odibi.utils.logging_context import get_logging_context
 
@@ -83,8 +84,12 @@ class HTMLStoryRenderer:
             # Note: Template creates its own environment, so we attach to that
             template.environment.filters["to_yaml"] = self._to_yaml
 
-            # Render with metadata and theme
-            html = template.render(metadata=metadata, theme=self.theme)
+            # Render with metadata, theme, and version
+            html = template.render(
+                metadata=metadata,
+                theme=self.theme,
+                odibi_version=odibi.__version__,
+            )
 
             ctx.debug(
                 "HTML story rendered",
