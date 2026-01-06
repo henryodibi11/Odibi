@@ -866,6 +866,16 @@ class IncrementalConfig(BaseModel):
         ),
     )
 
+    # Date format for string columns
+    date_format: Optional[str] = Field(
+        default=None,
+        description=(
+            "Source date format when the column is stored as a string. "
+            "Use 'oracle' for DD-MON-YY format (e.g., '20-APR-24 07:11:01.0'). "
+            "When set, SQL pushdown will use appropriate CONVERT/TO_DATE functions."
+        ),
+    )
+
     @model_validator(mode="after")
     def check_mode_args(self):
         if self.mode == IncrementalMode.ROLLING_WINDOW:

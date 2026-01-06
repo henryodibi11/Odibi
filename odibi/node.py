@@ -769,15 +769,28 @@ class NodeExecutor:
 
             if delta:
                 cutoff = now - delta
-                # Format for SQL Server: 'YYYY-MM-DD HH:MM:SS'
-                cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
-
                 quoted_col = self._quote_sql_column(inc.column, sql_format)
+
+                if inc.date_format == "oracle":
+                    cutoff_str = cutoff.strftime("%d-%b-%y %H:%M:%S").upper()
+                    col_expr = f"TO_TIMESTAMP({quoted_col}, 'DD-MON-RR HH24:MI:SS.FF')"
+                    cutoff_expr = f"TO_TIMESTAMP('{cutoff_str}', 'DD-MON-RR HH24:MI:SS')"
+                else:
+                    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+                    col_expr = quoted_col
+                    cutoff_expr = f"'{cutoff_str}'"
+
                 if inc.fallback_column:
                     quoted_fallback = self._quote_sql_column(inc.fallback_column, sql_format)
-                    return f"COALESCE({quoted_col}, {quoted_fallback}) >= '{cutoff_str}'"
+                    if inc.date_format == "oracle":
+                        fallback_expr = (
+                            f"TO_TIMESTAMP({quoted_fallback}, 'DD-MON-RR HH24:MI:SS.FF')"
+                        )
+                        return f"COALESCE({col_expr}, {fallback_expr}) >= {cutoff_expr}"
+                    else:
+                        return f"COALESCE({quoted_col}, {quoted_fallback}) >= {cutoff_expr}"
                 else:
-                    return f"{quoted_col} >= '{cutoff_str}'"
+                    return f"{col_expr} >= {cutoff_expr}"
 
         elif inc.mode == IncrementalMode.STATEFUL:
             # For stateful, we need to get the HWM from state
