@@ -183,8 +183,10 @@ def test_spark_smart_read_subsequent_run(mock_context, mock_engine, mock_connect
         ),
     )
 
-    with patch("odibi.node.datetime") as mock_datetime, \
-         patch.object(mock_engine, "filter_greater_than", return_value=mock_df) as mock_filter:
+    with (
+        patch("odibi.node.datetime") as mock_datetime,
+        patch.object(mock_engine, "filter_greater_than", return_value=mock_df) as mock_filter,
+    ):
         mock_datetime.now.return_value = frozen_time
 
         node = Node(config, mock_context, mock_engine, mock_connections)
@@ -305,8 +307,10 @@ def test_spark_smart_read_fallback_column(mock_context, mock_engine, mock_connec
         ),
     )
 
-    with patch("odibi.node.datetime") as mock_datetime, \
-         patch.object(mock_engine, "filter_coalesce", return_value=mock_df) as mock_filter:
+    with (
+        patch("odibi.node.datetime") as mock_datetime,
+        patch.object(mock_engine, "filter_coalesce", return_value=mock_df) as mock_filter,
+    ):
         mock_datetime.now.return_value = frozen_time
 
         node = Node(config, mock_context, mock_engine, mock_connections)
