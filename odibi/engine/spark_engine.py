@@ -2253,21 +2253,25 @@ class SparkEngine(Engine):
 
         Supports:
         - ISO format: 2024-04-20 07:11:01
-        - Oracle format: 20-APR-24 07:11:01.0
+        - Oracle format: 20-APR-24 07:11:01.0 (handles uppercase months)
         """
         from pyspark.sql import functions as F
 
-        formats = [
-            "dd-MMM-yy HH:mm:ss.S",
-            "dd-MMM-yy HH:mm:ss",
-            "yyyy-MM-dd HH:mm:ss",
-            "yyyy-MM-dd'T'HH:mm:ss",
-            "MM/dd/yyyy HH:mm:ss",
-        ]
-
         result = F.to_timestamp(col)
-        for fmt in formats:
-            result = F.coalesce(result, F.to_timestamp(col, fmt))
+
+        result = F.coalesce(result, F.to_timestamp(col, "yyyy-MM-dd HH:mm:ss"))
+        result = F.coalesce(result, F.to_timestamp(col, "yyyy-MM-dd'T'HH:mm:ss"))
+        result = F.coalesce(result, F.to_timestamp(col, "MM/dd/yyyy HH:mm:ss"))
+
+        col_oracle = F.concat(
+            F.substring(col, 1, 3),
+            F.upper(F.substring(col, 4, 1)),
+            F.lower(F.substring(col, 5, 2)),
+            F.substring(col, 7, 100),
+        )
+        result = F.coalesce(result, F.to_timestamp(col_oracle, "dd-MMM-yy HH:mm:ss.S"))
+        result = F.coalesce(result, F.to_timestamp(col_oracle, "dd-MMM-yy HH:mm:ss"))
+
         return result
 
     def filter_coalesce(self, df, col1: str, col2: str, op: str, value: Any) -> Any:
