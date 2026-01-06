@@ -254,7 +254,7 @@ pipelines:
 | `status_mapping` | `Dict[int, str]` | No | - | Map status codes to names |
 | `phase_metrics` | `Dict[str, str]` | No | - | Columns to aggregate within each phase |
 | `metadata` | `Dict[str, str]` | No | - | Batch-level columns with aggregation method |
-| `output_time_format` | `str` | No | `"%Y-%m-%d %H:%M:%S"` | Format for timestamp output |
+| `fill_null_minutes` | `bool` | No | `False` | If True, fill null numeric columns with 0. Timestamps remain null for skipped phases. |
 
 ### Output Columns
 
@@ -284,9 +284,19 @@ start_threshold: 240  # Ignore readings where timer > 4 minutes
 
 **Why?** If you see `LoadTime = 500` on the first reading, you missed the start. The transformer finds a valid start point.
 
-### Empty Phases
+### Empty/Skipped Phases
 
-If a phase never ran (timer is always 0), it's skipped gracefully. No columns are generated for that phase.
+If a phase never ran (timer is always 0), the columns are still generated but with null values. Use `fill_null_minutes: true` to replace null numeric values with 0:
+
+```yaml
+transform:
+  - detect_sequential_phases:
+      group_by: BatchID
+      phases: [LoadTime, CookTime]
+      fill_null_minutes: true  # null _max_minutes, _status_minutes → 0
+```
+
+Timestamp columns (`_start`, `_end`) remain null for skipped phases.
 
 ### NaN Status Values
 
@@ -336,11 +346,11 @@ transform:
 
 | Engine | Implementation | Scalability |
 |--------|----------------|-------------|
-| **Pandas** | Native | Single machine |
-| **Spark** | `applyInPandas` | Parallel per group across cluster |
+| **Pandas** | Native loops | Single machine |
+| **Spark** | Native window functions | 5-20x faster, parallel across cluster |
 | **Polars** | Pandas fallback | Single machine |
 
-For Spark, each batch group is processed independently in parallel, making it efficient for large datasets with many batches.
+For Spark, the transformer uses native window functions (`lag`, `lead`, `row_number`) instead of `applyInPandas`, avoiding Python serialization overhead. This makes it efficient for large datasets (2M+ rows).
 
 ---
 

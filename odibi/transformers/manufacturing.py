@@ -659,8 +659,8 @@ def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
 
         start_rows = start_rows.withColumn(
             "true_start_ts",
-            F.from_unixtime(
-                F.unix_timestamp("start_obs_ts") - F.col("start_obs_timer").cast("long")
+            (
+                F.col("start_obs_ts").cast("long") - F.col("start_obs_timer").cast("long")
             ).cast("timestamp"),
         )
 
