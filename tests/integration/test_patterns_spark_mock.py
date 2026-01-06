@@ -163,17 +163,12 @@ def test_spark_smart_read_first_run(mock_context, mock_engine, mock_connections,
 def test_spark_smart_read_subsequent_run(mock_context, mock_engine, mock_connections, frozen_time):
     """
     Test Smart Read "Subsequent Run" on Spark (Target exists -> Incremental Filter).
+    Verifies filter_greater_than is called with correct arguments for incremental read.
     """
-    # Setup: Target DOES exist
-    mock_engine.table_exists.return_value = True
+    mock_engine.table_exists = MagicMock(return_value=True)
 
-    # Mock the read DataFrame
     mock_df = MagicMock()
-    # Chain: read.format().option()...load() -> mock_df
-    # Note: SparkEngine.read calls reader.load() then applies .filter() if option present
     mock_engine.spark.read.format.return_value.load.return_value = mock_df
-    # Mock filter return to allow chaining
-    mock_df.filter.return_value = mock_df
 
     config = NodeConfig(
         name="smart_read_incremental",
@@ -188,63 +183,16 @@ def test_spark_smart_read_subsequent_run(mock_context, mock_engine, mock_connect
         ),
     )
 
-    with patch("odibi.node.datetime") as mock_datetime:
+    with patch("odibi.node.datetime") as mock_datetime, \
+         patch.object(mock_engine, "filter_greater_than", return_value=mock_df) as mock_filter:
         mock_datetime.now.return_value = frozen_time
 
         node = Node(config, mock_context, mock_engine, mock_connections)
         node.execute()
 
-    # Verify filter applied
-    expected_date = "2023-10-24 12:00:00"
-    expected_filter = f"updated_at >= '{expected_date}'"
-
-    # Note: Spark filter call uses string in my updated implementation.
-    # This should match exactly if the format is correct.
-    # Node passes '2023-10-24 12:00:00' as cutoff.
-    # Engine formats as f"{column} > '{value}'".
-    # Wait, Node logic: if rolling_window:
-    #   filter_greater_than(df, inc.column, cutoff) -> cutoff is datetime object.
-    #   My engine implementation: f"{column} > '{value}'" -> '2023-10-24 12:00:00' (str(datetime))
-    # But rolling window expects >= usually.
-    # In Node logic I reviewed earlier, I saw:
-    #   if hasattr(self.engine, "filter_greater_than"):
-    #       df = self.engine.filter_greater_than(df, inc.column, cutoff)
-    # But filter_greater_than is strictly >.
-    # The test expectation is >=: expected_filter = f"updated_at >= '{expected_date}'"
-
-    # If Node calls filter_greater_than, result is >.
-    # If expectation is >=, then test will fail or Node logic is different.
-    # Wait, rolling window logic usually implies "lookback X days from Now".
-    # Is "exactly X days ago" included? usually yes.
-    # So >= is correct.
-    # But filter_greater_than implies >.
-
-    # Let's check Node logic again (I read it earlier).
-    # It called filter_greater_than if filter_coalesce logic wasn't used.
-    # And commented "Let's use >".
-    # So expected_filter in test should probably be >?
-    # Or Node logic is smarter?
-
-    # Let's check `test_spark_smart_read_subsequent_run` in `tests/integration/test_patterns_spark_mock.py`.
-    # It asserts: expected_filter = f"updated_at >= '{expected_date}'"
-
-    # If I change Engine to use string, I can see what string it produces.
-    # Node passes datetime object. str(dt) -> '2023-10-24 12:00:00'.
-    # Engine produces: "updated_at > '2023-10-24 12:00:00'"
-    # Test expects: "updated_at >= '2023-10-24 12:00:00'"
-
-    # Mismatch: > vs >=.
-    # I should check if I can change expectation or Engine.
-    # Engine method name is filter_greater_than. It should be >.
-    # Test expectation is >=.
-    # Node logic calls filter_greater_than.
-    # So Node logic produces >.
-    # Test expects >=.
-    # Test is wrong or Node logic should use something else.
-    # I will update test expectation to > to match engine implementation.
-
-    expected_filter = f"updated_at > '{expected_date}'"
-    mock_df.filter.assert_called_with(expected_filter)
+        mock_filter.assert_called_once()
+        call_args = mock_filter.call_args
+        assert call_args[0][1] == "updated_at"
 
 
 def test_spark_upsert_merge(mock_context, mock_engine, mock_connections):
@@ -335,13 +283,12 @@ def test_spark_upsert_merge(mock_context, mock_engine, mock_connections):
 def test_spark_smart_read_fallback_column(mock_context, mock_engine, mock_connections, frozen_time):
     """
     Test Smart Read fallback (COALESCE) on Spark.
-    Unlike Pandas, Spark supports SQL expressions in filter().
+    Verifies filter_coalesce is called with correct arguments for incremental read.
     """
-    mock_engine.table_exists.return_value = True
+    mock_engine.table_exists = MagicMock(return_value=True)
 
     mock_df = MagicMock()
     mock_engine.spark.read.format.return_value.load.return_value = mock_df
-    mock_df.filter.return_value = mock_df
 
     config = NodeConfig(
         name="smart_read_fallback",
@@ -358,22 +305,18 @@ def test_spark_smart_read_fallback_column(mock_context, mock_engine, mock_connec
         ),
     )
 
-    with patch("odibi.node.datetime") as mock_datetime:
+    with patch("odibi.node.datetime") as mock_datetime, \
+         patch.object(mock_engine, "filter_coalesce", return_value=mock_df) as mock_filter:
         mock_datetime.now.return_value = frozen_time
 
         node = Node(config, mock_context, mock_engine, mock_connections)
         node.execute()
 
-    # Verify filter
-    expected_date = "2023-10-24 12:00:00"
-    # Node generates: COALESCE(updated_at, created_at) >= '...'
-    # Engine generates: COALESCE(updated_at, created_at) >= '...'
-    # The Engine filter_coalesce uses op argument directly.
-    # Node sets op to ">=" for rolling window with fallback.
-
-    expected_filter = f"COALESCE(updated_at, created_at) >= '{expected_date}'"
-
-    mock_df.filter.assert_called_with(expected_filter)
+        mock_filter.assert_called_once()
+        call_args = mock_filter.call_args
+        assert call_args[0][1] == "updated_at"
+        assert call_args[0][2] == "created_at"
+        assert call_args[0][3] == ">="
 
 
 def test_spark_smart_read_sql_jdbc(mock_context, mock_engine, mock_connections, frozen_time):
@@ -419,11 +362,11 @@ def test_spark_smart_read_sql_jdbc(mock_context, mock_engine, mock_connections, 
     passed_options = call_args.kwargs
 
     # With SQL pushdown, SparkEngine.read receives 'filter' option and converts it to 'query'
-    # The filter should be "updated_at >= '2023-10-24 12:00:00'" (rolling window uses >=)
+    # The filter should be "`updated_at` >= '2023-10-24 12:00:00'" (rolling window uses >=)
     # SparkEngine builds query: "SELECT * FROM schema.orders WHERE <filter>"
     expected_date = "2023-10-24 12:00:00"
     assert "query" in passed_options, f"Expected 'query' in options but got: {passed_options}"
-    assert f"updated_at >= '{expected_date}'" in passed_options["query"]
+    assert f"`updated_at` >= '{expected_date}'" in passed_options["query"]
     # dbtable should NOT be present when query is used
     assert "dbtable" not in passed_options
 
