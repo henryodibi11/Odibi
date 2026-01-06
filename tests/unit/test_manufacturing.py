@@ -375,3 +375,50 @@ class TestDetectSequentialPhases:
 
         assert result_df.iloc[0]["LoadTime_max_minutes"] == pytest.approx(180 / 60, rel=0.01)
         assert result_df.iloc[0]["LoadTime_end"] == pd.Timestamp("2024-01-01 10:02:00")
+
+    def test_fill_null_minutes_replaces_nulls_with_zero(self):
+        """
+        Test that fill_null_minutes=True replaces null numeric columns with 0.
+
+        Timestamp columns should remain null for skipped phases.
+        """
+        data = {
+            "ts": pd.to_datetime(
+                [
+                    "2024-01-01 10:00:00",
+                    "2024-01-01 10:01:00",
+                    "2024-01-01 10:02:00",
+                ]
+            ),
+            "BatchID": ["B001", "B001", "B001"],
+            "LoadTime": [0, 0, 0],
+            "CookTime": [60, 120, 180],
+            "Status": [1, 2, 2],
+            "Level": [10, 20, 30],
+        }
+        df = pd.DataFrame(data)
+        context = EngineContext(PandasContext(), df, EngineType.PANDAS)
+
+        params = DetectSequentialPhasesParams(
+            group_by="BatchID",
+            timestamp_col="ts",
+            phases=["LoadTime", "CookTime"],
+            start_threshold=240,
+            status_col="Status",
+            status_mapping={1: "idle", 2: "active"},
+            phase_metrics={"Level": "max"},
+            fill_null_minutes=True,
+        )
+
+        result = detect_sequential_phases(context, params)
+        result_df = result.df
+
+        assert result_df.iloc[0]["LoadTime_max_minutes"] == 0
+        assert result_df.iloc[0]["LoadTime_idle_minutes"] == 0
+        assert result_df.iloc[0]["LoadTime_active_minutes"] == 0
+        assert result_df.iloc[0]["LoadTime_Level"] == 0
+
+        assert pd.isna(result_df.iloc[0]["LoadTime_start"])
+        assert pd.isna(result_df.iloc[0]["LoadTime_end"])
+
+        assert result_df.iloc[0]["CookTime_max_minutes"] > 0
