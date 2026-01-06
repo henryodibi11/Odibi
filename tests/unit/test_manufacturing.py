@@ -279,3 +279,60 @@ class TestDetectSequentialPhases:
         assert "BatchID" in result_df.columns
         assert "AssetID" in result_df.columns
         assert set(result_df["AssetID"].tolist()) == {"A1", "A2"}
+
+    def test_skipped_phase_returns_all_columns_with_nulls(self):
+        """
+        Test that skipped phases still produce all expected columns with null values.
+
+        This is critical for Spark applyInPandas which requires the returned DataFrame
+        to have all columns defined in the schema.
+        """
+        data = {
+            "ts": pd.to_datetime(
+                [
+                    "2024-01-01 10:00:00",
+                    "2024-01-01 10:01:00",
+                    "2024-01-01 10:02:00",
+                ]
+            ),
+            "BatchID": ["B001", "B001", "B001"],
+            "LoadTime": [0, 0, 0],
+            "CookTime": [60, 120, 180],
+            "CoolTime": [0, 0, 0],
+            "Status": [1, 2, 2],
+            "Level": [10, 20, 30],
+        }
+        df = pd.DataFrame(data)
+        context = EngineContext(PandasContext(), df, EngineType.PANDAS)
+
+        params = DetectSequentialPhasesParams(
+            group_by="BatchID",
+            timestamp_col="ts",
+            phases=["LoadTime", "CookTime", "CoolTime"],
+            start_threshold=240,
+            status_col="Status",
+            status_mapping={1: "idle", 2: "active"},
+            phase_metrics={"Level": "max"},
+            metadata={"BatchID": "first"},
+        )
+
+        result = detect_sequential_phases(context, params)
+        result_df = result.df
+
+        assert len(result_df) == 1
+
+        for phase in ["LoadTime", "CookTime", "CoolTime"]:
+            assert f"{phase}_start" in result_df.columns
+            assert f"{phase}_end" in result_df.columns
+            assert f"{phase}_max_minutes" in result_df.columns
+            assert f"{phase}_idle_minutes" in result_df.columns
+            assert f"{phase}_active_minutes" in result_df.columns
+            assert f"{phase}_Level" in result_df.columns
+
+        assert pd.isna(result_df.iloc[0]["LoadTime_start"])
+        assert pd.isna(result_df.iloc[0]["LoadTime_max_minutes"])
+        assert pd.isna(result_df.iloc[0]["CoolTime_start"])
+        assert pd.isna(result_df.iloc[0]["CoolTime_max_minutes"])
+
+        assert pd.notna(result_df.iloc[0]["CookTime_start"])
+        assert result_df.iloc[0]["CookTime_max_minutes"] == pytest.approx(180 / 60, rel=0.01)

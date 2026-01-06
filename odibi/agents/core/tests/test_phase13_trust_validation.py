@@ -736,9 +736,9 @@ class TestInvariant_DiscoveryNeverTriggersImprovement:
             ]
 
             for method in forbidden_methods:
-                assert not hasattr(
-                    manager, method
-                ), f"IssueDiscoveryManager MUST NOT have '{method}' method"
+                assert not hasattr(manager, method), (
+                    f"IssueDiscoveryManager MUST NOT have '{method}' method"
+                )
 
     def test_discovered_issue_has_no_self_fix_methods(self):
         """DiscoveredIssue has no methods to fix itself."""
@@ -770,9 +770,9 @@ class TestInvariant_DiscoveryNeverTriggersImprovement:
         forbidden_methods = ["fix_all", "improve_all", "trigger_improvements", "batch_fix"]
 
         for method in forbidden_methods:
-            assert not hasattr(
-                result, method
-            ), f"IssueDiscoveryResult MUST NOT have '{method}' method"
+            assert not hasattr(result, method), (
+                f"IssueDiscoveryResult MUST NOT have '{method}' method"
+            )
 
     def test_discovery_does_not_modify_files(self):
         """Running discovery MUST NOT modify any files."""

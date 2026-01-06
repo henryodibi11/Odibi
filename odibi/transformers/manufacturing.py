@@ -126,6 +126,36 @@ def _normalize_group_by(group_by: Union[str, List[str]]) -> List[str]:
     return list(group_by)
 
 
+def _get_expected_columns(params: "DetectSequentialPhasesParams") -> Dict[str, None]:
+    """
+    Build a dict of ALL expected output columns with None values.
+
+    This ensures Spark applyInPandas always receives a DataFrame with
+    all columns defined in the schema, even when phases are skipped.
+    """
+    columns = {}
+
+    phase_names = [p.timer_col if isinstance(p, PhaseConfig) else p for p in params.phases]
+    for phase in phase_names:
+        columns[f"{phase}_start"] = None
+        columns[f"{phase}_end"] = None
+        columns[f"{phase}_max_minutes"] = None
+
+        if params.status_mapping:
+            for status_name in params.status_mapping.values():
+                columns[f"{phase}_{status_name}_minutes"] = None
+
+        if params.phase_metrics:
+            for metric_col in params.phase_metrics.keys():
+                columns[f"{phase}_{metric_col}"] = None
+
+    if params.metadata:
+        for col in params.metadata.keys():
+            columns[col] = None
+
+    return columns
+
+
 def detect_sequential_phases(
     context: EngineContext, params: DetectSequentialPhasesParams
 ) -> EngineContext:
@@ -197,6 +227,8 @@ def _detect_phases_pandas(df: pd.DataFrame, params: DetectSequentialPhasesParams
             row = {group_by_cols[0]: group_id if not isinstance(group_id, tuple) else group_id[0]}
         else:
             row = {col: val for col, val in zip(group_by_cols, group_id)}
+
+        row.update(_get_expected_columns(params))
 
         previous_phase_end = None
         first_phase_start = None
@@ -525,6 +557,8 @@ def _process_single_group_pandas(
         row = {group_by_cols[0]: group[group_by_cols[0]].iloc[0]}
     else:
         row = {col: group[col].iloc[0] for col in group_by_cols}
+
+    row.update(_get_expected_columns(params))
 
     previous_phase_end = None
     first_phase_start = None
