@@ -2234,12 +2234,53 @@ class SparkEngine(Engine):
             return {}
 
     def filter_greater_than(self, df, column: str, value: Any) -> Any:
-        """Filter DataFrame where column > value."""
-        return df.filter(f"{column} > '{value}'")
+        """Filter DataFrame where column > value.
+
+        Automatically casts string columns to timestamp for proper comparison.
+        """
+        from pyspark.sql import functions as F
+        from pyspark.sql.types import StringType
+
+        col_type = df.schema[column].dataType
+        if isinstance(col_type, StringType):
+            return df.filter(F.to_timestamp(F.col(column)) > value)
+        return df.filter(F.col(column) > value)
 
     def filter_coalesce(self, df, col1: str, col2: str, op: str, value: Any) -> Any:
-        """Filter using COALESCE(col1, col2) op value."""
-        return df.filter(f"COALESCE({col1}, {col2}) {op} '{value}'")
+        """Filter using COALESCE(col1, col2) op value.
+
+        Automatically casts string columns to timestamp for proper comparison.
+        """
+        from pyspark.sql import functions as F
+        from pyspark.sql.types import StringType
+
+        col1_type = df.schema[col1].dataType
+        col2_type = df.schema[col2].dataType
+
+        if isinstance(col1_type, StringType):
+            c1 = F.to_timestamp(F.col(col1))
+        else:
+            c1 = F.col(col1)
+
+        if isinstance(col2_type, StringType):
+            c2 = F.to_timestamp(F.col(col2))
+        else:
+            c2 = F.col(col2)
+
+        coalesced = F.coalesce(c1, c2)
+
+        if op == ">":
+            return df.filter(coalesced > value)
+        elif op == ">=":
+            return df.filter(coalesced >= value)
+        elif op == "<":
+            return df.filter(coalesced < value)
+        elif op == "<=":
+            return df.filter(coalesced <= value)
+        elif op == "=":
+            return df.filter(coalesced == value)
+        else:
+            return df.filter(f"COALESCE({col1}, {col2}) {op} '{value}'")
 
     def add_write_metadata(
         self,

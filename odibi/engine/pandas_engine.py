@@ -2099,32 +2099,47 @@ class PandasEngine(Engine):
         return df.isna().mean().to_dict()
 
     def filter_greater_than(self, df: pd.DataFrame, column: str, value: Any) -> pd.DataFrame:
-        """Filter DataFrame where column > value."""
+        """Filter DataFrame where column > value.
+
+        Automatically casts string columns to datetime for proper comparison.
+        """
         if column not in df.columns:
             raise ValueError(f"Column '{column}' not found in DataFrame")
 
         try:
-            # Handle timestamp string comparison
-            if pd.api.types.is_datetime64_any_dtype(df[column]) and isinstance(value, str):
+            col_series = df[column]
+
+            if pd.api.types.is_string_dtype(col_series):
+                col_series = pd.to_datetime(col_series, errors="coerce")
+            elif pd.api.types.is_datetime64_any_dtype(col_series) and isinstance(value, str):
                 value = pd.to_datetime(value)
 
-            return df[df[column] > value]
+            return df[col_series > value]
         except Exception as e:
             raise ValueError(f"Failed to filter {column} > {value}: {e}")
 
     def filter_coalesce(
         self, df: pd.DataFrame, col1: str, col2: str, op: str, value: Any
     ) -> pd.DataFrame:
-        """Filter using COALESCE(col1, col2) op value."""
+        """Filter using COALESCE(col1, col2) op value.
+
+        Automatically casts string columns to datetime for proper comparison.
+        """
         if col1 not in df.columns:
-            # If fallback only? No, usually primary must exist.
             raise ValueError(f"Column '{col1}' not found")
 
-        # If col2 missing, behave like col1
+        def _to_datetime_if_string(series: pd.Series) -> pd.Series:
+            if pd.api.types.is_string_dtype(series):
+                return pd.to_datetime(series, errors="coerce")
+            return series
+
+        s1 = _to_datetime_if_string(df[col1])
+
         if col2 not in df.columns:
-            s = df[col1]
+            s = s1
         else:
-            s = df[col1].combine_first(df[col2])
+            s2 = _to_datetime_if_string(df[col2])
+            s = s1.combine_first(s2)
 
         try:
             if pd.api.types.is_datetime64_any_dtype(s) and isinstance(value, str):
