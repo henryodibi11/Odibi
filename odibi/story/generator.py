@@ -360,8 +360,7 @@ class StoryGenerator:
         ctx = get_logging_context()
 
         if self.is_remote:
-            ctx.debug("Cross-run comparison not yet supported for remote storage")
-            return None
+            return self._find_last_successful_run_remote()
 
         if self.output_path is None:
             return None
@@ -394,6 +393,81 @@ class StoryGenerator:
             except Exception as e:
                 ctx.debug(f"Failed to load story JSON: {json_path}, error: {e}")
                 continue
+
+        return None
+
+    def _find_last_successful_run_remote(self) -> Optional[Dict[str, Any]]:
+        """Find the most recent successful run's JSON data from remote storage.
+
+        Uses fsspec to list and read JSON files from Azure Blob, ADLS, S3, etc.
+
+        Returns:
+            Dictionary of the last successful run metadata, or None
+        """
+        import json
+
+        ctx = get_logging_context()
+
+        try:
+            import fsspec
+        except ImportError:
+            ctx.debug("fsspec not available, skipping remote comparison")
+            return None
+
+        pipeline_path = f"{self.output_path_str.rstrip('/')}/{self.pipeline_name}"
+
+        try:
+            fs = fsspec.filesystem(
+                pipeline_path.split("://")[0],
+                **self.storage_options
+            )
+
+            # List all JSON files recursively under pipeline directory
+            # fsspec glob pattern for recursive search
+            glob_pattern = f"{pipeline_path.split('://', 1)[1]}/**/*.json"
+            json_files = fs.glob(glob_pattern)
+
+            if not json_files:
+                ctx.debug("No previous story JSON files found", path=pipeline_path)
+                return None
+
+            # Sort by path descending (date/time order due to folder structure)
+            json_files = sorted(json_files, reverse=True)
+
+            ctx.debug(
+                "Found story JSON files for comparison",
+                count=len(json_files),
+                path=pipeline_path,
+            )
+
+            # Find the most recent successful run
+            protocol = pipeline_path.split("://")[0]
+            for json_path in json_files:
+                full_path = f"{protocol}://{json_path}"
+                try:
+                    with fsspec.open(
+                        full_path, "r", encoding="utf-8", **self.storage_options
+                    ) as f:
+                        data = json.load(f)
+
+                    # Check if this run was successful (no failed nodes)
+                    if data.get("failed_nodes", 0) == 0:
+                        ctx.debug(
+                            "Found last successful run (remote)",
+                            path=full_path,
+                            run_id=data.get("run_id"),
+                        )
+                        return data
+                except Exception as e:
+                    ctx.debug(f"Failed to load remote story JSON: {full_path}, error: {e}")
+                    continue
+
+        except Exception as e:
+            ctx.warning(
+                "Failed to search remote storage for previous runs",
+                error=str(e),
+                path=pipeline_path,
+            )
 
         return None
 
