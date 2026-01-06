@@ -871,8 +871,10 @@ class IncrementalConfig(BaseModel):
         default=None,
         description=(
             "Source date format when the column is stored as a string. "
-            "Use 'oracle' for DD-MON-YY format (e.g., '20-APR-24 07:11:01.0'). "
-            "When set, SQL pushdown will use appropriate CONVERT/TO_DATE functions."
+            "Options: 'oracle' (DD-MON-YY, e.g. '20-APR-24'), "
+            "'sql_server' (uses CONVERT with style 120), "
+            "'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DDTHH:MM:SS). "
+            "When set, SQL pushdown will use appropriate CONVERT/TO_TIMESTAMP functions."
         ),
     )
 

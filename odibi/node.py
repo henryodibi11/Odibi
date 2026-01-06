@@ -723,6 +723,54 @@ class NodeExecutor:
         else:
             return f"`{column}`"
 
+    def _get_date_expr(
+        self, quoted_col: str, cutoff: datetime, date_format: Optional[str]
+    ) -> Tuple[str, str]:
+        """Get SQL expressions for date column and cutoff value.
+
+        Args:
+            quoted_col: The quoted column name
+            cutoff: The cutoff datetime value
+            date_format: The source date format
+
+        Returns:
+            Tuple of (column_expression, cutoff_expression)
+
+        Supported date_format values:
+            - None: Default ISO format (YYYY-MM-DD HH:MM:SS)
+            - "oracle": DD-MON-YY format (e.g., 20-APR-24 07:11:01.0)
+            - "sql_server": SQL Server CONVERT with style 120
+            - "us": MM/DD/YYYY format
+            - "eu": DD/MM/YYYY format
+            - "iso": Explicit ISO format with T separator
+        """
+        if date_format == "oracle":
+            cutoff_str = cutoff.strftime("%d-%b-%y %H:%M:%S").upper()
+            col_expr = f"TO_TIMESTAMP({quoted_col}, 'DD-MON-RR HH24:MI:SS.FF')"
+            cutoff_expr = f"TO_TIMESTAMP('{cutoff_str}', 'DD-MON-RR HH24:MI:SS')"
+        elif date_format == "sql_server":
+            cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+            col_expr = f"CONVERT(DATETIME, {quoted_col}, 120)"
+            cutoff_expr = f"'{cutoff_str}'"
+        elif date_format == "us":
+            cutoff_str = cutoff.strftime("%m/%d/%Y %H:%M:%S")
+            col_expr = f"TO_TIMESTAMP({quoted_col}, 'MM/DD/YYYY HH24:MI:SS')"
+            cutoff_expr = f"TO_TIMESTAMP('{cutoff_str}', 'MM/DD/YYYY HH24:MI:SS')"
+        elif date_format == "eu":
+            cutoff_str = cutoff.strftime("%d/%m/%Y %H:%M:%S")
+            col_expr = f"TO_TIMESTAMP({quoted_col}, 'DD/MM/YYYY HH24:MI:SS')"
+            cutoff_expr = f"TO_TIMESTAMP('{cutoff_str}', 'DD/MM/YYYY HH24:MI:SS')"
+        elif date_format == "iso":
+            cutoff_str = cutoff.strftime("%Y-%m-%dT%H:%M:%S")
+            col_expr = f"TO_TIMESTAMP({quoted_col}, 'YYYY-MM-DD\"T\"HH24:MI:SS')"
+            cutoff_expr = f"TO_TIMESTAMP('{cutoff_str}', 'YYYY-MM-DD\"T\"HH24:MI:SS')"
+        else:
+            cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+            col_expr = quoted_col
+            cutoff_expr = f"'{cutoff_str}'"
+
+        return col_expr, cutoff_expr
+
     def _generate_incremental_sql_filter(
         self,
         inc: IncrementalConfig,
@@ -770,25 +818,12 @@ class NodeExecutor:
             if delta:
                 cutoff = now - delta
                 quoted_col = self._quote_sql_column(inc.column, sql_format)
-
-                if inc.date_format == "oracle":
-                    cutoff_str = cutoff.strftime("%d-%b-%y %H:%M:%S").upper()
-                    col_expr = f"TO_TIMESTAMP({quoted_col}, 'DD-MON-RR HH24:MI:SS.FF')"
-                    cutoff_expr = f"TO_TIMESTAMP('{cutoff_str}', 'DD-MON-RR HH24:MI:SS')"
-                else:
-                    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
-                    col_expr = quoted_col
-                    cutoff_expr = f"'{cutoff_str}'"
+                col_expr, cutoff_expr = self._get_date_expr(quoted_col, cutoff, inc.date_format)
 
                 if inc.fallback_column:
                     quoted_fallback = self._quote_sql_column(inc.fallback_column, sql_format)
-                    if inc.date_format == "oracle":
-                        fallback_expr = (
-                            f"TO_TIMESTAMP({quoted_fallback}, 'DD-MON-RR HH24:MI:SS.FF')"
-                        )
-                        return f"COALESCE({col_expr}, {fallback_expr}) >= {cutoff_expr}"
-                    else:
-                        return f"COALESCE({quoted_col}, {quoted_fallback}) >= {cutoff_expr}"
+                    fallback_expr, _ = self._get_date_expr(quoted_fallback, cutoff, inc.date_format)
+                    return f"COALESCE({col_expr}, {fallback_expr}) >= {cutoff_expr}"
                 else:
                     return f"{col_expr} >= {cutoff_expr}"
 
