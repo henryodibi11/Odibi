@@ -417,10 +417,7 @@ class StoryGenerator:
         pipeline_path = f"{self.output_path_str.rstrip('/')}/{self.pipeline_name}"
 
         try:
-            fs = fsspec.filesystem(
-                pipeline_path.split("://")[0],
-                **self.storage_options
-            )
+            fs = fsspec.filesystem(pipeline_path.split("://")[0], **self.storage_options)
 
             # List all JSON files recursively under pipeline directory
             # fsspec glob pattern for recursive search
@@ -445,9 +442,7 @@ class StoryGenerator:
             for json_path in json_files:
                 full_path = f"{protocol}://{json_path}"
                 try:
-                    with fsspec.open(
-                        full_path, "r", encoding="utf-8", **self.storage_options
-                    ) as f:
+                    with fsspec.open(full_path, "r", encoding="utf-8", **self.storage_options) as f:
                         data = json.load(f)
 
                     # Check if this run was successful (no failed nodes)
