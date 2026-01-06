@@ -478,7 +478,7 @@
                     {% if metadata.plant %} / {{ metadata.plant }}{% endif %}
                 </span>
             </div>
-            {% if metadata.git_info %}
+            {% if metadata.git_info and metadata.git_info.commit != 'unknown' %}
             <div class="meta-item">
                 <label>Git</label>
                 <span style="font-family: var(--mono-font); font-size: 0.9em;">
