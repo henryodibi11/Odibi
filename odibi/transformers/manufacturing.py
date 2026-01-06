@@ -659,9 +659,9 @@ def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
 
         start_rows = start_rows.withColumn(
             "true_start_ts",
-            (
-                F.col("start_obs_ts").cast("long") - F.col("start_obs_timer").cast("long")
-            ).cast("timestamp"),
+            (F.col("start_obs_ts").cast("long") - F.col("start_obs_timer").cast("long")).cast(
+                "timestamp"
+            ),
         )
 
         phase_with_start = phase_df.join(
@@ -695,18 +695,20 @@ def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
 
         phase_bounds = start_rows.join(plateau_rows, on=group_by_cols, how="left")
 
-        no_plateau = phase_with_start.filter(~F.col("is_plateau")).groupBy(*group_by_cols).agg(
-            F.max(ts).alias("fallback_end_ts"),
-            F.max(timer_col).alias("fallback_timer"),
+        no_plateau = (
+            phase_with_start.filter(~F.col("is_plateau"))
+            .groupBy(*group_by_cols)
+            .agg(
+                F.max(ts).alias("fallback_end_ts"),
+                F.max(timer_col).alias("fallback_timer"),
+            )
         )
 
         phase_bounds = phase_bounds.join(no_plateau, on=group_by_cols, how="left")
 
         phase_bounds = phase_bounds.withColumn(
             "final_end_ts", F.coalesce(F.col("end_ts"), F.col("fallback_end_ts"))
-        ).withColumn(
-            "max_timer", F.coalesce(F.col("plateau_timer"), F.col("fallback_timer"))
-        )
+        ).withColumn("max_timer", F.coalesce(F.col("plateau_timer"), F.col("fallback_timer")))
 
         phase_summary = phase_bounds.select(
             *group_by_cols,
@@ -720,9 +722,7 @@ def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
         if params.status_mapping and params.status_col:
             status_durations = _compute_status_durations_spark(
                 df=df,
-                phase_bounds=phase_bounds.select(
-                    *group_by_cols, "true_start_ts", "final_end_ts"
-                ),
+                phase_bounds=phase_bounds.select(*group_by_cols, "true_start_ts", "final_end_ts"),
                 params=params,
                 timer_col=timer_col,
                 group_by_cols=group_by_cols,
@@ -733,9 +733,7 @@ def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
         if params.phase_metrics:
             metrics_df = _compute_phase_metrics_spark(
                 df=df,
-                phase_bounds=phase_bounds.select(
-                    *group_by_cols, "true_start_ts", "final_end_ts"
-                ),
+                phase_bounds=phase_bounds.select(*group_by_cols, "true_start_ts", "final_end_ts"),
                 params=params,
                 timer_col=timer_col,
                 group_by_cols=group_by_cols,
@@ -755,9 +753,7 @@ def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
 
     if params.metadata:
         phase_start_cols = [F.col(f"{p}_start") for p in phase_names]
-        summary_df = summary_df.withColumn(
-            "_first_phase_start", F.coalesce(*phase_start_cols)
-        )
+        summary_df = summary_df.withColumn("_first_phase_start", F.coalesce(*phase_start_cols))
 
         metadata_df = _compute_metadata_spark(
             df=df,
@@ -774,9 +770,7 @@ def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
         numeric_cols = _get_numeric_columns(params)
         for col in numeric_cols:
             if col in summary_df.columns:
-                summary_df = summary_df.withColumn(
-                    col, F.coalesce(F.col(col), F.lit(0.0))
-                )
+                summary_df = summary_df.withColumn(col, F.coalesce(F.col(col), F.lit(0.0)))
 
     first_phase_start_col = f"{phase_names[0]}_start" if phase_names else None
     if first_phase_start_col and first_phase_start_col in summary_df.columns:
@@ -797,15 +791,13 @@ def _compute_status_durations_spark(
     status_mapping = params.status_mapping
     valid_codes = list(status_mapping.keys())
 
-    status_df = (
-        df.join(
-            phase_bounds.withColumnRenamed("true_start_ts", "_start")
-            .withColumnRenamed("final_end_ts", "_end"),
-            on=group_by_cols,
-            how="inner",
-        )
-        .filter((F.col(ts) >= F.col("_start")) & (F.col(ts) <= F.col("_end")))
-    )
+    status_df = df.join(
+        phase_bounds.withColumnRenamed("true_start_ts", "_start").withColumnRenamed(
+            "final_end_ts", "_end"
+        ),
+        on=group_by_cols,
+        how="inner",
+    ).filter((F.col(ts) >= F.col("_start")) & (F.col(ts) <= F.col("_end")))
 
     status_df = status_df.withColumn(
         "valid_status",
@@ -813,9 +805,7 @@ def _compute_status_durations_spark(
     )
 
     w_status = (
-        Window.partitionBy(*group_by_cols)
-        .orderBy(ts)
-        .rowsBetween(Window.unboundedPreceding, 0)
+        Window.partitionBy(*group_by_cols).orderBy(ts).rowsBetween(Window.unboundedPreceding, 0)
     )
 
     status_df = status_df.withColumn(
@@ -835,14 +825,10 @@ def _compute_status_durations_spark(
 
     status_df = status_df.withColumn(
         "interval_sec",
-        F.greatest(
-            F.lit(0), F.unix_timestamp("interval_end_ts") - F.unix_timestamp(ts)
-        ),
+        F.greatest(F.lit(0), F.unix_timestamp("interval_end_ts") - F.unix_timestamp(ts)),
     )
 
-    status_df = status_df.filter(
-        (F.col("ffill_status").isNotNull()) & (F.col("interval_sec") > 0)
-    )
+    status_df = status_df.filter((F.col("ffill_status").isNotNull()) & (F.col("interval_sec") > 0))
 
     status_df = status_df.withColumn("interval_min", F.col("interval_sec") / 60.0)
 
@@ -850,9 +836,9 @@ def _compute_status_durations_spark(
         F.sum("interval_min").alias("minutes")
     )
 
-    durations_pivot = durations.groupBy(*group_by_cols).pivot(
-        "ffill_status", valid_codes
-    ).agg(F.first("minutes"))
+    durations_pivot = (
+        durations.groupBy(*group_by_cols).pivot("ffill_status", valid_codes).agg(F.first("minutes"))
+    )
 
     for code, status_name in status_mapping.items():
         old_col = str(code)
@@ -871,15 +857,13 @@ def _compute_phase_metrics_spark(
 
     ts = params.timestamp_col
 
-    metrics_df = (
-        df.join(
-            phase_bounds.withColumnRenamed("true_start_ts", "_start")
-            .withColumnRenamed("final_end_ts", "_end"),
-            on=group_by_cols,
-            how="inner",
-        )
-        .filter((F.col(ts) >= F.col("_start")) & (F.col(ts) <= F.col("_end")))
-    )
+    metrics_df = df.join(
+        phase_bounds.withColumnRenamed("true_start_ts", "_start").withColumnRenamed(
+            "final_end_ts", "_end"
+        ),
+        on=group_by_cols,
+        how="inner",
+    ).filter((F.col(ts) >= F.col("_start")) & (F.col(ts) <= F.col("_end")))
 
     agg_exprs = []
     for metric_col, agg_name in params.phase_metrics.items():
