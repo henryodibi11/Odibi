@@ -745,6 +745,24 @@ incremental:
   # Handle late-arriving data: look back 2 hours from HWM
   watermark_lag: "2h"
 ```
+
+Example (Oracle Date Format):
+```yaml
+incremental:
+  mode: "rolling_window"
+  column: "EVENT_START"
+  lookback: 3
+  unit: "day"
+  # For string columns with Oracle format (DD-MON-YY)
+  date_format: "oracle"
+```
+
+Supported date_format values:
+- `oracle`: DD-MON-YY (e.g., '20-APR-24 07:11:01.0')
+- `sql_server`: Uses CONVERT with style 120
+- `us`: MM/DD/YYYY format
+- `eu`: DD/MM/YYYY format
+- `iso`: YYYY-MM-DDTHH:MM:SS format
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **mode** | IncrementalMode | No | `IncrementalMode.ROLLING_WINDOW` | Incremental strategy: 'rolling_window' or 'stateful' |
@@ -754,6 +772,7 @@ incremental:
 | **unit** | Optional[IncrementalUnit] | No | - | Time unit for lookback (Rolling Window only). Options: 'hour', 'day', 'month', 'year' |
 | **state_key** | Optional[str] | No | - | Unique ID for state tracking. Defaults to node name if not provided. |
 | **watermark_lag** | Optional[str] | No | - | Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency. |
+| **date_format** | Optional[str] | No | - | Source date format when the column is stored as a string. Options: 'oracle' (DD-MON-YY, e.g. '20-APR-24'), 'sql_server' (uses CONVERT with style 120), 'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DDTHH:MM:SS). When set, SQL pushdown will use appropriate CONVERT/TO_TIMESTAMP functions. |
 
 ---
 ### `TimeTravelConfig`
@@ -3126,6 +3145,7 @@ detect_sequential_phases:
 | **metadata** | Optional[Dict[str, str]] | No | - | Columns to include in output with aggregation method. Options: 'first', 'last', 'first_after_start', 'max', 'min', 'mean', 'sum'. E.g., {ProductCode: first_after_start, Weight: max} |
 | **output_time_format** | str | No | `%Y-%m-%d %H:%M:%S` | Format for output timestamp columns |
 | **fill_null_minutes** | bool | No | `False` | If True, fill null numeric columns (_max_minutes, _status_minutes, _metrics) with 0. Timestamp columns remain null for skipped phases. |
+| **spark_native** | bool | No | `False` | If True, use native Spark window functions. If False (default), use applyInPandas which is often faster for datasets with many batches. |
 
 ---
 ### 📂 Advanced & Feature Engineering

@@ -823,6 +823,24 @@ class IncrementalConfig(BaseModel):
       # Handle late-arriving data: look back 2 hours from HWM
       watermark_lag: "2h"
     ```
+
+    Example (Oracle Date Format):
+    ```yaml
+    incremental:
+      mode: "rolling_window"
+      column: "EVENT_START"
+      lookback: 3
+      unit: "day"
+      # For string columns with Oracle format (DD-MON-YY)
+      date_format: "oracle"
+    ```
+
+    Supported date_format values:
+    - `oracle`: DD-MON-YY (e.g., '20-APR-24 07:11:01.0')
+    - `sql_server`: Uses CONVERT with style 120
+    - `us`: MM/DD/YYYY format
+    - `eu`: DD/MM/YYYY format
+    - `iso`: YYYY-MM-DDTHH:MM:SS format
     """
 
     model_config = {"populate_by_name": True}
