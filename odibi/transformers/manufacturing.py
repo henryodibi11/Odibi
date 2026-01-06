@@ -122,11 +122,6 @@ class DetectSequentialPhasesParams(BaseModel):
         description="If True, fill null numeric columns (_max_minutes, _status_minutes, _metrics) "
         "with 0. Timestamp columns remain null for skipped phases.",
     )
-    use_native_spark: bool = Field(
-        default=True,
-        description="If True, use native Spark window functions instead of applyInPandas. "
-        "Native implementation is faster for large datasets (5-20x speedup).",
-    )
 
 
 def _normalize_group_by(group_by: Union[str, List[str]]) -> List[str]:
@@ -233,10 +228,7 @@ def detect_sequential_phases(
     if context.engine_type == EngineType.PANDAS:
         result_df = _detect_phases_pandas(context.df, params)
     elif context.engine_type == EngineType.SPARK:
-        if params.use_native_spark:
-            result_df = _detect_phases_spark_native(context.df, params)
-        else:
-            result_df = _detect_phases_spark(context.df, params)
+        result_df = _detect_phases_spark_native(context.df, params)
     elif context.engine_type == EngineType.POLARS:
         result_df = _detect_phases_polars(context.df, params)
     else:
