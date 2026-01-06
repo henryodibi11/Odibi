@@ -336,3 +336,42 @@ class TestDetectSequentialPhases:
 
         assert pd.notna(result_df.iloc[0]["CookTime_start"])
         assert result_df.iloc[0]["CookTime_max_minutes"] == pytest.approx(180 / 60, rel=0.01)
+
+    def test_duplicate_timestamps_do_not_cause_false_plateau(self):
+        """
+        Test that duplicate rows per timestamp don't trigger false plateau detection.
+
+        Real PLC data often has multiple readings per timestamp. Plateau should only
+        be detected when timer values are equal across DIFFERENT timestamps.
+        """
+        data = {
+            "ts": pd.to_datetime(
+                [
+                    "2024-01-01 10:00:00",
+                    "2024-01-01 10:00:00",
+                    "2024-01-01 10:01:00",
+                    "2024-01-01 10:01:00",
+                    "2024-01-01 10:02:00",
+                    "2024-01-01 10:02:00",
+                    "2024-01-01 10:03:00",
+                    "2024-01-01 10:03:00",
+                ]
+            ),
+            "BatchID": ["B001"] * 8,
+            "LoadTime": [60, 60, 120, 120, 180, 180, 180, 180],
+        }
+        df = pd.DataFrame(data)
+        context = EngineContext(PandasContext(), df, EngineType.PANDAS)
+
+        params = DetectSequentialPhasesParams(
+            group_by="BatchID",
+            timestamp_col="ts",
+            phases=["LoadTime"],
+            start_threshold=240,
+        )
+
+        result = detect_sequential_phases(context, params)
+        result_df = result.df
+
+        assert result_df.iloc[0]["LoadTime_max_minutes"] == pytest.approx(180 / 60, rel=0.01)
+        assert result_df.iloc[0]["LoadTime_end"] == "2024-01-01 10:02:00"

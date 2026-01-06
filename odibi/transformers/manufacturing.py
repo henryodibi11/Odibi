@@ -340,17 +340,19 @@ def _detect_single_phase(
     end_time = None
     max_timer = 0
 
-    for i in range(1, len(after_start)):
-        curr_val = after_start[timer_col].iloc[i]
-        prev_val = after_start[timer_col].iloc[i - 1]
+    unique_times = after_start.drop_duplicates(subset=[timestamp_col]).reset_index(drop=True)
+
+    for i in range(1, len(unique_times)):
+        curr_val = unique_times[timer_col].iloc[i]
+        prev_val = unique_times[timer_col].iloc[i - 1]
         if curr_val == prev_val:
-            end_time = after_start[timestamp_col].iloc[i - 1]
+            end_time = unique_times[timestamp_col].iloc[i - 1]
             max_timer = curr_val
             break
 
-    if end_time is None and len(after_start) > 0:
-        end_time = after_start[timestamp_col].iloc[-1]
-        max_timer = after_start[timer_col].iloc[-1]
+    if end_time is None and len(unique_times) > 0:
+        end_time = unique_times[timestamp_col].iloc[-1]
+        max_timer = unique_times[timer_col].iloc[-1]
 
     if end_time is None:
         return None
