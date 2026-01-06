@@ -374,4 +374,4 @@ class TestDetectSequentialPhases:
         result_df = result.df
 
         assert result_df.iloc[0]["LoadTime_max_minutes"] == pytest.approx(180 / 60, rel=0.01)
-        assert result_df.iloc[0]["LoadTime_end"] == "2024-01-01 10:02:00"
+        assert result_df.iloc[0]["LoadTime_end"] == pd.Timestamp("2024-01-01 10:02:00")

@@ -128,17 +128,18 @@ def _normalize_group_by(group_by: Union[str, List[str]]) -> List[str]:
 
 def _get_expected_columns(params: "DetectSequentialPhasesParams") -> Dict[str, None]:
     """
-    Build a dict of ALL expected output columns with None values.
+    Build a dict of ALL expected output columns with None/NaT values.
 
     This ensures Spark applyInPandas always receives a DataFrame with
     all columns defined in the schema, even when phases are skipped.
+    Uses pd.NaT for timestamp columns to match TimestampType schema.
     """
     columns = {}
 
     phase_names = [p.timer_col if isinstance(p, PhaseConfig) else p for p in params.phases]
     for phase in phase_names:
-        columns[f"{phase}_start"] = None
-        columns[f"{phase}_end"] = None
+        columns[f"{phase}_start"] = pd.NaT
+        columns[f"{phase}_end"] = pd.NaT
         columns[f"{phase}_max_minutes"] = None
 
         if params.status_mapping:
@@ -358,8 +359,8 @@ def _detect_single_phase(
         return None
 
     columns = {
-        f"{timer_col}_start": true_start.strftime(time_format),
-        f"{timer_col}_end": end_time.strftime(time_format),
+        f"{timer_col}_start": true_start,
+        f"{timer_col}_end": end_time,
         f"{timer_col}_max_minutes": round(max_timer / 60, 6) if max_timer else 0,
     }
 
@@ -505,6 +506,7 @@ def _detect_phases_spark(spark_df, params: DetectSequentialPhasesParams):
         StringType,
         StructField,
         StructType,
+        TimestampType,
     )
 
     group_by_cols = _normalize_group_by(params.group_by)
@@ -515,8 +517,8 @@ def _detect_phases_spark(spark_df, params: DetectSequentialPhasesParams):
 
     phase_names = [p.timer_col if isinstance(p, PhaseConfig) else p for p in params.phases]
     for phase in phase_names:
-        output_fields.append(StructField(f"{phase}_start", StringType(), True))
-        output_fields.append(StructField(f"{phase}_end", StringType(), True))
+        output_fields.append(StructField(f"{phase}_start", TimestampType(), True))
+        output_fields.append(StructField(f"{phase}_end", TimestampType(), True))
         output_fields.append(StructField(f"{phase}_max_minutes", DoubleType(), True))
 
         if params.status_mapping:
