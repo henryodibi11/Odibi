@@ -3125,6 +3125,7 @@ detect_sequential_phases:
 | **phase_metrics** | Optional[Dict[str, str]] | No | - | Columns to aggregate within each phase window. E.g., {Level: max, Pressure: max}. Outputs {Phase}_{Column} columns. |
 | **metadata** | Optional[Dict[str, str]] | No | - | Columns to include in output with aggregation method. Options: 'first', 'last', 'first_after_start', 'max', 'min', 'mean', 'sum'. E.g., {ProductCode: first_after_start, Weight: max} |
 | **output_time_format** | str | No | `%Y-%m-%d %H:%M:%S` | Format for output timestamp columns |
+| **fill_null_minutes** | bool | No | `False` | If True, fill null numeric columns (_max_minutes, _status_minutes, _metrics) with 0. Timestamp columns remain null for skipped phases. |
 
 ---
 ### 📂 Advanced & Feature Engineering
