@@ -2319,7 +2319,7 @@ class NodeExecutor:
             # If target was deleted, we must write even if hash matches
             target_exists = self._check_target_exists(write_config, connection)
             if not target_exists:
-                from odibi.utils.logging import get_logging_context
+                from odibi.utils.logging_context import get_logging_context
 
                 ctx = get_logging_context()
                 ctx.warning(
