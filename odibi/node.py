@@ -2315,6 +2315,19 @@ class NodeExecutor:
         previous_hash = get_content_hash_from_state(state_backend, config.name, table_name)
 
         if previous_hash and current_hash == previous_hash:
+            # Before skipping, verify the target actually exists
+            # If target was deleted, we must write even if hash matches
+            target_exists = self._check_target_exists(write_config, connection)
+            if not target_exists:
+                from odibi.utils.logging import get_logging_context
+
+                ctx = get_logging_context()
+                ctx.warning(
+                    f"[{config.name}] Target does not exist despite matching hash, "
+                    "proceeding with write"
+                )
+                self._pending_content_hash = current_hash
+                return {"should_skip": False, "hash": current_hash}
             return {"should_skip": True, "hash": current_hash}
 
         self._pending_content_hash = current_hash
@@ -2353,6 +2366,46 @@ class NodeExecutor:
             logger.warning(f"[{config.name}] Failed to store content hash: {e}")
         finally:
             self._pending_content_hash = None
+
+    def _check_target_exists(self, write_config: Any, connection: Any) -> bool:
+        """Check if the target table or path exists.
+
+        Used by skip_if_unchanged to verify target wasn't deleted.
+
+        Args:
+            write_config: Write configuration with table/path info
+            connection: Target connection
+
+        Returns:
+            True if target exists, False otherwise
+        """
+        try:
+            if write_config.table:
+                # Table-based target
+                if hasattr(self.engine, "spark"):
+                    return self.engine.spark.catalog.tableExists(write_config.table)
+                return True  # Assume exists for non-Spark engines
+
+            if write_config.path:
+                # Path-based Delta target
+                full_path = connection.get_path(write_config.path)
+                if hasattr(self.engine, "spark"):
+                    try:
+                        from delta.tables import DeltaTable
+
+                        return DeltaTable.isDeltaTable(self.engine.spark, full_path)
+                    except Exception:
+                        # Fallback: check if path exists
+                        try:
+                            self.engine.spark.read.format("delta").load(full_path).limit(0)
+                            return True
+                        except Exception:
+                            return False
+                return True  # Assume exists for non-Spark engines
+
+            return True  # No table or path specified, assume exists
+        except Exception:
+            return False  # On any error, assume doesn't exist (safer to write)
 
     def _calculate_delta_diagnostics(
         self,
