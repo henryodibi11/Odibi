@@ -89,19 +89,95 @@ STATUS_STOPPED = "⏹️ Stopped by user."
 STATUS_AWAITING = "⏳ Awaiting confirmation..."
 
 # Token cost estimates (per 1K tokens, in USD)
-# Based on OpenAI pricing as of late 2024
+# Based on OpenAI pricing as of January 2025
+# Source: https://openai.com/api/pricing/
 TOKEN_COSTS: Final[dict[str, dict[str, float]]] = {
+    # GPT-5 series
+    "gpt-5.2": {"input": 0.00175, "output": 0.014},
+    "gpt-5.2-pro": {"input": 0.021, "output": 0.168},
+    "gpt-5.1": {"input": 0.00125, "output": 0.01},
+    "gpt-5.1-codex": {"input": 0.00125, "output": 0.01},
+    "gpt-5.1-codex-mini": {"input": 0.00025, "output": 0.002},
+    "gpt-5": {"input": 0.00125, "output": 0.01},
+    "gpt-5-pro": {"input": 0.015, "output": 0.12},
+    "gpt-5-mini": {"input": 0.00025, "output": 0.002},
+    "gpt-5-nano": {"input": 0.00005, "output": 0.0004},
+    "gpt-5-codex": {"input": 0.00125, "output": 0.01},
+    "gpt-5-chat-latest": {"input": 0.00125, "output": 0.01},
+    # GPT-4.1 series
+    "gpt-4.1": {"input": 0.002, "output": 0.008},
+    "gpt-4.1-mini": {"input": 0.0004, "output": 0.0016},
+    "gpt-4.1-nano": {"input": 0.0001, "output": 0.0004},
+    "gpt-4.1-2025-04-14": {"input": 0.002, "output": 0.008},
+    "gpt-4.1-mini-2025-04-14": {"input": 0.0004, "output": 0.0016},
+    "gpt-4.1-nano-2025-04-14": {"input": 0.0001, "output": 0.0004},
+    # GPT-4o series
     "gpt-4o": {"input": 0.0025, "output": 0.01},
+    "gpt-4o-2024-05-13": {"input": 0.005, "output": 0.015},
+    "gpt-4o-2024-08-06": {"input": 0.0025, "output": 0.01},
     "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
+    "gpt-4o-mini-2024-07-18": {"input": 0.00015, "output": 0.0006},
+    # GPT-4 series (legacy)
     "gpt-4-turbo": {"input": 0.01, "output": 0.03},
     "gpt-4": {"input": 0.03, "output": 0.06},
+    "gpt-4-32k": {"input": 0.06, "output": 0.12},
+    # GPT-3.5 series (legacy)
     "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
-    "gpt-4.1": {"input": 0.002, "output": 0.008},
+    "gpt-3.5-turbo-0125": {"input": 0.0005, "output": 0.0015},
+    "gpt-3.5-turbo-instruct": {"input": 0.0015, "output": 0.002},
+    # O-series reasoning models
     "o1": {"input": 0.015, "output": 0.06},
-    "o1-mini": {"input": 0.003, "output": 0.012},
+    "o1-pro": {"input": 0.15, "output": 0.6},
+    "o1-mini": {"input": 0.0011, "output": 0.0044},
     "o1-preview": {"input": 0.015, "output": 0.06},
+    "o3": {"input": 0.002, "output": 0.008},
+    "o3-pro": {"input": 0.02, "output": 0.08},
+    "o3-mini": {"input": 0.0011, "output": 0.0044},
+    "o3-deep-research": {"input": 0.01, "output": 0.04},
+    "o4-mini": {"input": 0.0011, "output": 0.0044},
+    "o4-mini-deep-research": {"input": 0.002, "output": 0.008},
+    # Realtime models (text pricing)
+    "gpt-realtime": {"input": 0.004, "output": 0.016},
+    "gpt-realtime-mini": {"input": 0.0006, "output": 0.0024},
+    "gpt-4o-realtime-preview": {"input": 0.005, "output": 0.02},
+    "gpt-4o-mini-realtime-preview": {"input": 0.0006, "output": 0.0024},
+    # Audio models (text pricing)
+    "gpt-audio": {"input": 0.0025, "output": 0.01},
+    "gpt-audio-mini": {"input": 0.0006, "output": 0.0024},
+    "gpt-4o-audio-preview": {"input": 0.0025, "output": 0.01},
+    "gpt-4o-mini-audio-preview": {"input": 0.00015, "output": 0.0006},
+    # Transcription models
+    "gpt-4o-transcribe": {"input": 0.0025, "output": 0.01},
+    "gpt-4o-mini-transcribe": {"input": 0.00125, "output": 0.005},
+    "gpt-4o-mini-tts": {"input": 0.0006, "output": 0.012},
+    # Image generation models (text input pricing)
+    "gpt-image-1": {"input": 0.005, "output": 0.04},
+    "gpt-image-1-mini": {"input": 0.002, "output": 0.008},
+    "gpt-image-1.5": {"input": 0.005, "output": 0.01},
+    # Computer use
+    "computer-use-preview": {"input": 0.003, "output": 0.012},
+    # Codex
+    "codex-mini-latest": {"input": 0.0015, "output": 0.006},
+    # Embedding models
+    "text-embedding-3-small": {"input": 0.00002, "output": 0.0},
+    "text-embedding-3-large": {"input": 0.00013, "output": 0.0},
+    "text-embedding-ada-002": {"input": 0.0001, "output": 0.0},
+    # Claude models (Anthropic)
+    "claude-3-opus": {"input": 0.015, "output": 0.075},
+    "claude-3-sonnet": {"input": 0.003, "output": 0.015},
+    "claude-3-haiku": {"input": 0.00025, "output": 0.00125},
+    "claude-3.5-sonnet": {"input": 0.003, "output": 0.015},
+    "claude-3.5-haiku": {"input": 0.0008, "output": 0.004},
+    "claude-3.7-sonnet": {"input": 0.003, "output": 0.015},
+    "claude-4-opus": {"input": 0.015, "output": 0.075},
+    "claude-4-sonnet": {"input": 0.003, "output": 0.015},
+    # Google models
+    "gemini-1.5-pro": {"input": 0.00125, "output": 0.005},
+    "gemini-1.5-flash": {"input": 0.000075, "output": 0.0003},
+    "gemini-2.0-flash": {"input": 0.0001, "output": 0.0004},
+    "gemini-2.0-pro": {"input": 0.00125, "output": 0.01},
     # Default for unknown models
-    "default": {"input": 0.005, "output": 0.015},
+    "default": {"input": 0.002, "output": 0.008},
 }
 
 

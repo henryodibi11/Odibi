@@ -60,6 +60,10 @@ from ..tools.diagram_tools import (
     render_mermaid,
 )
 from ..tools.file_tools import undo_edit, edit_file
+from ..tools.file_upload import (
+    build_multimodal_content,
+    format_file_preview,
+)
 from ..tools.git_tools import (
     format_diff,
     format_git_result,
@@ -314,7 +318,93 @@ you can also help with pipelines, transformers, and connections.
 
 ## Odibi Framework Knowledge
 
-You are an expert on the Odibi data engineering framework. Key knowledge:
+You are an expert on the Odibi data engineering framework. You can both DEVELOP odibi and USE it.
+
+### Finding Odibi Knowledge
+
+**PRIORITY ORDER for understanding odibi:**
+1. **Check if Odibi is indexed** - Use `search` tool first to see if odibi source code is available
+2. **If indexed** - Use semantic search to find relevant odibi code, patterns, and implementations
+3. **Read the docs** - Check `docs/` folder for explanations and examples
+4. **Only then guess** - If neither is available, use your training knowledge
+
+**When asked to IMPROVE/DEVELOP odibi:**
+- Odibi source will ALWAYS be indexed - use `search` to find relevant code
+- Read actual implementations before suggesting changes
+- Follow existing patterns in the codebase
+
+### Using Odibi (Running Pipelines)
+
+**YOU CAN RUN ODIBI PIPELINES DIRECTLY using Python execution:**
+
+```python
+from odibi import PipelineManager, SemanticLayerRunner
+
+# Load project from YAML config
+manager = PipelineManager.from_yaml("project.yaml")  # or qat_project.yaml, etc.
+
+# Run pipelines (bronze, silver, gold layers)
+result = manager.run(pipelines=['bronze'], parallel=True, max_workers=16, console=True)
+result = manager.run(pipelines=['silver'], parallel=True, max_workers=16, console=True)
+result = manager.run(pipelines=['gold'], parallel=True, max_workers=16, console=True)
+
+# Run semantic layer (creates views in Databricks)
+semantic_runner = SemanticLayerRunner(manager.project_config)
+semantic_result = semantic_runner.run()
+```
+
+**Querying Data:**
+- In Databricks, pipeline nodes are saved as **views**
+- You can query them directly with SQL: `SELECT * FROM view_name LIMIT 10`
+- To see what data looks like, use `execute_sql` tool
+
+**Finding Configs:**
+- Look for `project.yaml`, `*_project.yaml` files in the workspace
+- These define: connections, pipelines, nodes, transformations
+- Read these to understand available data sources and pipelines
+
+**PROACTIVE ODIBI USAGE:**
+1. When user asks about data → search for project YAML configs
+2. Read the config to understand available connections and pipelines
+3. Suggest running pipelines or querying views to answer questions
+4. Use `execute_python` to run odibi code directly
+5. Use `execute_sql` to query resulting views
+
+### Odibi Documentation (docs/ folder)
+
+**ALWAYS check the docs when you need help understanding odibi:**
+
+| Need | Where to Look |
+|------|---------------|
+| Quick syntax lookup | `docs/reference/cheatsheet.md` |
+| YAML config options | `docs/reference/yaml_schema.md` |
+| Copy-paste examples | `docs/examples/canonical/` (01-05) |
+| Pattern for a problem | `docs/patterns/` (SCD2, merge, fact, dimension, aggregation) |
+| How connections work | `docs/features/connections.md` |
+| Data quality/validation | `docs/validation/` |
+| Semantic layer | `docs/semantics/` |
+| Troubleshooting | `docs/troubleshooting.md` |
+| Full guides | `docs/guides/` |
+| Engine parity status | `docs/reference/PARITY_TABLE.md` |
+| API reference | `docs/reference/api/` |
+| Medallion architecture | `docs/guides/medallion_architecture.md` |
+| Decision guide | `docs/guides/decision_guide.md` |
+
+**Key docs to read first:**
+- `docs/golden_path.md` - The canonical way to use odibi
+- `docs/playbook/README.md` - Operational playbook
+- `docs/reference/cheatsheet.md` - Quick reference for all features
+- `docs/reference/yaml_schema.md` - Complete YAML config reference
+- `docs/guides/the_definitive_guide.md` - Comprehensive guide
+
+**Patterns docs (docs/patterns/):**
+- `append_only_raw.md`, `incremental_stateful.md`, `merge_upsert.md`
+- `dimension.md`, `date_dimension.md`, `fact.md`, `aggregation.md`, `scd2.md`
+- `smart_read.md`, `skip_if_unchanged.md`, `windowed_reprocess.md`
+
+**When confused, READ THE DOCS before guessing!**
+
+### Developing Odibi (Framework Code)
 
 **Architecture:**
 - `odibi/engine/` - Spark, Pandas, Polars engines (must maintain parity)
@@ -990,6 +1080,7 @@ CONVERSATION:
         history: list[dict],
         agent: str,
         max_iterations: int = 50,
+        files: list = None,
     ) -> Generator[tuple[list[dict], str, str, str, Any, bool], None, None]:
         """Process a message with streaming support.
 
@@ -997,7 +1088,25 @@ CONVERSATION:
             Tuple of (history, status, thinking, activity, pending_action, show_actions).
         """
         history = history.copy()
-        history.append({"role": "user", "content": message})
+
+        # Process uploaded files
+        file_paths = []
+        file_previews = []
+        if files:
+            for f in files:
+                if hasattr(f, "name"):
+                    file_paths.append(f.name)
+                    file_previews.append(format_file_preview(f.name))
+                elif isinstance(f, str):
+                    file_paths.append(f)
+                    file_previews.append(format_file_preview(f))
+
+        # Build display message for history (user sees file names)
+        display_message = message
+        if file_previews:
+            display_message = message + "\n\n**Attached:** " + ", ".join(file_previews)
+
+        history.append({"role": "user", "content": display_message})
 
         clear_activity()
         reset_thinking()
@@ -1005,7 +1114,13 @@ CONVERSATION:
 
         yield history, "🚀 Starting...", "", refresh_activity_display(), None, False
 
-        self.state.conversation_history.append({"role": "user", "content": message})
+        # Build multimodal content for LLM
+        if file_paths:
+            llm_content = build_multimodal_content(message, file_paths)
+        else:
+            llm_content = message
+
+        self.state.conversation_history.append({"role": "user", "content": llm_content})
         add_activity("Received user message")
 
         # Detect corrections and save as negative feedback
@@ -1776,6 +1891,63 @@ def create_enhanced_chat_interface(
                 lines=2,
                 scale=4,
             )
+            components["file_upload"] = gr.File(
+                label="📎",
+                file_count="multiple",
+                file_types=[
+                    # Images
+                    ".png",
+                    ".jpg",
+                    ".jpeg",
+                    ".gif",
+                    ".webp",
+                    ".bmp",
+                    # Data files
+                    ".csv",
+                    ".tsv",
+                    ".xlsx",
+                    ".xls",
+                    ".parquet",
+                    ".feather",
+                    ".pickle",
+                    ".pkl",
+                    ".sqlite",
+                    ".db",
+                    # Documents
+                    ".pdf",
+                    ".docx",
+                    # Notebooks
+                    ".ipynb",
+                    # Code/Text
+                    ".txt",
+                    ".md",
+                    ".py",
+                    ".js",
+                    ".ts",
+                    ".jsx",
+                    ".tsx",
+                    ".json",
+                    ".yaml",
+                    ".yml",
+                    ".toml",
+                    ".sql",
+                    ".sh",
+                    ".html",
+                    ".css",
+                    ".xml",
+                    ".vue",
+                    ".svelte",
+                    ".java",
+                    ".scala",
+                    ".go",
+                    ".rs",
+                    ".rb",
+                    ".php",
+                    ".cs",
+                ],
+                scale=1,
+                min_width=80,
+            )
             components["send_btn"] = gr.Button(
                 "➤",
                 variant="primary",
@@ -1816,8 +1988,8 @@ def setup_enhanced_chat_handlers(
     """Set up event handlers for the enhanced chat interface."""
     handler = EnhancedChatHandler(get_config())
 
-    def on_send(message: str, history: list[dict], agent: str):
-        if not message.strip():
+    def on_send(message: str, history: list[dict], agent: str, files: list = None):
+        if not message.strip() and not files:
             if todo_display:
                 yield (
                     history,
@@ -1828,6 +2000,7 @@ def setup_enhanced_chat_handlers(
                     None,
                     gr.update(visible=False),
                     gr.update(visible=False),
+                    None,
                 )
             else:
                 yield (
@@ -1838,6 +2011,7 @@ def setup_enhanced_chat_handlers(
                     None,
                     gr.update(visible=False),
                     gr.update(visible=False),
+                    None,
                 )
             return
 
@@ -1850,7 +2024,7 @@ def setup_enhanced_chat_handlers(
 
         is_final = False
         for result in handler.process_message_streaming(
-            message, history, agent, max_iterations=max_iters
+            message, history, agent, max_iterations=max_iters, files=files
         ):
             updated_history, status, thinking, activity, pending, show_actions = result
             # Show feedback row only when processing is complete (no status)
@@ -1866,6 +2040,7 @@ def setup_enhanced_chat_handlers(
                     pending,
                     gr.update(visible=show_actions),
                     gr.update(visible=is_final),
+                    None,
                 )
             else:
                 yield (
@@ -1877,6 +2052,7 @@ def setup_enhanced_chat_handlers(
                     pending,
                     gr.update(visible=show_actions),
                     gr.update(visible=is_final),
+                    None,
                 )
 
     base_outputs = [
@@ -1893,6 +2069,7 @@ def setup_enhanced_chat_handlers(
             components["pending_action"],
             components["actions_accordion"],
             components["feedback_row"],
+            components["file_upload"],
         ]
     )
 
@@ -1902,6 +2079,7 @@ def setup_enhanced_chat_handlers(
             components["message_input"],
             components["chatbot"],
             components["agent_selector"],
+            components["file_upload"],
         ],
         outputs=base_outputs,
     )
@@ -1912,6 +2090,7 @@ def setup_enhanced_chat_handlers(
             components["message_input"],
             components["chatbot"],
             components["agent_selector"],
+            components["file_upload"],
         ],
         outputs=base_outputs,
     )

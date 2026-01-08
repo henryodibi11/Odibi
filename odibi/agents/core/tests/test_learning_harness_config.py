@@ -155,17 +155,17 @@ class TestSourceBindingPaths:
         """Configs should reference ${BOUND_SOURCE_ROOT} for bound sources."""
         for yaml_file in harness_yaml_files:
             content = yaml_file.read_text()
-            assert (
-                "${BOUND_SOURCE_ROOT}" in content
-            ), f"{yaml_file.name} should use ${{BOUND_SOURCE_ROOT}} placeholder"
+            assert "${BOUND_SOURCE_ROOT}" in content, (
+                f"{yaml_file.name} should use ${{BOUND_SOURCE_ROOT}} placeholder"
+            )
 
     def test_configs_use_artifacts_root(self, harness_yaml_files):
         """Configs should reference ${ARTIFACTS_ROOT} for outputs."""
         for yaml_file in harness_yaml_files:
             content = yaml_file.read_text()
-            assert (
-                "${ARTIFACTS_ROOT}" in content
-            ), f"{yaml_file.name} should use ${{ARTIFACTS_ROOT}} placeholder"
+            assert "${ARTIFACTS_ROOT}" in content, (
+                f"{yaml_file.name} should use ${{ARTIFACTS_ROOT}} placeholder"
+            )
 
     def test_no_hardcoded_absolute_paths(self, harness_yaml_files):
         """Configs should not have hardcoded absolute paths."""
@@ -181,9 +181,9 @@ class TestSourceBindingPaths:
         for yaml_file in harness_yaml_files:
             content = yaml_file.read_text()
             for pattern in bad_patterns:
-                assert (
-                    pattern not in content
-                ), f"{yaml_file.name} contains hardcoded path: {pattern}"
+                assert pattern not in content, (
+                    f"{yaml_file.name} contains hardcoded path: {pattern}"
+                )
 
 
 # ============================================
@@ -220,9 +220,9 @@ class TestPipelineStructure:
                             node.get("transformer"),
                         ]
                     )
-                    assert (
-                        has_operation
-                    ), f"{yaml_file.name} node '{node.get('name')}' has no operations"
+                    assert has_operation, (
+                        f"{yaml_file.name} node '{node.get('name')}' has no operations"
+                    )
 
 
 # ============================================
@@ -261,9 +261,9 @@ class TestSingleStressor:
 
         # Should have type/schema operations
         content = yaml_file.read_text().lower()
-        assert (
-            "cast" in content or "union" in content or "schema" in content
-        ), "schema_drift should handle type coercion or schema operations"
+        assert "cast" in content or "union" in content or "schema" in content, (
+            "schema_drift should handle type coercion or schema operations"
+        )
 
 
 # ============================================

@@ -238,7 +238,7 @@ class LLMClient:
 
     def chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict],
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 16384,
@@ -248,6 +248,7 @@ class LLMClient:
 
         Args:
             messages: List of message dicts with 'role' and 'content'.
+                     Content can be a string or list of content blocks for multimodal.
             system_prompt: Optional system message to prepend.
             temperature: Sampling temperature (0.0 = deterministic).
             max_tokens: Maximum tokens in response.
@@ -321,7 +322,7 @@ class LLMClient:
 
     def chat_stream(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict],
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 16384,
@@ -329,7 +330,7 @@ class LLMClient:
         """Send a streaming chat completion request.
 
         Args:
-            messages: List of message dicts with 'role' and 'content'.
+            messages: List of message dicts. Content can be string or list for multimodal.
             system_prompt: Optional system message to prepend.
             temperature: Sampling temperature (0.0 = deterministic).
             max_tokens: Maximum tokens in response.
@@ -403,7 +404,7 @@ class LLMClient:
 
     def chat_stream_with_tools(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict],
         system_prompt: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 16384,
@@ -420,7 +421,7 @@ class LLMClient:
         tool calls. It provides callbacks for real-time UI updates.
 
         Args:
-            messages: List of message dicts.
+            messages: List of message dicts. Content can be string or list for multimodal.
             system_prompt: Optional system message.
             temperature: Sampling temperature.
             max_tokens: Maximum tokens.
