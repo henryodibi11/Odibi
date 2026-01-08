@@ -168,7 +168,9 @@ def create_app(
 
                 chat_column, chat_components = create_enhanced_chat_interface(config=config)
 
-        chat_handler = setup_enhanced_chat_handlers(chat_components, get_config)
+        chat_handler = setup_enhanced_chat_handlers(
+            chat_components, get_config, todo_display=todo_components.get("todo_display")
+        )
 
         setup_explorer_handlers(explorer_components, chat_components)
 
@@ -194,6 +196,16 @@ def create_app(
         setup_memory_handlers(memory_components, get_config)
 
         setup_campaigns_handlers(campaigns_components, chat_components)
+
+        def run_selected_task(selected_task: str) -> str:
+            """Return the selected task to be sent to chat input."""
+            return selected_task if selected_task else ""
+
+        todo_components["run_task_btn"].click(
+            fn=run_selected_task,
+            inputs=[todo_components["task_selector"]],
+            outputs=[chat_components["message_input"]],
+        )
 
         def load_initial_memories():
             try:

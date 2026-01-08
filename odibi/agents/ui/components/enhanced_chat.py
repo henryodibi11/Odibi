@@ -116,10 +116,6 @@ from odibi.agents.core.memory import MemoryType
 
 AGENT_CHOICES = [
     ("🤖 Auto (Orchestrator)", "auto"),
-    ("🔍 Code Analyst", "code_analyst"),
-    ("🔧 Refactor Engineer", "refactor_engineer"),
-    ("🧪 Test Architect", "test_architect"),
-    ("📝 Documentation", "documentation"),
 ]
 
 
@@ -871,6 +867,9 @@ class EnhancedChatHandler:
                 def on_tool_start(name: str):
                     add_activity(f"Preparing to call {name}...", tool_name=name)
 
+                def on_rate_limit(wait_seconds: int):
+                    add_activity(f"⏳ Rate limited, retrying in {wait_seconds}s...")
+
                 # Sanitize history before each LLM call to remove orphaned tool_calls
                 self._sanitize_conversation_history()
 
@@ -878,10 +877,11 @@ class EnhancedChatHandler:
                     messages=self.state.conversation_history,
                     system_prompt=system_prompt,
                     temperature=0.1,
-                    max_tokens=16384,  # Increased from 4096 to handle large file writes
+                    max_tokens=16384,
                     tools=TOOL_DEFINITIONS if not no_tools_support else None,
                     on_content=on_content,
                     on_tool_call_start=on_tool_start,
+                    on_rate_limit=on_rate_limit,
                 )
 
                 elapsed = time.time() - start_time
@@ -1362,13 +1362,17 @@ def create_enhanced_chat_interface(
 def setup_enhanced_chat_handlers(
     components: dict[str, Any],
     get_config: Callable,
+    todo_display: Optional[Any] = None,
 ) -> EnhancedChatHandler:
     """Set up event handlers for the enhanced chat interface."""
     handler = EnhancedChatHandler(get_config())
 
     def on_send(message: str, history: list[dict], agent: str):
         if not message.strip():
-            yield history, "", "", "", None, gr.update(visible=False)
+            if todo_display:
+                yield history, "", "", "", "", None, gr.update(visible=False)
+            else:
+                yield history, "", "", "", None, gr.update(visible=False)
             return
 
         handler.config = get_config()
@@ -1378,15 +1382,43 @@ def setup_enhanced_chat_handlers(
             message, history, agent, max_iterations=max_iters
         ):
             updated_history, status, thinking, activity, pending, show_actions = result
-            yield (
-                updated_history,
-                "",
-                f"**{status}**" if status else "",
-                thinking,
-                activity,
-                pending,
-                gr.update(visible=show_actions),
-            )
+            if todo_display:
+                yield (
+                    updated_history,
+                    "",
+                    f"**{status}**" if status else "",
+                    thinking,
+                    activity,
+                    update_todo_display(),
+                    pending,
+                    gr.update(visible=show_actions),
+                )
+            else:
+                yield (
+                    updated_history,
+                    "",
+                    f"**{status}**" if status else "",
+                    thinking,
+                    activity,
+                    pending,
+                    gr.update(visible=show_actions),
+                )
+
+    base_outputs = [
+        components["chatbot"],
+        components["message_input"],
+        components["status_bar"],
+        components["thinking_display"],
+        components["activity_display"],
+    ]
+    if todo_display:
+        base_outputs.append(todo_display)
+    base_outputs.extend(
+        [
+            components["pending_action"],
+            components["actions_accordion"],
+        ]
+    )
 
     components["send_btn"].click(
         fn=on_send,
@@ -1395,15 +1427,7 @@ def setup_enhanced_chat_handlers(
             components["chatbot"],
             components["agent_selector"],
         ],
-        outputs=[
-            components["chatbot"],
-            components["message_input"],
-            components["status_bar"],
-            components["thinking_display"],
-            components["activity_display"],
-            components["pending_action"],
-            components["actions_accordion"],
-        ],
+        outputs=base_outputs,
     )
 
     components["message_input"].submit(
@@ -1413,15 +1437,7 @@ def setup_enhanced_chat_handlers(
             components["chatbot"],
             components["agent_selector"],
         ],
-        outputs=[
-            components["chatbot"],
-            components["message_input"],
-            components["status_bar"],
-            components["thinking_display"],
-            components["activity_display"],
-            components["pending_action"],
-            components["actions_accordion"],
-        ],
+        outputs=base_outputs,
     )
 
     def on_confirm(history: list[dict]):

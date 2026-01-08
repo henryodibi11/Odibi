@@ -15,12 +15,24 @@ All you need is: endpoint, api_key, model name.
 """
 
 import json
+import re
 import time
 import threading
 from dataclasses import dataclass, field
 from typing import Callable, Generator, Optional
 
 import requests
+
+
+def _parse_retry_after(error_text: str) -> int:
+    """Parse retry-after seconds from rate limit error message."""
+    match = re.search(r"retry after (\d+) seconds", error_text, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    match = re.search(r"Please retry after (\d+)", error_text)
+    if match:
+        return int(match.group(1))
+    return 20
 
 
 @dataclass
@@ -399,6 +411,8 @@ class LLMClient:
         on_content: Optional[Callable[[str], None]] = None,
         on_tool_call_start: Optional[Callable[[str], None]] = None,
         on_thinking: Optional[Callable[[str], None]] = None,
+        on_rate_limit: Optional[Callable[[int], None]] = None,
+        max_retries: int = 3,
     ) -> ChatResponse:
         """Stream a chat completion with tool support.
 
@@ -414,6 +428,8 @@ class LLMClient:
             on_content: Callback for each content chunk.
             on_tool_call_start: Callback when tool call detection starts.
             on_thinking: Callback for thinking/reasoning tokens.
+            on_rate_limit: Callback when rate limited (receives wait seconds).
+            max_retries: Maximum retry attempts for rate limits.
 
         Returns:
             ChatResponse with full content and tool calls.
@@ -434,6 +450,7 @@ class LLMClient:
         payload = {
             "messages": full_messages,
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
 
         if uses_completion_tokens:
@@ -452,87 +469,115 @@ class LLMClient:
         accumulated_content = ""
         tool_calls = []
         finish_reason = ""
+        usage = TokenUsage()
+        retry_count = 0
 
-        try:
-            response = self._session.post(
-                url, headers=headers, json=payload, timeout=180, stream=True
-            )
+        while retry_count <= max_retries:
+            try:
+                response = self._session.post(
+                    url, headers=headers, json=payload, timeout=180, stream=True
+                )
 
-            if response.status_code != 200:
-                raise LLMError(f"LLM API error: {response.status_code} - {response.text[:500]}")
-
-            for line in response.iter_lines():
-                if self.is_cancelled:
-                    response.close()
-                    break
-
-                if not line:
+                if response.status_code == 429:
+                    retry_count += 1
+                    if retry_count > max_retries:
+                        raise LLMError(
+                            f"Rate limit exceeded after {max_retries} retries. "
+                            f"Please wait and try again."
+                        )
+                    wait_seconds = _parse_retry_after(response.text)
+                    if on_rate_limit:
+                        on_rate_limit(wait_seconds)
+                    time.sleep(wait_seconds)
                     continue
 
-                line = line.decode("utf-8")
-                if not line.startswith("data: "):
-                    continue
+                if response.status_code != 200:
+                    raise LLMError(f"LLM API error: {response.status_code} - {response.text[:500]}")
 
-                data = line[6:]
-                if data == "[DONE]":
-                    break
+                for line in response.iter_lines():
+                    if self.is_cancelled:
+                        response.close()
+                        break
 
-                try:
-                    chunk = json.loads(data)
-                    choices = chunk.get("choices", [])
-                    if not choices:
+                    if not line:
                         continue
 
-                    choice = choices[0]
-                    delta = choice.get("delta", {})
-                    finish_reason = choice.get("finish_reason", "") or finish_reason
+                    line = line.decode("utf-8")
+                    if not line.startswith("data: "):
+                        continue
 
-                    content = delta.get("content", "")
-                    if content:
-                        accumulated_content += content
-                        if on_content:
-                            on_content(content)
+                    data = line[6:]
+                    if data == "[DONE]":
+                        break
 
-                    tool_call_deltas = delta.get("tool_calls", [])
-                    for tc_delta in tool_call_deltas:
-                        tc_index = tc_delta.get("index", 0)
+                    try:
+                        chunk = json.loads(data)
 
-                        while len(tool_calls) <= tc_index:
-                            tool_calls.append(
-                                {
-                                    "id": "",
-                                    "type": "function",
-                                    "function": {"name": "", "arguments": ""},
-                                }
+                        if "usage" in chunk and chunk["usage"]:
+                            usage_data = chunk["usage"]
+                            usage = TokenUsage(
+                                prompt_tokens=usage_data.get("prompt_tokens", 0),
+                                completion_tokens=usage_data.get("completion_tokens", 0),
+                                total_tokens=usage_data.get("total_tokens", 0),
                             )
 
-                        tc = tool_calls[tc_index]
+                        choices = chunk.get("choices", [])
+                        if not choices:
+                            continue
 
-                        if "id" in tc_delta:
-                            tc["id"] = tc_delta["id"]
-                            if on_tool_call_start:
-                                on_tool_call_start(tc_delta.get("function", {}).get("name", ""))
+                        choice = choices[0]
+                        delta = choice.get("delta", {})
+                        finish_reason = choice.get("finish_reason", "") or finish_reason
 
-                        if "function" in tc_delta:
-                            func = tc_delta["function"]
-                            if "name" in func:
-                                tc["function"]["name"] = func["name"]
-                            if "arguments" in func:
-                                tc["function"]["arguments"] += func["arguments"]
+                        content = delta.get("content", "")
+                        if content:
+                            accumulated_content += content
+                            if on_content:
+                                on_content(content)
 
-                except (json.JSONDecodeError, IndexError, KeyError):
-                    continue
+                        tool_call_deltas = delta.get("tool_calls", [])
+                        for tc_delta in tool_call_deltas:
+                            tc_index = tc_delta.get("index", 0)
 
-        except requests.exceptions.Timeout:
-            raise LLMError("LLM API request timed out")
-        except requests.exceptions.RequestException as e:
-            raise LLMError(f"LLM API connection error: {e}")
+                            while len(tool_calls) <= tc_index:
+                                tool_calls.append(
+                                    {
+                                        "id": "",
+                                        "type": "function",
+                                        "function": {"name": "", "arguments": ""},
+                                    }
+                                )
+
+                            tc = tool_calls[tc_index]
+
+                            if "id" in tc_delta:
+                                tc["id"] = tc_delta["id"]
+                                if on_tool_call_start:
+                                    on_tool_call_start(tc_delta.get("function", {}).get("name", ""))
+
+                            if "function" in tc_delta:
+                                func = tc_delta["function"]
+                                if "name" in func:
+                                    tc["function"]["name"] = func["name"]
+                                if "arguments" in func:
+                                    tc["function"]["arguments"] += func["arguments"]
+
+                    except (json.JSONDecodeError, IndexError, KeyError):
+                        continue
+
+                break
+
+            except requests.exceptions.Timeout:
+                raise LLMError("LLM API request timed out")
+            except requests.exceptions.RequestException as e:
+                raise LLMError(f"LLM API connection error: {e}")
 
         valid_tool_calls = [tc for tc in tool_calls if tc["id"] and tc["function"]["name"]]
 
         return ChatResponse(
             content=accumulated_content if accumulated_content else None,
             tool_calls=valid_tool_calls if valid_tool_calls else None,
+            usage=usage,
             finish_reason=finish_reason,
             model=self.config.model,
         )

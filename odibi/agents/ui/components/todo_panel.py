@@ -160,6 +160,14 @@ def create_todo_panel() -> tuple[gr.Column, dict[str, Any]]:
             elem_classes=["todo-list"],
         )
 
+        with gr.Row():
+            components["task_selector"] = gr.Dropdown(
+                label="Select Task to Run",
+                choices=[],
+                scale=3,
+            )
+            components["run_task_btn"] = gr.Button("▶ Run", scale=1, size="sm", variant="primary")
+
         with gr.Accordion("Manage Tasks", open=False):
             with gr.Row():
                 components["new_todo_input"] = gr.Textbox(
@@ -175,33 +183,55 @@ def create_todo_panel() -> tuple[gr.Column, dict[str, Any]]:
                 variant="secondary",
             )
 
-        def add_todo(content: str) -> tuple[str, str]:
+        def get_task_choices() -> list[str]:
+            """Get list of incomplete task contents for dropdown."""
+            return [t.content for t in manager.todos if t.status != TodoStatus.COMPLETED]
+
+        def add_todo(content: str) -> tuple[str, str, gr.update]:
             if content.strip():
                 manager.add(content.strip())
-            return manager.format_markdown(), ""
+            return (
+                manager.format_markdown(),
+                "",
+                gr.update(choices=get_task_choices()),
+            )
 
         components["add_todo_btn"].click(
             fn=add_todo,
             inputs=[components["new_todo_input"]],
-            outputs=[components["todo_display"], components["new_todo_input"]],
+            outputs=[
+                components["todo_display"],
+                components["new_todo_input"],
+                components["task_selector"],
+            ],
         )
 
         components["new_todo_input"].submit(
             fn=add_todo,
             inputs=[components["new_todo_input"]],
-            outputs=[components["todo_display"], components["new_todo_input"]],
+            outputs=[
+                components["todo_display"],
+                components["new_todo_input"],
+                components["task_selector"],
+            ],
         )
 
-        def clear_todos() -> str:
+        def clear_todos() -> tuple[str, gr.update]:
             manager.clear()
-            return manager.format_markdown()
+            return manager.format_markdown(), gr.update(choices=[], value=None)
 
         components["clear_todos_btn"].click(
             fn=clear_todos,
-            outputs=[components["todo_display"]],
+            outputs=[components["todo_display"], components["task_selector"]],
         )
 
+        def refresh_task_selector() -> gr.update:
+            return gr.update(choices=get_task_choices())
+
+        components["refresh_selector"] = refresh_task_selector
+
     components["manager"] = manager
+    components["get_task_choices"] = get_task_choices
     return todo_column, components
 
 
