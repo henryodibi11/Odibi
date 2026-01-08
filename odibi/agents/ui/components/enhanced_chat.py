@@ -1821,7 +1821,7 @@ def setup_enhanced_chat_handlers(
             if todo_display:
                 yield (
                     history,
-                    gr.update(value="", interactive=True),
+                    "",
                     "",
                     "",
                     "",
@@ -1832,7 +1832,7 @@ def setup_enhanced_chat_handlers(
             else:
                 yield (
                     history,
-                    gr.update(value="", interactive=True),
+                    "",
                     "",
                     "",
                     None,
@@ -1841,10 +1841,13 @@ def setup_enhanced_chat_handlers(
                 )
             return
 
+        # Cancel any in-progress request before starting new one
+        handler.request_stop()
+        handler.reset_stop()
+
         handler.config = get_config()
         max_iters = getattr(handler.config.agent, "max_iterations", 50)
 
-        # Disable input while processing to prevent concurrent requests
         is_final = False
         for result in handler.process_message_streaming(
             message, history, agent, max_iterations=max_iters
@@ -1855,7 +1858,7 @@ def setup_enhanced_chat_handlers(
             if todo_display:
                 yield (
                     updated_history,
-                    gr.update(value="" if is_final else message, interactive=is_final),
+                    "",
                     f"**{status}**" if status else "",
                     thinking,
                     activity,
@@ -1867,7 +1870,7 @@ def setup_enhanced_chat_handlers(
             else:
                 yield (
                     updated_history,
-                    gr.update(value="" if is_final else message, interactive=is_final),
+                    "",
                     f"**{status}**" if status else "",
                     thinking,
                     activity,
@@ -2073,7 +2076,7 @@ def setup_enhanced_chat_handlers(
                 if todo_display:
                     yield (
                         updated_history,
-                        gr.update(interactive=is_final),
+                        "",
                         f"**{status}**" if status else "",
                         thinking,
                         activity,
@@ -2085,7 +2088,7 @@ def setup_enhanced_chat_handlers(
                 else:
                     yield (
                         updated_history,
-                        gr.update(interactive=is_final),
+                        "",
                         f"**{status}**" if status else "",
                         thinking,
                         activity,
