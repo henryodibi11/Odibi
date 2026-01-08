@@ -20,6 +20,7 @@ from odibi.plugins import get_connection_factory, load_plugins
 from odibi.registry import FunctionRegistry
 from odibi.state import StateManager, create_state_backend
 from odibi.story import StoryGenerator
+from odibi.story.lineage_utils import generate_lineage
 from odibi.transformers import register_standard_library
 from odibi.utils import load_yaml_with_env
 from odibi.utils.alerting import send_alert
@@ -1697,6 +1698,27 @@ class PipelineManager:
 
             if result.story_path:
                 self._ctx.debug(f"Story generated: {result.story_path}")
+
+        # Generate combined lineage if configured
+        if (
+            hasattr(self.project_config, "story")
+            and self.project_config.story
+            and self.project_config.story.generate_lineage
+        ):
+            # Flush any pending async story writes before generating lineage
+            self.flush_stories()
+
+            try:
+                lineage_result = generate_lineage(self.project_config)
+                if lineage_result:
+                    self._ctx.info(
+                        "Combined lineage generated",
+                        nodes=len(lineage_result.nodes),
+                        edges=len(lineage_result.edges),
+                        json_path=lineage_result.json_path,
+                    )
+            except Exception as e:
+                self._ctx.warning(f"Failed to generate combined lineage: {e}")
 
         if len(pipeline_names) == 1:
             return results[pipeline_names[0]]

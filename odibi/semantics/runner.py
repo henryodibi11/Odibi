@@ -18,7 +18,12 @@ from typing import Any, Callable, Dict, Optional
 from odibi.config import ProjectConfig
 from odibi.semantics.metrics import SemanticLayerConfig, parse_semantic_config
 from odibi.semantics.story import SemanticStoryGenerator, SemanticStoryMetadata
-from odibi.story.lineage import LineageGenerator, LineageResult
+from odibi.story.lineage import LineageResult
+from odibi.story.lineage_utils import (
+    generate_lineage,
+    get_full_stories_path,
+    get_storage_options,
+)
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -290,170 +295,31 @@ class SemanticLayerRunner:
         self,
         write_file: Optional[Callable[[str, str], None]] = None,
     ) -> Optional[LineageResult]:
-        """Generate combined lineage from all stories."""
-        ctx = get_logging_context()
+        """Generate combined lineage from all stories.
 
-        stories_path = self._get_full_stories_path()
-        storage_options = self._get_storage_options()
-
-        ctx.debug("Generating lineage", stories_path=stories_path)
-
-        try:
-            lineage_gen = LineageGenerator(
-                stories_path=stories_path,
-                storage_options=storage_options,
-            )
-            result = lineage_gen.generate()
-            lineage_gen.save(result, write_file=write_file)
-            return result
-        except Exception as e:
-            ctx.warning(f"Failed to generate lineage: {e}")
-            return None
+        Uses the shared generate_lineage utility for consistency with
+        PipelineManager lineage generation.
+        """
+        return generate_lineage(
+            project_config=self.project_config,
+            write_file=write_file,
+        )
 
     def _get_full_stories_path(self) -> str:
         """
         Build the full path to stories, including cloud URL if remote.
 
-        Converts relative paths like "OEE/Stories/" to full cloud URLs:
-        - Azure: abfs://container@account.dfs.core.windows.net/OEE/Stories/
-        - S3: s3://bucket/OEE/Stories/
-        - GCS: gs://bucket/OEE/Stories/
-
-        This enables fsspec to correctly identify remote storage and use
-        the appropriate filesystem implementation.
+        Delegates to the shared utility function for consistency.
         """
-        stories_path = self.project_config.story.path
-
-        # Already a full URL
-        if "://" in stories_path:
-            return stories_path
-
-        # Get story connection info
-        story_conn_name = self.project_config.story.connection
-        story_conn = self.project_config.connections.get(story_conn_name)
-
-        if not story_conn:
-            return stories_path
-
-        conn_type = getattr(story_conn, "type", None)
-        if conn_type is None:
-            return stories_path
-
-        conn_type_value = conn_type.value if hasattr(conn_type, "value") else str(conn_type)
-
-        # Strip leading/trailing slashes for clean path construction
-        clean_path = stories_path.strip("/")
-
-        # Azure Blob Storage / Delta Lake
-        if conn_type_value in ("azure_blob", "delta"):
-            account_name = getattr(story_conn, "account_name", None)
-            container = getattr(story_conn, "container", None)
-
-            if account_name and container:
-                return f"abfs://{container}@{account_name}.dfs.core.windows.net/{clean_path}"
-
-        # AWS S3
-        elif conn_type_value in ("s3", "aws_s3"):
-            bucket = getattr(story_conn, "bucket", None)
-
-            if bucket:
-                return f"s3://{bucket}/{clean_path}"
-
-        # Google Cloud Storage
-        elif conn_type_value in ("gcs", "google_cloud_storage"):
-            bucket = getattr(story_conn, "bucket", None)
-
-            if bucket:
-                return f"gs://{bucket}/{clean_path}"
-
-        # HDFS
-        elif conn_type_value == "hdfs":
-            host = getattr(story_conn, "host", None)
-            port = getattr(story_conn, "port", 8020)
-
-            if host:
-                return f"hdfs://{host}:{port}/{clean_path}"
-
-        # DBFS (Databricks File System)
-        elif conn_type_value == "dbfs":
-            return f"dbfs:/{clean_path}"
-
-        return stories_path
+        return get_full_stories_path(self.project_config)
 
     def _get_storage_options(self) -> Dict[str, Any]:
         """
         Get storage options from story connection for fsspec/adlfs.
 
-        Handles all Azure auth modes:
-        - account_key / direct_key: Returns account_key for fsspec
-        - sas: Returns sas_token for fsspec
-        - connection_string: Returns connection_string for fsspec
-        - aad_msi / managed_identity: Returns empty dict (uses default Azure credential)
-        - key_vault: Would need to fetch secret (not implemented here)
+        Delegates to the shared utility function for consistency.
         """
-        story_conn_name = self.project_config.story.connection
-        story_conn = self.project_config.connections.get(story_conn_name)
-
-        if not story_conn:
-            return {}
-
-        # Check for direct credentials on connection
-        if hasattr(story_conn, "credentials") and story_conn.credentials:
-            return dict(story_conn.credentials)
-        if hasattr(story_conn, "account_key") and story_conn.account_key:
-            return {"account_key": story_conn.account_key}
-        if hasattr(story_conn, "sas_token") and story_conn.sas_token:
-            return {"sas_token": story_conn.sas_token}
-
-        # Check nested auth structure
-        if hasattr(story_conn, "auth") and story_conn.auth:
-            auth = story_conn.auth
-
-            # Helper to get value from auth (handles both dict and Pydantic model)
-            def get_auth_value(key: str):
-                if isinstance(auth, dict):
-                    return auth.get(key)
-                return getattr(auth, key, None)
-
-            auth_mode = get_auth_value("mode")
-            if auth_mode:
-                mode_value = auth_mode.value if hasattr(auth_mode, "value") else str(auth_mode)
-            else:
-                mode_value = None
-
-            # account_key or direct_key mode
-            account_key = get_auth_value("account_key")
-            if account_key:
-                return {"account_key": account_key}
-
-            # SAS token mode
-            sas_token = get_auth_value("sas_token")
-            if sas_token:
-                return {"sas_token": sas_token}
-
-            # Connection string mode
-            connection_string = get_auth_value("connection_string")
-            if connection_string:
-                return {"connection_string": connection_string}
-
-            # MSI / managed identity - uses DefaultAzureCredential, no explicit creds needed
-            if mode_value in ("aad_msi", "managed_identity"):
-                # Return account_name for adlfs to use with DefaultAzureCredential
-                account_name = getattr(story_conn, "account_name", None)
-                if account_name:
-                    return {"account_name": account_name}
-                return {}
-
-            # Key Vault mode - would need to fetch from Key Vault
-            if mode_value == "key_vault":
-                ctx = get_logging_context()
-                ctx.warning(
-                    "Key Vault auth for SQL output not yet implemented. "
-                    "Consider using direct_key or aad_msi for story connection."
-                )
-                return {}
-
-        return {}
+        return get_storage_options(self.project_config)
 
     def _get_write_file_from_story_connection(self) -> Optional[Callable[[str, str], None]]:
         """
