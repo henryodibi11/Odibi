@@ -1700,12 +1700,18 @@ class PipelineManager:
                 self._ctx.debug(f"Story generated: {result.story_path}")
 
         # Generate combined lineage if configured
-        if (
-            hasattr(self.project_config, "story")
-            and self.project_config.story
-            and self.project_config.story.generate_lineage
-        ):
+        has_story = hasattr(self.project_config, "story") and self.project_config.story
+        generate_lineage_enabled = has_story and self.project_config.story.generate_lineage
+
+        self._ctx.debug(
+            "Lineage check",
+            has_story=has_story,
+            generate_lineage_enabled=generate_lineage_enabled,
+        )
+
+        if generate_lineage_enabled:
             # Flush any pending async story writes before generating lineage
+            self._ctx.info("Generating combined lineage...")
             self.flush_stories()
 
             try:
@@ -1717,6 +1723,8 @@ class PipelineManager:
                         edges=len(lineage_result.edges),
                         json_path=lineage_result.json_path,
                     )
+                else:
+                    self._ctx.warning("Lineage generation returned None")
             except Exception as e:
                 self._ctx.warning(f"Failed to generate combined lineage: {e}")
 
