@@ -171,9 +171,9 @@ transform:
 
 ---
 
-## Full Example: FBR Cycle Time Analysis
+## Full Example: Batch Process Analysis
 
-A complete Silver layer transformation for batch reactor data:
+A complete Silver layer transformation for batch processing data:
 
 ```yaml
 pipelines:
@@ -184,7 +184,7 @@ pipelines:
         read:
           connection: lakehouse
           format: delta
-          path: "bronze/reactor_telemetry"
+          path: "bronze/process_telemetry"
 
         transform:
           # Step 1: Detect all phases and calculate metrics
@@ -193,9 +193,8 @@ pipelines:
               timestamp_col: ts
               phases:
                 - LoadTime
-                - AcidTime
-                - DryTime
-                - CookTime
+                - MixTime
+                - HeatTime
                 - CoolTime
                 - UnloadTime
               start_threshold: 240
@@ -207,26 +206,16 @@ pipelines:
                 4: faulted
               phase_metrics:
                 Level: max
+                Temperature: max
               metadata:
                 ProductCode: first_after_start
                 Weight: max
-                BatchRate: mean
 
           # Step 2: Filter to complete batches only
           - filter_rows:
-              condition: "CookTime_Level > 70"
+              condition: "HeatTime_Level > 70"
 
-          # Step 3: Remove intermediate columns
-          - drop_columns:
-              columns:
-                - LoadTime_Level
-                - AcidTime_Level
-                - DryTime_Level
-                - CookTime_Level
-                - CoolTime_Level
-                - UnloadTime_Level
-
-          # Step 4: Sort by batch start time
+          # Step 3: Sort by batch start time
           - sort:
               by: LoadTime_start
               ascending: true
@@ -335,7 +324,7 @@ transform:
 
 | Industry | Phases | Status Codes |
 |----------|--------|--------------|
-| **Batch Reactors** | Load, React, Cool, Unload | idle, active, hold, faulted |
+| **Batch Processing** | Load, Mix, Heat, Unload | idle, active, hold, faulted |
 | **Food Processing** | Load, Cook, Cool, Package | running, stopped, cleaning |
 | **CIP Cleaning** | PreRinse, Wash, Rinse, Sanitize | active, draining, idle |
 | **Injection Molding** | Clamp, Inject, Cool, Eject | running, setup, fault |
