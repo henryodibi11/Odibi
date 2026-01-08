@@ -285,7 +285,6 @@ class SemanticStoryGenerator:
             base_path = f"{self.output_path_str.rstrip('/')}/{self.name}/{date_str}"
         else:
             base_path = self.output_path / self.name / date_str
-            base_path.mkdir(parents=True, exist_ok=True)
             base_path = str(base_path)
 
         json_path = f"{base_path}/{time_str}.json"
@@ -298,6 +297,7 @@ class SemanticStoryGenerator:
             write_file(json_path, json_content)
             write_file(html_path, html_content)
         elif not self.is_remote:
+            Path(base_path).mkdir(parents=True, exist_ok=True)
             Path(json_path).write_text(json_content, encoding="utf-8")
             Path(html_path).write_text(html_content, encoding="utf-8")
 
