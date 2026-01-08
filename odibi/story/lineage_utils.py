@@ -171,6 +171,109 @@ def get_storage_options(project_config: ProjectConfig) -> Dict[str, Any]:
     return {}
 
 
+def get_write_file(project_config: ProjectConfig) -> Optional[Callable[[str, str], None]]:
+    """
+    Create a write_file callback for remote storage using story connection.
+
+    Args:
+        project_config: Project configuration with story connection
+
+    Returns:
+        Callable for writing files, or None if local storage
+    """
+    storage_options = get_storage_options(project_config)
+
+    story_conn_name = project_config.story.connection
+    story_conn = project_config.connections.get(story_conn_name)
+
+    if not story_conn:
+        return None
+
+    conn_type = getattr(story_conn, "type", None)
+    if conn_type is None:
+        return None
+
+    conn_type_value = conn_type.value if hasattr(conn_type, "value") else str(conn_type)
+
+    if conn_type_value == "local":
+        base_path = getattr(story_conn, "base_path", "./data")
+
+        def write_file_local(path: str, content: str) -> None:
+            import os
+
+            full_path = os.path.join(base_path, path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            with open(full_path, "w") as f:
+                f.write(content)
+
+        return write_file_local
+
+    elif conn_type_value in ("azure_blob", "delta"):
+        if not storage_options:
+            return None
+
+        account_name = getattr(story_conn, "account_name", None)
+        container = getattr(story_conn, "container", None)
+
+        if not account_name or not container:
+            return None
+
+        def write_file_azure(path: str, content: str) -> None:
+            import fsspec
+
+            if path.startswith(("abfs://", "az://")):
+                full_path = path
+            else:
+                full_path = f"abfs://{container}@{account_name}.dfs.core.windows.net/{path}"
+
+            fs_options = {"account_name": account_name, **storage_options}
+            fs = fsspec.filesystem("abfs", **fs_options)
+            with fs.open(full_path, "w") as f:
+                f.write(content)
+
+        return write_file_azure
+
+    elif conn_type_value in ("s3", "aws_s3"):
+        bucket = getattr(story_conn, "bucket", None)
+        if not bucket:
+            return None
+
+        def write_file_s3(path: str, content: str) -> None:
+            import fsspec
+
+            if path.startswith("s3://"):
+                full_path = path
+            else:
+                full_path = f"s3://{bucket}/{path}"
+
+            fs = fsspec.filesystem("s3", **storage_options)
+            with fs.open(full_path, "w") as f:
+                f.write(content)
+
+        return write_file_s3
+
+    elif conn_type_value in ("gcs", "google_cloud_storage"):
+        bucket = getattr(story_conn, "bucket", None)
+        if not bucket:
+            return None
+
+        def write_file_gcs(path: str, content: str) -> None:
+            import fsspec
+
+            if path.startswith("gs://"):
+                full_path = path
+            else:
+                full_path = f"gs://{bucket}/{path}"
+
+            fs = fsspec.filesystem("gcs", **storage_options)
+            with fs.open(full_path, "w") as f:
+                f.write(content)
+
+        return write_file_gcs
+
+    return None
+
+
 def generate_lineage(
     project_config: ProjectConfig,
     date: Optional[str] = None,
@@ -186,6 +289,7 @@ def generate_lineage(
         project_config: Project configuration
         date: Optional date string for lineage (defaults to today)
         write_file: Optional callback for writing files to remote storage
+                    (auto-created from story connection if not provided)
 
     Returns:
         LineageResult if successful, None if generation fails
@@ -194,6 +298,10 @@ def generate_lineage(
 
     stories_path = get_full_stories_path(project_config)
     storage_options = get_storage_options(project_config)
+
+    # Auto-create write_file callback if not provided and using remote storage
+    if write_file is None:
+        write_file = get_write_file(project_config)
 
     ctx.debug("Generating lineage", stories_path=stories_path)
 
