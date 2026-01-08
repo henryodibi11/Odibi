@@ -369,7 +369,10 @@ def format_write_result(result: WriteResult, show_diff: bool = True) -> str:
     output = f"✅ {result.content}"
 
     if show_diff and result.diff:
-        output += f"\n\n<details>\n<summary>📝 View changes</summary>\n\n```diff\n{result.diff}\n```\n\n</details>"
+        output += (
+            f"\n\n<details>\n<summary>📝 View changes</summary>\n\n"
+            f"```diff\n{result.diff}\n```\n\n</details>"
+        )
     elif result.is_new_file:
         output += " (new file)"
 
@@ -447,26 +450,72 @@ def list_directory(
         )
 
 
-def format_file_for_display(result: FileResult, language: str = "python") -> str:
-    """Format a file result for display in chat.
+def format_file_for_display(
+    result: FileResult,
+    language: str = "",
+    max_lines: int = 100,
+    show_line_numbers: bool = True,
+) -> str:
+    """Format a file result for display in chat with syntax highlighting.
 
     Args:
         result: The file result to format.
-        language: Language for syntax highlighting.
+        language: Language for syntax highlighting (auto-detected if empty).
+        max_lines: Maximum lines before collapsing.
+        show_line_numbers: Whether lines are already numbered.
 
     Returns:
         Markdown-formatted file content.
     """
+    from .output_formatters import detect_language
+
     if not result.success:
-        return f"**Error:** {result.error}"
+        return f"❌ **Error:** {result.error}"
 
-    extension = Path(result.path).suffix.lstrip(".")
-    lang = extension if extension else language
+    # Auto-detect language from file extension
+    if not language:
+        language = detect_language(result.path)
 
-    return f"""**File:** `{result.path}`
-**Lines:** {result.line_count}
+    filename = Path(result.path).name
+    lines = result.content.split("\n")
+    content_lines = len(lines)
 
-```{lang}
+    # Build header
+    header_parts = [f"📄 **{filename}**"]
+    if result.line_count > 0:
+        if content_lines < result.line_count:
+            header_parts.append(f"({content_lines} of {result.line_count} lines)")
+        else:
+            header_parts.append(f"({result.line_count} lines)")
+
+    header = " ".join(header_parts)
+
+    # Collapse large files
+    if content_lines > max_lines and max_lines > 0:
+        preview_lines = lines[:20]
+        preview = "\n".join(preview_lines)
+
+        return f"""{header}
+
+<details>
+<summary>📄 View full content ({content_lines} lines)</summary>
+
+```{language}
+{result.content}
+```
+
+</details>
+
+**Preview (first 20 lines):**
+```{language}
+{preview}
+```
+
+*... {content_lines - 20} more lines (click above to expand)*"""
+
+    return f"""{header}
+
+```{language}
 {result.content}
 ```"""
 
@@ -564,21 +613,29 @@ def edit_file(
             if lines_with_similar:
                 hint = "\n\nSimilar content found at:\n" + "\n".join(lines_with_similar[:3])
 
+            error_msg = (
+                "old_str not found in file. "
+                f"Make sure it matches exactly including whitespace.{hint}"
+            )
             return WriteResult(
                 success=False,
                 content="",
                 path=str(path),
-                error=f"old_str not found in file. Make sure it matches exactly including whitespace.{hint}",
+                error=error_msg,
             )
 
         # Check uniqueness if not replace_all
         count = old_content.count(old_str)
         if not replace_all and count > 1:
+            error_msg = (
+                f"old_str appears {count} times in file. "
+                "Add more context to make it unique, or use replace_all=true."
+            )
             return WriteResult(
                 success=False,
                 content="",
                 path=str(path),
-                error=f"old_str appears {count} times in file. Add more context to make it unique, or use replace_all=true.",
+                error=error_msg,
             )
 
         # Save history for undo
@@ -615,7 +672,8 @@ def edit_file(
         display_path = get_dbfs_display_path(str(file_path.absolute()))
         verified_lines = new_content.count("\n") + 1
 
-        message = f"✅ Edited {display_path} ({replacements} replacement{'s' if replacements > 1 else ''}, {verified_lines} lines)"
+        repl_word = "replacement" if replacements == 1 else "replacements"
+        message = f"✅ Edited {display_path} ({replacements} {repl_word}, {verified_lines} lines)"
 
         return WriteResult(
             success=True,

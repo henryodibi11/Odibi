@@ -7,8 +7,15 @@ and interact with Spark DataFrames.
 import io
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
+
+from .output_formatters import (
+    auto_format,
+    format_dataframe,
+    format_plot_as_base64,
+    format_spark_schema,
+)
 
 
 @dataclass
@@ -20,6 +27,7 @@ class ExecutionResult:
     error: Optional[str] = None
     result_value: Optional[Any] = None
     execution_time: float = 0.0
+    captured_figures: list = field(default_factory=list)  # For matplotlib figures
 
 
 def is_databricks() -> bool:
@@ -72,6 +80,8 @@ def execute_python(
 
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
+    captured_figures = []
+    result_value = None
 
     namespace = {
         "__builtins__": __builtins__,
@@ -98,21 +108,42 @@ def execute_python(
         except ImportError:
             pass
 
+    # Add matplotlib with figure capturing
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")  # Non-interactive backend
+        import matplotlib.pyplot as plt
+
+        namespace["plt"] = plt
+        namespace["matplotlib"] = matplotlib
+    except ImportError:
+        plt = None
+
     start_time = time.time()
 
     try:
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
             exec(code, namespace)
 
-            if "\n" not in code and not code.strip().startswith(
-                ("import", "from", "def", "class", "if", "for", "while", "with", "try")
+            # Try to get the last expression's value for auto-formatting
+            lines = code.strip().split("\n")
+            last_line = lines[-1].strip() if lines else ""
+            if last_line and not last_line.startswith(
+                ("import", "from", "def", "class", "if", "for", "while", "with", "try", "#")
             ):
                 try:
-                    eval_result = eval(code.split("\n")[-1], namespace)
+                    eval_result = eval(last_line, namespace)
                     if eval_result is not None:
-                        print(repr(eval_result))
+                        result_value = eval_result
                 except Exception:
                     pass
+
+        # Capture any matplotlib figures
+        if plt is not None:
+            figs = [plt.figure(i) for i in plt.get_fignums()]
+            for fig in figs:
+                captured_figures.append(fig)
 
         execution_time = time.time() - start_time
         output = stdout_capture.getvalue()
@@ -124,7 +155,9 @@ def execute_python(
         return ExecutionResult(
             success=True,
             output=output if output else "(No output)",
+            result_value=result_value,
             execution_time=execution_time,
+            captured_figures=captured_figures,
         )
 
     except Exception:
@@ -171,20 +204,37 @@ def execute_sql(
 
         output_parts = []
 
+        # Show query (truncated)
+        query_display = query.strip()
+        if len(query_display) > 200:
+            query_display = query_display[:200] + "..."
+        output_parts.append(f"```sql\n{query_display}\n```")
+
         if show_schema:
             schema_str = df._jdf.schema().treeString()
-            output_parts.append(f"**Schema:**\n```\n{schema_str}\n```\n")
+            formatted_schema = format_spark_schema(schema_str)
+            output_parts.append(formatted_schema)
 
         pdf = df.limit(limit).toPandas()
         execution_time = time.time() - start_time
 
-        row_count = df.count() if limit < 1000 else f">{limit}"
-        output_parts.append(f"**Results:** ({row_count} rows, showing {len(pdf)})\n")
-        output_parts.append(pdf.to_markdown(index=False))
+        # Format results as clean table
+        try:
+            total_rows = df.count() if limit < 1000 else None
+        except Exception:
+            total_rows = None
+
+        if total_rows is not None:
+            title = f"Results ({total_rows:,} total rows, showing {len(pdf)})"
+        else:
+            title = f"Results (showing {len(pdf)} rows)"
+
+        formatted_df = format_dataframe(pdf, title=title, show_dtypes=show_schema)
+        output_parts.append(formatted_df)
 
         return ExecutionResult(
             success=True,
-            output="\n".join(output_parts),
+            output="\n\n".join(output_parts),
             result_value=pdf,
             execution_time=execution_time,
         )
@@ -284,20 +334,28 @@ def describe_table(table_name: str) -> ExecutionResult:
 
         output_parts = []
 
-        output_parts.append(f"## Table: `{table_name}`\n")
+        output_parts.append(f"## 📋 Table: `{table_name}`")
 
+        # Format schema as clean table
         schema_str = df._jdf.schema().treeString()
-        output_parts.append(f"### Schema\n```\n{schema_str}\n```\n")
+        formatted_schema = format_spark_schema(schema_str)
+        output_parts.append(formatted_schema)
 
-        row_count = df.count()
-        output_parts.append(f"### Row Count: {row_count:,}\n")
+        # Row count
+        try:
+            row_count = df.count()
+            output_parts.append(f"**Row Count:** {row_count:,}")
+        except Exception:
+            output_parts.append("**Row Count:** *(unable to count)*")
 
+        # Sample data as formatted table
         sample = df.limit(5).toPandas()
-        output_parts.append(f"### Sample Data\n{sample.to_markdown(index=False)}")
+        formatted_sample = format_dataframe(sample, title="Sample Data", max_rows=5)
+        output_parts.append(formatted_sample)
 
         return ExecutionResult(
             success=True,
-            output="\n".join(output_parts),
+            output="\n\n".join(output_parts),
         )
 
     except Exception as e:
@@ -309,7 +367,9 @@ def describe_table(table_name: str) -> ExecutionResult:
 
 
 def format_execution_result(result: ExecutionResult) -> str:
-    """Format an execution result for display.
+    """Format an execution result for display with smart formatting.
+
+    Automatically formats DataFrames as tables, dicts as JSON, plots as images.
 
     Args:
         result: ExecutionResult to format.
@@ -321,9 +381,40 @@ def format_execution_result(result: ExecutionResult) -> str:
         return f"❌ **Execution Failed**\n\n```\n{result.error}\n```"
 
     time_str = f" ({result.execution_time:.2f}s)" if result.execution_time > 0.1 else ""
+    parts = [f"✅ **Executed**{time_str}"]
 
-    output = result.output
-    if len(output) > 5000:
-        output = output[:5000] + "\n\n... (truncated)"
+    # Format the result value if present (DataFrames, dicts, etc.)
+    if result.result_value is not None:
+        formatted_value = auto_format(result.result_value)
+        parts.append(formatted_value)
+    elif result.output and result.output != "(No output)":
+        # Format text output with collapsing for large outputs
+        output = result.output.strip()
+        lines = output.split("\n")
 
-    return f"✅ **Executed**{time_str}\n\n{output}"
+        if len(lines) > 50:
+            # Collapse large output
+            parts.append(
+                f"<details>\n"
+                f"<summary>📄 Output ({len(lines)} lines)</summary>\n\n"
+                f"```\n{output}\n```\n\n"
+                f"</details>"
+            )
+        elif len(output) > 3000:
+            # Truncate very long single-line output
+            parts.append(f"```\n{output[:3000]}\n```\n\n*... truncated ({len(output)} chars)*")
+        else:
+            parts.append(f"```\n{output}\n```")
+
+    # Embed any captured figures
+    for fig in result.captured_figures:
+        try:
+            img_md = format_plot_as_base64(fig)
+            parts.append(img_md)
+        except Exception:
+            parts.append("*(Chart could not be rendered)*")
+
+    if len(parts) == 1:
+        parts.append("*(No output)*")
+
+    return "\n\n".join(parts)
