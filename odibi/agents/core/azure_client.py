@@ -208,11 +208,18 @@ class AzureOpenAIClient:
             full_messages.append({"role": "system", "content": system_prompt})
         full_messages.extend(messages)
 
+        model_lower = self.config.chat_deployment.lower()
+        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4", "gpt-5"))
+
         payload = {
             "messages": full_messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
         }
+
+        if uses_completion_tokens:
+            payload["max_completion_tokens"] = max_tokens
+        else:
+            payload["temperature"] = temperature
+            payload["max_tokens"] = max_tokens
 
         response = self._session.post(url, json=payload)
 

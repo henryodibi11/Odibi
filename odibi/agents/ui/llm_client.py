@@ -259,7 +259,7 @@ class LLMClient:
             full_messages.extend(messages)
 
             model_lower = self.config.model.lower()
-            uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4"))
+            uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4", "gpt-5"))
             no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
 
             payload = {
@@ -338,7 +338,7 @@ class LLMClient:
         full_messages.extend(messages)
 
         model_lower = self.config.model.lower()
-        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4"))
+        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4", "gpt-5"))
 
         payload = {
             "messages": full_messages,
@@ -428,7 +428,7 @@ class LLMClient:
         full_messages.extend(messages)
 
         model_lower = self.config.model.lower()
-        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4"))
+        uses_completion_tokens = any(x in model_lower for x in ("o1", "o3", "o4", "gpt-5"))
         no_tools_support = model_lower in ("o1-preview", "o1-mini", "o1")
 
         payload = {
