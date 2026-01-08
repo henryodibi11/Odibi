@@ -194,25 +194,78 @@ def _escape_html(text: str) -> str:
     )
 
 
+def get_context_window_size(model: str) -> int:
+    """Get the context window size for a model.
+
+    Args:
+        model: Model name.
+
+    Returns:
+        Context window size in tokens.
+    """
+    model_lower = model.lower()
+
+    # OpenAI models
+    if "gpt-4o" in model_lower or "gpt-4-turbo" in model_lower:
+        return 128_000
+    if "gpt-4" in model_lower and "32k" in model_lower:
+        return 32_768
+    if "gpt-4" in model_lower:
+        return 8_192
+    if "gpt-3.5" in model_lower and "16k" in model_lower:
+        return 16_384
+    if "gpt-3.5" in model_lower:
+        return 4_096
+    if "o1" in model_lower or "o3" in model_lower:
+        return 200_000
+
+    # Anthropic models
+    if "claude-3" in model_lower or "claude-4" in model_lower:
+        return 200_000
+    if "claude-2" in model_lower:
+        return 100_000
+
+    # Google models
+    if "gemini" in model_lower:
+        return 1_000_000  # Gemini 1.5 Pro
+
+    # Default fallback
+    return 128_000
+
+
 def format_token_usage(
     model: str,
     input_tokens: int,
     output_tokens: int,
     show_cost: bool = True,
+    show_context: bool = True,
 ) -> str:
-    """Format token usage for display.
+    """Format token usage for display with context window indicator.
 
     Args:
         model: Model name.
         input_tokens: Number of input tokens.
         output_tokens: Number of output tokens.
         show_cost: Whether to show estimated cost.
+        show_context: Whether to show context window usage.
 
     Returns:
         Formatted token usage string.
     """
     total = input_tokens + output_tokens
     result = f"📊 {input_tokens:,} in / {output_tokens:,} out ({total:,} total)"
+
+    if show_context and input_tokens > 0:
+        context_size = get_context_window_size(model)
+        usage_pct = (input_tokens / context_size) * 100
+        # Color coding: green <50%, yellow 50-80%, red >80%
+        if usage_pct < 50:
+            indicator = "🟢"
+        elif usage_pct < 80:
+            indicator = "🟡"
+        else:
+            indicator = "🔴"
+        result += f" | {indicator} {usage_pct:.0f}% context"
 
     if show_cost:
         cost = estimate_cost(model, input_tokens, output_tokens)

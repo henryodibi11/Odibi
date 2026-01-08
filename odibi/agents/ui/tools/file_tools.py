@@ -514,6 +514,128 @@ class FileHistory:
             cls._history.clear()
 
 
+def edit_file(
+    path: str,
+    old_str: str,
+    new_str: str,
+    replace_all: bool = False,
+) -> WriteResult:
+    """Make surgical edits to a file by replacing specific text.
+
+    This is more efficient than write_file for small changes to large files.
+    The old_str must be found exactly (including whitespace) in the file.
+
+    Args:
+        path: Path to the file to edit.
+        old_str: Exact text to find and replace. Must match exactly.
+        new_str: Text to replace old_str with.
+        replace_all: If True, replace all occurrences. If False, old_str must be unique.
+
+    Returns:
+        WriteResult indicating success/failure with diff.
+    """
+    try:
+        normalized_path = normalize_databricks_path(path)
+        file_path = Path(normalized_path)
+
+        if not file_path.exists():
+            return WriteResult(
+                success=False,
+                content="",
+                path=str(path),
+                error=f"File not found: {path}",
+            )
+
+        # Read current content
+        old_content = file_path.read_text(encoding="utf-8")
+
+        # Check if old_str exists
+        if old_str not in old_content:
+            # Try to find similar content for helpful error
+            lines_with_similar = []
+            old_lines = old_str.split("\n")
+            if old_lines:
+                first_line = old_lines[0].strip()
+                for i, line in enumerate(old_content.split("\n"), 1):
+                    if first_line and first_line in line:
+                        lines_with_similar.append(f"  Line {i}: {line[:80]}...")
+
+            hint = ""
+            if lines_with_similar:
+                hint = "\n\nSimilar content found at:\n" + "\n".join(lines_with_similar[:3])
+
+            return WriteResult(
+                success=False,
+                content="",
+                path=str(path),
+                error=f"old_str not found in file. Make sure it matches exactly including whitespace.{hint}",
+            )
+
+        # Check uniqueness if not replace_all
+        count = old_content.count(old_str)
+        if not replace_all and count > 1:
+            return WriteResult(
+                success=False,
+                content="",
+                path=str(path),
+                error=f"old_str appears {count} times in file. Add more context to make it unique, or use replace_all=true.",
+            )
+
+        # Save history for undo
+        FileHistory.save_state(str(file_path), old_content)
+
+        # Perform replacement
+        if replace_all:
+            new_content = old_content.replace(old_str, new_str)
+            replacements = count
+        else:
+            new_content = old_content.replace(old_str, new_str, 1)
+            replacements = 1
+
+        # Generate diff
+        diff = _generate_diff(old_content, new_content, file_path.name)
+
+        # Write new content
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+
+        # Verify write
+        written_content = file_path.read_text(encoding="utf-8")
+        if written_content != new_content:
+            # Restore old content
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(old_content)
+            return WriteResult(
+                success=False,
+                content="",
+                path=str(path),
+                error="Write verification failed, restored original content",
+            )
+
+        display_path = get_dbfs_display_path(str(file_path.absolute()))
+        verified_lines = new_content.count("\n") + 1
+
+        message = f"✅ Edited {display_path} ({replacements} replacement{'s' if replacements > 1 else ''}, {verified_lines} lines)"
+
+        return WriteResult(
+            success=True,
+            content=message,
+            path=display_path,
+            line_count=verified_lines,
+            diff=diff,
+            old_content=old_content,
+            is_new_file=False,
+        )
+
+    except Exception as e:
+        return WriteResult(
+            success=False,
+            content="",
+            path=str(path),
+            error=str(e),
+        )
+
+
 def undo_edit(path: str) -> FileResult:
     """Undo the last edit to a file.
 
