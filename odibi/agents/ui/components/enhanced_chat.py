@@ -1764,10 +1764,10 @@ def create_enhanced_chat_interface(
         # Feedback buttons for explicit user feedback
         with gr.Row(visible=False) as feedback_row:
             components["feedback_row"] = feedback_row
-            gr.Markdown("**Was this response helpful?**", scale=2)
+            gr.Markdown("**Was this response helpful?**")
             components["thumbs_up"] = gr.Button("👍", scale=0, size="sm", min_width=50)
             components["thumbs_down"] = gr.Button("👎", scale=0, size="sm", min_width=50)
-            components["feedback_status"] = gr.Markdown("", scale=1)
+            components["feedback_status"] = gr.Markdown("")
 
         with gr.Row():
             components["message_input"] = gr.Textbox(
