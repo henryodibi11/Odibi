@@ -101,6 +101,13 @@ class ConversationStore:
                 path_prefix=path_prefix,
             )
 
+        self._loaded = False
+
+    def _ensure_loaded(self) -> None:
+        """Lazy load conversations on first access."""
+        if self._loaded:
+            return
+        self._loaded = True
         self._load_all()
 
     def _load_all(self) -> None:
@@ -152,6 +159,7 @@ class ConversationStore:
         Returns:
             Conversation or None.
         """
+        self._ensure_loaded()
         return self._conversations.get(conv_id)
 
     def list_recent(self, limit: int = 20) -> list[Conversation]:
@@ -163,6 +171,7 @@ class ConversationStore:
         Returns:
             List of conversations sorted by updated_at.
         """
+        self._ensure_loaded()
         convs = list(self._conversations.values())
         convs.sort(key=lambda c: c.updated_at, reverse=True)
         return convs[:limit]
@@ -176,6 +185,7 @@ class ConversationStore:
         Returns:
             True if deleted.
         """
+        self._ensure_loaded()
         if conv_id in self._conversations:
             del self._conversations[conv_id]
             if self.backend_type == "local" and self.storage_dir:
@@ -587,11 +597,26 @@ def setup_conversation_handlers(
             store = get_conversation_store(config)
             conv = store.get(conv_id)
             if conv:
-                logger.info("Loaded conversation: %s (%d messages)", conv_id, len(conv.messages))
-                # Sync the chat handler's conversation history so LLM has context
+                messages = conv.messages
+                total = len(messages)
+                logger.info("Loaded conversation: %s (%d messages)", conv_id, total)
+
+                # Sync full history to chat handler for LLM context
                 if chat_handler and hasattr(chat_handler, "load_history"):
-                    chat_handler.load_history(conv.messages)
-                return conv.messages
+                    chat_handler.load_history(messages)
+
+                # Limit displayed messages to prevent UI freeze
+                # Keep last 50 messages for display, but LLM has full context
+                max_display = 50
+                if total > max_display:
+                    # Add a summary message at the start
+                    summary_msg = {
+                        "role": "assistant",
+                        "content": f"*... {total - max_display} earlier messages hidden for performance. LLM has full context.*",
+                    }
+                    display_messages = [summary_msg] + messages[-max_display:]
+                    return display_messages
+                return messages
             logger.warning("Conversation not found: %s", conv_id)
             return []
         except Exception as e:
