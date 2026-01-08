@@ -1039,15 +1039,10 @@ TIPS:
 ]
 
 TOOLS_REQUIRING_CONFIRMATION = {
-    "write_file",
-    "edit_file",
-    "run_command",
-    "odibi_run",
-    "execute_python",
-    "sql",
-    "ruff",  # only when fix=True
-    "explorer_experiment",  # runs commands in sandbox
-    "implement_feature",  # writes code and runs tests
+    "run_command",  # arbitrary shell commands
+    "sql",  # database writes
+    # File operations (write_file, edit_file) now run without confirmation
+    # for faster autonomous workflows. Git provides undo safety.
 }
 
 
