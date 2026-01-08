@@ -330,8 +330,16 @@ class Pipeline:
             if missing:
                 available = ", ".join(self.graph.nodes.keys())
                 raise ValueError(f"Node(s) not found: {missing}. Available: {available}")
+            # Auto-include all upstream dependencies
             filtered_nodes = set(node_list)
-            self._ctx.info(f"Running specific node(s): {node_list}")
+            for n in node_list:
+                deps = self.graph.get_dependencies(n)
+                filtered_nodes.update(deps)
+            if len(filtered_nodes) > len(node_list):
+                dep_count = len(filtered_nodes) - len(node_list)
+                self._ctx.info(f"Running node(s): {node_list} (+ {dep_count} dependencies)")
+            else:
+                self._ctx.info(f"Running specific node(s): {node_list}")
 
         # Update execution order to only include filtered nodes
         execution_order = [n for n in execution_order if n in filtered_nodes]
