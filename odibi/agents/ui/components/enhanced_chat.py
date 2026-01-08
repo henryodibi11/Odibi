@@ -1821,7 +1821,7 @@ def setup_enhanced_chat_handlers(
             if todo_display:
                 yield (
                     history,
-                    "",
+                    gr.update(value="", interactive=True),
                     "",
                     "",
                     "",
@@ -1830,12 +1830,21 @@ def setup_enhanced_chat_handlers(
                     gr.update(visible=False),
                 )
             else:
-                yield history, "", "", "", None, gr.update(visible=False), gr.update(visible=False)
+                yield (
+                    history,
+                    gr.update(value="", interactive=True),
+                    "",
+                    "",
+                    None,
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                )
             return
 
         handler.config = get_config()
         max_iters = getattr(handler.config.agent, "max_iterations", 50)
 
+        # Disable input while processing to prevent concurrent requests
         is_final = False
         for result in handler.process_message_streaming(
             message, history, agent, max_iterations=max_iters
@@ -1846,7 +1855,7 @@ def setup_enhanced_chat_handlers(
             if todo_display:
                 yield (
                     updated_history,
-                    "",
+                    gr.update(value="" if is_final else message, interactive=is_final),
                     f"**{status}**" if status else "",
                     thinking,
                     activity,
@@ -1858,7 +1867,7 @@ def setup_enhanced_chat_handlers(
             else:
                 yield (
                     updated_history,
-                    "",
+                    gr.update(value="" if is_final else message, interactive=is_final),
                     f"**{status}**" if status else "",
                     thinking,
                     activity,
@@ -2060,28 +2069,29 @@ def setup_enhanced_chat_handlers(
                 command, history, agent, max_iterations=max_iters
             ):
                 updated_history, status, thinking, activity, pending, show_actions = result
+                is_final = not status and not show_actions and pending is None
                 if todo_display:
                     yield (
                         updated_history,
-                        "",
+                        gr.update(interactive=is_final),
                         f"**{status}**" if status else "",
                         thinking,
                         activity,
                         update_todo_display(),
                         pending,
                         gr.update(visible=show_actions),
-                        gr.update(visible=False),  # feedback_row
+                        gr.update(visible=is_final),  # feedback_row
                     )
                 else:
                     yield (
                         updated_history,
-                        "",
+                        gr.update(interactive=is_final),
                         f"**{status}**" if status else "",
                         thinking,
                         activity,
                         pending,
                         gr.update(visible=show_actions),
-                        gr.update(visible=False),  # feedback_row
+                        gr.update(visible=is_final),  # feedback_row
                     )
 
         return action
