@@ -184,7 +184,7 @@ def ensure_index(
     store.delete_all()
 
     indexer = LocalIndexer(
-        odibi_root=str(odibi_root_path),
+        root=str(odibi_root_path),
         embedder=embedder,
         vector_store=store,
     )
