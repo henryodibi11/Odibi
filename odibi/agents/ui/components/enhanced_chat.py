@@ -429,6 +429,102 @@ class EnhancedChatHandler:
 
         self.state.conversation_history = cleaned
 
+    def _estimate_tokens(self, text: str) -> int:
+        """Rough token estimate (4 chars per token)."""
+        return len(text) // 4
+
+    def _estimate_history_tokens(self) -> int:
+        """Estimate total tokens in conversation history."""
+        total = 0
+        for msg in self.state.conversation_history:
+            content = msg.get("content", "")
+            if content:
+                total += self._estimate_tokens(content)
+            # Tool calls add overhead
+            if msg.get("tool_calls"):
+                total += len(msg["tool_calls"]) * 100  # Rough estimate per tool call
+        return total
+
+    def _summarize_old_messages(self, threshold_pct: float = 0.7) -> bool:
+        """Summarize older messages when context window is filling up.
+
+        Args:
+            threshold_pct: Trigger summarization when usage exceeds this %.
+
+        Returns:
+            True if summarization was performed.
+        """
+        from ..utils import get_context_window_size
+
+        model = self.config.llm.model
+        context_size = get_context_window_size(model)
+        current_tokens = self._estimate_history_tokens()
+        usage_pct = current_tokens / context_size
+
+        if usage_pct < threshold_pct:
+            return False
+
+        history = self.state.conversation_history
+        if len(history) < 6:  # Need enough messages to summarize
+            return False
+
+        # Keep the last 4 messages intact (recent context)
+        keep_recent = 4
+        messages_to_summarize = history[:-keep_recent]
+        recent_messages = history[-keep_recent:]
+
+        if len(messages_to_summarize) < 4:
+            return False
+
+        # Build summary using LLM
+        try:
+            client = self.get_llm_client()
+
+            summary_prompt = """Summarize this conversation history concisely.
+Focus on:
+- Key decisions made
+- Important code changes or files discussed
+- Current task/goal
+- Any errors or issues encountered
+
+Keep it under 500 words. Format as bullet points.
+
+CONVERSATION:
+"""
+            for msg in messages_to_summarize:
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                if content and role in ("user", "assistant"):
+                    # Truncate very long messages
+                    if len(content) > 1000:
+                        content = content[:1000] + "..."
+                    summary_prompt += f"\n[{role.upper()}]: {content}\n"
+
+            response = client.chat(
+                messages=[{"role": "user", "content": summary_prompt}],
+                temperature=0.0,
+                max_tokens=1000,
+            )
+
+            summary = response.content or "Previous conversation context."
+
+            # Replace old messages with summary
+            summary_message = {
+                "role": "system",
+                "content": f"## Summary of Earlier Conversation\n\n{summary}\n\n---\n(Older messages summarized to save context space)",
+            }
+
+            self.state.conversation_history = [summary_message] + recent_messages
+            add_activity("📝 Summarized older messages to save context space")
+            return True
+
+        except Exception as e:
+            # Don't break chat if summarization fails
+            import logging
+
+            logging.getLogger(__name__).warning("Context summarization failed: %s", e)
+            return False
+
     def get_llm_client(self) -> LLMClient:
         """Get the LLM client from current config."""
         llm_config = LLMConfig(
@@ -912,25 +1008,18 @@ class EnhancedChatHandler:
         self.state.conversation_history.append({"role": "user", "content": message})
         add_activity("Received user message")
 
-        # Auto-recall relevant memories for context
-        memory_context = ""
-        try:
-            manager = get_memory_manager(self.config)
-            memories = manager.recall(message, top_k=3)
-            if memories:
-                memory_context = "\n\n## Relevant Memories\n"
-                for mem in memories:
-                    memory_context += f"- [{mem.memory_type.value}] {mem.summary}\n"
-                add_activity(f"Recalled {len(memories)} relevant memories")
-        except Exception:
-            pass  # Memory recall is optional
+        # Detect corrections and save as negative feedback
+        previous_exchange = self._get_previous_exchange()
+        if previous_exchange:
+            self.detect_and_save_correction(message, previous_exchange)
 
         try:
             client = self.get_llm_client()
 
-            system_prompt = ENHANCED_CHAT_SYSTEM_PROMPT
-            system_prompt += "\n\n## Accessible Paths"
-            system_prompt += f"\n**Working Project:** {self.config.project.project_root}"
+            # Build system prompt with memory injection
+            system_prompt = self._get_system_prompt(user_message=message)
+
+            # Add reference repos if configured
             if self.config.project.reference_repos:
                 system_prompt += "\n**Reference Repos:**"
                 for repo in self.config.project.reference_repos:
@@ -959,8 +1048,16 @@ class EnhancedChatHandler:
             except Exception:
                 pass
 
-            if memory_context:
-                system_prompt += memory_context
+            # Auto-summarize if context window is filling up
+            if self._summarize_old_messages(threshold_pct=0.7):
+                yield (
+                    history,
+                    "📝 Summarizing older messages...",
+                    "",
+                    refresh_activity_display(),
+                    None,
+                    False,
+                )
 
             for iteration in range(max_iterations):
                 if self.should_stop:
@@ -1400,12 +1497,218 @@ class EnhancedChatHandler:
         history.append({"role": "assistant", "content": "❌ Action cancelled."})
         return history, "", None, False
 
-    def _get_system_prompt(self) -> str:
-        """Build system prompt with project context."""
+    def _get_system_prompt(self, user_message: str = "") -> str:
+        """Build system prompt with project context and relevant memories.
+
+        Args:
+            user_message: Current user message for memory recall context.
+
+        Returns:
+            Complete system prompt with injected memories.
+        """
         system_prompt = ENHANCED_CHAT_SYSTEM_PROMPT
         system_prompt += "\n\n## Accessible Paths"
         system_prompt += f"\n**Working Project:** {self.config.project.project_root}"
+
+        # Memory injection - recall relevant context from past sessions
+        if user_message:
+            memories_section = self._get_relevant_memories(user_message)
+            if memories_section:
+                system_prompt += memories_section
+
         return system_prompt
+
+    def _get_relevant_memories(
+        self, message: str, max_memories: int = 5, max_tokens: int = 500
+    ) -> str:
+        """Recall and format relevant memories for system prompt injection.
+
+        Args:
+            message: User message to find relevant memories for.
+            max_memories: Maximum number of memories to inject.
+            max_tokens: Approximate token budget for memories section.
+
+        Returns:
+            Formatted memories section or empty string if none found.
+        """
+        try:
+            memory_mgr = get_memory_manager(self.config)
+
+            # Search for memories relevant to current message
+            memories = memory_mgr.recall(message, top_k=max_memories)
+
+            # Also get high-importance preferences/decisions (always relevant)
+            important_prefs = memory_mgr.store.search(
+                query="",
+                memory_types=[MemoryType.PREFERENCE, MemoryType.DECISION],
+                min_importance=0.8,
+                top_k=3,
+            )
+
+            # Deduplicate by ID
+            seen_ids = {m.id for m in memories}
+            for pref in important_prefs:
+                if pref.id not in seen_ids:
+                    memories.append(pref)
+                    seen_ids.add(pref.id)
+
+            if not memories:
+                return ""
+
+            # Format memories section
+            lines = [
+                "\n\n## Relevant Context From Past Sessions",
+                "(Use this to maintain consistency and avoid repeating past mistakes)\n",
+            ]
+
+            total_chars = 0
+            char_limit = max_tokens * 4  # Rough chars-to-tokens ratio
+
+            for mem in memories:
+                # Format: [type] summary (date)
+                date_str = mem.created_at[:10] if mem.created_at else ""
+                line = f"- [{mem.memory_type.value}] {mem.summary}"
+                if date_str:
+                    line += f" ({date_str})"
+
+                # Add file context if present
+                if mem.metadata.get("file"):
+                    line += f" [re: {mem.metadata['file']}]"
+
+                if total_chars + len(line) > char_limit:
+                    break
+
+                lines.append(line)
+                total_chars += len(line)
+
+            return "\n".join(lines)
+
+        except Exception:
+            # Don't break chat if memory recall fails
+            return ""
+
+    def save_feedback_memory(
+        self,
+        feedback_type: str,
+        user_message: str,
+        assistant_response: str,
+        is_positive: bool,
+    ) -> None:
+        """Save user feedback as a memory for future learning.
+
+        Args:
+            feedback_type: "explicit" (thumbs up/down) or "correction" (user corrected).
+            user_message: The user's original message.
+            assistant_response: The assistant's response that received feedback.
+            is_positive: True for positive feedback, False for negative.
+        """
+        try:
+            memory_mgr = get_memory_manager(self.config)
+
+            if is_positive:
+                memory_type = MemoryType.LEARNING
+                summary = f"Good response pattern: {user_message[:80]}..."
+                content = (
+                    f"User Message: {user_message}\n\n"
+                    f"Response (positive feedback): {assistant_response[:500]}"
+                )
+                importance = 0.6
+            else:
+                memory_type = MemoryType.LEARNING
+                summary = f"Response needs improvement: {user_message[:80]}..."
+                content = (
+                    f"User Message: {user_message}\n\n"
+                    f"Response (negative feedback): {assistant_response[:500]}\n\n"
+                    "Note: User indicated this response was not helpful."
+                )
+                importance = 0.8  # Higher importance to avoid repeating
+
+            memory_mgr.remember(
+                memory_type=memory_type,
+                content=content,
+                summary=summary,
+                tags=["feedback", feedback_type, "positive" if is_positive else "negative"],
+                importance=importance,
+            )
+        except Exception:
+            pass  # Don't break chat if memory save fails
+
+    def detect_and_save_correction(
+        self, user_message: str, previous_exchange: tuple[str, str]
+    ) -> None:
+        """Detect if user is correcting the agent and save as memory.
+
+        Args:
+            user_message: Current user message.
+            previous_exchange: Tuple of (previous_user_msg, previous_assistant_response).
+        """
+        correction_phrases = [
+            "no,",
+            "no ",
+            "wrong",
+            "that's not",
+            "i meant",
+            "actually,",
+            "not what i asked",
+            "incorrect",
+            "you misunderstood",
+            "that's incorrect",
+            "nope",
+            "try again",
+        ]
+
+        message_lower = user_message.lower().strip()
+        is_correction = any(message_lower.startswith(phrase) for phrase in correction_phrases)
+
+        if is_correction and previous_exchange:
+            prev_user, prev_response = previous_exchange
+            self.save_feedback_memory(
+                feedback_type="correction",
+                user_message=prev_user,
+                assistant_response=prev_response,
+                is_positive=False,
+            )
+
+    def _get_previous_exchange(self) -> Optional[tuple[str, str]]:
+        """Get the previous user message and assistant response.
+
+        Returns:
+            Tuple of (user_message, assistant_response) or None if not available.
+        """
+        history = self.state.conversation_history
+        if len(history) < 2:
+            return None
+
+        # Find the last user message and its following assistant response
+        last_user_msg = None
+        last_assistant_resp = None
+
+        for i in range(len(history) - 2, -1, -1):
+            msg = history[i]
+            if msg.get("role") == "user" and last_user_msg is None:
+                last_user_msg = msg.get("content", "")
+            elif msg.get("role") == "assistant" and last_user_msg is not None:
+                # Found assistant response after user message
+                last_assistant_resp = msg.get("content", "")
+                break
+
+        # Actually we want: user -> assistant -> (current user)
+        # So look for the pattern in reverse
+        for i in range(len(history) - 1, 0, -1):
+            if history[i].get("role") == "user":
+                # This is the current message, look for previous exchange
+                for j in range(i - 1, -1, -1):
+                    if history[j].get("role") == "assistant":
+                        last_assistant_resp = history[j].get("content", "")
+                        # Find the user message before this assistant response
+                        for k in range(j - 1, -1, -1):
+                            if history[k].get("role") == "user":
+                                last_user_msg = history[k].get("content", "")
+                                return (last_user_msg, last_assistant_resp)
+                        break
+                break
+
+        return None
 
 
 def create_enhanced_chat_interface(
@@ -1458,6 +1761,14 @@ def create_enhanced_chat_interface(
             elem_classes=["status-bar"],
         )
 
+        # Feedback buttons for explicit user feedback
+        with gr.Row(visible=False) as feedback_row:
+            components["feedback_row"] = feedback_row
+            gr.Markdown("**Was this response helpful?**", scale=2)
+            components["thumbs_up"] = gr.Button("👍", scale=0, size="sm", min_width=50)
+            components["thumbs_down"] = gr.Button("👎", scale=0, size="sm", min_width=50)
+            components["feedback_status"] = gr.Markdown("", scale=1)
+
         with gr.Row():
             components["message_input"] = gr.Textbox(
                 label="Message",
@@ -1484,6 +1795,16 @@ def create_enhanced_chat_interface(
                 elem_classes=["activity-feed"],
             )
 
+        with gr.Accordion("⚡ Quick Actions", open=False):
+            with gr.Row():
+                components["qa_tests"] = gr.Button("🧪 Run Tests", size="sm")
+                components["qa_lint"] = gr.Button("🔧 Lint", size="sm")
+                components["qa_status"] = gr.Button("📦 Git Status", size="sm")
+            with gr.Row():
+                components["qa_diff"] = gr.Button("📝 Git Diff", size="sm")
+                components["qa_typecheck"] = gr.Button("✓ Typecheck", size="sm")
+                components["qa_index"] = gr.Button("🔍 Reindex", size="sm")
+
     return chat_column, components
 
 
@@ -1498,18 +1819,30 @@ def setup_enhanced_chat_handlers(
     def on_send(message: str, history: list[dict], agent: str):
         if not message.strip():
             if todo_display:
-                yield history, "", "", "", "", None, gr.update(visible=False)
+                yield (
+                    history,
+                    "",
+                    "",
+                    "",
+                    "",
+                    None,
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                )
             else:
-                yield history, "", "", "", None, gr.update(visible=False)
+                yield history, "", "", "", None, gr.update(visible=False), gr.update(visible=False)
             return
 
         handler.config = get_config()
         max_iters = getattr(handler.config.agent, "max_iterations", 50)
 
+        is_final = False
         for result in handler.process_message_streaming(
             message, history, agent, max_iterations=max_iters
         ):
             updated_history, status, thinking, activity, pending, show_actions = result
+            # Show feedback row only when processing is complete (no status)
+            is_final = not status and not show_actions and pending is None
             if todo_display:
                 yield (
                     updated_history,
@@ -1520,6 +1853,7 @@ def setup_enhanced_chat_handlers(
                     update_todo_display(),
                     pending,
                     gr.update(visible=show_actions),
+                    gr.update(visible=is_final),
                 )
             else:
                 yield (
@@ -1530,6 +1864,7 @@ def setup_enhanced_chat_handlers(
                     activity,
                     pending,
                     gr.update(visible=show_actions),
+                    gr.update(visible=is_final),
                 )
 
     base_outputs = [
@@ -1545,6 +1880,7 @@ def setup_enhanced_chat_handlers(
         [
             components["pending_action"],
             components["actions_accordion"],
+            components["feedback_row"],
         ]
     )
 
@@ -1647,5 +1983,124 @@ def setup_enhanced_chat_handlers(
         outputs=[components["sound_toggle"], components["sound_enabled"]],
         js="() => { toggleSound(); }",
     )
+
+    # Feedback button handlers
+    def on_thumbs_up(history: list[dict]):
+        """Handle positive feedback."""
+        if len(history) >= 2:
+            # Get the last exchange
+            last_user = None
+            last_assistant = None
+            for msg in reversed(history):
+                if msg.get("role") == "assistant" and last_assistant is None:
+                    last_assistant = msg.get("content", "")
+                elif msg.get("role") == "user" and last_assistant is not None:
+                    last_user = msg.get("content", "")
+                    break
+
+            if last_user and last_assistant:
+                handler.save_feedback_memory(
+                    feedback_type="explicit",
+                    user_message=last_user,
+                    assistant_response=last_assistant,
+                    is_positive=True,
+                )
+                return gr.update(visible=False), "✓ Thanks!"
+
+        return gr.update(visible=False), ""
+
+    def on_thumbs_down(history: list[dict]):
+        """Handle negative feedback."""
+        if len(history) >= 2:
+            # Get the last exchange
+            last_user = None
+            last_assistant = None
+            for msg in reversed(history):
+                if msg.get("role") == "assistant" and last_assistant is None:
+                    last_assistant = msg.get("content", "")
+                elif msg.get("role") == "user" and last_assistant is not None:
+                    last_user = msg.get("content", "")
+                    break
+
+            if last_user and last_assistant:
+                handler.save_feedback_memory(
+                    feedback_type="explicit",
+                    user_message=last_user,
+                    assistant_response=last_assistant,
+                    is_positive=False,
+                )
+                return gr.update(visible=False), "✓ Noted, will improve"
+
+        return gr.update(visible=False), ""
+
+    if "thumbs_up" in components:
+        components["thumbs_up"].click(
+            fn=on_thumbs_up,
+            inputs=[components["chatbot"]],
+            outputs=[components["feedback_row"], components["feedback_status"]],
+        )
+
+    if "thumbs_down" in components:
+        components["thumbs_down"].click(
+            fn=on_thumbs_down,
+            inputs=[components["chatbot"]],
+            outputs=[components["feedback_row"], components["feedback_status"]],
+        )
+
+    # Quick action handlers - inject commands into chat
+    def create_quick_action(command: str):
+        """Create a quick action that sends a command to the chat."""
+
+        def action(history: list[dict], agent: str):
+            handler.config = get_config()
+            max_iters = getattr(handler.config.agent, "max_iterations", 50)
+
+            # Inject the command as a user message
+            for result in handler.process_message_streaming(
+                command, history, agent, max_iterations=max_iters
+            ):
+                updated_history, status, thinking, activity, pending, show_actions = result
+                if todo_display:
+                    yield (
+                        updated_history,
+                        "",
+                        f"**{status}**" if status else "",
+                        thinking,
+                        activity,
+                        update_todo_display(),
+                        pending,
+                        gr.update(visible=show_actions),
+                        gr.update(visible=False),  # feedback_row
+                    )
+                else:
+                    yield (
+                        updated_history,
+                        "",
+                        f"**{status}**" if status else "",
+                        thinking,
+                        activity,
+                        pending,
+                        gr.update(visible=show_actions),
+                        gr.update(visible=False),  # feedback_row
+                    )
+
+        return action
+
+    quick_actions = {
+        "qa_tests": "Run pytest for the project",
+        "qa_lint": "Run ruff check on the project",
+        "qa_status": "Show git status",
+        "qa_diff": "Show git diff of uncommitted changes",
+        "qa_typecheck": "Run ruff check for type errors",
+        "qa_index": "Reindex the semantic search index for the current project",
+    }
+
+    for btn_key, command in quick_actions.items():
+        if btn_key in components:
+            components[btn_key].click(
+                fn=create_quick_action(command),
+                inputs=[components["chatbot"], components["agent_selector"]],
+                outputs=base_outputs,
+            )
 
     return handler

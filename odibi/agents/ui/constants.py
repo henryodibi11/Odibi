@@ -1363,5 +1363,54 @@ ENHANCED_JS_RAW = """
 
     setTimeout(setupScroll, 2000);
     setTimeout(setupScroll, 5000);
+
+    // Keyboard shortcuts
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+Enter or Cmd+Enter: Send message
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                const sendBtn = document.querySelector('button.primary');
+                if (sendBtn) {
+                    e.preventDefault();
+                    sendBtn.click();
+                    console.log('[Odibi] Ctrl+Enter: Send');
+                }
+            }
+
+            // Escape: Stop generation
+            if (e.key === 'Escape') {
+                const stopBtn = Array.from(document.querySelectorAll('button'))
+                    .find(b => b.textContent && b.textContent.includes('⏹️'));
+                if (stopBtn) {
+                    stopBtn.click();
+                    console.log('[Odibi] Escape: Stop');
+                }
+            }
+
+            // Ctrl+L: Clear chat
+            if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                const clearBtn = Array.from(document.querySelectorAll('button'))
+                    .find(b => b.textContent && b.textContent.includes('🗑️'));
+                if (clearBtn) {
+                    e.preventDefault();
+                    clearBtn.click();
+                    console.log('[Odibi] Ctrl+L: Clear');
+                }
+            }
+
+            // Ctrl+/ : Focus input
+            if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+                const input = document.querySelector('textarea');
+                if (input) {
+                    e.preventDefault();
+                    input.focus();
+                    console.log('[Odibi] Ctrl+/: Focus input');
+                }
+            }
+        });
+        console.log('[Odibi] Keyboard shortcuts registered: Ctrl+Enter (send), Esc (stop), Ctrl+L (clear), Ctrl+/ (focus)');
+    }
+
+    setupKeyboardShortcuts();
 }
 """
