@@ -26,6 +26,43 @@ First, explore the project:
 4. Look for existing README, docs/, or documentation
 5. Identify data sources (connections) and destinations
 
+## Step 1.5: Data Profiling (Critical for Quality Docs)
+
+**For each pipeline node's output table/view, run SQL to understand the actual data:**
+
+```sql
+-- Sample data (5 rows)
+SELECT * FROM {table_name} LIMIT 5
+
+-- Row count and date range
+SELECT COUNT(*) as row_count,
+       MIN(date_column) as earliest,
+       MAX(date_column) as latest
+FROM {table_name}
+
+-- Column cardinality (understand what's in each column)
+SELECT '{column}' as col, COUNT(DISTINCT {column}) as unique_values
+FROM {table_name}
+```
+
+**Use this data to:**
+- Write realistic example values in the data dictionary
+- Understand what each column actually contains (not just the name)
+- Identify primary keys, foreign keys, and relationships
+- Spot data quality issues to document
+- Describe date ranges and data freshness
+
+**For semantic layer metrics, validate them:**
+```sql
+-- Run each metric to show example output
+SELECT dimension_col, metric_value
+FROM semantic_view
+GROUP BY dimension_col
+LIMIT 10
+```
+
+This makes documentation **grounded in reality**, not just config assumptions.
+
 ## Step 2: Create Documentation Structure
 
 Generate documentation with these sections:
