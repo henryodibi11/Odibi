@@ -30,10 +30,10 @@ This roadmap outlines where Odibi is headed. It's a living document that evolves
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Improved error messages** | Every error includes what failed, what was expected, and how to fix | 🔄 Planned |
-| **Rows read vs written in Stories** | Distinguish input rows from output rows in audit reports | 🔄 Planned |
-| **PyPI publication** | `pip install odibi` from PyPI | 🔄 Planned |
-| **Documentation site** | Hosted docs on GitHub Pages | 🔄 Planned |
+| **Improved error messages** | Every error includes what failed, what was expected, and how to fix | ✅ Done |
+| **Rows read vs written in Stories** | Distinguish input rows from output rows in audit reports | ✅ Done |
+| **PyPI publication** | `pip install odibi` from PyPI | ✅ Done |
+| **Documentation site** | Hosted docs on GitHub Pages | ✅ Done |
 
 ### v2.6.0 - Observability
 
