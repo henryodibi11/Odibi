@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-01-09
+
+### Added - System Environments & SQL Server Backend
+
+- **Environment Tagging** (`system.environment`):
+  - Tag all `meta_runs` and `meta_state` records with environment (dev, qat, prod)
+  - Enables cross-environment querying from a single catalog location
+  - Environment column added to both Delta and SQL Server schemas
+
+- **SQL Server System Backend** (`SqlServerSystemBackend`):
+  - Store system catalog tables in SQL Server instead of Delta
+  - Auto-creates schema and tables (`[odibi_system].[meta_runs]`, `[odibi_system].[meta_state]`)
+  - Configure via `system.connection` pointing to sql_server type connection
+  - `system.schema_name` controls target schema (default: `odibi_system`)
+
+- **System Sync** (`odibi system sync`):
+  - New CLI command to sync system data between backends
+  - Push local development runs/state to centralized SQL Server
+  - `sync_from` config specifies source backend
+  - Options: `--env`, `--tables runs|state`, `--dry-run`
+
+- **SyncFromConfig** model:
+  - `connection`: Source connection name
+  - `path`: Source path (for file-based backends)
+  - `schema_name`: Source schema (for SQL Server)
+
+### Documentation
+- Updated `docs/features/catalog.md` with SQL Server backend, environment tagging, and sync sections
+- Updated `docs/guides/environments.md` with system environment use cases
+- Regenerated `docs/reference/yaml_schema.md` with new config models
+
+## [2.4.2] - 2026-01-09
+
+### Testing
+- **FK Validation Coverage**: Added 51 new tests for `fk.py` (32% → 88% coverage)
+  - Full RelationshipConfig and RelationshipRegistry tests
+  - FKValidator Pandas engine tests with orphan detection
+  - validate_fk_on_load convenience function tests (error, warn, filter modes)
+  - parse_relationships_config tests
+- **Explanation Linter Coverage**: Added 42 new tests for `explanation_linter.py` (40% → 100% coverage)
+  - All lint rules tested (E001-E004, W001)
+  - All lazy phrases and required sections validated
+  - format_issues and has_errors methods tested
+
+## [2.4.1] - 2026-01-09
+
+### Fixed
+- **Freshness Validation Bug**: Fixed `TypeError` in freshness check when datetime conversion fails (returns `None` instead of `pd.NaT`)
+
+### Testing
+- **Validation Module Coverage**: Added 54 new tests for validation module (109 → 163 total)
+  - Full Polars engine coverage for all test types (NOT_NULL, UNIQUE, RANGE, ACCEPTED_VALUES, REGEX_MATCH, FRESHNESS, SCHEMA)
+  - Polars LazyFrame support tested
+  - `write_quarantine()` function fully tested
+  - Exception handling paths covered
+  - Missing column edge cases for all engines
+
 ## [2.4.0] - 2026-01-09
 
 ### Open Source Release

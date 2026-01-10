@@ -2382,7 +2382,7 @@
       "type": "object"
     },
     "SqlServerMergeOptions": {
-      "description": "Options for SQL Server MERGE operations (Phase 1).\n\nEnables incremental sync from Spark to SQL Server using T-SQL MERGE.\nData is written to a staging table, then merged into the target.\n\n### Basic Usage\n```yaml\nwrite:\n  connection: azure_sql\n  format: sql_server\n  table: oee.oee_fact\n  mode: merge\n  merge_keys: [DateId, P_ID]\n  merge_options:\n    update_condition: \"source._hash_diff != target._hash_diff\"\n    exclude_columns: [_hash_diff]\n    audit_cols:\n      created_col: created_ts\n      updated_col: updated_ts\n```\n\n### Conditions\n- `update_condition`: Only update rows matching this condition (e.g., hash diff)\n- `delete_condition`: Delete rows matching this condition (soft delete pattern)\n- `insert_condition`: Only insert rows matching this condition",
+      "description": "Options for SQL Server MERGE operations (Phase 1).\n\nEnables incremental sync from Spark to SQL Server using T-SQL MERGE.\nData is written to a staging table, then merged into the target.\n\n### Basic Usage\n```yaml\nwrite:\n  connection: azure_sql\n  format: sql_server\n  table: sales.fact_orders\n  mode: merge\n  merge_keys: [DateId, store_id]\n  merge_options:\n    update_condition: \"source._hash_diff != target._hash_diff\"\n    exclude_columns: [_hash_diff]\n    audit_cols:\n      created_col: created_ts\n      updated_col: updated_ts\n```\n\n### Conditions\n- `update_condition`: Only update rows matching this condition (e.g., hash diff)\n- `delete_condition`: Delete rows matching this condition (soft delete pattern)\n- `insert_condition`: Only insert rows matching this condition",
       "properties": {
         "update_condition": {
           "anyOf": [

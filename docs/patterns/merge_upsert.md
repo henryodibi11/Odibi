@@ -178,7 +178,7 @@ order_id | product      | qty | created_at          | updated_at          | _cre
   transformer: merge
   params:
     target: silver.inventory
-    keys: [plant_id, material_id]  ← Composite key
+    keys: [store_id, material_id]  ← Composite key
     strategy: upsert
     audit_cols:
       created_col: created_ts
@@ -342,7 +342,7 @@ transform:
     - function: merge
       params:
         connection: adls_prod
-        path: OEE/silver/orders
+        path: sales/silver/orders
         register_table: silver.orders
         keys: [order_id]
         strategy: upsert

@@ -203,7 +203,7 @@ pipelines:
 
 **Purpose:** Type-safe, validated Python objects
 
-**Key File:** [`odibi/config.py`](file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/config.py)
+**Key File:** `odibi/config.py`
 
 **Main Models:**
 
@@ -338,7 +338,7 @@ nodes:
 **Purpose:** Execute the actual work
 
 **Key Files:**
-- [`odibi/pipeline.py`](file:///c:/Users/hodibi/OneDrive%20-%20Ingredion/Desktop/Repos/Odibi/odibi/pipeline.py) - Pipeline orchestration
+- `odibi/pipeline.py` - Pipeline orchestration
 - `odibi/node.py` - Individual node execution
 - `odibi/context.py` - Data passing between nodes
 - `odibi/engine/pandas_engine.py` - Actual read/write/transform logic

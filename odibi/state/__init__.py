@@ -174,11 +174,13 @@ class CatalogStateBackend(StateBackend):
         meta_state_path: str,
         spark_session: Any = None,
         storage_options: Optional[Dict[str, str]] = None,
+        environment: Optional[str] = None,
     ):
         self.meta_runs_path = meta_runs_path
         self.meta_state_path = meta_state_path
         self.spark = spark_session
         self.storage_options = storage_options or {}
+        self.environment = environment
 
     def load_state(self) -> Dict[str, Any]:
         """
@@ -339,7 +341,12 @@ class CatalogStateBackend(StateBackend):
 
     def set_hwm(self, key: str, value: Any) -> None:
         val_str = json.dumps(value, default=str)
-        row = {"key": key, "value": val_str, "updated_at": datetime.now(timezone.utc)}
+        row = {
+            "key": key,
+            "value": val_str,
+            "environment": self.environment,
+            "updated_at": datetime.now(timezone.utc),
+        }
 
         def _do_set():
             if self.spark:
@@ -356,6 +363,7 @@ class CatalogStateBackend(StateBackend):
             [
                 StructField("key", StringType(), False),
                 StructField("value", StringType(), True),
+                StructField("environment", StringType(), True),
                 StructField("updated_at", TimestampType(), True),
             ]
         )
@@ -375,6 +383,7 @@ class CatalogStateBackend(StateBackend):
           ON t.key = s.key
           WHEN MATCHED THEN UPDATE SET
             t.value = s.value,
+            t.environment = s.environment,
             t.updated_at = s.updated_at
           WHEN NOT MATCHED THEN INSERT *
         """
@@ -434,6 +443,7 @@ class CatalogStateBackend(StateBackend):
             {
                 "key": u["key"],
                 "value": json.dumps(u["value"], default=str),
+                "environment": self.environment,
                 "updated_at": timestamp,
             }
             for u in updates
@@ -454,6 +464,7 @@ class CatalogStateBackend(StateBackend):
             [
                 StructField("key", StringType(), False),
                 StructField("value", StringType(), True),
+                StructField("environment", StringType(), True),
                 StructField("updated_at", TimestampType(), True),
             ]
         )
@@ -473,6 +484,7 @@ class CatalogStateBackend(StateBackend):
           ON t.key = s.key
           WHEN MATCHED THEN UPDATE SET
             t.value = s.value,
+            t.environment = s.environment,
             t.updated_at = s.updated_at
           WHEN NOT MATCHED THEN INSERT *
         """
@@ -509,6 +521,235 @@ class CatalogStateBackend(StateBackend):
                 schema_mode="merge",
             )
         logger.debug(f"Batch set {len(rows)} HWM value(s) locally")
+
+
+class SqlServerSystemBackend(StateBackend):
+    """
+    SQL Server State Backend for centralized system tables.
+
+    Stores meta_runs and meta_state in SQL Server tables for cross-environment
+    visibility and querying. Useful when you want a single source of truth
+    for pipeline observability across dev/qat/prod environments.
+
+    Example config:
+    ```yaml
+    system:
+      connection: sql_server
+      schema_name: odibi_system
+      environment: prod
+    ```
+    """
+
+    # SQL Server table DDL
+    META_RUNS_DDL = """
+    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'meta_runs' AND schema_id = SCHEMA_ID(:schema))
+    BEGIN
+        CREATE TABLE [{schema}].[meta_runs] (
+            run_id NVARCHAR(100),
+            pipeline_name NVARCHAR(255),
+            node_name NVARCHAR(255),
+            status NVARCHAR(50),
+            rows_processed BIGINT,
+            duration_ms BIGINT,
+            metrics_json NVARCHAR(MAX),
+            environment NVARCHAR(50),
+            timestamp DATETIME2,
+            date DATE
+        )
+    END
+    """
+
+    META_STATE_DDL = """
+    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'meta_state' AND schema_id = SCHEMA_ID(:schema))
+    BEGIN
+        CREATE TABLE [{schema}].[meta_state] (
+            [key] NVARCHAR(500) PRIMARY KEY,
+            [value] NVARCHAR(MAX),
+            environment NVARCHAR(50),
+            updated_at DATETIME2
+        )
+    END
+    """
+
+    def __init__(
+        self,
+        connection: Any,
+        schema_name: str = "odibi_system",
+        environment: Optional[str] = None,
+    ):
+        """
+        Initialize SQL Server System Backend.
+
+        Args:
+            connection: AzureSQL connection object
+            schema_name: Schema for system tables (default: odibi_system)
+            environment: Environment tag for records (e.g., 'dev', 'prod')
+        """
+        self.connection = connection
+        self.schema_name = schema_name
+        self.environment = environment
+        self._tables_created = False
+
+    def _ensure_tables(self) -> None:
+        """Create system tables if they don't exist."""
+        if self._tables_created:
+            return
+
+        try:
+            # Create schema if not exists
+            schema_ddl = f"""
+            IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = '{self.schema_name}')
+            BEGIN
+                EXEC('CREATE SCHEMA [{self.schema_name}]')
+            END
+            """
+            self.connection.execute(schema_ddl)
+
+            # Create tables
+            runs_ddl = self.META_RUNS_DDL.replace("{schema}", self.schema_name).replace(
+                ":schema", f"'{self.schema_name}'"
+            )
+            self.connection.execute(runs_ddl)
+
+            state_ddl = self.META_STATE_DDL.replace("{schema}", self.schema_name).replace(
+                ":schema", f"'{self.schema_name}'"
+            )
+            self.connection.execute(state_ddl)
+
+            self._tables_created = True
+            logger.debug(f"SQL Server system tables ensured in schema {self.schema_name}")
+        except Exception as e:
+            logger.warning(f"Failed to ensure SQL Server system tables: {e}")
+
+    def load_state(self) -> Dict[str, Any]:
+        """Load state - returns empty dict for SQL Server backend."""
+        return {"pipelines": {}}
+
+    def save_pipeline_run(self, pipeline_name: str, pipeline_data: Dict[str, Any]) -> None:
+        """Pipeline runs are logged via log_run, not this method."""
+        pass
+
+    def get_last_run_info(self, pipeline_name: str, node_name: str) -> Optional[Dict[str, Any]]:
+        """Get last run info from SQL Server."""
+        self._ensure_tables()
+        try:
+            sql = f"""
+            SELECT TOP 1 status, metrics_json
+            FROM [{self.schema_name}].[meta_runs]
+            WHERE pipeline_name = :pipeline_name AND node_name = :node_name
+            ORDER BY timestamp DESC
+            """
+            result = self.connection.execute(
+                sql, {"pipeline_name": pipeline_name, "node_name": node_name}
+            )
+            if result:
+                row = result[0]
+                meta = {}
+                if row[1]:
+                    try:
+                        meta = json.loads(row[1])
+                    except Exception:
+                        pass
+                return {"success": row[0] == "SUCCESS", "metadata": meta}
+        except Exception as e:
+            logger.warning(f"Failed to get last run info: {e}")
+        return None
+
+    def get_last_run_status(self, pipeline_name: str, node_name: str) -> Optional[bool]:
+        """Get last run status."""
+        info = self.get_last_run_info(pipeline_name, node_name)
+        return info.get("success") if info else None
+
+    def get_hwm(self, key: str) -> Any:
+        """Get HWM value from SQL Server."""
+        self._ensure_tables()
+        try:
+            sql = f"""
+            SELECT [value] FROM [{self.schema_name}].[meta_state]
+            WHERE [key] = :key
+            """
+            result = self.connection.execute(sql, {"key": key})
+            if result and result[0][0]:
+                try:
+                    return json.loads(result[0][0])
+                except Exception:
+                    return result[0][0]
+        except Exception as e:
+            logger.warning(f"Failed to get HWM: {e}")
+        return None
+
+    def set_hwm(self, key: str, value: Any) -> None:
+        """Set HWM value in SQL Server using MERGE."""
+        self._ensure_tables()
+        val_str = json.dumps(value, default=str)
+        try:
+            sql = f"""
+            MERGE [{self.schema_name}].[meta_state] AS target
+            USING (SELECT :key AS [key]) AS source
+            ON target.[key] = source.[key]
+            WHEN MATCHED THEN
+                UPDATE SET [value] = :value, environment = :env, updated_at = GETUTCDATE()
+            WHEN NOT MATCHED THEN
+                INSERT ([key], [value], environment, updated_at)
+                VALUES (:key, :value, :env, GETUTCDATE());
+            """
+            self.connection.execute(sql, {"key": key, "value": val_str, "env": self.environment})
+        except Exception as e:
+            logger.warning(f"Failed to set HWM: {e}")
+
+    def set_hwm_batch(self, updates: List[Dict[str, Any]]) -> None:
+        """Set multiple HWM values."""
+        for update in updates:
+            self.set_hwm(update["key"], update["value"])
+
+    def log_run(
+        self,
+        run_id: str,
+        pipeline_name: str,
+        node_name: str,
+        status: str,
+        rows_processed: int = 0,
+        duration_ms: int = 0,
+        metrics_json: str = "{}",
+    ) -> None:
+        """Log a run to SQL Server meta_runs table."""
+        self._ensure_tables()
+        try:
+            sql = f"""
+            INSERT INTO [{self.schema_name}].[meta_runs]
+            (run_id, pipeline_name, node_name, status, rows_processed, duration_ms,
+             metrics_json, environment, timestamp, date)
+            VALUES (:run_id, :pipeline, :node, :status, :rows, :duration,
+                    :metrics, :env, GETUTCDATE(), CAST(GETUTCDATE() AS DATE))
+            """
+            self.connection.execute(
+                sql,
+                {
+                    "run_id": run_id,
+                    "pipeline": pipeline_name,
+                    "node": node_name,
+                    "status": status,
+                    "rows": rows_processed,
+                    "duration": duration_ms,
+                    "metrics": metrics_json,
+                    "env": self.environment,
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log run to SQL Server: {e}")
+
+    def log_runs_batch(self, records: List[Dict[str, Any]]) -> None:
+        """Log multiple runs to SQL Server."""
+        for record in records:
+            self.log_run(
+                run_id=record["run_id"],
+                pipeline_name=record["pipeline_name"],
+                node_name=record["node_name"],
+                status=record["status"],
+                rows_processed=record.get("rows_processed", 0),
+                duration_ms=record.get("duration_ms", 0),
+                metrics_json=record.get("metrics_json", "{}"),
+            )
 
 
 class StateManager:
@@ -613,6 +854,22 @@ def create_state_backend(
     storage_options = {}
 
     conn_type = _get(conn_config, "type")
+    environment = getattr(config.system, "environment", None)
+
+    # SQL Server backend - centralized system tables
+    if conn_type in ("sql_server", "azure_sql"):
+        from odibi.connections.factory import create_connection
+
+        # Create the SQL connection
+        connection = create_connection(system_conn_name, conn_config)
+        schema_name = getattr(config.system, "schema_name", None) or "odibi_system"
+
+        logger.info(f"Using SQL Server system backend: {system_conn_name}, schema: {schema_name}")
+        return SqlServerSystemBackend(
+            connection=connection,
+            schema_name=schema_name,
+            environment=environment,
+        )
 
     # Determine Base URI based on connection type
     if conn_type == "local":
@@ -675,4 +932,273 @@ def create_state_backend(
         meta_state_path=meta_state_path,
         spark_session=spark_session,
         storage_options=storage_options,
+        environment=environment,
     )
+
+
+def create_sync_source_backend(
+    sync_from_config: Any,
+    connections: Dict[str, Any],
+    project_root: str = ".",
+) -> StateBackend:
+    """
+    Create a source StateBackend for sync operations.
+
+    Args:
+        sync_from_config: SyncFromConfig with connection/path/schema_name
+        connections: Dictionary of connection configs
+        project_root: Root directory for local paths
+
+    Returns:
+        Configured StateBackend for reading source data
+    """
+
+    def _get(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    conn_name = _get(sync_from_config, "connection")
+    conn_config = connections.get(conn_name)
+
+    if not conn_config:
+        raise ValueError(f"Sync source connection '{conn_name}' not found in connections.")
+
+    conn_type = _get(conn_config, "type")
+
+    # SQL Server source
+    if conn_type in ("sql_server", "azure_sql"):
+        from odibi.connections.factory import create_connection
+
+        connection = create_connection(conn_name, conn_config)
+        schema_name = _get(sync_from_config, "schema_name") or "odibi_system"
+        return SqlServerSystemBackend(
+            connection=connection,
+            schema_name=schema_name,
+            environment=None,
+        )
+
+    # File-based source (local, azure_blob)
+    base_uri = ""
+    storage_options = {}
+    path = _get(sync_from_config, "path") or "_odibi_system"
+
+    if conn_type == "local":
+        base_path = _get(conn_config, "base_path")
+        if not os.path.isabs(base_path):
+            base_path = os.path.join(project_root, base_path)
+        base_uri = os.path.join(base_path, path)
+
+    elif conn_type == "azure_blob":
+        account = _get(conn_config, "account_name")
+        container = _get(conn_config, "container")
+        base_uri = f"abfss://{container}@{account}.dfs.core.windows.net/{path}"
+
+        auth = _get(conn_config, "auth", {})
+        auth_mode = _get(auth, "mode")
+        if auth_mode == "account_key":
+            storage_options = {
+                "account_name": account,
+                "account_key": _get(auth, "account_key"),
+            }
+        elif auth_mode == "sas":
+            storage_options = {
+                "account_name": account,
+                "sas_token": _get(auth, "sas_token"),
+            }
+
+    if not base_uri:
+        base_uri = os.path.join(project_root, path)
+
+    meta_state_path = f"{base_uri}/meta_state"
+    meta_runs_path = f"{base_uri}/meta_runs"
+
+    return CatalogStateBackend(
+        meta_runs_path=meta_runs_path,
+        meta_state_path=meta_state_path,
+        spark_session=None,
+        storage_options=storage_options,
+        environment=None,
+    )
+
+
+def sync_system_data(
+    source_backend: StateBackend,
+    target_backend: StateBackend,
+    tables: Optional[List[str]] = None,
+) -> Dict[str, int]:
+    """
+    Sync system data from source backend to target backend.
+
+    Reads meta_runs and meta_state from source and writes to target.
+
+    Args:
+        source_backend: Source StateBackend to read from
+        target_backend: Target StateBackend to write to
+        tables: Optional list of tables to sync ('runs', 'state'). Default: both.
+
+    Returns:
+        Dict with counts: {'runs': N, 'state': M}
+    """
+    if tables is None:
+        tables = ["runs", "state"]
+
+    result = {"runs": 0, "state": 0}
+
+    # Sync runs (meta_runs)
+    if "runs" in tables:
+        runs_count = _sync_runs(source_backend, target_backend)
+        result["runs"] = runs_count
+        logger.info(f"Synced {runs_count} run records")
+
+    # Sync state (meta_state / HWM)
+    if "state" in tables:
+        state_count = _sync_state(source_backend, target_backend)
+        result["state"] = state_count
+        logger.info(f"Synced {state_count} state records")
+
+    return result
+
+
+def _sync_runs(source: StateBackend, target: StateBackend) -> int:
+    """Sync runs from source to target."""
+    records = []
+
+    # Read runs from source
+    if isinstance(source, CatalogStateBackend):
+        if not DeltaTable or not pd:
+            logger.warning("Delta/Pandas not available for reading source runs")
+            return 0
+
+        try:
+            dt = DeltaTable(source.meta_runs_path, storage_options=source.storage_options)
+            df = dt.to_pandas()
+            if df.empty:
+                return 0
+
+            for _, row in df.iterrows():
+                records.append(
+                    {
+                        "run_id": row.get("run_id"),
+                        "pipeline_name": row.get("pipeline_name"),
+                        "node_name": row.get("node_name"),
+                        "status": row.get("status"),
+                        "rows_processed": int(row.get("rows_processed", 0) or 0),
+                        "duration_ms": int(row.get("duration_ms", 0) or 0),
+                        "metrics_json": row.get("metrics_json") or row.get("metadata") or "{}",
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Failed to read runs from source: {e}")
+            return 0
+
+    elif isinstance(source, SqlServerSystemBackend):
+        source._ensure_tables()
+        try:
+            sql = f"""SELECT run_id, pipeline_name, node_name, status, rows_processed,
+                      duration_ms, metrics_json FROM [{source.schema_name}].[meta_runs]"""
+            rows = source.connection.execute(sql)
+            if rows:
+                for row in rows:
+                    records.append(
+                        {
+                            "run_id": row[0],
+                            "pipeline_name": row[1],
+                            "node_name": row[2],
+                            "status": row[3],
+                            "rows_processed": int(row[4] or 0),
+                            "duration_ms": int(row[5] or 0),
+                            "metrics_json": row[6] or "{}",
+                        }
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to read runs from SQL source: {e}")
+            return 0
+
+    if not records:
+        return 0
+
+    # Write runs to target
+    if isinstance(target, SqlServerSystemBackend):
+        target.log_runs_batch(records)
+    elif isinstance(target, CatalogStateBackend):
+        _write_runs_to_catalog(target, records)
+
+    return len(records)
+
+
+def _write_runs_to_catalog(target: CatalogStateBackend, records: List[Dict]) -> None:
+    """Write run records to CatalogStateBackend."""
+    if not pd or not write_deltalake:
+        logger.warning("Delta/Pandas not available for writing runs")
+        return
+
+    df = pd.DataFrame(records)
+    df["timestamp"] = datetime.now(timezone.utc)
+    df["date"] = datetime.now(timezone.utc).date()
+    df["environment"] = target.environment
+
+    def _write():
+        write_deltalake(
+            target.meta_runs_path,
+            df,
+            mode="append",
+            storage_options=target.storage_options,
+            schema_mode="merge",
+        )
+
+    _retry_delta_operation(_write)
+
+
+def _sync_state(source: StateBackend, target: StateBackend) -> int:
+    """Sync HWM state from source to target."""
+    hwm_records = []
+
+    # Read state from source
+    if isinstance(source, CatalogStateBackend):
+        if not DeltaTable or not pd:
+            logger.warning("Delta/Pandas not available for reading source state")
+            return 0
+
+        try:
+            dt = DeltaTable(source.meta_state_path, storage_options=source.storage_options)
+            df = dt.to_pandas()
+            if df.empty:
+                return 0
+
+            for _, row in df.iterrows():
+                key = row.get("key")
+                value = row.get("value")
+                if key:
+                    try:
+                        hwm_records.append({"key": key, "value": json.loads(value)})
+                    except (json.JSONDecodeError, TypeError):
+                        hwm_records.append({"key": key, "value": value})
+        except Exception as e:
+            logger.warning(f"Failed to read state from source: {e}")
+            return 0
+
+    elif isinstance(source, SqlServerSystemBackend):
+        source._ensure_tables()
+        try:
+            sql = f"SELECT [key], [value] FROM [{source.schema_name}].[meta_state]"
+            rows = source.connection.execute(sql)
+            if rows:
+                for row in rows:
+                    key, value = row[0], row[1]
+                    if key:
+                        try:
+                            hwm_records.append({"key": key, "value": json.loads(value)})
+                        except (json.JSONDecodeError, TypeError):
+                            hwm_records.append({"key": key, "value": value})
+        except Exception as e:
+            logger.warning(f"Failed to read state from SQL source: {e}")
+            return 0
+
+    if not hwm_records:
+        return 0
+
+    # Write state to target
+    target.set_hwm_batch(hwm_records)
+
+    return len(hwm_records)

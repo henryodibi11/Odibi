@@ -60,8 +60,8 @@ my-odibi-project/
 ### Example `project.yaml`
 
 ```yaml
-project: OEE
-description: "OEE Analytics Platform"
+project: SalesAnalytics
+description: "Sales Analytics Platform"
 engine: spark
 version: "1.0.0"
 owner: "Data Team"

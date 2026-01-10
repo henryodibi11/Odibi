@@ -198,3 +198,66 @@ environments:
       - type: slack
         url: ${SLACK_WEBHOOK}
 ```
+
+### 5. System Environment Tagging
+
+Tag all system catalog records (runs, state) with the environment for cross-environment observability:
+
+```yaml
+system:
+  connection: catalog_storage
+  path: _odibi_system
+  environment: dev  # Default environment tag
+
+environments:
+  qat:
+    system:
+      environment: qat
+  prod:
+    system:
+      environment: prod
+```
+
+This enables queries across environments:
+```sql
+SELECT * FROM meta_runs WHERE environment = 'prod' AND status = 'FAILED'
+```
+
+### 6. Centralized SQL Server System Catalog
+
+Store system metadata in a central SQL Server for unified observability:
+
+```yaml
+system:
+  connection: local_storage
+  path: .odibi/system
+
+environments:
+  prod:
+    system:
+      connection: sql_server
+      schema_name: odibi_system
+      environment: prod
+      sync_from:
+        connection: local_storage
+        path: .odibi/system
+
+connections:
+  local_storage:
+    type: local
+    base_path: ./
+  sql_server:
+    type: sql_server
+    server: central-server.database.windows.net
+    database: odibi_metadata
+```
+
+In production, the SQL Server backend:
+- Auto-creates schema and tables
+- Stores `meta_runs` and `meta_state`
+- Enables syncing local dev data to central location
+
+Sync local data to SQL Server:
+```bash
+odibi system sync project.yaml --env prod
+```

@@ -235,27 +235,27 @@ The JSON file contains the complete lineage data:
       "pipeline_layer": "gold"
     },
     {
-      "name": "OEE_semantic",
-      "story_path": "stories/OEE_semantic/2026-01-02/run_08-15-00.json",
+      "name": "Sales_semantic",
+      "story_path": "stories/Sales_semantic/2026-01-02/run_08-15-00.json",
       "status": "success",
       "duration": 27.3,
       "pipeline_layer": "semantic"
     }
   ],
   "nodes": [
-    {"id": "raw_oee_data", "type": "source", "layer": "raw"},
-    {"id": "bronze_oee", "type": "table", "layer": "bronze"},
-    {"id": "cleaned_oee", "type": "table", "layer": "silver"},
-    {"id": "oee_fact", "type": "table", "layer": "gold"},
-    {"id": "vw_oee_daily", "type": "view", "layer": "semantic"},
-    {"id": "vw_oee_monthly", "type": "view", "layer": "semantic"}
+    {"id": "raw_sales_data", "type": "source", "layer": "raw"},
+    {"id": "bronze_sales", "type": "table", "layer": "bronze"},
+    {"id": "cleaned_sales", "type": "table", "layer": "silver"},
+    {"id": "fact_orders", "type": "table", "layer": "gold"},
+    {"id": "vw_sales_daily", "type": "view", "layer": "semantic"},
+    {"id": "vw_sales_monthly", "type": "view", "layer": "semantic"}
   ],
   "edges": [
-    {"from": "raw_oee_data", "to": "bronze_oee"},
-    {"from": "bronze_oee", "to": "cleaned_oee"},
-    {"from": "cleaned_oee", "to": "oee_fact"},
-    {"from": "oee_fact", "to": "vw_oee_daily"},
-    {"from": "oee_fact", "to": "vw_oee_monthly"}
+    {"from": "raw_sales_data", "to": "bronze_sales"},
+    {"from": "bronze_sales", "to": "cleaned_sales"},
+    {"from": "cleaned_sales", "to": "fact_orders"},
+    {"from": "fact_orders", "to": "vw_sales_daily"},
+    {"from": "fact_orders", "to": "vw_sales_monthly"}
   ]
 }
 ```
@@ -306,7 +306,7 @@ Each node represents a data asset:
 
 ```json
 {
-  "id": "oee_fact",       // Unique identifier
+  "id": "fact_orders",    // Unique identifier
   "type": "table",        // "source", "table", or "view"
   "layer": "gold"         // Which layer it belongs to
 }
@@ -318,8 +318,8 @@ Each edge represents data flow:
 
 ```json
 {
-  "from": "cleaned_oee",  // Source node ID
-  "to": "oee_fact"        // Target node ID
+  "from": "cleaned_sales", // Source node ID
+  "to": "fact_orders"      // Target node ID
 }
 ```
 
@@ -390,10 +390,10 @@ def find_sources(target_id, edges, visited=None):
     
     return sources
 
-# What feeds into vw_oee_daily?
-sources = find_sources("vw_oee_daily", result.edges)
-print(f"vw_oee_daily depends on: {sources}")
-# Output: ['oee_fact', 'cleaned_oee', 'bronze_oee', 'raw_oee_data']
+# What feeds into vw_sales_daily?
+sources = find_sources("vw_sales_daily", result.edges)
+print(f"vw_sales_daily depends on: {sources}")
+# Output: ['fact_orders', 'cleaned_sales', 'bronze_sales', 'raw_sales_data']
 ```
 
 ### Example 4: Custom Write Location
@@ -517,9 +517,9 @@ stories/lineage/2026-01-03/run_10-00-00.json
 Before making changes, check what depends on a table:
 
 ```python
-# What views depend on oee_fact?
-downstream = [e.to_node for e in result.edges if e.from_node == "oee_fact"]
-print(f"Changing oee_fact will affect: {downstream}")
+# What views depend on fact_orders?
+downstream = [e.to_node for e in result.edges if e.from_node == "fact_orders"]
+print(f"Changing fact_orders will affect: {downstream}")
 ```
 
 ---

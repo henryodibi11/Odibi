@@ -114,9 +114,9 @@ write:
 write:
   connection: azure_sql
   format: sql_server
-  table: oee.oee_fact
+  table: sales.fact_orders
   mode: merge
-  merge_keys: [DateId, P_ID]
+  merge_keys: [DateId, store_id]
   merge_options:
     update_condition: "source._hash_diff != target._hash_diff"
     delete_condition: "source._is_deleted = 1"
@@ -176,9 +176,9 @@ write:
 ### Generated T-SQL
 
 ```sql
-MERGE [oee].[oee_fact] AS target
-USING [staging].[oee_fact_staging] AS source
-ON target.[DateId] = source.[DateId] AND target.[P_ID] = source.[P_ID]
+MERGE [sales].[fact_orders] AS target
+USING [staging].[fact_orders_staging] AS source
+ON target.[DateId] = source.[DateId] AND target.[store_id] = source.[store_id]
 
 WHEN MATCHED AND source._hash_diff != target._hash_diff THEN
     UPDATE SET
@@ -189,8 +189,8 @@ WHEN MATCHED AND source._is_deleted = 1 THEN
     DELETE
 
 WHEN NOT MATCHED BY TARGET AND source.is_valid = 1 THEN
-    INSERT ([DateId], [P_ID], [value], [created_ts], [updated_ts])
-    VALUES (source.[DateId], source.[P_ID], source.[value], GETUTCDATE(), GETUTCDATE())
+    INSERT ([DateId], [store_id], [value], [created_ts], [updated_ts])
+    VALUES (source.[DateId], source.[store_id], source.[value], GETUTCDATE(), GETUTCDATE())
 
 OUTPUT $action INTO @MergeActions;
 
@@ -219,8 +219,8 @@ Merge keys tell SQL Server how to match rows between your source data and the ta
 
 ```yaml
 merge_keys: [order_id]                    # Single key - one column identifies a row
-merge_keys: [plant_id, material_id]       # Composite key - two columns together identify a row
-merge_keys: [DateId, P_ID, Shift]         # Multi-column - all three must match
+merge_keys: [store_id, product_id]       # Composite key - two columns together identify a row
+merge_keys: [DateId, store_id, Shift]     # Multi-column - all three must match
 ```
 
 **How do I know what my merge keys are?**
@@ -356,7 +356,7 @@ Automatically create a clustered primary key on your merge keys when auto-creati
 ```yaml
 merge_options:
   auto_create_table: true
-  primary_key_on_merge_keys: true  # Creates: PK_oee_fact PRIMARY KEY CLUSTERED ([DateId], [P_ID])
+  primary_key_on_merge_keys: true  # Creates: PK_fact_orders PRIMARY KEY CLUSTERED ([DateId], [store_id])
 ```
 
 #### Index on Merge Keys
@@ -365,7 +365,7 @@ If you already have a primary key elsewhere but want to speed up merges, create 
 
 ```yaml
 merge_options:
-  index_on_merge_keys: true  # Creates: IX_oee_fact_DateId_P_ID NONCLUSTERED ([DateId], [P_ID])
+  index_on_merge_keys: true  # Creates: IX_fact_orders_DateId_store_id NONCLUSTERED ([DateId], [store_id])
 ```
 
 **Note:** Use `primary_key_on_merge_keys` OR `index_on_merge_keys`, not both. Primary key takes precedence if both are set.
@@ -534,24 +534,24 @@ All three engines support SQL Server Merge:
 
 ## Examples
 
-### Example 1: OEE Fact Table Sync
+### Example 1: Sales Fact Table Sync
 
-Sync OEE (Overall Equipment Effectiveness) data to Azure SQL for Power BI:
+Sync sales metrics data to Azure SQL for Power BI:
 
 ```yaml
 nodes:
-  - id: sync_oee_to_sql
-    name: "Sync OEE to Azure SQL"
+  - id: sync_sales_to_sql
+    name: "Sync Sales to Azure SQL"
     read:
       connection: delta_lake
       format: delta
-      table: gold.oee_fact
+      table: gold.fact_orders
     write:
       connection: azure_sql
       format: sql_server
-      table: oee.oee_fact
+      table: sales.fact_orders
       mode: merge
-      merge_keys: [DateId, P_ID]
+      merge_keys: [DateId, store_id]
       merge_options:
         update_condition: "source._hash_diff != target._hash_diff"
         exclude_columns: [_hash_diff]
@@ -618,9 +618,9 @@ Optimize large table syncs when only a small percentage of rows change:
 write:
   connection: azure_sql
   format: sql_server
-  table: gold.oee_fact
+  table: gold.fact_orders
   mode: merge
-  merge_keys: [DateId, P_ID]
+  merge_keys: [DateId, store_id]
   merge_options:
     incremental: true                           # Only write changed rows
     hash_column: _hash_diff                     # Use existing hash column
@@ -733,7 +733,7 @@ If the table doesn't exist and you have `auto_create_table: true`:
 
 Check the logs! You'll see:
 ```
-Starting SQL Server MERGE, target_table=oee.oee_fact, merge_keys=[DateId, P_ID]
+Starting SQL Server MERGE, target_table=sales.fact_orders, merge_keys=[DateId, store_id]
 MERGE completed: inserted=50, updated=10, deleted=0
 ```
 

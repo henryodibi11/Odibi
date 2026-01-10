@@ -94,6 +94,7 @@ GROUP_MAPPING = {
     "LineageConfig": "Setting",
     "StateConfig": "Setting",
     "SystemConfig": "Core",
+    "SyncFromConfig": "Core",
     # Contract/Test types
     "NotNullTest": "Contract",
     "UniqueTest": "Contract",

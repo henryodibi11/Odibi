@@ -135,7 +135,7 @@ connections:
 
 # These all work:
 source: gold.fact_orders              # → /mnt/data/gold/fact_orders
-source: gold.oee/plant_a/metrics      # → /mnt/data/gold/oee/plant_a/metrics
+source: gold.sales/store_a/metrics    # → /mnt/data/gold/sales/store_a/metrics
 source: gold.domain/v2/fact_sales     # → /mnt/data/gold/domain/v2/fact_sales
 ```
 

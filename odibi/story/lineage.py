@@ -784,9 +784,9 @@ class LineageGenerator:
         """Normalize node ID for cross-layer matching.
 
         Handles variations like:
-        - OEE/gold/oee_fact -> oee_fact
-        - oee.oee_fact -> oee_fact
-        - test.oee_fact -> oee_fact
+        - Sales/gold/fact_orders -> fact_orders
+        - sales.fact_orders -> fact_orders
+        - test.fact_orders -> fact_orders
         """
         name = node_id.lower()
         if "/" in name:
@@ -803,8 +803,8 @@ class LineageGenerator:
     ) -> List["LineageEdge"]:
         """Create edges between layers by matching normalized node names.
 
-        When a node in one layer (e.g., gold output "OEE/gold/oee_fact")
-        matches a node in another layer (e.g., semantic source "oee.oee_fact"),
+        When a node in one layer (e.g., gold output "Sales/gold/fact_orders")
+        matches a node in another layer (e.g., semantic source "sales.fact_orders"),
         create an edge connecting them.
         """
         ctx = get_logging_context()
@@ -850,7 +850,7 @@ class LineageGenerator:
         """Fix node layers by inheriting from matching nodes with definitive layers.
 
         A table belongs to the layer where it is WRITTEN (output), not where it is read.
-        If oee.oee_fact and oee_fact both exist, they should have the same layer.
+        If sales.fact_orders and fact_orders both exist, they should have the same layer.
         """
         ctx = get_logging_context()
 

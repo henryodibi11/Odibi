@@ -109,3 +109,118 @@ def test_pattern_block_preserves_existing_params():
         assert node["params"]["grain"] == ["order_id"]
     finally:
         os.remove(path)
+
+
+class TestEnvironmentsOverride:
+    """Tests for environments override functionality."""
+
+    def test_environments_override_connections(self):
+        """Test that environments block overrides connections."""
+        content = """
+        connections:
+          data_lake:
+            type: local
+            base_path: ./dev_data
+
+        environments:
+          prod:
+            connections:
+              data_lake:
+                base_path: /prod/data
+        """
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as f:
+            f.write(content)
+            path = f.name
+
+        try:
+            # Without env - should use dev path
+            config = load_yaml_with_env(path)
+            assert config["connections"]["data_lake"]["base_path"] == "./dev_data"
+
+            # With prod env - should override
+            config = load_yaml_with_env(path, env="prod")
+            assert config["connections"]["data_lake"]["base_path"] == "/prod/data"
+        finally:
+            os.remove(path)
+
+    def test_environments_override_system(self):
+        """Test that environments block can override system config."""
+        content = """
+        system:
+          connection: local_dev
+          environment: dev
+
+        environments:
+          prod:
+            system:
+              connection: sql_server
+              environment: prod
+        """
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as f:
+            f.write(content)
+            path = f.name
+
+        try:
+            config = load_yaml_with_env(path, env="prod")
+            assert config["system"]["connection"] == "sql_server"
+            assert config["system"]["environment"] == "prod"
+        finally:
+            os.remove(path)
+
+    def test_environments_nonexistent_env_uses_base(self):
+        """Test that non-existent env uses base config."""
+        content = """
+        connections:
+          data_lake:
+            type: local
+            base_path: ./dev_data
+
+        environments:
+          prod:
+            connections:
+              data_lake:
+                base_path: /prod/data
+        """
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as f:
+            f.write(content)
+            path = f.name
+
+        try:
+            # qat env doesn't exist, should use base
+            config = load_yaml_with_env(path, env="qat")
+            assert config["connections"]["data_lake"]["base_path"] == "./dev_data"
+        finally:
+            os.remove(path)
+
+    def test_environments_external_file_override(self):
+        """Test that env.{env}.yaml file is applied."""
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Main config
+            main_content = """
+            connections:
+              data_lake:
+                type: local
+                base_path: ./dev_data
+            """
+
+            # env.prod.yaml override
+            env_content = """
+            connections:
+              data_lake:
+                base_path: /prod/data
+            """
+
+            main_path = os.path.join(tmpdir, "config.yaml")
+            env_path = os.path.join(tmpdir, "env.prod.yaml")
+
+            with open(main_path, "w") as f:
+                f.write(main_content)
+            with open(env_path, "w") as f:
+                f.write(env_content)
+
+            config = load_yaml_with_env(main_path, env="prod")
+            assert config["connections"]["data_lake"]["base_path"] == "/prod/data"

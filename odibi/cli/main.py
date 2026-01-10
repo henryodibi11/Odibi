@@ -13,6 +13,7 @@ from odibi.cli.run import run_command
 from odibi.cli.schema import add_schema_parser, schema_command
 from odibi.cli.secrets import add_secrets_parser, secrets_command
 from odibi.cli.story import add_story_parser, story_command
+from odibi.cli.system import add_system_parser, system_command
 from odibi.cli.test import test_command
 from odibi.cli.ui import add_ui_parser, ui_command
 from odibi.cli.validate import validate_command
@@ -53,7 +54,7 @@ Examples:
     run_parser = subparsers.add_parser("run", help="Execute pipeline")
     run_parser.add_argument("config", help="Path to YAML config file")
     run_parser.add_argument(
-        "--env", default="development", help="Environment (development/production)"
+        "--env", default=None, help="Environment to apply overrides (e.g., dev, qat, prod)"
     )
     run_parser.add_argument(
         "--dry-run", action="store_true", help="Simulate execution without running operations"
@@ -94,12 +95,15 @@ Examples:
     deploy_parser = subparsers.add_parser("deploy", help="Deploy definitions to System Catalog")
     deploy_parser.add_argument("config", help="Path to YAML config file")
     deploy_parser.add_argument(
-        "--env", default="development", help="Environment (development/production)"
+        "--env", default=None, help="Environment to apply overrides (e.g., dev, qat, prod)"
     )
 
     # odibi validate
     validate_parser = subparsers.add_parser("validate", help="Validate config")
     validate_parser.add_argument("config", help="Path to YAML config file")
+    validate_parser.add_argument(
+        "--env", default=None, help="Environment to apply overrides (e.g., dev, qat, prod)"
+    )
 
     # odibi test
     test_parser = subparsers.add_parser("test", help="Run unit tests for transformations")
@@ -115,6 +119,9 @@ Examples:
     graph_parser = subparsers.add_parser("graph", help="Visualize dependency graph")
     graph_parser.add_argument("config", help="Path to YAML config file")
     graph_parser.add_argument("--pipeline", help="Pipeline name (optional)")
+    graph_parser.add_argument(
+        "--env", default=None, help="Environment to apply overrides (e.g., dev, qat, prod)"
+    )
     graph_parser.add_argument(
         "--format",
         choices=["ascii", "dot", "mermaid"],
@@ -149,6 +156,9 @@ Examples:
 
     # odibi lineage
     add_lineage_parser(subparsers)
+
+    # odibi system
+    add_system_parser(subparsers)
 
     args = parser.parse_args()
 
@@ -194,6 +204,8 @@ Examples:
         return schema_command(args)
     elif args.command == "lineage":
         return lineage_command(args)
+    elif args.command == "system":
+        return system_command(args)
     else:
         parser.print_help()
         return 1

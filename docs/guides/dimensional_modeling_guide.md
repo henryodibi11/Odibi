@@ -342,12 +342,12 @@ The theory says "always use surrogate keys in gold." Reality is more nuanced.
 
 ### Use Natural Keys When:
 
-- **Source system IDs are stable** — e.g., `P_ID` from opsvisdata, `LID` from reference tables
+- **Source system IDs are stable** — e.g., `entity_id` from operational systems, `location_id` from reference tables
 - **You're a solo DE and simplicity matters** — fewer moving parts = fewer bugs
 - **No multi-source integration with conflicting IDs** — one source per entity
 - **No need for unknown member (SK=0) handling** — your FKs always resolve
 
-**Example:** OEE project uses `P_ID`, `LID`, `F_ID` as natural keys because they're system-generated and never change.
+**Example:** Analytics project uses `entity_id`, `location_id`, `facility_id` as natural keys because they're system-generated and never change.
 
 ### Use Surrogate Keys When:
 
@@ -374,13 +374,13 @@ Both handle SCD Type 2, but they serve different purposes.
 ```yaml
 transform:
   steps:
-    - sql_file: "sql/cleaned_vw_dim_plantprocess.sql"  # Custom transform first
+    - sql_file: "sql/cleaned_vw_dim_location.sql"  # Custom transform first
     - function: scd2
       params:
-        connection: goat_prod
-        path: "OEE/silver/cleaned_vw_dim_plantprocess"
-        keys: [P_ID]
-        track_cols: [PlantCode, Region, Site, Department]
+        connection: warehouse_prod
+        path: "analytics/silver/cleaned_vw_dim_location"
+        keys: [location_id]
+        track_cols: [LocationCode, Region, Site, Department]
         effective_time_col: _extracted_at
 ```
 

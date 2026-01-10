@@ -9,7 +9,8 @@ def validate_command(args):
 
         # Check if we should look for transforms.py
         # PipelineManager.from_yaml handles loading transforms.py automatically
-        manager = PipelineManager.from_yaml(args.config)
+        env = getattr(args, "env", None)
+        manager = PipelineManager.from_yaml(args.config, env=env)
 
         # Iterate over pipelines and validate logic/params
         all_valid = True

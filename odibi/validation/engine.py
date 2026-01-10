@@ -604,7 +604,7 @@ class Validator:
                     else:
                         max_ts = df[col].max()
 
-                    if max_ts is not pd.NaT:
+                    if max_ts is not None and max_ts is not pd.NaT:
                         from datetime import datetime, timedelta, timezone
 
                         duration_str = test.max_age

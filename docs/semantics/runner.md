@@ -52,7 +52,7 @@ You:
 
 Before using the Semantic Layer Runner, you need:
 
-1. **Gold layer tables** - Your fact tables with calculated metrics (e.g., `oee_fact`)
+1. **Gold layer tables** - Your fact tables with calculated metrics (e.g., `fact_orders`)
 2. **A SQL Server connection** - Where views will be created
 3. **A storage connection** - Where stories and SQL files will be saved (e.g., Azure Data Lake)
 
@@ -63,7 +63,7 @@ Before using the Semantic Layer Runner, you need:
 The Semantic Layer Runner is configured in your `odibi.yaml` project file. Here's a complete example:
 
 ```yaml
-project: OEE
+project: SalesAnalytics
 engine: spark
 
 # Define your connections
@@ -73,7 +73,7 @@ connections:
     type: delta
     account_name: mydatalake
     container: datalake
-    base_path: gold/OEE
+    base_path: gold/sales
     auth:
       mode: account_key
       account_key: ${AZURE_STORAGE_KEY}
@@ -112,50 +112,50 @@ semantic:
   connection: sql_server
   
   # Where to save generated SQL files (optional but recommended)
-  sql_output_path: gold/OEE/views
+  sql_output_path: gold/sales/views
   
   # Define your views
   views:
-    - name: vw_oee_daily
-      description: "Daily OEE metrics by plant and process"
-      source: oee_fact
+    - name: vw_sales_daily
+      description: "Daily sales metrics by store"
+      source: fact_orders
       db_schema: semantic
       metrics:
-        - name: oee
-          expr: "AVG(OEE)"
-          description: "Average Overall Equipment Effectiveness"
-        - name: teep
-          expr: "AVG(TEEP)"
-          description: "Total Effective Equipment Performance"
-        - name: efficiency
-          expr: "AVG(Efficiency)"
-          description: "Average Efficiency"
-        - name: total_production
-          expr: "SUM([Good Production])"
-          description: "Total good production"
+        - name: revenue
+          expr: "SUM(revenue)"
+          description: "Total revenue"
+        - name: order_count
+          expr: "COUNT(*)"
+          description: "Total number of orders"
+        - name: avg_order_value
+          expr: "AVG(order_value)"
+          description: "Average order value"
+        - name: total_sales
+          expr: "SUM(total_sales)"
+          description: "Total sales amount"
       dimensions:
         - name: date
           column: Date
-        - name: plant_process
-          column: P_ID
+        - name: store
+          column: store_id
       grain: day
 
-    - name: vw_oee_monthly
-      description: "Monthly OEE metrics by plant"
-      source: oee_fact
+    - name: vw_sales_monthly
+      description: "Monthly sales metrics by store"
+      source: fact_orders
       db_schema: semantic
       metrics:
-        - name: oee
-          expr: "AVG(OEE)"
-        - name: teep
-          expr: "AVG(TEEP)"
-        - name: total_production
-          expr: "SUM([Good Production])"
+        - name: revenue
+          expr: "SUM(revenue)"
+        - name: order_count
+          expr: "COUNT(*)"
+        - name: total_sales
+          expr: "SUM(total_sales)"
       dimensions:
         - name: year_month
           column: "FORMAT(Date, 'yyyy-MM')"
-        - name: plant_process
-          column: P_ID
+        - name: store
+          column: store_id
       grain: month
 ```
 
@@ -179,7 +179,7 @@ Optional path where generated SQL files will be saved. Useful for:
 
 ```yaml
 semantic:
-  sql_output_path: gold/OEE/views
+  sql_output_path: gold/sales/views
 ```
 
 #### `semantic.views`
@@ -204,9 +204,9 @@ Each metric defines an aggregation:
 
 ```yaml
 metrics:
-  - name: oee                    # Column name in the view
-    expr: "AVG(OEE)"             # SQL aggregation expression
-    description: "Average OEE"   # Optional documentation
+  - name: revenue                # Column name in the view
+    expr: "SUM(revenue)"         # SQL aggregation expression
+    description: "Total revenue" # Optional documentation
 ```
 
 **Common expressions:**
@@ -230,8 +230,8 @@ dimensions:
 ```yaml
 dimensions:
   # Simple column reference
-  - name: plant_id
-    column: P_ID
+  - name: store_id
+    column: store_id
 
   # Date formatting
   - name: year_month
@@ -353,29 +353,29 @@ The runner generates standard SQL Server view definitions. Here's an example of 
 
 ```yaml
 views:
-  - name: vw_oee_monthly
-    source: oee_fact
+  - name: vw_sales_monthly
+    source: fact_orders
     db_schema: semantic
     metrics:
-      - name: oee
-        expr: "AVG(OEE)"
-      - name: total_production
-        expr: "SUM([Good Production])"
+      - name: revenue
+        expr: "SUM(revenue)"
+      - name: total_sales
+        expr: "SUM(total_sales)"
     dimensions:
       - name: year_month
         column: "FORMAT(Date, 'yyyy-MM')"
-      - name: plant_id
-        column: P_ID
+      - name: store_id
+        column: store_id
     filters:
-      - "OEE > 0"
+      - "revenue > 0"
 ```
 
 ### Output (SQL)
 
 ```sql
--- View: semantic.vw_oee_monthly
+-- View: semantic.vw_sales_monthly
 -- Generated by Odibi Semantic Layer Runner
--- Source: oee_fact
+-- Source: fact_orders
 -- Generated at: 2026-01-02T10:30:00
 
 -- Ensure schema exists
@@ -386,15 +386,15 @@ END
 GO
 
 -- Create or replace view
-CREATE OR ALTER VIEW semantic.vw_oee_monthly AS
+CREATE OR ALTER VIEW semantic.vw_sales_monthly AS
 SELECT
     FORMAT(Date, 'yyyy-MM') AS year_month,
-    P_ID AS plant_id,
-    AVG(OEE) AS oee,
-    SUM([Good Production]) AS total_production
-FROM oee_fact
-WHERE OEE > 0
-GROUP BY FORMAT(Date, 'yyyy-MM'), P_ID
+    store_id AS store_id,
+    SUM(revenue) AS revenue,
+    SUM(total_sales) AS total_sales
+FROM fact_orders
+WHERE revenue > 0
+GROUP BY FORMAT(Date, 'yyyy-MM'), store_id
 GO
 ```
 
@@ -414,8 +414,8 @@ Stories are saved to:
 
 Example:
 ```
-stories/OEE_semantic/2026-01-02/run_10-30-45.json
-stories/OEE_semantic/2026-01-02/run_10-30-45.html
+stories/Sales_semantic/2026-01-02/run_10-30-45.json
+stories/Sales_semantic/2026-01-02/run_10-30-45.html
 ```
 
 ### Story Contents
@@ -424,7 +424,7 @@ The JSON story includes:
 
 ```json
 {
-  "name": "OEE_semantic",
+  "name": "Sales_semantic",
   "started_at": "2026-01-02T10:30:45",
   "completed_at": "2026-01-02T10:31:12",
   "duration": 27.3,
@@ -432,39 +432,39 @@ The JSON story includes:
   "views_failed": 0,
   "views": [
     {
-      "view_name": "vw_oee_daily",
-      "source_table": "oee_fact",
+      "view_name": "vw_sales_daily",
+      "source_table": "fact_orders",
       "status": "success",
       "duration": 2.1,
-      "sql_generated": "CREATE OR ALTER VIEW semantic.vw_oee_daily AS ...",
-      "sql_file_path": "gold/OEE/views/vw_oee_daily.sql",
-      "metrics_included": ["oee", "teep", "efficiency", "total_production"],
-      "dimensions_included": ["date", "plant_process"]
+      "sql_generated": "CREATE OR ALTER VIEW semantic.vw_sales_daily AS ...",
+      "sql_file_path": "gold/sales/views/vw_sales_daily.sql",
+      "metrics_included": ["revenue", "order_count", "avg_order_value", "total_sales"],
+      "dimensions_included": ["date", "store"]
     },
     {
-      "view_name": "vw_oee_monthly",
-      "source_table": "oee_fact",
+      "view_name": "vw_sales_monthly",
+      "source_table": "fact_orders",
       "status": "success",
       "duration": 1.8,
       "sql_generated": "...",
-      "sql_file_path": "gold/OEE/views/vw_oee_monthly.sql",
-      "metrics_included": ["oee", "teep", "total_production"],
-      "dimensions_included": ["year_month", "plant_process"]
+      "sql_file_path": "gold/sales/views/vw_sales_monthly.sql",
+      "metrics_included": ["revenue", "order_count", "total_sales"],
+      "dimensions_included": ["year_month", "store"]
     }
   ],
   "sql_files_saved": [
-    "gold/OEE/views/vw_oee_daily.sql",
-    "gold/OEE/views/vw_oee_monthly.sql"
+    "gold/sales/views/vw_sales_daily.sql",
+    "gold/sales/views/vw_sales_monthly.sql"
   ],
   "graph_data": {
     "nodes": [
-      {"id": "oee_fact", "type": "table", "layer": "gold"},
-      {"id": "vw_oee_daily", "type": "view", "layer": "semantic"},
-      {"id": "vw_oee_monthly", "type": "view", "layer": "semantic"}
+      {"id": "fact_orders", "type": "table", "layer": "gold"},
+      {"id": "vw_sales_daily", "type": "view", "layer": "semantic"},
+      {"id": "vw_sales_monthly", "type": "view", "layer": "semantic"}
     ],
     "edges": [
-      {"from": "oee_fact", "to": "vw_oee_daily"},
-      {"from": "oee_fact", "to": "vw_oee_monthly"}
+      {"from": "fact_orders", "to": "vw_sales_daily"},
+      {"from": "fact_orders", "to": "vw_sales_monthly"}
     ]
   }
 }
@@ -519,7 +519,7 @@ if result['views_failed']:
 ```yaml
 views:
   # Good - clear purpose
-  - name: vw_oee_daily_by_plant
+  - name: vw_sales_daily_by_store
   
   # Bad - unclear
   - name: v1
@@ -529,9 +529,9 @@ views:
 
 ```yaml
 metrics:
-  - name: oee
-    expr: "AVG(OEE)"
-    description: "Overall Equipment Effectiveness - measures manufacturing productivity"
+  - name: revenue
+    expr: "SUM(revenue)"
+    description: "Total revenue - sum of all order values"
 ```
 
 ### 3. Separate Schemas by Purpose
@@ -539,11 +539,11 @@ metrics:
 ```yaml
 views:
   # Operational views for daily dashboards
-  - name: vw_oee_daily
+  - name: vw_sales_daily
     db_schema: operational
   
   # Executive views for monthly reports
-  - name: vw_oee_monthly
+  - name: vw_sales_monthly
     db_schema: executive
 ```
 
@@ -572,7 +572,7 @@ The typical workflow is:
 
 1. **Bronze pipeline** - Ingest raw data
 2. **Silver pipeline** - Clean and transform
-3. **Gold pipeline** - Build fact tables (e.g., `oee_fact`)
+3. **Gold pipeline** - Build fact tables (e.g., `fact_orders`)
 4. **Semantic layer** - Create views from facts
 
 ```python

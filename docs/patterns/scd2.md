@@ -70,14 +70,14 @@ nodes:
     transformer: "scd2"
     params:
       connection: adls_prod            # READ existing history from here
-      path: OEE/silver/dim_customers
+      path: sales/silver/dim_customers
       keys: ["customer_id"]
       track_cols: ["address", "tier"]
       effective_time_col: "txn_date"
 
     write:
       connection: adls_prod            # WRITE result back (same location)
-      path: OEE/silver/dim_customers
+      path: sales/silver/dim_customers
       format: "delta"
       mode: "overwrite"
 ```

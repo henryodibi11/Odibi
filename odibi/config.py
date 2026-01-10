@@ -1931,9 +1931,9 @@ class SqlServerMergeOptions(BaseModel):
     write:
       connection: azure_sql
       format: sql_server
-      table: oee.oee_fact
+      table: sales.fact_orders
       mode: merge
-      merge_keys: [DateId, P_ID]
+      merge_keys: [DateId, store_id]
       merge_options:
         update_condition: "source._hash_diff != target._hash_diff"
         exclude_columns: [_hash_diff]
@@ -3275,15 +3275,85 @@ class StoryConfig(BaseModel):
         return self
 
 
+class SyncFromConfig(BaseModel):
+    """
+    Configuration for syncing system data from a source location.
+
+    Used to pull system data (runs, state) from another backend into the target.
+
+    Example:
+    ```yaml
+    sync_from:
+      connection: local_parquet
+      path: .odibi/system/
+    ```
+    """
+
+    connection: str = Field(description="Connection name for the source system data")
+    path: Optional[str] = Field(
+        default=None,
+        description="Path to source system data (for file-based sources)",
+    )
+    schema_name: Optional[str] = Field(
+        default=None,
+        description="Schema name for SQL Server source (if applicable)",
+    )
+
+
 class SystemConfig(BaseModel):
     """
     Configuration for the Odibi System Catalog (The Brain).
 
     Stores metadata, state, and pattern configurations.
+
+    Example:
+    ```yaml
+    system:
+      connection: adls_bronze
+      path: _odibi_system
+      environment: dev  # Tags all system records with environment
+    ```
+
+    With SQL Server (Phase 2):
+    ```yaml
+    system:
+      connection: sql_server
+      schema: odibi_system
+      environment: prod
+    ```
+
+    With sync from local (Phase 4):
+    ```yaml
+    system:
+      connection: sql_server
+      schema_name: odibi_system
+      environment: prod
+      sync_from:
+        connection: local_parquet
+        path: .odibi/system/
+    ```
     """
 
     connection: str = Field(description="Connection to store system tables (e.g., 'adls_bronze')")
     path: str = Field(default="_odibi_system", description="Path relative to connection root")
+    environment: Optional[str] = Field(
+        default=None,
+        description=(
+            "Environment tag (e.g., 'dev', 'qat', 'prod'). "
+            "Written to all system table records for cross-environment querying."
+        ),
+    )
+    schema_name: Optional[str] = Field(
+        default=None,
+        description="Schema name for SQL Server system tables (e.g., 'odibi_system'). Used when connection is SQL Server.",
+    )
+    sync_from: Optional[SyncFromConfig] = Field(
+        default=None,
+        description=(
+            "Source to sync system data from. Enables pushing local development "
+            "data to centralized SQL Server system tables."
+        ),
+    )
 
 
 class LineageConfig(BaseModel):
@@ -3421,9 +3491,37 @@ class ProjectConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def check_environments_not_implemented(self):
-        """Check environments implementation."""
-        # Implemented in Phase 3
+    def validate_environments_structure(self):
+        """Validate environments block contains only overrideable fields."""
+        if not self.environments:
+            return self
+
+        # Fields that can be overridden per environment
+        overrideable_fields = {
+            "connections",
+            "system",
+            "performance",
+            "logging",
+            "retry",
+            "alerts",
+            "story",
+            "lineage",
+        }
+
+        for env_name, env_overrides in self.environments.items():
+            if not isinstance(env_overrides, dict):
+                raise ValueError(
+                    f"Environment '{env_name}' must be a dictionary of overrides, "
+                    f"got {type(env_overrides).__name__}"
+                )
+            invalid_keys = set(env_overrides.keys()) - overrideable_fields
+            if invalid_keys:
+                raise ValueError(
+                    f"Environment '{env_name}' contains non-overrideable fields: "
+                    f"{sorted(invalid_keys)}. "
+                    f"Only these fields can be overridden: {sorted(overrideable_fields)}"
+                )
+
         return self
 
 

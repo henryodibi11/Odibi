@@ -88,7 +88,7 @@ When a node needs to join data from multiple sources:
   inputs:
     events: $read_bronze.shift_events
     calendar: $read_bronze.calendar_dim
-    plant: $read_bronze.plant_dim
+    store: $read_bronze.store_dim
   transform:
     steps:
       - operation: join
@@ -96,8 +96,8 @@ When a node needs to join data from multiple sources:
         right: calendar
         on: [date_id]
       - operation: join
-        right: plant
-        on: [plant_id]
+        right: store
+        on: [store_id]
 ```
 
 ### 3. Mixing References with Explicit Reads
@@ -177,9 +177,9 @@ When a node with a `write` block completes, its output metadata is recorded in t
    SELECT * FROM meta_outputs
    WHERE pipeline_name = 'read_bronze' AND node_name = 'shift_events'
 
-3. Returns: {connection: 'goat_prod', path: 'bronze/OEE/shift_events', format: 'delta'}
+3. Returns: {connection: 'goat_prod', path: 'bronze/sales/shift_events', format: 'delta'}
 
-4. At runtime: engine.read(connection='goat_prod', path='bronze/OEE/shift_events', format='delta')
+4. At runtime: engine.read(connection='goat_prod', path='bronze/sales/shift_events', format='delta')
 ```
 
 ---

@@ -251,7 +251,7 @@ For external tables not managed by pipelines, use `connection.path`:
 
 ```yaml
 source: gold.fact_orders              # → /mnt/data/gold/fact_orders
-source: gold.oee/plant_a/metrics      # → /mnt/data/gold/oee/plant_a/metrics (nested paths work!)
+source: gold.sales/store_a/metrics    # → /mnt/data/gold/sales/store_a/metrics (nested paths work!)
 ```
 
 The split happens on the **first dot only**, so subdirectories are supported.

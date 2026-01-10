@@ -5,18 +5,18 @@
 Manufacturing processes generate **time-series sensor data** at high frequency (every second or minute). Raw data looks like this:
 
 ```
-timestamp           | BatchID | LoadTime | CookTime | Status | Level | Weight
-2024-01-01 10:00:00 | B001    | 0        | 0        | 1      | 10    | 500
-2024-01-01 10:01:00 | B001    | 45       | 0        | 2      | 15    | 500
-2024-01-01 10:02:00 | B001    | 105      | 0        | 2      | 25    | 502
-... (thousands of rows per batch)
+timestamp           | RunID | SetupTime | ProcessTime | Status | Level | Weight
+2024-01-01 10:00:00 | R001  | 0         | 0           | 1      | 10    | 500
+2024-01-01 10:01:00 | R001  | 45        | 0           | 2      | 15    | 500
+2024-01-01 10:02:00 | R001  | 105       | 0           | 2      | 25    | 502
+... (thousands of rows per run)
 ```
 
-But business users need **one summary row per batch**:
+But business users need **one summary row per run**:
 
 ```
-BatchID | ProductCode | LoadTime_start      | LoadTime_end        | LoadTime_max_minutes | LoadTime_active_minutes | CookTime_start | ...
-B001    | PROD-A      | 2024-01-01 09:59:15 | 2024-01-01 10:15:00 | 15.75                | 12.5                    | 2024-01-01 11:00:00 | ...
+RunID | ItemCode | SetupTime_start     | SetupTime_end       | SetupTime_max_minutes | SetupTime_active_minutes | ProcessTime_start | ...
+R001  | ITEM-A   | 2024-01-01 09:59:15 | 2024-01-01 10:15:00 | 15.75                 | 12.5                     | 2024-01-01 11:00:00 | ...
 ```
 
 This pattern solves:
@@ -53,12 +53,12 @@ Your data system **polls** the PLC at intervals (e.g., every minute). You don't 
 
 ```
 What you capture:
-10:00:00 | LoadTime = 0      ← Phase hasn't started yet
-10:01:00 | LoadTime = 45     ← Phase started ~45 seconds ago!
-10:02:00 | LoadTime = 105    ← Running
-10:05:00 | LoadTime = 285    ← Running
-10:06:00 | LoadTime = 300    ← Stopped
-10:07:00 | LoadTime = 300    ← Still 300 (plateau = phase ended)
+10:00:00 | SetupTime = 0      ← Phase hasn't started yet
+10:01:00 | SetupTime = 45     ← Phase started ~45 seconds ago!
+10:02:00 | SetupTime = 105    ← Running
+10:05:00 | SetupTime = 285    ← Running
+10:06:00 | SetupTime = 300    ← Stopped
+10:07:00 | SetupTime = 300    ← Still 300 (plateau = phase ended)
 ```
 
 ### Back-Calculating True Start
@@ -75,9 +75,9 @@ True start = 10:01:00 - 45 seconds = 10:00:15
 The transformer finds the **first repeated value** (plateau):
 
 ```
-10:05:00 | LoadTime = 285
-10:06:00 | LoadTime = 300
-10:07:00 | LoadTime = 300  ← REPEAT! Phase ended at 10:06:00
+10:05:00 | SetupTime = 285
+10:06:00 | SetupTime = 300
+10:07:00 | SetupTime = 300  ← REPEAT! Phase ended at 10:06:00
 ```
 
 ---
@@ -89,19 +89,19 @@ The transformer finds the **first repeated value** (plateau):
 ```yaml
 transform:
   - detect_sequential_phases:
-      group_by: BatchID
+      group_by: RunID
       timestamp_col: ts
       phases:
-        - LoadTime
-        - CookTime
-        - CoolTime
+        - SetupTime
+        - ProcessTime
+        - CycleTime
 ```
 
 **Output columns:**
-- `BatchID`
-- `LoadTime_start`, `LoadTime_end`, `LoadTime_max_minutes`
-- `CookTime_start`, `CookTime_end`, `CookTime_max_minutes`
-- `CoolTime_start`, `CoolTime_end`, `CoolTime_max_minutes`
+- `RunID`
+- `SetupTime_start`, `SetupTime_end`, `SetupTime_max_minutes`
+- `ProcessTime_start`, `ProcessTime_end`, `ProcessTime_max_minutes`
+- `CycleTime_start`, `CycleTime_end`, `CycleTime_max_minutes`
 
 ### With Status Tracking
 
@@ -110,9 +110,9 @@ Track how long equipment spent in each state during each phase:
 ```yaml
 transform:
   - detect_sequential_phases:
-      group_by: BatchID
+      group_by: RunID
       timestamp_col: ts
-      phases: [LoadTime, CookTime, CoolTime]
+      phases: [SetupTime, ProcessTime, CycleTime]
       status_col: Status
       status_mapping:
         1: idle
@@ -122,8 +122,8 @@ transform:
 ```
 
 **Additional output columns:**
-- `LoadTime_idle_minutes`, `LoadTime_active_minutes`, `LoadTime_hold_minutes`, `LoadTime_faulted_minutes`
-- `CookTime_idle_minutes`, `CookTime_active_minutes`, ...
+- `SetupTime_idle_minutes`, `SetupTime_active_minutes`, `SetupTime_hold_minutes`, `SetupTime_faulted_minutes`
+- `ProcessTime_idle_minutes`, `ProcessTime_active_minutes`, ...
 
 ### With Phase Metrics
 
@@ -132,9 +132,9 @@ Capture max/min/avg of other columns within each phase window:
 ```yaml
 transform:
   - detect_sequential_phases:
-      group_by: BatchID
+      group_by: RunID
       timestamp_col: ts
-      phases: [LoadTime, CookTime]
+      phases: [SetupTime, ProcessTime]
       phase_metrics:
         Level: max
         Pressure: max
@@ -142,23 +142,23 @@ transform:
 ```
 
 **Additional output columns:**
-- `LoadTime_Level`, `LoadTime_Pressure`, `LoadTime_Temperature`
-- `CookTime_Level`, `CookTime_Pressure`, `CookTime_Temperature`
+- `SetupTime_Level`, `SetupTime_Pressure`, `SetupTime_Temperature`
+- `ProcessTime_Level`, `ProcessTime_Pressure`, `ProcessTime_Temperature`
 
 ### With Metadata
 
-Include batch-level attributes in the output:
+Include run-level attributes in the output:
 
 ```yaml
 transform:
   - detect_sequential_phases:
-      group_by: BatchID
+      group_by: RunID
       timestamp_col: ts
-      phases: [LoadTime, CookTime]
+      phases: [SetupTime, ProcessTime]
       metadata:
-        ProductCode: first_after_start  # First value after phase 1 starts
-        Weight: max                      # Max weight across batch
-        Operator: first                  # First value in group
+        ItemCode: first_after_start  # First value after phase 1 starts
+        Weight: max                  # Max weight across run
+        Operator: first              # First value in group
 ```
 
 **Metadata aggregation options:**
@@ -177,10 +177,10 @@ A complete Silver layer transformation for batch processing data:
 
 ```yaml
 pipelines:
-  - pipeline: silver_batch_analysis
+  - pipeline: silver_run_analysis
     layer: silver
     nodes:
-      - name: batch_phase_summary
+      - name: run_phase_summary
         read:
           connection: lakehouse
           format: delta
@@ -189,14 +189,14 @@ pipelines:
         transform:
           # Step 1: Detect all phases and calculate metrics
           - detect_sequential_phases:
-              group_by: BatchID
+              group_by: RunID
               timestamp_col: ts
               phases:
-                - LoadTime
-                - MixTime
-                - HeatTime
-                - CoolTime
-                - UnloadTime
+                - SetupTime
+                - PrepTime
+                - ActiveTime
+                - CycleTime
+                - CompleteTime
               start_threshold: 240
               status_col: Status
               status_mapping:
@@ -208,22 +208,22 @@ pipelines:
                 Level: max
                 Temperature: max
               metadata:
-                ProductCode: first_after_start
+                ItemCode: first_after_start
                 Weight: max
 
-          # Step 2: Filter to complete batches only
+          # Step 2: Filter to complete runs only
           - filter_rows:
-              condition: "HeatTime_Level > 70"
+              condition: "ActiveTime_Level > 70"
 
-          # Step 3: Sort by batch start time
+          # Step 3: Sort by run start time
           - sort:
-              by: LoadTime_start
+              by: SetupTime_start
               ascending: true
 
         write:
           connection: lakehouse
           format: delta
-          path: "silver/batch_phase_summary"
+          path: "silver/run_phase_summary"
           mode: overwrite
 ```
 
@@ -235,20 +235,20 @@ pipelines:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `group_by` | `str` or `List[str]` | Yes | - | Column(s) to group by. E.g., `"BatchID"` or `["BatchID", "AssetID"]` |
+| `group_by` | `str` or `List[str]` | Yes | - | Column(s) to group by. E.g., `"RunID"` or `["RunID", "AssetID"]` |
 | `timestamp_col` | `str` | No | `"ts"` | Timestamp column for ordering |
 | `phases` | `List[str]` | Yes | - | Timer columns representing sequential phases |
 | `start_threshold` | `int` | No | `240` | Max timer value (seconds) to consider as valid start |
 | `status_col` | `str` | No | - | Column containing equipment status codes |
 | `status_mapping` | `Dict[int, str]` | No | - | Map status codes to names |
 | `phase_metrics` | `Dict[str, str]` | No | - | Columns to aggregate within each phase |
-| `metadata` | `Dict[str, str]` | No | - | Batch-level columns with aggregation method |
+| `metadata` | `Dict[str, str]` | No | - | Run-level columns with aggregation method |
 | `fill_null_minutes` | `bool` | No | `False` | If True, fill null numeric columns with 0. Timestamps remain null for skipped phases. |
 | `spark_native` | `bool` | No | `False` | If True, use native Spark window functions instead of applyInPandas. See Engine Support section. |
 
 ### Output Columns
 
-For each phase (e.g., `LoadTime`):
+For each phase (e.g., `SetupTime`):
 
 | Column | Description |
 |--------|-------------|
@@ -272,7 +272,7 @@ If your first reading shows a timer value > `start_threshold`, the transformer s
 start_threshold: 240  # Ignore readings where timer > 4 minutes
 ```
 
-**Why?** If you see `LoadTime = 500` on the first reading, you missed the start. The transformer finds a valid start point.
+**Why?** If you see `SetupTime = 500` on the first reading, you missed the start. The transformer finds a valid start point.
 
 ### Empty/Skipped Phases
 
@@ -281,8 +281,8 @@ If a phase never ran (timer is always 0), the columns are still generated but wi
 ```yaml
 transform:
   - detect_sequential_phases:
-      group_by: BatchID
-      phases: [LoadTime, CookTime]
+      group_by: RunID
+      phases: [SetupTime, ProcessTime]
       fill_null_minutes: true  # null _max_minutes, _status_minutes → 0
 ```
 
@@ -304,19 +304,19 @@ If the data ends mid-phase (no plateau detected), the transformer uses the last 
 
 ## Multi-Column Grouping
 
-Group by multiple columns when the same batch runs on different equipment:
+Group by multiple columns when the same run operates on different equipment:
 
 ```yaml
 transform:
   - detect_sequential_phases:
       group_by:
-        - BatchID
+        - RunID
         - AssetID
       timestamp_col: ts
-      phases: [LoadTime, CookTime]
+      phases: [SetupTime, ProcessTime]
 ```
 
-**Output:** One row per unique `(BatchID, AssetID)` combination.
+**Output:** One row per unique `(RunID, AssetID)` combination.
 
 ---
 
@@ -324,11 +324,11 @@ transform:
 
 | Industry | Phases | Status Codes |
 |----------|--------|--------------|
-| **Batch Processing** | Load, Mix, Heat, Unload | idle, active, hold, faulted |
-| **Food Processing** | Load, Cook, Cool, Package | running, stopped, cleaning |
+| **Batch Processing** | Setup, Prep, Active, Complete | idle, active, hold, faulted |
+| **Assembly Line** | Load, Process, Inspect, Unload | running, stopped, maintenance |
 | **CIP Cleaning** | PreRinse, Wash, Rinse, Sanitize | active, draining, idle |
-| **Injection Molding** | Clamp, Inject, Cool, Eject | running, setup, fault |
-| **Pharma** | Charge, Mix, Heat, Discharge | running, hold, sampling |
+| **Injection Molding** | Clamp, Inject, Cycle, Eject | running, setup, fault |
+| **Discrete Manufacturing** | Queue, Setup, Run, Teardown | running, hold, changeover |
 
 ---
 
@@ -343,16 +343,16 @@ transform:
 ### Spark Performance
 
 By default, Spark uses `applyInPandas` which:
-- Groups data once, then processes each batch in parallel
-- Works well for datasets with **many batches** (e.g., thousands of BatchIDs)
+- Groups data once, then processes each run in parallel
+- Works well for datasets with **many runs** (e.g., thousands of RunIDs)
 
-For datasets with **few large batches**, you can try native Spark window functions:
+For datasets with **few large runs**, you can try native Spark window functions:
 
 ```yaml
 transform:
   - detect_sequential_phases:
-      group_by: BatchID
-      phases: [LoadTime, CookTime]
+      group_by: RunID
+      phases: [SetupTime, ProcessTime]
       spark_native: true  # Use window functions instead of applyInPandas
 ```
 
@@ -366,13 +366,13 @@ The native implementation uses `lag`, `lead`, and `row_number` window functions 
 
 2. **Don't include `status_col` if you don't need it** - The transformer works fine without status tracking; you just won't get time-in-state columns.
 
-3. **Use `phase_metrics` for QA filtering** - Capture `Level: max` to filter out incomplete batches:
+3. **Use `phase_metrics` for QA filtering** - Capture `Level: max` to filter out incomplete runs:
    ```yaml
    phase_metrics:
      Level: max
    # Then filter:
    - filter_rows:
-       condition: "CookTime_Level > 70"
+       condition: "ProcessTime_Level > 70"
    ```
 
 4. **Chain with other transformers** - The output is a normal DataFrame. Use `filter_rows`, `drop_columns`, `sort`, etc. for post-processing.

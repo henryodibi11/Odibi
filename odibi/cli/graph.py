@@ -21,7 +21,8 @@ def graph_command(args):
     """
     try:
         # Load pipeline manager
-        manager = PipelineManager.from_yaml(args.config)
+        env = getattr(args, "env", None)
+        manager = PipelineManager.from_yaml(args.config, env=env)
 
         # Determine which pipeline to graph
         pipeline_name = args.pipeline

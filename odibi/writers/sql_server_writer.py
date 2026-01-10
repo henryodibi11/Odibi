@@ -127,11 +127,11 @@ class SqlServerMergeWriter:
         Generate staging table name from target table.
 
         Args:
-            target_table: Target table name (e.g., 'oee.oee_fact')
+            target_table: Target table name (e.g., 'sales.fact_orders')
             staging_schema: Schema for staging table
 
         Returns:
-            Staging table name (e.g., '[staging].[oee_fact_staging]')
+            Staging table name (e.g., '[staging].[fact_orders_staging]')
         """
         if "." in target_table:
             _, table_name = target_table.split(".", 1)
@@ -151,7 +151,7 @@ class SqlServerMergeWriter:
         Parse table name into schema and table parts.
 
         Args:
-            table: Table name (e.g., 'oee.oee_fact' or 'oee_fact')
+            table: Table name (e.g., 'sales.fact_orders' or 'fact_orders')
 
         Returns:
             Tuple of (schema, table_name)
@@ -176,7 +176,7 @@ class SqlServerMergeWriter:
         Check if a table exists in SQL Server.
 
         Args:
-            table: Table name (e.g., 'oee.oee_fact')
+            table: Table name (e.g., 'sales.fact_orders')
 
         Returns:
             True if table exists

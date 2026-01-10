@@ -507,7 +507,7 @@ params:
 transformer: "scd2"
 params:
   connection: adls_prod           # Connection name
-  path: OEE/silver/dim_customers  # Relative path
+  path: sales/silver/dim_customers  # Relative path
   keys: ["customer_id"]
   track_cols: ["address", "tier"]
   effective_time_col: "txn_date"
@@ -571,7 +571,7 @@ transform:
     - function: merge
       params:
         connection: adls_prod           # Connection name
-        path: OEE/silver/customers      # Relative path
+        path: sales/silver/customers    # Relative path
         register_table: silver.customers  # Register in metastore
         keys: ["customer_id"]
         strategy: "upsert"

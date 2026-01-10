@@ -34,6 +34,80 @@ connections:
 |-------|------|----------|-------------|
 | `connection` | string | Yes | Connection name for catalog storage |
 | `path` | string | No | Subdirectory for catalog tables (default: `_odibi_system`) |
+| `environment` | string | No | Environment tag (e.g., `dev`, `qat`, `prod`) written to all records |
+| `schema_name` | string | No | SQL Server schema name (default: `odibi_system`). Used when connection is SQL Server |
+| `sync_from` | object | No | Source configuration for syncing data from another backend |
+
+### SQL Server Backend
+
+For centralized observability across environments, you can store system tables in SQL Server instead of Delta:
+
+```yaml
+system:
+  connection: sql_server
+  schema_name: odibi_system
+  environment: prod
+
+connections:
+  sql_server:
+    type: sql_server
+    server: myserver.database.windows.net
+    database: odibi_metadata
+    auth:
+      mode: service_principal
+```
+
+The SQL Server backend:
+- **Auto-creates schema and tables** on first use
+- Stores `meta_runs` and `meta_state` tables
+- Enables cross-environment querying from a single location
+- Useful when multiple dev/qat/prod environments need unified observability
+
+### Environment Tagging
+
+Tag all system records with an environment identifier for cross-environment analysis:
+
+```yaml
+system:
+  connection: adls_bronze
+  path: _odibi_system
+  environment: prod  # All records tagged with 'prod'
+```
+
+This enables queries like:
+```sql
+SELECT * FROM meta_runs WHERE environment = 'prod' AND status = 'FAILED'
+```
+
+### System Sync
+
+Sync local development data to a centralized SQL Server:
+
+```yaml
+system:
+  connection: sql_server
+  schema_name: odibi_system
+  environment: prod
+  sync_from:
+    connection: local_dev
+    path: .odibi/system/
+
+connections:
+  sql_server:
+    type: sql_server
+    server: central-server.database.windows.net
+    database: odibi_metadata
+  local_dev:
+    type: local
+    base_path: ./
+```
+
+Then run:
+```bash
+odibi system sync project.yaml
+```
+
+This pushes local `meta_runs` and `meta_state` to the central SQL Server, re-tagging records with the target environment.
 
 ## Catalog Tables
 
@@ -79,18 +153,20 @@ Execution history with metrics. Partitioned by `pipeline_name` and `date`.
 | `rows_processed` | long | Number of rows processed |
 | `duration_ms` | long | Execution time in milliseconds |
 | `metrics_json` | string | Additional metrics as JSON |
+| `environment` | string | Environment tag (dev, qat, prod) |
 | `timestamp` | timestamp | Execution timestamp |
 | `date` | date | Partition date |
 
 ### meta_state
 
-High-water mark (HWM) storage for incremental processing. Partitioned by `pipeline_name`.
+High-water mark (HWM) storage for incremental processing.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `pipeline_name` | string | Pipeline name |
-| `node_name` | string | Node name |
-| `hwm_value` | string | Serialized high-water mark value |
+| `key` | string | HWM key (e.g., `pipeline.node.hwm`) |
+| `value` | string | Serialized high-water mark value (JSON) |
+| `environment` | string | Environment tag (dev, qat, prod) |
+| `updated_at` | timestamp | Last update timestamp |
 
 ### meta_patterns
 
@@ -457,6 +533,29 @@ Output includes:
 | `metrics` | `--format` |
 | `patterns` | `--format` |
 | `stats` | `--pipeline`, `--days` |
+
+### System Sync CLI
+
+Sync system data between backends:
+
+```bash
+# Sync all tables (runs + state)
+odibi system sync project.yaml
+
+# Sync with environment override
+odibi system sync project.yaml --env prod
+
+# Sync only specific tables
+odibi system sync project.yaml --tables runs
+odibi system sync project.yaml --tables state
+
+# Preview without making changes
+odibi system sync project.yaml --dry-run
+```
+
+| Command | Options |
+|---------|---------|
+| `system sync` | `--env`, `--tables`, `--dry-run` |
 
 ## Complete Example
 

@@ -119,6 +119,17 @@ class CatalogManager:
         """Check if running in Pandas mode."""
         return self.engine is not None and self.engine.name == "pandas"
 
+    @property
+    def is_sql_server_mode(self) -> bool:
+        """Check if running with SQL Server system backend."""
+        if self.connection is None:
+            return False
+        # Check if connection is AzureSQL type
+        conn_type = getattr(self.connection, "__class__", None)
+        if conn_type is None:
+            return False
+        return conn_type.__name__ in ("AzureSQL", "SqlServerConnection")
+
     def _get_storage_options(self) -> Dict[str, Any]:
         """Get storage options for pandas/delta-rs operations.
 
@@ -550,6 +561,7 @@ class CatalogManager:
                 StructField("rows_processed", LongType(), True),
                 StructField("duration_ms", LongType(), True),
                 StructField("metrics_json", StringType(), True),
+                StructField("environment", StringType(), True),
                 StructField("timestamp", TimestampType(), True),
                 StructField("date", DateType(), True),
             ]
@@ -591,6 +603,7 @@ class CatalogManager:
             [
                 StructField("key", StringType(), False),
                 StructField("value", StringType(), True),
+                StructField("environment", StringType(), True),
                 StructField("updated_at", TimestampType(), True),
             ]
         )
@@ -1365,6 +1378,16 @@ class CatalogManager:
 
         Note: For better performance with multiple nodes, use log_runs_batch() instead.
         """
+        environment = getattr(self.config, "environment", None)
+
+        # SQL Server mode - direct insert
+        if self.is_sql_server_mode:
+            self._log_run_sql_server(
+                run_id, pipeline_name, node_name, status,
+                rows_processed, duration_ms, metrics_json, environment
+            )
+            return
+
         if not self.spark and not self.engine:
             return
 
@@ -1381,6 +1404,7 @@ class CatalogManager:
                         rows_processed,
                         duration_ms,
                         metrics_json,
+                        environment,
                     )
                 ]
                 schema = self._get_schema_meta_runs()
@@ -1407,6 +1431,7 @@ class CatalogManager:
                     "rows_processed": [rows_processed],
                     "duration_ms": [duration_ms],
                     "metrics_json": [metrics_json],
+                    "environment": [environment],
                     "timestamp": [timestamp],
                     "date": [timestamp.date()],
                 }
@@ -1425,6 +1450,43 @@ class CatalogManager:
         except Exception as e:
             logger.warning(f"Failed to log run to system catalog: {e}")
 
+    def _log_run_sql_server(
+        self,
+        run_id: str,
+        pipeline_name: str,
+        node_name: str,
+        status: str,
+        rows_processed: int,
+        duration_ms: int,
+        metrics_json: str,
+        environment: Optional[str],
+    ) -> None:
+        """Log a run to SQL Server meta_runs table."""
+        schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        try:
+            sql = f"""
+            INSERT INTO [{schema_name}].[meta_runs]
+            (run_id, pipeline_name, node_name, status, rows_processed, duration_ms,
+             metrics_json, environment, timestamp, date)
+            VALUES (:run_id, :pipeline, :node, :status, :rows, :duration,
+                    :metrics, :env, GETUTCDATE(), CAST(GETUTCDATE() AS DATE))
+            """
+            self.connection.execute(
+                sql,
+                {
+                    "run_id": run_id,
+                    "pipeline": pipeline_name,
+                    "node": node_name,
+                    "status": status,
+                    "rows": rows_processed or 0,
+                    "duration": duration_ms or 0,
+                    "metrics": metrics_json or "{}",
+                    "env": environment,
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log run to SQL Server: {e}")
+
     def log_runs_batch(
         self,
         records: List[Dict[str, Any]],
@@ -1438,10 +1500,23 @@ class CatalogManager:
             records: List of dicts with keys: run_id, pipeline_name, node_name,
                      status, rows_processed, duration_ms, metrics_json
         """
-        if not self.spark and not self.engine:
+        if not records:
             return
 
-        if not records:
+        environment = getattr(self.config, "environment", None)
+
+        # SQL Server mode - batch insert
+        if self.is_sql_server_mode:
+            for r in records:
+                self._log_run_sql_server(
+                    r["run_id"], r["pipeline_name"], r["node_name"], r["status"],
+                    r.get("rows_processed", 0), r.get("duration_ms", 0),
+                    r.get("metrics_json", "{}"), environment
+                )
+            logger.debug(f"Batch logged {len(records)} run records to SQL Server")
+            return
+
+        if not self.spark and not self.engine:
             return
 
         def _do_batch_log():
@@ -1457,6 +1532,7 @@ class CatalogManager:
                         r.get("rows_processed", 0),
                         r.get("duration_ms", 0),
                         r.get("metrics_json", "{}"),
+                        environment,
                     )
                     for r in records
                 ]
@@ -1486,6 +1562,7 @@ class CatalogManager:
                     "rows_processed": [r.get("rows_processed", 0) for r in records],
                     "duration_ms": [r.get("duration_ms", 0) for r in records],
                     "metrics_json": [r.get("metrics_json", "{}") for r in records],
+                    "environment": [environment] * len(records),
                     "timestamp": [timestamp] * len(records),
                     "date": [timestamp.date()] * len(records),
                 }

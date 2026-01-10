@@ -27,7 +27,7 @@ nodes:
       table: my_snapshot_table
       mode: append
       skip_if_unchanged: true
-      skip_hash_sort_columns: [P_ID, DateId]  # For deterministic ordering
+      skip_hash_sort_columns: [store_id, date_id]  # For deterministic ordering
 ```
 
 ## How It Works
@@ -68,26 +68,26 @@ flowchart TD
 - Append-only fact tables (new data every run)
 - Very large tables (hash computation is expensive)
 
-## Example: Global Manufacturing Data
+## Example: Reference Data Sync
 
 ```yaml
-# Pipeline runs hourly for global coverage
+# Pipeline runs hourly for freshness
 # But this table only changes 1-2 times per day
 
 nodes:
-  - name: bronze_osmdssds_detail
+  - name: bronze_reference_data
     read:
       connection: azure_sql
       format: sql
-      table: dbo.vw_OSMDSSDSEDetail
+      table: dbo.vw_reference_detail
     write:
       connection: bronze
       format: delta
-      table: osmdssds_detail
+      table: reference_detail
       mode: append
       add_metadata: true
       skip_if_unchanged: true
-      skip_hash_sort_columns: [P_ID, DateId]
+      skip_hash_sort_columns: [store_id, date_id]
 ```
 
 **Result:**

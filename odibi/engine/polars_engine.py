@@ -564,25 +564,89 @@ class PolarsEngine(Engine):
         return failures
 
     def validate_data(self, df: Any, validation_config: Any) -> List[str]:
-        """Validate data against rules."""
+        """Validate data against rules.
+
+        Args:
+            df: DataFrame or LazyFrame
+            validation_config: ValidationConfig object
+
+        Returns:
+            List of validation failure messages
+        """
         failures = []
 
-        # We'll materialize for complex validation or use lazy expressions
-        # Lazy is better.
+        if isinstance(df, pl.LazyFrame):
+            schema = df.collect_schema()
+            columns = schema.names()
+        else:
+            columns = df.columns
 
-        # Not empty check
         if getattr(validation_config, "not_empty", False):
             count = self.count_rows(df)
             if count == 0:
                 failures.append("DataFrame is empty")
 
-        # No nulls
         if getattr(validation_config, "no_nulls", None):
             cols = validation_config.no_nulls
             null_counts = self.count_nulls(df, cols)
             for col, count in null_counts.items():
                 if count > 0:
                     failures.append(f"Column '{col}' has {count} null values")
+
+        if getattr(validation_config, "schema_validation", None):
+            schema_failures = self.validate_schema(df, validation_config.schema_validation)
+            failures.extend(schema_failures)
+
+        if getattr(validation_config, "ranges", None):
+            for col, bounds in validation_config.ranges.items():
+                if col in columns:
+                    min_val = bounds.get("min")
+                    max_val = bounds.get("max")
+
+                    if min_val is not None:
+                        if isinstance(df, pl.LazyFrame):
+                            min_violations = (
+                                df.filter(pl.col(col) < min_val)
+                                .select(pl.len())
+                                .collect()
+                                .item()
+                            )
+                        else:
+                            min_violations = len(df.filter(pl.col(col) < min_val))
+                        if min_violations > 0:
+                            failures.append(f"Column '{col}' has values < {min_val}")
+
+                    if max_val is not None:
+                        if isinstance(df, pl.LazyFrame):
+                            max_violations = (
+                                df.filter(pl.col(col) > max_val)
+                                .select(pl.len())
+                                .collect()
+                                .item()
+                            )
+                        else:
+                            max_violations = len(df.filter(pl.col(col) > max_val))
+                        if max_violations > 0:
+                            failures.append(f"Column '{col}' has values > {max_val}")
+                else:
+                    failures.append(f"Column '{col}' not found for range validation")
+
+        if getattr(validation_config, "allowed_values", None):
+            for col, allowed in validation_config.allowed_values.items():
+                if col in columns:
+                    if isinstance(df, pl.LazyFrame):
+                        invalid_count = (
+                            df.filter(~pl.col(col).is_in(allowed))
+                            .select(pl.len())
+                            .collect()
+                            .item()
+                        )
+                    else:
+                        invalid_count = len(df.filter(~pl.col(col).is_in(allowed)))
+                    if invalid_count > 0:
+                        failures.append(f"Column '{col}' has invalid values")
+                else:
+                    failures.append(f"Column '{col}' not found for allowed values validation")
 
         return failures
 
@@ -762,3 +826,298 @@ class PolarsEngine(Engine):
             return df.with_columns([pl.lit("[REDACTED]").alias(c) for c in columns])
 
         return df
+
+    def get_table_schema(
+        self,
+        connection: Any,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        format: Optional[str] = None,
+    ) -> Optional[Dict[str, str]]:
+        """Get schema of an existing table/file.
+
+        Args:
+            connection: Connection object
+            table: Table name
+            path: File path
+            format: Data format (optional, helps with file-based sources)
+
+        Returns:
+            Schema dict or None if table doesn't exist or schema fetch fails.
+        """
+        from odibi.utils.logging_context import get_logging_context
+
+        ctx = get_logging_context().with_context(engine="polars")
+
+        try:
+            if table and format in ["sql", "sql_server", "azure_sql"]:
+                query = f"SELECT TOP 0 * FROM {table}"
+                df = connection.read_sql(query)
+                return {col: str(dtype) for col, dtype in zip(df.columns, df.dtypes)}
+
+            if path:
+                full_path = connection.get_path(path) if connection else path
+                if not os.path.exists(full_path):
+                    return None
+
+                if format == "delta":
+                    try:
+                        from deltalake import DeltaTable
+
+                        dt = DeltaTable(full_path)
+                        arrow_schema = dt.schema().to_pyarrow()
+                        return {field.name: str(field.type) for field in arrow_schema}
+                    except ImportError:
+                        ctx.warning(
+                            "deltalake library not installed for schema introspection",
+                            path=full_path,
+                        )
+                        return None
+
+                elif format == "parquet":
+                    try:
+                        import pyarrow.parquet as pq
+                        import glob as glob_mod
+
+                        target_path = full_path
+                        if os.path.isdir(full_path):
+                            files = glob_mod.glob(os.path.join(full_path, "*.parquet"))
+                            if not files:
+                                return None
+                            target_path = files[0]
+
+                        schema = pq.read_schema(target_path)
+                        return {field.name: str(field.type) for field in schema}
+                    except ImportError:
+                        lf = pl.scan_parquet(full_path)
+                        schema = lf.collect_schema()
+                        return {name: str(dtype) for name, dtype in schema.items()}
+
+                elif format == "csv":
+                    lf = pl.scan_csv(full_path)
+                    schema = lf.collect_schema()
+                    return {name: str(dtype) for name, dtype in schema.items()}
+
+        except (FileNotFoundError, PermissionError):
+            return None
+        except Exception as e:
+            ctx.warning(f"Failed to infer schema for {table or path}: {e}")
+            return None
+
+        return None
+
+    def maintain_table(
+        self,
+        connection: Any,
+        format: str,
+        table: Optional[str] = None,
+        path: Optional[str] = None,
+        config: Optional[Any] = None,
+    ) -> None:
+        """Run table maintenance operations (optimize, vacuum) for Delta tables.
+
+        Args:
+            connection: Connection object
+            format: Table format
+            table: Table name
+            path: Table path
+            config: AutoOptimizeConfig object
+        """
+        from odibi.utils.logging_context import get_logging_context
+
+        ctx = get_logging_context().with_context(engine="polars")
+
+        if format != "delta" or not config or not getattr(config, "enabled", False):
+            return
+
+        if not path and not table:
+            return
+
+        full_path = connection.get_path(path if path else table) if connection else (path or table)
+
+        ctx.info("Starting table maintenance", path=str(full_path))
+
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            ctx.warning(
+                "Auto-optimize skipped: 'deltalake' library not installed",
+                path=str(full_path),
+            )
+            return
+
+        try:
+            import time
+
+            start = time.time()
+
+            storage_opts = {}
+            if hasattr(connection, "pandas_storage_options"):
+                storage_opts = connection.pandas_storage_options()
+
+            dt = DeltaTable(full_path, storage_options=storage_opts)
+
+            ctx.info("Running Delta OPTIMIZE (compaction)", path=str(full_path))
+            dt.optimize.compact()
+
+            retention = getattr(config, "vacuum_retention_hours", None)
+            if retention is not None and retention > 0:
+                ctx.info(
+                    "Running Delta VACUUM",
+                    path=str(full_path),
+                    retention_hours=retention,
+                )
+                dt.vacuum(
+                    retention_hours=retention,
+                    enforce_retention_duration=True,
+                    dry_run=False,
+                )
+
+            elapsed = (time.time() - start) * 1000
+            ctx.info(
+                "Table maintenance completed",
+                path=str(full_path),
+                elapsed_ms=round(elapsed, 2),
+            )
+
+        except Exception as e:
+            ctx.warning(
+                "Auto-optimize failed",
+                path=str(full_path),
+                error=str(e),
+            )
+
+    def get_source_files(self, df: Any) -> List[str]:
+        """Get list of source files that generated this DataFrame.
+
+        For Polars, this checks if source file info was stored
+        in the DataFrame's metadata during read.
+
+        Args:
+            df: DataFrame or LazyFrame
+
+        Returns:
+            List of file paths (or empty list if not applicable/supported)
+        """
+        if isinstance(df, pl.LazyFrame):
+            return []
+
+        if hasattr(df, "attrs"):
+            return df.attrs.get("odibi_source_files", [])
+
+        return []
+
+    def vacuum_delta(
+        self,
+        connection: Any,
+        path: str,
+        retention_hours: int = 168,
+        dry_run: bool = False,
+        enforce_retention_duration: bool = True,
+    ) -> Dict[str, Any]:
+        """VACUUM a Delta table to remove old files.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            retention_hours: Retention period (default 168 = 7 days)
+            dry_run: If True, only show files to be deleted
+            enforce_retention_duration: If False, allows retention < 168 hours (testing only)
+
+        Returns:
+            Dictionary with files_deleted count
+        """
+        from odibi.utils.logging_context import get_logging_context
+        import time
+
+        ctx = get_logging_context().with_context(engine="polars")
+        start = time.time()
+
+        ctx.debug(
+            "Starting Delta VACUUM",
+            path=path,
+            retention_hours=retention_hours,
+            dry_run=dry_run,
+        )
+
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            ctx.error("Delta Lake library not installed", path=path)
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[polars]' "
+                "or 'pip install deltalake'. See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path) if connection else path
+
+        storage_opts = {}
+        if hasattr(connection, "pandas_storage_options"):
+            storage_opts = connection.pandas_storage_options()
+
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        deleted_files = dt.vacuum(
+            retention_hours=retention_hours,
+            dry_run=dry_run,
+            enforce_retention_duration=enforce_retention_duration,
+        )
+
+        elapsed = (time.time() - start) * 1000
+        ctx.info(
+            "Delta VACUUM completed",
+            path=str(full_path),
+            files_deleted=len(deleted_files),
+            dry_run=dry_run,
+            elapsed_ms=round(elapsed, 2),
+        )
+
+        return {"files_deleted": len(deleted_files)}
+
+    def get_delta_history(
+        self, connection: Any, path: str, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Get Delta table history.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            limit: Maximum number of versions to return
+
+        Returns:
+            List of version metadata dictionaries
+        """
+        from odibi.utils.logging_context import get_logging_context
+        import time
+
+        ctx = get_logging_context().with_context(engine="polars")
+        start = time.time()
+
+        ctx.debug("Getting Delta table history", path=path, limit=limit)
+
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            ctx.error("Delta Lake library not installed", path=path)
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[polars]' "
+                "or 'pip install deltalake'. See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path) if connection else path
+
+        storage_opts = {}
+        if hasattr(connection, "pandas_storage_options"):
+            storage_opts = connection.pandas_storage_options()
+
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        history = dt.history(limit=limit)
+
+        elapsed = (time.time() - start) * 1000
+        ctx.info(
+            "Delta history retrieved",
+            path=str(full_path),
+            versions_returned=len(history) if history else 0,
+            elapsed_ms=round(elapsed, 2),
+        )
+
+        return history

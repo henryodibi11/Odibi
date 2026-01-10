@@ -415,10 +415,60 @@ Metadata for a column in the data dictionary.
 Configuration for the Odibi System Catalog (The Brain).
 
 Stores metadata, state, and pattern configurations.
+
+Example:
+```yaml
+system:
+  connection: adls_bronze
+  path: _odibi_system
+  environment: dev  # Tags all system records with environment
+```
+
+With SQL Server (Phase 2):
+```yaml
+system:
+  connection: sql_server
+  schema: odibi_system
+  environment: prod
+```
+
+With sync from local (Phase 4):
+```yaml
+system:
+  connection: sql_server
+  schema_name: odibi_system
+  environment: prod
+  sync_from:
+    connection: local_parquet
+    path: .odibi/system/
+```
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection to store system tables (e.g., 'adls_bronze') |
 | **path** | str | No | `_odibi_system` | Path relative to connection root |
+| **environment** | Optional[str] | No | - | Environment tag (e.g., 'dev', 'qat', 'prod'). Written to all system table records for cross-environment querying. |
+| **schema_name** | Optional[str] | No | - | Schema name for SQL Server system tables (e.g., 'odibi_system'). Used when connection is SQL Server. |
+| **sync_from** | Optional[[SyncFromConfig](#syncfromconfig)] | No | - | Source to sync system data from. Enables pushing local development data to centralized SQL Server system tables. |
+
+---
+### `SyncFromConfig`
+> *Used in: [SystemConfig](#systemconfig)*
+
+Configuration for syncing system data from a source location.
+
+Used to pull system data (runs, state) from another backend into the target.
+
+Example:
+```yaml
+sync_from:
+  connection: local_parquet
+  path: .odibi/system/
+```
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **connection** | str | Yes | - | Connection name for the source system data |
+| **path** | Optional[str] | No | - | Path to source system data (for file-based sources) |
+| **schema_name** | Optional[str] | No | - | Schema name for SQL Server source (if applicable) |
 
 ---
 ## Connections
@@ -1432,9 +1482,9 @@ Data is written to a staging table, then merged into the target.
 write:
   connection: azure_sql
   format: sql_server
-  table: oee.oee_fact
+  table: sales.fact_orders
   mode: merge
-  merge_keys: [DateId, P_ID]
+  merge_keys: [DateId, store_id]
   merge_options:
     update_condition: "source._hash_diff != target._hash_diff"
     exclude_columns: [_hash_diff]
@@ -3247,7 +3297,7 @@ Example:
 ```yaml
 - function: generate_numeric_key
   params:
-    columns: [DateID, P_ID, ReasonID, Shutdown_Duration_Min, Notes]
+    columns: [DateID, store_id, reason_id, duration_min, notes]
     output_col: ID
     coalesce_with: ID  # Keep existing ID if not null
 ```

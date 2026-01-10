@@ -503,7 +503,7 @@ class NumericKeyParams(BaseModel):
     ```yaml
     - function: generate_numeric_key
       params:
-        columns: [DateID, P_ID, ReasonID, Shutdown_Duration_Min, Notes]
+        columns: [DateID, store_id, reason_id, duration_min, notes]
         output_col: ID
         coalesce_with: ID  # Keep existing ID if not null
     ```
