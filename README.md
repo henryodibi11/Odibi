@@ -3,8 +3,10 @@
 **Declarative data pipelines. YAML in, star schemas out.**
 
 [![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
+[![PyPI](https://img.shields.io/pypi/v/odibi.svg)](https://pypi.org/project/odibi/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://henryodibi11.github.io/Odibi/)
 
 Odibi is a framework for building data pipelines. You describe *what* you want in YAML; Odibi handles *how*. Every run generates a "Data Story" — an audit report showing exactly what happened to your data.
 
