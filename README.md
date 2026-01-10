@@ -18,8 +18,15 @@ Odibi is a framework for building data pipelines. You describe *what* you want i
 pip install odibi
 ```
 
-Clone and run the reference example:
+**Option 1: Start from a template**
+```bash
+odibi init my_project --template star-schema
+cd my_project
+odibi run odibi.yaml
+odibi story last          # View the audit report
+```
 
+**Option 2: Clone the reference example**
 ```bash
 git clone https://github.com/henryodibi11/Odibi.git
 cd Odibi/docs/examples/canonical/runnable

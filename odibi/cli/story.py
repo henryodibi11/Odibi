@@ -29,6 +29,10 @@ def story_command(args):
         return diff_command(args)
     elif args.story_command == "list":
         return list_command(args)
+    elif args.story_command == "last":
+        return last_command(args)
+    elif args.story_command == "show":
+        return show_command(args)
     else:
         print(f"Unknown story command: {args.story_command}")
         return 1
@@ -304,6 +308,144 @@ def list_command(args):
         return 1
 
 
+def last_command(args):
+    """
+    Show the most recent story file.
+
+    Args:
+        args: Parsed arguments with optional --node filter
+
+    Returns:
+        Exit code
+    """
+    import json
+    import webbrowser
+
+    # Common story directories to search (with recursive glob)
+    search_patterns = [
+        Path("stories/runs"),
+        Path("data/gold/stories"),
+        Path("data/stories"),
+        Path("stories"),
+        Path("."),
+    ]
+
+    # Find the most recent story file
+    latest_story = None
+    latest_time = 0
+
+    for base_dir in search_patterns:
+        if not base_dir.exists():
+            continue
+
+        # Use recursive glob to find stories in subdirectories
+        for ext in ["**/*.html", "**/*.json", "*.html", "*.json"]:
+            for story_file in base_dir.glob(ext):
+                if story_file.is_file():
+                    mtime = story_file.stat().st_mtime
+                    if mtime > latest_time:
+                        latest_time = mtime
+                        latest_story = story_file
+
+    if not latest_story:
+        print("❌ No story files found")
+        print("   Run a pipeline first: odibi run odibi.yaml")
+        return 1
+
+    print(f"📖 Latest story: {latest_story}")
+
+    # If --node is specified, filter and display node info
+    if hasattr(args, "node") and args.node:
+        if latest_story.suffix == ".json":
+            with open(latest_story, "r") as f:
+                story_data = json.load(f)
+
+            # Find the node
+            nodes = story_data.get("nodes", [])
+            node_info = None
+            for node in nodes:
+                if node.get("node_name") == args.node:
+                    node_info = node
+                    break
+
+            if node_info:
+                print(f"\n🔍 Node: {args.node}")
+                print("=" * 60)
+                print(f"   Status: {node_info.get('status', 'unknown')}")
+                print(f"   Duration: {node_info.get('duration', 0):.3f}s")
+                print(f"   Rows In: {node_info.get('rows_in', 'N/A')}")
+                print(f"   Rows Out: {node_info.get('rows_out', 'N/A')}")
+
+                if node_info.get("error"):
+                    print(f"\n❌ Error: {node_info.get('error')}")
+
+                if node_info.get("source_path"):
+                    print(f"\n   Source: {node_info.get('source_path')}")
+                if node_info.get("target_path"):
+                    print(f"   Target: {node_info.get('target_path')}")
+            else:
+                print(f"❌ Node '{args.node}' not found in story")
+                print(f"   Available nodes: {[n.get('node_name') for n in nodes]}")
+                return 1
+        else:
+            print("   (Node filtering only works with JSON stories)")
+    else:
+        # Open the story in browser if HTML, or print path
+        if latest_story.suffix == ".html":
+            abs_path = latest_story.absolute()
+            print("🌐 Opening in browser...")
+            webbrowser.open(f"file://{abs_path}")
+        else:
+            print(f"   View: odibi story show {latest_story}")
+
+    return 0
+
+
+def show_command(args):
+    """
+    Show a specific story file.
+
+    Args:
+        args: Parsed arguments with story path
+
+    Returns:
+        Exit code
+    """
+    import json
+    import webbrowser
+
+    story_path = Path(args.path)
+
+    if not story_path.exists():
+        print(f"❌ Story not found: {story_path}")
+        return 1
+
+    print(f"📖 Story: {story_path}")
+
+    if story_path.suffix == ".html":
+        abs_path = story_path.absolute()
+        print("🌐 Opening in browser...")
+        webbrowser.open(f"file://{abs_path}")
+    elif story_path.suffix == ".json":
+        with open(story_path, "r") as f:
+            story_data = json.load(f)
+
+        print(f"\n📊 Pipeline: {story_data.get('pipeline_name', 'Unknown')}")
+        print(f"   Duration: {story_data.get('duration', 0):.2f}s")
+        print(f"   Status: {'✅ Success' if story_data.get('success') else '❌ Failed'}")
+        print(f"   Nodes: {len(story_data.get('nodes', []))}")
+
+        if story_data.get("nodes"):
+            print("\n   Node Summary:")
+            for node in story_data["nodes"]:
+                status_icon = "✅" if node.get("status") == "success" else "❌"
+                print(f"     {status_icon} {node.get('node_name')}: {node.get('duration', 0):.3f}s")
+    else:
+        print("   (Use a text editor to view this file)")
+
+    return 0
+
+
 def add_story_parser(subparsers):
     """
     Add story subcommand parser.
@@ -375,5 +517,18 @@ def add_story_parser(subparsers):
         default=10,
         help="Maximum number of stories to show (default: 10)",
     )
+
+    # odibi story last
+    last_parser = story_subparsers.add_parser(
+        "last", help="View the most recent story (opens HTML in browser)"
+    )
+    last_parser.add_argument(
+        "--node",
+        help="Filter to show details for a specific node",
+    )
+
+    # odibi story show
+    show_parser = story_subparsers.add_parser("show", help="View a specific story file")
+    show_parser.add_argument("path", help="Path to story file (JSON or HTML)")
 
     return story_parser

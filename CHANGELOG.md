@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-01-10
+
+### Added - Developer Experience: Golden Path & Debugging
+
+- **Golden Path Templates** (`odibi init`):
+  - Templates now aligned with `docs/golden_path.md` canonical examples
+  - Three templates: `hello`, `scd2`, `star-schema`
+  - Each template includes sample data from canonical examples
+  - Improved interactive prompt with descriptions
+
+- **Frictionless Debugging** (`PipelineResults.debug_summary()`):
+  - New method generates actionable next steps when pipelines fail
+  - Shows failed nodes with truncated error messages
+  - Points to story path and specific debugging commands
+  - Automatically printed by CLI on failure
+
+- **Story Commands** (`odibi story last`, `odibi story show`):
+  - `odibi story last` - Opens most recent story (HTML in browser, JSON summary)
+  - `odibi story last --node <name>` - Filter to specific node details
+  - `odibi story show <path>` - View any story file
+
+- **Improved CLI Output**:
+  - Success: Shows story path and view command
+  - Failure: Shows debug summary with next steps
+  - CLI epilog updated with Golden Path quick start
+
+### Changed
+
+- `odibi init` now copies sample data from canonical examples
+- README template updated with Golden Path workflow and debugging guide
+- CLI help reorganized into "Golden Path", "Core Commands", and "Debugging" sections
+
+### Fixed
+
+- **Validation bug**: Patterns (`dimension`, `fact`, `scd2`, etc.) were incorrectly failing validation with "not registered" error
+- **Story search**: `odibi story last` now recursively searches nested story directories
+
 ## [2.5.0] - 2026-01-09
 
 ### Added - System Environments & SQL Server Backend

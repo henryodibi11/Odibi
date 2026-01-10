@@ -260,3 +260,116 @@ class TestStoryParserIntegration:
         # Test list
         args = parser.parse_args(["story", "list"])
         assert args.story_command == "list"
+
+        # Test last
+        args = parser.parse_args(["story", "last"])
+        assert args.story_command == "last"
+
+        # Test last with --node
+        args = parser.parse_args(["story", "last", "--node", "dim_customer"])
+        assert args.story_command == "last"
+        assert args.node == "dim_customer"
+
+        # Test show
+        args = parser.parse_args(["story", "show", "stories/run.json"])
+        assert args.story_command == "show"
+        assert args.path == "stories/run.json"
+
+
+class TestLastCommand:
+    """Tests for story last CLI command."""
+
+    def test_last_command_no_stories(self, tmp_path, capsys):
+        """last should show error when no stories exist."""
+        import os
+
+        from odibi.cli.story import last_command
+
+        # Change to empty temp dir
+        original_cwd = os.getcwd()
+        os.chdir(tmp_path)
+
+        try:
+            args = Namespace(node=None)
+            result = last_command(args)
+
+            assert result == 1
+            captured = capsys.readouterr()
+            assert "No story files found" in captured.out
+        finally:
+            os.chdir(original_cwd)
+
+    def test_last_command_finds_most_recent(self, tmp_path, capsys):
+        """last should find the most recent story file."""
+        import os
+        import time
+
+        from odibi.cli.story import last_command
+
+        # Create stories dir with files
+        stories_dir = tmp_path / "stories"
+        stories_dir.mkdir()
+
+        # Create older story
+        old_story = stories_dir / "old.json"
+        old_story.write_text('{"pipeline_name": "old"}')
+
+        time.sleep(0.1)  # Ensure different mtime
+
+        # Create newer story
+        new_story = stories_dir / "new.json"
+        new_story.write_text('{"pipeline_name": "new", "nodes": []}')
+
+        original_cwd = os.getcwd()
+        os.chdir(tmp_path)
+
+        try:
+            args = Namespace(node=None)
+            result = last_command(args)
+
+            assert result == 0
+            captured = capsys.readouterr()
+            assert "new.json" in captured.out
+        finally:
+            os.chdir(original_cwd)
+
+
+class TestShowCommand:
+    """Tests for story show CLI command."""
+
+    def test_show_command_file_not_found(self, capsys):
+        """show should error when file doesn't exist."""
+        from odibi.cli.story import show_command
+
+        args = Namespace(path="nonexistent.json")
+        result = show_command(args)
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "not found" in captured.out
+
+    def test_show_command_json_story(self, tmp_path, capsys):
+        """show should display JSON story summary."""
+        from odibi.cli.story import show_command
+
+        story_file = tmp_path / "test_story.json"
+        story_data = {
+            "pipeline_name": "test_pipeline",
+            "duration": 5.5,
+            "success": True,
+            "nodes": [
+                {"node_name": "node1", "status": "success", "duration": 1.0},
+                {"node_name": "node2", "status": "success", "duration": 2.0},
+            ],
+        }
+        story_file.write_text(json.dumps(story_data))
+
+        args = Namespace(path=str(story_file))
+        result = show_command(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "test_pipeline" in captured.out
+        assert "5.5" in captured.out
+        assert "node1" in captured.out
+        assert "node2" in captured.out

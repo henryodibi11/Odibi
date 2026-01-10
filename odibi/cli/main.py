@@ -30,13 +30,25 @@ def main():
         description="Odibi Data Pipeline Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  odibi run config.yaml                    Run a pipeline
-  odibi validate config.yaml               Validate configuration
-  odibi graph config.yaml                  Visualize dependencies
-  odibi story generate config.yaml        Generate documentation
-  odibi story diff run1.json run2.json    Compare two runs
-  odibi story list                         List story files
+Golden Path (Quick Start):
+  odibi init my_project              Create new project from template
+  cd my_project
+  odibi validate odibi.yaml          Check configuration
+  odibi run odibi.yaml               Run pipeline
+  odibi story last                   View execution story
+
+Core Commands:
+  odibi run config.yaml              Run a pipeline
+  odibi validate config.yaml         Validate configuration
+  odibi graph config.yaml            Visualize dependencies
+  odibi doctor                       Check environment health
+
+Debugging:
+  odibi story show <path>            View a specific story
+  odibi story last --node <name>     Inspect a failed node
+  odibi graph config.yaml --verbose  Detailed dependency view
+
+Learn more: https://henryodibi11.github.io/Odibi/golden_path/
         """,
     )
 

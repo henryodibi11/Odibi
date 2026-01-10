@@ -74,6 +74,50 @@ class PipelineResults:
             "node_count": len(self.node_results),
         }
 
+    def debug_summary(self) -> str:
+        """Generate a debug summary with next steps for failed pipelines.
+
+        Returns:
+            Formatted string with failure details and suggested next steps.
+            Returns empty string if pipeline succeeded.
+        """
+        if not self.failed:
+            return ""
+
+        lines = []
+        lines.append(f"\n{'=' * 60}")
+        lines.append(f"❌ Pipeline '{self.pipeline_name}' failed")
+        lines.append(f"{'=' * 60}")
+
+        # List failed nodes with errors
+        lines.append("\nFailed nodes:")
+        for node_name in self.failed:
+            node_res = self.node_results.get(node_name)
+            if node_res and node_res.error:
+                error_msg = str(node_res.error)[:200]
+                lines.append(f"  • {node_name}: {error_msg}")
+            else:
+                lines.append(f"  • {node_name}")
+
+        # Story path if available
+        lines.append("\n📖 Next Steps:")
+        if self.story_path:
+            lines.append("  1. View the execution story:")
+            lines.append(f"     odibi story show {self.story_path}")
+            lines.append("")
+            lines.append("  2. Inspect a specific failed node:")
+            first_failed = self.failed[0] if self.failed else "<node_name>"
+            lines.append(f"     odibi story last --node {first_failed}")
+        else:
+            lines.append("  1. Check the logs for error details")
+
+        lines.append("")
+        lines.append("  3. If this is an environment issue:")
+        lines.append("     odibi doctor")
+        lines.append("")
+
+        return "\n".join(lines)
+
 
 class Pipeline:
     """Pipeline executor and orchestrator."""
@@ -1169,7 +1213,7 @@ class Pipeline:
         if node_name not in self.graph.nodes:
             available = ", ".join(self.graph.nodes.keys()) or "none"
             raise ValueError(
-                f"Node '{node_name}' not found in pipeline. " f"Available nodes: {available}"
+                f"Node '{node_name}' not found in pipeline. Available nodes: {available}"
             )
 
         # Register mock data if provided
@@ -1217,16 +1261,27 @@ class Pipeline:
 
             for node_name, node in self.graph.nodes.items():
                 if node.transformer:
-                    try:
-                        FunctionRegistry.validate_params(node.transformer, node.params)
-                    except ValueError as e:
-                        validation["errors"].append(f"Node '{node_name}' transformer error: {e}")
-                        validation["valid"] = False
-                        self._ctx.log_validation_result(
-                            passed=False,
-                            rule_name=f"transformer_params:{node_name}",
-                            failures=[str(e)],
-                        )
+                    # First check if it's a pattern (dimension, fact, scd2, etc.)
+                    from odibi.patterns import _PATTERNS
+
+                    if node.transformer in _PATTERNS:
+                        # Pattern validation is handled by the pattern class itself
+                        # Just verify it exists - detailed validation happens at runtime
+                        pass
+                    else:
+                        # It's a function from the registry
+                        try:
+                            FunctionRegistry.validate_params(node.transformer, node.params)
+                        except ValueError as e:
+                            validation["errors"].append(
+                                f"Node '{node_name}' transformer error: {e}"
+                            )
+                            validation["valid"] = False
+                            self._ctx.log_validation_result(
+                                passed=False,
+                                rule_name=f"transformer_params:{node_name}",
+                                failures=[str(e)],
+                            )
 
                 if node.transform and node.transform.steps:
                     for i, step in enumerate(node.transform.steps):

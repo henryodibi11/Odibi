@@ -6,12 +6,18 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Map template names to their relative paths in the repo
+# Templates align with docs/golden_path.md canonical examples
 TEMPLATE_MAP = {
-    "kitchen": "examples/templates/kitchen_sink.odibi.yaml",
-    "full": "examples/templates/template_full.yaml",
-    "local": "examples/templates/simple_local.yaml",
-    "local-medallion": "examples/templates/simple_local.yaml",
-    "azure": "examples/templates/azure_spark.yaml",
+    "hello": "docs/examples/canonical/runnable/01_hello_world.yaml",
+    "scd2": "docs/examples/canonical/runnable/03_scd2_dimension.yaml",
+    "star-schema": "docs/examples/canonical/runnable/04_fact_table.yaml",
+}
+
+# Template descriptions for interactive prompt
+TEMPLATE_DESCRIPTIONS = {
+    "hello": "Hello World - Simple CSV read/write (start here)",
+    "scd2": "SCD Type 2 - Slowly Changing Dimension pattern",
+    "star-schema": "Star Schema - Full dimensional model with fact table",
 }
 
 
@@ -46,7 +52,8 @@ def init_pipeline_command(args):
         print("\nSelect a project template:")
         templates = list(TEMPLATE_MAP.keys())
         for i, t in enumerate(templates):
-            print(f"  {i + 1}. {t}")
+            desc = TEMPLATE_DESCRIPTIONS.get(t, t)
+            print(f"  {i + 1}. {t:<12} - {desc}")
 
         try:
             choice = input(f"\nEnter number (default: 1 [{templates[0]}]): ").strip()
@@ -61,7 +68,7 @@ def init_pipeline_command(args):
                     return 1
         except (ValueError, EOFError, KeyboardInterrupt):
             # Fallback for non-interactive
-            template_name = "local"
+            template_name = "hello"
             logger.info(f"Using default template: {template_name}")
 
     # 1. Determine Target Path
@@ -100,9 +107,18 @@ def init_pipeline_command(args):
     try:
         os.makedirs(target_dir)
 
-        # Copy the template to odibi.yaml
+        # Copy the template to odibi.yaml and fix paths
         target_file = target_dir / "odibi.yaml"
-        shutil.copy2(source_path, target_file)
+
+        # Read template, fix relative paths for standalone project
+        with open(source_path, "r") as f:
+            template_content = f.read()
+
+        # Fix paths: ../sample_data -> ./sample_data (for standalone projects)
+        template_content = template_content.replace("../sample_data", "./sample_data")
+
+        with open(target_file, "w") as f:
+            f.write(template_content)
 
         # Create standard directories
         os.makedirs(target_dir / "data", exist_ok=True)
@@ -110,13 +126,12 @@ def init_pipeline_command(args):
         os.makedirs(target_dir / "logs", exist_ok=True)
         os.makedirs(target_dir / ".github/workflows", exist_ok=True)
 
-        # Create sample data for local template
-        if template_name in ["local", "local-medallion"]:
-            with open(target_dir / "data/raw/sample_data.csv", "w") as f:
-                f.write("id,name,value,updated_at\n")
-                f.write("1,Item A,100,2023-01-01 10:00:00\n")
-                f.write("2,Item B,200,2023-01-01 11:00:00\n")
-                f.write("1,Item A (Old),90,2023-01-01 09:00:00\n")
+        # Copy sample data from canonical examples
+        sample_data_dir = repo_root / "docs/examples/canonical/sample_data"
+        if sample_data_dir.exists():
+            target_sample_dir = target_dir / "sample_data"
+            shutil.copytree(sample_data_dir, target_sample_dir)
+            logger.debug(f"Copied sample data to: {target_sample_dir}")
 
         # Create Dockerfile
         dockerfile_content = """FROM python:3.11-slim
@@ -192,48 +207,58 @@ jobs:
 
 A data engineering project built with [Odibi](https://github.com/henryodibi11/Odibi).
 
-## Getting Started
+## Quick Start (Golden Path)
 
-### Prerequisites
-- Python 3.9+
-- Odibi (`pip install odibi`)
-
-### Project Structure
-- `odibi.yaml`: Main pipeline configuration
-- `data/`: Local data storage
-- `stories/`: Execution reports (HTML)
-
-### Commands
-
-**1. Validate Configuration**
 ```bash
+# 1. Validate your config
 odibi validate odibi.yaml
+
+# 2. Run the pipeline
+odibi run odibi.yaml
+
+# 3. View the execution story
+odibi story last
 ```
 
-**2. Check Health**
+## Project Structure
+
+- `odibi.yaml` - Pipeline configuration
+- `sample_data/` - Source CSV files
+- `data/` - Output data (created on first run)
+
+## Debugging
+
+If a pipeline fails, Odibi shows you exactly what to do next:
+
 ```bash
+# View the story for a failed node
+odibi story last --node <node_name>
+
+# Visualize the dependency graph
+odibi graph odibi.yaml
+
+# Check environment health
 odibi doctor
 ```
 
-**3. Run Pipeline**
-```bash
-odibi run odibi.yaml
-```
+## Learn More
 
-**4. View Results**
-```bash
-odibi ui
-```
-
-## CI/CD
-A GitHub Actions workflow is included in `.github/workflows/ci.yaml` that validates the project on every push.
+- [Golden Path Guide](https://henryodibi11.github.io/Odibi/golden_path/)
+- [YAML Schema Reference](https://henryodibi11.github.io/Odibi/reference/yaml_schema/)
+- [Patterns (SCD2, Fact, Dimension)](https://henryodibi11.github.io/Odibi/patterns/)
 """
         with open(target_dir / "README.md", "w") as f:
             f.write(readme_content)
 
-        logger.info(f"Created new project '{project_name}' using '{template_name}' template.")
-        logger.info(f"Location: {target_dir}")
-        logger.info(f"Next step: cd {project_name} && odibi run odibi.yaml")
+        # Print golden path next steps
+        print(f"\n✅ Created project: {project_name}")
+        print(f"   Template: {template_name} ({TEMPLATE_DESCRIPTIONS.get(template_name, '')})")
+        print(f"\n📁 Location: {target_dir}")
+        print("\n🚀 Golden Path - Next Steps:")
+        print(f"   cd {project_name}")
+        print("   odibi validate odibi.yaml   # Check config")
+        print("   odibi run odibi.yaml        # Run pipeline")
+        print("   odibi story last            # View results")
 
         return 0
 

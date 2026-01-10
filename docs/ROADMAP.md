@@ -4,7 +4,7 @@ This roadmap outlines where Odibi is headed. It's a living document that evolves
 
 ---
 
-## Current Release: v2.4.0
+## Current Release: v2.6.0
 
 ### What's Available Now
 
@@ -21,21 +21,14 @@ This roadmap outlines where Odibi is headed. It's a living document that evolves
 | **Azure connections** (ADLS, SQL Server, Key Vault) | ✅ Stable |
 | **Semantic layer** (metrics, materialization) | ✅ Stable |
 | **CLI** (`odibi run`, `odibi validate`, etc.) | ✅ Stable |
+| **Golden Path Templates** (`odibi init`) | ✅ Stable |
+| **Frictionless Debugging** (`debug_summary()`, `odibi story last`) | ✅ Stable |
 
 ---
 
 ## Short Term (Next 1-2 Releases)
 
-### v2.5.0 - Developer Experience
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Improved error messages** | Every error includes what failed, what was expected, and how to fix | ✅ Done |
-| **Rows read vs written in Stories** | Distinguish input rows from output rows in audit reports | ✅ Done |
-| **PyPI publication** | `pip install odibi` from PyPI | ✅ Done |
-| **Documentation site** | Hosted docs on GitHub Pages | ✅ Done |
-
-### v2.6.0 - Observability
+### v2.7.0 - Observability
 
 | Feature | Description | Status |
 |---------|-------------|--------|

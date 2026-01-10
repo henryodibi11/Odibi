@@ -1588,8 +1588,7 @@ class PandasEngine(Engine):
                 null_counts[col] = int(df[col].isna().sum())
             else:
                 raise ValueError(
-                    f"Column '{col}' not found in DataFrame. "
-                    f"Available columns: {list(df.columns)}"
+                    f"Column '{col}' not found in DataFrame. Available columns: {list(df.columns)}"
                 )
         return null_counts
 

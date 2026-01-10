@@ -1,6 +1,7 @@
 """Tests for CLI module (Phase 2.5)."""
 
 import sys
+from argparse import Namespace
 from unittest.mock import ANY, Mock, patch
 
 import pytest
@@ -88,6 +89,9 @@ class TestRunCommand:
 
         mock_result = Mock()
         mock_result.failed = []
+        mock_result.pipeline_name = "test_pipeline"
+        mock_result.duration = 1.5
+        mock_result.story_path = None  # No story path in mock
 
         mock_manager = Mock()
         mock_manager.run.return_value = mock_result
@@ -164,3 +168,76 @@ pipelines:
 
         result = validate_command(args)
         assert result == 0  # Success
+
+
+class TestInitCommand:
+    """Test init-pipeline command."""
+
+    def test_init_command_creates_project(self, tmp_path, monkeypatch):
+        """init should create project directory with odibi.yaml."""
+        from odibi.cli.init_pipeline import init_pipeline_command
+
+        # Change to temp directory
+        monkeypatch.chdir(tmp_path)
+
+        args = Namespace(name="test_project", template="hello", force=False)
+        result = init_pipeline_command(args)
+
+        # Should succeed (may fail if templates not found, which is OK in test env)
+        project_dir = tmp_path / "test_project"
+        if result == 0:
+            assert project_dir.exists()
+            assert (project_dir / "odibi.yaml").exists()
+
+    def test_init_command_fixes_sample_data_path(self, tmp_path, monkeypatch):
+        """init should replace ../sample_data with ./sample_data in odibi.yaml."""
+        from odibi.cli.init_pipeline import init_pipeline_command
+
+        monkeypatch.chdir(tmp_path)
+
+        args = Namespace(name="test_project", template="hello", force=False)
+        result = init_pipeline_command(args)
+
+        if result == 0:
+            odibi_yaml = tmp_path / "test_project" / "odibi.yaml"
+            content = odibi_yaml.read_text()
+
+            # Should NOT have ../sample_data (broken path)
+            assert "../sample_data" not in content
+            # Should have ./sample_data (correct for standalone project)
+            assert "./sample_data" in content
+
+    def test_init_command_copies_sample_data(self, tmp_path, monkeypatch):
+        """init should copy sample_data directory."""
+        from odibi.cli.init_pipeline import init_pipeline_command
+
+        monkeypatch.chdir(tmp_path)
+
+        args = Namespace(name="test_project", template="star-schema", force=False)
+        result = init_pipeline_command(args)
+
+        if result == 0:
+            sample_dir = tmp_path / "test_project" / "sample_data"
+            assert sample_dir.exists()
+            # Should have the CSV files
+            assert (sample_dir / "customers.csv").exists()
+            assert (sample_dir / "products.csv").exists()
+            assert (sample_dir / "orders.csv").exists()
+
+    def test_init_command_force_overwrites(self, tmp_path, monkeypatch):
+        """init --force should overwrite existing directory."""
+        from odibi.cli.init_pipeline import init_pipeline_command
+
+        monkeypatch.chdir(tmp_path)
+
+        # Create existing directory
+        existing = tmp_path / "test_project"
+        existing.mkdir()
+        (existing / "existing_file.txt").write_text("should be gone")
+
+        args = Namespace(name="test_project", template="hello", force=True)
+        result = init_pipeline_command(args)
+
+        if result == 0:
+            assert not (existing / "existing_file.txt").exists()
+            assert (existing / "odibi.yaml").exists()

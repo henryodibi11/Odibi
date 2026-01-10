@@ -41,39 +41,21 @@ def run_command(args):
 
         # Check results for failures
         failed = False
-        if isinstance(results, dict):
-            # Multiple pipelines
-            for result in results.values():
-                if result.failed:
-                    failed = True
-                    logger.error(f"Pipeline '{result.pipeline_name}' failed")
-                    for node_name in result.failed:
-                        node_res = result.node_results.get(node_name)
-                        if node_res and node_res.error:
-                            logger.error(f"Node '{node_name}' error: {node_res.error}")
+        all_results = results.values() if isinstance(results, dict) else [results]
 
-                            # Unbury Suggestions
-                            error_obj = node_res.error
-                            suggestions = getattr(error_obj, "suggestions", [])
-
-                            if not suggestions and hasattr(error_obj, "original_error"):
-                                suggestions = getattr(error_obj.original_error, "suggestions", [])
-
-                            if suggestions:
-                                logger.info("💡 Suggestions:")
-                                for suggestion in suggestions:
-                                    logger.info(f"   - {suggestion}")
-                    break
-        else:
-            # Single pipeline
-            if results.failed:
+        for result in all_results:
+            if result.failed:
                 failed = True
-                logger.error(f"Pipeline '{results.pipeline_name}' failed")
-                for node_name in results.failed:
-                    node_res = results.node_results.get(node_name)
-                    if node_res and node_res.error:
-                        logger.error(f"Node '{node_name}' error: {node_res.error}")
 
+                # Print debug summary with next steps
+                debug_output = result.debug_summary()
+                if debug_output:
+                    print(debug_output)
+
+                # Also log individual errors for detail
+                for node_name in result.failed:
+                    node_res = result.node_results.get(node_name)
+                    if node_res and node_res.error:
                         # Unbury Suggestions
                         error_obj = node_res.error
                         suggestions = getattr(error_obj, "suggestions", [])
@@ -82,15 +64,20 @@ def run_command(args):
                             suggestions = getattr(error_obj.original_error, "suggestions", [])
 
                         if suggestions:
-                            logger.info("Suggestions:")
+                            logger.info("💡 Suggestions:")
                             for suggestion in suggestions:
                                 logger.info(f"   - {suggestion}")
+            else:
+                # Success - still show story path
+                if result.story_path:
+                    print(f"\n✅ Pipeline '{result.pipeline_name}' completed successfully")
+                    print(f"   Duration: {result.duration:.2f}s")
+                    print(f"   Story: {result.story_path}")
+                    print(f"   View:  odibi story show {result.story_path}")
 
         if failed:
-            logger.error("Pipeline execution failed")
             return 1
         else:
-            logger.info("Pipeline completed successfully")
             return 0
 
     except Exception as e:

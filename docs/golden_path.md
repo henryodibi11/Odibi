@@ -12,8 +12,15 @@ pip install odibi
 
 ---
 
-## Step 2: Clone the Reference
+## Step 2: Create Your Project
 
+**Option A: Use the CLI (recommended)**
+```bash
+odibi init my_project --template star-schema
+cd my_project
+```
+
+**Option B: Clone the reference**
 ```bash
 git clone https://github.com/henryodibi11/Odibi.git
 cd Odibi/docs/examples/canonical/runnable
@@ -21,10 +28,11 @@ cd Odibi/docs/examples/canonical/runnable
 
 ---
 
-## Step 3: Run the Canonical Pipeline
+## Step 3: Run the Pipeline
 
 ```bash
-odibi run 04_fact_table.yaml
+odibi run odibi.yaml          # Option A
+odibi run 04_fact_table.yaml  # Option B
 ```
 
 This builds a complete star schema:
@@ -41,12 +49,11 @@ This builds a complete star schema:
 ## Step 4: See What Happened
 
 ```bash
-# View the output
-ls data/gold/
+# View the audit report (opens in browser)
+odibi story last
 
-# Open the audit report
-start data/gold/stories/*.html   # Windows
-open data/gold/stories/*.html    # Mac/Linux
+# Or manually browse the output
+ls data/gold/
 ```
 
 ---

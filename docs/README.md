@@ -4,9 +4,27 @@
 
 ---
 
-## 🎯 Start Here
+## ⚡ Quick Start
 
-> **New to Odibi?** Follow the [Golden Path](golden_path.md) → Run [THE Reference Pipeline](examples/canonical/THE_REFERENCE.md) → You're done.
+```bash
+pip install odibi
+
+# Create a project from template
+odibi init my_project --template star-schema
+cd my_project
+
+# Run it
+odibi run odibi.yaml
+
+# View the audit report
+odibi story last
+```
+
+**That's it.** You now have a working star schema pipeline.
+
+---
+
+## 🎯 Start Here
 
 | Goal | Go to |
 |------|-------|
@@ -23,6 +41,23 @@ Odibi is a framework for building data pipelines. You describe *what* you want i
 - **Declarative**: YAML over imperative Python
 - **Auditable**: Every run generates a "Data Story" (HTML report)
 - **Dual-engine**: Pandas (local) → Spark (production) with zero config changes
+
+---
+
+## CLI Cheat Sheet
+
+```bash
+# Create & Run
+odibi init my_project          # Scaffold from template
+odibi run odibi.yaml           # Execute pipeline
+odibi validate odibi.yaml      # Check config without running
+
+# Debug
+odibi story last               # View most recent story
+odibi story last --node X      # Inspect a specific node
+odibi doctor                   # Check environment health
+odibi graph odibi.yaml         # Visualize dependencies
+```
 
 ---
 

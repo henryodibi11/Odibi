@@ -240,7 +240,7 @@ def create_sql_server_connection(name: str, config: Dict[str, Any]) -> Any:
             config_keys=list(config.keys()),
         )
         raise ValueError(
-            f"Connection '{name}' missing 'host' or 'server'. " f"Got keys: {list(config.keys())}"
+            f"Connection '{name}' missing 'host' or 'server'. Got keys: {list(config.keys())}"
         )
 
     auth_config = config.get("auth", {})

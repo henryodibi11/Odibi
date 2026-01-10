@@ -22,7 +22,6 @@ from deltalake import DeltaTable, write_deltalake
 
 from odibi.state import (
     CatalogStateBackend,
-    SqlServerSystemBackend,
     create_sync_source_backend,
     sync_system_data,
 )
@@ -204,7 +203,7 @@ def test_sync_delta_to_delta():
 
     result = sync_system_data(source_backend, target_backend)
 
-    print(f"\n  Results:")
+    print("\n  Results:")
     print(f"    Runs synced:  {result['runs']}")
     print(f"    State synced: {result['state']}")
 
@@ -296,7 +295,7 @@ def main():
     try:
         setup_directories()
         write_source_data()
-        result = test_sync_delta_to_delta()
+        test_sync_delta_to_delta()
         runs_df, state_df = verify_target_data()
         test_create_sync_source_backend()
         print_summary()
