@@ -55,17 +55,13 @@ class TestValidatorPandas:
 
     def test_not_null_pass(self, validator, sample_df):
         """NOT_NULL passes when no nulls in column."""
-        config = ValidationConfig(
-            tests=[NotNullTest(type=TestType.NOT_NULL, columns=["id"])]
-        )
+        config = ValidationConfig(tests=[NotNullTest(type=TestType.NOT_NULL, columns=["id"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 0
 
     def test_not_null_fail(self, validator, sample_df):
         """NOT_NULL fails when nulls exist in column."""
-        config = ValidationConfig(
-            tests=[NotNullTest(type=TestType.NOT_NULL, columns=["name"])]
-        )
+        config = ValidationConfig(tests=[NotNullTest(type=TestType.NOT_NULL, columns=["name"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "Column 'name' contains 1 NULLs" in failures[0]
@@ -81,17 +77,13 @@ class TestValidatorPandas:
 
     def test_unique_pass(self, validator, sample_df):
         """UNIQUE passes when column has no duplicates."""
-        config = ValidationConfig(
-            tests=[UniqueTest(type=TestType.UNIQUE, columns=["id"])]
-        )
+        config = ValidationConfig(tests=[UniqueTest(type=TestType.UNIQUE, columns=["id"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 0
 
     def test_unique_fail(self, validator, sample_df):
         """UNIQUE fails when duplicates exist."""
-        config = ValidationConfig(
-            tests=[UniqueTest(type=TestType.UNIQUE, columns=["status"])]
-        )
+        config = ValidationConfig(tests=[UniqueTest(type=TestType.UNIQUE, columns=["status"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "not unique" in failures[0]
@@ -164,26 +156,20 @@ class TestValidatorPandas:
 
     def test_row_count_pass(self, validator, sample_df):
         """ROW_COUNT passes when within bounds."""
-        config = ValidationConfig(
-            tests=[RowCountTest(type=TestType.ROW_COUNT, min=1, max=100)]
-        )
+        config = ValidationConfig(tests=[RowCountTest(type=TestType.ROW_COUNT, min=1, max=100)])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 0
 
     def test_row_count_fail_min(self, validator, sample_df):
         """ROW_COUNT fails when below minimum."""
-        config = ValidationConfig(
-            tests=[RowCountTest(type=TestType.ROW_COUNT, min=100)]
-        )
+        config = ValidationConfig(tests=[RowCountTest(type=TestType.ROW_COUNT, min=100)])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "< min" in failures[0]
 
     def test_row_count_fail_max(self, validator, sample_df):
         """ROW_COUNT fails when above maximum."""
-        config = ValidationConfig(
-            tests=[RowCountTest(type=TestType.ROW_COUNT, max=2)]
-        )
+        config = ValidationConfig(tests=[RowCountTest(type=TestType.ROW_COUNT, max=2)])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "> max" in failures[0]
@@ -275,17 +261,13 @@ class TestValidatorPandas:
     def test_empty_dataframe(self, validator):
         """Empty DataFrame passes basic tests."""
         empty_df = pd.DataFrame(columns=["id", "name"])
-        config = ValidationConfig(
-            tests=[UniqueTest(type=TestType.UNIQUE, columns=["id"])]
-        )
+        config = ValidationConfig(tests=[UniqueTest(type=TestType.UNIQUE, columns=["id"])])
         failures = validator.validate(empty_df, config)
         assert len(failures) == 0
 
     def test_unique_missing_column(self, validator, sample_df):
         """UNIQUE fails when column doesn't exist."""
-        config = ValidationConfig(
-            tests=[UniqueTest(type=TestType.UNIQUE, columns=["nonexistent"])]
-        )
+        config = ValidationConfig(tests=[UniqueTest(type=TestType.UNIQUE, columns=["nonexistent"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "not found" in failures[0]
@@ -364,34 +346,26 @@ class TestValidatorPolars:
 
     def test_polars_not_null_pass(self, validator, sample_df):
         """NOT_NULL passes with Polars DataFrame."""
-        config = ValidationConfig(
-            tests=[NotNullTest(type=TestType.NOT_NULL, columns=["id"])]
-        )
+        config = ValidationConfig(tests=[NotNullTest(type=TestType.NOT_NULL, columns=["id"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 0
 
     def test_polars_not_null_fail(self, validator, sample_df):
         """NOT_NULL fails with Polars DataFrame when nulls exist."""
-        config = ValidationConfig(
-            tests=[NotNullTest(type=TestType.NOT_NULL, columns=["name"])]
-        )
+        config = ValidationConfig(tests=[NotNullTest(type=TestType.NOT_NULL, columns=["name"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "NULLs" in failures[0]
 
     def test_polars_unique_pass(self, validator, sample_df):
         """UNIQUE passes with Polars DataFrame."""
-        config = ValidationConfig(
-            tests=[UniqueTest(type=TestType.UNIQUE, columns=["id"])]
-        )
+        config = ValidationConfig(tests=[UniqueTest(type=TestType.UNIQUE, columns=["id"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 0
 
     def test_polars_unique_fail(self, validator, sample_df):
         """UNIQUE fails with Polars DataFrame when duplicates exist."""
-        config = ValidationConfig(
-            tests=[UniqueTest(type=TestType.UNIQUE, columns=["status"])]
-        )
+        config = ValidationConfig(tests=[UniqueTest(type=TestType.UNIQUE, columns=["status"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "not unique" in failures[0]
@@ -422,9 +396,7 @@ class TestValidatorPolars:
 
     def test_polars_row_count_fail(self, validator, sample_df):
         """ROW_COUNT fails with Polars DataFrame when below minimum."""
-        config = ValidationConfig(
-            tests=[RowCountTest(type=TestType.ROW_COUNT, min=100)]
-        )
+        config = ValidationConfig(tests=[RowCountTest(type=TestType.ROW_COUNT, min=100)])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "< min" in failures[0]
@@ -442,9 +414,7 @@ class TestValidatorPolars:
                 "value": [10, 20, 30, 40],
             }
         )
-        config = ValidationConfig(
-            tests=[NotNullTest(type=TestType.NOT_NULL, columns=["id"])]
-        )
+        config = ValidationConfig(tests=[NotNullTest(type=TestType.NOT_NULL, columns=["id"])])
         failures = validator.validate(lf, config)
         assert len(failures) == 1
         assert "NULLs" in failures[0]
@@ -525,9 +495,7 @@ class TestValidatorPolars:
 
     def test_polars_unique_missing_column(self, validator, sample_df):
         """UNIQUE fails with Polars when column missing."""
-        config = ValidationConfig(
-            tests=[UniqueTest(type=TestType.UNIQUE, columns=["nonexistent"])]
-        )
+        config = ValidationConfig(tests=[UniqueTest(type=TestType.UNIQUE, columns=["nonexistent"])])
         failures = validator.validate(sample_df, config)
         assert len(failures) == 1
         assert "not found" in failures[0]
@@ -559,12 +527,8 @@ class TestValidatorPolars:
         except ImportError:
             pytest.skip("Polars not installed")
 
-        lf = pl.LazyFrame(
-            {"id": [1, 2, 2, 3], "name": ["a", "b", "c", "d"]}
-        )
-        config = ValidationConfig(
-            tests=[UniqueTest(type=TestType.UNIQUE, columns=["id"])]
-        )
+        lf = pl.LazyFrame({"id": [1, 2, 2, 3], "name": ["a", "b", "c", "d"]})
+        config = ValidationConfig(tests=[UniqueTest(type=TestType.UNIQUE, columns=["id"])])
         failures = validator.validate(lf, config)
         assert len(failures) == 1
         assert "not unique" in failures[0]
@@ -576,9 +540,7 @@ class TestValidatorPolars:
         except ImportError:
             pytest.skip("Polars not installed")
 
-        lf = pl.LazyFrame(
-            {"status": ["active", "inactive", "unknown"]}
-        )
+        lf = pl.LazyFrame({"status": ["active", "inactive", "unknown"]})
         config = ValidationConfig(
             tests=[
                 AcceptedValuesTest(
@@ -635,9 +597,7 @@ class TestValidatorPolars:
             pytest.skip("Polars not installed")
 
         df = pl.DataFrame({"id": [1, 2], "name": ["A", "B"]})
-        config = ValidationConfig(
-            tests=[SchemaContract(type=TestType.SCHEMA, strict=True)]
-        )
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
         context = {"columns": {"id": "int64", "name": "str"}}
         failures = validator.validate(df, config, context)
         assert len(failures) == 0
@@ -650,9 +610,7 @@ class TestValidatorPolars:
             pytest.skip("Polars not installed")
 
         df = pl.DataFrame({"id": [1, 2]})
-        config = ValidationConfig(
-            tests=[SchemaContract(type=TestType.SCHEMA, strict=False)]
-        )
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=False)])
         context = {"columns": {"id": "int64", "name": "str"}}
         failures = validator.validate(df, config, context)
         assert len(failures) == 1
@@ -669,9 +627,7 @@ class TestValidatorSchema:
     def test_schema_strict_pass(self, validator):
         """Schema test passes in strict mode when columns match exactly."""
         df = pd.DataFrame({"id": [1, 2], "name": ["A", "B"]})
-        config = ValidationConfig(
-            tests=[SchemaContract(type=TestType.SCHEMA, strict=True)]
-        )
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
         context = {"columns": {"id": "int64", "name": "object"}}
         failures = validator.validate(df, config, context)
         assert len(failures) == 0
@@ -679,9 +635,7 @@ class TestValidatorSchema:
     def test_schema_strict_fail_extra_column(self, validator):
         """Schema test fails in strict mode when extra columns exist."""
         df = pd.DataFrame({"id": [1, 2], "name": ["A", "B"], "extra": [1, 2]})
-        config = ValidationConfig(
-            tests=[SchemaContract(type=TestType.SCHEMA, strict=True)]
-        )
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
         context = {"columns": {"id": "int64", "name": "object"}}
         failures = validator.validate(df, config, context)
         assert len(failures) == 1
@@ -690,9 +644,7 @@ class TestValidatorSchema:
     def test_schema_non_strict_pass(self, validator):
         """Schema test passes in non-strict mode when extra columns exist."""
         df = pd.DataFrame({"id": [1, 2], "name": ["A", "B"], "extra": [1, 2]})
-        config = ValidationConfig(
-            tests=[SchemaContract(type=TestType.SCHEMA, strict=False)]
-        )
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=False)])
         context = {"columns": {"id": "int64", "name": "object"}}
         failures = validator.validate(df, config, context)
         assert len(failures) == 0
@@ -700,9 +652,7 @@ class TestValidatorSchema:
     def test_schema_non_strict_fail_missing(self, validator):
         """Schema test fails in non-strict mode when required columns missing."""
         df = pd.DataFrame({"id": [1, 2]})
-        config = ValidationConfig(
-            tests=[SchemaContract(type=TestType.SCHEMA, strict=False)]
-        )
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=False)])
         context = {"columns": {"id": "int64", "name": "object"}}
         failures = validator.validate(df, config, context)
         assert len(failures) == 1
@@ -720,13 +670,9 @@ class TestValidatorFreshness:
         """Freshness test passes when data is recent."""
         from datetime import datetime, timezone
 
-        df = pd.DataFrame(
-            {"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2}
-        )
+        df = pd.DataFrame({"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 0
@@ -738,9 +684,7 @@ class TestValidatorFreshness:
         old_time = datetime.now(timezone.utc) - timedelta(hours=48)
         df = pd.DataFrame({"id": [1, 2], "updated_at": [old_time] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 1
@@ -750,11 +694,7 @@ class TestValidatorFreshness:
         """Freshness test fails when column not found."""
         df = pd.DataFrame({"id": [1, 2]})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(
-                    type=TestType.FRESHNESS, column="nonexistent", max_age="1h"
-                )
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="nonexistent", max_age="1h")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 1
@@ -764,13 +704,9 @@ class TestValidatorFreshness:
         """Freshness test works with days format."""
         from datetime import datetime, timezone
 
-        df = pd.DataFrame(
-            {"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2}
-        )
+        df = pd.DataFrame({"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="7d")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="7d")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 0
@@ -779,13 +715,9 @@ class TestValidatorFreshness:
         """Freshness test works with minutes format."""
         from datetime import datetime, timezone
 
-        df = pd.DataFrame(
-            {"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2}
-        )
+        df = pd.DataFrame({"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="30m")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="30m")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 0
@@ -797,9 +729,7 @@ class TestValidatorFreshness:
         now_str = datetime.now(timezone.utc).isoformat()
         df = pd.DataFrame({"id": [1, 2], "updated_at": [now_str, now_str]})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 0
@@ -808,9 +738,7 @@ class TestValidatorFreshness:
         """Freshness test handles unparseable timestamps gracefully."""
         df = pd.DataFrame({"id": [1, 2], "updated_at": [{"nested": "obj"}, {"another": "obj"}]})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 0
@@ -866,13 +794,9 @@ class TestValidatorPolarsAdvanced:
 
         from datetime import datetime, timezone
 
-        df = pl.DataFrame(
-            {"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2}
-        )
+        df = pl.DataFrame({"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 0
@@ -889,9 +813,7 @@ class TestValidatorPolarsAdvanced:
         old_time = datetime.now(timezone.utc) - timedelta(hours=48)
         df = pl.DataFrame({"id": [1, 2], "updated_at": [old_time] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 1
@@ -906,9 +828,7 @@ class TestValidatorPolarsAdvanced:
 
         df = pl.DataFrame({"id": [1, 2]})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="nonexistent", max_age="1h")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="nonexistent", max_age="1h")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 1
@@ -926,9 +846,7 @@ class TestValidatorPolarsAdvanced:
         old_time = datetime.now(timezone.utc) - timedelta(hours=48)
         lf = pl.LazyFrame({"id": [1, 2], "updated_at": [old_time] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
         )
         failures = validator.validate(lf, config)
         assert len(failures) == 1
@@ -945,9 +863,7 @@ class TestValidatorPolarsAdvanced:
         old_time = datetime.now(timezone.utc) - timedelta(days=10)
         df = pl.DataFrame({"id": [1, 2], "updated_at": [old_time] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="7d")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="7d")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 1
@@ -961,13 +877,9 @@ class TestValidatorPolarsAdvanced:
 
         from datetime import datetime, timezone
 
-        df = pl.DataFrame(
-            {"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2}
-        )
+        df = pl.DataFrame({"id": [1, 2], "updated_at": [datetime.now(timezone.utc)] * 2})
         config = ValidationConfig(
-            tests=[
-                FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="30m")
-            ]
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="30m")]
         )
         failures = validator.validate(df, config)
         assert len(failures) == 0

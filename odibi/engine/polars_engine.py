@@ -606,10 +606,7 @@ class PolarsEngine(Engine):
                     if min_val is not None:
                         if isinstance(df, pl.LazyFrame):
                             min_violations = (
-                                df.filter(pl.col(col) < min_val)
-                                .select(pl.len())
-                                .collect()
-                                .item()
+                                df.filter(pl.col(col) < min_val).select(pl.len()).collect().item()
                             )
                         else:
                             min_violations = len(df.filter(pl.col(col) < min_val))
@@ -619,10 +616,7 @@ class PolarsEngine(Engine):
                     if max_val is not None:
                         if isinstance(df, pl.LazyFrame):
                             max_violations = (
-                                df.filter(pl.col(col) > max_val)
-                                .select(pl.len())
-                                .collect()
-                                .item()
+                                df.filter(pl.col(col) > max_val).select(pl.len()).collect().item()
                             )
                         else:
                             max_violations = len(df.filter(pl.col(col) > max_val))
@@ -636,10 +630,7 @@ class PolarsEngine(Engine):
                 if col in columns:
                     if isinstance(df, pl.LazyFrame):
                         invalid_count = (
-                            df.filter(~pl.col(col).is_in(allowed))
-                            .select(pl.len())
-                            .collect()
-                            .item()
+                            df.filter(~pl.col(col).is_in(allowed)).select(pl.len()).collect().item()
                         )
                     else:
                         invalid_count = len(df.filter(~pl.col(col).is_in(allowed)))

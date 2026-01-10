@@ -1144,7 +1144,6 @@ def _write_runs_to_catalog(target: CatalogStateBackend, records: List[Dict]) -> 
             df,
             mode="append",
             storage_options=target.storage_options,
-            schema_mode="merge",
         )
 
     _retry_delta_operation(_write)

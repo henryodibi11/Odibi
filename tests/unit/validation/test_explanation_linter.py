@@ -118,71 +118,92 @@ class TestExplanationLinter:
 
     def test_lint_missing_purpose_section(self, linter):
         """Test linting missing Purpose section."""
-        text = """
+        text = (
+            """
         **Details:** Some details here
         **Result:** The result is good
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         purpose_issues = [i for i in issues if i.rule == "E003" and "Purpose" in i.message]
         assert len(purpose_issues) == 1
 
     def test_lint_missing_details_section(self, linter):
         """Test linting missing Details section."""
-        text = """
+        text = (
+            """
         **Purpose:** Some purpose here
         **Result:** The result is good
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         details_issues = [i for i in issues if i.rule == "E003" and "Details" in i.message]
         assert len(details_issues) == 1
 
     def test_lint_missing_result_section(self, linter):
         """Test linting missing Result section."""
-        text = """
+        text = (
+            """
         **Purpose:** Some purpose here
         **Details:** Some details here
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         result_issues = [i for i in issues if i.rule == "E003" and "Result" in i.message]
         assert len(result_issues) == 1
 
     def test_lint_all_sections_present(self, linter):
         """Test linting with all required sections present."""
-        text = """
+        text = (
+            """
         **Purpose:** This operation transforms data
         **Details:** It uses specific algorithms
         **Result:** Outputs a transformed dataset
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert not any(i.rule == "E003" for i in issues)
 
     def test_lint_sections_with_colon(self, linter):
         """Test sections work with or without colon."""
-        text = """
+        text = (
+            """
         **Purpose** This operation transforms data
         **Details** It uses specific algorithms
         **Result** Outputs a transformed dataset
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert not any(i.rule == "E003" for i in issues)
 
     def test_lint_sections_case_insensitive(self, linter):
         """Test section matching is case-insensitive."""
-        text = """
+        text = (
+            """
         **PURPOSE:** This operation transforms data
         **DETAILS:** It uses specific algorithms
         **RESULT:** Outputs a transformed dataset
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert not any(i.rule == "E003" for i in issues)
 
     def test_lint_lazy_phrase_calculates_stuff(self, linter):
         """Test detecting 'calculates stuff' lazy phrase."""
-        text = """
+        text = (
+            """
         **Purpose:** This calculates stuff
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         lazy_issues = [i for i in issues if i.rule == "E004"]
         assert len(lazy_issues) >= 1
@@ -190,114 +211,147 @@ class TestExplanationLinter:
 
     def test_lint_lazy_phrase_does_things(self, linter):
         """Test detecting 'does things' lazy phrase."""
-        text = """
+        text = (
+            """
         **Purpose:** This does things
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "E004" and "does things" in i.message.lower() for i in issues)
 
     def test_lint_lazy_phrase_processes_data(self, linter):
         """Test detecting 'processes data' lazy phrase."""
-        text = """
+        text = (
+            """
         **Purpose:** This processes data
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "E004" and "processes data" in i.message.lower() for i in issues)
 
     def test_lint_lazy_phrase_handles_records(self, linter):
         """Test detecting 'handles records' lazy phrase."""
-        text = """
+        text = (
+            """
         **Purpose:** This handles records
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "E004" and "handles records" in i.message.lower() for i in issues)
 
     def test_lint_lazy_phrase_todo(self, linter):
         """Test detecting 'TODO' lazy phrase."""
-        text = """
+        text = (
+            """
         **Purpose:** TODO fill this in
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "E004" and "todo" in i.message.lower() for i in issues)
 
     def test_lint_lazy_phrase_placeholder(self, linter):
         """Test detecting '[placeholder]' lazy phrase."""
-        text = """
+        text = (
+            """
         **Purpose:** [placeholder]
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "E004" and "[placeholder]" in i.message.lower() for i in issues)
 
     def test_lint_lazy_phrase_tbd(self, linter):
         """Test detecting 'TBD' lazy phrase."""
-        text = """
+        text = (
+            """
         **Purpose:** TBD
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "E004" and "tbd" in i.message.lower() for i in issues)
 
     def test_lint_lazy_phrase_to_be_determined(self, linter):
         """Test detecting 'to be determined' lazy phrase."""
-        text = """
+        text = (
+            """
         **Purpose:** The approach is to be determined
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "E004" and "to be determined" in i.message.lower() for i in issues)
 
     def test_lint_lazy_phrase_case_insensitive(self, linter):
         """Test lazy phrase detection is case-insensitive."""
-        text = """
+        text = (
+            """
         **Purpose:** This DOES THINGS here
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "E004" for i in issues)
 
     def test_lint_formula_without_code_block(self, linter):
         """Test warning when formula mentioned without code block."""
-        text = """
+        text = (
+            """
         **Purpose:** Calculate using formula
         **Details:** Some details
         **Result:** The result
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert any(i.rule == "W001" and i.severity == "warning" for i in issues)
 
     def test_lint_formula_with_code_block(self, linter):
         """Test no warning when formula has code block."""
-        text = """
+        text = (
+            """
         **Purpose:** Calculate using formula
         **Details:** Here's the formula:
         ```
         result = a + b
         ```
         **Result:** The result is calculated
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert not any(i.rule == "W001" for i in issues)
 
     def test_lint_no_formula_no_warning(self, linter):
         """Test no formula warning when formula not mentioned."""
-        text = """
+        text = (
+            """
         **Purpose:** This transforms data
         **Details:** Some details here
         **Result:** Outputs a transformed dataset
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         assert not any(i.rule == "W001" for i in issues)
 
@@ -405,11 +459,14 @@ class TestExplanationLinter:
 
     def test_multiple_lazy_phrases(self, linter):
         """Test detecting multiple lazy phrases in one explanation."""
-        text = """
+        text = (
+            """
         **Purpose:** This does things and calculates stuff
         **Details:** TODO fill in later
         **Result:** TBD
-        """ + "x" * 50
+        """
+            + "x" * 50
+        )
         issues = linter.lint(text, "my_operation")
         lazy_issues = [i for i in issues if i.rule == "E004"]
         assert len(lazy_issues) >= 4

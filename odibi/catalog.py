@@ -1383,8 +1383,14 @@ class CatalogManager:
         # SQL Server mode - direct insert
         if self.is_sql_server_mode:
             self._log_run_sql_server(
-                run_id, pipeline_name, node_name, status,
-                rows_processed, duration_ms, metrics_json, environment
+                run_id,
+                pipeline_name,
+                node_name,
+                status,
+                rows_processed,
+                duration_ms,
+                metrics_json,
+                environment,
             )
             return
 
@@ -1509,9 +1515,14 @@ class CatalogManager:
         if self.is_sql_server_mode:
             for r in records:
                 self._log_run_sql_server(
-                    r["run_id"], r["pipeline_name"], r["node_name"], r["status"],
-                    r.get("rows_processed", 0), r.get("duration_ms", 0),
-                    r.get("metrics_json", "{}"), environment
+                    r["run_id"],
+                    r["pipeline_name"],
+                    r["node_name"],
+                    r["status"],
+                    r.get("rows_processed", 0),
+                    r.get("duration_ms", 0),
+                    r.get("metrics_json", "{}"),
+                    environment,
                 )
             logger.debug(f"Batch logged {len(records)} run records to SQL Server")
             return

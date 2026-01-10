@@ -84,9 +84,7 @@ class TestHasQuarantineTests:
 
     def test_no_quarantine_tests(self):
         """Returns False when no tests use quarantine severity."""
-        tests = [
-            NotNullTest(type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.FAIL)
-        ]
+        tests = [NotNullTest(type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.FAIL)]
         assert has_quarantine_tests(tests) is False
 
     def test_has_quarantine_tests(self):
@@ -121,9 +119,7 @@ class TestHasQuarantineTests:
 
     def test_warn_severity_not_quarantine(self):
         """Returns False when only WARN severity is used."""
-        tests = [
-            NotNullTest(type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.WARN)
-        ]
+        tests = [NotNullTest(type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.WARN)]
         assert has_quarantine_tests(tests) is False
 
 
@@ -435,9 +431,7 @@ class TestSplitValidInvalid:
         """All rows pass when no violations."""
         df = pd.DataFrame({"id": [1, 2, 3], "value": [10, 20, 30]})
         tests = [
-            NotNullTest(
-                type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.QUARANTINE
-            )
+            NotNullTest(type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.QUARANTINE)
         ]
 
         result = split_valid_invalid(df, tests, mock_engine)
@@ -449,9 +443,7 @@ class TestSplitValidInvalid:
         """All rows quarantined when all fail."""
         df = pd.DataFrame({"id": [None, None, None]})
         tests = [
-            NotNullTest(
-                type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.QUARANTINE
-            )
+            NotNullTest(type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.QUARANTINE)
         ]
 
         result = split_valid_invalid(df, tests, mock_engine)
@@ -463,9 +455,7 @@ class TestSplitValidInvalid:
         """Empty DataFrame returns empty results."""
         df = pd.DataFrame(columns=["id", "value"])
         tests = [
-            NotNullTest(
-                type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.QUARANTINE
-            )
+            NotNullTest(type=TestType.NOT_NULL, columns=["id"], on_fail=ContractSeverity.QUARANTINE)
         ]
 
         result = split_valid_invalid(df, tests, mock_engine)
@@ -601,9 +591,7 @@ class TestApplySampling:
     def test_sample_fraction_reduces_rows(self):
         """sample_fraction reduces rows proportionally."""
         df = pd.DataFrame({"id": range(1000)})
-        config = QuarantineConfig(
-            connection="test", path="test/path", sample_fraction=0.1
-        )
+        config = QuarantineConfig(connection="test", path="test/path", sample_fraction=0.1)
         result = _apply_sampling(df, config, is_spark=False, is_polars=False)
         assert len(result) < 200
 
@@ -636,9 +624,7 @@ class TestApplySamplingPolars:
 
     def test_sample_fraction_polars(self, polars_df):
         """sample_fraction works with Polars DataFrame."""
-        config = QuarantineConfig(
-            connection="test", path="test/path", sample_fraction=0.1
-        )
+        config = QuarantineConfig(connection="test", path="test/path", sample_fraction=0.1)
         result = _apply_sampling(polars_df, config, is_spark=False, is_polars=True)
         assert len(result) < 50
 

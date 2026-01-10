@@ -428,9 +428,7 @@ class TestFKValidatorPandas:
 
     def test_validate_relationship_valid(self, sample_dim_customer):
         """Test validating a valid relationship."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2, 3], "customer_sk": [101, 102, 103]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2, 3], "customer_sk": [101, 102, 103]})
         rel = RelationshipConfig(
             name="orders_customers",
             fact="fact_orders",
@@ -449,9 +447,7 @@ class TestFKValidatorPandas:
         assert result.null_count == 0
         assert result.total_rows == 3
 
-    def test_validate_relationship_with_orphans(
-        self, sample_fact_df, sample_dim_customer
-    ):
+    def test_validate_relationship_with_orphans(self, sample_fact_df, sample_dim_customer):
         """Test detecting orphan records."""
         rel = RelationshipConfig(
             name="orders_customers",
@@ -472,9 +468,7 @@ class TestFKValidatorPandas:
 
     def test_validate_relationship_with_nulls(self, sample_dim_customer):
         """Test handling null values in FK."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2, 3], "customer_sk": [101, None, 103]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2, 3], "customer_sk": [101, None, 103]})
         rel = RelationshipConfig(
             name="orders_customers",
             fact="fact_orders",
@@ -495,9 +489,7 @@ class TestFKValidatorPandas:
 
     def test_validate_relationship_nullable_allowed(self, sample_dim_customer):
         """Test nullable=True allows nulls."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2, 3], "customer_sk": [101, None, 103]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2, 3], "customer_sk": [101, None, 103]})
         rel = RelationshipConfig(
             name="orders_customers",
             fact="fact_orders",
@@ -554,9 +546,7 @@ class TestFKValidatorPandas:
         assert result.valid is False
         assert result.error is not None
 
-    def test_validate_fact_all_valid(
-        self, sample_dim_customer, sample_dim_product
-    ):
+    def test_validate_fact_all_valid(self, sample_dim_customer, sample_dim_product):
         """Test validating all relationships for a fact table."""
         fact_df = pd.DataFrame(
             {
@@ -642,9 +632,7 @@ class TestFKValidatorPandas:
 
     def test_validate_fact_orphan_records_collected(self, sample_dim_customer):
         """Test orphan records are collected in report."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2, 3], "customer_sk": [101, 888, 999]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2, 3], "customer_sk": [101, 888, 999]})
         rel = RelationshipConfig(
             name="orders_customers",
             fact="fact_orders",
@@ -674,9 +662,7 @@ class TestGetOrphanRecords:
 
     def test_get_orphan_records_pandas(self):
         """Test extracting orphan records with Pandas."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2, 3], "customer_sk": [101, 999, 888]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2, 3], "customer_sk": [101, 999, 888]})
         dim_df = pd.DataFrame({"customer_sk": [101, 102, 103]})
         rel = RelationshipConfig(
             name="test",
@@ -693,9 +679,7 @@ class TestGetOrphanRecords:
 
     def test_get_orphan_records_pandas_with_nulls(self):
         """Test orphan extraction excludes null FKs."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2, 3, 4], "customer_sk": [101, 999, None, 888]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2, 3, 4], "customer_sk": [101, 999, None, 888]})
         dim_df = pd.DataFrame({"customer_sk": [101, 102]})
         rel = RelationshipConfig(
             name="test",
@@ -712,9 +696,7 @@ class TestGetOrphanRecords:
 
     def test_get_orphan_records_pandas_no_orphans(self):
         """Test no orphans returned when all valid."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2], "customer_sk": [101, 102]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2], "customer_sk": [101, 102]})
         dim_df = pd.DataFrame({"customer_sk": [101, 102, 103]})
         rel = RelationshipConfig(
             name="test",
@@ -774,9 +756,7 @@ class TestValidateFKOnLoad:
 
     def test_on_load_filter_removes_orphans(self, dim_customer):
         """Test on_failure='filter' removes orphan rows."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2, 3], "customer_sk": [101, 999, 102]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2, 3], "customer_sk": [101, 999, 102]})
         rel = RelationshipConfig(
             name="orders_customers",
             fact="fact_orders",
@@ -809,9 +789,7 @@ class TestValidateFKOnLoad:
 
     def test_on_load_valid_no_action(self, dim_customer):
         """Test no action when all valid."""
-        fact_df = pd.DataFrame(
-            {"order_id": [1, 2], "customer_sk": [101, 102]}
-        )
+        fact_df = pd.DataFrame({"order_id": [1, 2], "customer_sk": [101, 102]})
         rel = RelationshipConfig(
             name="orders_customers",
             fact="fact_orders",
