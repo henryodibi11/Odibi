@@ -512,13 +512,13 @@ class CatalogStateBackend(StateBackend):
                 .when_not_matched_insert_all()
                 .execute()
             )
-        except (ValueError, Exception):
+        except Exception:
+            # Table doesn't exist or merge failed - create/append
             write_deltalake(
                 self.meta_state_path,
                 df,
-                mode="append",
+                mode="overwrite",
                 storage_options=self.storage_options,
-                schema_mode="merge",
             )
         logger.debug(f"Batch set {len(rows)} HWM value(s) locally")
 
