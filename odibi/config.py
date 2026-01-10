@@ -293,7 +293,11 @@ class DeleteDetectionConfig(BaseModel):
             return self
 
         if not self.keys:
-            raise ValueError(f"delete_detection: 'keys' required for mode='{self.mode.value}'")
+            raise ValueError(
+                f"DeleteDetectionConfig validation failed: 'keys' is required when mode='{self.mode.value}'. "
+                f"Specify the business key column(s) to identify deleted records. "
+                f"Example: keys: ['customer_id'] or keys: ['order_id', 'line_num']"
+            )
 
         # Note: snapshot_diff can use connection+path OR fallback to context inference
         # Validation at runtime in detect_deletes transformer will warn if neither available
@@ -301,11 +305,15 @@ class DeleteDetectionConfig(BaseModel):
         if self.mode == DeleteDetectionMode.SQL_COMPARE:
             if not self.source_connection:
                 raise ValueError(
-                    "delete_detection: 'source_connection' required for sql_compare mode"
+                    "DeleteDetectionConfig validation failed: 'source_connection' is required for mode='sql_compare'. "
+                    "Specify the connection name that points to the live source database. "
+                    "Example: source_connection: 'azure_sql'"
                 )
             if not self.source_table and not self.source_query:
                 raise ValueError(
-                    "delete_detection: 'source_table' or 'source_query' required for sql_compare mode"
+                    "DeleteDetectionConfig validation failed: Either 'source_table' or 'source_query' is required for mode='sql_compare'. "
+                    "Specify the table/query to compare against for detecting deleted records. "
+                    "Example: source_table: 'dbo.Customers' or source_query: 'SELECT customer_id FROM dbo.Customers WHERE active = 1'"
                 )
 
         return self
@@ -748,7 +756,11 @@ class TimeTravelConfig(BaseModel):
     @model_validator(mode="after")
     def check_one_method(self):
         if self.as_of_version is not None and self.as_of_timestamp is not None:
-            raise ValueError("Specify either 'as_of_version' or 'as_of_timestamp', not both.")
+            raise ValueError(
+                f"TimeTravelConfig validation failed: Cannot specify both 'as_of_version' and 'as_of_timestamp'. "
+                f"Got as_of_version={self.as_of_version} and as_of_timestamp='{self.as_of_timestamp}'. "
+                f"Use only one: as_of_version for a specific Delta version number, or as_of_timestamp for a point in time."
+            )
         return self
 
 
@@ -1025,7 +1037,12 @@ class ReadConfig(BaseModel):
         """Move top-level query to options."""
         if self.query:
             if "query" in self.options and self.options["query"] != self.query:
-                raise ValueError("Cannot specify 'query' in both top-level and options")
+                raise ValueError(
+                    f"ReadConfig validation failed: 'query' specified in both top-level and options with different values. "
+                    f"Top-level query: '{self.query[:50]}{'...' if len(self.query) > 50 else ''}'. "
+                    f"Options query: '{str(self.options['query'])[:50]}{'...' if len(str(self.options['query'])) > 50 else ''}'. "
+                    f"Remove one of them or ensure they are identical."
+                )
             self.options["query"] = self.query
         return self
 
@@ -1034,7 +1051,12 @@ class ReadConfig(BaseModel):
         """Move top-level filter to options for SQL pushdown."""
         if self.filter:
             if "filter" in self.options and self.options["filter"] != self.filter:
-                raise ValueError("Cannot specify 'filter' in both top-level and options")
+                raise ValueError(
+                    f"ReadConfig validation failed: 'filter' specified in both top-level and options with different values. "
+                    f"Top-level filter: '{self.filter[:50]}{'...' if len(self.filter) > 50 else ''}'. "
+                    f"Options filter: '{str(self.options['filter'])[:50]}{'...' if len(str(self.options['filter'])) > 50 else ''}'. "
+                    f"Remove one of them or ensure they are identical."
+                )
             self.options["filter"] = self.filter
         return self
 
@@ -1043,14 +1065,22 @@ class ReadConfig(BaseModel):
         """Ensure either table or path is provided."""
         # 1. Can't set both path and table
         if self.table and self.path:
-            raise ValueError("ReadConfig: 'table' and 'path' are mutually exclusive.")
+            raise ValueError(
+                f"ReadConfig validation failed: 'table' and 'path' are mutually exclusive. "
+                f"Got table='{self.table}' and path='{self.path}'. "
+                f"Use 'table' for catalog/database tables or 'path' for file-based sources, but not both."
+            )
 
         # 2. Format-specific rules
         has_query = self.options and "query" in self.options
 
         if self.format == ReadFormat.SQL:
             if not (self.table or self.query or has_query):
-                raise ValueError("ReadConfig: For format='sql', specify either 'table' or 'query'.")
+                raise ValueError(
+                    f"ReadConfig validation failed: For format='sql', either 'table' or 'query' is required. "
+                    f"Got table={self.table}, query={self.query}. "
+                    f"Example: table: 'dbo.Customers' or query: 'SELECT * FROM dbo.Customers WHERE active = 1'"
+                )
         elif self.format in [ReadFormat.CSV, ReadFormat.PARQUET, ReadFormat.JSON]:
             if not self.path:
                 # Some users might read from table/catalog even for parquet?
@@ -1059,7 +1089,9 @@ class ReadConfig(BaseModel):
 
         if not self.table and not self.path and not has_query:
             raise ValueError(
-                "Either 'table' or 'path' must be provided for read config (or 'query' in options)"
+                "ReadConfig validation failed: No data source specified. "
+                "Provide one of: 'table' (for database/catalog), 'path' (for files), "
+                "or 'query' (for SQL). Example: table: 'schema.table_name'"
             )
 
         return self
@@ -1126,11 +1158,24 @@ class TransformStep(BaseModel):
     @model_validator(mode="after")
     def check_step_type(self):
         """Ensure exactly one step type is provided."""
-        step_types = [self.sql, self.sql_file, self.function, self.operation]
-        if sum(x is not None for x in step_types) != 1:
-            raise ValueError(
-                "Exactly one of 'sql', 'sql_file', 'function', or 'operation' must be provided"
-            )
+        specified = [
+            name for name, val in [
+                ("sql", self.sql), ("sql_file", self.sql_file),
+                ("function", self.function), ("operation", self.operation)
+            ] if val is not None
+        ]
+        if len(specified) != 1:
+            if len(specified) == 0:
+                raise ValueError(
+                    "TransformStep validation failed: No step type specified. "
+                    "Provide exactly one of: 'sql', 'sql_file', 'function', or 'operation'. "
+                    "Example: sql: 'SELECT * FROM df' or operation: 'drop_duplicates'"
+                )
+            else:
+                raise ValueError(
+                    f"TransformStep validation failed: Multiple step types specified: "
+                    f"{specified}. Use exactly one of: 'sql', 'sql_file', 'function', or 'operation'."
+                )
         return self
 
 
@@ -2149,16 +2194,21 @@ class TriggerConfig(BaseModel):
     @model_validator(mode="after")
     def check_exactly_one_trigger(self):
         """Ensure exactly one trigger type is specified."""
-        triggers = [
-            self.processing_time is not None,
-            self.once is True,
-            self.available_now is True,
-            self.continuous is not None,
-        ]
-        if sum(triggers) > 1:
+        specified = []
+        if self.processing_time is not None:
+            specified.append(f"processing_time='{self.processing_time}'")
+        if self.once is True:
+            specified.append("once=True")
+        if self.available_now is True:
+            specified.append("available_now=True")
+        if self.continuous is not None:
+            specified.append(f"continuous='{self.continuous}'")
+
+        if len(specified) > 1:
             raise ValueError(
-                "TriggerConfig: specify exactly one of 'processing_time', 'once', "
-                "'available_now', or 'continuous'"
+                f"TriggerConfig validation failed: Multiple trigger types specified: {', '.join(specified)}. "
+                f"Specify exactly one of: 'processing_time', 'once', 'available_now', or 'continuous'. "
+                f"Example: processing_time: '10 seconds' for micro-batch, or once: true for single batch."
             )
         return self
 
@@ -3214,7 +3264,9 @@ class StoryConfig(BaseModel):
     def check_retention_policy(self):
         if self.retention_days is None and self.retention_count is None:
             raise ValueError(
-                "StoryConfig: Specify at least one of 'retention_days' or 'retention_count'."
+                "StoryConfig validation failed: No retention policy specified. "
+                "Provide at least one of: 'retention_days' (e.g., 30) or 'retention_count' (e.g., 100). "
+                "This controls how long/many story files are kept before cleanup."
             )
         return self
 
@@ -3333,10 +3385,11 @@ class ProjectConfig(BaseModel):
     def validate_story_connection_exists(self):
         """Ensure story.connection is defined in connections."""
         if self.story.connection not in self.connections:
-            available = ", ".join(self.connections.keys())
+            available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
             raise ValueError(
-                f"Story connection '{self.story.connection}' not found. "
-                f"Available connections: {available}"
+                f"ProjectConfig validation failed: Story connection '{self.story.connection}' not found in connections. "
+                f"Available connections: [{available}]. "
+                f"Add '{self.story.connection}' to your connections section or update story.connection to use an existing one."
             )
         return self
 
@@ -3346,14 +3399,19 @@ class ProjectConfig(BaseModel):
         Validate system config connection exists.
         """
         if self.system is None:
-            raise ValueError("System config is mandatory")
+            raise ValueError(
+                "ProjectConfig validation failed: 'system' configuration is mandatory. "
+                "Add a system section with connection and path for the Odibi System Catalog. "
+                "Example: system: { connection: 'adls_bronze', path: '_odibi_system' }"
+            )
 
         # Ensure the system connection exists
         if self.system.connection not in self.connections:
-            available = ", ".join(self.connections.keys())
+            available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
             raise ValueError(
-                f"System connection '{self.system.connection}' not found. "
-                f"Available connections: {available}"
+                f"ProjectConfig validation failed: System connection '{self.system.connection}' not found in connections. "
+                f"Available connections: [{available}]. "
+                f"Add '{self.system.connection}' to your connections section or update system.connection to use an existing one."
             )
 
         return self

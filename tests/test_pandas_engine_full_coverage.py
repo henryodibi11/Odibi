@@ -112,7 +112,7 @@ class TestPandasEngineRead:
 
     def test_read_requires_path_or_table(self, engine, tmp_conn):
         """Read without path or table raises ValueError."""
-        with pytest.raises(ValueError, match="Either path or table must be provided"):
+        with pytest.raises(ValueError, match="neither 'path' nor 'table' was provided"):
             engine.read(tmp_conn, "csv")
 
     @pytest.mark.parametrize(

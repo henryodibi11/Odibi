@@ -60,26 +60,44 @@ class DateDimensionPattern(Pattern):
                 "DateDimensionPattern validation failed: 'start_date' is required",
                 pattern="DateDimensionPattern",
             )
-            raise ValueError("DateDimensionPattern: 'start_date' parameter is required.")
+            raise ValueError(
+                "DateDimensionPattern: 'start_date' parameter is required. "
+                "Expected format: 'YYYY-MM-DD' (e.g., '2024-01-01'). "
+                "Provide a valid start_date in params."
+            )
 
         if not self.params.get("end_date"):
             ctx.error(
                 "DateDimensionPattern validation failed: 'end_date' is required",
                 pattern="DateDimensionPattern",
             )
-            raise ValueError("DateDimensionPattern: 'end_date' parameter is required.")
+            raise ValueError(
+                "DateDimensionPattern: 'end_date' parameter is required. "
+                "Expected format: 'YYYY-MM-DD' (e.g., '2024-12-31'). "
+                "Provide a valid end_date in params."
+            )
 
         try:
             start = self._parse_date(self.params["start_date"])
             end = self._parse_date(self.params["end_date"])
             if start > end:
-                raise ValueError("start_date must be before or equal to end_date")
+                raise ValueError(
+                    f"start_date must be before or equal to end_date. "
+                    f"Provided: start_date='{self.params['start_date']}', "
+                    f"end_date='{self.params['end_date']}'. "
+                    f"Swap the values or adjust the date range."
+                )
         except Exception as e:
             ctx.error(
                 f"DateDimensionPattern validation failed: {e}",
                 pattern="DateDimensionPattern",
             )
-            raise ValueError(f"DateDimensionPattern: Invalid date parameters: {e}")
+            raise ValueError(
+                f"DateDimensionPattern: Invalid date parameters. {e} "
+                f"Provided: start_date='{self.params.get('start_date')}', "
+                f"end_date='{self.params.get('end_date')}'. "
+                f"Expected format: 'YYYY-MM-DD'."
+            )
 
         fiscal_month = self.params.get("fiscal_year_start_month", 1)
         if not isinstance(fiscal_month, int) or fiscal_month < 1 or fiscal_month > 12:
@@ -88,7 +106,9 @@ class DateDimensionPattern(Pattern):
                 pattern="DateDimensionPattern",
             )
             raise ValueError(
-                "DateDimensionPattern: 'fiscal_year_start_month' must be an integer 1-12."
+                f"DateDimensionPattern: 'fiscal_year_start_month' must be an integer 1-12. "
+                f"Provided: {fiscal_month!r} (type: {type(fiscal_month).__name__}). "
+                f"Use an integer like 1 for January or 7 for July."
             )
 
         ctx.debug(

@@ -94,7 +94,7 @@ class TestAzureSQLConnection:
         """Should fail validation if SQL auth missing credentials."""
         conn = AzureSQL(server="myserver.database.windows.net", database="mydb", auth_mode="sql")
 
-        with pytest.raises(ValueError, match="requires username"):
+        with pytest.raises(ValueError, match="requires 'username'"):
             conn.validate()
 
 

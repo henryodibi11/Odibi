@@ -1,54 +1,108 @@
-# Odibi Phase 3 Plan: The "Rich Docs" Strategy
+# Odibi Roadmap
 
-We are pivoting from a separate Cookbook to an **Embedded Knowledge** strategy. The goal is to make `docs/api.md` a single, high-value artifact that serves as both Reference and Guide.
+This roadmap outlines where Odibi is headed. It's a living document that evolves based on user feedback and real-world usage.
 
-We will achieve this by embedding "Gold Mine" recipes directly into the Python code docstrings.
+---
 
-## 1. The Strategy: "Code as Documentation"
+## Current Release: v2.4.0
 
-We will rewrite the Pydantic model docstrings in `odibi/config.py` and `odibi/transformers/*.py` to include:
-1.  **The Business Problem**: Why do I need this?
-2.  **The Recipe**: A copy-pasteable YAML block.
-3.  **The "Why"**: Brief explanation of the mechanics.
+### What's Available Now
 
-## 2. Targeted Upgrades
+| Feature | Status |
+|---------|--------|
+| **Declarative YAML pipelines** | ✅ Stable |
+| **Multi-engine support** (Pandas, Spark, Polars) | ✅ Stable |
+| **Dimensional modeling patterns** (Dimension, Fact, SCD2, Aggregation) | ✅ Stable |
+| **Data validation & quality gates** | ✅ Stable |
+| **Quarantine for bad records** | ✅ Stable |
+| **Data Stories** (execution audit reports) | ✅ Stable |
+| **System Catalog** (10 Delta meta tables) | ✅ Stable |
+| **Incremental loading** (HWM, skip-if-unchanged) | ✅ Stable |
+| **Azure connections** (ADLS, SQL Server, Key Vault) | ✅ Stable |
+| **Semantic layer** (metrics, materialization) | ✅ Stable |
+| **CLI** (`odibi run`, `odibi validate`, etc.) | ✅ Stable |
 
-We will enhance the following models with extensive examples:
+---
 
-### A. `SCD2Params` (in `odibi/transformers/scd.py`)
-*   **Theme**: "The Time Machine"
-*   **Content**: Explain how to track history, handle effective dates, and close open records.
-*   **Recipe**: A full YAML snippet showing keys, tracking columns, and flags.
+## Short Term (Next 1-2 Releases)
 
-### B. `WriteConfig` (in `odibi/config.py`)
-*   **Theme**: "Big Data Performance"
-*   **Content**: Explain when to use `partition_by` (filtering) vs `zorder_by` (skipping).
-*   **Recipe**: A "Lakehouse Optimized" configuration.
+### v2.5.0 - Developer Experience
 
-### C. `ValidationConfig` (in `odibi/config.py`)
-*   **Theme**: "The Indestructible Pipeline"
-*   **Content**: Explain blocking vs. warning severity.
-*   **Recipe**: A "Quality Gate" configuration preventing bad data from reaching Gold.
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Improved error messages** | Every error includes what failed, what was expected, and how to fix | 🔄 Planned |
+| **Rows read vs written in Stories** | Distinguish input rows from output rows in audit reports | 🔄 Planned |
+| **PyPI publication** | `pip install odibi` from PyPI | 🔄 Planned |
+| **Documentation site** | Hosted docs on GitHub Pages | 🔄 Planned |
 
-### D. `MergeParams` (in `odibi/transformers/merge_transformer.py`)
-*   **Theme**: "GDPR & Compliance"
-*   **Content**: Explain `delete_match` strategy.
-*   **Recipe**: A "Right to be Forgotten" pipeline snippet.
+### v2.6.0 - Observability
 
-## 3. Execution Steps
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Enhanced lineage** | Cross-pipeline lineage stitching | 🔄 Planned |
+| **Metrics export** | Export pipeline metrics to Prometheus/DataDog | 💭 Considering |
+| **Slack/Teams alerts** | Richer alert formatting | 💭 Considering |
 
-1.  [x] **Edit `odibi/transformers/scd.py`**: Replace the placeholder docstring with the full "Time Machine" guide.
-2.  [x] **Edit `odibi/config.py`**: update `WriteConfig`, `ValidationConfig`, and `NodeConfig` with rich examples.
-3.  [x] **Run `python odibi/introspect.py`**: Generate the new `api.md`.
-4.  [x] **Review**: Confirm `api.md` looks like a "Gold Mine" without needing a separate cookbook.
+---
 
-## 4. Extended Improvements (Completed)
+## Medium Term (3-6 Months)
 
-Based on feedback, we went further to improve usability:
+### Performance & Scale
 
-*   **Smart Node Scenarios**: Added concrete examples for "Standard ETL", "Heavy Lifter", and "Tagged Runner" in `NodeConfig`.
-*   **Universal Reader**: Added "Time Traveler" and "Streaming" recipes to `ReadConfig`.
-*   **Transformer Catalog**: Added a searchable list of available transformers directly in `NodeConfig` docs.
-*   **Concept Clarity**: Explicitly explained "Transformer (App) vs. Transform Steps (Script)" and "Chaining Operations".
-*   **Navigation**: Added "Back to Catalog" links for better UX.
-*   **"Kitchen Sink" Scenario**: Demonstrated `read` -> `transformer` -> `transform` -> `write` in a single node to prove composability.
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Parallel node execution** | Run independent nodes concurrently | 💭 Considering |
+| **Lazy evaluation mode** | Defer execution for optimization | 💭 Considering |
+| **Memory profiling** | Track memory usage per node | 💭 Considering |
+
+### Ecosystem Integration
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **dbt compatibility** | Import/export dbt models | 💭 Considering |
+| **Airflow operator** | Native Airflow integration | 💭 Considering |
+| **Databricks Asset Bundles** | First-class DAB support | 💭 Considering |
+
+---
+
+## Long Term Vision
+
+### The Ultimate Goal
+
+> A framework so easy and powerful it gives data engineers time back to focus on what matters.
+
+**Principles guiding development:**
+- **Declarative over imperative** — YAML is the source of truth
+- **Explicit over implicit** — No magic, no surprises
+- **Engine parity** — Same config works on Pandas, Spark, or Polars
+- **Stories over logs** — Every run generates human-readable audit docs
+
+### What Odibi Will Never Be
+
+- ❌ A scheduler (use Airflow, Databricks Workflows, etc.)
+- ❌ A BI tool (it prepares data for BI tools)
+- ❌ A data catalog (it writes to catalogs)
+- ❌ An agent/chat framework (use specialized tools for that)
+
+---
+
+## Request a Feature
+
+Have an idea? We'd love to hear it:
+
+1. **GitHub Issues**: [Request a feature](https://github.com/henryodibi11/Odibi/issues/new)
+2. **Discussions**: [Share ideas](https://github.com/henryodibi11/Odibi/discussions)
+
+### How We Prioritize
+
+Features are prioritized based on:
+1. **Real usage** — Does a story show the need? (See our [Chimera Mindset](./philosophy.md#the-chimera-mindset))
+2. **Impact** — How many users benefit?
+3. **Complexity** — Can we ship it without breaking things?
+4. **Alignment** — Does it fit [Odibi's principles](./philosophy.md)?
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](https://github.com/henryodibi11/Odibi/blob/main/CHANGELOG.md) for detailed release notes.

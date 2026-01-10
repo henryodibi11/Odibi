@@ -84,6 +84,8 @@ class NodeResult(BaseModel):
     success: bool
     duration: float
     rows_processed: Optional[int] = None
+    rows_read: Optional[int] = None
+    rows_written: Optional[int] = None
     result_schema: Optional[Any] = Field(default=None, alias="schema")  # Renamed to avoid shadowing
     error: Optional[Exception] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -372,6 +374,8 @@ class NodeExecutor:
                     success=True,
                     duration=duration,
                     rows_processed=metadata.get("rows"),
+                    rows_read=metadata.get("rows_read"),
+                    rows_written=metadata.get("rows_written"),
                     schema=metadata.get("schema"),
                     metadata=metadata,
                 )
@@ -462,9 +466,11 @@ class NodeExecutor:
         connection = self.connections.get(read_config.connection)
 
         if connection is None:
+            available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
             raise ValueError(
-                f"Connection '{read_config.connection}' not found. "
-                f"Available: {', '.join(self.connections.keys())}"
+                f"Read phase failed: Connection '{read_config.connection}' not found in configured connections. "
+                f"Available connections: [{available}]. "
+                f"Check your read.connection value in the node configuration or add the missing connection to project.yaml."
             )
 
         with ctx.operation(
@@ -624,9 +630,11 @@ class NodeExecutor:
                         if "connection" in read_config and read_config["connection"]:
                             connection = self.connections.get(read_config["connection"])
                             if connection is None:
+                                available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
                                 raise ValueError(
-                                    f"Connection '{read_config['connection']}' not found for input '{name}'. "
-                                    f"Available: {', '.join(self.connections.keys())}"
+                                    f"Input '{name}' failed: Connection '{read_config['connection']}' not found. "
+                                    f"Available connections: [{available}]. "
+                                    f"Check the connection name in your input reference or add it to project.yaml connections."
                                 )
 
                         # Check if table/path exists before reading
@@ -666,8 +674,10 @@ class NodeExecutor:
 
                 if df is None:
                     raise ValueError(
-                        f"Cannot resolve reference '{ref}': not found in catalog and not in context cache. "
-                        f"Ensure the referenced node has run and written its output."
+                        f"Input '{name}' failed: Cannot resolve reference '{ref}'. "
+                        f"The referenced data was not found in the catalog or context cache. "
+                        f"Ensure the referenced node has run successfully and written its output before this node executes. "
+                        f"Check: 1) The node name is spelled correctly. 2) The referenced pipeline ran first. 3) depends_on is configured if same-pipeline."
                     )
 
                 # Store input source path for transforms that need it (e.g., detect_deletes)
@@ -684,9 +694,11 @@ class NodeExecutor:
                 connection = self.connections.get(conn_name) if conn_name else None
 
                 if conn_name and connection is None:
+                    available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
                     raise ValueError(
-                        f"Connection '{conn_name}' not found for input '{name}'. "
-                        f"Available: {', '.join(self.connections.keys())}"
+                        f"Input '{name}' failed: Connection '{conn_name}' not found. "
+                        f"Available connections: [{available}]. "
+                        f"Check your input configuration or add the missing connection to project.yaml."
                     )
 
                 df = self.engine.read(
@@ -698,8 +710,9 @@ class NodeExecutor:
 
             else:
                 raise ValueError(
-                    f"Invalid input format for '{name}': {ref}. "
-                    "Expected $pipeline.node reference or read config dict."
+                    f"Input '{name}' failed: Invalid input format. Got: {type(ref).__name__} = {repr(ref)[:100]}. "
+                    f"Expected either: 1) A pipeline reference string like '$pipeline_name.node_name', or "
+                    f"2) A read config dict with 'connection', 'format', and 'table'/'path' keys."
                 )
 
             dataframes[name] = df
@@ -1112,7 +1125,16 @@ class NodeExecutor:
                     failures=failures,
                     contract_count=len(config.contracts),
                 )
-                raise ValidationError(f"{config.name} (Contract Failure)", failures)
+                failure_summary = "; ".join(
+                    f"{f.get('test', 'unknown')}: {f.get('message', 'failed')}"
+                    for f in failures[:3]
+                )
+                if len(failures) > 3:
+                    failure_summary += f"; ... and {len(failures) - 3} more"
+                raise ValidationError(
+                    f"Node '{config.name}' contract validation failed with {len(failures)} error(s): {failure_summary}",
+                    failures
+                )
 
             ctx.info(
                 "Contract validation passed",
@@ -1393,7 +1415,12 @@ class NodeExecutor:
                                 sql_content = self._resolve_sql_file(step.sql_file)
                                 current_df = self._execute_sql_step(sql_content, current_df)
                             else:
-                                raise TransformError(f"Invalid transform step: {step}")
+                                step_repr = repr(step)[:100] if step else "None"
+                                raise TransformError(
+                                    f"Transform step {step_idx + 1}/{total_steps} is invalid. "
+                                    f"Step config: {step_repr}. "
+                                    f"Each step must have exactly one of: 'sql', 'sql_file', 'function', or 'operation'."
+                                )
 
                         rows_after = (
                             self._count_rows(current_df) if current_df is not None else None
@@ -1506,8 +1533,9 @@ class NodeExecutor:
         """
         if not self.config_file:
             raise ValueError(
-                f"Cannot resolve sql_file '{sql_file_path}': config_file path not available. "
-                "Ensure pipeline was loaded from a YAML file."
+                f"Cannot resolve sql_file '{sql_file_path}': The config_file path is not available. "
+                f"This happens when a pipeline is created programmatically without a YAML source. "
+                f"Solutions: 1) Load pipeline from YAML using load_config_from_file(), or 2) Use inline 'sql:' instead of 'sql_file:'."
             )
 
         config_dir = Path(self.config_file).parent
@@ -1515,15 +1543,20 @@ class NodeExecutor:
 
         if not file_path.exists():
             raise FileNotFoundError(
-                f"SQL file not found: {sql_file_path}\n"
-                f"Looked in: {file_path.absolute()}\n"
-                f"Config directory: {config_dir.absolute()}"
+                f"SQL file not found: '{sql_file_path}'. "
+                f"Looked in: {file_path.absolute()}. "
+                f"The path is resolved relative to the YAML config file at: {config_dir.absolute()}. "
+                f"Check: 1) The file exists at the expected location. 2) The path is relative to your pipeline YAML, not project.yaml."
             )
 
         try:
             return file_path.read_text(encoding="utf-8")
         except Exception as e:
-            raise ValueError(f"Error reading SQL file '{sql_file_path}': {e}") from e
+            raise ValueError(
+                f"Failed to read SQL file '{sql_file_path}' at {file_path.absolute()}. "
+                f"Error: {type(e).__name__}: {e}. "
+                f"Check file permissions and encoding (must be UTF-8)."
+            ) from e
 
     def _execute_function_step(
         self,
@@ -2553,11 +2586,16 @@ class NodeExecutor:
         if df is not None:
             # Reuse row count from write phase if available (avoids redundant count)
             cached_row_count = None
+            rows_written = None
             if self._delta_write_info:
                 cached_row_count = self._delta_write_info.get("_cached_row_count")
+                rows_written = self._delta_write_info.get("_cached_row_count")
             metadata["rows"] = (
                 cached_row_count if cached_row_count is not None else self._count_rows(df)
             )
+            # Track rows read vs rows written for story metrics
+            metadata["rows_read"] = self._read_row_count
+            metadata["rows_written"] = rows_written
             metadata["schema"] = self._get_schema(df)
             metadata["source_files"] = self.engine.get_source_files(df)
             # Skip null profiling if configured (expensive for large Spark DataFrames)

@@ -262,9 +262,14 @@ class MarkdownStoryRenderer:
 
             # Data metrics
             if node.rows_in is not None:
-                lines.append(f"**Rows In:** {node.rows_in:,}")
+                lines.append(f"**Rows Read:** {node.rows_in:,}")
             if node.rows_out is not None:
                 lines.append(f"**Rows Out:** {node.rows_out:,}")
+            if node.rows_written is not None:
+                if node.rows_in is not None and node.rows_written == 0 and node.rows_in > 0:
+                    lines.append(f"**Rows Written:** {node.rows_written:,} (no changes detected)")
+                else:
+                    lines.append(f"**Rows Written:** {node.rows_written:,}")
 
                 # Historical Rows
                 if node.historical_avg_rows is not None and node.rows_out is not None:

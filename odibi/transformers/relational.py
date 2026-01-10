@@ -50,7 +50,10 @@ class JoinParams(BaseModel):
         if isinstance(v, str):
             return [v]
         if not v:
-            raise ValueError("'on' must contain at least one join key")
+            raise ValueError(
+                f"Join 'on' parameter must contain at least one join key column. "
+                f"Got: {v!r}. Provide column name(s) that exist in both datasets."
+            )
         return v
 
 
@@ -88,7 +91,9 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
             ),
         )
         raise ValueError(
-            f"Dataset '{params.right_dataset}' not found in context. Ensure it is in 'depends_on'."
+            f"Join failed: dataset '{params.right_dataset}' not found in context. "
+            f"Available datasets: {list(context.context._data.keys()) if hasattr(context, 'context') and hasattr(context.context, '_data') else 'unknown'}. "
+            f"Ensure '{params.right_dataset}' is listed in 'depends_on' for this node."
         )
 
     # Get right df row count
@@ -285,7 +290,12 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
                 missing_dataset=ds_name,
                 requested_datasets=params.datasets,
             )
-            raise ValueError(f"Dataset '{ds_name}' not found.")
+            raise ValueError(
+                f"Union failed: dataset '{ds_name}' not found in context. "
+                f"Requested datasets: {params.datasets}. "
+                f"Available datasets: {list(context.context._data.keys()) if hasattr(context, 'context') and hasattr(context.context, '_data') else 'unknown'}. "
+                f"Ensure all datasets are listed in 'depends_on'."
+            )
 
         # Get row count of other df
         try:
@@ -452,7 +462,11 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
             "Pivot failed: unsupported engine",
             engine_type=str(context.engine_type),
         )
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"Pivot transformer does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration."
+        )
 
 
 # -------------------------------------------------------------------------
@@ -560,7 +574,11 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
             "Unpivot failed: unsupported engine",
             engine_type=str(context.engine_type),
         )
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"Unpivot transformer does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration."
+        )
 
 
 # -------------------------------------------------------------------------

@@ -124,7 +124,9 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
             )
         else:
             raise ValueError(
-                f"SCD2: connection '{params.connection}' does not support path resolution."
+                f"SCD2: connection '{params.connection}' (type: {type(connection).__name__}) "
+                f"does not support path resolution. Expected a connection with 'get_path' method. "
+                f"Connection type must be 'local', 'adls', or similar file-based connection."
             )
 
     ctx.debug(
@@ -158,7 +160,11 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
         result = _scd2_pandas(context, source_df, resolved_params)
     else:
         ctx.error("SCD2 failed: unsupported engine", engine_type=str(context.engine_type))
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"SCD2 transformer does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration or use a different transformer."
+        )
 
     rows_after = None
     try:

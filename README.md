@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 Odibi is a framework for building data pipelines. You describe *what* you want in YAML; Odibi handles *how*. Every run generates a "Data Story" — an audit report showing exactly what happened to your data.
 
@@ -145,4 +145,4 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md).
 ---
 
 **Maintainer:** Henry Odibi ([@henryodibi11](https://github.com/henryodibi11))  
-**License:** MIT
+**License:** Apache 2.0

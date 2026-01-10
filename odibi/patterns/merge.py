@@ -36,13 +36,25 @@ class MergePattern(Pattern):
                 "MergePattern validation failed: 'target' or 'path' is required",
                 pattern="MergePattern",
             )
-            raise ValueError("MergePattern: 'target' or 'path' is required.")
+            provided_params = {k: v for k, v in self.params.items() if v is not None}
+            raise ValueError(
+                f"MergePattern: 'target' or 'path' is required. "
+                f"Expected: A target table path string. "
+                f"Provided params: {list(provided_params.keys())}. "
+                f"Fix: Add 'target' or 'path' to your pattern configuration."
+            )
         if not self.params.get("keys"):
             ctx.error(
                 "MergePattern validation failed: 'keys' is required",
                 pattern="MergePattern",
             )
-            raise ValueError("MergePattern: 'keys' is required.")
+            source_columns = list(self.source.columns) if hasattr(self.source, 'columns') else []
+            raise ValueError(
+                f"MergePattern: 'keys' is required. "
+                f"Expected: A list of column names to match source and target rows for merge. "
+                f"Available source columns: {source_columns}. "
+                f"Fix: Add 'keys' with columns that uniquely identify rows (e.g., keys=['id'])."
+            )
 
         ctx.debug(
             "MergePattern validation passed",

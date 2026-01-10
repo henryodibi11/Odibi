@@ -1167,7 +1167,11 @@ class Pipeline:
             NodeResult
         """
         if node_name not in self.graph.nodes:
-            raise ValueError(f"Node '{node_name}' not found in pipeline")
+            available = ", ".join(self.graph.nodes.keys()) or "none"
+            raise ValueError(
+                f"Node '{node_name}' not found in pipeline. "
+                f"Available nodes: {available}"
+            )
 
         # Register mock data if provided
         if mock_data:
@@ -1484,7 +1488,10 @@ class PipelineManager:
             logger.debug("Configuration loaded successfully")
         except FileNotFoundError:
             logger.error(f"YAML file not found: {yaml_path}")
-            raise FileNotFoundError(f"YAML file not found: {yaml_path}")
+            raise FileNotFoundError(
+                f"YAML file not found: {yaml_path}. "
+                f"Verify the file exists and consider using an absolute path."
+            )
 
         project_config = ProjectConfig(**config)
         logger.debug(

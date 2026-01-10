@@ -7,16 +7,16 @@ name = "odibi"
 version = "2.4.0"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
-    {name = "Henry Odibi", email = "henryodibi@outlook.com"}
+    {name = "Henry Odibi", email = "odibiengineering@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 keywords = ["data-engineering", "pipeline", "etl", "workflow", "orchestration"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -78,13 +78,7 @@ sql = [
 polars = [
     "polars>=0.20.0",
 ]
-agents = [
-    "gradio>=4.44.0",  # 4.44+ required for Blocks(js=) parameter
-    "requests>=2.28.0",
-    "chromadb>=0.5.0",  # 0.5+ supports pydantic v2
-    "sentence-transformers>=3.0.0",
-    "threadpoolctl>=3.1.0",  # fixes compatibility issues in Databricks
-]
+
 all = [
     "pyspark>=3.4.0",
     "delta-spark>=2.3.0",
@@ -141,7 +135,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["odibi*", "agents*"]
+include = ["odibi*"]
 exclude = ["tests*"]
 
 [tool.black]

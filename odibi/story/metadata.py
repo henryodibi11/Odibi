@@ -43,6 +43,7 @@ class NodeExecutionMetadata:
     # Data metrics
     rows_in: Optional[int] = None
     rows_out: Optional[int] = None
+    rows_written: Optional[int] = None
     rows_change: Optional[int] = None
     rows_change_pct: Optional[float] = None
     sample_in: Optional[List[Dict[str, Any]]] = None
@@ -165,6 +166,7 @@ class NodeExecutionMetadata:
             "duration": self.duration,
             "rows_in": self.rows_in,
             "rows_out": self.rows_out,
+            "rows_written": self.rows_written,
             "rows_change": self.rows_change,
             "rows_change_pct": self.rows_change_pct,
             "sample_in": self.sample_in,

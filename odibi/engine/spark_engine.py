@@ -1554,7 +1554,10 @@ class SparkEngine(Engine):
                 )
             else:
                 ctx.error("Either path or table must be provided for streaming write")
-                raise ValueError("Either path or table must be provided for streaming write")
+                raise ValueError(
+                    "Streaming write operation failed: neither 'path' nor 'table' was provided. "
+                    "Specify a file path or table name in your streaming configuration."
+                )
 
             elapsed = (time.time() - start_time) * 1000
 

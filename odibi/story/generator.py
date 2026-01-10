@@ -960,9 +960,10 @@ class StoryGenerator:
             status="success" if result.success else "failed",
             duration=result.duration,
             rows_out=result.rows_processed,
+            rows_written=result.rows_written,
             schema_out=result.result_schema,
             # From metadata dict
-            rows_in=None,  # Calculated if we had input info
+            rows_in=result.rows_read,  # Use rows_read from NodeResult
             sample_in=meta.get("sample_data_in"),
             executed_sql=meta.get("executed_sql", []),
             sql_hash=meta.get("sql_hash"),

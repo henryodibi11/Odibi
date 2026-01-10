@@ -83,9 +83,15 @@ class PolarsEngine(Engine):
             if connection:
                 full_path = connection.get_path(table)
             else:
-                raise ValueError("Connection is required when specifying 'table'.")
+                raise ValueError(
+                    f"Cannot read table '{table}': connection is required when using 'table' parameter. "
+                    "Provide a valid connection object or use 'path' for file-based reads."
+                )
         else:
-            raise ValueError("Either path or table must be provided")
+            raise ValueError(
+                "Read operation failed: neither 'path' nor 'table' was provided. "
+                "Specify a file path or table name in your configuration."
+            )
 
         # Handle glob patterns/lists
         # Polars scan methods often support glob strings directly.
@@ -123,11 +129,16 @@ class PolarsEngine(Engine):
                 return pl.scan_delta(full_path, **delta_opts)
 
             else:
-                raise ValueError(f"Unsupported format for Polars engine: {format}")
+                raise ValueError(
+                    f"Unsupported format for Polars engine: '{format}'. "
+                    "Supported formats: csv, parquet, json, delta."
+                )
 
         except Exception as e:
-            # Fallback or error handling
-            raise ValueError(f"Failed to read {format} from {full_path}: {e}")
+            raise ValueError(
+                f"Failed to read {format} from '{full_path}': {e}. "
+                "Check that the file exists, the format is correct, and you have read permissions."
+            )
 
     def write(
         self,
@@ -155,9 +166,15 @@ class PolarsEngine(Engine):
             if connection:
                 full_path = connection.get_path(table)
             else:
-                raise ValueError("Connection is required when specifying 'table'.")
+                raise ValueError(
+                    f"Cannot write to table '{table}': connection is required when using 'table' parameter. "
+                    "Provide a valid connection object or use 'path' for file-based writes."
+                )
         else:
-            raise ValueError("Either path or table must be provided")
+            raise ValueError(
+                "Write operation failed: neither 'path' nor 'table' was provided. "
+                "Specify a file path or table name in your configuration."
+            )
 
         is_lazy = isinstance(df, pl.LazyFrame)
 
@@ -197,7 +214,10 @@ class PolarsEngine(Engine):
             )
 
         else:
-            raise ValueError(f"Unsupported write format for Polars: {format}")
+            raise ValueError(
+                f"Unsupported write format for Polars engine: '{format}'. "
+                "Supported formats: csv, parquet, json, delta."
+            )
 
         return None
 
@@ -220,7 +240,10 @@ class PolarsEngine(Engine):
             )
 
         if not table:
-            raise ValueError("SQL format requires 'table' config")
+            raise ValueError(
+                "SQL write operation failed: 'table' parameter is required but was not provided. "
+                "Specify the target table name in your configuration."
+            )
 
         if mode == "merge":
             merge_keys = options.get("merge_keys")
@@ -617,10 +640,16 @@ class PolarsEngine(Engine):
 
         # 1. Validation
         if missing and getattr(policy, "on_missing_columns", None) == OnMissingColumns.FAIL:
-            raise ValueError(f"Schema Policy Violation: Missing columns {missing}")
+            raise ValueError(
+                f"Schema Policy Violation: DataFrame is missing required columns {missing}. "
+                f"Available columns: {current_cols}. Add missing columns or set on_missing_columns policy."
+            )
 
         if new_cols and getattr(policy, "on_new_columns", None) == OnNewColumns.FAIL:
-            raise ValueError(f"Schema Policy Violation: New columns {new_cols}")
+            raise ValueError(
+                f"Schema Policy Violation: DataFrame contains unexpected columns {new_cols}. "
+                f"Expected columns: {target_cols}. Remove extra columns or set on_new_columns policy."
+            )
 
         # 2. Transformations
         exprs = []

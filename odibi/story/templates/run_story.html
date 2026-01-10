@@ -760,7 +760,12 @@
                     {% endif %}
                 </div>
                 <div class="node-metrics">
-                    {% if node.rows_out is not none %}
+                    {% if node.rows_in is not none %}
+                    <span title="Rows Read">📥 {{ "{:,}".format(node.rows_in) }}</span>
+                    {% endif %}
+                    {% if node.rows_written is not none %}
+                    <span title="Rows Written">📤 {{ "{:,}".format(node.rows_written) }}{% if node.rows_in is not none and node.rows_written == 0 and node.rows_in > 0 %} (no changes){% endif %}</span>
+                    {% elif node.rows_out is not none %}
                     <span>{{ "{:,}".format(node.rows_out) }} rows</span>
                     {% endif %}
 
@@ -2048,10 +2053,24 @@
             </div>`;
         }
         
-        // Rows (if available)
-        if (node.rows_out !== null && node.rows_out !== undefined) {
+        // Rows Read (if available)
+        if (node.rows_in !== null && node.rows_in !== undefined) {
             html += `<div class="tooltip-row">
-                <span class="tooltip-label">Rows:</span>
+                <span class="tooltip-label">Rows Read:</span>
+                <span class="tooltip-value">${node.rows_in.toLocaleString()}</span>
+            </div>`;
+        }
+        
+        // Rows Written (if available)
+        if (node.rows_written !== null && node.rows_written !== undefined) {
+            const noChanges = node.rows_in && node.rows_written === 0 && node.rows_in > 0 ? ' (no changes)' : '';
+            html += `<div class="tooltip-row">
+                <span class="tooltip-label">Rows Written:</span>
+                <span class="tooltip-value">${node.rows_written.toLocaleString()}${noChanges}</span>
+            </div>`;
+        } else if (node.rows_out !== null && node.rows_out !== undefined) {
+            html += `<div class="tooltip-row">
+                <span class="tooltip-label">Rows Out:</span>
                 <span class="tooltip-value">${node.rows_out.toLocaleString()}</span>
             </div>`;
         }
@@ -2195,7 +2214,8 @@
                     </div>
                     <div style="font-size: 13px; color: #666; display: flex; flex-wrap: wrap; gap: 12px;">
                         ${!isExternal && node.duration !== undefined ? `<span>⏱ ${node.duration.toFixed(3)}s</span>` : ''}
-                        ${!isExternal && node.rows_out !== null && node.rows_out !== undefined ? `<span>📊 ${node.rows_out.toLocaleString()} rows</span>` : ''}
+                        ${!isExternal && node.rows_in !== null && node.rows_in !== undefined ? `<span title="Rows Read">📥 ${node.rows_in.toLocaleString()}</span>` : ''}
+                        ${!isExternal && node.rows_written !== null && node.rows_written !== undefined ? `<span title="Rows Written">📤 ${node.rows_written.toLocaleString()}${node.rows_in && node.rows_written === 0 && node.rows_in > 0 ? ' (no changes)' : ''}</span>` : (!isExternal && node.rows_out !== null && node.rows_out !== undefined ? `<span>📊 ${node.rows_out.toLocaleString()} rows</span>` : '')}
                         ${isExternal ? '<span style="font-style: italic;">External dependency</span>' : ''}
                     </div>
                     ${upstream.length > 0 ? `<div style="font-size: 12px; margin-top: 6px;">← <span style="color: #666;">${upstream.length} upstream:</span> ${makeDepLinks(upstream, '#0066cc')}</div>` : (isExternal ? '' : '<div style="font-size: 12px; color: #999; margin-top: 6px;">← No dependencies (source)</div>')}

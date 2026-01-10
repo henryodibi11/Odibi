@@ -123,3 +123,73 @@ nodes:
 | :--- | :--- |
 | `${source}` | The path of the source file (if reading). |
 | `${SELF}` | The name of the current node. |
+
+---
+
+## Transformer Quick Reference
+
+### SQL Core (Column & Row Operations)
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `filter_rows` | Filter rows with SQL WHERE | `condition` |
+| `derive_columns` | Add calculated columns | `derivations: {col: expr}` |
+| `cast_columns` | Change column types | `casts: {col: type}` |
+| `clean_text` | Trim, lowercase, remove chars | `columns, lowercase, strip` |
+| `select_columns` | Keep only listed columns | `columns: [...]` |
+| `drop_columns` | Remove columns | `columns: [...]` |
+| `rename_columns` | Rename columns | `mapping: {old: new}` |
+| `fill_nulls` | Replace nulls | `fills: {col: value}` |
+| `case_when` | Conditional logic | `conditions: [{when, then}]` |
+| `sort` | Order rows | `order_by: "col DESC"` |
+| `limit` | Take first N rows | `n: 100` |
+| `distinct` | Remove duplicates | `columns: [...]` (optional) |
+
+### Date/Time Operations
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `extract_date_parts` | Extract year, month, day | `column, parts: [year, month]` |
+| `date_add` | Add interval to date | `column, interval, unit` |
+| `date_trunc` | Truncate to period | `column, unit: "month"` |
+| `date_diff` | Days between dates | `start_col, end_col` |
+| `convert_timezone` | Convert timezones | `column, from_tz, to_tz` |
+
+### Relational (Joins & Aggregations)
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `join` | Join datasets | `right_dataset, on, how` |
+| `union` | Stack datasets | `datasets: [...]` |
+| `aggregate` | Group and aggregate | `group_by, aggregations` |
+| `pivot` | Rows to columns | `index, columns, values` |
+| `unpivot` | Columns to rows | `id_vars, value_vars` |
+
+### Advanced (Complex Transformations)
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `deduplicate` | Keep first/last per key | `keys, order_by` |
+| `hash_columns` | Generate hash | `columns, output_column` |
+| `window_calculation` | Window functions | `partition_by, order_by, expr` |
+| `explode_list_column` | Flatten arrays | `column, outer: true` |
+| `dict_based_mapping` | Value mapping | `column, mapping: {}` |
+| `regex_replace` | Regex substitution | `column, pattern, replacement` |
+| `parse_json` | Extract from JSON | `column, schema` |
+| `generate_surrogate_key` | UUID keys | `columns, output_column` |
+| `sessionize` | Session detection | `timestamp_col, gap_minutes` |
+
+### Patterns (SCD, Merge, Delete Detection)
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `scd2` | SCD Type 2 history | `target, keys, track_cols` |
+| `merge` | Upsert/append/delete | `target, keys, strategy` |
+| `detect_deletes` | Find deleted records | `target, keys` |
+
+### Validation
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `cross_check` | Compare datasets | `inputs: [a, b], type` |
+| `validate_and_flag` | Flag bad records | `rules: [{col, condition}]` |

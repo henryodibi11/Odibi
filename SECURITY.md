@@ -26,7 +26,7 @@ Instead, report vulnerabilities via one of these channels:
    - Provide detailed information about the vulnerability
 
 2. **Email**:
-   - Send to: henryodibi@outlook.com
+   - Send to: odibiengineering@gmail.com
    - Subject: "[SECURITY] ODIBI Vulnerability Report"
    - Include detailed description and reproduction steps
 

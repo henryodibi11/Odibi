@@ -97,13 +97,19 @@ class AzureADLS(BaseConnection):
 
         if not self.account:
             ctx.error("ADLS connection validation failed: missing 'account'")
-            raise ValueError("ADLS connection requires 'account'")
+            raise ValueError(
+                "ADLS connection requires 'account'. "
+                "Provide the storage account name (e.g., account: 'mystorageaccount')."
+            )
         if not self.container:
             ctx.error(
                 "ADLS connection validation failed: missing 'container'",
                 account=self.account,
             )
-            raise ValueError("ADLS connection requires 'container'")
+            raise ValueError(
+                f"ADLS connection requires 'container' for account '{self.account}'. "
+                "Provide the container/filesystem name."
+            )
 
         if self.auth_mode == "key_vault":
             if not self.key_vault_name or not self.secret_name:
@@ -161,7 +167,12 @@ class AzureADLS(BaseConnection):
                     container=self.container,
                     missing="tenant_id and/or client_id",
                 )
-                raise ValueError("service_principal mode requires 'tenant_id' and 'client_id'")
+                raise ValueError(
+                    f"service_principal mode requires 'tenant_id' and 'client_id' "
+                    f"for connection to {self.account}/{self.container}. "
+                    f"Got tenant_id={self.tenant_id or '(missing)'}, "
+                    f"client_id={self.client_id or '(missing)'}."
+                )
 
             if not self.client_secret and not (self.key_vault_name and self.secret_name):
                 ctx.error(

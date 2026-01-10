@@ -50,7 +50,11 @@ def detect_deletes(
     if config.mode == DeleteDetectionMode.SQL_COMPARE:
         return _detect_deletes_sql_compare(context, config)
 
-    raise ValueError(f"Unknown delete detection mode: {config.mode}")
+    raise ValueError(
+        f"Unknown delete detection mode: '{config.mode}'. "
+        f"Supported modes: 'none', 'snapshot_diff', 'sql_compare'. "
+        f"Check your 'mode' configuration."
+    )
 
 
 def _detect_deletes_snapshot_diff(
@@ -248,7 +252,11 @@ def _sql_compare_spark(
 
     conn = _get_connection(context, config.source_connection)
     if conn is None:
-        raise ValueError(f"detect_deletes: Connection '{config.source_connection}' not found.")
+        raise ValueError(
+            f"detect_deletes: Connection '{config.source_connection}' not found in engine connections. "
+            f"Available connections: {list(context.engine.connections.keys()) if hasattr(context, 'engine') and hasattr(context.engine, 'connections') else 'None'}. "
+            f"Define the connection in your project config or check the connection name."
+        )
 
     source_keys_query = _build_source_keys_query(config)
 
@@ -280,7 +288,11 @@ def _sql_compare_pandas(
 
     conn = _get_connection(context, config.source_connection)
     if conn is None:
-        raise ValueError(f"detect_deletes: Connection '{config.source_connection}' not found.")
+        raise ValueError(
+            f"detect_deletes: Connection '{config.source_connection}' not found in engine connections. "
+            f"Available connections: {list(context.engine.connections.keys()) if hasattr(context, 'engine') and hasattr(context.engine, 'connections') else 'None'}. "
+            f"Define the connection in your project config or check the connection name."
+        )
 
     source_keys_query = _build_source_keys_query(config)
 
@@ -544,7 +556,12 @@ def _get_jdbc_url(conn: Any) -> str:
         if isinstance(opts, dict) and "url" in opts:
             return opts["url"]
 
-    raise ValueError(f"Cannot determine JDBC URL from connection type {type(conn).__name__}")
+    raise ValueError(
+        f"Cannot determine JDBC URL from connection type '{type(conn).__name__}'. "
+        f"Expected one of these attributes: 'jdbc_url', 'get_jdbc_url()', 'url', or 'get_spark_options()'. "
+        f"Available attributes: {[a for a in dir(conn) if not a.startswith('_')]}. "
+        f"Ensure your connection class implements JDBC URL access."
+    )
 
 
 def _get_jdbc_properties(conn: Any) -> Dict[str, str]:
@@ -585,4 +602,9 @@ def _get_sqlalchemy_engine(conn: Any) -> Any:
 
         return create_engine(conn.connection_string)
 
-    raise ValueError(f"Cannot create SQLAlchemy engine from connection type {type(conn).__name__}")
+    raise ValueError(
+        f"Cannot create SQLAlchemy engine from connection type '{type(conn).__name__}'. "
+        f"Expected one of these attributes: 'engine', 'get_engine()', or 'connection_string'. "
+        f"Available attributes: {[a for a in dir(conn) if not a.startswith('_')]}. "
+        f"Ensure your connection class provides SQLAlchemy engine access."
+    )

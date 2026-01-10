@@ -35,13 +35,22 @@ class SCD2Pattern(Pattern):
                 "SCD2Pattern validation failed: 'keys' parameter is required",
                 pattern="SCD2Pattern",
             )
-            raise ValueError("SCD2Pattern: 'keys' parameter is required.")
+            raise ValueError(
+                "SCD2Pattern: 'keys' parameter is required. "
+                f"Expected a list of business key column names, but got: {self.params.get('keys')!r}. "
+                f"Available params: {list(self.params.keys())}. "
+                "Fix: Provide 'keys' as a list, e.g., keys=['customer_id']."
+            )
         if not self.params.get("target"):
             ctx.error(
                 "SCD2Pattern validation failed: 'target' parameter is required",
                 pattern="SCD2Pattern",
             )
-            raise ValueError("SCD2Pattern: 'target' parameter is required (table name or path).")
+            raise ValueError(
+                "SCD2Pattern: 'target' parameter is required. "
+                f"Expected a table name or path string, but got: {self.params.get('target')!r}. "
+                "Fix: Provide 'target' as a string, e.g., target='dim_customer'."
+            )
 
         ctx.debug(
             "SCD2Pattern validation passed",
@@ -94,7 +103,11 @@ class SCD2Pattern(Pattern):
                 error_type=type(e).__name__,
                 params=filtered_params,
             )
-            raise ValueError(f"Invalid SCD2 parameters: {e}")
+            raise ValueError(
+                f"Invalid SCD2 parameters: {e}. "
+                f"Provided params: {filtered_params}. "
+                f"Valid param names: {list(valid_keys)}."
+            )
 
         try:
             result_ctx = scd2(context, scd_params)

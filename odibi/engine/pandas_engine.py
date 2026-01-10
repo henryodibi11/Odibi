@@ -160,7 +160,10 @@ class PandasEngine(Engine):
             Full resolved path
         """
         if not path:
-            raise ValueError("Path must be provided")
+            raise ValueError(
+                "Failed to resolve path: path argument is required but was empty or None. "
+                "Provide a valid file path or use 'table' parameter with a connection."
+            )
         if path.startswith(self._CLOUD_URI_PREFIXES):
             return path
         if connection:
@@ -260,9 +263,15 @@ class PandasEngine(Engine):
         except ValueError:
             if table and not connection:
                 ctx.error("Connection required when specifying 'table'", table=table)
-                raise ValueError("Connection is required when specifying 'table'.")
+                raise ValueError(
+                    f"Cannot read table '{table}': connection is required when using 'table' parameter. "
+                    "Provide a valid connection object or use 'path' for file-based reads."
+                )
             ctx.error("Neither path nor table provided for read operation")
-            raise ValueError("Either path or table must be provided")
+            raise ValueError(
+                "Read operation failed: neither 'path' nor 'table' was provided. "
+                "Specify a file path or table name in your configuration."
+            )
 
         # Merge storage options for cloud connections
         merged_options = self._merge_storage_options(connection, options)
@@ -555,7 +564,9 @@ class PandasEngine(Engine):
                     connection_type=type(connection).__name__,
                 )
                 raise ValueError(
-                    f"Connection type '{type(connection).__name__}' does not support SQL operations"
+                    f"Cannot read SQL table '{full_path}': connection type '{type(connection).__name__}' "
+                    "does not support SQL operations. Use a SQL-compatible connection "
+                    "(e.g., SqlServerConnection, AzureSqlConnection)."
                 )
 
             table_name = str(full_path)
@@ -568,7 +579,10 @@ class PandasEngine(Engine):
             return connection.read_table(table_name=tbl, schema=schema)
         else:
             ctx.error("Unsupported format", format=format)
-            raise ValueError(f"Unsupported format for Pandas engine: {format}")
+            raise ValueError(
+                f"Unsupported format for Pandas engine: '{format}'. "
+                "Supported formats: csv, parquet, json, excel, delta, sql, sql_server, azure_sql."
+            )
 
     def write(
         self,
@@ -1573,7 +1587,10 @@ class PandasEngine(Engine):
             if col in df.columns:
                 null_counts[col] = int(df[col].isna().sum())
             else:
-                raise ValueError(f"Column '{col}' not found in DataFrame")
+                raise ValueError(
+                    f"Column '{col}' not found in DataFrame. "
+                    f"Available columns: {list(df.columns)}"
+                )
         return null_counts
 
     def validate_schema(self, df: pd.DataFrame, schema_rules: Dict[str, Any]) -> List[str]:

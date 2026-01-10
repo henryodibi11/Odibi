@@ -106,7 +106,11 @@ class FactPattern(Pattern):
                 "FactPattern validation failed: 'keys' required when 'deduplicate' is True",
                 pattern="FactPattern",
             )
-            raise ValueError("FactPattern: 'keys' required when 'deduplicate' is True.")
+            raise ValueError(
+                "FactPattern: 'keys' required when 'deduplicate' is True. "
+                "Keys define which columns uniquely identify a fact row for deduplication. "
+                "Provide keys=['col1', 'col2'] to specify the deduplication columns."
+            )
 
         if orphan_handling not in ("unknown", "reject", "quarantine"):
             ctx.error(
@@ -135,13 +139,22 @@ class FactPattern(Pattern):
                     "FactPattern validation failed: quarantine.connection is required",
                     pattern="FactPattern",
                 )
-                raise ValueError("FactPattern: 'quarantine.connection' is required.")
+                raise ValueError(
+                    "FactPattern: 'quarantine.connection' is required. "
+                    "The connection specifies where to write quarantined orphan records "
+                    "(e.g., a Spark session or database connection). "
+                    "Add 'connection' to your quarantine config."
+                )
             if not quarantine_config.get("path") and not quarantine_config.get("table"):
                 ctx.error(
                     "FactPattern validation failed: quarantine requires 'path' or 'table'",
                     pattern="FactPattern",
                 )
-                raise ValueError("FactPattern: 'quarantine' requires either 'path' or 'table'.")
+                raise ValueError(
+                    f"FactPattern: 'quarantine' requires either 'path' or 'table'. "
+                    f"Got config: {quarantine_config}. "
+                    "Add 'path' for file storage or 'table' for database storage."
+                )
 
         for i, dim in enumerate(dimensions):
             required_keys = ["source_column", "dimension_table", "dimension_key", "surrogate_key"]
@@ -151,7 +164,12 @@ class FactPattern(Pattern):
                         f"FactPattern validation failed: dimension[{i}] missing '{key}'",
                         pattern="FactPattern",
                     )
-                    raise ValueError(f"FactPattern: dimension[{i}] missing required key '{key}'.")
+                    raise ValueError(
+                        f"FactPattern: dimension[{i}] missing required key '{key}'. "
+                        f"Required keys: {required_keys}. "
+                        f"Got: {dim}. "
+                        f"Ensure all required keys are provided in the dimension config."
+                    )
 
         ctx.debug(
             "FactPattern validation passed",

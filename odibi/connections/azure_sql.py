@@ -114,7 +114,12 @@ class AzureSQL(BaseConnection):
                     server=self.server,
                     database=self.database,
                 )
-                raise ValueError("key_vault mode requires key_vault_name and secret_name")
+                raise ValueError(
+                    f"key_vault mode requires 'key_vault_name' and 'secret_name' "
+                    f"for connection to {self.server}/{self.database}. "
+                    f"Got key_vault_name={self.key_vault_name or '(missing)'}, "
+                    f"secret_name={self.secret_name or '(missing)'}."
+                )
 
             ctx.debug(
                 "Fetching password from Key Vault",
@@ -147,7 +152,8 @@ class AzureSQL(BaseConnection):
                     error=str(e),
                 )
                 raise ImportError(
-                    "Key Vault support requires 'azure-identity' and 'azure-keyvault-secrets'"
+                    "Key Vault support requires 'azure-identity' and 'azure-keyvault-secrets'. "
+                    "Install with: pip install odibi[azure]"
                 )
 
         ctx.debug(
@@ -224,13 +230,18 @@ class AzureSQL(BaseConnection):
 
         if not self.server:
             ctx.error("AzureSQL validation failed: missing 'server'")
-            raise ValueError("Azure SQL connection requires 'server'")
+            raise ValueError(
+                "Azure SQL connection requires 'server'. "
+                "Provide the SQL server hostname (e.g., server: 'myserver.database.windows.net')."
+            )
         if not self.database:
             ctx.error(
                 "AzureSQL validation failed: missing 'database'",
                 server=self.server,
             )
-            raise ValueError("Azure SQL connection requires 'database'")
+            raise ValueError(
+                f"Azure SQL connection requires 'database' for server '{self.server}'."
+            )
 
         if self.auth_mode == "sql":
             if not self.username:
@@ -239,7 +250,10 @@ class AzureSQL(BaseConnection):
                     server=self.server,
                     database=self.database,
                 )
-                raise ValueError("Azure SQL with auth_mode='sql' requires username")
+                raise ValueError(
+                    f"Azure SQL with auth_mode='sql' requires 'username' "
+                    f"for connection to {self.server}/{self.database}."
+                )
             if not self.password and not (self.key_vault_name and self.secret_name):
                 ctx.error(
                     "AzureSQL validation failed: SQL auth requires password",

@@ -43,7 +43,7 @@ class TestReadConfig:
                 format="csv",
                 # Missing path, table, AND query option
             )
-        assert "Either 'table' or 'path' must be provided" in str(exc_info.value)
+        assert "No data source specified" in str(exc_info.value)
 
     def test_valid_read_config_with_query_option(self):
         """Valid config with query in options should parse correctly without table/path."""
@@ -211,7 +211,7 @@ class TestTriggerConfig:
         """Only one trigger type can be specified."""
         with pytest.raises(ValidationError) as exc_info:
             TriggerConfig(processing_time="10 seconds", once=True)
-        assert "specify exactly one" in str(exc_info.value)
+        assert "Multiple trigger types specified" in str(exc_info.value)
 
     def test_empty_trigger_is_valid(self):
         """Empty trigger config is valid (defaults to processing as fast as possible)."""

@@ -138,6 +138,30 @@ improve_odibi/
 spark-warehouse/
 artifacts/
 explorer_sandboxes/
+smoke_test/
+test_odibi_local/
+-p/
+
+# Internal planning docs (moved to henry-lab)
+templates/
+STABILITY_CAMPAIGN.md
+BUGS.md
+GAPS.md
+
+# Agents (moved to henry-lab)
+agents/
+
+# Internal docs (moved to henry-lab)
+docs/marketing/
+docs/plans/
+docs/roadmap/
+docs/planning/
+docs/archive/
+docs/project/
+docs/out/
+docs/architecture/
+docs/design/
+docs/dashboards/
 
 # Coverage
 .coverage

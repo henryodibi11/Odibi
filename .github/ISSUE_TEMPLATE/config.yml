@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/henryodibi11/Odibi/discussions
+    about: Ask questions, share ideas, or show what you've built
+  - name: Documentation
+    url: https://henryodibi11.github.io/Odibi/
+    about: Check the docs first - your answer might be there

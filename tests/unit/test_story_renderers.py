@@ -110,7 +110,7 @@ class TestMarkdownStoryRenderer:
         renderer = MarkdownStoryRenderer()
         markdown = renderer.render(sample_metadata)
 
-        assert "Rows In:" in markdown
+        assert "Rows Read:" in markdown
         assert "Rows Out:" in markdown
         assert "Row Change:" in markdown
         assert "850" in markdown

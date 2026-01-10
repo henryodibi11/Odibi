@@ -1221,9 +1221,8 @@ export PYSPARK_DRIVER_PYTHON=/usr/bin/python3.9
 
 ### How to Report Bugs
 
-1. Check if it's already documented in [BUGS.md](https://github.com/henryodibi11/Odibi/blob/main/BUGS.md)
-2. Check [GAPS.md](https://github.com/henryodibi11/Odibi/blob/main/GAPS.md) for known limitations
-3. Create a GitHub issue with:
+1. Check [GitHub Issues](https://github.com/henryodibi11/Odibi/issues) for existing reports
+2. Create a new issue with:
    - Odibi version
    - Python version
    - Engine (Pandas/Spark/Polars)
@@ -1251,9 +1250,9 @@ export PYSPARK_DRIVER_PYTHON=/usr/bin/python3.9
 
 ### Links
 
-- [BUGS.md](https://github.com/henryodibi11/Odibi/blob/main/BUGS.md) - Fixed bugs and workarounds
-- [GAPS.md](https://github.com/henryodibi11/Odibi/blob/main/GAPS.md) - Known gaps and roadmap
-- [GitHub Issues](https://github.com/henryodibi11/Odibi/issues) - Report new issues
+- [GitHub Issues](https://github.com/henryodibi11/Odibi/issues) - Report bugs and request features
+- [Discussions](https://github.com/henryodibi11/Odibi/discussions) - Ask questions and share ideas
+- [Roadmap](./ROADMAP.md) - See what's coming next
 
 ---
 

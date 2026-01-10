@@ -64,14 +64,22 @@ class AggregationPattern(Pattern):
                 "AggregationPattern validation failed: 'grain' is required",
                 pattern="AggregationPattern",
             )
-            raise ValueError("AggregationPattern: 'grain' parameter is required.")
+            raise ValueError(
+                "AggregationPattern: 'grain' parameter is required. "
+                "Grain defines the grouping columns for aggregation (e.g., ['date', 'region']). "
+                "Provide a list of column names to group by."
+            )
 
         if not measures:
             ctx.error(
                 "AggregationPattern validation failed: 'measures' is required",
                 pattern="AggregationPattern",
             )
-            raise ValueError("AggregationPattern: 'measures' parameter is required.")
+            raise ValueError(
+                "AggregationPattern: 'measures' parameter is required. "
+                "Measures define the aggregations to compute (e.g., [{'name': 'total_sales', 'expr': 'sum(amount)'}]). "
+                "Provide a list of dicts, each with 'name' and 'expr' keys."
+            )
 
         for i, measure in enumerate(measures):
             if not isinstance(measure, dict):
@@ -80,20 +88,28 @@ class AggregationPattern(Pattern):
                     pattern="AggregationPattern",
                 )
                 raise ValueError(
-                    f"AggregationPattern: measure[{i}] must be a dict with 'name' and 'expr'."
+                    f"AggregationPattern: measure[{i}] must be a dict with 'name' and 'expr'. "
+                    f"Got {type(measure).__name__}: {measure!r}. "
+                    "Example: {'name': 'total_sales', 'expr': 'sum(amount)'}"
                 )
             if "name" not in measure:
                 ctx.error(
                     f"AggregationPattern validation failed: measure[{i}] missing 'name'",
                     pattern="AggregationPattern",
                 )
-                raise ValueError(f"AggregationPattern: measure[{i}] missing 'name'.")
+                raise ValueError(
+                    f"AggregationPattern: measure[{i}] missing 'name'. "
+                    f"Got: {measure!r}. Add a 'name' key for the output column name."
+                )
             if "expr" not in measure:
                 ctx.error(
                     f"AggregationPattern validation failed: measure[{i}] missing 'expr'",
                     pattern="AggregationPattern",
                 )
-                raise ValueError(f"AggregationPattern: measure[{i}] missing 'expr'.")
+                raise ValueError(
+                    f"AggregationPattern: measure[{i}] missing 'expr'. "
+                    f"Got: {measure!r}. Add an 'expr' key with the aggregation expression (e.g., 'sum(amount)')."
+                )
 
         incremental = self.params.get("incremental")
         if incremental:
@@ -103,7 +119,9 @@ class AggregationPattern(Pattern):
                     pattern="AggregationPattern",
                 )
                 raise ValueError(
-                    "AggregationPattern: incremental config requires 'timestamp_column'."
+                    "AggregationPattern: incremental config requires 'timestamp_column'. "
+                    f"Got: {incremental!r}. "
+                    "Add 'timestamp_column' to specify which column tracks record timestamps."
                 )
             merge_strategy = incremental.get("merge_strategy", "replace")
             if merge_strategy not in ("replace", "sum", "min", "max"):

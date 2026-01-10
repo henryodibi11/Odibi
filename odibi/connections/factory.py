@@ -69,7 +69,10 @@ def create_azure_blob_connection(name: str, config: Dict[str, Any]) -> Any:
             connection_name=name,
             config_keys=list(config.keys()),
         )
-        raise ValueError(f"Connection '{name}' missing 'account_name'")
+        raise ValueError(
+            f"Connection '{name}' missing 'account_name'. "
+            f"Expected 'account_name' or 'account' in config, got keys: {list(config.keys())}"
+        )
 
     auth_config = config.get("auth", {})
 
@@ -236,7 +239,10 @@ def create_sql_server_connection(name: str, config: Dict[str, Any]) -> Any:
             connection_name=name,
             config_keys=list(config.keys()),
         )
-        raise ValueError(f"Connection '{name}' missing 'host' or 'server'")
+        raise ValueError(
+            f"Connection '{name}' missing 'host' or 'server'. "
+            f"Got keys: {list(config.keys())}"
+        )
 
     auth_config = config.get("auth", {})
     username = auth_config.get("username") or config.get("username")

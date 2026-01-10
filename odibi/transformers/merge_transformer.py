@@ -177,7 +177,11 @@ class MergeParams(BaseModel):
     @classmethod
     def check_keys(cls, v):
         if not v:
-            raise ValueError("Merge: 'keys' must not be empty.")
+            raise ValueError(
+                "Merge: 'keys' must not be empty. "
+                "Provide at least one column name to join source and target on. "
+                f"Got: {v!r}"
+            )
         return v
 
     @model_validator(mode="after")
@@ -227,7 +231,11 @@ def merge(context, params=None, current=None, **kwargs):
         if hasattr(context, "df"):
             current = context.df
         else:
-            raise ValueError("Merge requires a DataFrame: pass via context.df or as 'current' arg")
+            raise ValueError(
+                f"Merge requires a DataFrame but none was provided. "
+                f"Either pass a DataFrame as the 'current' argument, or ensure context.df is set. "
+                f"Context type: {type(context).__name__}. Has 'df' attr: {hasattr(context, 'df')}."
+            )
 
     # Resolve target path from connection if provided
     target = merge_params.target
@@ -257,7 +265,9 @@ def merge(context, params=None, current=None, **kwargs):
             )
         else:
             raise ValueError(
-                f"Merge: connection '{merge_params.connection}' does not support path resolution."
+                f"Merge: connection '{merge_params.connection}' (type: {type(connection).__name__}) "
+                f"does not support path resolution. Expected a connection with 'get_path' method. "
+                f"Connection type must be 'local', 'adls', or similar file-based connection."
             )
 
     ctx.debug(
@@ -724,7 +734,11 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
     # Ensure keys exist
     for k in keys:
         if k not in target_df.columns or k not in source_df.columns:
-            raise ValueError(f"Key column '{k}' missing in target or source")
+            raise ValueError(
+                f"Merge key column '{k}' not found in DataFrame. "
+                f"Target columns: {list(target_df.columns)}. Source columns: {list(source_df.columns)}. "
+                f"Check your 'keys' configuration matches actual column names."
+            )
 
     target_df_indexed = target_df.set_index(keys)
     source_df_indexed = source_df.set_index(keys)

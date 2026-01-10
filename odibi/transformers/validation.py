@@ -61,7 +61,11 @@ def cross_check(context: EngineContext, params: CrossCheckParams) -> Any:
             "CrossCheck failed: insufficient inputs",
             inputs_count=len(params.inputs),
         )
-        raise ValueError("Cross-check requires at least 2 inputs")
+        raise ValueError(
+            f"Cross-check requires at least 2 inputs to compare, but got {len(params.inputs)}. "
+            f"Inputs provided: {params.inputs!r}. "
+            "Add another input dataset to the 'inputs' list."
+        )
 
     dfs = {}
     for name in params.inputs:
@@ -76,7 +80,11 @@ def cross_check(context: EngineContext, params: CrossCheckParams) -> Any:
                     else None
                 ),
             )
-            raise ValueError(f"Input '{name}' not found in context")
+            raise ValueError(
+                f"Cross-check input '{name}' not found in context. "
+                f"Available inputs: {list(context.context._data.keys()) if hasattr(context.context, '_data') else 'unknown'}. "
+                f"Ensure '{name}' is listed in 'depends_on' for this node."
+            )
         dfs[name] = df
 
     if params.type == "row_count_diff":

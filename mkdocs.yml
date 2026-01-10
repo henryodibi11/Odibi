@@ -161,6 +161,7 @@ nav:
   # CONCEPTS - Understanding-oriented
   # ─────────────────────────────────────────────
   - Concepts:
+      - Philosophy: philosophy.md
       - Pipelines & Nodes: features/pipelines.md
       - Connections: features/connections.md
       - Engines: features/engines.md

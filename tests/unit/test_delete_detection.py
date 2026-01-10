@@ -47,7 +47,7 @@ class TestDeleteDetectionConfigValidation:
 
     def test_snapshot_diff_requires_keys(self):
         """Snapshot diff mode requires keys."""
-        with pytest.raises(ValueError, match="'keys' required for mode='snapshot_diff'"):
+        with pytest.raises(ValueError, match="'keys' is required when mode='snapshot_diff'"):
             DeleteDetectionConfig(mode=DeleteDetectionMode.SNAPSHOT_DIFF)
 
     def test_snapshot_diff_valid_with_keys(self):
@@ -71,7 +71,7 @@ class TestDeleteDetectionConfigValidation:
 
     def test_sql_compare_requires_keys(self):
         """SQL compare mode requires keys."""
-        with pytest.raises(ValueError, match="'keys' required for mode='sql_compare'"):
+        with pytest.raises(ValueError, match="'keys' is required when mode='sql_compare'"):
             DeleteDetectionConfig(
                 mode=DeleteDetectionMode.SQL_COMPARE,
                 source_connection="my_conn",
@@ -80,7 +80,7 @@ class TestDeleteDetectionConfigValidation:
 
     def test_sql_compare_requires_source_connection(self):
         """SQL compare mode requires source_connection."""
-        with pytest.raises(ValueError, match="'source_connection' required for sql_compare"):
+        with pytest.raises(ValueError, match="'source_connection' is required for mode='sql_compare'"):
             DeleteDetectionConfig(
                 mode=DeleteDetectionMode.SQL_COMPARE,
                 keys=["id"],
@@ -89,7 +89,7 @@ class TestDeleteDetectionConfigValidation:
 
     def test_sql_compare_requires_source_table_or_query(self):
         """SQL compare mode requires source_table or source_query."""
-        with pytest.raises(ValueError, match="'source_table' or 'source_query' required"):
+        with pytest.raises(ValueError, match="'source_table' or 'source_query' is required"):
             DeleteDetectionConfig(
                 mode=DeleteDetectionMode.SQL_COMPARE,
                 keys=["id"],

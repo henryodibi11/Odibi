@@ -63,7 +63,10 @@ class RelationshipConfig(BaseModel):
     @classmethod
     def validate_not_empty(cls, v: str, info) -> str:
         if not v or not v.strip():
-            raise ValueError(f"{info.field_name} cannot be empty")
+            raise ValueError(
+                f"RelationshipConfig.{info.field_name} cannot be empty. "
+                f"Got: {v!r}. Provide a non-empty string value."
+            )
         return v.strip()
 
     @field_validator("on_violation")
@@ -71,7 +74,9 @@ class RelationshipConfig(BaseModel):
     def validate_on_violation(cls, v: str) -> str:
         valid = ("warn", "error", "quarantine")
         if v.lower() not in valid:
-            raise ValueError(f"on_violation must be one of {valid}")
+            raise ValueError(
+                f"Invalid on_violation value. Expected one of {valid}, got: {v!r}."
+            )
         return v.lower()
 
 

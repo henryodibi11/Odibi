@@ -174,7 +174,11 @@ def explode_list_column(context: EngineContext, params: ExplodeParams) -> Engine
 
     else:
         ctx.error("Explode failed: unsupported engine", engine_type=str(context.engine_type))
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"Explode transformer does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration."
+        )
 
 
 # -------------------------------------------------------------------------
@@ -237,7 +241,11 @@ def dict_based_mapping(context: EngineContext, params: DictMappingParams) -> Eng
         return context.with_df(df)
 
     else:
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"Dict-based mapping does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration."
+        )
 
 
 # -------------------------------------------------------------------------
@@ -328,7 +336,11 @@ def unpack_struct(context: EngineContext, params: UnpackStructParams) -> EngineC
         return context.with_df(res)
 
     else:
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"Unpack struct does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration."
+        )
 
 
 # -------------------------------------------------------------------------
@@ -1205,7 +1217,11 @@ def _split_by_day(context: EngineContext, params: SplitEventsByPeriodParams) -> 
         return context.with_df(result)
 
     else:
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"Split events by day does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration."
+        )
 
 
 def _split_by_hour(context: EngineContext, params: SplitEventsByPeriodParams) -> EngineContext:
@@ -1321,7 +1337,11 @@ def _split_by_hour(context: EngineContext, params: SplitEventsByPeriodParams) ->
         return context.with_df(result)
 
     else:
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"Split events by hour does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration."
+        )
 
 
 def _split_by_shift(context: EngineContext, params: SplitEventsByPeriodParams) -> EngineContext:
@@ -1445,4 +1465,8 @@ def _split_by_shift(context: EngineContext, params: SplitEventsByPeriodParams) -
         return context.with_df(result)
 
     else:
-        raise ValueError(f"Unsupported engine: {context.engine_type}")
+        raise ValueError(
+            f"Split events by shift does not support engine type '{context.engine_type}'. "
+            f"Supported engines: SPARK, PANDAS. "
+            f"Check your engine configuration."
+        )
