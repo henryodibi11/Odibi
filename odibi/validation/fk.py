@@ -74,9 +74,7 @@ class RelationshipConfig(BaseModel):
     def validate_on_violation(cls, v: str) -> str:
         valid = ("warn", "error", "quarantine")
         if v.lower() not in valid:
-            raise ValueError(
-                f"Invalid on_violation value. Expected one of {valid}, got: {v!r}."
-            )
+            raise ValueError(f"Invalid on_violation value. Expected one of {valid}, got: {v!r}.")
         return v.lower()
 
 

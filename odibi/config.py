@@ -1159,10 +1159,14 @@ class TransformStep(BaseModel):
     def check_step_type(self):
         """Ensure exactly one step type is provided."""
         specified = [
-            name for name, val in [
-                ("sql", self.sql), ("sql_file", self.sql_file),
-                ("function", self.function), ("operation", self.operation)
-            ] if val is not None
+            name
+            for name, val in [
+                ("sql", self.sql),
+                ("sql_file", self.sql_file),
+                ("function", self.function),
+                ("operation", self.operation),
+            ]
+            if val is not None
         ]
         if len(specified) != 1:
             if len(specified) == 0:

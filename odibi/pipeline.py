@@ -1169,8 +1169,7 @@ class Pipeline:
         if node_name not in self.graph.nodes:
             available = ", ".join(self.graph.nodes.keys()) or "none"
             raise ValueError(
-                f"Node '{node_name}' not found in pipeline. "
-                f"Available nodes: {available}"
+                f"Node '{node_name}' not found in pipeline. " f"Available nodes: {available}"
             )
 
         # Register mock data if provided

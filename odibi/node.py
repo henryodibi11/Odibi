@@ -630,7 +630,9 @@ class NodeExecutor:
                         if "connection" in read_config and read_config["connection"]:
                             connection = self.connections.get(read_config["connection"])
                             if connection is None:
-                                available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
+                                available = (
+                                    ", ".join(sorted(self.connections.keys())) or "(none defined)"
+                                )
                                 raise ValueError(
                                     f"Input '{name}' failed: Connection '{read_config['connection']}' not found. "
                                     f"Available connections: [{available}]. "
@@ -1133,7 +1135,7 @@ class NodeExecutor:
                     failure_summary += f"; ... and {len(failures) - 3} more"
                 raise ValidationError(
                     f"Node '{config.name}' contract validation failed with {len(failures)} error(s): {failure_summary}",
-                    failures
+                    failures,
                 )
 
             ctx.info(

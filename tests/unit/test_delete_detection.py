@@ -80,7 +80,9 @@ class TestDeleteDetectionConfigValidation:
 
     def test_sql_compare_requires_source_connection(self):
         """SQL compare mode requires source_connection."""
-        with pytest.raises(ValueError, match="'source_connection' is required for mode='sql_compare'"):
+        with pytest.raises(
+            ValueError, match="'source_connection' is required for mode='sql_compare'"
+        ):
             DeleteDetectionConfig(
                 mode=DeleteDetectionMode.SQL_COMPARE,
                 keys=["id"],

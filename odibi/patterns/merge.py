@@ -48,7 +48,7 @@ class MergePattern(Pattern):
                 "MergePattern validation failed: 'keys' is required",
                 pattern="MergePattern",
             )
-            source_columns = list(self.source.columns) if hasattr(self.source, 'columns') else []
+            source_columns = list(self.source.columns) if hasattr(self.source, "columns") else []
             raise ValueError(
                 f"MergePattern: 'keys' is required. "
                 f"Expected: A list of column names to match source and target rows for merge. "
