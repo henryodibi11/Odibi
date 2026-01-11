@@ -1649,8 +1649,14 @@ class PipelineManager:
                         engine=engine_instance,
                         connection=sys_conn,
                     )
+                    # Set project name for tagging all catalog records
+                    self.catalog_manager.project = project_config.project
                     self.catalog_manager.bootstrap()
-                    self._ctx.info("System Catalog initialized", path=base_path)
+                    self._ctx.info(
+                        "System Catalog initialized",
+                        path=base_path,
+                        project=project_config.project,
+                    )
             else:
                 self._ctx.warning(
                     f"System connection '{project_config.system.connection}' not found",

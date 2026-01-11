@@ -89,6 +89,7 @@ class CatalogManager:
         self.base_path = base_path.rstrip("/")
         self.engine = engine
         self.connection = connection
+        self._project: Optional[str] = None
 
         # Table Paths
         self.tables = {
@@ -138,6 +139,16 @@ class CatalogManager:
         if conn_type is None:
             return False
         return conn_type.__name__ in ("AzureSQL", "SqlServerConnection")
+
+    @property
+    def project(self) -> Optional[str]:
+        """Get the project name for tagging catalog records."""
+        return self._project
+
+    @project.setter
+    def project(self, value: Optional[str]) -> None:
+        """Set the project name for tagging catalog records."""
+        self._project = value
 
     def _get_storage_options(self) -> Dict[str, Any]:
         """Get storage options for pandas/delta-rs operations.
@@ -588,6 +599,7 @@ class CatalogManager:
         return StructType(
             [
                 StructField("run_id", StringType(), True),
+                StructField("project", StringType(), True),
                 StructField("pipeline_name", StringType(), True),
                 StructField("node_name", StringType(), True),
                 StructField("status", StringType(), True),
@@ -746,6 +758,7 @@ class CatalogManager:
         return StructType(
             [
                 StructField("run_id", StringType(), False),  # PK, UUID
+                StructField("project", StringType(), True),
                 StructField("pipeline_name", StringType(), False),
                 StructField("owner", StringType(), True),
                 StructField("layer", StringType(), True),
@@ -777,6 +790,7 @@ class CatalogManager:
             [
                 StructField("run_id", StringType(), False),  # FK to pipeline run
                 StructField("node_id", StringType(), False),  # UUID for this node execution
+                StructField("project", StringType(), True),
                 StructField("pipeline_name", StringType(), False),
                 StructField("node_name", StringType(), False),
                 StructField("status", StringType(), False),  # SUCCESS | FAILURE | SKIPPED
@@ -799,12 +813,14 @@ class CatalogManager:
             [
                 StructField("failure_id", StringType(), False),  # PK, UUID
                 StructField("run_id", StringType(), False),  # FK to pipeline run
+                StructField("project", StringType(), True),
                 StructField("pipeline_name", StringType(), False),
                 StructField("node_name", StringType(), False),
                 StructField("error_type", StringType(), False),  # Exception class name
                 StructField("error_message", StringType(), True),  # max 1000 chars
                 StructField("error_code", StringType(), True),  # future taxonomy
                 StructField("stack_trace", StringType(), True),  # max 2000 chars
+                StructField("environment", StringType(), True),
                 StructField("timestamp", TimestampType(), False),
                 StructField("date", DateType(), False),  # for partitioning
             ]
@@ -1592,11 +1608,13 @@ class CatalogManager:
         Note: For better performance with multiple nodes, use log_runs_batch() instead.
         """
         environment = getattr(self.config, "environment", None)
+        project = self._project
 
         # SQL Server mode - direct insert
         if self.is_sql_server_mode:
             self._log_run_sql_server(
                 run_id,
+                project,
                 pipeline_name,
                 node_name,
                 status,
@@ -1617,6 +1635,7 @@ class CatalogManager:
                 rows = [
                     (
                         run_id,
+                        project,
                         pipeline_name,
                         node_name,
                         status,
@@ -1644,6 +1663,7 @@ class CatalogManager:
 
                 data = {
                     "run_id": [run_id],
+                    "project": [project],
                     "pipeline_name": [pipeline_name],
                     "node_name": [node_name],
                     "status": [status],
@@ -1672,6 +1692,7 @@ class CatalogManager:
     def _log_run_sql_server(
         self,
         run_id: str,
+        project: Optional[str],
         pipeline_name: str,
         node_name: str,
         status: str,
@@ -1685,15 +1706,16 @@ class CatalogManager:
         try:
             sql = f"""
             INSERT INTO [{schema_name}].[meta_runs]
-            (run_id, pipeline_name, node_name, status, rows_processed, duration_ms,
+            (run_id, project, pipeline_name, node_name, status, rows_processed, duration_ms,
              metrics_json, environment, timestamp, date)
-            VALUES (:run_id, :pipeline, :node, :status, :rows, :duration,
+            VALUES (:run_id, :project, :pipeline, :node, :status, :rows, :duration,
                     :metrics, :env, GETUTCDATE(), CAST(GETUTCDATE() AS DATE))
             """
             self.connection.execute(
                 sql,
                 {
                     "run_id": run_id,
+                    "project": project,
                     "pipeline": pipeline_name,
                     "node": node_name,
                     "status": status,
@@ -1723,12 +1745,14 @@ class CatalogManager:
             return
 
         environment = getattr(self.config, "environment", None)
+        project = self._project
 
         # SQL Server mode - batch insert
         if self.is_sql_server_mode:
             for r in records:
                 self._log_run_sql_server(
                     r["run_id"],
+                    project,
                     r["pipeline_name"],
                     r["node_name"],
                     r["status"],
@@ -1750,6 +1774,7 @@ class CatalogManager:
                 rows = [
                     (
                         r["run_id"],
+                        project,
                         r["pipeline_name"],
                         r["node_name"],
                         r["status"],
@@ -1780,6 +1805,7 @@ class CatalogManager:
 
                 data = {
                     "run_id": [r["run_id"] for r in records],
+                    "project": [project] * len(records),
                     "pipeline_name": [r["pipeline_name"] for r in records],
                     "node_name": [r["node_name"] for r in records],
                     "status": [r["status"] for r in records],
@@ -1830,6 +1856,8 @@ class CatalogManager:
         if not self.spark and not self.engine:
             return
 
+        project = self._project
+
         def _do_log():
             if self.spark:
                 from pyspark.sql.types import (
@@ -1843,6 +1871,7 @@ class CatalogManager:
                 schema = StructType(
                     [
                         StructField("run_id", StringType(), False),
+                        StructField("project", StringType(), True),
                         StructField("pipeline_name", StringType(), False),
                         StructField("owner", StringType(), True),
                         StructField("layer", StringType(), True),
@@ -1867,6 +1896,7 @@ class CatalogManager:
 
                 row = (
                     pipeline_run["run_id"],
+                    project,
                     pipeline_run["pipeline_name"],
                     pipeline_run.get("owner"),
                     pipeline_run.get("layer"),
@@ -1897,6 +1927,7 @@ class CatalogManager:
 
                 data = {
                     "run_id": [pipeline_run["run_id"]],
+                    "project": [project],
                     "pipeline_name": [pipeline_run["pipeline_name"]],
                     "owner": [pipeline_run.get("owner")],
                     "layer": [pipeline_run.get("layer")],
@@ -1942,14 +1973,15 @@ class CatalogManager:
             )
 
         schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        project = self._project
         try:
             sql = f"""
             INSERT INTO [{schema_name}].[meta_pipeline_runs]
-            (run_id, pipeline_name, owner, layer, run_start_at, run_end_at, duration_ms,
+            (run_id, project, pipeline_name, owner, layer, run_start_at, run_end_at, duration_ms,
              status, nodes_total, nodes_succeeded, nodes_failed, nodes_skipped,
              rows_processed, error_summary, terminal_nodes, environment,
              databricks_cluster_id, databricks_job_id, databricks_workspace_id, created_at)
-            VALUES (:run_id, :pipeline_name, :owner, :layer, :run_start_at, :run_end_at, :duration_ms,
+            VALUES (:run_id, :project, :pipeline_name, :owner, :layer, :run_start_at, :run_end_at, :duration_ms,
                     :status, :nodes_total, :nodes_succeeded, :nodes_failed, :nodes_skipped,
                     :rows_processed, :error_summary, :terminal_nodes, :environment,
                     :databricks_cluster_id, :databricks_job_id, :databricks_workspace_id, :created_at)
@@ -1958,6 +1990,7 @@ class CatalogManager:
                 sql,
                 {
                     "run_id": pipeline_run["run_id"],
+                    "project": project,
                     "pipeline_name": pipeline_run["pipeline_name"],
                     "owner": pipeline_run.get("owner"),
                     "layer": pipeline_run.get("layer"),
@@ -2022,6 +2055,8 @@ class CatalogManager:
         if not self.spark and not self.engine:
             return
 
+        project = self._project
+
         def _do_log():
             if self.spark:
                 from pyspark.sql.types import (
@@ -2036,6 +2071,7 @@ class CatalogManager:
                     [
                         StructField("run_id", StringType(), False),
                         StructField("node_id", StringType(), False),
+                        StructField("project", StringType(), True),
                         StructField("pipeline_name", StringType(), False),
                         StructField("node_name", StringType(), False),
                         StructField("status", StringType(), True),
@@ -2053,6 +2089,7 @@ class CatalogManager:
                     (
                         r["run_id"],
                         r["node_id"],
+                        project,
                         r["pipeline_name"],
                         r["node_name"],
                         r.get("status"),
@@ -2077,6 +2114,7 @@ class CatalogManager:
                 data = {
                     "run_id": [r["run_id"] for r in node_results],
                     "node_id": [r["node_id"] for r in node_results],
+                    "project": [project] * len(node_results),
                     "pipeline_name": [r["pipeline_name"] for r in node_results],
                     "node_name": [r["node_name"] for r in node_results],
                     "status": [r.get("status") for r in node_results],
@@ -2113,14 +2151,15 @@ class CatalogManager:
             )
 
         schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        project = self._project
         try:
             for r in node_results:
                 sql = f"""
                 INSERT INTO [{schema_name}].[meta_node_runs]
-                (run_id, node_id, pipeline_name, node_name, status,
+                (run_id, node_id, project, pipeline_name, node_name, status,
                  run_start_at, run_end_at, duration_ms, rows_processed,
                  metrics_json, environment, created_at)
-                VALUES (:run_id, :node_id, :pipeline_name, :node_name, :status,
+                VALUES (:run_id, :node_id, :project, :pipeline_name, :node_name, :status,
                         :run_start_at, :run_end_at, :duration_ms, :rows_processed,
                         :metrics_json, :environment, :created_at)
                 """
@@ -2129,6 +2168,7 @@ class CatalogManager:
                     {
                         "run_id": r["run_id"],
                         "node_id": r["node_id"],
+                        "project": project,
                         "pipeline_name": r["pipeline_name"],
                         "node_name": r["node_name"],
                         "status": r.get("status"),
@@ -2179,6 +2219,8 @@ class CatalogManager:
             return
 
         now = datetime.now(timezone.utc)
+        project = self._project
+        environment = getattr(self.config, "environment", None)
 
         def _do_log():
             if self.spark:
@@ -2194,12 +2236,14 @@ class CatalogManager:
                     [
                         StructField("failure_id", StringType(), False),
                         StructField("run_id", StringType(), False),
+                        StructField("project", StringType(), True),
                         StructField("pipeline_name", StringType(), False),
                         StructField("node_name", StringType(), False),
                         StructField("error_type", StringType(), True),
                         StructField("error_message", StringType(), True),
                         StructField("error_code", StringType(), True),
                         StructField("stack_trace", StringType(), True),
+                        StructField("environment", StringType(), True),
                         StructField("timestamp", TimestampType(), True),
                         StructField("date", DateType(), True),
                     ]
@@ -2208,12 +2252,14 @@ class CatalogManager:
                 row = (
                     failure_id,
                     run_id,
+                    project,
                     pipeline_name,
                     node_name,
                     error_type,
                     error_message[:1000] if error_message else None,
                     None,  # error_code (future taxonomy)
                     stack_trace[:2000] if stack_trace else None,
+                    environment,
                     now,
                     now.date(),
                 )
@@ -2228,12 +2274,14 @@ class CatalogManager:
                 data = {
                     "failure_id": [failure_id],
                     "run_id": [run_id],
+                    "project": [project],
                     "pipeline_name": [pipeline_name],
                     "node_name": [node_name],
                     "error_type": [error_type],
                     "error_message": [error_message[:1000] if error_message else None],
                     "error_code": [None],  # future taxonomy
                     "stack_trace": [stack_trace[:2000] if stack_trace else None],
+                    "environment": [environment],
                     "timestamp": [now],
                     "date": [now.date()],
                 }
@@ -2271,24 +2319,28 @@ class CatalogManager:
             )
 
         schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        project = self._project
+        environment = getattr(self.config, "environment", None)
         try:
             sql = f"""
             INSERT INTO [{schema_name}].[meta_failures]
-            (failure_id, run_id, pipeline_name, node_name, error_type,
-             error_message, error_code, stack_trace, timestamp, date)
-            VALUES (:failure_id, :run_id, :pipeline_name, :node_name, :error_type,
-                    :error_message, NULL, :stack_trace, GETUTCDATE(), CAST(GETUTCDATE() AS DATE))
+            (failure_id, run_id, project, pipeline_name, node_name, error_type,
+             error_message, error_code, stack_trace, environment, timestamp, date)
+            VALUES (:failure_id, :run_id, :project, :pipeline_name, :node_name, :error_type,
+                    :error_message, NULL, :stack_trace, :environment, GETUTCDATE(), CAST(GETUTCDATE() AS DATE))
             """
             self.connection.execute(
                 sql,
                 {
                     "failure_id": failure_id,
                     "run_id": run_id,
+                    "project": project,
                     "pipeline_name": pipeline_name,
                     "node_name": node_name,
                     "error_type": error_type,
                     "error_message": error_message[:1000] if error_message else None,
                     "stack_trace": stack_trace[:2000] if stack_trace else None,
+                    "environment": environment,
                 },
             )
             logger.debug(f"Logged failure to SQL Server: {failure_id}")

@@ -341,6 +341,7 @@ class TestUpdateDailyStats:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": None,
                     "layer": None,
@@ -398,6 +399,7 @@ class TestUpdateDailyStats:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": None,
                     "layer": None,
@@ -457,6 +459,7 @@ class TestUpdatePipelineHealth:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": "owner@example.com",
                     "layer": "silver",
@@ -516,6 +519,7 @@ class TestUpdatePipelineHealth:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": None,
                     "layer": None,
@@ -559,6 +563,7 @@ class TestUpdatePipelineHealth:
             [
                 {
                     "run_id": "run-002",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": None,
                     "layer": None,
@@ -611,6 +616,7 @@ class TestUpdateSlaStatus:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": "owner@example.com",
                     "layer": None,
@@ -667,6 +673,7 @@ class TestUpdateSlaStatus:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": None,
                     "layer": None,
@@ -720,6 +727,7 @@ class TestCatalogHelpers:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "pipeline_a",
                     "owner": None,
                     "layer": None,
@@ -742,6 +750,7 @@ class TestCatalogHelpers:
                 },
                 {
                     "run_id": "run-002",
+                    "project": None,
                     "pipeline_name": "pipeline_b",
                     "owner": None,
                     "layer": None,
@@ -783,6 +792,7 @@ class TestCatalogHelpers:
             [
                 {
                     "run_id": "run-old",
+                    "project": None,
                     "pipeline_name": "pipeline_a",
                     "owner": None,
                     "layer": None,
@@ -805,6 +815,7 @@ class TestCatalogHelpers:
                 },
                 {
                     "run_id": "run-new",
+                    "project": None,
                     "pipeline_name": "pipeline_a",
                     "owner": None,
                     "layer": None,
@@ -842,6 +853,7 @@ class TestCatalogHelpers:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": "owner@example.com",
                     "layer": "silver",
@@ -982,6 +994,7 @@ class TestRebuildSummariesGuardSemantics:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": None,
                     "layer": None,
@@ -1034,6 +1047,7 @@ class TestRebuildSummariesGuardSemantics:
             [
                 {
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "owner": None,
                     "layer": None,
@@ -1104,12 +1118,14 @@ class TestCleanupCommand:
                 {
                     "failure_id": "fail-001",
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "node_name": "test_node",
                     "error_type": "RuntimeError",
                     "error_message": "Test error",
                     "error_code": None,
                     "stack_trace": None,
+                    "environment": None,
                     "timestamp": now - timedelta(days=100),
                     "date": old_date,
                 }
@@ -1149,24 +1165,28 @@ class TestCleanupCommand:
                 {
                     "failure_id": "fail-old",
                     "run_id": "run-001",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "node_name": "test_node",
                     "error_type": "RuntimeError",
                     "error_message": "Old error",
                     "error_code": None,
                     "stack_trace": None,
+                    "environment": None,
                     "timestamp": now - timedelta(days=100),
                     "date": old_date,
                 },
                 {
                     "failure_id": "fail-recent",
                     "run_id": "run-002",
+                    "project": None,
                     "pipeline_name": "test_pipeline",
                     "node_name": "test_node",
                     "error_type": "RuntimeError",
                     "error_message": "Recent error",
                     "error_code": None,
                     "stack_trace": None,
+                    "environment": None,
                     "timestamp": now - timedelta(days=10),
                     "date": recent_date,
                 },

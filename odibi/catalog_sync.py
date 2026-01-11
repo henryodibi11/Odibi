@@ -49,12 +49,14 @@ ALL_SYNC_TABLES = [
 ]
 
 # SQL Server DDL templates for each table
+# NOTE: These schemas MUST match the Delta table schemas in catalog.py
 SQL_SERVER_DDL = {
     "meta_runs": """
         IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'meta_runs' AND schema_id = SCHEMA_ID('{schema}'))
         BEGIN
             CREATE TABLE [{schema}].[meta_runs] (
                 run_id NVARCHAR(100),
+                project NVARCHAR(255),
                 pipeline_name NVARCHAR(255),
                 node_name NVARCHAR(255),
                 status NVARCHAR(50),
@@ -66,7 +68,7 @@ SQL_SERVER_DDL = {
                 date DATE,
                 _synced_at DATETIME2 DEFAULT GETUTCDATE()
             );
-            CREATE INDEX IX_meta_runs_pipeline_date ON [{schema}].[meta_runs] (pipeline_name, date);
+            CREATE INDEX IX_meta_runs_project_pipeline ON [{schema}].[meta_runs] (project, pipeline_name, date);
         END
     """,
     "meta_pipeline_runs": """
@@ -74,23 +76,29 @@ SQL_SERVER_DDL = {
         BEGIN
             CREATE TABLE [{schema}].[meta_pipeline_runs] (
                 run_id NVARCHAR(100) PRIMARY KEY,
+                project NVARCHAR(255),
                 pipeline_name NVARCHAR(255),
-                status NVARCHAR(50),
-                start_time DATETIME2,
-                end_time DATETIME2,
+                owner NVARCHAR(255),
+                layer NVARCHAR(50),
+                run_start_at DATETIME2,
+                run_end_at DATETIME2,
                 duration_ms BIGINT,
-                nodes_total INT,
-                nodes_success INT,
-                nodes_failed INT,
-                nodes_skipped INT,
-                total_rows BIGINT,
+                status NVARCHAR(50),
+                nodes_total BIGINT,
+                nodes_succeeded BIGINT,
+                nodes_failed BIGINT,
+                nodes_skipped BIGINT,
+                rows_processed BIGINT,
+                error_summary NVARCHAR(500),
+                terminal_nodes NVARCHAR(MAX),
                 environment NVARCHAR(50),
-                config_hash NVARCHAR(100),
-                trigger NVARCHAR(50),
-                date DATE,
+                databricks_cluster_id NVARCHAR(100),
+                databricks_job_id NVARCHAR(100),
+                databricks_workspace_id NVARCHAR(100),
+                created_at DATETIME2,
                 _synced_at DATETIME2 DEFAULT GETUTCDATE()
             );
-            CREATE INDEX IX_meta_pipeline_runs_date ON [{schema}].[meta_pipeline_runs] (pipeline_name, date);
+            CREATE INDEX IX_meta_pipeline_runs_project ON [{schema}].[meta_pipeline_runs] (project, pipeline_name, created_at);
         END
     """,
     "meta_node_runs": """
@@ -98,22 +106,21 @@ SQL_SERVER_DDL = {
         BEGIN
             CREATE TABLE [{schema}].[meta_node_runs] (
                 run_id NVARCHAR(100),
-                pipeline_run_id NVARCHAR(100),
+                node_id NVARCHAR(100),
+                project NVARCHAR(255),
                 pipeline_name NVARCHAR(255),
                 node_name NVARCHAR(255),
                 status NVARCHAR(50),
-                start_time DATETIME2,
-                end_time DATETIME2,
+                run_start_at DATETIME2,
+                run_end_at DATETIME2,
                 duration_ms BIGINT,
-                rows_read BIGINT,
-                rows_written BIGINT,
-                pattern NVARCHAR(100),
-                error_message NVARCHAR(MAX),
+                rows_processed BIGINT,
+                metrics_json NVARCHAR(MAX),
                 environment NVARCHAR(50),
-                date DATE,
+                created_at DATETIME2,
                 _synced_at DATETIME2 DEFAULT GETUTCDATE()
             );
-            CREATE INDEX IX_meta_node_runs_pipeline ON [{schema}].[meta_node_runs] (pipeline_name, node_name, date);
+            CREATE INDEX IX_meta_node_runs_project ON [{schema}].[meta_node_runs] (project, pipeline_name, node_name);
         END
     """,
     "meta_tables": """
@@ -142,18 +149,99 @@ SQL_SERVER_DDL = {
             CREATE TABLE [{schema}].[meta_failures] (
                 failure_id NVARCHAR(100) PRIMARY KEY,
                 run_id NVARCHAR(100),
+                project NVARCHAR(255),
                 pipeline_name NVARCHAR(255),
                 node_name NVARCHAR(255),
                 error_type NVARCHAR(100),
                 error_message NVARCHAR(MAX),
+                error_code NVARCHAR(50),
                 stack_trace NVARCHAR(MAX),
-                timestamp DATETIME2,
                 environment NVARCHAR(50),
+                timestamp DATETIME2,
                 date DATE,
                 _synced_at DATETIME2 DEFAULT GETUTCDATE()
             );
-            CREATE INDEX IX_meta_failures_date ON [{schema}].[meta_failures] (pipeline_name, date);
+            CREATE INDEX IX_meta_failures_project ON [{schema}].[meta_failures] (project, pipeline_name, date);
         END
+    """,
+}
+
+# Power BI-ready views for dashboards
+SQL_SERVER_VIEWS = {
+    "vw_pipeline_summary": """
+        CREATE OR ALTER VIEW [{schema}].[vw_pipeline_summary] AS
+        SELECT
+            project,
+            pipeline_name,
+            COUNT(*) as total_runs,
+            SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
+            SUM(CASE WHEN status = 'FAILURE' THEN 1 ELSE 0 END) as failure_count,
+            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) as success_rate_pct,
+            AVG(duration_ms) as avg_duration_ms,
+            SUM(rows_processed) as total_rows_processed,
+            MAX(created_at) as last_run_at,
+            MAX(CAST(created_at AS DATE)) as last_run_date
+        FROM [{schema}].[meta_pipeline_runs]
+        GROUP BY project, pipeline_name
+    """,
+    "vw_daily_health": """
+        CREATE OR ALTER VIEW [{schema}].[vw_daily_health] AS
+        SELECT
+            CAST(created_at AS DATE) as run_date,
+            project,
+            environment,
+            COUNT(DISTINCT pipeline_name) as pipelines_run,
+            COUNT(*) as total_runs,
+            SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
+            SUM(CASE WHEN status = 'FAILURE' THEN 1 ELSE 0 END) as failure_count,
+            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) as success_rate_pct,
+            SUM(rows_processed) as total_rows,
+            AVG(duration_ms) as avg_duration_ms
+        FROM [{schema}].[meta_pipeline_runs]
+        GROUP BY CAST(created_at AS DATE), project, environment
+    """,
+    "vw_recent_failures": """
+        CREATE OR ALTER VIEW [{schema}].[vw_recent_failures] AS
+        SELECT TOP 100
+            f.project,
+            f.pipeline_name,
+            f.node_name,
+            f.error_type,
+            f.error_message,
+            f.timestamp as failure_time,
+            f.date as failure_date,
+            f.environment
+        FROM [{schema}].[meta_failures] f
+        ORDER BY f.timestamp DESC
+    """,
+    "vw_node_performance": """
+        CREATE OR ALTER VIEW [{schema}].[vw_node_performance] AS
+        SELECT
+            project,
+            pipeline_name,
+            node_name,
+            COUNT(*) as execution_count,
+            SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
+            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) as success_rate_pct,
+            AVG(duration_ms) as avg_duration_ms,
+            MAX(duration_ms) as max_duration_ms,
+            SUM(rows_processed) as total_rows
+        FROM [{schema}].[meta_node_runs]
+        GROUP BY project, pipeline_name, node_name
+    """,
+    "vw_project_scorecard": """
+        CREATE OR ALTER VIEW [{schema}].[vw_project_scorecard] AS
+        SELECT
+            project,
+            COUNT(DISTINCT pipeline_name) as pipeline_count,
+            COUNT(*) as total_runs,
+            SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
+            SUM(CASE WHEN status = 'FAILURE' THEN 1 ELSE 0 END) as failure_count,
+            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) as success_rate_pct,
+            SUM(rows_processed) as total_rows_processed,
+            MAX(created_at) as last_activity
+        FROM [{schema}].[meta_pipeline_runs]
+        GROUP BY project
     """,
 }
 
@@ -268,6 +356,10 @@ class CatalogSyncer:
 
         # Update last sync timestamp
         self._update_sync_state(results)
+
+        # Create/update Power BI views for SQL Server targets
+        if self.target_type == "sql_server":
+            self._ensure_sql_views()
 
         success_count = sum(1 for r in results.values() if r.get("success"))
         total_rows = sum(r.get("rows", 0) for r in results.values())
@@ -494,6 +586,27 @@ class CatalogSyncer:
                 self.target.execute(ddl)
             except Exception as e:
                 logger.debug(f"Table creation note for {table}: {e}")
+
+    def _ensure_sql_views(self) -> None:
+        """Create or update Power BI-ready views in SQL Server."""
+        schema = self.config.schema_name or "odibi_system"
+        views_created = 0
+
+        for view_name, view_ddl in SQL_SERVER_VIEWS.items():
+            try:
+                ddl = view_ddl.format(schema=schema)
+                self.target.execute(ddl)
+                views_created += 1
+                logger.debug(f"Created/updated view: {schema}.{view_name}")
+            except Exception as e:
+                logger.debug(f"View creation note for {view_name}: {e}")
+
+        if views_created > 0:
+            self._ctx.info(
+                f"Created/updated {views_created} Power BI views",
+                schema=schema,
+                views=list(SQL_SERVER_VIEWS.keys()),
+            )
 
     def _df_to_records(self, df: Any) -> List[Dict[str, Any]]:
         """Convert DataFrame to list of records."""
