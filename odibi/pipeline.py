@@ -1333,12 +1333,37 @@ class Pipeline:
         return None
 
     def _get_databricks_workspace_id(self) -> Optional[str]:
-        """Extract Databricks workspace ID from Spark context."""
+        """Extract Databricks workspace ID from Spark context or environment."""
+        import os
+
         try:
             if hasattr(self.engine, "spark") and self.engine.spark:
-                return self.engine.spark.conf.get("spark.databricks.workspaceId", None)
+                # Try multiple Spark config keys
+                for key in [
+                    "spark.databricks.workspaceId",
+                    "spark.databricks.workspaceUrl",
+                    "spark.databricks.clusterUsageTags.orgId",
+                ]:
+                    value = self.engine.spark.conf.get(key, None)
+                    if value:
+                        return value
         except Exception:
             pass
+
+        # Fallback to environment variables (set in Databricks jobs/notebooks)
+        for env_key in ["DATABRICKS_WORKSPACE_ID", "DATABRICKS_HOST"]:
+            value = os.environ.get(env_key)
+            if value:
+                # Extract workspace ID from host URL if needed
+                if "://" in value:
+                    # e.g., https://adb-1234567890.1.azuredatabricks.net -> adb-1234567890
+                    try:
+                        host = value.split("://")[1].split(".")[0]
+                        return host
+                    except Exception:
+                        return value
+                return value
+
         return None
 
     def _flush_batch_writes(self) -> None:
