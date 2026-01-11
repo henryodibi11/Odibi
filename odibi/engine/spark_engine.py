@@ -1587,10 +1587,35 @@ class SparkEngine(Engine):
                 result["status"] = "terminated"
                 elapsed = (time.time() - start_time) * 1000
                 result["elapsed_ms"] = round(elapsed, 2)
+
+                # Get rows written from streaming query progress
+                rows_written = None
+                try:
+                    progress = query.lastProgress
+                    if progress and "numOutputRows" in progress.get("sink", {}):
+                        rows_written = progress["sink"]["numOutputRows"]
+                    elif progress and "numInputRows" in progress:
+                        rows_written = progress["numInputRows"]
+                except Exception:
+                    pass
+
+                # Fallback: query the Delta table for row count if format is delta
+                if rows_written is None and path and format == "delta":
+                    try:
+                        full_path = connection.get_path(path)
+                        count_df = self.spark.read.format("delta").load(full_path)
+                        rows_written = count_df.count()
+                    except Exception:
+                        pass
+
+                if rows_written is not None:
+                    result["_cached_row_count"] = rows_written
+
                 ctx.info(
                     "Streaming query terminated",
                     query_id=str(query.id),
                     elapsed_ms=round(elapsed, 2),
+                    rows_written=rows_written,
                 )
 
                 if register_table and path and format == "delta":

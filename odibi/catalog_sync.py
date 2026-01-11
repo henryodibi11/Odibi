@@ -174,7 +174,7 @@ SQL_SERVER_VIEWS = {
             COUNT(*) as total_runs,
             SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
             SUM(CASE WHEN status = 'FAILURE' THEN 1 ELSE 0 END) as failure_count,
-            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) as success_rate_pct,
+            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) / NULLIF(COUNT(*), 0) AS DECIMAL(5,4)) as success_rate,
             AVG(duration_ms) as avg_duration_ms,
             SUM(rows_processed) as total_rows_processed,
             MAX(created_at) as last_run_at,
@@ -192,7 +192,7 @@ SQL_SERVER_VIEWS = {
             COUNT(*) as total_runs,
             SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
             SUM(CASE WHEN status = 'FAILURE' THEN 1 ELSE 0 END) as failure_count,
-            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) as success_rate_pct,
+            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) / NULLIF(COUNT(*), 0) AS DECIMAL(5,4)) as success_rate,
             SUM(rows_processed) as total_rows,
             AVG(duration_ms) as avg_duration_ms
         FROM [{schema}].[meta_pipeline_runs]
@@ -220,7 +220,7 @@ SQL_SERVER_VIEWS = {
             node_name,
             COUNT(*) as execution_count,
             SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
-            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) as success_rate_pct,
+            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) / NULLIF(COUNT(*), 0) AS DECIMAL(5,4)) as success_rate,
             AVG(duration_ms) as avg_duration_ms,
             MAX(duration_ms) as max_duration_ms,
             SUM(rows_processed) as total_rows
@@ -235,7 +235,7 @@ SQL_SERVER_VIEWS = {
             COUNT(*) as total_runs,
             SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
             SUM(CASE WHEN status = 'FAILURE' THEN 1 ELSE 0 END) as failure_count,
-            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) as success_rate_pct,
+            CAST(SUM(CASE WHEN status = 'SUCCESS' THEN 1.0 ELSE 0 END) / NULLIF(COUNT(*), 0) AS DECIMAL(5,4)) as success_rate,
             SUM(rows_processed) as total_rows_processed,
             MAX(created_at) as last_activity
         FROM [{schema}].[meta_pipeline_runs]
