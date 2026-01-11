@@ -1205,6 +1205,9 @@ class Pipeline:
             self.catalog_manager.optimize()
             self._ctx.debug("Catalog optimized")
 
+        # Catalog sync to secondary destination (if configured)
+        self._sync_catalog_if_configured()
+
         # Lineage: Complete
         if self.lineage:
             self.lineage.emit_pipeline_complete(self.config, results)
@@ -1363,6 +1366,60 @@ class Pipeline:
                 )
             finally:
                 self._pending_hwm_updates = []
+
+    def _sync_catalog_if_configured(self) -> None:
+        """Sync catalog to secondary destination if sync_to is configured."""
+        if not self.catalog_manager:
+            return
+        if not self.project_config or not self.project_config.system:
+            return
+        if not self.project_config.system.sync_to:
+            return
+
+        sync_config = self.project_config.system.sync_to
+
+        # Only sync if on=after_run
+        if sync_config.on != "after_run":
+            return
+
+        try:
+            from odibi.catalog_sync import CatalogSyncer
+
+            # Get target connection
+            target_conn_name = sync_config.connection
+            target_conn = self.connections.get(target_conn_name)
+            if not target_conn:
+                self._ctx.warning(
+                    f"Sync target connection '{target_conn_name}' not found, skipping sync"
+                )
+                return
+
+            syncer = CatalogSyncer(
+                source_catalog=self.catalog_manager,
+                sync_config=sync_config,
+                target_connection=target_conn,
+                spark=getattr(self.engine, "spark", None),
+                environment=self.project_config.system.environment,
+            )
+
+            if sync_config.async_sync:
+                syncer.sync_async()
+                self._ctx.debug(f"Catalog sync started async to {target_conn_name}")
+            else:
+                results = syncer.sync()
+                success_count = sum(1 for r in results.values() if r.get("success"))
+                self._ctx.info(
+                    f"Catalog synced to {target_conn_name}",
+                    tables_synced=success_count,
+                    total_tables=len(results),
+                )
+
+        except Exception as e:
+            # Sync failures should never fail the pipeline
+            self._ctx.warning(
+                f"Catalog sync failed (non-fatal): {e}",
+                suggestion="Run 'odibi catalog sync' manually to retry",
+            )
 
     def run_node(self, node_name: str, mock_data: Optional[Dict[str, Any]] = None) -> NodeResult:
         """Execute a single node (for testing/debugging).

@@ -130,6 +130,40 @@ def add_catalog_parser(subparsers):
         "--days", "-d", type=int, default=7, help="Statistics over last N days (default: 7)"
     )
 
+    # odibi catalog sync
+    sync_parser = catalog_subparsers.add_parser(
+        "sync",
+        help="Sync catalog to secondary destination",
+        description=(
+            "Manually sync system catalog tables to the configured sync_to destination. "
+            "Use this to sync on-demand or when automatic sync is set to 'manual'."
+        ),
+    )
+    sync_parser.add_argument("config", help="Path to YAML config file")
+    sync_parser.add_argument(
+        "--tables",
+        "-t",
+        help="Comma-separated list of tables to sync (default: high-priority tables)",
+    )
+    sync_parser.add_argument(
+        "--mode",
+        "-m",
+        choices=["incremental", "full"],
+        help="Override sync mode (default: use config value)",
+    )
+    sync_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be synced without actually syncing",
+    )
+
+    # odibi catalog sync-status
+    sync_status_parser = catalog_subparsers.add_parser(
+        "sync-status",
+        help="Show sync status for configured destinations",
+    )
+    sync_status_parser.add_argument("config", help="Path to YAML config file")
+
     return catalog_parser
 
 
@@ -138,14 +172,16 @@ def catalog_command(args):
     if not hasattr(args, "catalog_command") or args.catalog_command is None:
         print("Usage: odibi catalog <command>")
         print("\nAvailable commands:")
-        print("  runs       List execution runs")
-        print("  pipelines  List registered pipelines")
-        print("  nodes      List registered nodes")
-        print("  state      List HWM state checkpoints")
-        print("  tables     List registered assets")
-        print("  metrics    List metrics definitions")
-        print("  patterns   List pattern compliance")
-        print("  stats      Show execution statistics")
+        print("  runs        List execution runs")
+        print("  pipelines   List registered pipelines")
+        print("  nodes       List registered nodes")
+        print("  state       List HWM state checkpoints")
+        print("  tables      List registered assets")
+        print("  metrics     List metrics definitions")
+        print("  patterns    List pattern compliance")
+        print("  stats       Show execution statistics")
+        print("  sync        Sync catalog to secondary destination")
+        print("  sync-status Show sync status")
         return 1
 
     command_map = {
@@ -157,6 +193,8 @@ def catalog_command(args):
         "metrics": _metrics_command,
         "patterns": _patterns_command,
         "stats": _stats_command,
+        "sync": _sync_command,
+        "sync-status": _sync_status_command,
     }
 
     handler = command_map.get(args.catalog_command)
@@ -550,4 +588,156 @@ def _stats_command(args) -> int:
 
     except Exception as e:
         logger.error(f"Failed to compute statistics: {e}")
+        return 1
+
+
+def _sync_command(args):
+    """Execute catalog sync command."""
+    from odibi.catalog_sync import CatalogSyncer, ALL_SYNC_TABLES, DEFAULT_SYNC_TABLES
+    from odibi.config import load_config_from_file
+
+    try:
+        config_path = Path(args.config).resolve()
+        project_config = load_config_from_file(str(config_path))
+
+        if not project_config.system:
+            print("Error: No 'system' configuration found in config file.")
+            return 1
+
+        if not project_config.system.sync_to:
+            print("Error: No 'sync_to' configured in system section.")
+            print("\nTo enable sync, add sync_to to your config:")
+            print("  system:")
+            print("    connection: your_blob_connection")
+            print("    sync_to:")
+            print("      connection: your_sql_server")
+            print("      schema_name: odibi_system")
+            return 1
+
+        sync_config = project_config.system.sync_to
+
+        # Parse tables argument
+        tables_to_sync = None
+        if args.tables:
+            tables_to_sync = [t.strip() for t in args.tables.split(",")]
+            invalid = [t for t in tables_to_sync if t not in ALL_SYNC_TABLES]
+            if invalid:
+                print(f"Error: Unknown tables: {invalid}")
+                print(f"Available tables: {ALL_SYNC_TABLES}")
+                return 1
+
+        # Override mode if specified
+        if args.mode:
+            sync_config = sync_config.model_copy(update={"mode": args.mode})
+
+        # Dry run
+        if args.dry_run:
+            tables = tables_to_sync or sync_config.tables or DEFAULT_SYNC_TABLES
+            print("=== Dry Run - Would sync the following ===\n")
+            print(f"Target: {sync_config.connection}")
+            print(f"Mode: {sync_config.mode}")
+            print(f"Tables: {', '.join(tables)}")
+            return 0
+
+        # Get catalog manager
+        catalog = _get_catalog_manager(args)
+        if not catalog:
+            print("Error: Could not initialize catalog manager.")
+            return 1
+
+        # Get target connection
+        load_extensions(config_path.parent)
+        pm = PipelineManager(str(config_path))
+        target_conn = pm.connections.get(sync_config.connection)
+        if not target_conn:
+            print(f"Error: Target connection '{sync_config.connection}' not found.")
+            return 1
+
+        # Create syncer and run
+        syncer = CatalogSyncer(
+            source_catalog=catalog,
+            sync_config=sync_config,
+            target_connection=target_conn,
+            spark=getattr(pm, "spark", None),
+            environment=project_config.system.environment,
+        )
+
+        print(f"Syncing catalog to {sync_config.connection}...")
+        results = syncer.sync(tables=tables_to_sync)
+
+        # Print results
+        print("\n=== Sync Results ===\n")
+        total_rows = 0
+        for table, result in results.items():
+            status = "✓" if result.get("success") else "✗"
+            rows = result.get("rows", 0)
+            total_rows += rows
+            error = result.get("error", "")
+            if error:
+                print(f"  {status} {table}: {error}")
+            else:
+                print(f"  {status} {table}: {rows:,} rows")
+
+        success_count = sum(1 for r in results.values() if r.get("success"))
+        print(f"\nSummary: {success_count}/{len(results)} tables synced, {total_rows:,} total rows")
+
+        return 0 if success_count == len(results) else 1
+
+    except Exception as e:
+        logger.error(f"Sync failed: {e}")
+        return 1
+
+
+def _sync_status_command(args):
+    """Show sync status for configured destinations."""
+    from odibi.config import load_config_from_file
+
+    try:
+        config_path = Path(args.config).resolve()
+        project_config = load_config_from_file(str(config_path))
+
+        if not project_config.system:
+            print("Error: No 'system' configuration found.")
+            return 1
+
+        print("=== Catalog Sync Status ===\n")
+        print(f"Primary: {project_config.system.connection}")
+        print(f"Path: {project_config.system.path}")
+
+        if not project_config.system.sync_to:
+            print("\nNo sync_to configured.")
+            return 0
+
+        sync_config = project_config.system.sync_to
+        print(f"\nSync Target: {sync_config.connection}")
+        print(f"Mode: {sync_config.mode}")
+        print(f"Trigger: {sync_config.on}")
+        print(f"Async: {sync_config.async_sync}")
+
+        if sync_config.tables:
+            print(f"Tables: {', '.join(sync_config.tables)}")
+        else:
+            print("Tables: (default high-priority tables)")
+
+        # Try to get last sync timestamps
+        catalog = _get_catalog_manager(args)
+        if catalog:
+            print("\n--- Last Sync Timestamps ---")
+            from odibi.catalog_sync import DEFAULT_SYNC_TABLES
+
+            for table in sync_config.tables or DEFAULT_SYNC_TABLES:
+                key = f"sync_to:{sync_config.connection}:{table}:last_timestamp"
+                try:
+                    value = catalog.get_state(key)
+                    if value:
+                        print(f"  {table}: {value}")
+                    else:
+                        print(f"  {table}: never synced")
+                except Exception:
+                    print(f"  {table}: unknown")
+
+        return 0
+
+    except Exception as e:
+        logger.error(f"Failed to get sync status: {e}")
         return 1

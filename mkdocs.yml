@@ -153,6 +153,7 @@ nav:
       - Environments: guides/environments.md
       - Secrets Management: guides/secrets.md
       - Azure Setup: guides/setup_azure.md
+      - Catalog Sync: guides/catalog_sync.md
       - Performance Tuning: guides/performance_tuning.md
       - WSL Setup: guides/wsl_setup.md
       - Best Practices: guides/best_practices.md

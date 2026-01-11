@@ -3334,41 +3334,125 @@ class RetentionConfig(BaseModel):
     observability_errors: int = Field(default=90, description="Days to retain observability errors")
 
 
+class SyncToConfig(BaseModel):
+    """
+    Configuration for syncing system catalog to a secondary destination.
+
+    Enables automatic replication of Delta-based system tables to SQL Server
+    (for dashboards/queries) or another blob storage (for cross-region backup).
+
+    The primary system catalog remains the source of truth with full Delta
+    capabilities (ACID, time travel, schema evolution). The sync target
+    receives copies for visibility and querying.
+
+    Example with SQL Server:
+    ```yaml
+    system:
+      connection: adls_prod          # Primary - Delta tables
+      path: _odibi_system
+      environment: prod
+      sync_to:
+        connection: sql_server_prod  # Secondary - SQL tables
+        schema_name: odibi_system
+        mode: incremental
+        on: after_run
+    ```
+
+    Example with another blob (cross-region):
+    ```yaml
+    system:
+      connection: adls_us_east
+      sync_to:
+        connection: adls_us_west     # Replicate Delta tables
+        path: _odibi_system_replica
+        mode: incremental
+    ```
+    """
+
+    connection: str = Field(description="Target connection name (SQL Server or blob storage)")
+    schema_name: Optional[str] = Field(
+        default="odibi_system",
+        description="Schema name for SQL Server targets. Ignored for blob targets.",
+    )
+    path: Optional[str] = Field(
+        default="_odibi_system",
+        description="Path for blob storage targets. Ignored for SQL Server targets.",
+    )
+    mode: Literal["full", "incremental"] = Field(
+        default="incremental",
+        description=(
+            "Sync mode: 'incremental' syncs only new/changed records since last sync. "
+            "'full' replaces all data in target (slower but ensures consistency)."
+        ),
+    )
+    on: Literal["after_run", "manual"] = Field(
+        default="after_run",
+        description=(
+            "When to trigger sync: 'after_run' syncs automatically after each pipeline run. "
+            "'manual' requires explicit 'odibi catalog sync' command."
+        ),
+    )
+    tables: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Subset of tables to sync. If not specified, syncs high-priority tables: "
+            "meta_runs, meta_pipeline_runs, meta_node_runs, meta_tables, meta_failures."
+        ),
+    )
+    async_sync: bool = Field(
+        default=True,
+        description="Run sync asynchronously (don't block pipeline completion)",
+    )
+    sync_last_days: Optional[int] = Field(
+        default=None,
+        description=(
+            "For incremental mode, only sync records from the last N days. "
+            "Useful for large tables. If not set, syncs all new records."
+        ),
+    )
+
+
 class SystemConfig(BaseModel):
     """
     Configuration for the Odibi System Catalog (The Brain).
 
-    Stores metadata, state, and pattern configurations.
+    Stores metadata, state, and pattern configurations. The primary connection
+    must be a storage connection (blob/local) that supports Delta tables.
 
     Example:
     ```yaml
     system:
-      connection: adls_bronze
+      connection: adls_bronze        # Primary - must be blob/local storage
       path: _odibi_system
-      environment: dev  # Tags all system records with environment
+      environment: dev
     ```
 
-    With SQL Server (Phase 2):
+    With sync to SQL Server (for dashboards/queries):
     ```yaml
     system:
-      connection: sql_server
-      schema: odibi_system
+      connection: adls_prod          # Primary - Delta tables
       environment: prod
+      sync_to:
+        connection: sql_server_prod  # Secondary - SQL for visibility
+        schema_name: odibi_system
     ```
 
-    With sync from local (Phase 4):
+    With sync to another blob (cross-region backup):
     ```yaml
     system:
-      connection: sql_server
-      schema_name: odibi_system
-      environment: prod
-      sync_from:
-        connection: local_parquet
-        path: .odibi/system/
+      connection: adls_us_east
+      sync_to:
+        connection: adls_us_west
+        path: _odibi_system_replica
     ```
     """
 
-    connection: str = Field(description="Connection to store system tables (e.g., 'adls_bronze')")
+    connection: str = Field(
+        description=(
+            "Connection for primary system tables. Must be blob storage (azure_blob) "
+            "or local filesystem - NOT SQL Server. Delta tables require storage backends."
+        )
+    )
     path: str = Field(default="_odibi_system", description="Path relative to connection root")
     environment: Optional[str] = Field(
         default=None,
@@ -3379,13 +3463,20 @@ class SystemConfig(BaseModel):
     )
     schema_name: Optional[str] = Field(
         default=None,
-        description="Schema name for SQL Server system tables (e.g., 'odibi_system'). Used when connection is SQL Server.",
+        description="Deprecated. Use sync_to.schema_name for SQL Server targets.",
+    )
+    sync_to: Optional[SyncToConfig] = Field(
+        default=None,
+        description=(
+            "Secondary destination to sync system catalog data to. "
+            "Use for SQL Server dashboards or cross-region Delta replication."
+        ),
     )
     sync_from: Optional[SyncFromConfig] = Field(
         default=None,
         description=(
             "Source to sync system data from. Enables pushing local development "
-            "data to centralized SQL Server system tables."
+            "data to centralized system tables."
         ),
     )
     cost_per_compute_hour: Optional[float] = Field(
@@ -3516,7 +3607,7 @@ class ProjectConfig(BaseModel):
     @model_validator(mode="after")
     def ensure_system_config(self):
         """
-        Validate system config connection exists.
+        Validate system config connection exists and is a valid type.
         """
         if self.system is None:
             raise ValueError(
@@ -3533,6 +3624,38 @@ class ProjectConfig(BaseModel):
                 f"Available connections: [{available}]. "
                 f"Add '{self.system.connection}' to your connections section or update system.connection to use an existing one."
             )
+
+        # Validate primary connection is NOT SQL Server (Delta tables require storage)
+        primary_conn = self.connections.get(self.system.connection)
+        if primary_conn:
+            conn_type = (
+                primary_conn.get("type")
+                if isinstance(primary_conn, dict)
+                else getattr(primary_conn, "type", None)
+            )
+            if conn_type in ("sql_server", "azure_sql"):
+                raise ValueError(
+                    f"ProjectConfig validation failed: System connection '{self.system.connection}' "
+                    f"is type '{conn_type}', but the primary system catalog requires storage "
+                    "(blob/local) for Delta tables. SQL Server cannot store Delta tables directly.\n\n"
+                    "Solution: Use a storage connection for system.connection, and add sync_to "
+                    "to replicate data to SQL Server for dashboards/queries:\n\n"
+                    "system:\n"
+                    "  connection: your_blob_connection  # Primary - Delta tables\n"
+                    "  environment: prod\n"
+                    "  sync_to:\n"
+                    f"    connection: {self.system.connection}  # Secondary - SQL for visibility\n"
+                    "    schema_name: odibi_system\n"
+                )
+
+        # Validate sync_to connection exists if configured
+        if self.system.sync_to:
+            if self.system.sync_to.connection not in self.connections:
+                available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
+                raise ValueError(
+                    f"ProjectConfig validation failed: sync_to connection '{self.system.sync_to.connection}' "
+                    f"not found in connections. Available connections: [{available}]."
+                )
 
         return self
 

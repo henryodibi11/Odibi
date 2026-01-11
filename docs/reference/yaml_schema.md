@@ -419,41 +419,43 @@ Metadata for a column in the data dictionary.
 
 Configuration for the Odibi System Catalog (The Brain).
 
-Stores metadata, state, and pattern configurations.
+Stores metadata, state, and pattern configurations. The primary connection
+must be a storage connection (blob/local) that supports Delta tables.
 
 Example:
 ```yaml
 system:
-  connection: adls_bronze
+  connection: adls_bronze        # Primary - must be blob/local storage
   path: _odibi_system
-  environment: dev  # Tags all system records with environment
+  environment: dev
 ```
 
-With SQL Server (Phase 2):
+With sync to SQL Server (for dashboards/queries):
 ```yaml
 system:
-  connection: sql_server
-  schema: odibi_system
+  connection: adls_prod          # Primary - Delta tables
   environment: prod
+  sync_to:
+    connection: sql_server_prod  # Secondary - SQL for visibility
+    schema_name: odibi_system
 ```
 
-With sync from local (Phase 4):
+With sync to another blob (cross-region backup):
 ```yaml
 system:
-  connection: sql_server
-  schema_name: odibi_system
-  environment: prod
-  sync_from:
-    connection: local_parquet
-    path: .odibi/system/
+  connection: adls_us_east
+  sync_to:
+    connection: adls_us_west
+    path: _odibi_system_replica
 ```
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **connection** | str | Yes | - | Connection to store system tables (e.g., 'adls_bronze') |
+| **connection** | str | Yes | - | Connection for primary system tables. Must be blob storage (azure_blob) or local filesystem - NOT SQL Server. Delta tables require storage backends. |
 | **path** | str | No | `_odibi_system` | Path relative to connection root |
 | **environment** | Optional[str] | No | - | Environment tag (e.g., 'dev', 'qat', 'prod'). Written to all system table records for cross-environment querying. |
-| **schema_name** | Optional[str] | No | - | Schema name for SQL Server system tables (e.g., 'odibi_system'). Used when connection is SQL Server. |
-| **sync_from** | Optional[[SyncFromConfig](#syncfromconfig)] | No | - | Source to sync system data from. Enables pushing local development data to centralized SQL Server system tables. |
+| **schema_name** | Optional[str] | No | - | Deprecated. Use sync_to.schema_name for SQL Server targets. |
+| **sync_to** | Optional[[SyncToConfig](#synctoconfig)] | No | - | Secondary destination to sync system catalog data to. Use for SQL Server dashboards or cross-region Delta replication. |
+| **sync_from** | Optional[[SyncFromConfig](#syncfromconfig)] | No | - | Source to sync system data from. Enables pushing local development data to centralized system tables. |
 | **cost_per_compute_hour** | Optional[float] | No | - | Estimated cost per compute hour (USD) for cost tracking |
 | **databricks_billing_enabled** | bool | No | `False` | Attempt to query Databricks billing tables for actual costs |
 | **retention_days** | Optional[[RetentionConfig](#retentionconfig)] | No | - | Retention periods for system tables |
@@ -1513,10 +1515,10 @@ write:
 | **exclude_columns** | List[str] | No | `PydanticUndefined` | Columns to exclude from MERGE (not written to target table) |
 | **staging_schema** | str | No | `staging` | Schema for staging table. Table name: {staging_schema}.{table}_staging |
 | **audit_cols** | Optional[[SqlServerAuditColsConfig](#sqlserverauditcolsconfig)] | No | - | Audit columns for created/updated timestamps |
-| **validations** | Optional[ForwardRef('[SqlServerMergeValidationConfig](#sqlservermergevalidationconfig)')] | No | - | Validation checks before merge (null keys, duplicate keys) |
+| **validations** | Optional[[SqlServerMergeValidationConfig](#sqlservermergevalidationconfig)] | No | - | Validation checks before merge (null keys, duplicate keys) |
 | **auto_create_schema** | bool | No | `False` | Auto-create schema if it doesn't exist (Phase 4). Runs CREATE SCHEMA IF NOT EXISTS. |
 | **auto_create_table** | bool | No | `False` | Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame. |
-| **schema_evolution** | Optional[ForwardRef('[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)')] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
+| **schema_evolution** | Optional[[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
 | **batch_size** | Optional[int] | No | - | Batch size for staging table writes (Phase 4). Chunks large DataFrames for memory efficiency. |
 | **primary_key_on_merge_keys** | bool | No | `False` | Create a clustered primary key on merge_keys when auto-creating table. Enforces uniqueness. |
 | **index_on_merge_keys** | bool | No | `False` | Create a nonclustered index on merge_keys. Use if primary key already exists elsewhere. |
