@@ -777,6 +777,11 @@ class CatalogManager:
                 StructField("databricks_cluster_id", StringType(), True),
                 StructField("databricks_job_id", StringType(), True),
                 StructField("databricks_workspace_id", StringType(), True),
+                StructField("estimated_cost_usd", DoubleType(), True),
+                StructField("actual_cost_usd", DoubleType(), True),
+                StructField(
+                    "cost_source", StringType(), True
+                ),  # configured_rate | databricks_billing | none
                 StructField("created_at", TimestampType(), False),
             ]
         )
@@ -798,6 +803,7 @@ class CatalogManager:
                 StructField("run_end_at", TimestampType(), True),
                 StructField("duration_ms", LongType(), True),
                 StructField("rows_processed", LongType(), True),
+                StructField("estimated_cost_usd", DoubleType(), True),
                 StructField("metrics_json", StringType(), True),  # flat dict, scalars only
                 StructField("environment", StringType(), True),
                 StructField("created_at", TimestampType(), False),
@@ -1890,6 +1896,9 @@ class CatalogManager:
                         StructField("databricks_cluster_id", StringType(), True),
                         StructField("databricks_job_id", StringType(), True),
                         StructField("databricks_workspace_id", StringType(), True),
+                        StructField("estimated_cost_usd", DoubleType(), True),
+                        StructField("actual_cost_usd", DoubleType(), True),
+                        StructField("cost_source", StringType(), True),
                         StructField("created_at", TimestampType(), True),
                     ]
                 )
@@ -1915,6 +1924,9 @@ class CatalogManager:
                     pipeline_run.get("databricks_cluster_id"),
                     pipeline_run.get("databricks_job_id"),
                     pipeline_run.get("databricks_workspace_id"),
+                    pipeline_run.get("estimated_cost_usd"),
+                    pipeline_run.get("actual_cost_usd"),
+                    pipeline_run.get("cost_source"),
                     pipeline_run.get("created_at"),
                 )
 
@@ -1946,6 +1958,9 @@ class CatalogManager:
                     "databricks_cluster_id": [pipeline_run.get("databricks_cluster_id")],
                     "databricks_job_id": [pipeline_run.get("databricks_job_id")],
                     "databricks_workspace_id": [pipeline_run.get("databricks_workspace_id")],
+                    "estimated_cost_usd": [pipeline_run.get("estimated_cost_usd")],
+                    "actual_cost_usd": [pipeline_run.get("actual_cost_usd")],
+                    "cost_source": [pipeline_run.get("cost_source")],
                     "created_at": [pipeline_run.get("created_at")],
                 }
                 df = pd.DataFrame(data)
@@ -2113,6 +2128,7 @@ class CatalogManager:
                         StructField("run_end_at", TimestampType(), True),
                         StructField("duration_ms", LongType(), True),
                         StructField("rows_processed", LongType(), True),
+                        StructField("estimated_cost_usd", DoubleType(), True),
                         StructField("metrics_json", StringType(), True),
                         StructField("environment", StringType(), True),
                         StructField("created_at", TimestampType(), True),
@@ -2131,6 +2147,7 @@ class CatalogManager:
                         r.get("run_end_at"),
                         r.get("duration_ms"),
                         r.get("rows_processed"),
+                        r.get("estimated_cost_usd"),
                         r.get("metrics_json"),
                         r.get("environment"),
                         r.get("created_at"),
@@ -2156,6 +2173,7 @@ class CatalogManager:
                     "run_end_at": [r.get("run_end_at") for r in node_results],
                     "duration_ms": [r.get("duration_ms") for r in node_results],
                     "rows_processed": [r.get("rows_processed") for r in node_results],
+                    "estimated_cost_usd": [r.get("estimated_cost_usd") for r in node_results],
                     "metrics_json": [r.get("metrics_json") for r in node_results],
                     "environment": [r.get("environment") for r in node_results],
                     "created_at": [r.get("created_at") for r in node_results],

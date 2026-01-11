@@ -1011,6 +1011,19 @@ class Pipeline:
             if not owner and self.project_config:
                 owner = getattr(self.project_config, "owner", None)
 
+            # Calculate estimated cost from duration and configured rate
+            estimated_cost_usd = None
+            cost_source = "none"
+            if self.project_config and hasattr(self.project_config, "system"):
+                system_config = getattr(self.project_config, "system", None)
+                if system_config:
+                    cost_per_hour = getattr(system_config, "cost_per_compute_hour", None)
+                    if cost_per_hour and results.duration:
+                        # duration is in seconds, convert to hours
+                        duration_hours = results.duration / 3600.0
+                        estimated_cost_usd = duration_hours * cost_per_hour
+                        cost_source = "configured_rate"
+
             pipeline_run = {
                 "run_id": run_id,
                 "pipeline_name": self.config.pipeline,
@@ -1031,6 +1044,9 @@ class Pipeline:
                 "databricks_cluster_id": self._get_databricks_cluster_id(),
                 "databricks_job_id": self._get_databricks_job_id(),
                 "databricks_workspace_id": self._get_databricks_workspace_id(),
+                "estimated_cost_usd": estimated_cost_usd,
+                "actual_cost_usd": None,  # Populated by Databricks billing query if enabled
+                "cost_source": cost_source,
                 "created_at": now,
             }
 
@@ -1056,6 +1072,11 @@ class Pipeline:
                                 metrics[k] = v
                     metrics_json = json.dumps(metrics, default=str)
 
+                    # Calculate node-level estimated cost (proportional to duration)
+                    node_cost_usd = None
+                    if estimated_cost_usd and results.duration and nr.duration:
+                        node_cost_usd = estimated_cost_usd * (nr.duration / results.duration)
+
                     node_run_records.append(
                         {
                             "run_id": run_id,
@@ -1067,6 +1088,7 @@ class Pipeline:
                             "run_end_at": run_end_at,
                             "duration_ms": int(nr.duration * 1000) if nr.duration else 0,
                             "rows_processed": nr.rows_processed,
+                            "estimated_cost_usd": node_cost_usd,
                             "metrics_json": metrics_json,
                             "environment": environment,
                             "created_at": now,
