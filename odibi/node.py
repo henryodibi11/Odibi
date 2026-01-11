@@ -2942,6 +2942,7 @@ class Node:
         performance_config: Optional[Any] = None,
         pipeline_name: Optional[str] = None,
         batch_write_buffers: Optional[Dict[str, List]] = None,
+        run_id: Optional[str] = None,
     ):
         """Initialize node."""
         self.config = config
@@ -2956,6 +2957,7 @@ class Node:
         self.performance_config = performance_config
         self.pipeline_name = pipeline_name
         self.batch_write_buffers = batch_write_buffers
+        self.run_id = run_id
 
         self._cached_result: Optional[Any] = None
 
@@ -3133,6 +3135,21 @@ class Node:
                         elapsed_ms=round(result_for_log.duration * 1000, 2),
                     )
 
+                    # Log failure to meta_failures (wrapped to never fail pipeline)
+                    if self.catalog_manager and self.run_id:
+                        try:
+                            self.catalog_manager.log_failure(
+                                failure_id=str(uuid.uuid4()),
+                                run_id=self.run_id,
+                                pipeline_name=self.pipeline_name or "unknown",
+                                node_name=self.config.name,
+                                error_type=type(e).__name__,
+                                error_message=str(e)[:1000],
+                                stack_trace=traceback.format_exc()[:2000],
+                            )
+                        except Exception:
+                            pass  # Never fail for observability
+
                     raise e
 
                 if result.success:
@@ -3154,6 +3171,26 @@ class Node:
                         error_type=type(result.error).__name__ if result.error else "Unknown",
                         elapsed_ms=round(result.duration * 1000, 2),
                     )
+
+                    # Log failure to meta_failures (wrapped to never fail pipeline)
+                    if self.catalog_manager and self.run_id and result.error:
+                        try:
+                            err = result.error
+                            self.catalog_manager.log_failure(
+                                failure_id=str(uuid.uuid4()),
+                                run_id=self.run_id,
+                                pipeline_name=self.pipeline_name or "unknown",
+                                node_name=self.config.name,
+                                error_type=type(err).__name__ if err else "Unknown",
+                                error_message=str(err)[:1000] if err else "Unknown error",
+                                stack_trace=(
+                                    result.metadata.get("error_traceback", "")[:2000]
+                                    if result.metadata
+                                    else None
+                                ),
+                            )
+                        except Exception:
+                            pass  # Never fail for observability
 
                 if result.rows_processed is not None:
                     rows_processed.add(result.rows_processed, {"node": self.config.name})

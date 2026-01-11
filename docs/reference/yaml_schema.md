@@ -69,6 +69,8 @@ pipelines:
   - pipeline: "user_onboarding"
     description: "Ingest and process new users"
     layer: "silver"
+    owner: "data-team@example.com"
+    freshness_sla: "6h"
     nodes:
       - name: "node1"
         ...
@@ -78,6 +80,9 @@ pipelines:
 | **pipeline** | str | Yes | - | Pipeline name |
 | **description** | Optional[str] | No | - | Pipeline description |
 | **layer** | Optional[str] | No | - | Logical layer (bronze/silver/gold) |
+| **owner** | Optional[str] | No | - | Pipeline owner (email or name) |
+| **freshness_sla** | Optional[str] | No | - | Expected freshness, e.g. '6h', '1d' |
+| **freshness_anchor** | Literal['run_completion', 'table_max_timestamp', 'watermark_state'] | No | `run_completion` | What defines freshness. Only 'run_completion' implemented initially. |
 | **nodes** | List[[NodeConfig](#nodeconfig)] | Yes | - | List of nodes in this pipeline |
 
 ---
@@ -449,6 +454,9 @@ system:
 | **environment** | Optional[str] | No | - | Environment tag (e.g., 'dev', 'qat', 'prod'). Written to all system table records for cross-environment querying. |
 | **schema_name** | Optional[str] | No | - | Schema name for SQL Server system tables (e.g., 'odibi_system'). Used when connection is SQL Server. |
 | **sync_from** | Optional[[SyncFromConfig](#syncfromconfig)] | No | - | Source to sync system data from. Enables pushing local development data to centralized SQL Server system tables. |
+| **cost_per_compute_hour** | Optional[float] | No | - | Estimated cost per compute hour (USD) for cost tracking |
+| **databricks_billing_enabled** | bool | No | `False` | Attempt to query Databricks billing tables for actual costs |
+| **retention_days** | Optional[[RetentionConfig](#retentionconfig)] | No | - | Retention periods for system tables |
 
 ---
 ### `SyncFromConfig`
@@ -1505,10 +1513,10 @@ write:
 | **exclude_columns** | List[str] | No | `PydanticUndefined` | Columns to exclude from MERGE (not written to target table) |
 | **staging_schema** | str | No | `staging` | Schema for staging table. Table name: {staging_schema}.{table}_staging |
 | **audit_cols** | Optional[[SqlServerAuditColsConfig](#sqlserverauditcolsconfig)] | No | - | Audit columns for created/updated timestamps |
-| **validations** | Optional[[SqlServerMergeValidationConfig](#sqlservermergevalidationconfig)] | No | - | Validation checks before merge (null keys, duplicate keys) |
+| **validations** | Optional[ForwardRef('[SqlServerMergeValidationConfig](#sqlservermergevalidationconfig)')] | No | - | Validation checks before merge (null keys, duplicate keys) |
 | **auto_create_schema** | bool | No | `False` | Auto-create schema if it doesn't exist (Phase 4). Runs CREATE SCHEMA IF NOT EXISTS. |
 | **auto_create_table** | bool | No | `False` | Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame. |
-| **schema_evolution** | Optional[[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
+| **schema_evolution** | Optional[ForwardRef('[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)')] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
 | **batch_size** | Optional[int] | No | - | Batch size for staging table writes (Phase 4). Chunks large DataFrames for memory efficiency. |
 | **primary_key_on_merge_keys** | bool | No | `False` | Create a clustered primary key on merge_keys when auto-creating table. Enforces uniqueness. |
 | **index_on_merge_keys** | bool | No | `False` | Create a nonclustered index on merge_keys. Use if primary key already exists elsewhere. |

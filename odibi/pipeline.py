@@ -1,6 +1,7 @@
 """Pipeline executor and orchestration."""
 
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -343,6 +344,9 @@ class Pipeline:
         start_time = time.time()
         start_timestamp = datetime.now().isoformat()
 
+        # Generate run_id at start for observability (used by log_failure in nodes)
+        self._current_run_id = str(uuid.uuid4())
+
         results = PipelineResults(pipeline_name=self.config.pipeline, start_time=start_timestamp)
 
         # Set global logging context for this pipeline run
@@ -630,6 +634,7 @@ class Pipeline:
                     pipeline_name=self.config.pipeline,
                     batch_write_buffers=batch_buffers,
                     config_file=node_config.source_yaml,
+                    run_id=self._current_run_id,
                 )
                 result = node.execute()
 
@@ -939,6 +944,165 @@ class Pipeline:
             skipped=len(results.skipped),
             total_nodes=len(self.graph.nodes),
         )
+
+        # =========================================================================
+        # LEVERAGE SUMMARY TABLES - Observability Logging
+        # =========================================================================
+        if self.catalog_manager and not dry_run:
+            import json
+            from datetime import timezone
+
+            from odibi.derived_updater import DerivedUpdater
+
+            run_id = self._current_run_id
+            now = datetime.now(timezone.utc)
+
+            # Parse start/end times from ISO strings
+            run_start_at = datetime.fromisoformat(results.start_time) if results.start_time else now
+            run_end_at = datetime.fromisoformat(results.end_time) if results.end_time else now
+
+            # Compute terminal nodes: nodes with no dependents in the DAG
+            # Terminal nodes = nodes that are NOT referenced as a dependency by any other node
+            terminal_node_names = []
+            rows_processed = None
+            try:
+                # Use full pipeline graph, not just executed nodes
+                all_pipeline_nodes = {n.name for n in self.config.nodes}
+                # Nodes referenced as upstream dependencies by other nodes
+                referenced_as_dependency = set()
+                for node_cfg in self.config.nodes:
+                    if node_cfg.depends_on:
+                        for dep in node_cfg.depends_on:
+                            referenced_as_dependency.add(dep)
+                # Terminal = nodes not referenced as dependency (leaf nodes)
+                terminal_node_names = sorted(all_pipeline_nodes - referenced_as_dependency)
+
+                # Sum rows_written for terminal nodes
+                # Per contract: if ANY terminal node is missing rows_written, set NULL
+                terminal_rows_sum = 0
+                all_have_rows = True
+                for t_name in terminal_node_names:
+                    nr = results.node_results.get(t_name)
+                    if nr and nr.rows_written is not None:
+                        terminal_rows_sum += nr.rows_written
+                    else:
+                        # Missing rows_written for this terminal node
+                        all_have_rows = False
+
+                if terminal_node_names and all_have_rows:
+                    rows_processed = terminal_rows_sum  # Can be 0 (valid, distinct from NULL)
+                # else: rows_processed stays None (unknown)
+            except Exception as term_ex:
+                self._ctx.debug(f"Terminal node detection failed: {term_ex}")
+                terminal_node_names = []
+                rows_processed = None
+
+            # Get first error summary
+            first_error = None
+            for fn in results.failed:
+                nr = results.node_results.get(fn)
+                if nr and nr.error:
+                    first_error = str(nr.error)[:500]
+                    break
+
+            # Build pipeline_run dict
+            pipeline_run = {
+                "run_id": run_id,
+                "pipeline_name": self.config.pipeline,
+                "owner": getattr(self.config, "owner", None),
+                "layer": getattr(self.config, "layer", None),
+                "run_start_at": run_start_at,
+                "run_end_at": run_end_at,
+                "duration_ms": int(results.duration * 1000),
+                "status": status,
+                "nodes_total": len(results.node_results),
+                "nodes_succeeded": len(results.completed),
+                "nodes_failed": len(results.failed),
+                "nodes_skipped": len(results.skipped),
+                "rows_processed": rows_processed,
+                "error_summary": first_error,
+                "terminal_nodes": ",".join(terminal_node_names) if terminal_node_names else None,
+                "environment": getattr(self.config, "environment", None),
+                "databricks_cluster_id": None,  # Future: extract from Spark context
+                "databricks_job_id": None,
+                "databricks_workspace_id": None,
+                "created_at": now,
+            }
+
+            # Log pipeline run (wrapped to never fail pipeline)
+            try:
+                self.catalog_manager.log_pipeline_run(pipeline_run)
+                self._ctx.debug(f"Logged pipeline run {run_id}")
+            except Exception as e:
+                self._ctx.debug(f"Failed to log pipeline run (non-fatal): {e}")
+
+            # Build node_results list for meta_node_runs
+            node_run_records = []
+            environment = getattr(self.config, "environment", None)
+            for node_name, nr in results.node_results.items():
+                try:
+                    # Build metrics_json from metadata
+                    metrics = {}
+                    if nr.metadata:
+                        for k, v in nr.metadata.items():
+                            if k.startswith("_"):
+                                continue
+                            if isinstance(v, (str, int, float, bool, type(None))):
+                                metrics[k] = v
+                    metrics_json = json.dumps(metrics, default=str)
+
+                    node_run_records.append(
+                        {
+                            "run_id": run_id,
+                            "node_id": str(uuid.uuid4()),
+                            "pipeline_name": self.config.pipeline,
+                            "node_name": node_name,
+                            "status": "SUCCESS" if nr.success else "FAILURE",
+                            "run_start_at": run_start_at,  # Approximate, no per-node timing
+                            "run_end_at": run_end_at,
+                            "duration_ms": int(nr.duration * 1000) if nr.duration else 0,
+                            "rows_processed": nr.rows_processed,
+                            "metrics_json": metrics_json,
+                            "environment": environment,
+                            "created_at": now,
+                        }
+                    )
+                except Exception as node_ex:
+                    self._ctx.debug(f"Failed to build node record for {node_name}: {node_ex}")
+
+            # Log node runs batch (wrapped to never fail pipeline)
+            try:
+                if node_run_records:
+                    self.catalog_manager.log_node_runs_batch(node_run_records)
+                    self._ctx.debug(f"Logged {len(node_run_records)} node runs")
+            except Exception as e:
+                self._ctx.debug(f"Failed to log node runs (non-fatal): {e}")
+
+            # Run derived updates (each wrapped independently)
+            try:
+                updater = DerivedUpdater(self.catalog_manager)
+                derived_updates = [
+                    ("meta_daily_stats", lambda: updater.update_daily_stats(run_id, pipeline_run)),
+                    ("meta_pipeline_health", lambda: updater.update_pipeline_health(pipeline_run)),
+                ]
+                freshness_sla = getattr(self.config, "freshness_sla", None)
+                if freshness_sla:
+                    freshness_anchor = getattr(self.config, "freshness_anchor", "run_completion")
+                    derived_updates.append(
+                        (
+                            "meta_sla_status",
+                            lambda: updater.update_sla_status(
+                                self.config.pipeline,
+                                getattr(self.config, "owner", None),
+                                freshness_sla,
+                                freshness_anchor,
+                            ),
+                        )
+                    )
+                for dt, fn in derived_updates:
+                    updater.apply_derived_update(dt, run_id, fn)
+            except Exception as e:
+                self._ctx.debug(f"Derived updates failed (non-fatal): {e}")
 
         # Start story generation in background thread (pure Python/file I/O, safe to parallelize)
         # This runs concurrently with state saving below

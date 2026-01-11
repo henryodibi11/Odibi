@@ -3022,6 +3022,8 @@ class PipelineConfig(BaseModel):
       - pipeline: "user_onboarding"
         description: "Ingest and process new users"
         layer: "silver"
+        owner: "data-team@example.com"
+        freshness_sla: "6h"
         nodes:
           - name: "node1"
             ...
@@ -3031,6 +3033,18 @@ class PipelineConfig(BaseModel):
     pipeline: str = Field(description="Pipeline name")
     description: Optional[str] = Field(default=None, description="Pipeline description")
     layer: Optional[str] = Field(default=None, description="Logical layer (bronze/silver/gold)")
+    owner: Optional[str] = Field(
+        default=None,
+        description="Pipeline owner (email or name)",
+    )
+    freshness_sla: Optional[str] = Field(
+        default=None,
+        description="Expected freshness, e.g. '6h', '1d'",
+    )
+    freshness_anchor: Literal["run_completion", "table_max_timestamp", "watermark_state"] = Field(
+        default="run_completion",
+        description="What defines freshness. Only 'run_completion' implemented initially.",
+    )
     nodes: List[NodeConfig] = Field(description="List of nodes in this pipeline")
 
     @field_validator("nodes")
@@ -3300,6 +3314,26 @@ class SyncFromConfig(BaseModel):
     )
 
 
+class RetentionConfig(BaseModel):
+    """
+    Retention configuration for system tables.
+
+    Controls how long observability data is retained before cleanup.
+
+    Example:
+    ```yaml
+    retention_days:
+      daily_stats: 365
+      failures: 90
+      observability_errors: 90
+    ```
+    """
+
+    daily_stats: int = Field(default=365, description="Days to retain daily stats")
+    failures: int = Field(default=90, description="Days to retain failure records")
+    observability_errors: int = Field(default=90, description="Days to retain observability errors")
+
+
 class SystemConfig(BaseModel):
     """
     Configuration for the Odibi System Catalog (The Brain).
@@ -3353,6 +3387,18 @@ class SystemConfig(BaseModel):
             "Source to sync system data from. Enables pushing local development "
             "data to centralized SQL Server system tables."
         ),
+    )
+    cost_per_compute_hour: Optional[float] = Field(
+        default=None,
+        description="Estimated cost per compute hour (USD) for cost tracking",
+    )
+    databricks_billing_enabled: bool = Field(
+        default=False,
+        description="Attempt to query Databricks billing tables for actual costs",
+    )
+    retention_days: Optional[RetentionConfig] = Field(
+        default=None,
+        description="Retention periods for system tables",
     )
 
 

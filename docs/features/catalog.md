@@ -679,8 +679,26 @@ for source in upstream:
 5. **Query lineage** - Understand impact before modifying source tables
 6. **Run optimization** - Periodically run `catalog.optimize()` for Spark deployments
 
+## Observability Tables
+
+In addition to the core catalog tables above, Odibi provides **8 observability tables** that auto-populate on every pipeline run for leadership dashboards:
+
+| Table | Purpose | See |
+|-------|---------|-----|
+| `meta_pipeline_runs` | Pipeline execution log | [Observability](observability.md#meta_pipeline_runs) |
+| `meta_node_runs` | Node execution log | [Observability](observability.md#meta_node_runs) |
+| `meta_failures` | Failure details | [Observability](observability.md#meta_failures) |
+| `meta_observability_errors` | Observability system failures | [Observability](observability.md#meta_observability_errors) |
+| `meta_derived_applied_runs` | Idempotency guard | [Observability](observability.md#meta_derived_applied_runs-guard-table) |
+| `meta_daily_stats` | Daily aggregates | [Observability](observability.md#meta_daily_stats) |
+| `meta_pipeline_health` | Current health snapshot | [Observability](observability.md#meta_pipeline_health) |
+| `meta_sla_status` | Freshness compliance | [Observability](observability.md#meta_sla_status) |
+
+For full documentation on observability tables, see [Observability Tables](observability.md).
+
 ## Related
 
+- [Observability Tables](observability.md) - Auto-populating tables for leadership dashboards
 - [Pipeline Configuration](../reference/yaml_schema.md) - YAML schema reference
 - [State Management](state.md) - HWM-based incremental loads
 - [Alerting](alerting.md) - Notifications for pipeline events

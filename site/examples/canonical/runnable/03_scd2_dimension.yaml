@@ -1,0 +1,49 @@
+# Example 3: SCD2 Dimension (Track History)
+# Runnable version of docs/examples/canonical/03_scd2_dimension.md
+project: customer_dimension
+
+connections:
+  bronze:
+    type: local
+    base_path: ../sample_data
+  silver:
+    type: local
+    base_path: ./data/silver
+
+story:
+  connection: silver
+  path: stories
+
+system:
+  connection: silver
+  path: _system
+
+pipelines:
+  - pipeline: dimensions
+    layer: silver
+    nodes:
+      - name: dim_customer
+        read:
+          connection: bronze
+          format: csv
+          path: customers.csv
+
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols:
+              - name
+              - email
+              - tier
+              - city
+            target: silver.dim_customer
+            unknown_member: true
+
+        write:
+          connection: silver
+          format: delta
+          path: dim_customer
+          mode: overwrite

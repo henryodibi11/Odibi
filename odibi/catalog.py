@@ -3,7 +3,7 @@ import json
 import logging
 import random
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 try:
@@ -102,6 +102,15 @@ class CatalogManager:
             "meta_schemas": f"{self.base_path}/meta_schemas",
             "meta_lineage": f"{self.base_path}/meta_lineage",
             "meta_outputs": f"{self.base_path}/meta_outputs",
+            # Leverage Summary Tables (Observability)
+            "meta_pipeline_runs": f"{self.base_path}/meta_pipeline_runs",
+            "meta_node_runs": f"{self.base_path}/meta_node_runs",
+            "meta_failures": f"{self.base_path}/meta_failures",
+            "meta_observability_errors": f"{self.base_path}/meta_observability_errors",
+            "meta_derived_applied_runs": f"{self.base_path}/meta_derived_applied_runs",
+            "meta_daily_stats": f"{self.base_path}/meta_daily_stats",
+            "meta_pipeline_health": f"{self.base_path}/meta_pipeline_health",
+            "meta_sla_status": f"{self.base_path}/meta_sla_status",
         }
 
         # Cache for meta table reads (invalidated on write operations)
@@ -281,6 +290,30 @@ class CatalogManager:
         self._ensure_table("meta_schemas", self._get_schema_meta_schemas())
         self._ensure_table("meta_lineage", self._get_schema_meta_lineage())
         self._ensure_table("meta_outputs", self._get_schema_meta_outputs())
+
+        # Leverage Summary Tables (Observability)
+        self._ensure_table("meta_pipeline_runs", self._get_schema_meta_pipeline_runs())
+        self._ensure_table(
+            "meta_node_runs",
+            self._get_schema_meta_node_runs(),
+            partition_cols=["pipeline_name"],
+        )
+        self._ensure_table(
+            "meta_failures",
+            self._get_schema_meta_failures(),
+            partition_cols=["date"],
+        )
+        self._ensure_table(
+            "meta_observability_errors",
+            self._get_schema_meta_observability_errors(),
+            partition_cols=["date"],
+        )
+        self._ensure_table(
+            "meta_derived_applied_runs", self._get_schema_meta_derived_applied_runs()
+        )
+        self._ensure_table("meta_daily_stats", self._get_schema_meta_daily_stats())
+        self._ensure_table("meta_pipeline_health", self._get_schema_meta_pipeline_health())
+        self._ensure_table("meta_sla_status", self._get_schema_meta_sla_status())
 
     def _ensure_table(
         self,
@@ -697,6 +730,186 @@ class CatalogManager:
                 StructField("table_name", StringType(), True),
                 StructField("last_run", TimestampType(), False),
                 StructField("row_count", LongType(), True),
+                StructField("updated_at", TimestampType(), False),
+            ]
+        )
+
+    # ========================================================================
+    # Leverage Summary Tables - Schemas
+    # ========================================================================
+
+    def _get_schema_meta_pipeline_runs(self) -> StructType:
+        """
+        meta_pipeline_runs (Fact): Pipeline execution log.
+        One row per pipeline execution. Append-only.
+        """
+        return StructType(
+            [
+                StructField("run_id", StringType(), False),  # PK, UUID
+                StructField("pipeline_name", StringType(), False),
+                StructField("owner", StringType(), True),
+                StructField("layer", StringType(), True),
+                StructField("run_start_at", TimestampType(), False),
+                StructField("run_end_at", TimestampType(), False),
+                StructField("duration_ms", LongType(), False),
+                StructField("status", StringType(), False),  # SUCCESS | FAILURE
+                StructField("nodes_total", LongType(), True),
+                StructField("nodes_succeeded", LongType(), True),
+                StructField("nodes_failed", LongType(), True),
+                StructField("nodes_skipped", LongType(), True),
+                StructField("rows_processed", LongType(), True),
+                StructField("error_summary", StringType(), True),  # max 500 chars
+                StructField("terminal_nodes", StringType(), True),  # comma-separated
+                StructField("environment", StringType(), True),
+                StructField("databricks_cluster_id", StringType(), True),
+                StructField("databricks_job_id", StringType(), True),
+                StructField("databricks_workspace_id", StringType(), True),
+                StructField("created_at", TimestampType(), False),
+            ]
+        )
+
+    def _get_schema_meta_node_runs(self) -> StructType:
+        """
+        meta_node_runs (Fact): Node execution log.
+        One row per node execution. Append-only.
+        """
+        return StructType(
+            [
+                StructField("run_id", StringType(), False),  # FK to pipeline run
+                StructField("node_id", StringType(), False),  # UUID for this node execution
+                StructField("pipeline_name", StringType(), False),
+                StructField("node_name", StringType(), False),
+                StructField("status", StringType(), False),  # SUCCESS | FAILURE | SKIPPED
+                StructField("run_start_at", TimestampType(), True),
+                StructField("run_end_at", TimestampType(), True),
+                StructField("duration_ms", LongType(), True),
+                StructField("rows_processed", LongType(), True),
+                StructField("metrics_json", StringType(), True),  # flat dict, scalars only
+                StructField("environment", StringType(), True),
+                StructField("created_at", TimestampType(), False),
+            ]
+        )
+
+    def _get_schema_meta_failures(self) -> StructType:
+        """
+        meta_failures (Fact): Failure details.
+        One row per failure event. Append-only.
+        """
+        return StructType(
+            [
+                StructField("failure_id", StringType(), False),  # PK, UUID
+                StructField("run_id", StringType(), False),  # FK to pipeline run
+                StructField("pipeline_name", StringType(), False),
+                StructField("node_name", StringType(), False),
+                StructField("error_type", StringType(), False),  # Exception class name
+                StructField("error_message", StringType(), True),  # max 1000 chars
+                StructField("error_code", StringType(), True),  # future taxonomy
+                StructField("stack_trace", StringType(), True),  # max 2000 chars
+                StructField("timestamp", TimestampType(), False),
+                StructField("date", DateType(), False),  # for partitioning
+            ]
+        )
+
+    def _get_schema_meta_observability_errors(self) -> StructType:
+        """
+        meta_observability_errors (Fact): Observability system failures.
+        One row per observability failure. Append-only.
+        """
+        return StructType(
+            [
+                StructField("error_id", StringType(), False),  # PK, UUID
+                StructField("run_id", StringType(), True),
+                StructField("pipeline_name", StringType(), True),
+                StructField("component", StringType(), False),  # catalog_update, billing_query
+                StructField("error_message", StringType(), True),  # max 500 chars
+                StructField("timestamp", TimestampType(), False),
+                StructField("date", DateType(), False),  # for partitioning
+            ]
+        )
+
+    def _get_schema_meta_derived_applied_runs(self) -> StructType:
+        """
+        meta_derived_applied_runs (Guard Table): Idempotency guard for derived tables.
+        One row per (derived_table, run_id). Prevents duplicate processing.
+        """
+        return StructType(
+            [
+                StructField("derived_table", StringType(), False),  # PK (with run_id)
+                StructField("run_id", StringType(), False),  # PK (with derived_table)
+                StructField("claim_token", StringType(), False),  # UUID of claiming process
+                StructField("status", StringType(), False),  # CLAIMED | APPLIED | FAILED
+                StructField("claimed_at", TimestampType(), False),
+                StructField("applied_at", TimestampType(), True),
+                StructField("error_message", StringType(), True),  # max 500 chars
+            ]
+        )
+
+    def _get_schema_meta_daily_stats(self) -> StructType:
+        """
+        meta_daily_stats (Derived): Daily aggregates.
+        PK: (date, pipeline_name). Upsert on pipeline completion.
+        """
+        return StructType(
+            [
+                StructField("date", DateType(), False),  # PK (with pipeline_name)
+                StructField("pipeline_name", StringType(), False),  # PK (with date)
+                StructField("runs", LongType(), False),
+                StructField("successes", LongType(), False),
+                StructField("failures", LongType(), False),
+                StructField("total_rows", LongType(), True),
+                StructField("total_duration_ms", LongType(), True),
+                StructField("estimated_cost_usd", DoubleType(), True),
+                StructField("actual_cost_usd", DoubleType(), True),
+                StructField(
+                    "cost_source", StringType(), True
+                ),  # configured_rate | databricks_billing | none | mixed
+                StructField("cost_is_actual", LongType(), True),  # 0/1 for cross-engine compat
+            ]
+        )
+
+    def _get_schema_meta_pipeline_health(self) -> StructType:
+        """
+        meta_pipeline_health (Derived): Current health snapshot.
+        PK: pipeline_name. Upsert on pipeline completion.
+        """
+        return StructType(
+            [
+                StructField("pipeline_name", StringType(), False),  # PK
+                StructField("owner", StringType(), True),
+                StructField("layer", StringType(), True),
+                StructField("total_runs", LongType(), False),
+                StructField("total_successes", LongType(), False),
+                StructField("total_failures", LongType(), False),
+                StructField("success_rate_7d", DoubleType(), True),
+                StructField("success_rate_30d", DoubleType(), True),
+                StructField("avg_duration_ms_7d", DoubleType(), True),
+                StructField("total_rows_30d", LongType(), True),
+                StructField("estimated_cost_30d", DoubleType(), True),
+                StructField("last_success_at", TimestampType(), True),
+                StructField("last_failure_at", TimestampType(), True),
+                StructField("last_run_at", TimestampType(), False),
+                StructField("updated_at", TimestampType(), False),
+            ]
+        )
+
+    def _get_schema_meta_sla_status(self) -> StructType:
+        """
+        meta_sla_status (Derived): Freshness compliance snapshot.
+        PK: pipeline_name. Upsert on pipeline completion.
+        """
+        return StructType(
+            [
+                StructField("pipeline_name", StringType(), False),  # PK
+                StructField("owner", StringType(), True),
+                StructField("freshness_sla", StringType(), True),  # e.g., "6h"
+                StructField(
+                    "freshness_anchor", StringType(), True
+                ),  # run_completion | table_max_timestamp | watermark_state
+                StructField("freshness_sla_minutes", LongType(), True),
+                StructField("last_success_at", TimestampType(), True),
+                StructField("minutes_since_success", LongType(), True),
+                StructField("sla_met", LongType(), True),  # 0/1 for cross-engine compat
+                StructField("hours_overdue", DoubleType(), True),
                 StructField("updated_at", TimestampType(), False),
             ]
         )
@@ -1592,6 +1805,681 @@ class CatalogManager:
             self._retry_with_backoff(_do_batch_log)
         except Exception as e:
             logger.warning(f"Failed to batch log runs to system catalog: {e}")
+
+    # =========================================================================
+    # LEVERAGE SUMMARY TABLES - OBSERVABILITY LOGGING
+    # =========================================================================
+
+    def log_pipeline_run(self, pipeline_run: Dict[str, Any]) -> None:
+        """
+        Log a completed pipeline run to meta_pipeline_runs.
+
+        Append-only, called exactly once per pipeline run after completion.
+
+        Args:
+            pipeline_run: Dict with keys:
+                run_id, pipeline_name, owner, layer, run_start_at, run_end_at,
+                duration_ms, status, nodes_total, nodes_succeeded, nodes_failed,
+                nodes_skipped, rows_processed, error_summary, terminal_nodes,
+                environment, created_at
+        """
+        if self.is_sql_server_mode:
+            self._log_pipeline_run_sql_server(pipeline_run)
+            return
+
+        if not self.spark and not self.engine:
+            return
+
+        def _do_log():
+            if self.spark:
+                from pyspark.sql.types import (
+                    IntegerType,
+                    LongType,
+                    StringType,
+                    StructField,
+                    StructType,
+                    TimestampType,
+                )
+
+                schema = StructType(
+                    [
+                        StructField("run_id", StringType(), False),
+                        StructField("pipeline_name", StringType(), False),
+                        StructField("owner", StringType(), True),
+                        StructField("layer", StringType(), True),
+                        StructField("run_start_at", TimestampType(), True),
+                        StructField("run_end_at", TimestampType(), True),
+                        StructField("duration_ms", LongType(), True),
+                        StructField("status", StringType(), True),
+                        StructField("nodes_total", IntegerType(), True),
+                        StructField("nodes_succeeded", IntegerType(), True),
+                        StructField("nodes_failed", IntegerType(), True),
+                        StructField("nodes_skipped", IntegerType(), True),
+                        StructField("rows_processed", LongType(), True),
+                        StructField("error_summary", StringType(), True),
+                        StructField("terminal_nodes", StringType(), True),
+                        StructField("environment", StringType(), True),
+                        StructField("databricks_cluster_id", StringType(), True),
+                        StructField("databricks_job_id", StringType(), True),
+                        StructField("databricks_workspace_id", StringType(), True),
+                        StructField("created_at", TimestampType(), True),
+                    ]
+                )
+
+                row = (
+                    pipeline_run["run_id"],
+                    pipeline_run["pipeline_name"],
+                    pipeline_run.get("owner"),
+                    pipeline_run.get("layer"),
+                    pipeline_run.get("run_start_at"),
+                    pipeline_run.get("run_end_at"),
+                    pipeline_run.get("duration_ms"),
+                    pipeline_run.get("status"),
+                    pipeline_run.get("nodes_total"),
+                    pipeline_run.get("nodes_succeeded"),
+                    pipeline_run.get("nodes_failed"),
+                    pipeline_run.get("nodes_skipped"),
+                    pipeline_run.get("rows_processed"),
+                    pipeline_run.get("error_summary"),
+                    pipeline_run.get("terminal_nodes"),
+                    pipeline_run.get("environment"),
+                    pipeline_run.get("databricks_cluster_id"),
+                    pipeline_run.get("databricks_job_id"),
+                    pipeline_run.get("databricks_workspace_id"),
+                    pipeline_run.get("created_at"),
+                )
+
+                df = self.spark.createDataFrame([row], schema)
+                df.write.format("delta").mode("append").save(self.tables["meta_pipeline_runs"])
+                logger.debug(f"Logged pipeline run {pipeline_run['run_id']}")
+
+            elif self.engine:
+                import pandas as pd
+
+                data = {
+                    "run_id": [pipeline_run["run_id"]],
+                    "pipeline_name": [pipeline_run["pipeline_name"]],
+                    "owner": [pipeline_run.get("owner")],
+                    "layer": [pipeline_run.get("layer")],
+                    "run_start_at": [pipeline_run.get("run_start_at")],
+                    "run_end_at": [pipeline_run.get("run_end_at")],
+                    "duration_ms": [pipeline_run.get("duration_ms")],
+                    "status": [pipeline_run.get("status")],
+                    "nodes_total": [pipeline_run.get("nodes_total")],
+                    "nodes_succeeded": [pipeline_run.get("nodes_succeeded")],
+                    "nodes_failed": [pipeline_run.get("nodes_failed")],
+                    "nodes_skipped": [pipeline_run.get("nodes_skipped")],
+                    "rows_processed": [pipeline_run.get("rows_processed")],
+                    "error_summary": [pipeline_run.get("error_summary")],
+                    "terminal_nodes": [pipeline_run.get("terminal_nodes")],
+                    "environment": [pipeline_run.get("environment")],
+                    "databricks_cluster_id": [pipeline_run.get("databricks_cluster_id")],
+                    "databricks_job_id": [pipeline_run.get("databricks_job_id")],
+                    "databricks_workspace_id": [pipeline_run.get("databricks_workspace_id")],
+                    "created_at": [pipeline_run.get("created_at")],
+                }
+                df = pd.DataFrame(data)
+
+                self.engine.write(
+                    df,
+                    connection=self.connection,
+                    format="delta",
+                    path=self.tables["meta_pipeline_runs"],
+                    mode="append",
+                )
+                logger.debug(f"Logged pipeline run {pipeline_run['run_id']}")
+
+        try:
+            self._retry_with_backoff(_do_log)
+        except Exception as e:
+            logger.warning(f"Failed to log pipeline run: {e}")
+
+    def _log_pipeline_run_sql_server(self, pipeline_run: Dict[str, Any]) -> None:
+        """SQL Server: Log pipeline run to meta_pipeline_runs."""
+        if not self._sql_server_table_exists("meta_pipeline_runs"):
+            raise NotImplementedError(
+                "meta_pipeline_runs table does not exist in SQL Server. "
+                "SQL Server backend for observability tables not yet implemented."
+            )
+
+        schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        try:
+            sql = f"""
+            INSERT INTO [{schema_name}].[meta_pipeline_runs]
+            (run_id, pipeline_name, owner, layer, run_start_at, run_end_at, duration_ms,
+             status, nodes_total, nodes_succeeded, nodes_failed, nodes_skipped,
+             rows_processed, error_summary, terminal_nodes, environment,
+             databricks_cluster_id, databricks_job_id, databricks_workspace_id, created_at)
+            VALUES (:run_id, :pipeline_name, :owner, :layer, :run_start_at, :run_end_at, :duration_ms,
+                    :status, :nodes_total, :nodes_succeeded, :nodes_failed, :nodes_skipped,
+                    :rows_processed, :error_summary, :terminal_nodes, :environment,
+                    :databricks_cluster_id, :databricks_job_id, :databricks_workspace_id, :created_at)
+            """
+            self.connection.execute(
+                sql,
+                {
+                    "run_id": pipeline_run["run_id"],
+                    "pipeline_name": pipeline_run["pipeline_name"],
+                    "owner": pipeline_run.get("owner"),
+                    "layer": pipeline_run.get("layer"),
+                    "run_start_at": pipeline_run.get("run_start_at"),
+                    "run_end_at": pipeline_run.get("run_end_at"),
+                    "duration_ms": pipeline_run.get("duration_ms"),
+                    "status": pipeline_run.get("status"),
+                    "nodes_total": pipeline_run.get("nodes_total"),
+                    "nodes_succeeded": pipeline_run.get("nodes_succeeded"),
+                    "nodes_failed": pipeline_run.get("nodes_failed"),
+                    "nodes_skipped": pipeline_run.get("nodes_skipped"),
+                    "rows_processed": pipeline_run.get("rows_processed"),
+                    "error_summary": pipeline_run.get("error_summary"),
+                    "terminal_nodes": pipeline_run.get("terminal_nodes"),
+                    "environment": pipeline_run.get("environment"),
+                    "databricks_cluster_id": pipeline_run.get("databricks_cluster_id"),
+                    "databricks_job_id": pipeline_run.get("databricks_job_id"),
+                    "databricks_workspace_id": pipeline_run.get("databricks_workspace_id"),
+                    "created_at": pipeline_run.get("created_at"),
+                },
+            )
+            logger.debug(f"Logged pipeline run to SQL Server: {pipeline_run['run_id']}")
+        except Exception as e:
+            logger.warning(f"Failed to log pipeline run to SQL Server: {e}")
+
+    def _sql_server_table_exists(self, table_name: str) -> bool:
+        """Check if a table exists in SQL Server."""
+        if not self.is_sql_server_mode:
+            return False
+        schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        try:
+            result = self.connection.execute(
+                """
+                SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table
+                """,
+                {"schema": schema_name, "table": table_name},
+            )
+            return result.fetchone() is not None
+        except Exception:
+            return False
+
+    def log_node_runs_batch(self, node_results: List[Dict[str, Any]]) -> None:
+        """
+        Batch log node execution results to meta_node_runs.
+
+        Append-only, called once per pipeline run with all node results.
+
+        Args:
+            node_results: List of dicts with keys:
+                run_id, node_id, pipeline_name, node_name, status,
+                run_start_at, run_end_at, duration_ms, rows_processed,
+                metrics_json, environment, created_at
+        """
+        if not node_results:
+            return
+
+        if self.is_sql_server_mode:
+            self._log_node_runs_batch_sql_server(node_results)
+            return
+
+        if not self.spark and not self.engine:
+            return
+
+        def _do_log():
+            if self.spark:
+                from pyspark.sql.types import (
+                    LongType,
+                    StringType,
+                    StructField,
+                    StructType,
+                    TimestampType,
+                )
+
+                schema = StructType(
+                    [
+                        StructField("run_id", StringType(), False),
+                        StructField("node_id", StringType(), False),
+                        StructField("pipeline_name", StringType(), False),
+                        StructField("node_name", StringType(), False),
+                        StructField("status", StringType(), True),
+                        StructField("run_start_at", TimestampType(), True),
+                        StructField("run_end_at", TimestampType(), True),
+                        StructField("duration_ms", LongType(), True),
+                        StructField("rows_processed", LongType(), True),
+                        StructField("metrics_json", StringType(), True),
+                        StructField("environment", StringType(), True),
+                        StructField("created_at", TimestampType(), True),
+                    ]
+                )
+
+                rows = [
+                    (
+                        r["run_id"],
+                        r["node_id"],
+                        r["pipeline_name"],
+                        r["node_name"],
+                        r.get("status"),
+                        r.get("run_start_at"),
+                        r.get("run_end_at"),
+                        r.get("duration_ms"),
+                        r.get("rows_processed"),
+                        r.get("metrics_json"),
+                        r.get("environment"),
+                        r.get("created_at"),
+                    )
+                    for r in node_results
+                ]
+
+                df = self.spark.createDataFrame(rows, schema)
+                df.write.format("delta").mode("append").save(self.tables["meta_node_runs"])
+                logger.debug(f"Batch logged {len(node_results)} node runs")
+
+            elif self.engine:
+                import pandas as pd
+
+                data = {
+                    "run_id": [r["run_id"] for r in node_results],
+                    "node_id": [r["node_id"] for r in node_results],
+                    "pipeline_name": [r["pipeline_name"] for r in node_results],
+                    "node_name": [r["node_name"] for r in node_results],
+                    "status": [r.get("status") for r in node_results],
+                    "run_start_at": [r.get("run_start_at") for r in node_results],
+                    "run_end_at": [r.get("run_end_at") for r in node_results],
+                    "duration_ms": [r.get("duration_ms") for r in node_results],
+                    "rows_processed": [r.get("rows_processed") for r in node_results],
+                    "metrics_json": [r.get("metrics_json") for r in node_results],
+                    "environment": [r.get("environment") for r in node_results],
+                    "created_at": [r.get("created_at") for r in node_results],
+                }
+                df = pd.DataFrame(data)
+
+                self.engine.write(
+                    df,
+                    connection=self.connection,
+                    format="delta",
+                    path=self.tables["meta_node_runs"],
+                    mode="append",
+                )
+                logger.debug(f"Batch logged {len(node_results)} node runs")
+
+        try:
+            self._retry_with_backoff(_do_log)
+        except Exception as e:
+            logger.warning(f"Failed to batch log node runs: {e}")
+
+    def _log_node_runs_batch_sql_server(self, node_results: List[Dict[str, Any]]) -> None:
+        """SQL Server: Batch log node runs."""
+        if not self._sql_server_table_exists("meta_node_runs"):
+            raise NotImplementedError(
+                "meta_node_runs table does not exist in SQL Server. "
+                "SQL Server backend for observability tables not yet implemented."
+            )
+
+        schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        try:
+            for r in node_results:
+                sql = f"""
+                INSERT INTO [{schema_name}].[meta_node_runs]
+                (run_id, node_id, pipeline_name, node_name, status,
+                 run_start_at, run_end_at, duration_ms, rows_processed,
+                 metrics_json, environment, created_at)
+                VALUES (:run_id, :node_id, :pipeline_name, :node_name, :status,
+                        :run_start_at, :run_end_at, :duration_ms, :rows_processed,
+                        :metrics_json, :environment, :created_at)
+                """
+                self.connection.execute(
+                    sql,
+                    {
+                        "run_id": r["run_id"],
+                        "node_id": r["node_id"],
+                        "pipeline_name": r["pipeline_name"],
+                        "node_name": r["node_name"],
+                        "status": r.get("status"),
+                        "run_start_at": r.get("run_start_at"),
+                        "run_end_at": r.get("run_end_at"),
+                        "duration_ms": r.get("duration_ms"),
+                        "rows_processed": r.get("rows_processed"),
+                        "metrics_json": r.get("metrics_json"),
+                        "environment": r.get("environment"),
+                        "created_at": r.get("created_at"),
+                    },
+                )
+            logger.debug(f"Batch logged {len(node_results)} node runs to SQL Server")
+        except Exception as e:
+            logger.warning(f"Failed to batch log node runs to SQL Server: {e}")
+
+    def log_failure(
+        self,
+        failure_id: str,
+        run_id: str,
+        pipeline_name: str,
+        node_name: str,
+        error_type: str,
+        error_message: str,
+        stack_trace: Optional[str] = None,
+    ) -> None:
+        """
+        Log a node failure to meta_failures.
+
+        Append-only, called on each node exception.
+
+        Args:
+            failure_id: Unique ID for this failure (UUID)
+            run_id: Pipeline run ID
+            pipeline_name: Name of the pipeline
+            node_name: Name of the failed node
+            error_type: Exception class name
+            error_message: Error message (max 1000 chars)
+            stack_trace: Stack trace (max 2000 chars)
+        """
+        if self.is_sql_server_mode:
+            self._log_failure_sql_server(
+                failure_id, run_id, pipeline_name, node_name, error_type, error_message, stack_trace
+            )
+            return
+
+        if not self.spark and not self.engine:
+            return
+
+        now = datetime.now(timezone.utc)
+
+        def _do_log():
+            if self.spark:
+                from pyspark.sql.types import (
+                    DateType,
+                    StringType,
+                    StructField,
+                    StructType,
+                    TimestampType,
+                )
+
+                schema = StructType(
+                    [
+                        StructField("failure_id", StringType(), False),
+                        StructField("run_id", StringType(), False),
+                        StructField("pipeline_name", StringType(), False),
+                        StructField("node_name", StringType(), False),
+                        StructField("error_type", StringType(), True),
+                        StructField("error_message", StringType(), True),
+                        StructField("error_code", StringType(), True),
+                        StructField("stack_trace", StringType(), True),
+                        StructField("timestamp", TimestampType(), True),
+                        StructField("date", DateType(), True),
+                    ]
+                )
+
+                row = (
+                    failure_id,
+                    run_id,
+                    pipeline_name,
+                    node_name,
+                    error_type,
+                    error_message[:1000] if error_message else None,
+                    None,  # error_code (future taxonomy)
+                    stack_trace[:2000] if stack_trace else None,
+                    now,
+                    now.date(),
+                )
+
+                df = self.spark.createDataFrame([row], schema)
+                df.write.format("delta").mode("append").save(self.tables["meta_failures"])
+                logger.debug(f"Logged failure {failure_id} for node {node_name}")
+
+            elif self.engine:
+                import pandas as pd
+
+                data = {
+                    "failure_id": [failure_id],
+                    "run_id": [run_id],
+                    "pipeline_name": [pipeline_name],
+                    "node_name": [node_name],
+                    "error_type": [error_type],
+                    "error_message": [error_message[:1000] if error_message else None],
+                    "error_code": [None],  # future taxonomy
+                    "stack_trace": [stack_trace[:2000] if stack_trace else None],
+                    "timestamp": [now],
+                    "date": [now.date()],
+                }
+                df = pd.DataFrame(data)
+
+                self.engine.write(
+                    df,
+                    connection=self.connection,
+                    format="delta",
+                    path=self.tables["meta_failures"],
+                    mode="append",
+                )
+                logger.debug(f"Logged failure {failure_id} for node {node_name}")
+
+        try:
+            self._retry_with_backoff(_do_log)
+        except Exception as e:
+            logger.warning(f"Failed to log failure: {e}")
+
+    def _log_failure_sql_server(
+        self,
+        failure_id: str,
+        run_id: str,
+        pipeline_name: str,
+        node_name: str,
+        error_type: str,
+        error_message: str,
+        stack_trace: Optional[str],
+    ) -> None:
+        """SQL Server: Log failure to meta_failures."""
+        if not self._sql_server_table_exists("meta_failures"):
+            raise NotImplementedError(
+                "meta_failures table does not exist in SQL Server. "
+                "SQL Server backend for observability tables not yet implemented."
+            )
+
+        schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        try:
+            sql = f"""
+            INSERT INTO [{schema_name}].[meta_failures]
+            (failure_id, run_id, pipeline_name, node_name, error_type,
+             error_message, error_code, stack_trace, timestamp, date)
+            VALUES (:failure_id, :run_id, :pipeline_name, :node_name, :error_type,
+                    :error_message, NULL, :stack_trace, GETUTCDATE(), CAST(GETUTCDATE() AS DATE))
+            """
+            self.connection.execute(
+                sql,
+                {
+                    "failure_id": failure_id,
+                    "run_id": run_id,
+                    "pipeline_name": pipeline_name,
+                    "node_name": node_name,
+                    "error_type": error_type,
+                    "error_message": error_message[:1000] if error_message else None,
+                    "stack_trace": stack_trace[:2000] if stack_trace else None,
+                },
+            )
+            logger.debug(f"Logged failure to SQL Server: {failure_id}")
+        except Exception as e:
+            logger.warning(f"Failed to log failure to SQL Server: {e}")
+
+    # =========================================================================
+    # LEVERAGE SUMMARY TABLES - QUERY HELPERS
+    # =========================================================================
+
+    def get_run_ids(
+        self, pipeline_name: Optional[str] = None, since: Optional[date] = None
+    ) -> List[str]:
+        """
+        Get run_ids from meta_pipeline_runs filtered by criteria.
+
+        Args:
+            pipeline_name: Optional pipeline name filter
+            since: Optional date boundary (run_end_at >= since)
+
+        Returns:
+            List of run_id strings
+        """
+
+        if self.is_sql_server_mode:
+            return self._get_run_ids_sql_server(pipeline_name, since)
+        elif self.is_spark_mode:
+            return self._get_run_ids_spark(pipeline_name, since)
+        elif self.is_pandas_mode:
+            return self._get_run_ids_pandas(pipeline_name, since)
+        else:
+            return []
+
+    def _get_run_ids_spark(self, pipeline_name: Optional[str], since: Optional[date]) -> List[str]:
+        """Spark: Query meta_pipeline_runs for run_ids."""
+        from pyspark.sql import functions as F
+
+        try:
+            df = self.spark.read.format("delta").load(self.tables["meta_pipeline_runs"])
+            if pipeline_name:
+                df = df.filter(F.col("pipeline_name") == pipeline_name)
+            if since:
+                df = df.filter(F.col("run_end_at") >= F.lit(str(since)))
+            return [row["run_id"] for row in df.select("run_id").collect()]
+        except Exception as e:
+            logger.warning(f"Failed to get run_ids: {e}")
+            return []
+
+    def _get_run_ids_pandas(self, pipeline_name: Optional[str], since: Optional[date]) -> List[str]:
+        """Pandas/delta-rs: Query meta_pipeline_runs for run_ids."""
+        try:
+            from deltalake import DeltaTable
+
+            storage_opts = self._get_storage_options()
+            dt = DeltaTable(self.tables["meta_pipeline_runs"], storage_options=storage_opts or None)
+            df = dt.to_pandas()
+
+            if pipeline_name:
+                df = df[df["pipeline_name"] == pipeline_name]
+            if since:
+                import pandas as pd
+
+                df["run_end_at"] = pd.to_datetime(df["run_end_at"])
+                df = df[df["run_end_at"].dt.date >= since]
+            return df["run_id"].tolist()
+        except Exception as e:
+            logger.warning(f"Failed to get run_ids: {e}")
+            return []
+
+    def _get_run_ids_sql_server(
+        self, pipeline_name: Optional[str], since: Optional[date]
+    ) -> List[str]:
+        """SQL Server: Query meta_pipeline_runs for run_ids."""
+        if not self._sql_server_table_exists("meta_pipeline_runs"):
+            raise NotImplementedError(
+                "meta_pipeline_runs table does not exist in SQL Server. "
+                "SQL Server backend for observability tables not yet implemented."
+            )
+
+        schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        try:
+            sql = f"SELECT run_id FROM [{schema_name}].[meta_pipeline_runs] WHERE 1=1"
+            params = {}
+            if pipeline_name:
+                sql += " AND pipeline_name = :pipeline_name"
+                params["pipeline_name"] = pipeline_name
+            if since:
+                sql += " AND run_end_at >= :since"
+                params["since"] = since
+            result = self.connection.execute(sql, params)
+            return [row[0] for row in result] if result else []
+        except Exception as e:
+            logger.warning(f"Failed to get run_ids from SQL Server: {e}")
+            return []
+
+    def get_pipeline_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a single pipeline run record by run_id.
+
+        Args:
+            run_id: Pipeline run ID
+
+        Returns:
+            Dict with pipeline run fields, or None if not found
+        """
+        if self.is_sql_server_mode:
+            return self._get_pipeline_run_sql_server(run_id)
+        elif self.is_spark_mode:
+            return self._get_pipeline_run_spark(run_id)
+        elif self.is_pandas_mode:
+            return self._get_pipeline_run_pandas(run_id)
+        else:
+            return None
+
+    def _get_pipeline_run_spark(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Spark: Get pipeline run by run_id."""
+        from pyspark.sql import functions as F
+
+        try:
+            df = self.spark.read.format("delta").load(self.tables["meta_pipeline_runs"])
+            df = df.filter(F.col("run_id") == run_id)
+            rows = df.collect()
+            if rows:
+                return rows[0].asDict()
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to get pipeline run: {e}")
+            return None
+
+    def _get_pipeline_run_pandas(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Pandas/delta-rs: Get pipeline run by run_id."""
+        try:
+            from deltalake import DeltaTable
+
+            storage_opts = self._get_storage_options()
+            dt = DeltaTable(self.tables["meta_pipeline_runs"], storage_options=storage_opts or None)
+            df = dt.to_pandas()
+            df = df[df["run_id"] == run_id]
+            if not df.empty:
+                return df.iloc[0].to_dict()
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to get pipeline run: {e}")
+            return None
+
+    def _get_pipeline_run_sql_server(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """SQL Server: Get pipeline run by run_id."""
+        if not self._sql_server_table_exists("meta_pipeline_runs"):
+            raise NotImplementedError(
+                "meta_pipeline_runs table does not exist in SQL Server. "
+                "SQL Server backend for observability tables not yet implemented."
+            )
+
+        schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
+        try:
+            sql = f"""
+                SELECT run_id, pipeline_name, owner, layer, run_start_at, run_end_at,
+                       duration_ms, status, nodes_total, nodes_succeeded, nodes_failed,
+                       nodes_skipped, rows_processed, error_summary, terminal_nodes,
+                       environment, created_at
+                FROM [{schema_name}].[meta_pipeline_runs]
+                WHERE run_id = :run_id
+            """
+            result = self.connection.execute(sql, {"run_id": run_id})
+            rows = list(result) if result else []
+            if rows:
+                row = rows[0]
+                return {
+                    "run_id": row[0],
+                    "pipeline_name": row[1],
+                    "owner": row[2],
+                    "layer": row[3],
+                    "run_start_at": row[4],
+                    "run_end_at": row[5],
+                    "duration_ms": row[6],
+                    "status": row[7],
+                    "nodes_total": row[8],
+                    "nodes_succeeded": row[9],
+                    "nodes_failed": row[10],
+                    "nodes_skipped": row[11],
+                    "rows_processed": row[12],
+                    "error_summary": row[13],
+                    "terminal_nodes": row[14],
+                    "environment": row[15],
+                    "created_at": row[16],
+                }
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to get pipeline run from SQL Server: {e}")
+            return None
 
     def log_pattern(
         self,
