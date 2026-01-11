@@ -582,7 +582,7 @@ class CatalogManager:
         """
         return StructType(
             [
-                StructField("project_name", StringType(), True),
+                StructField("project", StringType(), True),
                 StructField("table_name", StringType(), True),
                 StructField("path", StringType(), True),
                 StructField("format", StringType(), True),
@@ -1974,6 +1974,12 @@ class CatalogManager:
 
         schema_name = getattr(self.config, "schema_name", None) or "odibi_system"
         project = self._project
+
+        # Handle NaN values - SQL Server rejects float NaN
+        rows_processed = pipeline_run.get("rows_processed")
+        if rows_processed is not None and isinstance(rows_processed, float) and rows_processed != rows_processed:
+            rows_processed = None
+
         try:
             sql = f"""
             INSERT INTO [{schema_name}].[meta_pipeline_runs]
@@ -2002,7 +2008,7 @@ class CatalogManager:
                     "nodes_succeeded": pipeline_run.get("nodes_succeeded"),
                     "nodes_failed": pipeline_run.get("nodes_failed"),
                     "nodes_skipped": pipeline_run.get("nodes_skipped"),
-                    "rows_processed": pipeline_run.get("rows_processed"),
+                    "rows_processed": rows_processed,
                     "error_summary": pipeline_run.get("error_summary"),
                     "terminal_nodes": pipeline_run.get("terminal_nodes"),
                     "environment": pipeline_run.get("environment"),
@@ -2154,6 +2160,11 @@ class CatalogManager:
         project = self._project
         try:
             for r in node_results:
+                # Handle NaN values - SQL Server rejects float NaN
+                rows_processed = r.get("rows_processed")
+                if rows_processed is not None and isinstance(rows_processed, float) and rows_processed != rows_processed:
+                    rows_processed = None
+
                 sql = f"""
                 INSERT INTO [{schema_name}].[meta_node_runs]
                 (run_id, node_id, project, pipeline_name, node_name, status,
@@ -2175,7 +2186,7 @@ class CatalogManager:
                         "run_start_at": r.get("run_start_at"),
                         "run_end_at": r.get("run_end_at"),
                         "duration_ms": r.get("duration_ms"),
-                        "rows_processed": r.get("rows_processed"),
+                        "rows_processed": rows_processed,
                         "metrics_json": r.get("metrics_json"),
                         "environment": r.get("environment"),
                         "created_at": r.get("created_at"),
@@ -2632,7 +2643,7 @@ class CatalogManager:
                 merge_sql = f"""
                     MERGE INTO delta.`{target_path}` AS target
                     USING {view_name} AS source
-                    ON target.project_name = source.project_name
+                    ON target.project = source.project
                        AND target.table_name = source.table_name
                     WHEN MATCHED THEN UPDATE SET
                         target.path = source.path,
@@ -2651,7 +2662,7 @@ class CatalogManager:
 
                 # Construct DataFrame
                 data = {
-                    "project_name": [project_name],
+                    "project": [project_name],
                     "table_name": [table_name],
                     "path": [path],
                     "format": [format],
@@ -2675,7 +2686,7 @@ class CatalogManager:
                     format="delta",
                     path=target_path,
                     mode="upsert",
-                    options={"keys": ["project_name", "table_name"]},
+                    options={"keys": ["project", "table_name"]},
                 )
 
         try:
@@ -3308,7 +3319,7 @@ class CatalogManager:
         individually, especially when running parallel pipelines with many nodes.
 
         Args:
-            records: List of dicts with keys: project_name, table_name, path, format,
+            records: List of dicts with keys: project, table_name, path, format,
                      pattern_type, schema_hash (optional, defaults to "")
         """
         if not self.spark and not self.engine:
@@ -3328,7 +3339,7 @@ class CatalogManager:
 
                 rows = [
                     (
-                        r["project_name"],
+                        r.get("project") or r.get("project_name"),
                         r["table_name"],
                         r["path"],
                         r["format"],
@@ -3348,7 +3359,7 @@ class CatalogManager:
                 merge_sql = f"""
                     MERGE INTO delta.`{target_path}` AS target
                     USING {view_name} AS source
-                    ON target.project_name = source.project_name
+                    ON target.project = source.project
                        AND target.table_name = source.table_name
                     WHEN MATCHED THEN UPDATE SET
                         target.path = source.path,
@@ -3365,7 +3376,7 @@ class CatalogManager:
                 import pandas as pd
 
                 data = {
-                    "project_name": [r["project_name"] for r in records],
+                    "project": [r.get("project") or r.get("project_name") for r in records],
                     "table_name": [r["table_name"] for r in records],
                     "path": [r["path"] for r in records],
                     "format": [r["format"] for r in records],
@@ -3381,7 +3392,7 @@ class CatalogManager:
                     format="delta",
                     path=self.tables["meta_tables"],
                     mode="upsert",
-                    options={"keys": ["project_name", "table_name"]},
+                    options={"keys": ["project", "table_name"]},
                 )
 
             logger.debug(f"Batch registered {len(records)} asset(s)")

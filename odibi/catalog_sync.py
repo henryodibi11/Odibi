@@ -127,20 +127,18 @@ SQL_SERVER_DDL = {
         IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'meta_tables' AND schema_id = SCHEMA_ID('{schema}'))
         BEGIN
             CREATE TABLE [{schema}].[meta_tables] (
-                table_name NVARCHAR(500) PRIMARY KEY,
-                connection NVARCHAR(255),
+                project NVARCHAR(255),
+                table_name NVARCHAR(500),
                 path NVARCHAR(1000),
                 format NVARCHAR(50),
-                pipeline NVARCHAR(255),
-                node NVARCHAR(255),
-                layer NVARCHAR(50),
-                row_count BIGINT,
-                size_bytes BIGINT,
-                last_updated DATETIME2,
-                schema_json NVARCHAR(MAX),
+                pattern_type NVARCHAR(50),
+                schema_hash NVARCHAR(100),
+                updated_at DATETIME2,
                 environment NVARCHAR(50),
-                _synced_at DATETIME2 DEFAULT GETUTCDATE()
+                _synced_at DATETIME2 DEFAULT GETUTCDATE(),
+                PRIMARY KEY (project, table_name)
             );
+            CREATE INDEX IX_meta_tables_project ON [{schema}].[meta_tables] (project);
         END
     """,
     "meta_failures": """
@@ -405,6 +403,9 @@ class CatalogSyncer:
             if row_count == 0:
                 return {"success": True, "rows": 0, "message": "No new data"}
 
+            # Apply column mappings for schema alignment (Delta -> SQL Server)
+            df = self._apply_column_mappings(df, table)
+
             # Inject environment if not present or NULL in source
             if self.environment and "environment" in df.columns:
                 df["environment"] = df["environment"].fillna(self.environment)
@@ -608,6 +609,26 @@ class CatalogSyncer:
                 views=list(SQL_SERVER_VIEWS.keys()),
             )
 
+    def _apply_column_mappings(self, df: Any, table: str) -> Any:
+        """Apply column mappings for schema alignment between Delta and SQL Server.
+
+        Handles backward compatibility when Delta tables have old column names.
+        """
+        # Column mappings: old_name -> new_name
+        mappings = {
+            "meta_tables": {"project_name": "project"},
+        }
+
+        table_mappings = mappings.get(table, {})
+        if not table_mappings:
+            return df
+
+        for old_col, new_col in table_mappings.items():
+            if old_col in df.columns and new_col not in df.columns:
+                df = df.rename(columns={old_col: new_col})
+
+        return df
+
     def _df_to_records(self, df: Any) -> List[Dict[str, Any]]:
         """Convert DataFrame to list of records."""
         if hasattr(df, "to_dict"):
@@ -640,6 +661,8 @@ class CatalogSyncer:
                         safe_record[k] = json.dumps(v, default=str)
                     elif isinstance(v, datetime):
                         safe_record[k] = v.isoformat()
+                    elif isinstance(v, float) and (v != v):  # NaN check (NaN != NaN)
+                        safe_record[k] = None
                     else:
                         safe_record[k] = v
                 try:
