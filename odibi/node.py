@@ -2026,20 +2026,27 @@ class NodeExecutor:
             # Extract row count from Delta commit metadata if deferred
             if defer_row_count:
                 if delta_info:
-                    op_metrics = delta_info.get("operation_metrics") or {}
-                    # Delta returns numOutputRows for most operations
-                    row_count = op_metrics.get("numOutputRows") or op_metrics.get(
-                        "numTargetRowsInserted"
-                    )
-                    if row_count is not None:
-                        try:
-                            row_count = int(row_count)
-                        except (ValueError, TypeError):
-                            row_count = None
+                    # For streaming, check _cached_row_count first
+                    if delta_info.get("_cached_row_count") is not None:
+                        row_count = delta_info["_cached_row_count"]
+                    else:
+                        op_metrics = delta_info.get("operation_metrics") or {}
+                        # Delta returns numOutputRows for most operations
+                        row_count = op_metrics.get("numOutputRows") or op_metrics.get(
+                            "numTargetRowsInserted"
+                        )
+                        if row_count is not None:
+                            try:
+                                row_count = int(row_count)
+                            except (ValueError, TypeError):
+                                row_count = None
                 # Fallback: count if Delta metrics unavailable (e.g., older Delta versions)
-                if row_count is None:
-                    ctx.debug("Delta commit metrics unavailable, falling back to count")
-                    row_count = self._count_rows(df) if df is not None else 0
+                # Skip count for streaming DataFrames as they can't be counted
+                if row_count is None and df is not None:
+                    is_streaming = hasattr(df, "isStreaming") and df.isStreaming
+                    if not is_streaming:
+                        ctx.debug("Delta commit metrics unavailable, falling back to count")
+                        row_count = self._count_rows(df)
 
             metrics.rows_out = row_count
 
@@ -2081,7 +2088,12 @@ class NodeExecutor:
             # Store row count from write phase to avoid redundant counting in metadata
             if self._delta_write_info is None:
                 self._delta_write_info = {}
-            self._delta_write_info["_cached_row_count"] = row_count
+            # For streaming, preserve _cached_row_count from engine result if present
+            if row_count is not None:
+                self._delta_write_info["_cached_row_count"] = row_count
+            elif "_cached_row_count" not in self._delta_write_info:
+                # Fallback: try to get from delta_info (streaming case)
+                self._delta_write_info["_cached_row_count"] = None
 
             if write_config.skip_if_unchanged and write_config.format == "delta":
                 self._store_content_hash_after_write(config, connection)
