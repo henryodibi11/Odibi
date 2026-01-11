@@ -1833,7 +1833,6 @@ class CatalogManager:
         def _do_log():
             if self.spark:
                 from pyspark.sql.types import (
-                    IntegerType,
                     LongType,
                     StringType,
                     StructField,
@@ -1851,10 +1850,10 @@ class CatalogManager:
                         StructField("run_end_at", TimestampType(), True),
                         StructField("duration_ms", LongType(), True),
                         StructField("status", StringType(), True),
-                        StructField("nodes_total", IntegerType(), True),
-                        StructField("nodes_succeeded", IntegerType(), True),
-                        StructField("nodes_failed", IntegerType(), True),
-                        StructField("nodes_skipped", IntegerType(), True),
+                        StructField("nodes_total", LongType(), True),
+                        StructField("nodes_succeeded", LongType(), True),
+                        StructField("nodes_failed", LongType(), True),
+                        StructField("nodes_skipped", LongType(), True),
                         StructField("rows_processed", LongType(), True),
                         StructField("error_summary", StringType(), True),
                         StructField("terminal_nodes", StringType(), True),
