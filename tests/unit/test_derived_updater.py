@@ -48,6 +48,48 @@ def _write_df_with_schema(path: str, df: pd.DataFrame, mode: str = "overwrite"):
     write_deltalake(path, arrow_table, mode=mode)
 
 
+def _make_pipeline_run_record(
+    run_id: str,
+    pipeline_name: str,
+    now: datetime,
+    status: str = "SUCCESS",
+    duration_ms: int = 5000,
+    rows_processed: int = 100,
+    owner: str = None,
+    layer: str = None,
+    error_summary: str = None,
+    terminal_nodes: str = None,
+    environment: str = None,
+) -> dict:
+    """Create a pipeline run record with all required schema fields."""
+    return {
+        "run_id": run_id,
+        "project": None,
+        "pipeline_name": pipeline_name,
+        "owner": owner,
+        "layer": layer,
+        "run_start_at": now - timedelta(milliseconds=duration_ms),
+        "run_end_at": now,
+        "duration_ms": duration_ms,
+        "status": status,
+        "nodes_total": 1,
+        "nodes_succeeded": 1 if status == "SUCCESS" else 0,
+        "nodes_failed": 1 if status == "FAILURE" else 0,
+        "nodes_skipped": 0,
+        "rows_processed": rows_processed,
+        "error_summary": error_summary,
+        "terminal_nodes": terminal_nodes,
+        "environment": environment,
+        "databricks_cluster_id": None,
+        "databricks_job_id": None,
+        "databricks_workspace_id": None,
+        "estimated_cost_usd": None,
+        "actual_cost_usd": None,
+        "cost_source": None,
+        "created_at": now,
+    }
+
+
 @pytest.fixture
 def catalog_with_bootstrap(tmp_path):
     """Create a CatalogManager with bootstrapped observability tables."""
@@ -338,31 +380,7 @@ class TestUpdateDailyStats:
         # First, we need to write a pipeline run to meta_pipeline_runs
         runs_path = catalog_with_bootstrap.tables["meta_pipeline_runs"]
         run_df = pd.DataFrame(
-            [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now - timedelta(seconds=5),
-                    "run_end_at": now,
-                    "duration_ms": 5000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": "node1",
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
-            ]
+            [_make_pipeline_run_record("run-001", "test_pipeline", now, terminal_nodes="node1")]
         )
         _write_df_with_schema(runs_path, run_df)
 
@@ -397,29 +415,15 @@ class TestUpdateDailyStats:
         runs_path = catalog_with_bootstrap.tables["meta_pipeline_runs"]
         run_df = pd.DataFrame(
             [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now - timedelta(seconds=3),
-                    "run_end_at": now,
-                    "duration_ms": 3000,
-                    "status": "FAILURE",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 0,
-                    "nodes_failed": 1,
-                    "nodes_skipped": 0,
-                    "rows_processed": 0,
-                    "error_summary": "Test error",
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
+                _make_pipeline_run_record(
+                    "run-001",
+                    "test_pipeline",
+                    now,
+                    status="FAILURE",
+                    duration_ms=3000,
+                    rows_processed=0,
+                    error_summary="Test error",
+                )
             ]
         )
         _write_df_with_schema(runs_path, run_df)
@@ -457,29 +461,16 @@ class TestUpdatePipelineHealth:
         runs_path = catalog_with_bootstrap.tables["meta_pipeline_runs"]
         run_df = pd.DataFrame(
             [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": "owner@example.com",
-                    "layer": "silver",
-                    "run_start_at": now - timedelta(seconds=10),
-                    "run_end_at": now,
-                    "duration_ms": 10000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 500,
-                    "error_summary": None,
-                    "terminal_nodes": "node1",
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
+                _make_pipeline_run_record(
+                    "run-001",
+                    "test_pipeline",
+                    now,
+                    duration_ms=10000,
+                    rows_processed=500,
+                    owner="owner@example.com",
+                    layer="silver",
+                    terminal_nodes="node1",
+                )
             ]
         )
         _write_df_with_schema(runs_path, run_df)
@@ -515,33 +506,7 @@ class TestUpdatePipelineHealth:
         }
 
         runs_path = catalog_with_bootstrap.tables["meta_pipeline_runs"]
-        run_df = pd.DataFrame(
-            [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now - timedelta(seconds=5),
-                    "run_end_at": now,
-                    "duration_ms": 5000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
-            ]
-        )
+        run_df = pd.DataFrame([_make_pipeline_run_record("run-001", "test_pipeline", now)])
         _write_df_with_schema(runs_path, run_df)
 
         updater.update_pipeline_health(pipeline_run1)
@@ -561,29 +526,15 @@ class TestUpdatePipelineHealth:
         # Append second run
         run_df2 = pd.DataFrame(
             [
-                {
-                    "run_id": "run-002",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now2 - timedelta(seconds=3),
-                    "run_end_at": now2,
-                    "duration_ms": 3000,
-                    "status": "FAILURE",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 0,
-                    "nodes_failed": 1,
-                    "nodes_skipped": 0,
-                    "rows_processed": 0,
-                    "error_summary": "Error",
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now2,
-                }
+                _make_pipeline_run_record(
+                    "run-002",
+                    "test_pipeline",
+                    now2,
+                    status="FAILURE",
+                    duration_ms=3000,
+                    rows_processed=0,
+                    error_summary="Error",
+                )
             ]
         )
 
@@ -609,34 +560,19 @@ class TestUpdateSlaStatus:
     def test_update_sla_status_calculates_sla_met_correctly(self, updater, catalog_with_bootstrap):
         """update_sla_status should calculate sla_met based on freshness."""
         now = datetime.now(timezone.utc)
+        run_end = now - timedelta(minutes=29)
 
         # Write a recent successful run
         runs_path = catalog_with_bootstrap.tables["meta_pipeline_runs"]
         run_df = pd.DataFrame(
             [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": "owner@example.com",
-                    "layer": None,
-                    "run_start_at": now - timedelta(minutes=30),
-                    "run_end_at": now - timedelta(minutes=29),
-                    "duration_ms": 60000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
+                _make_pipeline_run_record(
+                    "run-001",
+                    "test_pipeline",
+                    run_end,
+                    duration_ms=60000,
+                    owner="owner@example.com",
+                )
             ]
         )
         _write_df_with_schema(runs_path, run_df)
@@ -666,35 +602,12 @@ class TestUpdateSlaStatus:
     def test_update_sla_status_detects_overdue(self, updater, catalog_with_bootstrap):
         """update_sla_status should detect when SLA is not met."""
         now = datetime.now(timezone.utc)
+        run_end = now - timedelta(hours=2)
 
         # Write an old successful run (2 hours ago)
         runs_path = catalog_with_bootstrap.tables["meta_pipeline_runs"]
         run_df = pd.DataFrame(
-            [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now - timedelta(hours=2, minutes=30),
-                    "run_end_at": now - timedelta(hours=2),
-                    "duration_ms": 60000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
-            ]
+            [_make_pipeline_run_record("run-001", "test_pipeline", run_end, duration_ms=60000)]
         )
         _write_df_with_schema(runs_path, run_df)
 
@@ -725,52 +638,8 @@ class TestCatalogHelpers:
 
         run_df = pd.DataFrame(
             [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "pipeline_a",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now,
-                    "run_end_at": now,
-                    "duration_ms": 1000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                },
-                {
-                    "run_id": "run-002",
-                    "project": None,
-                    "pipeline_name": "pipeline_b",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now,
-                    "run_end_at": now,
-                    "duration_ms": 1000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                },
+                _make_pipeline_run_record("run-001", "pipeline_a", now, duration_ms=1000),
+                _make_pipeline_run_record("run-002", "pipeline_b", now, duration_ms=1000),
             ]
         )
         _write_df_with_schema(runs_path, run_df)
@@ -790,52 +659,8 @@ class TestCatalogHelpers:
 
         run_df = pd.DataFrame(
             [
-                {
-                    "run_id": "run-old",
-                    "project": None,
-                    "pipeline_name": "pipeline_a",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": two_days_ago,
-                    "run_end_at": two_days_ago,
-                    "duration_ms": 1000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": two_days_ago,
-                },
-                {
-                    "run_id": "run-new",
-                    "project": None,
-                    "pipeline_name": "pipeline_a",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now,
-                    "run_end_at": now,
-                    "duration_ms": 1000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                },
+                _make_pipeline_run_record("run-old", "pipeline_a", two_days_ago, duration_ms=1000),
+                _make_pipeline_run_record("run-new", "pipeline_a", now, duration_ms=1000),
             ]
         )
         _write_df_with_schema(runs_path, run_df)
@@ -851,29 +676,15 @@ class TestCatalogHelpers:
 
         run_df = pd.DataFrame(
             [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": "owner@example.com",
-                    "layer": "silver",
-                    "run_start_at": now,
-                    "run_end_at": now,
-                    "duration_ms": 5000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": "node1",
-                    "environment": "dev",
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
+                _make_pipeline_run_record(
+                    "run-001",
+                    "test_pipeline",
+                    now,
+                    owner="owner@example.com",
+                    layer="silver",
+                    terminal_nodes="node1",
+                    environment="dev",
+                )
             ]
         )
         _write_df_with_schema(runs_path, run_df)
@@ -990,33 +801,7 @@ class TestRebuildSummariesGuardSemantics:
 
         # Create a pipeline run
         runs_path = catalog_with_bootstrap.tables["meta_pipeline_runs"]
-        run_df = pd.DataFrame(
-            [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now,
-                    "run_end_at": now,
-                    "duration_ms": 5000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
-            ]
-        )
+        run_df = pd.DataFrame([_make_pipeline_run_record("run-001", "test_pipeline", now)])
         _write_df_with_schema(runs_path, run_df)
 
         # Successfully apply derived update
@@ -1043,33 +828,7 @@ class TestRebuildSummariesGuardSemantics:
 
         # Create a pipeline run
         runs_path = catalog_with_bootstrap.tables["meta_pipeline_runs"]
-        run_df = pd.DataFrame(
-            [
-                {
-                    "run_id": "run-001",
-                    "project": None,
-                    "pipeline_name": "test_pipeline",
-                    "owner": None,
-                    "layer": None,
-                    "run_start_at": now,
-                    "run_end_at": now,
-                    "duration_ms": 5000,
-                    "status": "SUCCESS",
-                    "nodes_total": 1,
-                    "nodes_succeeded": 1,
-                    "nodes_failed": 0,
-                    "nodes_skipped": 0,
-                    "rows_processed": 100,
-                    "error_summary": None,
-                    "terminal_nodes": None,
-                    "environment": None,
-                    "databricks_cluster_id": None,
-                    "databricks_job_id": None,
-                    "databricks_workspace_id": None,
-                    "created_at": now,
-                }
-            ]
-        )
+        run_df = pd.DataFrame([_make_pipeline_run_record("run-001", "test_pipeline", now)])
         _write_df_with_schema(runs_path, run_df)
 
         # Mark as failed
