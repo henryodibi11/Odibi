@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1] - 2026-01-11
+
+### Added - Executive Dashboard Views & SLA Tracking
+
+- **Executive Dashboard Views** (SQL Server sync):
+  - `vw_pipeline_health_status` - RAG status per pipeline with health reasons
+  - `vw_exec_overview` - Project-level summary with 7d/30d/90d success rates and trends
+  - `vw_table_freshness` - Data staleness monitoring with freshness RAG
+  - `vw_pipeline_sla_status` - SLA compliance dashboard with breach detection
+  - `vw_exec_current_issues` - Currently failing pipelines with error details
+  - `vw_pipeline_risk` - Risk scoring based on failure rate and criticality
+  - `vw_cost_summary` - Cost tracking with 7d/30d trends
+
+- **Business Context Table** (`dim_pipeline_context`):
+  - Manually populated dimension for business metadata
+  - Fields: `business_owner`, `business_process`, `business_criticality`
+  - Enhances executive views with priority-based alerting
+
+- **Cost Tracking Columns**:
+  - Added `estimated_cost_usd`, `actual_cost_usd`, `cost_source` to `meta_pipeline_runs`
+  - Added `estimated_cost_usd` to `meta_node_runs`
+  - Cost aggregation in `meta_daily_stats`
+
+- **SLA Tracking Enhancement**:
+  - Added `environment` column to `meta_sla_status` for multi-environment support
+  - SLA sync now properly replicates to SQL Server
+
+### Fixed
+
+- Schema mismatch in test fixtures for `meta_pipeline_runs` (21 vs 24 fields)
+- SQL Server DDL for `meta_sla_status` missing `environment` column
+- `cost_trend` in `vw_cost_summary` now correctly typed as FLOAT
+
+### Documentation
+
+- Added Executive Dashboard Views section to `docs/features/observability.md`
+- Documented `dim_pipeline_context` schema and usage
+- Added SQL examples for populating business context
+
 ## [2.6.0] - 2026-01-10
 
 ### Added - Developer Experience: Golden Path & Debugging
