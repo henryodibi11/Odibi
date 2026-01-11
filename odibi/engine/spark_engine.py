@@ -1614,9 +1614,7 @@ class SparkEngine(Engine):
                     try:
                         full_path = connection.get_path(path)
                         # Get the most recent STREAMING UPDATE operation
-                        history_df = self.spark.sql(
-                            f"DESCRIBE HISTORY delta.`{full_path}` LIMIT 5"
-                        )
+                        history_df = self.spark.sql(f"DESCRIBE HISTORY delta.`{full_path}` LIMIT 5")
                         for row in history_df.collect():
                             op = row.operation if hasattr(row, "operation") else row["operation"]
                             if op in ("STREAMING UPDATE", "WRITE", "MERGE"):
