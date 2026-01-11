@@ -24,6 +24,7 @@ DEFAULT_SYNC_TABLES = [
     "meta_node_runs",
     "meta_tables",
     "meta_failures",
+    "meta_sla_status",
 ]
 
 # All available tables that can be synced
@@ -167,27 +168,42 @@ SQL_SERVER_DDL = {
             CREATE INDEX IX_meta_failures_project ON [{schema}].[meta_failures] (project, pipeline_name, date);
         END
     """,
+    "meta_sla_status": """
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'meta_sla_status' AND schema_id = SCHEMA_ID('{schema}'))
+        BEGIN
+            CREATE TABLE [{schema}].[meta_sla_status] (
+                pipeline_name NVARCHAR(255) NOT NULL PRIMARY KEY,
+                owner NVARCHAR(255),
+                freshness_sla NVARCHAR(50),
+                freshness_anchor NVARCHAR(50),
+                freshness_sla_minutes BIGINT,
+                last_success_at DATETIME2,
+                minutes_since_success BIGINT,
+                sla_met BIGINT,
+                hours_overdue FLOAT,
+                updated_at DATETIME2,
+                _synced_at DATETIME2 DEFAULT GETUTCDATE()
+            );
+        END
+    """,
 }
 
 # Dimension tables for executive dashboards (manually populated)
 SQL_SERVER_DIM_TABLES = {
-    "dim_pipeline_sla": """
-        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'dim_pipeline_sla' AND schema_id = SCHEMA_ID('{schema}'))
+    "dim_pipeline_context": """
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'dim_pipeline_context' AND schema_id = SCHEMA_ID('{schema}'))
         BEGIN
-            CREATE TABLE [{schema}].[dim_pipeline_sla] (
+            CREATE TABLE [{schema}].[dim_pipeline_context] (
                 project NVARCHAR(255) NOT NULL,
                 pipeline_name NVARCHAR(255) NOT NULL,
                 environment NVARCHAR(50) NOT NULL,
-                frequency NVARCHAR(50) NULL,
-                expected_completion_utc TIME NULL,
-                max_delay_minutes INT NULL,
                 business_criticality NVARCHAR(10) NULL,
                 business_owner NVARCHAR(255) NULL,
                 business_process NVARCHAR(255) NULL,
                 notes NVARCHAR(500) NULL,
                 created_at DATETIME2 DEFAULT GETUTCDATE(),
                 updated_at DATETIME2 DEFAULT GETUTCDATE(),
-                CONSTRAINT PK_dim_pipeline_sla PRIMARY KEY (project, pipeline_name, environment)
+                CONSTRAINT PK_dim_pipeline_context PRIMARY KEY (project, pipeline_name, environment)
             );
         END
     """,
@@ -200,6 +216,7 @@ TABLE_PRIMARY_KEYS = {
     "meta_node_runs": ["run_id", "node_id"],
     "meta_tables": ["project", "table_name"],
     "meta_failures": ["failure_id"],
+    "meta_sla_status": ["pipeline_name"],
 }
 
 # Power BI-ready views for dashboards
@@ -470,46 +487,35 @@ SQL_SERVER_VIEWS = {
             l.pipeline_name,
             l.environment,
             l.owner,
-            s.business_owner,
-            s.business_process,
-            s.business_criticality,
+            c.business_owner,
+            c.business_process,
+            c.business_criticality,
             l.status as last_run_status,
             l.run_end_at as last_run_end_at,
             l.duration_ms,
             l.rows_processed,
-            s.frequency,
-            s.expected_completion_utc,
-            s.max_delay_minutes,
+            s.freshness_sla,
+            s.freshness_sla_minutes,
+            s.last_success_at,
+            s.minutes_since_success,
+            s.sla_met,
+            s.hours_overdue,
             CASE
-                WHEN s.expected_completion_utc IS NULL THEN NULL
-                WHEN l.run_end_at IS NULL THEN 0
-                WHEN CAST(l.run_end_at AS DATE) = CAST(GETUTCDATE() AS DATE)
-                     AND l.status = 'SUCCESS' THEN 1
-                ELSE 0
-            END as ran_today_success,
-            CASE
-                WHEN s.expected_completion_utc IS NULL THEN 0
-                WHEN CAST(GETUTCDATE() AS TIME) > DATEADD(MINUTE, ISNULL(s.max_delay_minutes, 0), s.expected_completion_utc)
-                     AND (l.run_end_at IS NULL
-                          OR CAST(l.run_end_at AS DATE) < CAST(GETUTCDATE() AS DATE)
-                          OR l.status <> 'SUCCESS')
-                THEN 1 ELSE 0
-            END as is_late_now,
-            CASE
+                WHEN s.sla_met = 1 THEN 'GREEN'
+                WHEN s.sla_met = 0 AND s.hours_overdue <= 1 THEN 'AMBER'
+                WHEN s.sla_met = 0 THEN 'RED'
                 WHEN l.status = 'FAILURE' THEN 'RED'
-                WHEN s.expected_completion_utc IS NOT NULL
-                     AND CAST(GETUTCDATE() AS TIME) > DATEADD(MINUTE, ISNULL(s.max_delay_minutes, 0), s.expected_completion_utc)
-                     AND (l.run_end_at IS NULL OR CAST(l.run_end_at AS DATE) < CAST(GETUTCDATE() AS DATE) OR l.status <> 'SUCCESS')
-                THEN 'RED'
-                WHEN s.business_criticality = 'High' AND l.status <> 'SUCCESS' THEN 'RED'
+                WHEN c.business_criticality = 'High' AND l.status <> 'SUCCESS' THEN 'RED'
                 WHEN l.status = 'SUCCESS' THEN 'GREEN'
                 ELSE 'AMBER'
             END as sla_rag
         FROM latest l
-        LEFT JOIN [{schema}].[dim_pipeline_sla] s
-          ON l.project = s.project
-         AND l.pipeline_name = s.pipeline_name
-         AND l.environment = s.environment
+        LEFT JOIN [{schema}].[meta_sla_status] s
+          ON l.pipeline_name = s.pipeline_name
+        LEFT JOIN [{schema}].[dim_pipeline_context] c
+          ON l.project = c.project
+         AND l.pipeline_name = c.pipeline_name
+         AND l.environment = c.environment
     """,
     "vw_exec_current_issues": """
         CREATE OR ALTER VIEW [{schema}].[vw_exec_current_issues] AS
@@ -538,17 +544,17 @@ SQL_SERVER_VIEWS = {
             FROM [{schema}].[meta_failures]
             WHERE timestamp >= DATEADD(day, -2, GETUTCDATE())
         ),
-        sla_info AS (
+        context_info AS (
             SELECT project, pipeline_name, environment, business_criticality, business_owner, business_process
-            FROM [{schema}].[dim_pipeline_sla]
+            FROM [{schema}].[dim_pipeline_context]
         )
         SELECT
             fp.project,
             fp.pipeline_name,
             fp.environment,
-            s.business_criticality,
-            s.business_owner,
-            s.business_process,
+            c.business_criticality,
+            c.business_owner,
+            c.business_process,
             fp.last_status,
             fp.run_end_at as last_run_at,
             rf.node_name as failed_node,
@@ -556,15 +562,15 @@ SQL_SERVER_VIEWS = {
             rf.error_message,
             rf.timestamp as failure_time,
             CASE
-                WHEN s.business_criticality = 'High' THEN 1
-                WHEN s.business_criticality = 'Medium' THEN 2
+                WHEN c.business_criticality = 'High' THEN 1
+                WHEN c.business_criticality = 'Medium' THEN 2
                 ELSE 3
             END as priority_order
         FROM failed_pipelines fp
         LEFT JOIN recent_failures rf
           ON fp.project = rf.project AND fp.pipeline_name = rf.pipeline_name AND rf.rn = 1
-        LEFT JOIN sla_info s
-          ON fp.project = s.project AND fp.pipeline_name = s.pipeline_name AND fp.environment = s.environment
+        LEFT JOIN context_info c
+          ON fp.project = c.project AND fp.pipeline_name = c.pipeline_name AND fp.environment = c.environment
     """,
     "vw_pipeline_risk": """
         CREATE OR ALTER VIEW [{schema}].[vw_pipeline_risk] AS
@@ -587,39 +593,39 @@ SQL_SERVER_VIEWS = {
             FROM runs_30d
             GROUP BY project, pipeline_name, environment
         ),
-        sla AS (
+        ctx AS (
             SELECT project, pipeline_name, environment, business_criticality, business_owner, business_process
-            FROM [{schema}].[dim_pipeline_sla]
+            FROM [{schema}].[dim_pipeline_context]
         )
         SELECT
             a.project,
             a.pipeline_name,
             a.environment,
             a.owner,
-            s.business_owner,
-            s.business_process,
-            s.business_criticality,
+            c.business_owner,
+            c.business_process,
+            c.business_criticality,
             a.runs_30d,
             a.failures_30d,
             a.failure_rate_30d,
             a.runtime_hours_30d,
             a.cost_30d,
             (
-                CASE s.business_criticality
+                CASE c.business_criticality
                     WHEN 'High' THEN 3
                     WHEN 'Medium' THEN 2
                     ELSE 1
                 END
             ) * (a.failure_rate_30d * 100 + LOG10(NULLIF(a.runtime_hours_30d, 0) + 1) * 5) as risk_score,
             CASE
-                WHEN a.failure_rate_30d >= 0.10 AND s.business_criticality = 'High' THEN 'CRITICAL'
+                WHEN a.failure_rate_30d >= 0.10 AND c.business_criticality = 'High' THEN 'CRITICAL'
                 WHEN a.failure_rate_30d >= 0.10 THEN 'HIGH'
                 WHEN a.failure_rate_30d >= 0.05 THEN 'MEDIUM'
                 ELSE 'LOW'
             END as risk_level
         FROM agg a
-        LEFT JOIN sla s
-          ON a.project = s.project AND a.pipeline_name = s.pipeline_name AND a.environment = s.environment
+        LEFT JOIN ctx c
+          ON a.project = c.project AND a.pipeline_name = c.pipeline_name AND a.environment = c.environment
     """,
     "vw_cost_summary": """
         CREATE OR ALTER VIEW [{schema}].[vw_cost_summary] AS
