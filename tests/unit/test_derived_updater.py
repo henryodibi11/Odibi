@@ -12,6 +12,7 @@ Uses Pandas/delta-rs mode with temporary directories for Delta tables.
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
+import pyarrow as pa
 import pytest
 from deltalake import DeltaTable, write_deltalake
 
@@ -24,6 +25,27 @@ from odibi.derived_updater import (
     parse_duration_to_minutes,
 )
 from odibi.engine.pandas_engine import PandasEngine
+
+
+def _write_df_with_schema(path: str, df: pd.DataFrame, mode: str = "overwrite"):
+    """Write DataFrame to Delta with explicit schema to handle nullable columns.
+
+    Deltalake rejects DataFrames with columns containing only None values
+    (inferred as Null type). This helper converts to PyArrow with explicit
+    schema inference that preserves proper nullable types.
+    """
+    arrow_table = pa.Table.from_pandas(df, preserve_index=False)
+
+    new_columns = []
+    for i, col in enumerate(arrow_table.column_names):
+        column = arrow_table.column(i)
+        if pa.types.is_null(column.type):
+            new_columns.append(column.cast(pa.string()))
+        else:
+            new_columns.append(column)
+
+    arrow_table = pa.table(dict(zip(arrow_table.column_names, new_columns)))
+    write_deltalake(path, arrow_table, mode=mode)
 
 
 @pytest.fixture
@@ -189,11 +211,7 @@ class TestReclaimGuardSemantics:
         mask = (df["derived_table"] == "meta_daily_stats") & (df["run_id"] == "run-001")
         df.loc[mask, "claimed_at"] = stale_time
 
-        write_deltalake(
-            catalog_with_bootstrap.tables["meta_derived_applied_runs"],
-            df,
-            mode="overwrite",
-        )
+        _write_df_with_schema(catalog_with_bootstrap.tables["meta_derived_applied_runs"], df)
 
         reclaim_token = updater.reclaim_for_rebuild("meta_daily_stats", "run-001")
 
@@ -228,11 +246,7 @@ class TestReclaimGuardSemantics:
         mask = (df["derived_table"] == "meta_daily_stats") & (df["run_id"] == "run-001")
         df.loc[mask, "claimed_at"] = stale_time
 
-        write_deltalake(
-            catalog_with_bootstrap.tables["meta_derived_applied_runs"],
-            df,
-            mode="overwrite",
-        )
+        _write_df_with_schema(catalog_with_bootstrap.tables["meta_derived_applied_runs"], df)
 
         # Should NOT be reclaimable with default (60 min)
         reclaim_token = updater.reclaim_for_rebuild("meta_daily_stats", "run-001")
@@ -349,7 +363,7 @@ class TestUpdateDailyStats:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         updater.update_daily_stats("run-001", pipeline_run)
 
@@ -406,7 +420,7 @@ class TestUpdateDailyStats:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         updater.update_daily_stats("run-001", pipeline_run)
 
@@ -465,7 +479,7 @@ class TestUpdatePipelineHealth:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         updater.update_pipeline_health(pipeline_run)
 
@@ -524,7 +538,7 @@ class TestUpdatePipelineHealth:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         updater.update_pipeline_health(pipeline_run1)
 
@@ -571,7 +585,7 @@ class TestUpdatePipelineHealth:
         dt = DeltaTable(runs_path)
         existing = dt.to_pandas()
         combined = pd.concat([existing, run_df2], ignore_index=True)
-        write_deltalake(runs_path, combined, mode="overwrite")
+        _write_df_with_schema(runs_path, combined)
 
         updater.update_pipeline_health(pipeline_run2)
 
@@ -619,7 +633,7 @@ class TestUpdateSlaStatus:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         # SLA is 1 hour, last success was 29 minutes ago - should be met
         updater.update_sla_status("test_pipeline", "owner@example.com", "1h", "run_completion")
@@ -675,7 +689,7 @@ class TestUpdateSlaStatus:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         # SLA is 1 hour, last success was 2 hours ago - should NOT be met
         updater.update_sla_status("test_pipeline", None, "1h", "run_completion")
@@ -750,7 +764,7 @@ class TestCatalogHelpers:
                 },
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         run_ids = catalog_with_bootstrap.get_run_ids(pipeline_name="pipeline_a")
 
@@ -813,7 +827,7 @@ class TestCatalogHelpers:
                 },
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         run_ids = catalog_with_bootstrap.get_run_ids(since=yesterday.date())
 
@@ -850,7 +864,7 @@ class TestCatalogHelpers:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         result = catalog_with_bootstrap.get_pipeline_run("run-001")
 
@@ -990,7 +1004,7 @@ class TestRebuildSummariesGuardSemantics:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         # Successfully apply derived update
         token = updater.try_claim("meta_daily_stats", "run-001")
@@ -1042,7 +1056,7 @@ class TestRebuildSummariesGuardSemantics:
                 }
             ]
         )
-        write_deltalake(runs_path, run_df, mode="overwrite")
+        _write_df_with_schema(runs_path, run_df)
 
         # Mark as failed
         token = updater.try_claim("meta_daily_stats", "run-001")
@@ -1101,7 +1115,7 @@ class TestCleanupCommand:
                 }
             ]
         )
-        write_deltalake(failures_path, failures_df, mode="overwrite")
+        _write_df_with_schema(failures_path, failures_df)
 
         cutoffs = {
             "meta_daily_stats": date.today() - timedelta(days=365),
@@ -1158,7 +1172,7 @@ class TestCleanupCommand:
                 },
             ]
         )
-        write_deltalake(failures_path, failures_df, mode="overwrite")
+        _write_df_with_schema(failures_path, failures_df)
 
         # Verify both records exist
         dt = DeltaTable(failures_path)
