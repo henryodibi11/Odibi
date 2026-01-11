@@ -164,6 +164,26 @@ def add_catalog_parser(subparsers):
     )
     sync_status_parser.add_argument("config", help="Path to YAML config file")
 
+    # odibi catalog sync-purge
+    sync_purge_parser = catalog_subparsers.add_parser(
+        "sync-purge",
+        help="Purge old records from SQL Server sync tables",
+        description="Delete records older than N days from SQL Server sync tables.",
+    )
+    sync_purge_parser.add_argument("config", help="Path to YAML config file")
+    sync_purge_parser.add_argument(
+        "--days",
+        "-d",
+        type=int,
+        default=90,
+        help="Delete records older than N days (default: 90)",
+    )
+    sync_purge_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be purged without actually deleting",
+    )
+
     return catalog_parser
 
 
@@ -182,6 +202,7 @@ def catalog_command(args):
         print("  stats       Show execution statistics")
         print("  sync        Sync catalog to secondary destination")
         print("  sync-status Show sync status")
+        print("  sync-purge  Purge old records from SQL Server sync tables")
         return 1
 
     command_map = {
@@ -195,6 +216,7 @@ def catalog_command(args):
         "stats": _stats_command,
         "sync": _sync_command,
         "sync-status": _sync_status_command,
+        "sync-purge": _sync_purge_command,
     }
 
     handler = command_map.get(args.catalog_command)
@@ -740,4 +762,71 @@ def _sync_status_command(args):
 
     except Exception as e:
         logger.error(f"Failed to get sync status: {e}")
+        return 1
+
+
+def _sync_purge_command(args):
+    """Purge old records from SQL Server sync tables."""
+    from odibi.catalog_sync import CatalogSyncer
+    from odibi.config import load_config_from_file
+
+    try:
+        config_path = Path(args.config).resolve()
+        project_config = load_config_from_file(str(config_path))
+
+        if not project_config.system or not project_config.system.sync_to:
+            print("Error: No 'sync_to' configured in system section.")
+            return 1
+
+        sync_config = project_config.system.sync_to
+
+        # Get catalog and target connection
+        catalog = _get_catalog_manager(args)
+        if not catalog:
+            print("Error: Could not initialize catalog manager.")
+            return 1
+
+        load_extensions(config_path.parent)
+        pm = PipelineManager(str(config_path))
+        target_conn = pm.connections.get(sync_config.connection)
+        if not target_conn:
+            print(f"Error: Target connection '{sync_config.connection}' not found.")
+            return 1
+
+        syncer = CatalogSyncer(
+            source_catalog=catalog,
+            sync_config=sync_config,
+            target_connection=target_conn,
+            environment=project_config.system.environment,
+        )
+
+        if syncer.target_type != "sql_server":
+            print(f"Error: Purge only supported for SQL Server targets, got: {syncer.target_type}")
+            return 1
+
+        if args.dry_run:
+            print(f"=== Dry Run - Would purge records older than {args.days} days ===\n")
+            print(f"Target: {sync_config.connection}")
+            print(f"Schema: {sync_config.schema_name or 'odibi_system'}")
+            print("Tables: meta_runs, meta_pipeline_runs, meta_node_runs, meta_failures")
+            return 0
+
+        print(f"Purging records older than {args.days} days from {sync_config.connection}...")
+        results = syncer.purge_sql_tables(days=args.days)
+
+        print("\n=== Purge Results ===\n")
+        for table, result in results.items():
+            status = "✓" if result.get("success") else "✗"
+            if result.get("success"):
+                print(f"  {status} {table}: purged (keeping last {args.days} days)")
+            else:
+                print(f"  {status} {table}: {result.get('error', 'unknown error')}")
+
+        success_count = sum(1 for r in results.values() if r.get("success"))
+        print(f"\nPurged {success_count}/{len(results)} tables")
+
+        return 0 if success_count == len(results) else 1
+
+    except Exception as e:
+        logger.error(f"Purge failed: {e}")
         return 1

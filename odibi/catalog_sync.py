@@ -313,6 +313,12 @@ class CatalogSyncer:
             if row_count == 0:
                 return {"success": True, "rows": 0, "message": "No new data"}
 
+            # Inject environment if not present or NULL in source
+            if self.environment and "environment" in df.columns:
+                df["environment"] = df["environment"].fillna(self.environment)
+            elif self.environment:
+                df["environment"] = self.environment
+
             # Convert to records and insert
             if self.config.mode == "full":
                 # Truncate and reload
@@ -527,3 +533,49 @@ class CatalogSyncer:
                     self.target.execute(sql, safe_record)
                 except Exception as e:
                     logger.debug(f"Insert error for record: {e}")
+
+    def purge_sql_tables(self, days: int = 90) -> Dict[str, Any]:
+        """
+        Purge old records from SQL Server sync tables.
+
+        Args:
+            days: Delete records older than this many days (default: 90)
+
+        Returns:
+            Dict with purge results per table
+        """
+        if self.target_type != "sql_server":
+            return {"error": "Purge only supported for SQL Server targets"}
+
+        schema = self.config.schema_name or "odibi_system"
+        results = {}
+
+        # Tables with date columns for purging
+        purgeable_tables = {
+            "meta_runs": "date",
+            "meta_pipeline_runs": "date",
+            "meta_node_runs": "date",
+            "meta_failures": "date",
+        }
+
+        tables_to_purge = self.config.tables or list(purgeable_tables.keys())
+
+        for table in tables_to_purge:
+            date_col = purgeable_tables.get(table)
+            if not date_col:
+                results[table] = {"success": False, "error": "No date column for purge"}
+                continue
+
+            try:
+                sql = f"""
+                DELETE FROM [{schema}].[{table}]
+                WHERE [{date_col}] < DATEADD(day, -{days}, GETDATE())
+                """
+                self.target.execute(sql)
+                results[table] = {"success": True, "days_retained": days}
+                self._ctx.info(f"Purged {table} (records older than {days} days)")
+            except Exception as e:
+                results[table] = {"success": False, "error": str(e)}
+                self._ctx.warning(f"Failed to purge {table}: {e}")
+
+        return results
