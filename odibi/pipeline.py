@@ -560,6 +560,7 @@ class Pipeline:
                                 connections=self.connections,
                                 performance_config=self.performance_config,
                                 pipeline_name=self.config.pipeline,
+                                project_config=self.project_config,
                             )
                             if temp_node.restore():
                                 node_ctx.info(
@@ -635,6 +636,7 @@ class Pipeline:
                     batch_write_buffers=batch_buffers,
                     config_file=node_config.source_yaml,
                     run_id=self._current_run_id,
+                    project_config=self.project_config,
                 )
                 result = node.execute()
 
@@ -978,20 +980,18 @@ class Pipeline:
                 terminal_node_names = sorted(all_pipeline_nodes - referenced_as_dependency)
 
                 # Sum rows_written for terminal nodes
-                # Per contract: if ANY terminal node is missing rows_written, set NULL
+                # Sum available values - nodes without rows_written are treated as 0
                 terminal_rows_sum = 0
-                all_have_rows = True
+                any_have_rows = False
                 for t_name in terminal_node_names:
                     nr = results.node_results.get(t_name)
                     if nr and nr.rows_written is not None:
                         terminal_rows_sum += nr.rows_written
-                    else:
-                        # Missing rows_written for this terminal node
-                        all_have_rows = False
+                        any_have_rows = True
 
-                if terminal_node_names and all_have_rows:
-                    rows_processed = terminal_rows_sum  # Can be 0 (valid, distinct from NULL)
-                # else: rows_processed stays None (unknown)
+                if terminal_node_names and any_have_rows:
+                    rows_processed = terminal_rows_sum
+                # else: rows_processed stays None (no nodes had row counts)
             except Exception as term_ex:
                 self._ctx.debug(f"Terminal node detection failed: {term_ex}")
                 terminal_node_names = []

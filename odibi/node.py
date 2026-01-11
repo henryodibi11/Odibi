@@ -127,6 +127,7 @@ class NodeExecutor:
         state_manager: Optional[Any] = None,
         pipeline_name: Optional[str] = None,
         batch_write_buffers: Optional[Dict[str, List]] = None,
+        project_config: Optional[Any] = None,
     ):
         self.context = context
         self.engine = engine
@@ -138,6 +139,7 @@ class NodeExecutor:
         self.state_manager = state_manager
         self.pipeline_name = pipeline_name
         self.batch_write_buffers = batch_write_buffers
+        self.project_config = project_config
 
         # Ephemeral state per execution
         self._execution_steps: List[str] = []
@@ -2943,6 +2945,7 @@ class Node:
         pipeline_name: Optional[str] = None,
         batch_write_buffers: Optional[Dict[str, List]] = None,
         run_id: Optional[str] = None,
+        project_config: Optional[Any] = None,
     ):
         """Initialize node."""
         self.config = config
@@ -2958,6 +2961,7 @@ class Node:
         self.pipeline_name = pipeline_name
         self.batch_write_buffers = batch_write_buffers
         self.run_id = run_id
+        self.project_config = project_config
 
         self._cached_result: Optional[Any] = None
 
@@ -2998,6 +3002,7 @@ class Node:
             state_manager=self.state_manager,
             pipeline_name=pipeline_name,
             batch_write_buffers=batch_write_buffers,
+            project_config=project_config,
         )
 
     def restore(self) -> bool:
