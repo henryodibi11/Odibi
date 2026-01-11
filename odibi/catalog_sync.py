@@ -118,7 +118,8 @@ SQL_SERVER_DDL = {
                 metrics_json NVARCHAR(MAX),
                 environment NVARCHAR(50),
                 created_at DATETIME2,
-                _synced_at DATETIME2 DEFAULT GETUTCDATE()
+                _synced_at DATETIME2 DEFAULT GETUTCDATE(),
+                PRIMARY KEY (run_id, node_id)
             );
             CREATE INDEX IX_meta_node_runs_project ON [{schema}].[meta_node_runs] (project, pipeline_name, node_name);
         END
@@ -162,6 +163,15 @@ SQL_SERVER_DDL = {
             CREATE INDEX IX_meta_failures_project ON [{schema}].[meta_failures] (project, pipeline_name, date);
         END
     """,
+}
+
+# Primary key columns for each table (used for MERGE upsert)
+TABLE_PRIMARY_KEYS = {
+    "meta_runs": ["run_id", "pipeline_name", "node_name"],  # No explicit PK, use composite
+    "meta_pipeline_runs": ["run_id"],
+    "meta_node_runs": ["run_id", "node_id"],
+    "meta_tables": ["project", "table_name"],
+    "meta_failures": ["failure_id"],
 }
 
 # Power BI-ready views for dashboards
@@ -638,18 +648,39 @@ class CatalogSyncer:
         return []
 
     def _insert_to_sql_server(self, table: str, schema: str, records: List[Dict[str, Any]]) -> None:
-        """Insert records to SQL Server table."""
+        """Upsert records to SQL Server table using MERGE."""
         if not records:
             return
 
         # Get column names from first record
         columns = list(records[0].keys())
-        placeholders = ", ".join([f":{col}" for col in columns])
-        column_list = ", ".join([f"[{col}]" for col in columns])
 
-        sql = f"INSERT INTO [{schema}].[{table}] ({column_list}) VALUES ({placeholders})"
+        # Get primary key columns for this table
+        pk_columns = TABLE_PRIMARY_KEYS.get(table, [])
 
-        # Batch insert
+        if pk_columns:
+            # Build MERGE statement for upsert
+            on_clause = " AND ".join([f"target.[{col}] = source.[{col}]" for col in pk_columns])
+            update_cols = [col for col in columns if col not in pk_columns]
+            update_set = ", ".join([f"target.[{col}] = source.[{col}]" for col in update_cols])
+            source_select = ", ".join([f":{col} AS [{col}]" for col in columns])
+            column_list = ", ".join([f"[{col}]" for col in columns])
+            source_values = ", ".join([f"source.[{col}]" for col in columns])
+
+            sql = f"""
+            MERGE INTO [{schema}].[{table}] AS target
+            USING (SELECT {source_select}) AS source
+            ON {on_clause}
+            WHEN MATCHED THEN UPDATE SET {update_set}
+            WHEN NOT MATCHED THEN INSERT ({column_list}) VALUES ({source_values});
+            """
+        else:
+            # Fallback to INSERT for tables without defined PKs
+            placeholders = ", ".join([f":{col}" for col in columns])
+            column_list = ", ".join([f"[{col}]" for col in columns])
+            sql = f"INSERT INTO [{schema}].[{table}] ({column_list}) VALUES ({placeholders})"
+
+        # Batch upsert
         batch_size = 1000
         for i in range(0, len(records), batch_size):
             batch = records[i : i + batch_size]
@@ -668,7 +699,7 @@ class CatalogSyncer:
                 try:
                     self.target.execute(sql, safe_record)
                 except Exception as e:
-                    logger.debug(f"Insert error for record: {e}")
+                    logger.debug(f"Upsert error for record: {e}")
 
     def purge_sql_tables(self, days: int = 90) -> Dict[str, Any]:
         """

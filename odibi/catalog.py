@@ -1986,15 +1986,39 @@ class CatalogManager:
 
         try:
             sql = f"""
-            INSERT INTO [{schema_name}].[meta_pipeline_runs]
-            (run_id, project, pipeline_name, owner, layer, run_start_at, run_end_at, duration_ms,
-             status, nodes_total, nodes_succeeded, nodes_failed, nodes_skipped,
-             rows_processed, error_summary, terminal_nodes, environment,
-             databricks_cluster_id, databricks_job_id, databricks_workspace_id, created_at)
+            MERGE INTO [{schema_name}].[meta_pipeline_runs] AS target
+            USING (SELECT :run_id AS run_id) AS source
+            ON target.run_id = source.run_id
+            WHEN MATCHED THEN UPDATE SET
+                project = :project,
+                pipeline_name = :pipeline_name,
+                owner = :owner,
+                layer = :layer,
+                run_start_at = :run_start_at,
+                run_end_at = :run_end_at,
+                duration_ms = :duration_ms,
+                status = :status,
+                nodes_total = :nodes_total,
+                nodes_succeeded = :nodes_succeeded,
+                nodes_failed = :nodes_failed,
+                nodes_skipped = :nodes_skipped,
+                rows_processed = :rows_processed,
+                error_summary = :error_summary,
+                terminal_nodes = :terminal_nodes,
+                environment = :environment,
+                databricks_cluster_id = :databricks_cluster_id,
+                databricks_job_id = :databricks_job_id,
+                databricks_workspace_id = :databricks_workspace_id,
+                created_at = :created_at
+            WHEN NOT MATCHED THEN INSERT
+                (run_id, project, pipeline_name, owner, layer, run_start_at, run_end_at, duration_ms,
+                 status, nodes_total, nodes_succeeded, nodes_failed, nodes_skipped,
+                 rows_processed, error_summary, terminal_nodes, environment,
+                 databricks_cluster_id, databricks_job_id, databricks_workspace_id, created_at)
             VALUES (:run_id, :project, :pipeline_name, :owner, :layer, :run_start_at, :run_end_at, :duration_ms,
                     :status, :nodes_total, :nodes_succeeded, :nodes_failed, :nodes_skipped,
                     :rows_processed, :error_summary, :terminal_nodes, :environment,
-                    :databricks_cluster_id, :databricks_job_id, :databricks_workspace_id, :created_at)
+                    :databricks_cluster_id, :databricks_job_id, :databricks_workspace_id, :created_at);
             """
             self.connection.execute(
                 sql,
@@ -2022,7 +2046,7 @@ class CatalogManager:
                     "created_at": pipeline_run.get("created_at"),
                 },
             )
-            logger.debug(f"Logged pipeline run to SQL Server: {pipeline_run['run_id']}")
+            logger.debug(f"Upserted pipeline run to SQL Server: {pipeline_run['run_id']}")
         except Exception as e:
             logger.warning(f"Failed to log pipeline run to SQL Server: {e}")
 
@@ -2174,13 +2198,28 @@ class CatalogManager:
                     rows_processed = None
 
                 sql = f"""
-                INSERT INTO [{schema_name}].[meta_node_runs]
-                (run_id, node_id, project, pipeline_name, node_name, status,
-                 run_start_at, run_end_at, duration_ms, rows_processed,
-                 metrics_json, environment, created_at)
+                MERGE INTO [{schema_name}].[meta_node_runs] AS target
+                USING (SELECT :run_id AS run_id, :node_id AS node_id) AS source
+                ON target.run_id = source.run_id AND target.node_id = source.node_id
+                WHEN MATCHED THEN UPDATE SET
+                    project = :project,
+                    pipeline_name = :pipeline_name,
+                    node_name = :node_name,
+                    status = :status,
+                    run_start_at = :run_start_at,
+                    run_end_at = :run_end_at,
+                    duration_ms = :duration_ms,
+                    rows_processed = :rows_processed,
+                    metrics_json = :metrics_json,
+                    environment = :environment,
+                    created_at = :created_at
+                WHEN NOT MATCHED THEN INSERT
+                    (run_id, node_id, project, pipeline_name, node_name, status,
+                     run_start_at, run_end_at, duration_ms, rows_processed,
+                     metrics_json, environment, created_at)
                 VALUES (:run_id, :node_id, :project, :pipeline_name, :node_name, :status,
                         :run_start_at, :run_end_at, :duration_ms, :rows_processed,
-                        :metrics_json, :environment, :created_at)
+                        :metrics_json, :environment, :created_at);
                 """
                 self.connection.execute(
                     sql,
@@ -2200,7 +2239,7 @@ class CatalogManager:
                         "created_at": r.get("created_at"),
                     },
                 )
-            logger.debug(f"Batch logged {len(node_results)} node runs to SQL Server")
+            logger.debug(f"Upserted {len(node_results)} node runs to SQL Server")
         except Exception as e:
             logger.warning(f"Failed to batch log node runs to SQL Server: {e}")
 

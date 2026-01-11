@@ -1592,45 +1592,60 @@ class SparkEngine(Engine):
                 rows_written = None
 
                 # Method 1: Sum all micro-batch progress (most accurate for streaming)
+                # For autoloader, numInputRows = rows read from source files in this run
                 try:
                     recent_progress = query.recentProgress
                     if recent_progress:
                         total_rows = 0
                         for prog in recent_progress:
                             if prog:
-                                # Try sink output rows first, then input rows
-                                sink = prog.get("sink", {})
-                                if sink and sink.get("numOutputRows") is not None:
-                                    total_rows += sink["numOutputRows"]
-                                elif prog.get("numInputRows") is not None:
-                                    total_rows += prog["numInputRows"]
+                                # Use numInputRows - this is rows processed from source
+                                # NOT sink.numOutputRows which can be cumulative
+                                input_rows = prog.get("numInputRows")
+                                if input_rows is not None:
+                                    total_rows += input_rows
                         if total_rows > 0:
                             rows_written = total_rows
                 except Exception:
                     pass
 
-                # Method 2: Check Delta table history for rows written in recent operations
+                # Method 1b: Try lastProgress if recentProgress is empty
+                if rows_written is None:
+                    try:
+                        last_progress = query.lastProgress
+                        if last_progress:
+                            input_rows = last_progress.get("numInputRows")
+                            if input_rows is not None and input_rows > 0:
+                                rows_written = input_rows
+                    except Exception:
+                        pass
+
+                # Method 2: Check Delta table history for rows written in THIS run only
+                # We need to filter to operations that happened during this streaming run
                 if rows_written is None and path and format == "delta":
                     try:
                         full_path = connection.get_path(path)
-                        # Get the most recent STREAMING UPDATE operation
-                        history_df = self.spark.sql(f"DESCRIBE HISTORY delta.`{full_path}` LIMIT 5")
-                        for row in history_df.collect():
-                            op = row.operation if hasattr(row, "operation") else row["operation"]
-                            if op in ("STREAMING UPDATE", "WRITE", "MERGE"):
-                                metrics = (
-                                    row.operationMetrics
-                                    if hasattr(row, "operationMetrics")
-                                    else row["operationMetrics"]
-                                )
-                                if metrics:
-                                    # numOutputRows for streaming, numAddedRows for batch
-                                    rows_written = metrics.get(
-                                        "numOutputRows", metrics.get("numAddedRows")
-                                    )
-                                    if rows_written is not None:
-                                        rows_written = int(rows_written)
-                                        break
+                        # Get the most recent operation - should be from this run
+                        history_df = self.spark.sql(f"DESCRIBE HISTORY delta.`{full_path}` LIMIT 1")
+                        rows = history_df.collect()
+                        if rows:
+                            row = rows[0]
+                            metrics = (
+                                row.operationMetrics
+                                if hasattr(row, "operationMetrics")
+                                else row["operationMetrics"]
+                            )
+                            if metrics:
+                                # For streaming: numAddedRows is rows added in this batch
+                                # numOutputRows can be misleading (may include unchanged rows)
+                                added_rows = metrics.get("numAddedRows")
+                                if added_rows is not None:
+                                    rows_written = int(added_rows)
+                                else:
+                                    # Fallback to numOutputRows only if numAddedRows unavailable
+                                    output_rows = metrics.get("numOutputRows")
+                                    if output_rows is not None:
+                                        rows_written = int(output_rows)
                     except Exception:
                         pass
 
