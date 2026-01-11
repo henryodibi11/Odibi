@@ -113,6 +113,23 @@ def _retry_delta_operation(func, max_retries: int = 5, base_delay: float = 1.0):
             time.sleep(delay)
 
 
+def _get_guard_table_arrow_schema():
+    """Return PyArrow schema for meta_derived_applied_runs guard table."""
+    if not pa:
+        return None
+    return pa.schema(
+        [
+            pa.field("derived_table", pa.string(), nullable=False),
+            pa.field("run_id", pa.string(), nullable=False),
+            pa.field("claim_token", pa.string(), nullable=False),
+            pa.field("status", pa.string(), nullable=False),
+            pa.field("claimed_at", pa.timestamp("us", tz="UTC"), nullable=False),
+            pa.field("applied_at", pa.timestamp("us", tz="UTC"), nullable=True),
+            pa.field("error_message", pa.string(), nullable=True),
+        ]
+    )
+
+
 class DerivedUpdater:
     """
     Manages claim lifecycle for derived table updates.
@@ -606,9 +623,11 @@ class DerivedUpdater:
             df.loc[mask, "error_message"] = error_message
 
         def _do_overwrite():
+            arrow_schema = _get_guard_table_arrow_schema()
+            arrow_table = pa.Table.from_pandas(df, schema=arrow_schema, preserve_index=False)
             write_deltalake(
                 self._guard_path,
-                df,
+                arrow_table,
                 mode="overwrite",
                 schema_mode="overwrite",
                 storage_options=storage_opts or None,
@@ -673,9 +692,11 @@ class DerivedUpdater:
             return None
 
         def _do_overwrite():
+            arrow_schema = _get_guard_table_arrow_schema()
+            arrow_table = pa.Table.from_pandas(df, schema=arrow_schema, preserve_index=False)
             write_deltalake(
                 self._guard_path,
-                df,
+                arrow_table,
                 mode="overwrite",
                 schema_mode="overwrite",
                 storage_options=storage_opts or None,
