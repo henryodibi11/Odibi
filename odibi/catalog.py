@@ -1977,7 +1977,11 @@ class CatalogManager:
 
         # Handle NaN values - SQL Server rejects float NaN
         rows_processed = pipeline_run.get("rows_processed")
-        if rows_processed is not None and isinstance(rows_processed, float) and rows_processed != rows_processed:
+        if (
+            rows_processed is not None
+            and isinstance(rows_processed, float)
+            and rows_processed != rows_processed
+        ):
             rows_processed = None
 
         try:
@@ -2162,7 +2166,11 @@ class CatalogManager:
             for r in node_results:
                 # Handle NaN values - SQL Server rejects float NaN
                 rows_processed = r.get("rows_processed")
-                if rows_processed is not None and isinstance(rows_processed, float) and rows_processed != rows_processed:
+                if (
+                    rows_processed is not None
+                    and isinstance(rows_processed, float)
+                    and rows_processed != rows_processed
+                ):
                     rows_processed = None
 
                 sql = f"""
