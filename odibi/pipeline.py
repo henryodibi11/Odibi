@@ -1006,10 +1006,15 @@ class Pipeline:
                     break
 
             # Build pipeline_run dict
+            # Fall back to project owner if pipeline owner not set
+            owner = getattr(self.config, "owner", None)
+            if not owner and self.project_config:
+                owner = getattr(self.project_config, "owner", None)
+
             pipeline_run = {
                 "run_id": run_id,
                 "pipeline_name": self.config.pipeline,
-                "owner": getattr(self.config, "owner", None),
+                "owner": owner,
                 "layer": getattr(self.config, "layer", None),
                 "run_start_at": run_start_at,
                 "run_end_at": run_end_at,
@@ -1093,7 +1098,7 @@ class Pipeline:
                             "meta_sla_status",
                             lambda: updater.update_sla_status(
                                 self.config.pipeline,
-                                getattr(self.config, "owner", None),
+                                owner,  # Uses owner from above (pipeline or project fallback)
                                 freshness_sla,
                                 freshness_anchor,
                             ),
