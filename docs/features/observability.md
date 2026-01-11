@@ -562,8 +562,32 @@ risk_score = criticality_weight × (failure_rate × 100 + log10(runtime_hours) �
 
 Where `criticality_weight` is 3 (High), 2 (Medium), or 1 (Low).
 
-!!! tip "Business Context"
-    Populate `dim_pipeline_context` with `business_owner`, `business_process`, and `business_criticality` to enhance these views with business metadata.
+### Business Context (dim_pipeline_context)
+
+The `dim_pipeline_context` table is **manually populated** to add business metadata to your pipelines. This enriches the executive views with ownership and criticality information.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `project` | STRING | Project name (PK) |
+| `pipeline_name` | STRING | Pipeline name (PK) |
+| `environment` | STRING | Environment (PK) |
+| `business_criticality` | STRING | `High`, `Medium`, or `Low` |
+| `business_owner` | STRING | Business stakeholder name/email |
+| `business_process` | STRING | Business process this pipeline supports |
+| `notes` | STRING | Optional notes |
+
+**Example:**
+
+```sql
+INSERT INTO [odibi_system].[dim_pipeline_context] 
+    (project, pipeline_name, environment, business_criticality, business_owner, business_process)
+VALUES 
+    ('SalesAnalytics', 'orders_silver', 'prod', 'High', 'Jane Smith', 'Daily Sales Reporting'),
+    ('SalesAnalytics', 'inventory_bronze', 'prod', 'Medium', 'Bob Jones', 'Inventory Sync');
+```
+
+!!! note "Optional but Recommended"
+    Views work without business context (columns will be NULL), but populating this table enables priority-based alerting and risk scoring.
 
 ## Best Practices
 
