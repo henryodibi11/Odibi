@@ -1536,6 +1536,20 @@ class SparkEngine(Engine):
         for key, value in options.items():
             writer = writer.option(key, value)
 
+        # Capture Delta version before streaming to detect if new data was written
+        version_before = None
+        if path and format == "delta":
+            try:
+                full_path = connection.get_path(path)
+                history_df = self.spark.sql(f"DESCRIBE HISTORY delta.`{full_path}` LIMIT 1")
+                rows = history_df.collect()
+                if rows:
+                    version_before = (
+                        rows[0].version if hasattr(rows[0], "version") else rows[0]["version"]
+                    )
+            except Exception:
+                pass  # Table may not exist yet
+
         try:
             if table:
                 query = writer.toTable(table)
@@ -1621,31 +1635,38 @@ class SparkEngine(Engine):
                         pass
 
                 # Method 2: Check Delta table history for rows written in THIS run only
-                # We need to filter to operations that happened during this streaming run
+                # Compare version before/after to detect if new data was written
                 if rows_written is None and path and format == "delta":
                     try:
                         full_path = connection.get_path(path)
-                        # Get the most recent operation - should be from this run
                         history_df = self.spark.sql(f"DESCRIBE HISTORY delta.`{full_path}` LIMIT 1")
                         rows = history_df.collect()
                         if rows:
                             row = rows[0]
-                            metrics = (
-                                row.operationMetrics
-                                if hasattr(row, "operationMetrics")
-                                else row["operationMetrics"]
+                            version_after = (
+                                row.version if hasattr(row, "version") else row["version"]
                             )
-                            if metrics:
-                                # For streaming: numAddedRows is rows added in this batch
-                                # numOutputRows can be misleading (may include unchanged rows)
-                                added_rows = metrics.get("numAddedRows")
-                                if added_rows is not None:
-                                    rows_written = int(added_rows)
-                                else:
-                                    # Fallback to numOutputRows only if numAddedRows unavailable
-                                    output_rows = metrics.get("numOutputRows")
-                                    if output_rows is not None:
-                                        rows_written = int(output_rows)
+
+                            # If version hasn't changed, no new data was written
+                            if version_before is not None and version_after == version_before:
+                                rows_written = 0
+                            else:
+                                # New version created - get the row count from metrics
+                                metrics = (
+                                    row.operationMetrics
+                                    if hasattr(row, "operationMetrics")
+                                    else row["operationMetrics"]
+                                )
+                                if metrics:
+                                    # For streaming: numAddedRows is rows added in this batch
+                                    added_rows = metrics.get("numAddedRows")
+                                    if added_rows is not None:
+                                        rows_written = int(added_rows)
+                                    else:
+                                        # Fallback to numOutputRows
+                                        output_rows = metrics.get("numOutputRows")
+                                        if output_rows is not None:
+                                            rows_written = int(output_rows)
                     except Exception:
                         pass
 
