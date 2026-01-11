@@ -515,19 +515,17 @@ class DerivedUpdater:
             logger.debug(f"Already claimed: {derived_table}/{run_id}")
             return None
 
-        # Append new claim row
-        new_row = pd.DataFrame(
-            [
-                {
-                    "derived_table": derived_table,
-                    "run_id": run_id,
-                    "claim_token": claim_token,
-                    "status": "CLAIMED",
-                    "claimed_at": now,
-                    "applied_at": None,
-                    "error_message": None,
-                }
-            ]
+        # Append new claim row with explicit Arrow schema for type compatibility
+        new_row = pa.table(
+            {
+                "derived_table": [derived_table],
+                "run_id": [run_id],
+                "claim_token": [claim_token],
+                "status": ["CLAIMED"],
+                "claimed_at": pa.array([now], type=pa.timestamp("us", tz="UTC")),
+                "applied_at": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+                "error_message": pa.array([None], type=pa.string()),
+            }
         )
 
         def _do_append():
@@ -582,7 +580,7 @@ class DerivedUpdater:
         error_message: Optional[str],
     ) -> None:
         """Helper: read-modify-write for guard table updates in pandas mode."""
-        if not DeltaTable or not pd or not write_deltalake:
+        if not DeltaTable or not pd or not pa or not write_deltalake:
             raise ImportError("deltalake library required for pandas mode claim lifecycle")
 
         storage_opts = self.catalog._get_storage_options()
@@ -612,6 +610,7 @@ class DerivedUpdater:
                 self._guard_path,
                 df,
                 mode="overwrite",
+                schema_mode="overwrite",
                 storage_options=storage_opts or None,
             )
 
@@ -622,7 +621,7 @@ class DerivedUpdater:
         self, derived_table: str, run_id: str, max_age_minutes: int
     ) -> Optional[str]:
         """Pandas/delta-rs: read-modify-write CAS for reclaim, fall back to try_claim if no row."""
-        if not DeltaTable or not pd or not write_deltalake:
+        if not DeltaTable or not pd or not pa or not write_deltalake:
             raise ImportError("deltalake library required for pandas mode claim lifecycle")
 
         claim_token = str(uuid.uuid4())
@@ -651,7 +650,7 @@ class DerivedUpdater:
             df.loc[mask, "claim_token"] = claim_token
             df.loc[mask, "status"] = "CLAIMED"
             df.loc[mask, "claimed_at"] = now
-            df.loc[mask, "applied_at"] = None
+            df.loc[mask, "applied_at"] = pd.NaT
             df.loc[mask, "error_message"] = None
         elif status == "CLAIMED":
             claimed_at = row["claimed_at"]
@@ -667,7 +666,7 @@ class DerivedUpdater:
                 return None
             df.loc[mask, "claim_token"] = claim_token
             df.loc[mask, "claimed_at"] = now
-            df.loc[mask, "applied_at"] = None
+            df.loc[mask, "applied_at"] = pd.NaT
             df.loc[mask, "error_message"] = None
         else:
             logger.debug(f"Unknown status {status} for {derived_table}/{run_id}")
@@ -675,7 +674,11 @@ class DerivedUpdater:
 
         def _do_overwrite():
             write_deltalake(
-                self._guard_path, df, mode="overwrite", storage_options=storage_opts or None
+                self._guard_path,
+                df,
+                mode="overwrite",
+                schema_mode="overwrite",
+                storage_options=storage_opts or None,
             )
 
         _retry_delta_operation(_do_overwrite)
@@ -707,22 +710,21 @@ class DerivedUpdater:
         timestamp: datetime,
     ) -> None:
         """Pandas/delta-rs: append to meta_observability_errors."""
-        if not pd or not write_deltalake:
+        if not pa or not write_deltalake:
             return  # Silently skip if library not available
 
         storage_opts = self.catalog._get_storage_options()
-        row = pd.DataFrame(
-            [
-                {
-                    "error_id": error_id,
-                    "run_id": run_id,
-                    "pipeline_name": pipeline_name,
-                    "component": component,
-                    "error_message": error_message,
-                    "timestamp": timestamp,
-                    "date": timestamp.date(),
-                }
-            ]
+        # Use PyArrow table with explicit schema for type compatibility
+        row = pa.table(
+            {
+                "error_id": [error_id],
+                "run_id": pa.array([run_id], type=pa.string()),
+                "pipeline_name": pa.array([pipeline_name], type=pa.string()),
+                "component": [component],
+                "error_message": pa.array([error_message], type=pa.string()),
+                "timestamp": pa.array([timestamp], type=pa.timestamp("us", tz="UTC")),
+                "date": pa.array([timestamp.date()], type=pa.date32()),
+            }
         )
 
         def _do_append():
