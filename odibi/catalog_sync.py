@@ -197,16 +197,29 @@ class CatalogSyncer:
 
     def _get_target_type(self) -> str:
         """Determine target connection type."""
-        if hasattr(self.target, "type"):
-            conn_type = self.target.type
-        elif hasattr(self.target, "connection_type"):
+        # Check various ways connections expose their type
+        conn_type = None
+        if hasattr(self.target, "connection_type"):
             conn_type = self.target.connection_type
+        elif hasattr(self.target, "type"):
+            conn_type = self.target.type
         else:
+            # Check class name as fallback
+            class_name = self.target.__class__.__name__.lower()
+            if "sql" in class_name:
+                conn_type = "sql_server"
+            elif "adls" in class_name or "azure" in class_name or "blob" in class_name:
+                conn_type = "azure_adls"
+            elif "local" in class_name:
+                conn_type = "local"
+
+        if conn_type is None:
             conn_type = "unknown"
 
-        if conn_type in ("sql_server", "azure_sql"):
+        # Normalize to sql_server or delta
+        if conn_type in ("sql_server", "azure_sql", "AzureSQL"):
             return "sql_server"
-        elif conn_type in ("azure_blob", "adls", "local"):
+        elif conn_type in ("azure_blob", "azure_adls", "adls", "local", "s3", "gcs"):
             return "delta"
         else:
             return "delta"  # Default to delta
@@ -317,7 +330,26 @@ class CatalogSyncer:
     def _sync_to_delta(self, table: str) -> Dict[str, Any]:
         """Sync a single table to another Delta location."""
         source_path = self.source.tables.get(table)
-        target_path = f"{self.target.get_path(self.config.path or '_odibi_system')}/{table}"
+
+        # Build target path - ensure it's absolute
+        sync_path = self.config.path or "_odibi_system"
+        if hasattr(self.target, "get_path"):
+            base_path = self.target.get_path(sync_path)
+        elif hasattr(self.target, "uri"):
+            base_path = self.target.uri(sync_path)
+        else:
+            # Fallback - this shouldn't happen for blob connections
+            base_path = sync_path
+
+        target_path = f"{base_path}/{table}"
+
+        # Validate path is absolute (abfss://, s3://, etc.)
+        if not target_path.startswith(("abfss://", "s3://", "gs://", "az://", "/")):
+            return {
+                "success": False,
+                "error": f"Target path is not absolute: {target_path}. Check sync_to connection.",
+                "rows": 0,
+            }
 
         if not source_path:
             return {"success": False, "error": f"Table {table} not found in source", "rows": 0}
