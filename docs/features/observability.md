@@ -516,6 +516,55 @@ After running this pipeline:
 - `meta_pipeline_health`: Upserted with lifetime stats
 - `meta_sla_status`: Upserted with freshness compliance
 
+## Executive Dashboard Views
+
+When using [Catalog Sync](catalog_sync.md) to replicate data to SQL Server, Odibi automatically creates pre-built views optimized for visualization tools.
+
+### Available Views
+
+| View | Purpose | Key Metrics |
+|------|---------|-------------|
+| `vw_pipeline_health_status` | RAG status per pipeline | `health_status` (RED/AMBER/GREEN), `health_reason` |
+| `vw_exec_overview` | Executive summary by project | Success rates (7d/30d/90d), cost trends, reliability score |
+| `vw_table_freshness` | Data staleness monitoring | `freshness_status`, `hours_since_update` |
+| `vw_pipeline_sla_status` | SLA compliance dashboard | `sla_met`, `hours_overdue`, `sla_rag` |
+| `vw_exec_current_issues` | What's broken now | Failed pipelines with error details, priority order |
+| `vw_pipeline_risk` | Risk scoring | `risk_score`, `risk_level` (CRITICAL/HIGH/MEDIUM/LOW) |
+| `vw_cost_summary` | Cost tracking | 7d/30d costs, runtime hours, cost trends |
+
+### Health Status Logic
+
+The `vw_pipeline_health_status` view uses this RAG logic:
+
+| Status | Condition |
+|--------|-----------|
+| RED | Last run failed, success rate <90%, or no runs in 7 days |
+| AMBER | Success rate <100% or no run in 48+ hours |
+| GREEN | 100% success rate and recent runs |
+
+### SLA Status Logic
+
+The `vw_pipeline_sla_status` view combines SLA tracking with business context:
+
+| RAG | Condition |
+|-----|-----------|
+| GREEN | SLA met |
+| AMBER | SLA breached by ≤1 hour |
+| RED | SLA breached by >1 hour or high-criticality pipeline not successful |
+
+### Risk Scoring
+
+The `vw_pipeline_risk` view calculates risk as:
+
+```
+risk_score = criticality_weight × (failure_rate × 100 + log10(runtime_hours) × 5)
+```
+
+Where `criticality_weight` is 3 (High), 2 (Medium), or 1 (Low).
+
+!!! tip "Business Context"
+    Populate `dim_pipeline_context` with `business_owner`, `business_process`, and `business_criticality` to enhance these views with business metadata.
+
 ## Best Practices
 
 1. **Set owners** - Configure `owner` on all pipelines for accountability
