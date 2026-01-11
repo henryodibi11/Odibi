@@ -1590,21 +1590,49 @@ class SparkEngine(Engine):
 
                 # Get rows written from streaming query progress
                 rows_written = None
+
+                # Method 1: Sum all micro-batch progress (most accurate for streaming)
                 try:
-                    progress = query.lastProgress
-                    if progress and "numOutputRows" in progress.get("sink", {}):
-                        rows_written = progress["sink"]["numOutputRows"]
-                    elif progress and "numInputRows" in progress:
-                        rows_written = progress["numInputRows"]
+                    recent_progress = query.recentProgress
+                    if recent_progress:
+                        total_rows = 0
+                        for prog in recent_progress:
+                            if prog:
+                                # Try sink output rows first, then input rows
+                                sink = prog.get("sink", {})
+                                if sink and sink.get("numOutputRows") is not None:
+                                    total_rows += sink["numOutputRows"]
+                                elif prog.get("numInputRows") is not None:
+                                    total_rows += prog["numInputRows"]
+                        if total_rows > 0:
+                            rows_written = total_rows
                 except Exception:
                     pass
 
-                # Fallback: query the Delta table for row count if format is delta
+                # Method 2: Check Delta table history for rows written in recent operations
                 if rows_written is None and path and format == "delta":
                     try:
                         full_path = connection.get_path(path)
-                        count_df = self.spark.read.format("delta").load(full_path)
-                        rows_written = count_df.count()
+                        # Get the most recent STREAMING UPDATE operation
+                        history_df = self.spark.sql(
+                            f"DESCRIBE HISTORY delta.`{full_path}` LIMIT 5"
+                        )
+                        for row in history_df.collect():
+                            op = row.operation if hasattr(row, "operation") else row["operation"]
+                            if op in ("STREAMING UPDATE", "WRITE", "MERGE"):
+                                metrics = (
+                                    row.operationMetrics
+                                    if hasattr(row, "operationMetrics")
+                                    else row["operationMetrics"]
+                                )
+                                if metrics:
+                                    # numOutputRows for streaming, numAddedRows for batch
+                                    rows_written = metrics.get(
+                                        "numOutputRows", metrics.get("numAddedRows")
+                                    )
+                                    if rows_written is not None:
+                                        rows_written = int(rows_written)
+                                        break
                     except Exception:
                         pass
 
