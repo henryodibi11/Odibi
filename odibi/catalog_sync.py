@@ -674,11 +674,11 @@ SQL_SERVER_VIEWS = {
             a30.runs_30d,
             a30.runtime_hours_30d,
             a30.cost_30d,
-            CASE
+            CAST(CASE
                 WHEN a7.cost_7d > 0 AND a30.cost_30d > 0
-                THEN (a7.cost_7d * 4) / a30.cost_30d - 1
-                ELSE 0
-            END as cost_trend
+                THEN (a7.cost_7d * 4.0) / a30.cost_30d - 1.0
+                ELSE 0.0
+            END AS FLOAT) as cost_trend
         FROM agg_7d a7
         LEFT JOIN agg_30d a30
           ON a7.project = a30.project
