@@ -130,6 +130,28 @@ def _get_guard_table_arrow_schema():
     )
 
 
+def _convert_df_for_delta(df: "pd.DataFrame") -> "pa.Table":
+    """Convert DataFrame to PyArrow Table, casting null-only columns to string.
+
+    Delta Lake rejects columns with Null type (inferred when all values are None).
+    This helper detects such columns and casts them to string type.
+    """
+    if not pa or not pd:
+        raise ImportError("pyarrow and pandas required")
+
+    arrow_table = pa.Table.from_pandas(df, preserve_index=False)
+
+    new_columns = []
+    for i, col in enumerate(arrow_table.column_names):
+        column = arrow_table.column(i)
+        if pa.types.is_null(column.type):
+            new_columns.append(column.cast(pa.string()))
+        else:
+            new_columns.append(column)
+
+    return pa.table(dict(zip(arrow_table.column_names, new_columns)))
+
+
 class DerivedUpdater:
     """
     Manages claim lifecycle for derived table updates.
@@ -284,8 +306,8 @@ class DerivedUpdater:
                     error_id, run_id, pipeline_name, component, error_msg, now
                 )
             # If no backend available, silently skip (observability never fails)
-        except Exception:
-            # Swallow ALL exceptions - observability errors must never propagate
+        except BaseException:
+            # Swallow ALL exceptions including Rust panics - observability errors must never propagate
             pass
 
     # =========================================================================
@@ -1500,10 +1522,14 @@ class DerivedUpdater:
             ]
 
         result = pd.concat([existing, new_row], ignore_index=True)
+        result_arrow = _convert_df_for_delta(result)
 
         def _do_overwrite():
             write_deltalake(
-                daily_stats_path, result, mode="overwrite", storage_options=storage_opts or None
+                daily_stats_path,
+                result_arrow,
+                mode="overwrite",
+                storage_options=storage_opts or None,
             )
 
         _retry_delta_operation(_do_overwrite)
@@ -1608,10 +1634,14 @@ class DerivedUpdater:
             existing = existing[existing["pipeline_name"] != pipeline_name]
 
         result = pd.concat([existing, new_row], ignore_index=True)
+        result_arrow = _convert_df_for_delta(result)
 
         def _do_overwrite():
             write_deltalake(
-                health_path, result, mode="overwrite", storage_options=storage_opts or None
+                health_path,
+                result_arrow,
+                mode="overwrite",
+                storage_options=storage_opts or None,
             )
 
         _retry_delta_operation(_do_overwrite)
@@ -1692,10 +1722,14 @@ class DerivedUpdater:
             existing = existing[existing["pipeline_name"] != pipeline_name]
 
         result = pd.concat([existing, new_row], ignore_index=True)
+        result_arrow = _convert_df_for_delta(result)
 
         def _do_overwrite():
             write_deltalake(
-                sla_path, result, mode="overwrite", storage_options=storage_opts or None
+                sla_path,
+                result_arrow,
+                mode="overwrite",
+                storage_options=storage_opts or None,
             )
 
         _retry_delta_operation(_do_overwrite)
