@@ -1028,9 +1028,9 @@ class Pipeline:
                 "error_summary": first_error,
                 "terminal_nodes": ",".join(terminal_node_names) if terminal_node_names else None,
                 "environment": getattr(self.config, "environment", None),
-                "databricks_cluster_id": None,  # Future: extract from Spark context
-                "databricks_job_id": None,
-                "databricks_workspace_id": None,
+                "databricks_cluster_id": self._get_databricks_cluster_id(),
+                "databricks_job_id": self._get_databricks_job_id(),
+                "databricks_workspace_id": self._get_databricks_workspace_id(),
                 "created_at": now,
             }
 
@@ -1307,6 +1307,39 @@ class Pipeline:
             value: HWM value
         """
         self._pending_hwm_updates.append({"key": key, "value": value})
+
+    def _get_databricks_cluster_id(self) -> Optional[str]:
+        """Extract Databricks cluster ID from Spark context."""
+        try:
+            if hasattr(self.engine, "spark") and self.engine.spark:
+                return self.engine.spark.conf.get(
+                    "spark.databricks.clusterUsageTags.clusterId", None
+                )
+        except Exception:
+            pass
+        return None
+
+    def _get_databricks_job_id(self) -> Optional[str]:
+        """Extract Databricks job ID from Spark context."""
+        try:
+            if hasattr(self.engine, "spark") and self.engine.spark:
+                # Try job ID first, then run ID
+                job_id = self.engine.spark.conf.get("spark.databricks.job.id", None)
+                if job_id:
+                    return job_id
+                return self.engine.spark.conf.get("spark.databricks.job.runId", None)
+        except Exception:
+            pass
+        return None
+
+    def _get_databricks_workspace_id(self) -> Optional[str]:
+        """Extract Databricks workspace ID from Spark context."""
+        try:
+            if hasattr(self.engine, "spark") and self.engine.spark:
+                return self.engine.spark.conf.get("spark.databricks.workspaceId", None)
+        except Exception:
+            pass
+        return None
 
     def _flush_batch_writes(self) -> None:
         """Flush all buffered catalog writes in single batch operations.
