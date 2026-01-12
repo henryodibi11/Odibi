@@ -3223,6 +3223,10 @@ class Node:
                 def safe_default(o):
                     return str(o)
 
+                # Ensure version_hash is in metadata for resume capability
+                if result_for_log.success and "version_hash" not in result_for_log.metadata:
+                    result_for_log.metadata["version_hash"] = self.get_version_hash()
+
                 try:
                     metrics_json = json.dumps(result_for_log.metadata, default=safe_default)
                 except Exception:
