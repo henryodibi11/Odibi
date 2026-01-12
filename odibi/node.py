@@ -625,13 +625,15 @@ class NodeExecutor:
         dataframes = {}
 
         for name, ref in config.inputs.items():
+            df = None
+            from_cache = False
+
             if is_pipeline_reference(ref):
                 # Parse the reference to check if it's same-pipeline
                 parts = ref[1:].split(".", 1)  # Remove $ and split
                 ref_pipeline = parts[0] if len(parts) == 2 else None
                 ref_node = parts[1] if len(parts) == 2 else None
 
-                df = None
                 read_from_catalog = False
                 read_config = None
                 connection = None
@@ -651,6 +653,7 @@ class NodeExecutor:
                             source_node=ref_node,
                         )
                         df = cached_df
+                        from_cache = True
 
                 # 2) Catalog / Delta read:
                 #    - fallback for same-pipeline if cache miss
@@ -738,12 +741,18 @@ class NodeExecutor:
                     f"2) A read config dict with 'connection', 'format', and 'table'/'path' keys."
                 )
 
-            if df is not None and hasattr(df, "persist") and not getattr(df, "isStreaming", False):
+            # Only persist if we read from Delta (not from cache - already persisted)
+            if (
+                df is not None
+                and not from_cache
+                and hasattr(df, "persist")
+                and not getattr(df, "isStreaming", False)
+            ):
                 df = df.persist()
                 self._persisted_inputs.append(df)
             dataframes[name] = df
-            # After persist, count is cheap; for non-lazy engines, also count
-            row_count = self._count_rows(df) if df is not None else 0
+            # After persist, count is cheap; skip for lazy engines if from cache
+            row_count = self._count_rows_safe(df) if df is not None else 0
             ctx.info(
                 f"Loaded input '{name}'",
                 rows=row_count,
