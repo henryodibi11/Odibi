@@ -214,15 +214,15 @@ class CatalogStateBackend(StateBackend):
                 df.filter(
                     (F.col("pipeline_name") == pipeline_name) & (F.col("node_name") == node_name)
                 )
-                .select("status", "metadata")
+                .select("status", "metrics_json")
                 .orderBy(F.col("timestamp").desc())
                 .first()
             )
             if row:
                 meta = {}
-                if row.metadata:
+                if row.metrics_json:
                     try:
-                        meta = json.loads(row.metadata)
+                        meta = json.loads(row.metrics_json)
                     except Exception as e:
                         logger.debug(f"Failed to parse metadata JSON: {e}")
                 return {"success": (row.status == "SUCCESS"), "metadata": meta}
