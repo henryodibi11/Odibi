@@ -1285,8 +1285,12 @@ class SqlServerMergeWriter:
                 )
 
                 # Create table using JDBC write with overwrite mode (initial load)
-                staging_jdbc_options = {**jdbc_options, "dbtable": target_table}
-                df.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
+                initial_jdbc_options = {
+                    **jdbc_options,
+                    "dbtable": target_table,
+                    "batchsize": str(options.batch_size) if options.batch_size else "10000",
+                }
+                df.write.format("jdbc").options(**initial_jdbc_options).mode("overwrite").save()
 
                 row_count = df.count()
 
@@ -1418,7 +1422,11 @@ class SqlServerMergeWriter:
                     self.ctx.info("No changed rows detected, skipping merge")
                     return MergeResult(inserted=0, updated=0, deleted=0)
 
-        staging_jdbc_options = {**jdbc_options, "dbtable": staging_table}
+        staging_jdbc_options = {
+            **jdbc_options,
+            "dbtable": staging_table,
+            "batchsize": str(options.batch_size) if options.batch_size else "10000",
+        }
         df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
 
         self.ctx.debug("Staging write completed", staging_table=staging_table)

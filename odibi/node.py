@@ -304,6 +304,15 @@ class NodeExecutor:
                         config, result_df, input_df, ctx, input_dataframes
                     )
 
+                # Persist result after transforms to avoid recomputation on counts/writes
+                if (
+                    result_df is not None
+                    and hasattr(result_df, "persist")
+                    and not getattr(result_df, "isStreaming", False)
+                ):
+                    result_df = result_df.persist()
+                    self._persisted_inputs.append(result_df)
+
                 # 3. Validation Phase (returns filtered df if quarantine is used)
                 with phase_timer.phase("validation"):
                     result_df = self._execute_validation_phase(config, result_df, ctx)
