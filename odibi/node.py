@@ -2644,11 +2644,10 @@ class NodeExecutor:
             metadata["rows_written"] = rows_written
             metadata["schema"] = self._get_schema(df)
             metadata["source_files"] = self.engine.get_source_files(df)
-            # Skip null profiling if configured or for lazy engines (expensive for Spark)
-            skip_null_profiling = (
-                self.performance_config
-                and getattr(self.performance_config, "skip_null_profiling", False)
-            ) or self.engine.is_lazy
+            # Skip null profiling if configured (expensive for large DataFrames)
+            skip_null_profiling = self.performance_config and getattr(
+                self.performance_config, "skip_null_profiling", False
+            )
             if skip_null_profiling:
                 metadata["null_profile"] = {}
             else:
