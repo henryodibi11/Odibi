@@ -148,6 +148,7 @@ class NodeExecutor:
         self._validation_warnings: List[str] = []
         self._read_row_count: Optional[int] = None  # Cache row count from read phase
         self._table_exists_cache: Dict[str, bool] = {}  # Cache table existence checks
+        self._persisted_inputs: List[Any] = []  # Track persisted DataFrames for cleanup
 
     def _cached_table_exists(
         self,
@@ -198,6 +199,7 @@ class NodeExecutor:
         self._validation_warnings = []
         self._read_row_count = None
         self._table_exists_cache = {}  # Reset cache per execution
+        self._persisted_inputs = []  # Reset persisted inputs tracking
 
         ctx = create_logging_context(
             node_id=config.name,
@@ -371,6 +373,8 @@ class NodeExecutor:
                     phase_timings_ms=phase_timer.summary_ms(),
                 )
 
+                self._unpersist_inputs()
+
                 return NodeResult(
                     node_name=config.name,
                     success=True,
@@ -415,6 +419,8 @@ class NodeExecutor:
                     )
                 else:
                     error = e
+
+                self._unpersist_inputs()
 
                 return NodeResult(
                     node_name=config.name,
@@ -719,6 +725,13 @@ class NodeExecutor:
                     f"2) A read config dict with 'connection', 'format', and 'table'/'path' keys."
                 )
 
+            if (
+                df is not None
+                and hasattr(df, "persist")
+                and not getattr(df, "isStreaming", False)
+            ):
+                df = df.persist()
+                self._persisted_inputs.append(df)
             dataframes[name] = df
             row_count = self._count_rows(df) if df is not None else 0
             ctx.info(
@@ -2798,6 +2811,16 @@ class NodeExecutor:
         if df is not None and getattr(df, "isStreaming", False):
             return None
         return self.engine.count_rows(df)
+
+    def _unpersist_inputs(self) -> None:
+        """Unpersist any DataFrames that were cached during input loading."""
+        for df in self._persisted_inputs:
+            try:
+                if hasattr(df, "unpersist"):
+                    df.unpersist()
+            except Exception:
+                pass
+        self._persisted_inputs = []
 
     def _get_column_max(self, df: Any, column: str, fallback_column: Optional[str] = None) -> Any:
         """Get maximum value of a column, with optional fallback for NULL values."""
