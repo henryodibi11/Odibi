@@ -1406,18 +1406,24 @@ class SqlServerMergeWriter:
             if hash_column:
                 # Read target hashes and filter source
                 target_hashes = self.read_target_hashes(target_table, merge_keys, hash_column)
-                original_count = df_to_write.count()
+                # Skip counts for lazy engines (Spark) to avoid recomputation
+                is_lazy = getattr(spark_engine, "is_lazy", False) if spark_engine else False
+                original_count = None if is_lazy else df_to_write.count()
                 df_to_write = self.filter_changed_rows_spark(
                     df_to_write, target_hashes, merge_keys, hash_column
                 )
-                filtered_count = df_to_write.count()
-                self.ctx.info(
-                    "Incremental filter applied",
-                    original_rows=original_count,
-                    changed_rows=filtered_count,
-                    skipped_rows=original_count - filtered_count,
-                )
+                filtered_count = None if is_lazy else df_to_write.count()
+                if original_count is not None and filtered_count is not None:
+                    self.ctx.info(
+                        "Incremental filter applied",
+                        original_rows=original_count,
+                        changed_rows=filtered_count,
+                        skipped_rows=original_count - filtered_count,
+                    )
+                else:
+                    self.ctx.info("Incremental filter applied (row counts skipped for lazy engine)")
 
+                # For eager engines, skip merge if no changes; for lazy, we proceed
                 if filtered_count == 0:
                     self.ctx.info("No changed rows detected, skipping merge")
                     return MergeResult(inserted=0, updated=0, deleted=0)

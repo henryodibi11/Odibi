@@ -13,6 +13,18 @@ class Engine(ABC):
     _custom_readers: Dict[str, Any] = {}
     _custom_writers: Dict[str, Any] = {}
 
+    @property
+    def is_lazy(self) -> bool:
+        """Whether this engine uses lazy evaluation.
+
+        Lazy engines (like Spark) should avoid intermediate count() calls
+        as they trigger full recomputation of the DAG.
+
+        Returns:
+            True for lazy engines (Spark), False for eager engines (Pandas, Polars)
+        """
+        return False
+
     @classmethod
     def register_format(cls, fmt: str, reader: Optional[Any] = None, writer: Optional[Any] = None):
         """Register custom format reader/writer.

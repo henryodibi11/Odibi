@@ -501,7 +501,11 @@ def _build_source_keys_query(config: DeleteDetectionConfig) -> str:
 
 
 def _get_row_count(df: Any, engine_type: EngineType) -> int:
-    """Get row count from DataFrame."""
+    """Get row count from DataFrame.
+
+    Note: This intentionally uses direct count() rather than count_rows_safe()
+    because the count is used for threshold logic, not just logging.
+    """
     if engine_type == EngineType.SPARK:
         return df.count()
     else:

@@ -50,24 +50,12 @@ def filter_rows(context: EngineContext, params: FilterRowsParams) -> EngineConte
         condition=params.condition,
     )
 
-    rows_before = None
-    try:
-        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
-        if rows_before is None and hasattr(context.df, "count"):
-            rows_before = context.df.count()
-    except Exception as e:
-        ctx.debug(f"Could not get row count before transform: {type(e).__name__}")
+    rows_before = context.count_rows_safe()
 
     sql_query = f"SELECT * FROM df WHERE {params.condition}"
     result = context.sql(sql_query)
 
-    rows_after = None
-    try:
-        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
-        if rows_after is None and hasattr(result.df, "count"):
-            rows_after = result.df.count()
-    except Exception as e:
-        ctx.debug(f"Could not get row count after transform: {type(e).__name__}")
+    rows_after = context.count_rows_safe(result.df)
 
     elapsed_ms = (time.time() - start_time) * 1000
     rows_filtered = rows_before - rows_after if rows_before and rows_after else None

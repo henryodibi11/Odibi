@@ -138,13 +138,7 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
 
     source_df = context.df if current is None else current
 
-    rows_before = None
-    try:
-        rows_before = source_df.shape[0] if hasattr(source_df, "shape") else None
-        if rows_before is None and hasattr(source_df, "count"):
-            rows_before = source_df.count()
-    except Exception as e:
-        ctx.debug(f"Could not get row count: {type(e).__name__}")
+    rows_before = context.count_rows_safe(source_df)
 
     ctx.debug(
         "SCD2 source loaded",
@@ -166,13 +160,7 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
             f"Check your engine configuration or use a different transformer."
         )
 
-    rows_after = None
-    try:
-        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
-        if rows_after is None and hasattr(result.df, "count"):
-            rows_after = result.df.count()
-    except Exception as e:
-        ctx.debug(f"Could not get row count: {type(e).__name__}")
+    rows_after = context.count_rows_safe(result.df)
 
     elapsed_ms = (time.time() - start_time) * 1000
     ctx.debug(

@@ -70,6 +70,11 @@ class SparkEngine(Engine):
     name = "spark"
     engine_type = EngineType.SPARK
 
+    @property
+    def is_lazy(self) -> bool:
+        """Spark uses lazy evaluation - avoid intermediate counts."""
+        return True
+
     def __init__(
         self,
         connections: Optional[Dict[str, Any]] = None,

@@ -258,7 +258,7 @@ class NodeExecutor:
                             result_df = input_df
                             ctx.debug(
                                 "Using provided input_df",
-                                rows=self._count_rows(input_df) if input_df is not None else 0,
+                                rows=self._count_rows_safe(input_df),
                             )
                         elif config.depends_on:
                             result_df = self.context.get(config.depends_on[0])
@@ -266,7 +266,7 @@ class NodeExecutor:
                                 input_df = result_df
                             ctx.debug(
                                 f"Using data from dependency: {config.depends_on[0]}",
-                                rows=self._count_rows(result_df) if result_df is not None else 0,
+                                rows=self._count_rows_safe(result_df),
                             )
 
                     if config.read:
@@ -277,10 +277,11 @@ class NodeExecutor:
                     if input_df is not None:
                         input_schema = self._get_schema(input_df)
                         # Reuse row count from read phase if available (avoids redundant count)
+                        # For lazy engines, skip count if not already cached
                         rows_in = (
                             self._read_row_count
                             if self._read_row_count is not None
-                            else self._count_rows(input_df)
+                            else self._count_rows_safe(input_df)
                         )
                         metrics.rows_in = rows_in
                         metrics.schema_before = (
@@ -738,6 +739,7 @@ class NodeExecutor:
                 df = df.persist()
                 self._persisted_inputs.append(df)
             dataframes[name] = df
+            # After persist, count is cheap; for non-lazy engines, also count
             row_count = self._count_rows(df) if df is not None else 0
             ctx.info(
                 f"Loaded input '{name}'",
@@ -1188,7 +1190,7 @@ class NodeExecutor:
         input_dataframes = input_dataframes or {}
 
         pii_meta = self._calculate_pii(config)
-        rows_before = self._count_rows(result_df) if result_df is not None else None
+        rows_before = self._count_rows_safe(result_df)
         schema_before = self._get_schema(result_df) if result_df is not None else None
 
         # Register named inputs in context for SQL access
@@ -1204,7 +1206,7 @@ class NodeExecutor:
         if config.transformer:
             if result_df is None and input_df is not None:
                 result_df = input_df
-                rows_before = self._count_rows(result_df)
+                rows_before = self._count_rows_safe(result_df)
                 schema_before = self._get_schema(result_df)
 
             with ctx.operation(
@@ -1273,7 +1275,7 @@ class NodeExecutor:
                             compliance_score=1.0,
                         )
 
-                rows_after = self._count_rows(result_df) if result_df is not None else None
+                rows_after = self._count_rows_safe(result_df)
                 schema_after = self._get_schema(result_df) if result_df is not None else None
                 metrics.rows_out = rows_after
                 if isinstance(schema_after, dict):
@@ -1396,7 +1398,7 @@ class NodeExecutor:
             total_steps = len(transform_config.steps)
             for step_idx, step in enumerate(transform_config.steps):
                 step_name = self._get_step_name(step)
-                rows_before = self._count_rows(current_df) if current_df is not None else None
+                rows_before = self._count_rows_safe(current_df)
                 schema_before = self._get_schema(current_df) if current_df is not None else None
 
                 try:
@@ -1444,9 +1446,7 @@ class NodeExecutor:
                                     f"Each step must have exactly one of: 'sql', 'sql_file', 'function', or 'operation'."
                                 )
 
-                        rows_after = (
-                            self._count_rows(current_df) if current_df is not None else None
-                        )
+                        rows_after = self._count_rows_safe(current_df)
                         schema_after = (
                             self._get_schema(current_df) if current_df is not None else None
                         )
@@ -2814,6 +2814,18 @@ class NodeExecutor:
 
     def _count_rows(self, df: Any) -> Optional[int]:
         if df is not None and getattr(df, "isStreaming", False):
+            return None
+        return self.engine.count_rows(df)
+
+    def _count_rows_safe(self, df: Any) -> Optional[int]:
+        """Count rows, but skip for lazy engines to avoid recomputation.
+
+        Use this for non-essential counts (logging, debug). For essential counts
+        (after persist, metrics), use _count_rows directly.
+        """
+        if df is not None and getattr(df, "isStreaming", False):
+            return None
+        if self.engine.is_lazy:
             return None
         return self.engine.count_rows(df)
 

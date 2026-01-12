@@ -47,14 +47,7 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
         order_by=params.order_by,
     )
 
-    # Get row count before transformation (optional, for logging only)
-    rows_before = None
-    try:
-        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
-        if rows_before is None and hasattr(context.df, "count"):
-            rows_before = context.df.count()
-    except Exception as e:
-        ctx.debug(f"Could not get row count before transform: {type(e).__name__}")
+    rows_before = context.count_rows_safe()
 
     partition_clause = ", ".join(params.keys)
     order_clause = params.order_by if params.order_by else "(SELECT NULL)"
@@ -74,14 +67,7 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
     """
     result = context.sql(sql_query)
 
-    # Get row count after transformation (optional, for logging only)
-    rows_after = None
-    try:
-        rows_after = result.df.shape[0] if hasattr(result.df, "shape") else None
-        if rows_after is None and hasattr(result.df, "count"):
-            rows_after = result.df.count()
-    except Exception as e:
-        ctx.debug(f"Could not get row count after transform: {type(e).__name__}")
+    rows_after = context.count_rows_safe(result.df)
 
     elapsed_ms = (time.time() - start_time) * 1000
     duplicates_removed = rows_before - rows_after if rows_before and rows_after else None
@@ -131,13 +117,7 @@ def explode_list_column(context: EngineContext, params: ExplodeParams) -> Engine
         outer=params.outer,
     )
 
-    rows_before = None
-    try:
-        rows_before = context.df.shape[0] if hasattr(context.df, "shape") else None
-        if rows_before is None and hasattr(context.df, "count"):
-            rows_before = context.df.count()
-    except Exception:
-        pass
+    rows_before = context.count_rows_safe()
 
     if context.engine_type == EngineType.SPARK:
         import pyspark.sql.functions as F
@@ -145,7 +125,7 @@ def explode_list_column(context: EngineContext, params: ExplodeParams) -> Engine
         func = F.explode_outer if params.outer else F.explode
         df = context.df.withColumn(params.column, func(F.col(params.column)))
 
-        rows_after = df.count() if hasattr(df, "count") else None
+        rows_after = context.count_rows_safe(df)
         elapsed_ms = (time.time() - start_time) * 1000
         ctx.debug(
             "Explode completed",
@@ -161,7 +141,7 @@ def explode_list_column(context: EngineContext, params: ExplodeParams) -> Engine
         if not params.outer:
             df = df.dropna(subset=[params.column])
 
-        rows_after = df.shape[0] if hasattr(df, "shape") else None
+        rows_after = context.count_rows_safe(df)
         elapsed_ms = (time.time() - start_time) * 1000
         ctx.debug(
             "Explode completed",
