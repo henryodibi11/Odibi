@@ -49,14 +49,16 @@ def test_view_name_validation(spark_context):
     assert "alphanumeric" in str(exc.value)
 
 
-def test_get_returns_table(spark_context):
-    """Verify get logic."""
+def test_get_returns_stored_dataframe(spark_context):
+    """Verify get returns the original DataFrame reference (preserves persist)."""
     df = MockDataFrame()
     spark_context.register("node1", df)
 
-    # Get calls table()
-    spark_context.get("node1")
-    spark_context.spark.table.assert_called_with("node1")
+    # Get returns the stored DataFrame reference, not spark.table()
+    result = spark_context.get("node1")
+    assert result is df
+    # spark.table should NOT be called - we return the stored reference directly
+    spark_context.spark.table.assert_not_called()
 
 
 def test_thread_safety(spark_context):
