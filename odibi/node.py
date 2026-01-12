@@ -2637,17 +2637,18 @@ class NodeExecutor:
                 cached_row_count = self._delta_write_info.get("_cached_row_count")
                 rows_written = self._delta_write_info.get("_cached_row_count")
             metadata["rows"] = (
-                cached_row_count if cached_row_count is not None else self._count_rows(df)
+                cached_row_count if cached_row_count is not None else self._count_rows_safe(df)
             )
             # Track rows read vs rows written for story metrics
             metadata["rows_read"] = self._read_row_count
             metadata["rows_written"] = rows_written
             metadata["schema"] = self._get_schema(df)
             metadata["source_files"] = self.engine.get_source_files(df)
-            # Skip null profiling if configured (expensive for large Spark DataFrames)
-            skip_null_profiling = self.performance_config and getattr(
-                self.performance_config, "skip_null_profiling", False
-            )
+            # Skip null profiling if configured or for lazy engines (expensive for Spark)
+            skip_null_profiling = (
+                self.performance_config
+                and getattr(self.performance_config, "skip_null_profiling", False)
+            ) or self.engine.is_lazy
             if skip_null_profiling:
                 metadata["null_profile"] = {}
             else:
