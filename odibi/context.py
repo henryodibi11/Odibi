@@ -401,6 +401,9 @@ class SparkContext(Context):
         # Track registered views for cleanup
         self._registered_views: set[str] = set()
 
+        # Store actual DataFrame references to preserve persist state
+        self._dataframes: Dict[str, Any] = {}
+
         # Lock for thread safety
         self._lock = threading.RLock()
 
@@ -445,9 +448,10 @@ class SparkContext(Context):
         # 2. Validate Name (Explicit rule)
         self._validate_name(name)
 
-        # 3. Register
+        # 3. Register - store the actual DataFrame reference to preserve persist
         with self._lock:
             self._registered_views.add(name)
+            self._dataframes[name] = df  # Store direct reference
             if metadata:
                 self._metadata[name] = metadata
 
@@ -456,6 +460,9 @@ class SparkContext(Context):
 
     def get(self, name: str) -> Any:
         """Retrieve a registered Spark DataFrame.
+
+        Returns the original DataFrame reference to preserve persist state,
+        not a new DataFrame from spark.table() which would lose caching.
 
         Args:
             name: Identifier of the DataFrame
@@ -470,7 +477,11 @@ class SparkContext(Context):
             if name not in self._registered_views:
                 available = ", ".join(self._registered_views) if self._registered_views else "none"
                 raise KeyError(f"DataFrame '{name}' not found in context. Available: {available}")
+            # Return stored reference to preserve persist state
+            if name in self._dataframes:
+                return self._dataframes[name]
 
+        # Fallback to spark.table for backwards compatibility
         return self.spark.table(name)
 
     def get_metadata(self, name: str) -> Dict[str, Any]:
@@ -503,6 +514,7 @@ class SparkContext(Context):
         with self._lock:
             views_to_drop = list(self._registered_views)
             self._registered_views.clear()
+            self._dataframes.clear()
 
         for name in views_to_drop:
             try:
@@ -518,6 +530,7 @@ class SparkContext(Context):
         """
         with self._lock:
             self._registered_views.discard(name)
+            self._dataframes.pop(name, None)
             self._metadata.pop(name, None)
 
         try:
