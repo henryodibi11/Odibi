@@ -725,11 +725,7 @@ class NodeExecutor:
                     f"2) A read config dict with 'connection', 'format', and 'table'/'path' keys."
                 )
 
-            if (
-                df is not None
-                and hasattr(df, "persist")
-                and not getattr(df, "isStreaming", False)
-            ):
+            if df is not None and hasattr(df, "persist") and not getattr(df, "isStreaming", False):
                 df = df.persist()
                 self._persisted_inputs.append(df)
             dataframes[name] = df
