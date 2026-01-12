@@ -500,6 +500,10 @@ class SqlServerMergeWriter:
         config = config or SqlServerMergeValidationConfig()
         result = ValidationResult()
 
+        # Persist before validation counts to avoid Spark DAG recomputation
+        if hasattr(df, "persist") and not getattr(df, "isStreaming", False):
+            df = df.persist()
+
         if config.check_null_keys:
             from pyspark.sql import functions as F
 

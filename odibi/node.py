@@ -631,11 +631,31 @@ class NodeExecutor:
                 ref_pipeline = parts[0] if len(parts) == 2 else None
                 ref_node = parts[1] if len(parts) == 2 else None
 
-                # Try catalog lookup first (read from Delta table - the canonical source)
                 df = None
                 read_from_catalog = False
+                read_config = None
+                connection = None
 
-                if self.catalog_manager:
+                # Determine if this is a same-pipeline reference
+                same_pipeline_ref = (
+                    ref_node and current_pipeline and ref_pipeline == current_pipeline
+                )
+
+                # 1) Same-pipeline: prefer in-memory context cache (avoids re-reading from Delta)
+                if same_pipeline_ref:
+                    cached_df = self.context.get(ref_node)
+                    if cached_df is not None:
+                        ctx.debug(
+                            f"Using cached data for same-pipeline ref '{ref}' (cache hit)",
+                            input_name=name,
+                            source_node=ref_node,
+                        )
+                        df = cached_df
+
+                # 2) Catalog / Delta read:
+                #    - fallback for same-pipeline if cache miss
+                #    - primary path for cross-pipeline references
+                if df is None and self.catalog_manager:
                     try:
                         read_config = resolve_input_reference(ref, self.catalog_manager)
                         ctx.debug(
@@ -644,7 +664,6 @@ class NodeExecutor:
                             resolved_config=read_config,
                         )
 
-                        connection = None
                         if "connection" in read_config and read_config["connection"]:
                             connection = self.connections.get(read_config["connection"])
                             if connection is None:
@@ -670,27 +689,11 @@ class NodeExecutor:
                             )
                             read_from_catalog = True
                     except Exception as e:
-                        # Catalog lookup failed - will try cache fallback
+                        # Catalog lookup failed - will fall through to error if no cache either
                         ctx.debug(
                             f"Catalog lookup failed for '{ref}': {e}",
                             input_name=name,
                         )
-
-                # Fallback to context cache for same-pipeline refs (first run scenario)
-                if (
-                    df is None
-                    and ref_node
-                    and current_pipeline
-                    and ref_pipeline == current_pipeline
-                ):
-                    cached_df = self.context.get(ref_node)
-                    if cached_df is not None:
-                        ctx.debug(
-                            f"Using cached data for same-pipeline reference '{ref}' (Delta not available)",
-                            input_name=name,
-                            source_node=ref_node,
-                        )
-                        df = cached_df
 
                 if df is None:
                     raise ValueError(
@@ -701,8 +704,8 @@ class NodeExecutor:
                     )
 
                 # Store input source path for transforms that need it (e.g., detect_deletes)
-                # Only if we read from catalog (read_config was set)
-                if read_from_catalog:
+                # Only if we read from catalog (read_config was set and we actually read)
+                if read_from_catalog and read_config:
                     input_path = read_config.get("path") or read_config.get("table")
                     if input_path:
                         if connection and hasattr(connection, "get_path"):
