@@ -1206,8 +1206,21 @@ class NodeExecutor:
         schema_before = self._get_schema(result_df) if result_df is not None else None
 
         # Register named inputs in context for SQL access
+        # Persist Spark DataFrames before registering to avoid recomputation in SQL
         if input_dataframes:
             for name, df in input_dataframes.items():
+                # Ensure persisted before SQL access (temp views don't preserve cache)
+                if (
+                    hasattr(df, "persist")
+                    and not getattr(df, "isStreaming", False)
+                    and hasattr(df, "storageLevel")
+                ):
+                    # Check if not already persisted
+                    from pyspark import StorageLevel
+
+                    if df.storageLevel == StorageLevel.NONE:
+                        df = df.persist()
+                        self._persisted_inputs.append(df)
                 self.context.register(name, df)
             ctx.debug(
                 f"Registered {len(input_dataframes)} named inputs for transforms",
