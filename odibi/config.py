@@ -3667,6 +3667,7 @@ class ProjectConfig(BaseModel):
 
         # Fields that can be overridden per environment
         overrideable_fields = {
+            "engine",
             "connections",
             "system",
             "performance",
@@ -3675,6 +3676,7 @@ class ProjectConfig(BaseModel):
             "alerts",
             "story",
             "lineage",
+            "vars",
         }
 
         for env_name, env_overrides in self.environments.items():
