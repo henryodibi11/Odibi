@@ -148,7 +148,6 @@ class NodeExecutor:
         self._validation_warnings: List[str] = []
         self._read_row_count: Optional[int] = None  # Cache row count from read phase
         self._table_exists_cache: Dict[str, bool] = {}  # Cache table existence checks
-        self._persisted_inputs: List[Any] = []  # Track persisted DataFrames for cleanup
 
     def _cached_table_exists(
         self,
@@ -199,7 +198,6 @@ class NodeExecutor:
         self._validation_warnings = []
         self._read_row_count = None
         self._table_exists_cache = {}  # Reset cache per execution
-        self._persisted_inputs = []  # Reset persisted inputs tracking
 
         ctx = create_logging_context(
             node_id=config.name,
@@ -258,7 +256,7 @@ class NodeExecutor:
                             result_df = input_df
                             ctx.debug(
                                 "Using provided input_df",
-                                rows=self._count_rows_safe(input_df),
+                                rows=self._count_rows(input_df) if input_df is not None else 0,
                             )
                         elif config.depends_on:
                             result_df = self.context.get(config.depends_on[0])
@@ -266,7 +264,7 @@ class NodeExecutor:
                                 input_df = result_df
                             ctx.debug(
                                 f"Using data from dependency: {config.depends_on[0]}",
-                                rows=self._count_rows_safe(result_df),
+                                rows=self._count_rows(result_df) if result_df is not None else 0,
                             )
 
                     if config.read:
@@ -277,11 +275,10 @@ class NodeExecutor:
                     if input_df is not None:
                         input_schema = self._get_schema(input_df)
                         # Reuse row count from read phase if available (avoids redundant count)
-                        # For lazy engines, skip count if not already cached
                         rows_in = (
                             self._read_row_count
                             if self._read_row_count is not None
-                            else self._count_rows_safe(input_df)
+                            else self._count_rows(input_df)
                         )
                         metrics.rows_in = rows_in
                         metrics.schema_before = (
@@ -304,15 +301,6 @@ class NodeExecutor:
                     result_df = self._execute_transform_phase(
                         config, result_df, input_df, ctx, input_dataframes
                     )
-
-                # Persist result after transforms to avoid recomputation on counts/writes
-                if (
-                    result_df is not None
-                    and hasattr(result_df, "persist")
-                    and not getattr(result_df, "isStreaming", False)
-                ):
-                    result_df = result_df.persist()
-                    self._persisted_inputs.append(result_df)
 
                 # 3. Validation Phase (returns filtered df if quarantine is used)
                 with phase_timer.phase("validation"):
@@ -383,8 +371,6 @@ class NodeExecutor:
                     phase_timings_ms=phase_timer.summary_ms(),
                 )
 
-                self._unpersist_inputs()
-
                 return NodeResult(
                     node_name=config.name,
                     success=True,
@@ -429,8 +415,6 @@ class NodeExecutor:
                     )
                 else:
                     error = e
-
-                self._unpersist_inputs()
 
                 return NodeResult(
                     node_name=config.name,
@@ -625,40 +609,17 @@ class NodeExecutor:
         dataframes = {}
 
         for name, ref in config.inputs.items():
-            df = None
-            from_cache = False
-
             if is_pipeline_reference(ref):
                 # Parse the reference to check if it's same-pipeline
                 parts = ref[1:].split(".", 1)  # Remove $ and split
                 ref_pipeline = parts[0] if len(parts) == 2 else None
                 ref_node = parts[1] if len(parts) == 2 else None
 
+                # Try catalog lookup first (read from Delta table - the canonical source)
+                df = None
                 read_from_catalog = False
-                read_config = None
-                connection = None
 
-                # Determine if this is a same-pipeline reference
-                same_pipeline_ref = (
-                    ref_node and current_pipeline and ref_pipeline == current_pipeline
-                )
-
-                # 1) Same-pipeline: prefer in-memory context cache (avoids re-reading from Delta)
-                if same_pipeline_ref:
-                    cached_df = self.context.get(ref_node)
-                    if cached_df is not None:
-                        ctx.debug(
-                            f"Using cached data for same-pipeline ref '{ref}' (cache hit)",
-                            input_name=name,
-                            source_node=ref_node,
-                        )
-                        df = cached_df
-                        from_cache = True
-
-                # 2) Catalog / Delta read:
-                #    - fallback for same-pipeline if cache miss
-                #    - primary path for cross-pipeline references
-                if df is None and self.catalog_manager:
+                if self.catalog_manager:
                     try:
                         read_config = resolve_input_reference(ref, self.catalog_manager)
                         ctx.debug(
@@ -667,6 +628,7 @@ class NodeExecutor:
                             resolved_config=read_config,
                         )
 
+                        connection = None
                         if "connection" in read_config and read_config["connection"]:
                             connection = self.connections.get(read_config["connection"])
                             if connection is None:
@@ -692,11 +654,27 @@ class NodeExecutor:
                             )
                             read_from_catalog = True
                     except Exception as e:
-                        # Catalog lookup failed - will fall through to error if no cache either
+                        # Catalog lookup failed - will try cache fallback
                         ctx.debug(
                             f"Catalog lookup failed for '{ref}': {e}",
                             input_name=name,
                         )
+
+                # Fallback to context cache for same-pipeline refs (first run scenario)
+                if (
+                    df is None
+                    and ref_node
+                    and current_pipeline
+                    and ref_pipeline == current_pipeline
+                ):
+                    cached_df = self.context.get(ref_node)
+                    if cached_df is not None:
+                        ctx.debug(
+                            f"Using cached data for same-pipeline reference '{ref}' (Delta not available)",
+                            input_name=name,
+                            source_node=ref_node,
+                        )
+                        df = cached_df
 
                 if df is None:
                     raise ValueError(
@@ -707,8 +685,8 @@ class NodeExecutor:
                     )
 
                 # Store input source path for transforms that need it (e.g., detect_deletes)
-                # Only if we read from catalog (read_config was set and we actually read)
-                if read_from_catalog and read_config:
+                # Only if we read from catalog (read_config was set)
+                if read_from_catalog:
                     input_path = read_config.get("path") or read_config.get("table")
                     if input_path:
                         if connection and hasattr(connection, "get_path"):
@@ -741,18 +719,8 @@ class NodeExecutor:
                     f"2) A read config dict with 'connection', 'format', and 'table'/'path' keys."
                 )
 
-            # Only persist if we read from Delta (not from cache - already persisted)
-            if (
-                df is not None
-                and not from_cache
-                and hasattr(df, "persist")
-                and not getattr(df, "isStreaming", False)
-            ):
-                df = df.persist()
-                self._persisted_inputs.append(df)
             dataframes[name] = df
-            # After persist, count is cheap; skip for lazy engines if from cache
-            row_count = self._count_rows_safe(df) if df is not None else 0
+            row_count = self._count_rows(df) if df is not None else 0
             ctx.info(
                 f"Loaded input '{name}'",
                 rows=row_count,
@@ -1202,25 +1170,12 @@ class NodeExecutor:
         input_dataframes = input_dataframes or {}
 
         pii_meta = self._calculate_pii(config)
-        rows_before = self._count_rows_safe(result_df)
+        rows_before = self._count_rows(result_df) if result_df is not None else None
         schema_before = self._get_schema(result_df) if result_df is not None else None
 
         # Register named inputs in context for SQL access
-        # Persist Spark DataFrames before registering to avoid recomputation in SQL
         if input_dataframes:
             for name, df in input_dataframes.items():
-                # Ensure persisted before SQL access (temp views don't preserve cache)
-                if (
-                    hasattr(df, "persist")
-                    and not getattr(df, "isStreaming", False)
-                    and hasattr(df, "storageLevel")
-                ):
-                    # Check if not already persisted
-                    from pyspark import StorageLevel
-
-                    if df.storageLevel == StorageLevel.NONE:
-                        df = df.persist()
-                        self._persisted_inputs.append(df)
                 self.context.register(name, df)
             ctx.debug(
                 f"Registered {len(input_dataframes)} named inputs for transforms",
@@ -1231,7 +1186,7 @@ class NodeExecutor:
         if config.transformer:
             if result_df is None and input_df is not None:
                 result_df = input_df
-                rows_before = self._count_rows_safe(result_df)
+                rows_before = self._count_rows(result_df)
                 schema_before = self._get_schema(result_df)
 
             with ctx.operation(
@@ -1300,7 +1255,7 @@ class NodeExecutor:
                             compliance_score=1.0,
                         )
 
-                rows_after = self._count_rows_safe(result_df)
+                rows_after = self._count_rows(result_df) if result_df is not None else None
                 schema_after = self._get_schema(result_df) if result_df is not None else None
                 metrics.rows_out = rows_after
                 if isinstance(schema_after, dict):
@@ -1423,7 +1378,7 @@ class NodeExecutor:
             total_steps = len(transform_config.steps)
             for step_idx, step in enumerate(transform_config.steps):
                 step_name = self._get_step_name(step)
-                rows_before = self._count_rows_safe(current_df)
+                rows_before = self._count_rows(current_df) if current_df is not None else None
                 schema_before = self._get_schema(current_df) if current_df is not None else None
 
                 try:
@@ -1471,7 +1426,9 @@ class NodeExecutor:
                                     f"Each step must have exactly one of: 'sql', 'sql_file', 'function', or 'operation'."
                                 )
 
-                        rows_after = self._count_rows_safe(current_df)
+                        rows_after = (
+                            self._count_rows(current_df) if current_df is not None else None
+                        )
                         schema_after = (
                             self._get_schema(current_df) if current_df is not None else None
                         )
@@ -2650,14 +2607,14 @@ class NodeExecutor:
                 cached_row_count = self._delta_write_info.get("_cached_row_count")
                 rows_written = self._delta_write_info.get("_cached_row_count")
             metadata["rows"] = (
-                cached_row_count if cached_row_count is not None else self._count_rows_safe(df)
+                cached_row_count if cached_row_count is not None else self._count_rows(df)
             )
             # Track rows read vs rows written for story metrics
             metadata["rows_read"] = self._read_row_count
             metadata["rows_written"] = rows_written
             metadata["schema"] = self._get_schema(df)
             metadata["source_files"] = self.engine.get_source_files(df)
-            # Skip null profiling if configured (expensive for large DataFrames)
+            # Skip null profiling if configured (expensive for large Spark DataFrames)
             skip_null_profiling = self.performance_config and getattr(
                 self.performance_config, "skip_null_profiling", False
             )
@@ -2841,28 +2798,6 @@ class NodeExecutor:
         if df is not None and getattr(df, "isStreaming", False):
             return None
         return self.engine.count_rows(df)
-
-    def _count_rows_safe(self, df: Any) -> Optional[int]:
-        """Count rows, but skip for lazy engines to avoid recomputation.
-
-        Use this for non-essential counts (logging, debug). For essential counts
-        (after persist, metrics), use _count_rows directly.
-        """
-        if df is not None and getattr(df, "isStreaming", False):
-            return None
-        if self.engine.is_lazy:
-            return None
-        return self.engine.count_rows(df)
-
-    def _unpersist_inputs(self) -> None:
-        """Unpersist any DataFrames that were cached during input loading."""
-        for df in self._persisted_inputs:
-            try:
-                if hasattr(df, "unpersist"):
-                    df.unpersist()
-            except Exception:
-                pass
-        self._persisted_inputs = []
 
     def _get_column_max(self, df: Any, column: str, fallback_column: Optional[str] = None) -> Any:
         """Get maximum value of a column, with optional fallback for NULL values."""

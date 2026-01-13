@@ -66,29 +66,6 @@ class EngineContext:
             return self.engine.get_schema(self.df)
         return {}
 
-    def count_rows_safe(self, df: Optional[Any] = None) -> Optional[int]:
-        """Count rows, but skip for lazy engines to avoid recomputation.
-
-        Use this for non-essential counts (logging, debug).
-
-        Args:
-            df: DataFrame to count, defaults to self.df
-
-        Returns:
-            Row count or None for lazy engines
-        """
-        df = df if df is not None else self.df
-        if df is None:
-            return None
-        if self.engine and self.engine.is_lazy:
-            return None
-        # Eager engines: count normally
-        if hasattr(df, "shape"):
-            return df.shape[0]
-        if hasattr(df, "count"):
-            return df.count()
-        return None
-
     @property
     def spark(self) -> Any:
         """Helper to access SparkSession if available in context."""

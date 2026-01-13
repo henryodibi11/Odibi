@@ -278,7 +278,14 @@ def merge(context, params=None, current=None, **kwargs):
         register_table=register_table,
     )
 
-    rows_before = context.count_rows_safe(current) if isinstance(context, EngineContext) else None
+    # Get source row count
+    rows_before = None
+    try:
+        rows_before = current.shape[0] if hasattr(current, "shape") else None
+        if rows_before is None and hasattr(current, "count"):
+            rows_before = current.count()
+    except Exception as e:
+        ctx.debug(f"Could not get row count: {type(e).__name__}")
 
     ctx.debug("Merge source loaded", source_rows=rows_before)
 

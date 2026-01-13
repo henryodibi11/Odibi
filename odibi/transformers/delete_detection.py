@@ -314,13 +314,6 @@ def _apply_deletes(
     prev_df: Any = None,
 ) -> EngineContext:
     """Apply soft or hard delete based on config."""
-    # Persist DataFrames before counting to avoid Spark DAG recomputation
-    if context.engine_type == EngineType.SPARK:
-        if hasattr(deleted_keys, "persist") and not getattr(deleted_keys, "isStreaming", False):
-            deleted_keys = deleted_keys.persist()
-        if hasattr(context.df, "persist") and not getattr(context.df, "isStreaming", False):
-            context = context.with_df(context.df.persist())
-
     deleted_count = _get_row_count(deleted_keys, context.engine_type)
     total_count = _get_row_count(context.df, context.engine_type)
 
@@ -508,11 +501,7 @@ def _build_source_keys_query(config: DeleteDetectionConfig) -> str:
 
 
 def _get_row_count(df: Any, engine_type: EngineType) -> int:
-    """Get row count from DataFrame.
-
-    Note: This intentionally uses direct count() rather than count_rows_safe()
-    because the count is used for threshold logic, not just logging.
-    """
+    """Get row count from DataFrame."""
     if engine_type == EngineType.SPARK:
         return df.count()
     else:

@@ -422,7 +422,6 @@ class Pipeline:
                 pipeline_name=self.config.pipeline,
                 node_names=execution_order,
                 engine=self.engine_type,
-                layers=[list(layer) for layer in layers] if parallel else None,
             )
             progress.start()
 
