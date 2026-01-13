@@ -917,10 +917,11 @@ class CatalogManager:
     def _get_schema_meta_sla_status(self) -> StructType:
         """
         meta_sla_status (Derived): Freshness compliance snapshot.
-        PK: pipeline_name. Upsert on pipeline completion.
+        PK: project_name, pipeline_name. Upsert on pipeline completion.
         """
         return StructType(
             [
+                StructField("project_name", StringType(), False),  # PK
                 StructField("pipeline_name", StringType(), False),  # PK
                 StructField("owner", StringType(), True),
                 StructField("freshness_sla", StringType(), True),  # e.g., "6h"

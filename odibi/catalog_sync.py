@@ -177,6 +177,7 @@ SQL_SERVER_DDL = {
         IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'meta_sla_status' AND schema_id = SCHEMA_ID('{schema}'))
         BEGIN
             CREATE TABLE [{schema}].[meta_sla_status] (
+                project_name NVARCHAR(255) NOT NULL,
                 pipeline_name NVARCHAR(255) NOT NULL,
                 owner NVARCHAR(255),
                 freshness_sla NVARCHAR(50),
@@ -189,7 +190,7 @@ SQL_SERVER_DDL = {
                 updated_at DATETIME2,
                 environment NVARCHAR(50),
                 _synced_at DATETIME2 DEFAULT GETUTCDATE(),
-                CONSTRAINT PK_meta_sla_status PRIMARY KEY (pipeline_name, environment)
+                CONSTRAINT PK_meta_sla_status PRIMARY KEY (project_name, pipeline_name, environment)
             );
         END
     """,
@@ -223,7 +224,7 @@ TABLE_PRIMARY_KEYS = {
     "meta_node_runs": ["run_id", "node_id"],
     "meta_tables": ["project", "table_name"],
     "meta_failures": ["failure_id"],
-    "meta_sla_status": ["pipeline_name", "environment"],
+    "meta_sla_status": ["project_name", "pipeline_name", "environment"],
 }
 
 # Power BI-ready views for dashboards

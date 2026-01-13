@@ -1137,6 +1137,7 @@ class DerivedUpdater:
 
     def update_sla_status(
         self,
+        project_name: str,
         pipeline_name: str,
         owner: Optional[str],
         freshness_sla: Optional[str],
@@ -1148,6 +1149,7 @@ class DerivedUpdater:
         Dispatches by engine. FAIL-FAST (caller wraps via apply_derived_update).
 
         Args:
+            project_name: Project name
             pipeline_name: Pipeline name
             owner: Pipeline owner (nullable)
             freshness_sla: SLA string like '6h', '1d' (nullable - no-op if None)
@@ -1157,12 +1159,16 @@ class DerivedUpdater:
             return
 
         if self.catalog.is_spark_mode:
-            self._update_sla_status_spark(pipeline_name, owner, freshness_sla, freshness_anchor)
+            self._update_sla_status_spark(
+                project_name, pipeline_name, owner, freshness_sla, freshness_anchor
+            )
         elif self.catalog.is_pandas_mode:
-            self._update_sla_status_pandas(pipeline_name, owner, freshness_sla, freshness_anchor)
+            self._update_sla_status_pandas(
+                project_name, pipeline_name, owner, freshness_sla, freshness_anchor
+            )
         elif self.catalog.is_sql_server_mode:
             self._update_sla_status_sql_server(
-                pipeline_name, owner, freshness_sla, freshness_anchor
+                project_name, pipeline_name, owner, freshness_sla, freshness_anchor
             )
         else:
             raise RuntimeError("No supported backend available for update_sla_status")
@@ -1361,6 +1367,7 @@ class DerivedUpdater:
 
     def _update_sla_status_spark(
         self,
+        project_name: str,
         pipeline_name: str,
         owner: Optional[str],
         freshness_sla: str,
@@ -1388,6 +1395,7 @@ class DerivedUpdater:
                     WHERE pipeline_name = '{sql_escape(pipeline_name)}' AND status = 'SUCCESS'
                 )
                 SELECT
+                    '{sql_escape(project_name)}' AS project_name,
                     '{sql_escape(pipeline_name)}' AS pipeline_name,
                     {owner_sql} AS owner,
                     '{sql_escape(freshness_sla)}' AS freshness_sla,
@@ -1410,7 +1418,7 @@ class DerivedUpdater:
                     current_timestamp() AS updated_at
                 FROM success_stats s
             ) AS source
-            ON target.pipeline_name = source.pipeline_name
+            ON target.project_name = source.project_name AND target.pipeline_name = source.pipeline_name
             WHEN MATCHED THEN UPDATE SET
                 owner = source.owner,
                 freshness_sla = source.freshness_sla,
@@ -1422,16 +1430,16 @@ class DerivedUpdater:
                 hours_overdue = source.hours_overdue,
                 updated_at = source.updated_at
             WHEN NOT MATCHED THEN INSERT (
-                pipeline_name, owner, freshness_sla, freshness_anchor, freshness_sla_minutes,
+                project_name, pipeline_name, owner, freshness_sla, freshness_anchor, freshness_sla_minutes,
                 last_success_at, minutes_since_success, sla_met, hours_overdue, updated_at
             ) VALUES (
-                source.pipeline_name, source.owner, source.freshness_sla, source.freshness_anchor,
+                source.project_name, source.pipeline_name, source.owner, source.freshness_sla, source.freshness_anchor,
                 source.freshness_sla_minutes, source.last_success_at, source.minutes_since_success,
                 source.sla_met, source.hours_overdue, source.updated_at
             )
         """
         spark.sql(merge_sql)
-        logger.debug(f"Updated sla_status for {pipeline_name}")
+        logger.debug(f"Updated sla_status for {project_name}/{pipeline_name}")
 
     # =========================================================================
     # PANDAS/DELTA-RS: DERIVED UPDATERS
@@ -1649,6 +1657,7 @@ class DerivedUpdater:
 
     def _update_sla_status_pandas(
         self,
+        project_name: str,
         pipeline_name: str,
         owner: Optional[str],
         freshness_sla: str,
@@ -1704,6 +1713,7 @@ class DerivedUpdater:
         new_row = pd.DataFrame(
             [
                 {
+                    "project_name": project_name,
                     "pipeline_name": pipeline_name,
                     "owner": owner,
                     "freshness_sla": freshness_sla,
@@ -1719,7 +1729,12 @@ class DerivedUpdater:
         )
 
         if not existing.empty:
-            existing = existing[existing["pipeline_name"] != pipeline_name]
+            existing = existing[
+                ~(
+                    (existing["project_name"] == project_name)
+                    & (existing["pipeline_name"] == pipeline_name)
+                )
+            ]
 
         result = pd.concat([existing, new_row], ignore_index=True)
         result_arrow = _convert_df_for_delta(result)
@@ -1733,7 +1748,7 @@ class DerivedUpdater:
             )
 
         _retry_delta_operation(_do_overwrite)
-        logger.debug(f"Updated sla_status (pandas) for {pipeline_name}")
+        logger.debug(f"Updated sla_status (pandas) for {project_name}/{pipeline_name}")
 
     # =========================================================================
     # SQL SERVER: DERIVED UPDATERS
@@ -1968,6 +1983,7 @@ class DerivedUpdater:
 
     def _update_sla_status_sql_server(
         self,
+        project_name: str,
         pipeline_name: str,
         owner: Optional[str],
         freshness_sla: str,
@@ -1991,6 +2007,7 @@ class DerivedUpdater:
             MERGE [{schema}].[meta_sla_status] AS target
             USING (
                 SELECT
+                    :project_name AS project_name,
                     :pipeline_name AS pipeline_name,
                     :owner AS owner,
                     :freshness_sla AS freshness_sla,
@@ -1999,7 +2016,7 @@ class DerivedUpdater:
                     (SELECT MAX(run_end_at) FROM [{schema}].[meta_pipeline_runs]
                      WHERE pipeline_name = :pipeline_name AND status = 'SUCCESS') AS last_success_at
             ) AS source
-            ON target.pipeline_name = source.pipeline_name
+            ON target.project_name = source.project_name AND target.pipeline_name = source.pipeline_name
             WHEN MATCHED THEN UPDATE SET
                 owner = source.owner,
                 freshness_sla = source.freshness_sla,
@@ -2022,10 +2039,10 @@ class DerivedUpdater:
                 END,
                 updated_at = GETUTCDATE()
             WHEN NOT MATCHED THEN INSERT (
-                pipeline_name, owner, freshness_sla, freshness_anchor, freshness_sla_minutes,
+                project_name, pipeline_name, owner, freshness_sla, freshness_anchor, freshness_sla_minutes,
                 last_success_at, minutes_since_success, sla_met, hours_overdue, updated_at
             ) VALUES (
-                source.pipeline_name, source.owner, source.freshness_sla, source.freshness_anchor,
+                source.project_name, source.pipeline_name, source.owner, source.freshness_sla, source.freshness_anchor,
                 source.freshness_sla_minutes, source.last_success_at,
                 CASE
                     WHEN source.last_success_at IS NULL THEN NULL
@@ -2047,6 +2064,7 @@ class DerivedUpdater:
         conn.execute(
             merge_sql,
             {
+                "project_name": project_name,
                 "pipeline_name": pipeline_name,
                 "owner": owner,
                 "freshness_sla": freshness_sla,
@@ -2054,4 +2072,4 @@ class DerivedUpdater:
                 "sla_minutes": sla_minutes,
             },
         )
-        logger.debug(f"Updated sla_status (sql_server) for {pipeline_name}")
+        logger.debug(f"Updated sla_status (sql_server) for {project_name}/{pipeline_name}")

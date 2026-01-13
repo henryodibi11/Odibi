@@ -277,8 +277,9 @@ def _rebuild_summaries_command(args) -> int:
                     elif dt == "meta_sla_status":
                         owner = pipeline_run.get("owner")
                         freshness_anchor = pipeline_run.get("freshness_anchor", "run_completion")
+                        project_name = pipeline_run.get("project", "default")
                         updater.update_sla_status(
-                            run_pipeline_name, owner, freshness_sla, freshness_anchor
+                            project_name, run_pipeline_name, owner, freshness_sla, freshness_anchor
                         )
                     updater.mark_applied(dt, run_id, token)
                     rebuilt_count += 1

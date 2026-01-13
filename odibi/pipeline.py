@@ -1116,10 +1116,16 @@ class Pipeline:
                 freshness_sla = getattr(self.config, "freshness_sla", None)
                 if freshness_sla:
                     freshness_anchor = getattr(self.config, "freshness_anchor", "run_completion")
+                    project_name = (
+                        getattr(self.project_config, "project", None)
+                        if self.project_config
+                        else None
+                    ) or "default"
                     derived_updates.append(
                         (
                             "meta_sla_status",
                             lambda: updater.update_sla_status(
+                                project_name,
                                 self.config.pipeline,
                                 owner,  # Uses owner from above (pipeline or project fallback)
                                 freshness_sla,

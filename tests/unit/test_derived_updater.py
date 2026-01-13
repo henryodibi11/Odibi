@@ -578,13 +578,16 @@ class TestUpdateSlaStatus:
         _write_df_with_schema(runs_path, run_df)
 
         # SLA is 1 hour, last success was 29 minutes ago - should be met
-        updater.update_sla_status("test_pipeline", "owner@example.com", "1h", "run_completion")
+        updater.update_sla_status(
+            "test_project", "test_pipeline", "owner@example.com", "1h", "run_completion"
+        )
 
         dt = DeltaTable(catalog_with_bootstrap.tables["meta_sla_status"])
         df = dt.to_pandas()
 
         assert len(df) == 1
         row = df.iloc[0]
+        assert row["project_name"] == "test_project"
         assert row["pipeline_name"] == "test_pipeline"
         assert row["freshness_sla"] == "1h"
         assert row["freshness_sla_minutes"] == 60
@@ -592,7 +595,7 @@ class TestUpdateSlaStatus:
 
     def test_update_sla_status_skips_if_no_freshness_sla(self, updater, catalog_with_bootstrap):
         """update_sla_status should return early if freshness_sla is None."""
-        updater.update_sla_status("test_pipeline", None, None, "run_completion")
+        updater.update_sla_status("test_project", "test_pipeline", None, None, "run_completion")
 
         # SLA table should be empty (no error raised)
         dt = DeltaTable(catalog_with_bootstrap.tables["meta_sla_status"])
@@ -612,7 +615,7 @@ class TestUpdateSlaStatus:
         _write_df_with_schema(runs_path, run_df)
 
         # SLA is 1 hour, last success was 2 hours ago - should NOT be met
-        updater.update_sla_status("test_pipeline", None, "1h", "run_completion")
+        updater.update_sla_status("test_project", "test_pipeline", None, "1h", "run_completion")
 
         dt = DeltaTable(catalog_with_bootstrap.tables["meta_sla_status"])
         df = dt.to_pandas()
