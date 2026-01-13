@@ -246,9 +246,7 @@ class PipelineProgress:
                 if node_layer != self._last_printed_layer:
                     layer_size = len(self.layers[node_layer])
                     parallel_note = " (parallel)" if layer_size > 1 else ""
-                    console.print(
-                        f"\n[dim]Wave {node_layer + 1}{parallel_note}:[/dim]"
-                    )
+                    console.print(f"\n[dim]Wave {node_layer + 1}{parallel_note}:[/dim]")
                     self._last_printed_layer = node_layer
 
             status_str = self._format_status(status)
