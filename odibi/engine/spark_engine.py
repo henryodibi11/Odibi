@@ -2024,7 +2024,8 @@ class SparkEngine(Engine):
                     return False
                 # Table exists in catalog - verify it's actually readable
                 # This catches orphan entries where path was deleted
-                self.spark.table(table).limit(0).collect()
+                # Use limit(1) not limit(0) - limit(0) can succeed from metadata alone
+                self.spark.table(table).limit(1).collect()
                 ctx.debug(f"Table existence check: {table}", exists=True)
                 return True
             except Exception as e:
