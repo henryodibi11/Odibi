@@ -11,6 +11,11 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+try:
+    import pandas as pd
+except ImportError:
+    pd = None  # type: ignore
+
 from odibi.config import SyncToConfig
 from odibi.utils import get_logging_context
 
@@ -1157,6 +1162,12 @@ class CatalogSyncer:
                     elif isinstance(v, datetime):
                         safe_record[k] = v.isoformat()
                     elif isinstance(v, float) and (v != v):  # NaN check (NaN != NaN)
+                        safe_record[k] = None
+                    elif pd is not None and (v is pd.NaT or (hasattr(pd, "isna") and pd.isna(v))):
+                        # Handle pandas NaT (Not a Time) and other NA values
+                        safe_record[k] = None
+                    elif isinstance(v, str) and v == "NaT":
+                        # Handle stringified NaT
                         safe_record[k] = None
                     else:
                         safe_record[k] = v
