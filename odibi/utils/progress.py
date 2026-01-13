@@ -39,6 +39,7 @@ class PipelineProgress:
         pipeline_name: str,
         node_names: List[str],
         engine: str = "pandas",
+        layers: Optional[List[List[str]]] = None,
     ) -> None:
         """Initialize progress tracker.
 
@@ -46,12 +47,20 @@ class PipelineProgress:
             pipeline_name: Name of the pipeline being executed.
             node_names: List of node names in execution order.
             engine: Engine type (pandas/spark).
+            layers: Optional list of execution layers for parallel display.
         """
         self.pipeline_name = pipeline_name
         self.node_names = node_names
         self.engine = engine
+        self.layers = layers
         self.is_notebook = _is_notebook_environment()
         self.use_rich = is_rich_available()
+
+        self._node_to_layer: Dict[str, int] = {}
+        if layers:
+            for layer_idx, layer in enumerate(layers):
+                for node in layer:
+                    self._node_to_layer[node] = layer_idx
 
         self._node_statuses: Dict[str, Dict[str, Any]] = {
             name: {"status": NodeStatus.PENDING, "duration": None, "rows": None}
@@ -60,6 +69,7 @@ class PipelineProgress:
         self._live: Optional[Any] = None
         self._table: Optional[Any] = None
         self._start_time: Optional[float] = None
+        self._last_printed_layer: int = -1
 
     def start(self) -> None:
         """Start progress display."""
@@ -230,6 +240,17 @@ class PipelineProgress:
             self._live.update(self._table)
         elif self.is_notebook:
             console = get_console()
+
+            if self.layers and name in self._node_to_layer:
+                node_layer = self._node_to_layer[name]
+                if node_layer != self._last_printed_layer:
+                    layer_size = len(self.layers[node_layer])
+                    parallel_note = " (parallel)" if layer_size > 1 else ""
+                    console.print(
+                        f"\n[dim]Wave {node_layer + 1}{parallel_note}:[/dim]"
+                    )
+                    self._last_printed_layer = node_layer
+
             status_str = self._format_status(status)
             duration_str = self._format_duration(duration)
             rows_str = self._format_rows(rows)
@@ -243,6 +264,14 @@ class PipelineProgress:
         rows: Optional[int],
     ) -> None:
         """Update plain text display."""
+        if self.layers and name in self._node_to_layer:
+            node_layer = self._node_to_layer[name]
+            if node_layer != self._last_printed_layer:
+                layer_size = len(self.layers[node_layer])
+                parallel_note = " (parallel)" if layer_size > 1 else ""
+                print(f"\nWave {node_layer + 1}{parallel_note}:")
+                self._last_printed_layer = node_layer
+
         status_str = self._format_status_plain(status)
         duration_str = self._format_duration(duration)
         rows_str = self._format_rows(rows)
