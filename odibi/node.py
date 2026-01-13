@@ -157,7 +157,7 @@ class NodeExecutor:
     ) -> bool:
         """Check if table exists with caching to avoid repeated Delta operations.
 
-        Performance: Table existence checks involve Delta table open + limit(0).collect()
+        Performance: Table existence checks involve Delta table open + limit(1).collect()
         which can take 3-5s. Caching saves significant time for nodes that check
         existence multiple times (incremental filter, write phase, etc.).
         """
@@ -2446,7 +2446,10 @@ class NodeExecutor:
                     except Exception:
                         # Fallback: check if path exists
                         try:
-                            self.engine.spark.read.format("delta").load(full_path).limit(0)
+                            # Use limit(1).collect() to force file access
+                            self.engine.spark.read.format("delta").load(full_path).limit(
+                                1
+                            ).collect()
                             return True
                         except Exception:
                             return False

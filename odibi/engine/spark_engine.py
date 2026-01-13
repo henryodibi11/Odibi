@@ -1169,7 +1169,8 @@ class SparkEngine(Engine):
                             # Handle orphan catalog entries (only for path-not-found errors)
                             if table_in_catalog:
                                 try:
-                                    self.spark.table(register_table).limit(0).collect()
+                                    # Use limit(1) not limit(0) - limit(0) can succeed from metadata alone
+                                    self.spark.table(register_table).limit(1).collect()
                                     ctx.debug(
                                         f"Table '{register_table}' already registered and valid"
                                     )
@@ -1393,7 +1394,8 @@ class SparkEngine(Engine):
                 # Only treat as orphan if it's specifically a DELTA_PATH_DOES_NOT_EXIST error
                 if table_in_catalog:
                     try:
-                        self.spark.table(register_table).limit(0).collect()
+                        # Use limit(1) not limit(0) - limit(0) can succeed from metadata alone
+                        self.spark.table(register_table).limit(1).collect()
                         ctx.debug(
                             f"Table '{register_table}' already registered and valid, "
                             "skipping registration"

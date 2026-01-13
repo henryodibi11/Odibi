@@ -536,7 +536,8 @@ class CatalogManager:
     def _table_exists(self, path: str) -> bool:
         if self.spark:
             try:
-                self.spark.read.format("delta").load(path).limit(0).collect()
+                # Use limit(1) not limit(0) - limit(0) can succeed from metadata alone
+                self.spark.read.format("delta").load(path).limit(1).collect()
                 return True
             except Exception as e:
                 # If AnalysisException or "Path does not exist", return False

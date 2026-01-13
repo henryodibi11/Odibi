@@ -173,7 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Performance - Delta Write Optimization
 - **Skip Redundant Table Registration**: Tables using `register_table` now check `catalog.tableExists()` before running `CREATE TABLE IF NOT EXISTS`, saving 10-20s per incremental write.
 - **Batch Table Properties**: `ALTER TABLE SET TBLPROPERTIES` now batches all properties into a single SQL statement instead of one-per-property, saving 3-6s per node.
-- **Cache Table Existence Checks**: `NodeExecutor` now caches table existence checks per execution, avoiding repeated Delta table open + limit(0).collect() operations (3-5s each).
+- **Cache Table Existence Checks**: `NodeExecutor` now caches table existence checks per execution, avoiding repeated Delta table open + limit(1).collect() operations (3-5s each).
 
 These optimizations target the ~96% write phase overhead identified in Bronze pipeline profiling, with expected cumulative savings of 15-30s per node for incremental Delta writes.
 
