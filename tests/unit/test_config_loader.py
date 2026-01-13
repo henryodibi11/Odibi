@@ -224,3 +224,89 @@ class TestEnvironmentsOverride:
 
             config = load_yaml_with_env(main_path, env="prod")
             assert config["connections"]["data_lake"]["base_path"] == "/prod/data"
+
+
+class TestVarsSubstitution:
+    """Tests for ${vars.xxx} substitution."""
+
+    def test_vars_substitution_basic(self):
+        """Test basic vars substitution."""
+        content = """
+vars:
+  catalog: my_catalog
+  schema: my_schema
+
+pipelines:
+  - name: test
+    nodes:
+      - name: node1
+        write:
+          register_table: "${vars.catalog}.${vars.schema}.table1"
+"""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as f:
+            f.write(content)
+            path = f.name
+
+        try:
+            config = load_yaml_with_env(path)
+            register_table = config["pipelines"][0]["nodes"][0]["write"]["register_table"]
+            assert register_table == "my_catalog.my_schema.table1"
+        finally:
+            os.remove(path)
+
+    def test_vars_substitution_with_environment_override(self):
+        """Test that environment-specific vars override base vars."""
+        content = """
+vars:
+  catalog: dev_catalog
+
+environments:
+  prod:
+    vars:
+      catalog: prod_catalog
+
+pipelines:
+  - name: test
+    nodes:
+      - name: node1
+        write:
+          register_table: "${vars.catalog}.table1"
+"""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as f:
+            f.write(content)
+            path = f.name
+
+        try:
+            # Without env, should use base vars
+            config = load_yaml_with_env(path)
+            assert (
+                config["pipelines"][0]["nodes"][0]["write"]["register_table"]
+                == "dev_catalog.table1"
+            )
+
+            # With prod env, should use prod vars
+            config = load_yaml_with_env(path, env="prod")
+            assert (
+                config["pipelines"][0]["nodes"][0]["write"]["register_table"]
+                == "prod_catalog.table1"
+            )
+        finally:
+            os.remove(path)
+
+    def test_vars_substitution_undefined_var_returns_empty(self):
+        """Test that undefined vars return empty string with warning."""
+        content = """
+vars:
+  defined: value
+
+test: "${vars.undefined}_suffix"
+"""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as f:
+            f.write(content)
+            path = f.name
+
+        try:
+            config = load_yaml_with_env(path)
+            assert config["test"] == "_suffix"
+        finally:
+            os.remove(path)

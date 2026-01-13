@@ -10,6 +10,46 @@ from odibi.utils.logging import logger
 # Captures the variable name in group 1
 ENV_PATTERN = re.compile(r"\$\{(?:env:)?([A-Za-z0-9_]+)\}")
 
+# Pattern to match ${vars.xxx}
+VARS_PATTERN = re.compile(r"\$\{vars\.([A-Za-z0-9_]+)\}")
+
+
+def _substitute_vars(data: Any, vars_dict: Dict[str, Any]) -> Any:
+    """Recursively substitute ${vars.xxx} placeholders with values from vars dict.
+
+    Args:
+        data: The data structure to process (dict, list, or scalar)
+        vars_dict: Dictionary of variable names to values
+
+    Returns:
+        Data with all ${vars.xxx} placeholders replaced
+    """
+    if isinstance(data, dict):
+        return {k: _substitute_vars(v, vars_dict) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_substitute_vars(item, vars_dict) for item in data]
+    elif isinstance(data, str):
+
+        def replace_var(match):
+            var_name = match.group(1)
+            if var_name in vars_dict:
+                value = vars_dict[var_name]
+                # If the entire string is just the variable, return the raw value (preserves type)
+                if match.group(0) == data:
+                    return value
+                return str(value)
+            else:
+                logger.warning(
+                    "Undefined variable referenced",
+                    variable=f"vars.{var_name}",
+                    available_vars=list(vars_dict.keys()),
+                )
+                return ""  # Return empty string for undefined vars
+
+        return VARS_PATTERN.sub(replace_var, data)
+    else:
+        return data
+
 
 def _normalize_pattern_to_transformer(data: Dict[str, Any]) -> None:
     """Normalize 'pattern:' block to 'transformer:' + 'params:' fields.
@@ -332,6 +372,15 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
                 env=env,
                 expected_path=env_file_path,
             )
+
+    # Apply vars substitution after all merges are complete
+    vars_dict = data.get("vars", {})
+    if vars_dict:
+        logger.debug(
+            "Applying vars substitution",
+            vars_keys=list(vars_dict.keys()),
+        )
+        data = _substitute_vars(data, vars_dict)
 
     logger.debug(
         "Configuration loading complete",
