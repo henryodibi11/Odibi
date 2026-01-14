@@ -1629,6 +1629,12 @@ class SqlServerMergeWriter:
         jdbc_options = jdbc_options or {}
         strategy = options.strategy
 
+        # Auto-create schema if needed
+        if options.auto_create_schema:
+            schema, _ = self.parse_table_name(target_table)
+            if not self.check_schema_exists(schema):
+                self.create_schema(schema)
+
         self.ctx.info(
             "Starting SQL Server overwrite",
             target_table=target_table,
@@ -1692,6 +1698,12 @@ class SqlServerMergeWriter:
         """
         options = options or SqlServerOverwriteOptions()
         strategy = options.strategy
+        schema, table_name = self.parse_table_name(target_table)
+
+        # Auto-create schema if needed
+        if options.auto_create_schema:
+            if not self.check_schema_exists(schema):
+                self.create_schema(schema)
 
         self.ctx.info(
             "Starting SQL Server overwrite (Pandas)",
@@ -1700,7 +1712,6 @@ class SqlServerMergeWriter:
         )
 
         table_exists = self.check_table_exists(target_table)
-        schema, table_name = self.parse_table_name(target_table)
 
         if strategy == SqlServerOverwriteStrategy.DROP_CREATE:
             if table_exists:
@@ -1968,8 +1979,11 @@ class SqlServerMergeWriter:
             df = df.collect()
 
         schema, table_name = self.parse_table_name(target_table)
+
+        # Auto-create schema if needed
         if options.auto_create_schema:
-            self.create_schema(schema)
+            if not self.check_schema_exists(schema):
+                self.create_schema(schema)
 
         self.ctx.info(
             "Starting SQL Server overwrite (Polars)",
