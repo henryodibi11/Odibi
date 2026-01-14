@@ -1,5 +1,6 @@
 """Pandas engine implementation."""
 
+import fnmatch
 import glob
 import hashlib
 import os
@@ -218,6 +219,134 @@ class PandasEngine(Engine):
             dfs = list(results)
 
         return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+    def _read_excel_with_patterns(
+        self,
+        paths: Union[str, Path, List[str]],
+        sheet_pattern: Union[str, List[str], None] = None,
+        sheet_pattern_case_sensitive: bool = False,
+        add_source_file: bool = False,
+        is_glob: bool = False,
+        ctx: Any = None,
+        **read_kwargs,
+    ) -> pd.DataFrame:
+        """Read Excel files with glob and sheet pattern support.
+
+        Args:
+            paths: Single path, glob-expanded list, or list of paths.
+            sheet_pattern: Pattern(s) to match sheet names (e.g., "*powerbi*").
+                          Supports single string or list of patterns.
+            sheet_pattern_case_sensitive: Whether pattern matching is case-sensitive.
+            add_source_file: If True, adds '_source_file' column with filename.
+            is_glob: Whether paths is a glob-expanded list.
+            ctx: Logging context.
+            **read_kwargs: Additional kwargs for pd.read_excel.
+
+        Returns:
+            Concatenated DataFrame from all matching files/sheets.
+        """
+        if ctx is None:
+            ctx = get_logging_context()
+
+        # Normalize patterns to list
+        if sheet_pattern is None:
+            patterns = None
+        elif isinstance(sheet_pattern, str):
+            patterns = [sheet_pattern]
+        else:
+            patterns = list(sheet_pattern)
+
+        def match_sheet(sheet_name: str) -> bool:
+            """Check if sheet name matches any pattern."""
+            if patterns is None:
+                return True  # No pattern = match all
+
+            check_name = sheet_name if sheet_pattern_case_sensitive else sheet_name.lower()
+            for pattern in patterns:
+                check_pattern = pattern if sheet_pattern_case_sensitive else pattern.lower()
+                if fnmatch.fnmatch(check_name, check_pattern):
+                    return True
+            return False
+
+        def read_single_excel(file_path: Union[str, Path]) -> pd.DataFrame:
+            """Read a single Excel file, matching sheets by pattern."""
+            file_path_obj = Path(file_path) if isinstance(file_path, str) else file_path
+            file_name = file_path_obj.name
+
+            try:
+                # If no sheet pattern, use simple read_excel (faster, compatible with mocks)
+                if patterns is None:
+                    df = pd.read_excel(file_path, **read_kwargs)
+                    if add_source_file:
+                        df["_source_file"] = file_name
+                        df["_source_sheet"] = read_kwargs.get("sheet_name", 0)
+                    return df
+
+                # With sheet pattern, need to inspect sheets first
+                xls = pd.ExcelFile(file_path)
+                matching_sheets = [s for s in xls.sheet_names if match_sheet(s)]
+
+                if not matching_sheets:
+                    ctx.debug(
+                        "No matching sheets in Excel file",
+                        file=file_name,
+                        patterns=patterns,
+                        available_sheets=xls.sheet_names,
+                    )
+                    return pd.DataFrame()
+
+                ctx.debug(
+                    "Reading Excel sheets",
+                    file=file_name,
+                    matching_sheets=matching_sheets,
+                )
+
+                dfs = []
+                for sheet in matching_sheets:
+                    df = pd.read_excel(xls, sheet_name=sheet, **read_kwargs)
+                    if add_source_file:
+                        df["_source_file"] = file_name
+                        df["_source_sheet"] = sheet
+                    dfs.append(df)
+
+                return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+            except Exception as e:
+                ctx.warning(
+                    "Failed to read Excel file",
+                    file=file_name,
+                    error=str(e),
+                )
+                raise
+
+        # Handle single file vs multiple files
+        if is_glob and isinstance(paths, list):
+            ctx.info(
+                "Reading multiple Excel files",
+                file_count=len(paths),
+                sheet_patterns=patterns,
+            )
+            dfs = []
+            source_files = []
+            for file_path in paths:
+                df = read_single_excel(file_path)
+                if not df.empty:
+                    dfs.append(df)
+                    source_files.append(str(file_path))
+
+            if not dfs:
+                ctx.warning("No data read from Excel files", file_count=len(paths))
+                return pd.DataFrame()
+
+            result = pd.concat(dfs, ignore_index=True)
+            result.attrs["odibi_source_files"] = source_files
+            return result
+        else:
+            # Single file
+            df = read_single_excel(paths)
+            if hasattr(df, "attrs"):
+                df.attrs["odibi_source_files"] = [str(paths)]
+            return df
 
     def read(
         self,
@@ -505,7 +634,22 @@ class PandasEngine(Engine):
         elif format == "excel":
             ctx.debug("Reading Excel file", path=str(full_path))
             read_kwargs.pop("dtype_backend", None)
-            return self._process_df(pd.read_excel(full_path, **read_kwargs), post_read_query)
+
+            # Extract excel-specific options
+            sheet_pattern = read_kwargs.pop("sheet_pattern", None)
+            sheet_pattern_case_sensitive = read_kwargs.pop("sheet_pattern_case_sensitive", False)
+            add_source_file = read_kwargs.pop("add_source_file", False)
+
+            df = self._read_excel_with_patterns(
+                full_path if not is_glob else full_path,
+                sheet_pattern=sheet_pattern,
+                sheet_pattern_case_sensitive=sheet_pattern_case_sensitive,
+                add_source_file=add_source_file,
+                is_glob=is_glob,
+                ctx=ctx,
+                **read_kwargs,
+            )
+            return self._process_df(df, post_read_query)
         elif format == "delta":
             ctx.debug("Reading Delta table", path=str(full_path))
             try:

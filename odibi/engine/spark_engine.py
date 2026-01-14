@@ -624,6 +624,37 @@ class SparkEngine(Engine):
             full_path = connection.get_path(path)
             ctx.debug(f"Reading from path: {full_path}")
 
+            # Excel format: delegate to Pandas, convert to Spark
+            if format == "excel":
+                if streaming:
+                    ctx.error("Streaming not supported for Excel format")
+                    raise ValueError("Streaming not supported for Excel format")
+
+                ctx.debug("Reading Excel via Pandas engine (best Excel support)")
+                from odibi.engine.pandas_engine import PandasEngine
+
+                # Use Pandas engine for Excel reading
+                pandas_engine = PandasEngine()
+                pdf = pandas_engine._read_excel_with_patterns(
+                    full_path,
+                    sheet_pattern=options.pop("sheet_pattern", None),
+                    sheet_pattern_case_sensitive=options.pop("sheet_pattern_case_sensitive", False),
+                    add_source_file=options.pop("add_source_file", False),
+                    is_glob="*" in str(full_path) or "?" in str(full_path),
+                    ctx=ctx,
+                    **options,
+                )
+
+                # Convert Pandas DataFrame to Spark DataFrame
+                df = self.spark.createDataFrame(pdf)
+                elapsed = (time.time() - start_time) * 1000
+                ctx.info(
+                    f"Excel read completed (via Pandas): {path}",
+                    elapsed_ms=round(elapsed, 2),
+                    row_count=len(pdf),
+                )
+                return df
+
             # Auto-detect encoding for CSV (Batch only)
             if not streaming and format == "csv" and options.get("auto_encoding"):
                 options = options.copy()

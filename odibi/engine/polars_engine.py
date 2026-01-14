@@ -128,10 +128,34 @@ class PolarsEngine(Engine):
 
                 return pl.scan_delta(full_path, **delta_opts)
 
+            elif format == "excel":
+                # Excel format: delegate to Pandas (best Excel support), convert to Polars
+                from odibi.engine.pandas_engine import PandasEngine
+                from odibi.context import get_logging_context
+
+                ctx = get_logging_context().with_context(engine="polars")
+                ctx.debug("Reading Excel via Pandas engine (best Excel support)")
+
+                # Use Pandas engine for Excel reading
+                pandas_engine = PandasEngine()
+                pdf = pandas_engine._read_excel_with_patterns(
+                    full_path,
+                    sheet_pattern=options.pop("sheet_pattern", None),
+                    sheet_pattern_case_sensitive=options.pop("sheet_pattern_case_sensitive", False),
+                    add_source_file=options.pop("add_source_file", False),
+                    is_glob="*" in str(full_path) or "?" in str(full_path),
+                    ctx=ctx,
+                    **options,
+                )
+
+                # Convert Pandas DataFrame to Polars LazyFrame
+                ctx.info(f"Excel read completed (via Pandas): {path}", row_count=len(pdf))
+                return pl.from_pandas(pdf).lazy()
+
             else:
                 raise ValueError(
                     f"Unsupported format for Polars engine: '{format}'. "
-                    "Supported formats: csv, parquet, json, delta."
+                    "Supported formats: csv, parquet, json, delta, excel."
                 )
 
         except Exception as e:
