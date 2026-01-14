@@ -13,6 +13,7 @@ A metric represents a measurable value that can be aggregated across dimensions.
 ```yaml
 metrics:
   - name: revenue              # Required: unique identifier
+    label: "Total Revenue"     # Optional: display name for column alias
     description: "..."         # Optional: human-readable description
     expr: "SUM(total_amount)"  # Required: SQL aggregation expression
     source: fact_orders        # Required for simple metrics: source table
@@ -26,6 +27,7 @@ metrics:
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | str | Yes | - | Unique metric identifier (lowercase, alphanumeric + underscore) |
+| `label` | str | No | name | Display name used as column alias in generated views |
 | `description` | str | No | - | Human-readable description |
 | `expr` | str | Yes | - | SQL aggregation expression |
 | `source` | str | For simple | - | Source table name |
@@ -135,6 +137,7 @@ A dimension represents an attribute for grouping and filtering metrics.
 ```yaml
 dimensions:
   - name: region               # Required: unique identifier
+    label: "Sales Region"      # Optional: display name for column alias
     source: fact_orders        # Required: source table
     column: region             # Optional: column name (defaults to name)
     hierarchy:                 # Optional: drill-down hierarchy
@@ -149,6 +152,7 @@ dimensions:
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | str | Yes | - | Unique dimension identifier |
+| `label` | str | No | name | Display name used as column alias in generated views |
 | `source` | str | Yes | - | Source table name |
 | `column` | str | No | name | Column name in source |
 | `hierarchy` | list | No | [] | Ordered drill-down columns |

@@ -115,10 +115,10 @@ class TestViewGenerator:
         ddl = generator.generate_view_ddl(view_config)
 
         assert "CREATE OR ALTER VIEW semantic.vw_sales_daily AS" in ddl
-        assert "SUM(revenue) AS total_revenue" in ddl
-        assert "COUNT(*) AS order_count" in ddl
-        assert "order_date AS date" in ddl
-        assert "region_id AS region" in ddl
+        assert "SUM(revenue) AS [total_revenue]" in ddl
+        assert "COUNT(*) AS [order_count]" in ddl
+        assert "order_date AS [date]" in ddl
+        assert "region_id AS [region]" in ddl
         assert "gold.sales_fact" in ddl
         assert "GROUP BY" in ddl
 
@@ -157,7 +157,7 @@ class TestViewGenerator:
 
         ddl = generator.generate_view_ddl(view_config)
 
-        assert "DATETRUNC(month, order_date) AS month" in ddl
+        assert "DATETRUNC(month, order_date) AS [month]" in ddl
 
     def test_nullif_in_derived_metrics(self, config_with_views):
         """Test that division is protected with NULLIF."""
@@ -321,7 +321,7 @@ class TestTimeGrainTransformations:
         generator = ViewGenerator(grain_config)
         ddl = generator.generate_view_ddl(view)
 
-        assert "DATETRUNC(day, ts) AS day" in ddl
+        assert "DATETRUNC(day, ts) AS [day]" in ddl
 
     def test_week_grain(self, grain_config):
         """Test week grain transformation."""
@@ -329,7 +329,7 @@ class TestTimeGrainTransformations:
         generator = ViewGenerator(grain_config)
         ddl = generator.generate_view_ddl(view)
 
-        assert "DATETRUNC(week, ts) AS week" in ddl
+        assert "DATETRUNC(week, ts) AS [week]" in ddl
 
     def test_month_grain(self, grain_config):
         """Test month grain transformation."""
@@ -337,7 +337,7 @@ class TestTimeGrainTransformations:
         generator = ViewGenerator(grain_config)
         ddl = generator.generate_view_ddl(view)
 
-        assert "DATETRUNC(month, ts) AS month" in ddl
+        assert "DATETRUNC(month, ts) AS [month]" in ddl
 
     def test_quarter_grain(self, grain_config):
         """Test quarter grain transformation."""
@@ -345,7 +345,7 @@ class TestTimeGrainTransformations:
         generator = ViewGenerator(grain_config)
         ddl = generator.generate_view_ddl(view)
 
-        assert "DATETRUNC(quarter, ts) AS quarter" in ddl
+        assert "DATETRUNC(quarter, ts) AS [quarter]" in ddl
 
     def test_year_grain(self, grain_config):
         """Test year grain transformation."""
@@ -353,7 +353,7 @@ class TestTimeGrainTransformations:
         generator = ViewGenerator(grain_config)
         ddl = generator.generate_view_ddl(view)
 
-        assert "DATETRUNC(year, ts) AS year" in ddl
+        assert "DATETRUNC(year, ts) AS [year]" in ddl
 
 
 class TestCustomDimensionExpressions:
@@ -378,7 +378,7 @@ class TestCustomDimensionExpressions:
         generator = ViewGenerator(config)
         ddl = generator.generate_view_ddl(view)
 
-        assert "YEAR(DATEADD(month, 6, order_date)) AS fiscal_year" in ddl
+        assert "YEAR(DATEADD(month, 6, order_date)) AS [fiscal_year]" in ddl
         assert "DATETRUNC" not in ddl
 
     def test_custom_expr_without_column(self):
@@ -398,7 +398,7 @@ class TestCustomDimensionExpressions:
         generator = ViewGenerator(config)
         ddl = generator.generate_view_ddl(view)
 
-        assert "DATEPART(iso_week, created_at) AS iso_week" in ddl
+        assert "DATEPART(iso_week, created_at) AS [iso_week]" in ddl
 
     def test_custom_expr_monday_week_start(self):
         """Test custom week start (Monday instead of Sunday)."""

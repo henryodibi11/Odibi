@@ -70,6 +70,7 @@ metrics:
 | Field | Value | Purpose |
 |-------|-------|---------|
 | `name` | `"revenue"` | How you'll reference this metric in queries |
+| `label` | `"Total Revenue"` | Display name for column alias in generated views (optional, defaults to name) |
 | `description` | `"Total revenue..."` | Human-readable documentation |
 | `expr` | `"SUM(line_total)"` | SQL aggregation expression |
 | `source` | `"fact_orders"` | Table to aggregate from |
@@ -616,6 +617,33 @@ dimensions: []  # Added in next tutorial
 - Be descriptive: `completed_order_revenue` over `rev1`
 - Prefix related metrics: `revenue`, `revenue_completed`, `revenue_pending`
 - Include the filter in the name: `last_30_days_revenue`
+
+### Display Labels
+
+Use the `label` field to specify user-friendly column names in generated views:
+
+```yaml
+metrics:
+  - name: total_calendar_hours
+    label: "Total Calendar Hours"    # Appears as column alias in views
+    expr: "SUM([Total Calendar Hour])"
+    source: oee.oee_fact
+```
+
+This generates SQL like:
+```sql
+SELECT SUM([Total Calendar Hour]) AS [Total Calendar Hours]
+```
+
+Instead of:
+```sql
+SELECT SUM([Total Calendar Hour]) AS total_calendar_hours
+```
+
+**When to use labels:**
+- When source columns have spaces or special characters
+- When you want human-readable column names in BI tools
+- When the internal `name` differs from the desired display name
 
 ---
 

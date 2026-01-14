@@ -40,6 +40,7 @@ class MetricDefinition(BaseModel):
 
     Attributes:
         name: Unique metric identifier
+        label: Display name for column alias in generated views. Defaults to name.
         description: Human-readable description
         expr: SQL aggregation expression (e.g., "SUM(total_amount)").
             Optional for derived metrics.
@@ -57,6 +58,9 @@ class MetricDefinition(BaseModel):
     """
 
     name: str = Field(..., description="Unique metric identifier")
+    label: Optional[str] = Field(
+        None, description="Display name for column alias (defaults to name)"
+    )
     description: Optional[str] = Field(None, description="Human-readable description")
     expr: Optional[str] = Field(None, description="SQL aggregation expression")
     source: Optional[str] = Field(
@@ -104,6 +108,10 @@ class MetricDefinition(BaseModel):
             if not self.expr:
                 raise ValueError(f"Simple metric '{self.name}' requires 'expr'")
 
+    def get_alias(self) -> str:
+        """Get the column alias for this metric (label if set, otherwise name)."""
+        return self.label if self.label else self.name
+
 
 class DimensionDefinition(BaseModel):
     """
@@ -114,6 +122,7 @@ class DimensionDefinition(BaseModel):
 
     Attributes:
         name: Unique dimension identifier
+        label: Display name for column alias in generated views. Defaults to name.
         source: Source table reference. Supports three formats:
             - `$pipeline.node` (recommended): e.g., `$build_warehouse.dim_customer`
             - `connection.path`: e.g., `gold.dim_customer` or `gold.dims/customer`
@@ -128,6 +137,9 @@ class DimensionDefinition(BaseModel):
     """
 
     name: str = Field(..., description="Unique dimension identifier")
+    label: Optional[str] = Field(
+        None, description="Display name for column alias (defaults to name)"
+    )
     source: Optional[str] = Field(
         None,
         description=(
@@ -159,6 +171,10 @@ class DimensionDefinition(BaseModel):
     def get_column(self) -> str:
         """Get the actual column name to use."""
         return self.column if self.column else self.name
+
+    def get_alias(self) -> str:
+        """Get the column alias for this dimension (label if set, otherwise name)."""
+        return self.label if self.label else self.name
 
 
 class MaterializationConfig(BaseModel):

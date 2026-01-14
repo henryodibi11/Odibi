@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Semantic Layer: Display Labels** for metrics and dimensions:
+  - New `label` field on `MetricDefinition` and `DimensionDefinition`
+  - Controls column alias in generated views (e.g., `AS [Total Calendar Hours]`)
+  - Defaults to `name` if not specified
+  - Column aliases now wrapped in `[]` brackets for SQL Server compatibility with spaces
+
+### Fixed
+
+- **Version now read dynamically** from package metadata via `importlib.metadata`:
+  - `odibi.__version__` now matches `pyproject.toml` automatically
+  - Removed hardcoded `__version__` from submodules (`validation`, `testing`, `story`, `semantics`)
+  - Stories and all version references now show the correct installed version
+
 ## [2.6.1] - 2026-01-11
 
 ### Added - Executive Dashboard Views & SLA Tracking

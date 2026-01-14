@@ -151,7 +151,7 @@ class ViewGenerator:
         for dim_name in view_config.dimensions:
             dim_def = self._dimension_cache.get(dim_name.lower())
             dim_sql, dim_alias = self._get_dimension_sql(dim_name, dim_def)
-            select_parts.append(f"    {dim_sql} AS {dim_alias}")
+            select_parts.append(f"    {dim_sql} AS [{dim_alias}]")
             group_by_parts.append(dim_sql)
 
         component_metrics = set()
@@ -172,15 +172,18 @@ class ViewGenerator:
         for comp_name in sorted(component_metrics):
             comp_def = self._metric_cache.get(comp_name)
             if comp_def and comp_def.expr:
-                select_parts.append(f"    {comp_def.expr} AS {comp_name}")
+                alias = comp_def.get_alias()
+                select_parts.append(f"    {comp_def.expr} AS [{alias}]")
 
         for metric_def in simple_metrics:
             if metric_def.name not in component_metrics and metric_def.expr:
-                select_parts.append(f"    {metric_def.expr} AS {metric_def.name}")
+                alias = metric_def.get_alias()
+                select_parts.append(f"    {metric_def.expr} AS [{alias}]")
 
         for metric_def in derived_metrics:
             formula_sql = self._build_derived_formula_sql(metric_def)
-            select_parts.append(f"    {formula_sql} AS {metric_def.name}")
+            alias = metric_def.get_alias()
+            select_parts.append(f"    {formula_sql} AS [{alias}]")
 
         select_clause = ",\n".join(select_parts)
         group_by_clause = ", ".join(group_by_parts)
@@ -206,9 +209,11 @@ class ViewGenerator:
         if dim_def is None:
             return dim_name, dim_name
 
+        alias = dim_def.get_alias()
+
         # Custom expression takes priority
         if dim_def.expr:
-            return dim_def.expr, dim_name
+            return dim_def.expr, alias
 
         col = dim_def.get_column()
 
@@ -216,10 +221,10 @@ class ViewGenerator:
         if dim_def.grain:
             sql_template = self.GRAIN_SQL_MAP.get(dim_def.grain)
             if sql_template:
-                return sql_template.format(col=col), dim_name
-            return col, dim_name
+                return sql_template.format(col=col), alias
+            return col, alias
 
-        return col, dim_name
+        return col, alias
 
     def _build_derived_formula_sql(self, metric_def: MetricDefinition) -> str:
         """Build SQL for a derived metric with NULLIF protection."""

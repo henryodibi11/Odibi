@@ -1,6 +1,11 @@
 """ODIBI - Explicit, Traceable, Simple Data Engineering Framework."""
 
-__version__ = "2.4.0"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("odibi")
+except PackageNotFoundError:
+    __version__ = "0.0.0.dev0"  # Fallback for editable installs without metadata
 
 # Core components (available now)
 import odibi.transformers  # noqa: F401 # Register built-in transformers

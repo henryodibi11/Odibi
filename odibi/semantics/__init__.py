@@ -68,4 +68,3 @@ __all__ = [
     "SemanticLayerRunner",
     "run_semantic_layer",
 ]
-__version__ = "1.1.0"

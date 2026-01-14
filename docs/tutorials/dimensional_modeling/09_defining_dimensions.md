@@ -157,6 +157,7 @@ dimensions:
 | Field | Value | Purpose |
 |-------|-------|---------|
 | `name` | `"region"` | How you reference it in queries |
+| `label` | `"Sales Region"` | Display name for column alias in generated views (optional, defaults to name) |
 | `source` | `"dim_customer"` | Table containing the dimension |
 | `column` | `"region"` | Column to GROUP BY |
 

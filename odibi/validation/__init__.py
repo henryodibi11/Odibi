@@ -59,4 +59,3 @@ __all__ = [
     "validate_fk_on_load",
     "parse_relationships_config",
 ]
-__version__ = "1.3.0-alpha.1"
