@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.5] - 2026-01-14
+
+### Fixed
+
+- **View columns now preserve YAML order**: Metrics appear in the order listed in `views.metrics`, not alphabetically sorted
+
 ## [2.6.4] - 2026-01-14
 
 ### Added
@@ -16,8 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Column aliases now wrapped in `[]` brackets for SQL Server compatibility with spaces
 
 ### Fixed
-
-- **View columns now preserve YAML order**: Metrics appear in the order listed in `views.metrics`, not alphabetically sorted
 
 - **Version now read dynamically** from package metadata via `importlib.metadata`:
   - `odibi.__version__` now matches `pyproject.toml` automatically
