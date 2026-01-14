@@ -1,7 +1,7 @@
 """Tests for Excel reading with remote storage (Azure Blob, S3, etc.)."""
 
+import importlib.util
 import io
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -24,12 +24,7 @@ requires_openpyxl = pytest.mark.skipif(
 )
 
 # Check if fsspec is available
-try:
-    import fsspec
-
-    HAS_FSSPEC = True
-except ImportError:
-    HAS_FSSPEC = False
+HAS_FSSPEC = importlib.util.find_spec("fsspec") is not None
 
 requires_fsspec = pytest.mark.skipif(
     not HAS_FSSPEC,
