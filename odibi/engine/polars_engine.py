@@ -136,6 +136,11 @@ class PolarsEngine(Engine):
                 ctx = get_logging_context().with_context(engine="polars")
                 ctx.debug("Reading Excel via Pandas engine (best Excel support)")
 
+                # Get storage_options from connection for Azure/cloud authentication
+                excel_storage_options = None
+                if hasattr(connection, "pandas_storage_options"):
+                    excel_storage_options = connection.pandas_storage_options()
+
                 # Use Pandas engine for Excel reading
                 pandas_engine = PandasEngine()
                 pdf = pandas_engine._read_excel_with_patterns(
@@ -145,6 +150,7 @@ class PolarsEngine(Engine):
                     add_source_file=options.pop("add_source_file", False),
                     is_glob="*" in str(full_path) or "?" in str(full_path),
                     ctx=ctx,
+                    storage_options=excel_storage_options,
                     **options,
                 )
 

@@ -633,6 +633,11 @@ class SparkEngine(Engine):
                 ctx.debug("Reading Excel via Pandas engine (best Excel support)")
                 from odibi.engine.pandas_engine import PandasEngine
 
+                # Get storage_options from connection for Azure/cloud authentication
+                storage_options = None
+                if hasattr(connection, "pandas_storage_options"):
+                    storage_options = connection.pandas_storage_options()
+
                 # Use Pandas engine for Excel reading
                 pandas_engine = PandasEngine()
                 pdf = pandas_engine._read_excel_with_patterns(
@@ -642,6 +647,7 @@ class SparkEngine(Engine):
                     add_source_file=options.pop("add_source_file", False),
                     is_glob="*" in str(full_path) or "?" in str(full_path),
                     ctx=ctx,
+                    storage_options=storage_options,
                     **options,
                 )
 
