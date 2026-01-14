@@ -1967,6 +1967,11 @@ class NodeExecutor:
                 write_options["merge_options"] = write_config.merge_options
                 ctx.debug("Merge options configured")
 
+            # Extract overwrite_options from WriteConfig (SQL Server OVERWRITE)
+            if write_config.overwrite_options:
+                write_options["overwrite_options"] = write_config.overwrite_options
+                ctx.debug("Overwrite options configured")
+
             if write_config.format == "delta":
                 merged_props = {}
                 if self.performance_config and hasattr(
