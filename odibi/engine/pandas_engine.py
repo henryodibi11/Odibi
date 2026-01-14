@@ -135,7 +135,16 @@ class PandasEngine(Engine):
                     logger.warning(f"Failed to apply query '{query}': {e}")
         return df
 
-    _CLOUD_URI_PREFIXES = ("abfss://", "s3://", "gs://", "az://", "https://")
+    _CLOUD_URI_PREFIXES = (
+        "abfss://",
+        "abfs://",
+        "wasbs://",
+        "wasb://",
+        "az://",
+        "s3://",
+        "gs://",
+        "https://",
+    )
 
     def _retry_delta_operation(self, func, max_retries: int = 5, base_delay: float = 0.2):
         """Retry Delta operations with exponential backoff for concurrent conflicts."""
@@ -198,6 +207,111 @@ class PandasEngine(Engine):
 
         return options
 
+    def _is_remote_uri(self, path: Union[str, Path]) -> bool:
+        """Check if a path is a remote URI (cloud storage).
+
+        Args:
+            path: File path or URI
+
+        Returns:
+            True if path is a remote URI requiring fsspec
+        """
+        if isinstance(path, Path):
+            path = str(path)
+
+        parsed = urlparse(path)
+
+        # Windows drive letter check (e.g., C:\foo.xlsx parses as scheme='c')
+        if os.name == "nt" and len(parsed.scheme) == 1 and parsed.scheme.isalpha():
+            return False
+
+        # Cloud schemes
+        if parsed.scheme and parsed.scheme not in ("file", ""):
+            return True
+
+        # Fallback prefix check
+        return path.startswith(self._CLOUD_URI_PREFIXES)
+
+    def _expand_remote_glob(
+        self,
+        pattern: str,
+        storage_options: Optional[Dict[str, Any]] = None,
+        ctx: Any = None,
+    ) -> List[str]:
+        """Expand glob pattern for remote paths using fsspec.
+
+        Args:
+            pattern: Glob pattern (e.g., "abfss://container@account.dfs.core.windows.net/path/*.xlsx")
+            storage_options: Authentication options for cloud storage
+            ctx: Logging context
+
+        Returns:
+            List of matching file URIs
+        """
+        if ctx is None:
+            ctx = get_logging_context()
+
+        try:
+            import fsspec
+        except ImportError:
+            ctx.error("fsspec required for remote glob expansion")
+            raise ImportError(
+                "Remote glob patterns require 'fsspec'. "
+                "Install with: pip install fsspec adlfs"
+            )
+
+        # Parse protocol and path
+        if "://" in pattern:
+            protocol, _, path_part = pattern.partition("://")
+        else:
+            protocol = "file"
+            path_part = pattern
+
+        ctx.debug(
+            "Expanding remote glob pattern",
+            protocol=protocol,
+            pattern=path_part,
+        )
+
+        # Create filesystem with storage options
+        fs = fsspec.filesystem(protocol, **(storage_options or {}))
+
+        # Glob and reconstruct full URIs
+        matched = fs.glob(path_part)
+
+        if not matched:
+            ctx.warning("No files matched remote glob pattern", pattern=pattern)
+            return []
+
+        # Reconstruct full URIs
+        result = [f"{protocol}://{m}" for m in matched]
+
+        ctx.info(
+            "Remote glob pattern expanded",
+            pattern=pattern,
+            matched_files=len(result),
+        )
+
+        return result
+
+    def _open_remote_file(
+        self,
+        path: str,
+        storage_options: Optional[Dict[str, Any]] = None,
+    ):
+        """Open a remote file using fsspec.
+
+        Args:
+            path: Remote file URI
+            storage_options: Authentication options for cloud storage
+
+        Returns:
+            Context manager yielding a binary file-like object
+        """
+        import fsspec
+
+        return fsspec.open(path, "rb", **(storage_options or {}))
+
     def _read_parallel(self, read_func: Any, paths: List[str], **kwargs) -> pd.DataFrame:
         """Read multiple files in parallel using threads.
 
@@ -228,18 +342,24 @@ class PandasEngine(Engine):
         add_source_file: bool = False,
         is_glob: bool = False,
         ctx: Any = None,
+        storage_options: Optional[Dict[str, Any]] = None,
         **read_kwargs,
     ) -> pd.DataFrame:
         """Read Excel files with glob and sheet pattern support.
 
+        Supports both local files and remote cloud storage (Azure Blob, S3, etc.)
+        via fsspec integration.
+
         Args:
             paths: Single path, glob-expanded list, or list of paths.
+                   Can be local paths or cloud URIs (abfss://, s3://, etc.)
             sheet_pattern: Pattern(s) to match sheet names (e.g., "*powerbi*").
                           Supports single string or list of patterns.
             sheet_pattern_case_sensitive: Whether pattern matching is case-sensitive.
             add_source_file: If True, adds '_source_file' column with filename.
-            is_glob: Whether paths is a glob-expanded list.
+            is_glob: Whether paths contains a glob pattern to expand.
             ctx: Logging context.
+            storage_options: Authentication options for cloud storage (from connection).
             **read_kwargs: Additional kwargs for pd.read_excel.
 
         Returns:
@@ -268,85 +388,162 @@ class PandasEngine(Engine):
                     return True
             return False
 
-        def read_single_excel(file_path: Union[str, Path]) -> pd.DataFrame:
-            """Read a single Excel file, matching sheets by pattern."""
-            file_path_obj = Path(file_path) if isinstance(file_path, str) else file_path
-            file_name = file_path_obj.name
+        def get_file_name(file_path: str) -> str:
+            """Extract filename from path (works for both local and remote URIs)."""
+            if "://" in file_path:
+                # Remote URI - extract filename from path part
+                path_part = file_path.split("://", 1)[1]
+                return path_part.rsplit("/", 1)[-1] if "/" in path_part else path_part
+            else:
+                return Path(file_path).name
+
+        def read_single_excel(file_path: str) -> pd.DataFrame:
+            """Read a single Excel file, matching sheets by pattern.
+
+            Handles both local and remote files transparently.
+            """
+            file_name = get_file_name(file_path)
+            is_remote = self._is_remote_uri(file_path)
+
+            # For remote files, remove storage_options - we handle it via fsspec
+            # For local files, keep storage_options for consistency (pandas ignores it)
+            if is_remote:
+                excel_kwargs = {k: v for k, v in read_kwargs.items() if k != "storage_options"}
+            else:
+                excel_kwargs = read_kwargs.copy()
+                # Add storage_options back if provided (for test compatibility)
+                if storage_options and "storage_options" not in excel_kwargs:
+                    excel_kwargs["storage_options"] = storage_options
 
             try:
-                # If no sheet pattern, use simple read_excel (faster, compatible with mocks)
-                if patterns is None:
-                    df = pd.read_excel(file_path, **read_kwargs)
-                    if add_source_file:
-                        df["_source_file"] = file_name
-                        df["_source_sheet"] = read_kwargs.get("sheet_name", 0)
-                    return df
-
-                # With sheet pattern, need to inspect sheets first
-                xls = pd.ExcelFile(file_path)
-                matching_sheets = [s for s in xls.sheet_names if match_sheet(s)]
-
-                if not matching_sheets:
+                if is_remote:
+                    # Remote file - use fsspec to open and pass file handle
                     ctx.debug(
-                        "No matching sheets in Excel file",
+                        "Reading remote Excel file",
                         file=file_name,
-                        patterns=patterns,
-                        available_sheets=xls.sheet_names,
+                        uri=file_path,
                     )
-                    return pd.DataFrame()
-
-                ctx.debug(
-                    "Reading Excel sheets",
-                    file=file_name,
-                    matching_sheets=matching_sheets,
-                )
-
-                dfs = []
-                for sheet in matching_sheets:
-                    df = pd.read_excel(xls, sheet_name=sheet, **read_kwargs)
-                    if add_source_file:
-                        df["_source_file"] = file_name
-                        df["_source_sheet"] = sheet
-                    dfs.append(df)
-
-                return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                    with self._open_remote_file(file_path, storage_options) as fh:
+                        return _read_excel_from_source(fh, file_name, excel_kwargs)
+                else:
+                    # Local file - pass path directly to pandas (supports mocking)
+                    ctx.debug("Reading local Excel file", file=file_name)
+                    return _read_excel_from_source(file_path, file_name, excel_kwargs)
 
             except Exception as e:
                 ctx.warning(
                     "Failed to read Excel file",
                     file=file_name,
+                    path=file_path,
                     error=str(e),
                 )
                 raise
 
-        # Handle single file vs multiple files
-        if is_glob and isinstance(paths, list):
-            ctx.info(
-                "Reading multiple Excel files",
-                file_count=len(paths),
-                sheet_patterns=patterns,
-            )
-            dfs = []
-            source_files = []
-            for file_path in paths:
-                df = read_single_excel(file_path)
-                if not df.empty:
-                    dfs.append(df)
-                    source_files.append(str(file_path))
+        def _read_excel_from_source(source, file_name: str, excel_kwargs: dict) -> pd.DataFrame:
+            """Read Excel data from a path or file handle with sheet pattern matching.
 
-            if not dfs:
-                ctx.warning("No data read from Excel files", file_count=len(paths))
+            Args:
+                source: File path (str) or file handle for pandas to read from
+                file_name: Display name for the file (used in _source_file column)
+                excel_kwargs: Keyword arguments to pass to pd.read_excel
+            """
+            # If no sheet pattern, use simple read_excel
+            if patterns is None:
+                df = pd.read_excel(source, **excel_kwargs)
+                if add_source_file:
+                    df["_source_file"] = file_name
+                    df["_source_sheet"] = excel_kwargs.get("sheet_name", 0)
+                return df
+
+            # With sheet pattern, need to inspect sheets first
+            xls = pd.ExcelFile(source)
+            matching_sheets = [s for s in xls.sheet_names if match_sheet(s)]
+
+            if not matching_sheets:
+                ctx.debug(
+                    "No matching sheets in Excel file",
+                    file=file_name,
+                    patterns=patterns,
+                    available_sheets=xls.sheet_names,
+                )
                 return pd.DataFrame()
 
-            result = pd.concat(dfs, ignore_index=True)
+            ctx.debug(
+                "Reading Excel sheets",
+                file=file_name,
+                matching_sheets=matching_sheets,
+            )
+
+            dfs = []
+            for sheet in matching_sheets:
+                df = pd.read_excel(xls, sheet_name=sheet, **excel_kwargs)
+                if add_source_file:
+                    df["_source_file"] = file_name
+                    df["_source_sheet"] = sheet
+                dfs.append(df)
+
+            return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        # Expand glob patterns if needed
+        file_list: List[str] = []
+
+        if isinstance(paths, (str, Path)):
+            path_str = str(paths)
+
+            # Check if this is a glob pattern that needs expansion
+            has_glob = "*" in path_str or "?" in path_str or "[" in path_str
+
+            if has_glob:
+                if self._is_remote_uri(path_str):
+                    # Remote glob - use fsspec
+                    file_list = self._expand_remote_glob(path_str, storage_options, ctx)
+                else:
+                    # Local glob
+                    file_list = glob.glob(path_str)
+                    if not file_list:
+                        raise FileNotFoundError(f"No files matched pattern: {path_str}")
+                    ctx.info(
+                        "Local glob pattern expanded",
+                        pattern=path_str,
+                        matched_files=len(file_list),
+                    )
+            else:
+                # Single file (no glob)
+                file_list = [path_str]
+
+        elif isinstance(paths, list):
+            # Already a list of paths (pre-expanded)
+            file_list = [str(p) for p in paths]
+
+        if not file_list:
+            raise FileNotFoundError(f"No Excel files found for: {paths}")
+
+        # Read all files
+        ctx.info(
+            "Reading Excel files",
+            file_count=len(file_list),
+            sheet_patterns=patterns,
+            is_remote=self._is_remote_uri(file_list[0]) if file_list else False,
+        )
+
+        all_dfs = []
+        source_files = []
+
+        for file_path in file_list:
+            df = read_single_excel(file_path)
+            if not df.empty:
+                all_dfs.append(df)
+                source_files.append(file_path)
+
+        if not all_dfs:
+            ctx.warning("No data read from Excel files", file_count=len(file_list))
+            return pd.DataFrame()
+
+        result = pd.concat(all_dfs, ignore_index=True)
+        if hasattr(result, "attrs"):
             result.attrs["odibi_source_files"] = source_files
-            return result
-        else:
-            # Single file
-            df = read_single_excel(paths)
-            if hasattr(df, "attrs"):
-                df.attrs["odibi_source_files"] = [str(paths)]
-            return df
+
+        return result
 
     def read(
         self,
@@ -640,13 +837,17 @@ class PandasEngine(Engine):
             sheet_pattern_case_sensitive = read_kwargs.pop("sheet_pattern_case_sensitive", False)
             add_source_file = read_kwargs.pop("add_source_file", False)
 
+            # Extract storage_options for cloud storage authentication
+            storage_options = read_kwargs.pop("storage_options", None)
+
             df = self._read_excel_with_patterns(
-                full_path if not is_glob else full_path,
+                full_path,
                 sheet_pattern=sheet_pattern,
                 sheet_pattern_case_sensitive=sheet_pattern_case_sensitive,
                 add_source_file=add_source_file,
                 is_glob=is_glob,
                 ctx=ctx,
+                storage_options=storage_options,
                 **read_kwargs,
             )
             return self._process_df(df, post_read_query)
