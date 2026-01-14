@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.6] - 2026-01-14
+
+### Fixed
+
+- **Derived metrics now appear at end of views**: Simple metrics are emitted first in YAML order, then derived metrics at the end. This ensures predictable column ordering matching source tables.
+
 ## [2.6.5] - 2026-01-14
 
 ### Fixed
