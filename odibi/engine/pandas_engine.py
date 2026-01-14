@@ -256,8 +256,7 @@ class PandasEngine(Engine):
         except ImportError:
             ctx.error("fsspec required for remote glob expansion")
             raise ImportError(
-                "Remote glob patterns require 'fsspec'. "
-                "Install with: pip install fsspec adlfs"
+                "Remote glob patterns require 'fsspec'. " "Install with: pip install fsspec adlfs"
             )
 
         # Parse protocol and path

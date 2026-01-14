@@ -23,6 +23,19 @@ requires_openpyxl = pytest.mark.skipif(
     reason="Requires openpyxl >= 3.1.0 for Excel tests",
 )
 
+# Check if fsspec is available
+try:
+    import fsspec
+
+    HAS_FSSPEC = True
+except ImportError:
+    HAS_FSSPEC = False
+
+requires_fsspec = pytest.mark.skipif(
+    not HAS_FSSPEC,
+    reason="Requires fsspec for remote storage tests",
+)
+
 
 class TestRemoteUriDetection:
     """Tests for _is_remote_uri helper."""
@@ -63,6 +76,7 @@ class TestRemoteUriDetection:
         assert engine._is_remote_uri("D:/data/file.xlsx") is False
 
 
+@requires_fsspec
 class TestRemoteGlobExpansion:
     """Tests for _expand_remote_glob helper."""
 
