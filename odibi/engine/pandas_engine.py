@@ -396,6 +396,38 @@ class PandasEngine(Engine):
         # Prepare read options (options already includes storage_options from caller)
         read_kwargs = options.copy()
 
+        # Filter out Spark-specific options that don't apply to Pandas
+        spark_only_options = {
+            "inferSchema",
+            "multiLine",
+            "mode",
+            "columnNameOfCorruptRecord",
+            "dateFormat",
+            "timestampFormat",
+            "nullValue",
+            "nanValue",
+            "positiveInf",
+            "negativeInf",
+            "escape",
+            "charToEscapeQuoteEscaping",
+            "ignoreLeadingWhiteSpace",
+            "ignoreTrailingWhiteSpace",
+            "maxColumns",
+            "maxCharsPerColumn",
+            "unescapedQuoteHandling",
+            "enforceSchema",
+            "samplingRatio",
+            "emptyValue",
+            "locale",
+            "lineSep",
+            "pathGlobFilter",
+            "recursiveFileLookup",
+            "modifiedBefore",
+            "modifiedAfter",
+        }
+        for opt in spark_only_options:
+            read_kwargs.pop(opt, None)
+
         # Extract 'query' or 'filter' option for post-read filtering
         post_read_query = read_kwargs.pop("query", None) or read_kwargs.pop("filter", None)
 
