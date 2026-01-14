@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **View columns now preserve YAML order**: Metrics appear in the order listed in `views.metrics`, not alphabetically sorted
+
 - **Version now read dynamically** from package metadata via `importlib.metadata`:
   - `odibi.__version__` now matches `pyproject.toml` automatically
   - Removed hardcoded `__version__` from submodules (`validation`, `testing`, `story`, `semantics`)

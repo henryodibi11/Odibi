@@ -156,34 +156,35 @@ class ViewGenerator:
 
         component_metrics = set()
         derived_metrics = []
-        simple_metrics = []
+        emitted_metrics = set()
 
         for metric_name in view_config.metrics:
             metric_def = self._metric_cache.get(metric_name.lower())
             if metric_def:
                 if metric_def.type == MetricType.DERIVED:
-                    derived_metrics.append(metric_def)
+                    derived_metrics.append((metric_name, metric_def))
                     if metric_def.components:
                         for comp in metric_def.components:
                             component_metrics.add(comp.lower())
-                else:
-                    simple_metrics.append(metric_def)
 
-        for comp_name in sorted(component_metrics):
-            comp_def = self._metric_cache.get(comp_name)
-            if comp_def and comp_def.expr:
-                alias = comp_def.get_alias()
-                select_parts.append(f"    {comp_def.expr} AS [{alias}]")
-
-        for metric_def in simple_metrics:
-            if metric_def.name not in component_metrics and metric_def.expr:
+        for metric_name in view_config.metrics:
+            metric_def = self._metric_cache.get(metric_name.lower())
+            if metric_def and metric_def.type != MetricType.DERIVED:
+                if metric_def.name not in emitted_metrics and metric_def.expr:
+                    alias = metric_def.get_alias()
+                    select_parts.append(f"    {metric_def.expr} AS [{alias}]")
+                    emitted_metrics.add(metric_def.name)
+            elif metric_def and metric_def.type == MetricType.DERIVED:
+                if metric_def.components:
+                    for comp_name in metric_def.components:
+                        comp_def = self._metric_cache.get(comp_name.lower())
+                        if comp_def and comp_def.name not in emitted_metrics and comp_def.expr:
+                            alias = comp_def.get_alias()
+                            select_parts.append(f"    {comp_def.expr} AS [{alias}]")
+                            emitted_metrics.add(comp_def.name)
+                formula_sql = self._build_derived_formula_sql(metric_def)
                 alias = metric_def.get_alias()
-                select_parts.append(f"    {metric_def.expr} AS [{alias}]")
-
-        for metric_def in derived_metrics:
-            formula_sql = self._build_derived_formula_sql(metric_def)
-            alias = metric_def.get_alias()
-            select_parts.append(f"    {formula_sql} AS [{alias}]")
+                select_parts.append(f"    {formula_sql} AS [{alias}]")
 
         select_clause = ",\n".join(select_parts)
         group_by_clause = ", ".join(group_by_parts)
