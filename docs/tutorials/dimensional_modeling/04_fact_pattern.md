@@ -134,10 +134,10 @@ engine: pandas
 
 connections:
   source:
-    type: file
+    type: local
     path: ./data
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -153,19 +153,19 @@ pipelines:
           connection: warehouse
           path: dim_customer
           format: parquet
-      
+
       - name: dim_product
         read:
           connection: warehouse
           path: dim_product
           format: parquet
-      
+
       - name: dim_date
         read:
           connection: warehouse
           path: dim_date
           format: parquet
-      
+
       # Then build the fact table
       - name: fact_orders
         depends_on: [dim_customer, dim_product, dim_date]
@@ -173,7 +173,7 @@ pipelines:
           connection: source
           path: orders.csv
           format: csv
-        
+
         pattern:
           type: fact
           params:
@@ -200,7 +200,7 @@ pipelines:
             audit:
               load_timestamp: true
               source_system: "pos"
-        
+
         write:
           connection: warehouse
           path: fact_orders
@@ -391,10 +391,10 @@ params:
     # Pass through
     - quantity
     - unit_price
-    
+
     # Rename (maps status to order_status)
     - order_status: status
-    
+
     # Calculate
     - line_total: "quantity * unit_price"
     - discount_amount: "unit_price * 0.1"
@@ -459,10 +459,10 @@ engine: pandas
 
 connections:
   source:
-    type: file
+    type: local
     path: ./examples/tutorials/dimensional_modeling/data
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -479,19 +479,19 @@ pipelines:
           connection: warehouse
           path: dim_customer
           format: parquet
-      
+
       - name: dim_product
         read:
           connection: warehouse
           path: dim_product
           format: parquet
-      
+
       - name: dim_date
         read:
           connection: warehouse
           path: dim_date
           format: parquet
-      
+
       # Build fact table
       - name: fact_orders
         description: "Orders fact table with surrogate key lookups"
@@ -500,13 +500,13 @@ pipelines:
           connection: source
           path: orders.csv
           format: csv
-        
+
         pattern:
           type: fact
           params:
             # Define the grain (uniqueness)
             grain: [order_id]
-            
+
             # Define dimension lookups
             dimensions:
               - source_column: customer_id
@@ -514,31 +514,31 @@ pipelines:
                 dimension_key: customer_id
                 surrogate_key: customer_sk
                 scd2: true  # Filter to is_current = true
-              
+
               - source_column: product_id
                 dimension_table: dim_product
                 dimension_key: product_id
                 surrogate_key: product_sk
-              
+
               - source_column: order_date
                 dimension_table: dim_date
                 dimension_key: full_date
                 surrogate_key: date_sk
-            
+
             # Handle missing dimension values
             orphan_handling: unknown
-            
+
             # Define measures
             measures:
               - quantity
               - unit_price
               - line_total: "quantity * unit_price"
-            
+
             # Add audit columns
             audit:
               load_timestamp: true
               source_system: "pos"
-        
+
         write:
           connection: warehouse
           path: fact_orders
@@ -622,7 +622,7 @@ Now you can run powerful analytical queries:
 ### "Sales by region"
 
 ```sql
-SELECT 
+SELECT
     c.region,
     COUNT(*) AS order_count,
     SUM(f.line_total) AS total_revenue
@@ -643,7 +643,7 @@ ORDER BY total_revenue DESC;
 ### "Daily sales trend"
 
 ```sql
-SELECT 
+SELECT
     d.full_date,
     d.day_of_week,
     SUM(f.line_total) AS daily_revenue
@@ -656,7 +656,7 @@ ORDER BY d.full_date;
 ### "Top products by category"
 
 ```sql
-SELECT 
+SELECT
     p.category,
     p.name,
     SUM(f.quantity) AS units_sold,

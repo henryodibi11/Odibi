@@ -48,10 +48,10 @@ engine: pandas
 
 connections:
   source:
-    type: file
+    type: local
     path: ./data
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -66,7 +66,7 @@ pipelines:
           connection: source
           path: customers.csv
           format: csv
-        
+
         pattern:
           type: dimension
           params:
@@ -74,7 +74,7 @@ pipelines:
             surrogate_key: customer_sk
             scd_type: 0
             unknown_member: true
-        
+
         write:
           connection: warehouse
           path: dim_customer
@@ -144,10 +144,10 @@ engine: pandas
 
 connections:
   source:
-    type: file
+    type: local
     path: ./data
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -162,7 +162,7 @@ pipelines:
           connection: source
           path: customers_updated.csv
           format: csv
-        
+
         pattern:
           type: dimension
           params:
@@ -179,7 +179,7 @@ pipelines:
             unknown_member: true
             audit:
               load_timestamp: true
-        
+
         write:
           connection: warehouse
           path: dim_customer
@@ -253,10 +253,10 @@ engine: pandas
 
 connections:
   source:
-    type: file
+    type: local
     path: ./data
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -271,7 +271,7 @@ pipelines:
           connection: source
           path: customers_updated.csv
           format: csv
-        
+
         pattern:
           type: dimension
           params:
@@ -292,7 +292,7 @@ pipelines:
             audit:
               load_timestamp: true
               source_system: "crm"
-        
+
         write:
           connection: warehouse
           path: dim_customer
@@ -336,15 +336,15 @@ SELECT * FROM dim_customer WHERE is_current = true;
 
 **Point-in-time query (as of January 17):**
 ```sql
-SELECT * FROM dim_customer 
-WHERE '2024-01-17' >= valid_from 
+SELECT * FROM dim_customer
+WHERE '2024-01-17' >= valid_from
   AND ('2024-01-17' < valid_to OR valid_to IS NULL);
 ```
 
 **Customer C001's email history:**
 ```sql
-SELECT customer_sk, email, valid_from, valid_to 
-FROM dim_customer 
+SELECT customer_sk, email, valid_from, valid_to
+FROM dim_customer
 WHERE customer_id = 'C001'
 ORDER BY valid_from;
 ```
@@ -388,10 +388,10 @@ engine: pandas
 
 connections:
   source:
-    type: file
+    type: local
     path: ./examples/tutorials/dimensional_modeling/data
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -409,7 +409,7 @@ pipelines:
           connection: source
           path: customers.csv
           format: csv
-        
+
         pattern:
           type: dimension
           params:
@@ -430,7 +430,7 @@ pipelines:
             audit:
               load_timestamp: true
               source_system: "crm"
-        
+
         write:
           connection: warehouse
           path: dim_customer
@@ -447,7 +447,7 @@ pipelines:
           connection: source
           path: customers_updated.csv
           format: csv
-        
+
         pattern:
           type: dimension
           params:
@@ -468,7 +468,7 @@ pipelines:
             audit:
               load_timestamp: true
               source_system: "crm"
-        
+
         write:
           connection: warehouse
           path: dim_customer

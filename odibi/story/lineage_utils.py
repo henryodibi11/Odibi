@@ -86,6 +86,14 @@ def get_full_stories_path(project_config: ProjectConfig) -> str:
     elif conn_type_value == "dbfs":
         return f"dbfs:/{clean_path}"
 
+    # Local file system - use connection base_path
+    elif conn_type_value == "local":
+        base_path = getattr(story_conn, "base_path", None)
+        if base_path:
+            from pathlib import Path
+
+            return str(Path(base_path) / clean_path)
+
     return stories_path
 
 

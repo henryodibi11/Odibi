@@ -28,7 +28,7 @@ Your raw order data looks like this:
 **Without a date dimension:**
 ```sql
 -- Complex, repeated logic in every query
-SELECT 
+SELECT
     DATENAME(weekday, order_date) AS day_of_week,
     SUM(amount) AS total
 FROM orders
@@ -40,7 +40,7 @@ GROUP BY DATENAME(weekday, order_date);
 **With a date dimension:**
 ```sql
 -- Simple join, pre-calculated attributes
-SELECT 
+SELECT
     d.day_of_week,
     SUM(o.amount) AS total
 FROM fact_orders o
@@ -70,7 +70,7 @@ engine: pandas
 
 connections:
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -89,7 +89,7 @@ pipelines:
             end_date: "2024-01-28"
             fiscal_year_start_month: 7
             unknown_member: true
-        
+
         write:
           connection: warehouse
           path: dim_date
@@ -287,7 +287,7 @@ engine: pandas
 
 connections:
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -306,13 +306,13 @@ pipelines:
             # 10-year range for typical warehouse
             start_date: "2020-01-01"
             end_date: "2030-12-31"
-            
+
             # July fiscal year (education/government style)
             fiscal_year_start_month: 7
-            
+
             # Add unknown member for orphan handling
             unknown_member: true
-        
+
         write:
           connection: warehouse
           path: dim_date
@@ -400,7 +400,7 @@ print(result_df.head(10).to_string())
 ### "What day of the week had the most sales?"
 
 ```sql
-SELECT 
+SELECT
     d.day_of_week,
     SUM(f.line_total) AS total_sales,
     COUNT(*) AS order_count
@@ -413,7 +413,7 @@ ORDER BY total_sales DESC;
 ### "Show monthly sales trend"
 
 ```sql
-SELECT 
+SELECT
     d.year,
     d.month_name,
     SUM(f.line_total) AS monthly_sales
@@ -426,7 +426,7 @@ ORDER BY d.year, d.month;
 ### "Compare weekday vs weekend sales"
 
 ```sql
-SELECT 
+SELECT
     CASE WHEN d.is_weekend THEN 'Weekend' ELSE 'Weekday' END AS period,
     SUM(f.line_total) AS total_sales,
     AVG(f.line_total) AS avg_order
@@ -438,7 +438,7 @@ GROUP BY d.is_weekend;
 ### "Fiscal year performance"
 
 ```sql
-SELECT 
+SELECT
     d.fiscal_year,
     d.fiscal_quarter,
     SUM(f.line_total) AS quarterly_sales

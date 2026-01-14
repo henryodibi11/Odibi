@@ -19,7 +19,7 @@ erDiagram
     FACT_ORDERS ||--o{ DIM_PRODUCT : "product_sk"
     FACT_ORDERS ||--o{ DIM_DATE : "date_sk"
     AGG_DAILY_SALES ||--o{ DIM_DATE : "date_sk"
-    
+
     FACT_ORDERS {
         string order_id PK
         int customer_sk FK
@@ -31,7 +31,7 @@ erDiagram
         string status
         timestamp load_timestamp
     }
-    
+
     DIM_CUSTOMER {
         int customer_sk PK
         string customer_id
@@ -44,7 +44,7 @@ erDiagram
         date valid_to
         bool is_current
     }
-    
+
     DIM_PRODUCT {
         int product_sk PK
         string product_id
@@ -54,7 +54,7 @@ erDiagram
         decimal price
         decimal cost
     }
-    
+
     DIM_DATE {
         int date_sk PK
         date full_date
@@ -66,7 +66,7 @@ erDiagram
         int fiscal_year
         int fiscal_quarter
     }
-    
+
     AGG_DAILY_SALES {
         int date_sk PK
         decimal total_revenue
@@ -162,10 +162,10 @@ engine: pandas
 
 connections:
   source:
-    type: file
+    type: local
     path: ./examples/tutorials/dimensional_modeling/data
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -192,7 +192,7 @@ pipelines:
           connection: source
           path: customers.csv
           format: csv
-        
+
         pattern:
           type: dimension
           params:
@@ -213,13 +213,13 @@ pipelines:
             audit:
               load_timestamp: true
               source_system: "crm"
-        
+
         write:
           connection: warehouse
           path: dim_customer
           format: parquet
           mode: overwrite
-      
+
       # ------------------------------------------
       # Product Dimension (SCD Type 1)
       # ------------------------------------------
@@ -229,7 +229,7 @@ pipelines:
           connection: source
           path: products.csv
           format: csv
-        
+
         pattern:
           type: dimension
           params:
@@ -247,13 +247,13 @@ pipelines:
             audit:
               load_timestamp: true
               source_system: "inventory"
-        
+
         write:
           connection: warehouse
           path: dim_product
           format: parquet
           mode: overwrite
-      
+
       # ------------------------------------------
       # Date Dimension (Generated)
       # ------------------------------------------
@@ -266,7 +266,7 @@ pipelines:
             end_date: "2024-01-31"
             fiscal_year_start_month: 7
             unknown_member: true
-        
+
         write:
           connection: warehouse
           path: dim_date
@@ -285,19 +285,19 @@ pipelines:
           connection: warehouse
           path: dim_customer
           format: parquet
-      
+
       - name: dim_product
         read:
           connection: warehouse
           path: dim_product
           format: parquet
-      
+
       - name: dim_date
         read:
           connection: warehouse
           path: dim_date
           format: parquet
-      
+
       # ------------------------------------------
       # Orders Fact Table
       # ------------------------------------------
@@ -308,7 +308,7 @@ pipelines:
           connection: source
           path: orders.csv
           format: csv
-        
+
         pattern:
           type: fact
           params:
@@ -335,7 +335,7 @@ pipelines:
             audit:
               load_timestamp: true
               source_system: "pos"
-        
+
         write:
           connection: warehouse
           path: fact_orders
@@ -357,7 +357,7 @@ pipelines:
           connection: warehouse
           path: fact_orders
           format: parquet
-        
+
         pattern:
           type: aggregation
           params:
@@ -375,7 +375,7 @@ pipelines:
                 expr: "AVG(line_total)"
             audit:
               load_timestamp: true
-        
+
         write:
           connection: warehouse
           path: agg_daily_sales
@@ -566,7 +566,7 @@ odibi run --config star_schema.yaml
 ### Revenue by Region
 
 ```sql
-SELECT 
+SELECT
     c.region,
     COUNT(DISTINCT f.order_id) AS orders,
     SUM(f.line_total) AS revenue
@@ -587,7 +587,7 @@ ORDER BY revenue DESC;
 ### Revenue by Category
 
 ```sql
-SELECT 
+SELECT
     p.category,
     COUNT(*) AS orders,
     SUM(f.line_total) AS revenue,
@@ -606,7 +606,7 @@ ORDER BY revenue DESC;
 ### Daily Trend with Day of Week
 
 ```sql
-SELECT 
+SELECT
     d.full_date,
     d.day_of_week,
     a.total_revenue,
@@ -619,7 +619,7 @@ ORDER BY a.date_sk;
 ### Top Customers
 
 ```sql
-SELECT 
+SELECT
     c.name,
     c.region,
     COUNT(*) AS orders,
@@ -651,31 +651,31 @@ flowchart TB
         S2[products.csv]
         S3[orders.csv]
     end
-    
+
     subgraph Dimensions["Dimension Layer"]
         D1[dim_customer<br/>SCD Type 2]
         D2[dim_product<br/>SCD Type 1]
         D3[dim_date<br/>Generated]
     end
-    
+
     subgraph Facts["Fact Layer"]
         F1[fact_orders<br/>30 rows]
     end
-    
+
     subgraph Aggregates["Aggregate Layer"]
         A1[agg_daily_sales<br/>14 rows]
     end
-    
+
     S1 --> D1
     S2 --> D2
     S3 --> F1
-    
+
     D1 --> F1
     D2 --> F1
     D3 --> F1
-    
+
     F1 --> A1
-    
+
     style Sources fill:#1a1a2e,stroke:#4a90d9,color:#fff
     style Dimensions fill:#1a1a2e,stroke:#4a90d9,color:#fff
     style Facts fill:#1a1a2e,stroke:#4a90d9,color:#fff

@@ -17,7 +17,7 @@ Consider a dashboard showing "Daily Revenue by Product Category":
 **Without pre-aggregation:**
 ```sql
 -- Runs against 10 million fact rows every time
-SELECT 
+SELECT
     d.full_date,
     p.category,
     SUM(f.line_total) AS revenue
@@ -91,7 +91,7 @@ engine: pandas
 
 connections:
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -106,7 +106,7 @@ pipelines:
           connection: warehouse
           path: fact_orders
           format: parquet
-        
+
         pattern:
           type: aggregation
           params:
@@ -120,7 +120,7 @@ pipelines:
                 expr: "SUM(quantity)"
             audit:
               load_timestamp: true
-        
+
         write:
           connection: warehouse
           path: agg_daily_product_sales
@@ -222,11 +222,11 @@ measures:
   # Total after 10% discount
   - name: discounted_revenue
     expr: "SUM(line_total * 0.9)"
-  
+
   # Margin (if cost column existed)
   - name: total_margin
     expr: "SUM(line_total - cost)"
-  
+
   # Discount rate
   - name: avg_discount_rate
     expr: "AVG(discount_amount / line_total)"
@@ -408,7 +408,7 @@ engine: pandas
 
 connections:
   warehouse:
-    type: file
+    type: local
     path: ./warehouse
 
 story:
@@ -426,7 +426,7 @@ pipelines:
           connection: warehouse
           path: fact_orders
           format: parquet
-        
+
         pattern:
           type: aggregation
           params:
@@ -445,13 +445,13 @@ pipelines:
             having: "SUM(line_total) > 0"
             audit:
               load_timestamp: true
-        
+
         write:
           connection: warehouse
           path: agg_daily_product_sales
           format: parquet
           mode: overwrite
-      
+
       # Daily summary (no product breakdown)
       - name: agg_daily_sales
         description: "Daily sales summary"
@@ -459,7 +459,7 @@ pipelines:
           connection: warehouse
           path: fact_orders
           format: parquet
-        
+
         pattern:
           type: aggregation
           params:
@@ -477,13 +477,13 @@ pipelines:
                 expr: "AVG(line_total)"
             audit:
               load_timestamp: true
-        
+
         write:
           connection: warehouse
           path: agg_daily_sales
           format: parquet
           mode: overwrite
-      
+
       # Product summary (no date breakdown)
       - name: agg_product_sales
         description: "Product sales summary"
@@ -491,7 +491,7 @@ pipelines:
           connection: warehouse
           path: fact_orders
           format: parquet
-        
+
         pattern:
           type: aggregation
           params:
@@ -507,7 +507,7 @@ pipelines:
                 expr: "COUNT(DISTINCT customer_sk)"
             audit:
               load_timestamp: true
-        
+
         write:
           connection: warehouse
           path: agg_product_sales
@@ -522,7 +522,7 @@ pipelines:
 ### Dashboard Query: Daily Revenue Trend
 
 ```sql
-SELECT 
+SELECT
     a.date_sk,
     d.full_date,
     d.day_of_week,
@@ -553,7 +553,7 @@ ORDER BY a.date_sk;
 ### Dashboard Query: Top Products
 
 ```sql
-SELECT 
+SELECT
     p.name AS product_name,
     p.category,
     a.total_revenue,
