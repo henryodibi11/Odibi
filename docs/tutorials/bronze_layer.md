@@ -34,7 +34,6 @@ pipelines:
           path: orders/*.csv
           options:
             header: true
-            inferSchema: true
         write:
           connection: bronze
           table: raw_orders
@@ -91,7 +90,6 @@ nodes:
       path: orders/*.csv
       options:
         header: true
-        inferSchema: true            # Infer schema from CSV
     write:
       connection: bronze
       table: raw_orders

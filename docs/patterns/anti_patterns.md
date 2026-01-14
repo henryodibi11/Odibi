@@ -35,14 +35,14 @@ pipelines:
         read:
           connection: landing
           path: customers.csv
-        
+
         # ❌ DON'T transform in Bronze!
         transform:
           steps:
             - sql: "SELECT * FROM df WHERE status != 'inactive'"
             - function: "clean_text"
               params: { columns: ["name", "email"] }
-        
+
         write:
           connection: bronze
           path: customers
@@ -51,7 +51,7 @@ pipelines:
 
 ### Why It's Bad
 
-**You lose the original data forever.** 
+**You lose the original data forever.**
 
 Imagine this scenario:
 1. You filter out "inactive" customers in Bronze
@@ -73,7 +73,7 @@ pipelines:
         read:
           connection: landing
           path: customers.csv
-        
+
         # No transformations! Just land the data
         write:
           connection: bronze
@@ -89,14 +89,14 @@ pipelines:
         read:
           connection: bronze
           path: customers
-        
+
         # ✅ Transform in Silver
         transform:
           steps:
             - sql: "SELECT * FROM df WHERE status != 'inactive'"
             - function: "clean_text"
               params: { columns: ["name", "email"] }
-        
+
         write:
           connection: silver
           path: dim_customers
@@ -113,8 +113,8 @@ transform:
   steps:
     - function: "derive_columns"
       params:
-        columns:
-          _extracted_at: "current_timestamp()"
+        derivations:
+          _extracted_at: "current_timestamp"
           _source_file: "'customers.csv'"
 ```
 
@@ -131,7 +131,7 @@ nodes:
     read:
       connection: bronze
       path: customers  # Contains duplicate customer_id rows!
-    
+
     # ❌ SCD2 without deduplication
     transformer: "scd2"
     params:
@@ -139,7 +139,7 @@ nodes:
       keys: ["customer_id"]
       track_cols: ["name", "email", "address"]
       effective_time_col: "updated_at"
-    
+
     write:
       connection: silver
       table: dim_customers
@@ -179,20 +179,20 @@ nodes:
     read:
       connection: bronze
       path: customers
-    
+
     # ✅ Deduplicate first - keep most recent per customer
     transformer: "deduplicate"
     params:
       keys: ["customer_id"]
       order_by: "updated_at DESC"
-    
+
     write:
       connection: staging
       path: customers_deduped
 
   - name: "dim_customers"
     depends_on: ["dedup_customers"]
-    
+
     # ✅ Now SCD2 sees clean data
     transformer: "scd2"
     params:
@@ -200,7 +200,7 @@ nodes:
       keys: ["customer_id"]
       track_cols: ["name", "email", "address"]
       effective_time_col: "updated_at"
-    
+
     write:
       connection: silver
       table: dim_customers
@@ -221,7 +221,7 @@ nodes:
     read:
       connection: bronze
       path: orders
-    
+
     # ❌ DON'T use SCD2 for facts!
     transformer: "scd2"
     params:
@@ -229,7 +229,7 @@ nodes:
       keys: ["order_id"]
       track_cols: ["quantity", "total_amount"]
       effective_time_col: "order_date"
-    
+
     write:
       connection: silver
       table: fact_orders
@@ -261,7 +261,7 @@ nodes:
     read:
       connection: bronze
       path: orders
-    
+
     # ✅ Just append new orders
     write:
       connection: silver
@@ -275,14 +275,14 @@ nodes:
     read:
       connection: bronze
       path: orders
-    
+
     # ✅ Merge handles late corrections
     transformer: "merge"
     params:
       target: silver.fact_orders
       keys: ["order_id"]
       # Updates existing, inserts new
-    
+
     write:
       connection: silver
       table: fact_orders
@@ -311,7 +311,7 @@ nodes:
     read:
       # ❌ Hardcoded path - breaks when moving to prod
       path: "abfss://raw@devstorageaccount.dfs.core.windows.net/sales/2024/"
-    
+
     write:
       # ❌ Another hardcoded path
       path: "abfss://bronze@devstorageaccount.dfs.core.windows.net/sales"
@@ -341,7 +341,7 @@ connections:
     account: ${STORAGE_ACCOUNT}  # From environment
     container: raw
     credential: ${STORAGE_KEY}   # Secret from Key Vault
-  
+
   bronze:
     type: azure_blob
     account: ${STORAGE_ACCOUNT}
@@ -356,7 +356,7 @@ pipelines:
           # ✅ Use connection name + relative path
           connection: landing
           path: sales/2024/
-        
+
         write:
           # ✅ Portable across environments
           connection: bronze
@@ -378,7 +378,7 @@ nodes:
     read:
       connection: silver
       path: fact_orders  # customer_id can be NULL!
-    
+
     # ❌ Join without NULL handling
     transformer: "join"
     params:
@@ -414,7 +414,7 @@ nodes:
     read:
       connection: silver
       path: fact_orders
-    
+
     # ✅ Option 1: Fill NULLs with a placeholder that maps to "unknown" customer
     transform:
       steps:
@@ -422,14 +422,14 @@ nodes:
           params:
             columns: ["customer_id"]
             value: 0  # Maps to unknown member in dim_customer
-    
+
     write:
       connection: staging
       path: orders_with_valid_keys
 
   - name: "enrich_orders"
     depends_on: ["prep_orders"]
-    
+
     transformer: "join"
     params:
       right: silver.dim_customer  # Has customer_id=0 as unknown member
@@ -446,7 +446,7 @@ nodes:
     read:
       connection: silver
       path: orders_clean
-    
+
     pattern:
       type: fact
       params:
@@ -545,7 +545,7 @@ pipelines:
           steps:
             # ✅ All business calculations in ONE place
             - sql: |
-                SELECT 
+                SELECT
                   *,
                   quantity * unit_price as gross_amount,
                   quantity * unit_price * 0.92 as net_amount,
@@ -603,14 +603,14 @@ pipelines:
         read:
           connection: bronze
           path: orders  # ❌ Reading raw Bronze directly!
-        
+
         # Trying to do EVERYTHING in one step
         transform:
           steps:
             - sql: "SELECT * FROM df WHERE order_id IS NOT NULL"
             - function: "deduplicate"
               params: { keys: ["order_id"] }
-        
+
         pattern:
           type: aggregation
           params:
@@ -655,19 +655,19 @@ pipelines:
         read:
           connection: bronze
           path: orders
-        
+
         # All cleaning happens here, once
         transform:
           steps:
             - sql: "SELECT * FROM df WHERE order_id IS NOT NULL"
             - function: "deduplicate"
               params: { keys: ["order_id"] }
-        
+
         validation:
           contracts:
             - type: not_null
               columns: [order_id, customer_id, amount]
-        
+
         write:
           connection: silver
           path: fact_orders
@@ -680,7 +680,7 @@ pipelines:
         read:
           connection: silver
           path: fact_orders  # ✅ Reading from Silver
-        
+
         pattern:
           type: aggregation
           params:
@@ -697,7 +697,7 @@ pipelines:
         read:
           connection: silver
           path: fact_orders  # ✅ Same Silver source
-        
+
         pattern:
           type: aggregation
           params:
@@ -720,7 +720,7 @@ nodes:
     read:
       connection: landing
       path: sales/
-    
+
     # ❌ No metadata about when this was loaded
     write:
       connection: bronze
@@ -750,17 +750,17 @@ nodes:
     read:
       connection: landing
       path: sales/
-    
+
     # ✅ Add metadata columns
     transform:
       steps:
         - function: "derive_columns"
           params:
-            columns:
-              _extracted_at: "current_timestamp()"
+            derivations:
+              _extracted_at: "current_timestamp"
               _source_file: "input_file_name()"
               _batch_id: "'${BATCH_ID}'"  # From orchestrator
-    
+
     write:
       connection: bronze
       path: sales
@@ -789,7 +789,7 @@ nodes:
     read:
       connection: landing
       path: sales/${YESTERDAY}/  # Same file every rerun
-    
+
     # ❌ Append without deduplication
     write:
       connection: bronze
@@ -819,13 +819,13 @@ nodes:
     read:
       connection: landing
       path: sales/${YESTERDAY}/
-    
+
     # ✅ Merge inserts new, updates existing
     transformer: "merge"
     params:
       target: bronze.sales
       keys: ["order_id"]
-    
+
     write:
       connection: bronze
       table: sales
@@ -848,13 +848,13 @@ nodes:
     read:
       connection: bronze
       path: sales
-    
+
     # ✅ Deduplicate the appended data
     transformer: "deduplicate"
     params:
       keys: ["order_id"]
       order_by: "_extracted_at DESC"  # Keep most recent if duplicated
-    
+
     write:
       connection: silver
       path: fact_sales
@@ -874,7 +874,7 @@ nodes:
     read:
       connection: api
       endpoint: /customers
-    
+
     # ❌ Just writing whatever comes from the API
     write:
       connection: bronze
@@ -892,7 +892,7 @@ Day 2: {"id": 2, "name": "Bob", "loyalty_points": 500}  <- New field!
 
 Pipeline fails with:
 ```
-SchemaEvolutionException: Found new column 'loyalty_points' 
+SchemaEvolutionException: Found new column 'loyalty_points'
 not present in the target schema
 ```
 
@@ -911,7 +911,7 @@ nodes:
     read:
       connection: api
       endpoint: /customers
-    
+
     write:
       connection: bronze
       path: customers

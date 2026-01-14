@@ -173,7 +173,7 @@ The `effective_time_col` you specified doesn't exist in your **source** DataFram
    # BEFORE (wrong)
    params:
      effective_time_col: "updated_at"  # ❌ Doesn't exist
-   
+
    # AFTER (correct)
    params:
      effective_time_col: "UpdatedAt"  # ✅ Matches actual column
@@ -214,7 +214,7 @@ One of the columns in `track_cols` doesn't exist in your source data, or there's
    # BEFORE (wrong - case doesn't match)
    params:
      track_cols: ["name", "email", "address"]
-   
+
    # AFTER (correct - matches actual columns)
    params:
      track_cols: ["Name", "Email", "Address"]
@@ -268,7 +268,7 @@ transform:
   steps:
     - function: "derive_columns"
       params:
-        columns:
+        derivations:
           phone: "COALESCE(phone, 'unknown')"
 ```
 
@@ -311,7 +311,7 @@ SCD2 is working correctly! Every time a tracked column changes, it creates a new
    ```yaml
    # Tracking every column = version explosion
    track_cols: ["*"]  # ❌ Don't do this!
-   
+
    # Track only meaningful business changes
    track_cols: ["tier", "status", "region"]  # ✅ Selective
    ```
@@ -365,28 +365,28 @@ Before running your SCD2 pipeline, verify these items:
 def validate_scd2_input(df, config):
     """Validate data before SCD2 processing."""
     errors = []
-    
+
     # Check effective_time_col exists
     if config['effective_time_col'] not in df.columns:
         errors.append(f"effective_time_col '{config['effective_time_col']}' not in columns: {df.columns}")
-    
+
     # Check all track_cols exist
     for col in config['track_cols']:
         if col not in df.columns:
             errors.append(f"track_col '{col}' not in columns: {df.columns}")
-    
+
     # Check for duplicate keys
     key_cols = config['keys']
     dup_count = df.groupBy(key_cols).count().filter("count > 1").count()
     if dup_count > 0:
         errors.append(f"Found {dup_count} duplicate keys! Deduplicate first.")
-    
+
     # Check for NULL keys
     for key in key_cols:
         null_count = df.filter(df[key].isNull()).count()
         if null_count > 0:
             errors.append(f"Found {null_count} NULL values in key column '{key}'")
-    
+
     if errors:
         for e in errors:
             print(f"❌ {e}")

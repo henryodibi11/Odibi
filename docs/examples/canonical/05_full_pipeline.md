@@ -37,7 +37,7 @@ connections:
     database: production
     username: ${SQL_USER}
     password: ${SQL_PASSWORD}
-  
+
   lake:
     type: local
     base_path: ./data/lake
@@ -62,7 +62,7 @@ pipelines:
           connection: source_db
           format: jdbc
           table: dbo.orders
-        
+
         # Fail fast if source is broken
         contracts:
           - type: row_count
@@ -72,11 +72,11 @@ pipelines:
           - type: freshness
             column: created_at
             max_age: "24h"
-        
+
         incremental:
           mode: stateful
           column: updated_at
-        
+
         write:
           connection: lake
           format: delta
@@ -94,12 +94,12 @@ pipelines:
           connection: lake
           format: delta
           path: bronze/orders
-        
+
         transformer: deduplicate
         params:
           keys: [order_id]
           order_by: "updated_at DESC"
-        
+
         transform:
           steps:
             - function: filter_rows
@@ -107,10 +107,10 @@ pipelines:
                 condition: "amount > 0"
             - function: derive_columns
               params:
-                columns:
+                derivations:
                   amount_usd: "amount * 1.0"
                   order_year: "YEAR(order_date)"
-        
+
         validation:
           tests:
             - type: unique
@@ -121,15 +121,15 @@ pipelines:
               column: amount_usd
               min: 0
               max: 1000000
-          
+
           gate:
             require_pass_rate: 0.95
             on_failure: warn  # 'fail' to stop pipeline
-          
+
           quarantine:
             connection: lake
             path: quarantine/orders
-        
+
         write:
           connection: lake
           format: delta
@@ -144,7 +144,7 @@ pipelines:
     nodes:
       - name: agg_daily_sales
         depends_on: [clean_orders]
-        
+
         pattern:
           type: aggregation
           params:
@@ -156,7 +156,7 @@ pipelines:
                 expr: "COUNT(*)"
               - name: avg_order_value
                 expr: "AVG(amount_usd)"
-        
+
         write:
           connection: lake
           format: delta
