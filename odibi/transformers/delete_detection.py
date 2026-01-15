@@ -381,7 +381,8 @@ def _apply_soft_delete(
         if prev_df is not None:
             # snapshot_diff mode: deleted rows are NOT in source, need to union them
             # Mark existing source rows as not deleted
-            source_with_flag = context.df.withColumn(soft_delete_col, lit(False))
+            # Cast to boolean explicitly to ensure proper Delta Lake compatibility
+            source_with_flag = context.df.withColumn(soft_delete_col, lit(False).cast("boolean"))
 
             # Get full deleted rows from target, mark as deleted
             deleted_rows = prev_df.join(deleted_keys, on=keys, how="inner")
@@ -391,7 +392,7 @@ def _apply_soft_delete(
             deleted_cols_to_select = []
             for col_name in source_cols:
                 if col_name == soft_delete_col:
-                    deleted_cols_to_select.append(lit(True).alias(soft_delete_col))
+                    deleted_cols_to_select.append(lit(True).cast("boolean").alias(soft_delete_col))
                 elif col_name in deleted_rows.columns:
                     deleted_cols_to_select.append(deleted_rows[col_name])
                 else:
@@ -405,9 +406,10 @@ def _apply_soft_delete(
             # sql_compare mode: deleted rows ARE in source, just flag them
             deleted_keys_flagged = deleted_keys.withColumn("_del_flag", lit(True))
 
+            # Cast to boolean explicitly to ensure proper Delta Lake compatibility
             result = context.df.join(deleted_keys_flagged, on=keys, how="left").withColumn(
                 soft_delete_col,
-                when(col("_del_flag").isNotNull(), True).otherwise(False),
+                when(col("_del_flag").isNotNull(), lit(True)).otherwise(lit(False)).cast("boolean"),
             )
             result = result.drop("_del_flag")
 
@@ -418,7 +420,8 @@ def _apply_soft_delete(
 
         if prev_df is not None:
             # snapshot_diff mode: deleted rows are NOT in source, need to union them
-            df[soft_delete_col] = False
+            # Use explicit bool dtype to avoid Delta converting False to NULL
+            df[soft_delete_col] = pd.Series([False] * len(df), dtype="bool")
 
             # Get full deleted rows from target
             deleted_rows = prev_df.merge(deleted_keys, on=keys, how="inner")
@@ -434,13 +437,16 @@ def _apply_soft_delete(
 
             # Union source with deleted rows
             result = pd.concat([df, deleted_rows], ignore_index=True)
+            # Ensure boolean dtype is preserved after concat
+            result[soft_delete_col] = result[soft_delete_col].astype("bool")
         else:
             # sql_compare mode: deleted rows ARE in source, just flag them
             deleted_keys_df = deleted_keys.copy()
             deleted_keys_df["_del_flag"] = True
 
             df = df.merge(deleted_keys_df, on=keys, how="left")
-            df[soft_delete_col] = df["_del_flag"].notna()
+            # Use explicit bool dtype to avoid Delta converting False to NULL
+            df[soft_delete_col] = df["_del_flag"].notna().astype("bool")
             df = df.drop(columns=["_del_flag"])
             result = df
 

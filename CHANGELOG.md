@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-01-14
+
+### Added - Excel Reading Enhancements
+
+- **Excel Glob Patterns**: Read multiple Excel files with glob patterns like `"Sales/*.xlsx"` or `"data/**/*.xlsx"`
+- **Sheet Pattern Matching**: New `sheet_pattern` option filters sheets by pattern (e.g., `["*powerbi*", "*power bi*"]`)
+- **Source File Tracking**: New `add_source_file` option adds `_source_file` and `_source_sheet` columns for data lineage
+- **Cloud Excel Support**: Excel reading now works with Azure Blob Storage and S3 via fsspec integration
+
+### Fixed
+
+- **SQL Server Overwrite**: Fixed `auto_create_schema` and `overwrite_options` passthrough in SQL Server overwrite mode
+
 ## [2.6.6] - 2026-01-14
 
 ### Fixed

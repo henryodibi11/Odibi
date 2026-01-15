@@ -104,7 +104,7 @@ ODIBI's PandasEngine supports multiple file formats with both local and cloud st
 
 ### Excel (Microsoft Excel)
 
-**Use Case:** Business reports, spreadsheets
+**Use Case:** Business reports, spreadsheets, multi-file analysis
 
 **Supported:** `.xlsx` files
 
@@ -113,7 +113,7 @@ ODIBI's PandasEngine supports multiple file formats with both local and cloud st
 pip install openpyxl
 ```
 
-**Read Example:**
+**Read Example (Single File):**
 ```yaml
 - name: load_excel
   read:
@@ -124,6 +124,72 @@ pip install openpyxl
       sheet_name: "Sheet1"
 ```
 
+#### Reading Multiple Excel Files (Glob Patterns)
+
+Read all Excel files matching a pattern and combine them into a single DataFrame:
+
+```yaml
+- name: load_s_curve_data
+  read:
+    connection: bronze
+    path: "S Curve/*.xlsx"
+    format: excel
+    options:
+      add_source_file: true  # Track which file each row came from
+```
+
+**Recursive Pattern (All Subdirectories):**
+```yaml
+- name: load_all_reports
+  read:
+    connection: bronze
+    path: "data/**/*.xlsx"
+    format: excel
+    options:
+      add_source_file: true
+```
+
+#### Sheet Pattern Matching
+
+Filter sheets by name pattern instead of reading all sheets:
+
+```yaml
+- name: load_powerbi_sheets
+  read:
+    connection: bronze
+    path: "reports/*.xlsx"
+    format: excel
+    options:
+      sheet_pattern:
+        - "*powerbi*"
+        - "*power bi*"
+      sheet_pattern_case_sensitive: false  # Default: case-insensitive
+      add_source_file: true
+```
+
+#### Source File Tracking
+
+When `add_source_file: true`, two columns are added to track data lineage:
+- `_source_file`: The file path (e.g., `S Curve/Project_Alpha.xlsx`)
+- `_source_sheet`: The sheet name (e.g., `Sheet1`)
+
+This is essential for debugging and auditing when combining multiple files.
+
+#### Cloud Storage (Azure/S3)
+
+Excel reading works seamlessly with cloud storage:
+
+```yaml
+- name: load_excel_from_azure
+  read:
+    connection: bronze  # Uses connection's storage_options
+    path: "abfss://container@account.dfs.core.windows.net/reports/*.xlsx"
+    format: excel
+    options:
+      sheet_pattern: ["*data*"]
+      add_source_file: true
+```
+
 **Write Example:**
 ```yaml
 - name: save_excel
@@ -132,6 +198,8 @@ pip install openpyxl
     path: output/report.xlsx
     format: excel
 ```
+
+**Note:** All three engines (Pandas, Spark, Polars) support these Excel features with full parity.
 
 ---
 
