@@ -1,0 +1,43 @@
+# Odibi - Cline Rules
+
+## Project Context
+Solo data engineer's framework for data pipelines. Focus: stability and test coverage.
+
+## Project Structure
+- `odibi/engine/` - Spark, Pandas, Polars engines (MUST maintain parity)
+- `odibi/patterns/` - SCD2, Merge, Aggregation, Dimension, Fact patterns
+- `odibi/validation/` - Data quality engine, quarantine, FK validation
+- `odibi/transformers/` - SCD, merge, delete detection transforms
+- `odibi/semantics/` - Metrics, dimensions, materialization
+- `tests/unit/` - Test suite (matches source structure)
+- `.odibi/source_cache/` - Sample datasets for testing
+
+## Commands
+```bash
+pytest tests/ -v                    # Run all tests
+pytest tests/unit/test_X.py -v      # Run specific test
+ruff check . --fix                  # Lint and auto-fix
+ruff format .                       # Format code
+```
+
+## Critical Rules
+1. **Engine Parity:** Every feature must work in Pandas, Spark, AND Polars
+2. **No features without tests** - always write tests
+3. **Check existing tests first** for style and patterns before writing new ones
+4. **Use `get_logging_context()`** for structured logging
+5. **Pydantic models** for all config validation
+6. **Don't touch `_archive/`** - deprecated experimental code
+
+## When Writing Tests
+- Look at existing tests in `tests/unit/` for patterns
+- Generate synthetic DataFrames with edge cases:
+  - Null values, empty DataFrames
+  - Duplicate keys, late-arriving records
+  - Type mismatches, boundary conditions
+- Test all three engines when applicable
+- Use descriptive test names: `test_<function>_<scenario>_<expected>`
+
+## Code Style
+- No comments unless complex logic requires explanation
+- Follow existing import patterns in neighboring files
+- Use type hints consistently

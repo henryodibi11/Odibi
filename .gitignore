@@ -172,6 +172,9 @@ htmlcov/
 $null
 *.log
 
+# Generated tests (Cline/AI generated)
+tests/generated/
+
 # Generated parquet/delta data
 *.parquet
 _delta_log/
@@ -181,3 +184,4 @@ _system_catalog/
 projects/
 .odibi/
 .odibi/
+.aider*
