@@ -48,9 +48,11 @@ def pytest_runtest_setup(item):
             pytest.skip("Skipping Spark/Delta tests on Windows due to missing winutils")
 
 
-def pytest_ignore_collect(path, config):
+def pytest_ignore_collect(collection_path, config):
     # Ignore collection of any test file that appears to be Spark or Delta related on Windows
-    if sys.platform == "win32" and ("spark" in str(path).lower() or "delta" in str(path).lower()):
+    if sys.platform == "win32" and (
+        "spark" in str(collection_path).lower() or "delta" in str(collection_path).lower()
+    ):
         return True
 
 
