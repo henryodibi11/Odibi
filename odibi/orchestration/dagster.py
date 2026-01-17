@@ -27,7 +27,7 @@ class DagsterFactory:
         self.config = config
 
     def create_definitions(self) -> "Definitions":
-        if "dagster" not in globals():
+        if "Definitions" not in globals():
             raise ImportError("Dagster not installed. Run 'pip install dagster'")
 
         all_assets = []
