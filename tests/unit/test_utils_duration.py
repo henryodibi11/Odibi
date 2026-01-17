@@ -1,95 +1,60 @@
-import pytest
+"""Unit tests for odibi/utils/duration.py."""
+
+from datetime import timedelta
+
+
 from odibi.utils.duration import parse_duration
 
-# Try to import format_duration; if unavailable, skip its tests.
-try:
-    from odibi.utils.duration import format_duration
 
-    skip_format_tests = False
-except ImportError:
-    skip_format_tests = True
+class TestParseDuration:
+    """Tests for parse_duration function."""
 
-# Tests for parse_duration
+    def test_parse_duration_hours(self):
+        """Test parsing hours."""
+        result = parse_duration("2h")
+        assert result == timedelta(hours=2)
 
+    def test_parse_duration_minutes(self):
+        """Test parsing minutes."""
+        result = parse_duration("30m")
+        assert result == timedelta(minutes=30)
 
-def test_parse_duration_valid():
-    """
-    test_parse_duration_valid:
-    Given a valid duration string in the format "HH:MM:SS", parse_duration should return the correct total seconds.
-    Example: "01:02:03" -> 3723 seconds.
-    """
-    assert parse_duration("01:02:03") == 3723
+    def test_parse_duration_days(self):
+        """Test parsing days."""
+        result = parse_duration("1d")
+        assert result == timedelta(days=1)
 
+    def test_parse_duration_seconds(self):
+        """Test parsing seconds."""
+        result = parse_duration("45s")
+        assert result == timedelta(seconds=45)
 
-def test_parse_duration_invalid_format():
-    """
-    test_parse_duration_invalid_format:
-    If the duration string does not follow the "HH:MM:SS" format, parse_duration should raise a ValueError.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        parse_duration("1:02")  # Missing one component
-    assert "Invalid duration format" in str(exc_info.value)
+    def test_parse_duration_weeks(self):
+        """Test parsing weeks."""
+        result = parse_duration("2w")
+        assert result == timedelta(weeks=2)
 
+    def test_parse_duration_empty_string_returns_none(self):
+        """Test empty string returns None."""
+        assert parse_duration("") is None
 
-def test_parse_duration_invalid_values():
-    """
-    test_parse_duration_invalid_values:
-    If the duration string contains non-numeric values, parse_duration should raise a ValueError.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        parse_duration("01:xx:03")
-    assert "Invalid duration values" in str(exc_info.value)
+    def test_parse_duration_none_returns_none(self):
+        """Test None input returns None."""
+        assert parse_duration(None) is None
 
+    def test_parse_duration_invalid_suffix_returns_none(self):
+        """Test invalid suffix returns None."""
+        assert parse_duration("10x") is None
 
-def test_parse_duration_none():
-    """
-    test_parse_duration_none:
-    If None is passed as the duration string, parse_duration should raise a ValueError.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        parse_duration(None)
-    assert "cannot be None" in str(exc_info.value)
+    def test_parse_duration_invalid_number_returns_none(self):
+        """Test invalid number returns None."""
+        assert parse_duration("abch") is None
 
+    def test_parse_duration_case_insensitive(self):
+        """Test parsing is case insensitive."""
+        assert parse_duration("2H") == timedelta(hours=2)
+        assert parse_duration("30M") == timedelta(minutes=30)
 
-# Tests for format_duration (skipped if not implemented)
-
-
-@pytest.mark.skipif(skip_format_tests, reason="format_duration not implemented")
-def test_format_duration_valid():
-    """
-    test_format_duration_valid:
-    Given a valid duration in seconds, format_duration should return a string in "HH:MM:SS" format.
-    Example: 3723 seconds -> "01:02:03".
-    """
-    assert format_duration(3723) == "01:02:03"
-
-
-@pytest.mark.skipif(skip_format_tests, reason="format_duration not implemented")
-def test_format_duration_zero():
-    """
-    test_format_duration_zero:
-    Formatting a duration of zero seconds should return "00:00:00".
-    """
-    assert format_duration(0) == "00:00:00"
-
-
-@pytest.mark.skipif(skip_format_tests, reason="format_duration not implemented")
-def test_format_duration_negative():
-    """
-    test_format_duration_negative:
-    If a negative duration is provided, format_duration should raise a ValueError.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        format_duration(-10)
-    assert "negative" in str(exc_info.value)
-
-
-@pytest.mark.skipif(skip_format_tests, reason="format_duration not implemented")
-def test_format_duration_none():
-    """
-    test_format_duration_none:
-    If None is passed as the duration, format_duration should raise a ValueError.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        format_duration(None)
-    assert "cannot be None" in str(exc_info.value)
+    def test_parse_duration_with_whitespace(self):
+        """Test parsing with leading/trailing whitespace."""
+        assert parse_duration("  2h  ") == timedelta(hours=2)
