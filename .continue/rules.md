@@ -38,6 +38,10 @@ Before writing ANY odibi code, call these odibi-knowledge MCP tools:
 3. Write the code following the exact signature
 4. Call `get_yaml_structure` before writing YAML config
 
+**Fallback order if MCP times out:**
+1. Try CLI commands: `python -m odibi list transformers --format json`
+2. Read `docs/ODIBI_DEEP_CONTEXT.md` for comprehensive reference
+
 ## Required Reading
 
 Before making changes to odibi, read `docs/ODIBI_DEEP_CONTEXT.md` for complete framework context (2,200+ lines covering all features).
@@ -81,20 +85,20 @@ docs/                # Documentation
 ## Adding New Features
 
 ### New Transformer
-1. Check existing: `odibi list transformers`
+1. Check existing: `python -m odibi list transformers`
 2. Add to `odibi/transformers/` following existing patterns
 3. Register in `odibi/transformers/__init__.py`
 4. Add tests in `tests/unit/transformers/`
 5. Must work on Pandas AND Spark (engine parity)
 
 ### New Pattern
-1. Check existing: `odibi list patterns`
+1. Check existing: `python -m odibi list patterns`
 2. Add to `odibi/patterns/` extending `Pattern` base class
 3. Register in `odibi/patterns/__init__.py`
 4. Add tests
 
 ### New Connection
-1. Check existing: `odibi list connections`
+1. Check existing: `python -m odibi list connections`
 2. Add to `odibi/connections/`
 3. Register in `odibi/connections/factory.py`
 
@@ -134,10 +138,10 @@ ruff format <file>                      # Format code
 ## Debugging Tips
 
 ```bash
-odibi run config.yaml --dry-run         # Test without writing
-odibi run config.yaml --log-level DEBUG # Verbose logging
-odibi story last                        # View last execution report
-odibi doctor                            # Check environment health
+python -m odibi run config.yaml --dry-run         # Test without writing
+python -m odibi run config.yaml --log-level DEBUG # Verbose logging
+python -m odibi story last                        # View last execution report
+python -m odibi doctor                            # Check environment health
 ```
 
 ## CRITICAL: Transformer Function Signature
