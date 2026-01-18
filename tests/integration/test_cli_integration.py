@@ -63,8 +63,7 @@ class TestCLIValidateCommand:
     def test_validate_valid_minimal_config(self, tmp_path):
         """Validate should succeed with valid minimal config."""
         config_file = tmp_path / "valid.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 project: Test Project
 engine: pandas
 connections:
@@ -84,8 +83,7 @@ pipelines:
           connection: local
           path: test.csv
           format: csv
-"""
-        )
+""")
 
         result = subprocess.run(
             ["python", "-m", "odibi", "validate", str(config_file)], capture_output=True, text=True
@@ -112,8 +110,7 @@ class TestCLIRunCommand:
     def test_run_with_missing_data(self, tmp_path):
         """Run should fail gracefully when data files are missing."""
         config_file = tmp_path / "config.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 project: Test Project
 engine: pandas
 connections:
@@ -131,8 +128,7 @@ pipelines:
           connection: local
           path: missing.csv
           format: csv
-"""
-        )
+""")
 
         result = subprocess.run(
             ["python", "-m", "odibi", "run", str(config_file)], capture_output=True, text=True
