@@ -1,8 +1,10 @@
 """CLI commands for listing available transformers, patterns, and connections."""
 
+from __future__ import annotations
+
 import inspect
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from odibi.connections.factory import register_builtins
 from odibi.patterns import _PATTERNS
@@ -264,7 +266,7 @@ def explain_command(args) -> int:
     return 0
 
 
-def _get_first_line(text: str | None) -> str | None:
+def _get_first_line(text: Optional[str]) -> Optional[str]:
     """Get first line of docstring."""
     if not text:
         return None
