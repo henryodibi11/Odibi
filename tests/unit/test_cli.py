@@ -139,7 +139,8 @@ class TestValidateCommand:
     def test_validate_command_valid_config(self, tmp_path):
         """Validate command should succeed with valid config."""
         config_file = tmp_path / "valid.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 project: Test Project
 engine: pandas
 connections:
@@ -159,7 +160,8 @@ pipelines:
           connection: local
           path: test.csv
           format: csv
-""")
+"""
+        )
 
         args = Mock()
         args.config = str(config_file)

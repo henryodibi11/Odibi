@@ -112,7 +112,7 @@ all = [
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
-    "black>=26.0.0,<27.0.0",  # Pin to 26.x for consistent formatting across Python versions
+    "black==25.11.0",  # Pin exact version for consistent formatting across Python 3.9-3.12
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "pre-commit>=3.4.0",

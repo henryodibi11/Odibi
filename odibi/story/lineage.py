@@ -991,14 +991,16 @@ class LineageGenerator:
             status_class = "success" if layer.status == "success" else "failed"
             layer_class = self._get_layer_class(layer.pipeline_layer or layer.name)
 
-            rows.append(f"""
+            rows.append(
+                f"""
             <tr>
                 <td>{layer.name}</td>
                 <td><span class="layer-badge {layer_class}">{layer.pipeline_layer or "-"}</span></td>
                 <td><span class="status-badge {status_class}">{layer.status}</span></td>
                 <td>{layer.duration:.2f}s</td>
             </tr>
-            """)
+            """
+            )
 
         return f"""
         <table>

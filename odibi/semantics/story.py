@@ -330,7 +330,8 @@ class SemanticStoryGenerator:
 
             sql_html = f"<pre><code>{self._escape_html(view.sql_generated)}</code></pre>"
 
-            views_html.append(f"""
+            views_html.append(
+                f"""
             <div class="view-card {view.status}">
                 <h3>{view_status} {view.view_name}</h3>
                 <div class="view-details">
@@ -344,7 +345,8 @@ class SemanticStoryGenerator:
                     {sql_html}
                 </details>
             </div>
-            """)
+            """
+            )
 
         mermaid_code = self._generate_mermaid_diagram()
 
