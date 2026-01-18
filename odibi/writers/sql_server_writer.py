@@ -19,7 +19,6 @@ from odibi.config import (
 )
 from odibi.utils.logging_context import get_logging_context
 
-
 # Type mapping for schema inference
 POLARS_TO_SQL_TYPE_MAP: Dict[str, str] = {
     "Int8": "TINYINT",
@@ -658,8 +657,8 @@ class SqlServerMergeWriter:
         """
         schema, table_name = self.parse_table_name(table)
         sql = f"""
-        SELECT 
-            COLUMN_NAME, 
+        SELECT
+            COLUMN_NAME,
             DATA_TYPE,
             CHARACTER_MAXIMUM_LENGTH,
             NUMERIC_PRECISION,

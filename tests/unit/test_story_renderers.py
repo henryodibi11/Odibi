@@ -75,7 +75,7 @@ class TestMarkdownStoryRenderer:
         renderer = MarkdownStoryRenderer()
         markdown = renderer.render(sample_metadata)
 
-        assert "# 📊 Pipeline Run Story: test_pipeline" in markdown
+        assert "# Pipeline Run Story: test_pipeline" in markdown
         assert "test_pipeline" in markdown
         assert "bronze" in markdown
 

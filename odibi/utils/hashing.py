@@ -4,7 +4,6 @@ import hashlib
 import json
 from typing import Any, Optional, Set
 
-
 DEFAULT_EXCLUDE_FIELDS: Set[str] = {"description", "tags", "log_level"}
 
 

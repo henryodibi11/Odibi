@@ -15,7 +15,6 @@ from odibi.context import EngineContext
 from odibi.enums import EngineType
 from odibi.utils.logging_context import get_logging_context
 
-
 # =============================================================================
 # DETECT SEQUENTIAL PHASES
 # =============================================================================
