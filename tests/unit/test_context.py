@@ -1,18 +1,8 @@
 import pytest
 import pandas as pd
+import polars as pl
 
-try:
-    import polars as pl
-
-    HAS_POLARS = True
-except ImportError:
-    pl = None
-    HAS_POLARS = False
-
-from odibi.context import Context, PandasContext
-
-if HAS_POLARS:
-    from odibi.context import PolarsContext
+from odibi.context import Context, PandasContext, PolarsContext
 
 
 # Dummy implementation of Context for testing the abstract base class.
@@ -131,8 +121,6 @@ def test_pandas_context_metadata_handling(pandas_context_instance):
 # Tests for PolarsContext
 @pytest.fixture
 def polars_context_instance():
-    if not HAS_POLARS:
-        pytest.skip("polars not installed")
     return PolarsContext()
 
 
