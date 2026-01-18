@@ -1,8 +1,18 @@
 import pytest
 import pandas as pd
-import polars as pl
 
-from odibi.context import Context, PandasContext, PolarsContext
+from odibi.context import Context, PandasContext
+
+# Polars is optional - only import if available
+try:
+    import polars as pl
+    from odibi.context import PolarsContext
+
+    HAS_POLARS = True
+except ImportError:
+    pl = None
+    PolarsContext = None
+    HAS_POLARS = False
 
 
 # Dummy implementation of Context for testing the abstract base class.
@@ -121,9 +131,12 @@ def test_pandas_context_metadata_handling(pandas_context_instance):
 # Tests for PolarsContext
 @pytest.fixture
 def polars_context_instance():
+    if not HAS_POLARS:
+        pytest.skip("polars not installed")
     return PolarsContext()
 
 
+@pytest.mark.skipif(not HAS_POLARS, reason="polars not installed")
 def test_polars_context_basic_register(polars_context_instance):
     # Register a polars DataFrame and verify retrieval.
     df = pl.DataFrame({"a": [4, 5, 6]})
@@ -133,12 +146,14 @@ def test_polars_context_basic_register(polars_context_instance):
     assert retrieved.equals(df)
 
 
+@pytest.mark.skipif(not HAS_POLARS, reason="polars not installed")
 def test_polars_context_missing_key(polars_context_instance):
     # Expect KeyError when retrieving a non-existent key.
     with pytest.raises(KeyError):
         polars_context_instance.get("no_such_key")
 
 
+@pytest.mark.skipif(not HAS_POLARS, reason="polars not installed")
 def test_polars_context_registration_conflict(polars_context_instance):
     # Test registration conflict behavior for PolarsContext.
     df1 = pl.DataFrame({"a": [10]})
@@ -156,6 +171,7 @@ def test_polars_context_registration_conflict(polars_context_instance):
         )
 
 
+@pytest.mark.skipif(not HAS_POLARS, reason="polars not installed")
 def test_polars_context_metadata_handling(polars_context_instance):
     # Test metadata functionality for PolarsContext if implemented.
     if hasattr(polars_context_instance, "metadata"):
