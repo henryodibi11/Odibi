@@ -29,6 +29,8 @@ This 2,200+ line document covers:
 - **Medium term:** Find gaps and improve coverage
 - **Ultimate goal:** A framework so easy and powerful it gives me time back to focus on what matters
 
+**Success Test:** Can you hand the docs to a business analyst and have them build a working pipeline without your help? If yes, the framework is truly self-service.
+
 ## Project Structure
 
 ```
