@@ -9,6 +9,7 @@ from odibi.cli.export import add_export_parser, export_command
 from odibi.cli.graph import graph_command
 from odibi.cli.init_pipeline import add_init_parser, init_pipeline_command
 from odibi.cli.lineage import add_lineage_parser, lineage_command
+from odibi.cli.list_cmd import add_explain_parser, add_list_parser, explain_command, list_command
 from odibi.cli.run import run_command
 from odibi.cli.schema import add_schema_parser, schema_command
 from odibi.cli.secrets import add_secrets_parser, secrets_command
@@ -42,6 +43,12 @@ Core Commands:
   odibi validate config.yaml         Validate configuration
   odibi graph config.yaml            Visualize dependencies
   odibi doctor                       Check environment health
+
+Introspection (for AI tools):
+  odibi list transformers            List all available transformers
+  odibi list patterns                List all available patterns
+  odibi list connections             List all connection types
+  odibi explain <name>               Get detailed docs for any feature
 
 Debugging:
   odibi story show <path>            View a specific story
@@ -172,6 +179,12 @@ Learn more: https://henryodibi11.github.io/Odibi/golden_path/
     # odibi system
     add_system_parser(subparsers)
 
+    # odibi list (transformers, patterns, connections)
+    add_list_parser(subparsers)
+
+    # odibi explain <name>
+    add_explain_parser(subparsers)
+
     args = parser.parse_args()
 
     # Configure logging
@@ -218,6 +231,10 @@ Learn more: https://henryodibi11.github.io/Odibi/golden_path/
         return lineage_command(args)
     elif args.command == "system":
         return system_command(args)
+    elif args.command == "list":
+        return list_command(args)
+    elif args.command == "explain":
+        return explain_command(args)
     else:
         parser.print_help()
         return 1

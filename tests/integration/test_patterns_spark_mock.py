@@ -4,6 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+if sys.platform == "win32":
+    pytest.skip("Skipping Spark integration tests on Windows", allow_module_level=True)
+
 from odibi.config import IncrementalConfig, NodeConfig, ReadConfig, WriteConfig
 from odibi.context import Context
 from odibi.engine.spark_engine import SparkEngine

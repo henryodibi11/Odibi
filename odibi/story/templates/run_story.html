@@ -498,7 +498,7 @@
         <div style="display: flex; gap: 15px; align-items: center;">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <label style="font-weight: 500;">View:</label>
-                <select id="view-mode" onchange="setViewMode(this.value)" 
+                <select id="view-mode" onchange="setViewMode(this.value)"
                         style="padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em; background: var(--card-bg); color: var(--text-color);">
                     <option value="developer">👨‍💻 Developer</option>
                     <option value="stakeholder">📊 Stakeholder</option>
@@ -778,7 +778,7 @@
                     <span class="sparkline-container">
                         {{ "%.4f"|format(node.duration) }}s
                         {% if node.duration_history and node.duration_history|length > 1 %}
-                        <span class="sparkline" id="sparkline-{{ loop.index }}" 
+                        <span class="sparkline" id="sparkline-{{ loop.index }}"
                               data-history="{{ node.duration_history | tojson | e }}"
                               title="Duration trend (last {{ node.duration_history|length }} runs)"></span>
                         {% endif %}
@@ -811,7 +811,7 @@
                             🔍 Copy Debug Query
                         </button>
                         <button class="copy-btn" onclick="copyNodeLink(this, '{{ node.node_name }}'); event.stopPropagation();" title="Copy link to this node">
-                            🔗 Copy Link
+                            [Link]
                         </button>
                     </div>
 
@@ -1383,12 +1383,12 @@
                                 Show Side-by-Side
                             </button>
                         </div>
-                        
+
                         <!-- Inline Diff View (default) -->
                         <div id="config-diff-inline-{{ loop.index }}" class="config-diff-inline">
                             <pre id="config-diff-output-{{ loop.index }}" style="padding: 15px; max-height: 400px; overflow-y: auto;"></pre>
                         </div>
-                        
+
                         <!-- Side-by-Side View (hidden by default) -->
                         <div id="config-diff-sidebyside-{{ loop.index }}" class="config-diff-container" style="display: none;">
                             <div class="config-diff-pane">
@@ -1404,7 +1404,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <script>
                             (function() {
                                 const prev = {{ node.previous_config_snapshot | tojson | safe }};
@@ -1449,11 +1449,11 @@
     // ========================================
     // Config Diff Functions
     // ========================================
-    
+
     function generateConfigDiff(prev, curr) {
         const prevYaml = objectToYamlLines(prev);
         const currYaml = objectToYamlLines(curr);
-        
+
         const diff = computeLineDiff(prevYaml, currYaml);
         return diff.map(line => {
             if (line.type === 'added') {
@@ -1465,19 +1465,19 @@
             }
         }).join('\n');
     }
-    
+
     function objectToYamlLines(obj, indent = 0) {
         const lines = [];
         const prefix = '  '.repeat(indent);
-        
+
         if (obj === null || obj === undefined) {
             return ['null'];
         }
-        
+
         if (typeof obj !== 'object') {
             return [String(obj)];
         }
-        
+
         if (Array.isArray(obj)) {
             obj.forEach(item => {
                 if (typeof item === 'object' && item !== null) {
@@ -1502,19 +1502,19 @@
         }
         return lines;
     }
-    
+
     function computeLineDiff(oldLines, newLines) {
         const result = [];
         const oldSet = new Set(oldLines);
         const newSet = new Set(newLines);
-        
+
         // Find removed lines
         oldLines.forEach(line => {
             if (!newSet.has(line)) {
                 result.push({ type: 'removed', text: line });
             }
         });
-        
+
         // Find added and unchanged lines
         newLines.forEach(line => {
             if (!oldSet.has(line)) {
@@ -1523,24 +1523,24 @@
                 result.push({ type: 'unchanged', text: line });
             }
         });
-        
+
         // Sort: removed first, then unchanged/added in order
         const removed = result.filter(r => r.type === 'removed');
         const rest = result.filter(r => r.type !== 'removed');
         return [...removed, ...rest];
     }
-    
+
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-    
+
     function toggleConfigDiffView(index) {
         const inline = document.getElementById('config-diff-inline-' + index);
         const sideBySide = document.getElementById('config-diff-sidebyside-' + index);
         const btn = document.getElementById('config-diff-toggle-' + index);
-        
+
         if (inline && sideBySide && btn) {
             if (sideBySide.style.display === 'none') {
                 sideBySide.style.display = 'grid';
@@ -1553,36 +1553,36 @@
             }
         }
     }
-    
+
     // ========================================
     // Duration Sparkline Functions
     // ========================================
-    
+
     function renderSparkline(data, width = 60, height = 16) {
         if (!data || data.length < 2) return '';
-        
+
         const durations = data.map(d => d.duration).reverse(); // Oldest to newest
         const min = Math.min(...durations);
         const max = Math.max(...durations);
         const range = max - min || 1;
-        
+
         const points = durations.map((d, i) => {
             const x = (i / (durations.length - 1)) * width;
             const y = height - ((d - min) / range) * (height - 2) - 1;
             return `${x},${y}`;
         }).join(' ');
-        
+
         const lastDuration = durations[durations.length - 1];
         const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
-        const trend = lastDuration > avgDuration * 1.5 ? '#dc3545' : 
+        const trend = lastDuration > avgDuration * 1.5 ? '#dc3545' :
                       lastDuration < avgDuration * 0.5 ? '#28a745' : '#6c757d';
-        
+
         return `<svg width="${width}" height="${height}" style="vertical-align: middle;">
             <polyline points="${points}" fill="none" stroke="${trend}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             <circle cx="${width}" cy="${height - ((lastDuration - min) / range) * (height - 2) - 1}" r="2" fill="${trend}"/>
         </svg>`;
     }
-    
+
     function initSparklines() {
         document.querySelectorAll('.sparkline[data-history]').forEach(el => {
             try {
@@ -1623,10 +1623,10 @@
         // Handle both 'node-xxx' and 'xxx' formats
         const cleanName = nodeName && nodeName.startsWith('node-') ? nodeName.substring(5) : nodeName;
         const targetId = 'node-' + cleanName;
-        
+
         // Use querySelector with .node-card class to avoid matching SVG elements
         const nodeCard = document.querySelector('div.node-card#' + CSS.escape(targetId));
-        
+
         if (nodeCard) {
             nodeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
             // Flash highlight effect
@@ -1765,14 +1765,14 @@
     function toggleSection(sectionId) {
         const header = document.querySelector(`#${sectionId === 'timeline' ? 'execution-timeline' : 'pipeline-graph-card'} .collapsible-header`);
         const content = document.getElementById(`${sectionId}-content`);
-        
+
         if (header && content) {
             const isCollapsed = header.classList.toggle('collapsed');
             content.classList.toggle('collapsed', isCollapsed);
-            
+
             // Save state to localStorage
             localStorage.setItem(`odibi-section-${sectionId}`, isCollapsed ? 'collapsed' : 'expanded');
-            
+
             // If expanding pipeline, re-render graph to fix sizing
             if (sectionId === 'pipeline' && !isCollapsed) {
                 setTimeout(() => renderGraphviz('LR'), 100);
@@ -1788,12 +1788,12 @@
         // Timeline: default collapsed, Pipeline: default expanded
         const timelineState = localStorage.getItem('odibi-section-timeline') || 'collapsed';
         const pipelineState = localStorage.getItem('odibi-section-pipeline') || 'expanded';
-        
+
         const timelineHeader = document.querySelector('#execution-timeline .collapsible-header');
         const timelineContent = document.getElementById('timeline-content');
         const pipelineHeader = document.querySelector('#pipeline-graph-card .collapsible-header');
         const pipelineContent = document.getElementById('pipeline-content');
-        
+
         if (timelineHeader && timelineContent) {
             if (timelineState === 'collapsed') {
                 timelineHeader.classList.add('collapsed');
@@ -1803,7 +1803,7 @@
                 timelineContent.classList.remove('collapsed');
             }
         }
-        
+
         if (pipelineHeader && pipelineContent) {
             if (pipelineState === 'collapsed') {
                 pipelineHeader.classList.add('collapsed');
@@ -1953,11 +1953,11 @@
                 svgEl.style.maxWidth = '100%';
                 svgEl.style.height = 'auto';
                 svgEl.style.minHeight = '400px';
-                
+
                 // Add click and hover handlers to nodes (Graphviz uses .node class for node groups)
                 container.querySelectorAll('.node').forEach(nodeEl => {
                     nodeEl.style.cursor = 'pointer';
-                    
+
                     // Click to navigate
                     nodeEl.addEventListener('click', function(e) {
                         const titleEl = this.querySelector('title');
@@ -1967,7 +1967,7 @@
                             highlightNodeInGraph(nodeId);
                         }
                     });
-                    
+
                     // Hover to show tooltip
                     nodeEl.addEventListener('mouseenter', function(e) {
                         const titleEl = this.querySelector('title');
@@ -1976,11 +1976,11 @@
                             showDagTooltip(nodeId, e);
                         }
                     });
-                    
+
                     nodeEl.addEventListener('mousemove', function(e) {
                         moveDagTooltip(e);
                     });
-                    
+
                     nodeEl.addEventListener('mouseleave', function(e) {
                         hideDagTooltip();
                     });
@@ -2020,18 +2020,18 @@
     function showDagTooltip(nodeId, event) {
         const tooltip = document.getElementById('dag-tooltip');
         if (!tooltip || !graphData.nodes) return;
-        
+
         // Find node data
         const node = graphData.nodes.find(n => n.id === nodeId);
         if (!node) return;
-        
+
         // Build tooltip HTML
         let html = `<h4>${node.label || node.id}`;
         if (node.is_external) {
             html += `<span class="external-badge">External</span>`;
         }
         html += `</h4>`;
-        
+
         // Status
         const statusColors = {
             success: '#0ca678',
@@ -2044,7 +2044,7 @@
             <span class="tooltip-label">Status:</span>
             <span class="tooltip-value" style="color: ${statusColor}; font-weight: 500;">${node.status}</span>
         </div>`;
-        
+
         // Duration (if not external)
         if (!node.is_external && node.duration !== undefined) {
             html += `<div class="tooltip-row">
@@ -2052,7 +2052,7 @@
                 <span class="tooltip-value">${node.duration.toFixed(2)}s</span>
             </div>`;
         }
-        
+
         // Rows Read (if available)
         if (node.rows_in !== null && node.rows_in !== undefined) {
             html += `<div class="tooltip-row">
@@ -2060,7 +2060,7 @@
                 <span class="tooltip-value">${node.rows_in.toLocaleString()}</span>
             </div>`;
         }
-        
+
         // Rows Written (if available)
         if (node.rows_written !== null && node.rows_written !== undefined) {
             const noChanges = node.rows_in && node.rows_written === 0 && node.rows_in > 0 ? ' (no changes)' : '';
@@ -2074,7 +2074,7 @@
                 <span class="tooltip-value">${node.rows_out.toLocaleString()}</span>
             </div>`;
         }
-        
+
         // Source pipeline (for external nodes)
         if (node.is_external && node.source_pipeline) {
             html += `<div class="tooltip-row">
@@ -2082,7 +2082,7 @@
                 <span class="tooltip-value">${node.source_pipeline}</span>
             </div>`;
         }
-        
+
         // Dependencies
         if (node.dependencies && node.dependencies.length > 0) {
             html += `<div class="tooltip-row" style="flex-direction: column;">
@@ -2093,20 +2093,20 @@
             });
             html += `</ul></div>`;
         }
-        
+
         tooltip.innerHTML = html;
         tooltip.classList.add('visible');
         moveDagTooltip(event);
     }
-    
+
     function moveDagTooltip(event) {
         const tooltip = document.getElementById('dag-tooltip');
         if (!tooltip) return;
-        
+
         // Position tooltip near cursor but not overlapping
         let x = event.clientX + 15;
         let y = event.clientY + 15;
-        
+
         // Keep tooltip within viewport
         const rect = tooltip.getBoundingClientRect();
         if (x + rect.width > window.innerWidth - 10) {
@@ -2115,11 +2115,11 @@
         if (y + rect.height > window.innerHeight - 10) {
             y = event.clientY - rect.height - 15;
         }
-        
+
         tooltip.style.left = x + 'px';
         tooltip.style.top = y + 'px';
     }
-    
+
     function hideDagTooltip() {
         const tooltip = document.getElementById('dag-tooltip');
         if (tooltip) {
@@ -2136,7 +2136,7 @@
     function changeGraphViewType(viewType) {
         const graphContainer = document.getElementById('graphviz-container');
         const listView = document.getElementById('pipeline-list-view');
-        
+
         if (viewType === 'list') {
             graphContainer.style.display = 'none';
             listView.style.display = 'block';
@@ -2189,7 +2189,7 @@
         let html = `<div style="font-size: 13px; color: #666; margin-bottom: 16px;">
             ${graphData.nodes.length} nodes • Click node name for details • Click dependency to navigate
         </div>`;
-        
+
         // Render nodes in order
         graphData.nodes.forEach(node => {
             const upstream = edgesByTarget[node.id] || [];
@@ -2200,9 +2200,9 @@
             const borderStyle = isExternal ? '2px dashed' : '1px solid';
             const bgColor = isExternal ? '#f0f9ff' : 'white';
             const labelPrefix = isExternal ? '↗ ' : '';
-            
+
             html += `
-            <div style="display: flex; align-items: flex-start; padding: 12px 16px; margin-bottom: 8px; background: ${bgColor}; border-radius: 8px; border: ${borderStyle} #e1e4e8; transition: all 0.15s;" 
+            <div style="display: flex; align-items: flex-start; padding: 12px 16px; margin-bottom: 8px; background: ${bgColor}; border-radius: 8px; border: ${borderStyle} #e1e4e8; transition: all 0.15s;"
                  onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'; this.style.borderColor='${statusColor}';"
                  onmouseout="this.style.boxShadow='none'; this.style.borderColor='#e1e4e8';">
                 <div style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: ${statusColor}20; color: ${statusColor}; border-radius: ${isExternal ? '50%' : '6px'}; font-weight: bold; margin-right: 14px;">
@@ -2226,7 +2226,7 @@
 
         listView.innerHTML = html;
     }
-    
+
     // Set up event delegation for list view links (once, on document level)
     document.addEventListener('click', function(e) {
         const link = e.target.closest('.node-link, .dep-link');
@@ -2239,7 +2239,7 @@
             }
         }
     });
-    
+
     // Focus on a node in the graph from list view
     function focusGraphNode(nodeId) {
         highlightNodeInGraph(nodeId);
@@ -2319,7 +2319,7 @@
     function focusNodeCard(index) {
         // Remove previous focus
         nodeCards.forEach(card => card.classList.remove('keyboard-focus'));
-        
+
         currentFocusedIndex = index;
         const card = nodeCards[index];
         card.classList.add('keyboard-focus');
@@ -2383,7 +2383,7 @@
             html += `<div class="timeline-row">
                 <div class="timeline-label" title="${node.label}">${node.label}</div>
                 <div class="timeline-bar-container">
-                    <div class="timeline-bar ${statusClass}" 
+                    <div class="timeline-bar ${statusClass}"
                          style="width: ${widthPct}%;"
                          onclick="window.scrollToNode('${node.id}')"
                          title="${node.label}: ${node.duration.toFixed(3)}s">
@@ -2488,7 +2488,7 @@
         const viewTypeSelect = document.getElementById('graph-view-type');
         const pipelineContent = document.getElementById('pipeline-content');
         const isPipelineExpanded = pipelineContent && !pipelineContent.classList.contains('collapsed');
-        
+
         // Only render graph if pipeline section is expanded
         if (isPipelineExpanded) {
             if (viewTypeSelect && viewTypeSelect.value === 'list') {
@@ -2501,13 +2501,13 @@
         // Initialize other features
         initKeyboardNavigation();
         handleHashNavigation();
-        
+
         // Render timeline only if expanded
         const timelineContent = document.getElementById('timeline-content');
         if (timelineContent && !timelineContent.classList.contains('collapsed')) {
             setTimeout(renderExecutionTimeline, 100);
         }
-        
+
         // Highlight failed paths after graph renders
         setTimeout(highlightFailedPaths, 500);
     });

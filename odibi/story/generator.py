@@ -1405,7 +1405,7 @@ class StoryGenerator:
 </head>
 <body>
 <div class="container">
-    <h1>📊 Pipeline History: {self.pipeline_name}</h1>
+    <h1>Pipeline History: {self.pipeline_name}</h1>
     <p style="color: #666; margin-bottom: 20px;">Showing {len(runs)} most recent runs</p>
     <table>
         <thead>

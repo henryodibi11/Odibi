@@ -10,6 +10,8 @@
 
 Odibi is a framework for building data pipelines. You describe *what* you want in YAML; Odibi handles *how*. Every run generates a "Data Story" — an audit report showing exactly what happened to your data.
 
+> 🤖 **AI/LLM Users:** For comprehensive context, see [docs/ODIBI_DEEP_CONTEXT.md](docs/ODIBI_DEEP_CONTEXT.md) — 2,200+ lines covering all patterns, transformers, validation, connections, and runtime behavior.
+
 ---
 
 ## ⚡ Quick Start

@@ -1,5 +1,23 @@
 # Odibi - Agent Guide
 
+## AI Deep Context
+
+**For comprehensive framework documentation, read [docs/ODIBI_DEEP_CONTEXT.md](docs/ODIBI_DEEP_CONTEXT.md) first.**
+
+This 2,200+ line document covers:
+- Runtime behavior (Spark temp views, Pandas/DuckDB, Polars)
+- All 6 patterns (Dimension, Fact, SCD2, Merge, Aggregation, Date Dimension)
+- 52+ transformers with examples
+- Validation, quarantine, quality gates
+- Connections (Local, ADLS, Azure SQL, HTTP, DBFS)
+- Delta Lake features (partitioning, Z-ordering, VACUUM, schema evolution)
+- System Catalog, OpenLineage, FK validation
+- SQL Server writer, incremental loading modes
+- Manufacturing transformers, testing utilities
+- CLI reference, anti-patterns, extension points
+
+---
+
 ## About This Project
 
 **Creator:** Solo data engineer on an analytics team (only DE among data analysts)
@@ -50,6 +68,16 @@ python odibi/introspect.py          # Regenerate yaml_schema.md from Pydantic mo
 ```
 Auto-generates `docs/reference/yaml_schema.md` by introspecting config classes.
 The docstrings in `odibi/config.py` are the source of truth for documentation.
+
+### Introspection (AI-Friendly CLI)
+```bash
+odibi list transformers             # List all 52+ transformers
+odibi list patterns                 # List all 6 patterns
+odibi list connections              # List all connection types
+odibi explain <name>                # Get detailed docs for any feature
+odibi list transformers --format json  # JSON output for parsing
+```
+Use these commands to discover available features before generating YAML configs.
 
 ### WSL/Spark Testing (Windows)
 Tests requiring Spark must run through WSL:

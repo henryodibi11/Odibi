@@ -1,0 +1,56 @@
+# Odibi - AI Context
+
+> Odibi is a Python data pipeline framework for building enterprise data warehouses.
+> It orchestrates nodes (read → transform → validate → write) with dependency resolution,
+> supports Pandas/Spark/Polars engines, and provides patterns for common DWH tasks.
+
+## Primary Documentation
+
+For comprehensive AI context, read this file first:
+- docs/ODIBI_DEEP_CONTEXT.md (2,200+ lines covering all features)
+
+## Quick Reference
+
+- AGENTS.md - Agent-specific instructions and commands
+- docs/ODIBI_DEEP_CONTEXT.md - Complete framework reference
+- odibi/config.py - All configuration classes (source of truth)
+
+## Key Concepts
+
+- **Nodes**: Units of work (read → transform → validate → write)
+- **Patterns**: Dimension, Fact, SCD2, Merge, Aggregation, Date Dimension
+- **Engines**: Pandas (DuckDB SQL), Spark, Polars
+- **Connections**: Local, Azure ADLS, Azure SQL, HTTP, DBFS
+- **Validation**: Tests, quarantine, quality gates, FK validation
+
+## CLI Introspection (AI-Friendly)
+
+```bash
+odibi list transformers           # List all 52+ transformers
+odibi list patterns               # List all 6 patterns
+odibi list connections            # List all connection types
+odibi explain <name>              # Get detailed docs for any feature
+odibi list transformers --format json  # JSON output for parsing
+```
+
+## Source Code Structure
+
+odibi/
+├── engine/         # Spark, Pandas, Polars engines
+├── patterns/       # DWH patterns (dimension, fact, scd2, etc.)
+├── transformers/   # 52+ SQL-based transformations
+├── validation/     # Data quality, quarantine, FK validation
+├── connections/    # Storage and database connections
+├── semantics/      # Metrics, dimensions, materialization
+├── writers/        # SQL Server writer
+├── catalog.py      # System Catalog (meta-tables)
+├── config.py       # All Pydantic config models
+├── context.py      # Engine contexts (Spark temp views, etc.)
+├── pipeline.py     # Pipeline orchestration
+└── node.py         # Node execution
+
+## Important Runtime Behavior
+
+1. **Spark**: Node outputs registered as temp views via `createOrReplaceTempView()`
+2. **Pandas**: SQL via DuckDB (different syntax than Spark SQL)
+3. **Node names**: Must be alphanumeric + underscore only for Spark compatibility

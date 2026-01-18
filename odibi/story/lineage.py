@@ -456,7 +456,7 @@ class LineageGenerator:
 </head>
 <body>
     <div class="container">
-        <h1>🔗 Data Lineage</h1>
+        <h1>Data Lineage</h1>
         <p class="subtitle">End-to-end data flow for {result.date}</p>
 
         <div class="summary">
@@ -479,9 +479,9 @@ class LineageGenerator:
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>📊 Lineage Graph</h2>
+            <h2>Lineage Graph</h2>
             <div class="export-buttons">
-                <button onclick="exportSVG()" class="export-btn">📥 Export SVG</button>
+                <button onclick="exportSVG()" class="export-btn">Export SVG</button>
             </div>
         </div>
         <div class="lineage" id="lineage-container">
@@ -508,7 +508,7 @@ class LineageGenerator:
             </div>
         </div>
 
-        <h2>📋 Pipeline Layers</h2>
+        <h2>Pipeline Layers</h2>
         {layers_html}
 
         <footer style="text-align: center; color: #94a3b8; margin-top: 40px; font-size: 12px;">
@@ -915,12 +915,12 @@ class LineageGenerator:
         }
 
         layer_labels = {
-            "raw": "📥 Raw Sources",
-            "bronze": "🥉 Bronze Layer",
-            "silver": "🥈 Silver Layer",
-            "gold": "🥇 Gold Layer",
-            "semantic": "📊 Semantic Views",
-            "unknown": "❓ Other",
+            "raw": "Raw Sources",
+            "bronze": "Bronze Layer",
+            "silver": "Silver Layer",
+            "gold": "Gold Layer",
+            "semantic": "Semantic Views",
+            "unknown": "Other",
         }
 
         # Subgraph border styles (stroke color matches layer theme)

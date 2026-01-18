@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-01-18
+
+### Added - AI Assistant MCP Server Enhancements
+
+- **odibi-knowledge MCP Server** (`odibi_mcp`): Now includes 21 tools for AI assistants
+  - Integrated into main package via `pip install odibi[mcp]` or `pip install odibi[mcp-rag]`
+
+- **New Decision Support Tools**:
+  - `suggest_pattern` - Recommends the right pattern (scd2, merge, dimension, fact, aggregation, date_dimension) based on use case description with keyword matching and confidence scoring
+  - `get_engine_differences` - Documents critical differences between Spark, Pandas/DuckDB, and Polars SQL dialects (type names, array indexing, date functions, etc.)
+  - `get_validation_rules` - Complete reference for all 10 validation rule types with YAML examples
+
+- **Code Generation Tools** (from previous session):
+  - `generate_transformer` - Generates complete Python code for custom transformers with correct signature
+  - `generate_pipeline_yaml` - Generates complete valid YAML pipeline configs
+  - `validate_yaml` - Validates YAML configs and returns specific errors before runtime
+  - `diagnose_error` - Diagnoses common odibi errors and suggests fixes
+  - `get_example` - Dynamically loads examples from 150+ documentation files
+
+- **AI Assistant Configuration**:
+  - Updated `.clinerules` with all 21 MCP tools organized by category
+  - Updated `.continue/rules.md` for Continue IDE integration
+  - Updated `docs/guides/ai-assistant-setup.md` with complete tool reference
+
+### Testing
+
+- **MCP Knowledge Tests**: Added 29 unit tests for all MCP knowledge tools (`tests/unit/test_mcp_knowledge.py`)
+
+### Documentation
+
+- Complete MCP tool reference in `docs/guides/ai-assistant-setup.md`
+
 ## [2.7.0] - 2026-01-14
 
 ### Added - Excel Reading Enhancements

@@ -351,6 +351,91 @@ odibi catalog runs config.yaml --status FAILED --days 30
 odibi catalog state config.yaml --pipeline my_incremental_etl
 ```
 
+## Introspection Commands
+
+These commands help AI tools and developers discover available features without reading source code.
+
+### odibi list
+
+List available transformers, patterns, or connections.
+
+```bash
+odibi list <transformers|patterns|connections> [--format table|json]
+```
+
+#### Examples
+
+```bash
+# List all registered transformers
+odibi list transformers
+
+# List patterns as JSON (for AI tools)
+odibi list patterns --format json
+
+# List available connection types
+odibi list connections
+```
+
+#### Example Output (transformers)
+
+```
+Available Transformers (52):
+============================================================
+  add_prefix                     Adds a prefix to column names.
+  aggregate                      Performs grouping and aggregation via SQL.
+  fill_nulls                     Replaces null values with specified defaults.
+  ...
+```
+
+### odibi explain
+
+Get detailed documentation for a transformer, pattern, or connection.
+
+```bash
+odibi explain <name>
+```
+
+#### Examples
+
+```bash
+# Explain a transformer
+odibi explain fill_nulls
+
+# Explain a pattern
+odibi explain dimension
+
+# Explain a connection type
+odibi explain azure_sql
+```
+
+#### Example Output
+
+```
+Pattern: dimension
+============================================================
+
+Dimension Pattern: Builds complete dimension tables with surrogate keys and SCD support.
+
+Features:
+- Auto-generate integer surrogate keys
+- SCD Type 0 (static), 1 (overwrite), 2 (history tracking)
+- Optional unknown member row (SK=0) for orphan FK handling
+- Audit columns (load_timestamp, source_system)
+
+Configuration Options:
+    - natural_key (str): Natural/business key column name
+    - surrogate_key (str): Surrogate key column name to generate
+    - scd_type (int): 0=static, 1=overwrite, 2=history (default: 1)
+    ...
+
+Example YAML:
+  pattern:
+    type: dimension
+    params:
+      natural_key: customer_id
+      surrogate_key: customer_sk
+```
+
 ## Related
 
 - [Getting Started](../tutorials/getting_started.md) - Getting started with Odibi

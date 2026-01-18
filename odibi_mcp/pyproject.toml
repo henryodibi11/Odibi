@@ -1,0 +1,22 @@
+[project]
+name = "odibi-mcp"
+version = "0.1.0"
+description = "MCP server for Odibi knowledge retrieval"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+rag = [
+    "chromadb",
+    "sentence-transformers",
+]
+
+[project.scripts]
+odibi-mcp = "odibi_mcp.server:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

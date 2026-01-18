@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odibi"
-version = "2.7.0"
+version = "2.8.0"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
     {name = "Henry Odibi", email = "odibiengineering@gmail.com"}
@@ -78,6 +78,14 @@ sql = [
 polars = [
     "polars>=0.20.0",
 ]
+mcp = [
+    "mcp>=1.0.0",
+]
+mcp-rag = [
+    "mcp>=1.0.0",
+    "chromadb",
+    "sentence-transformers",
+]
 
 all = [
     "pyspark>=3.4.0",
@@ -135,7 +143,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["odibi*"]
+include = ["odibi*", "odibi_mcp*"]
 exclude = ["tests*"]
 
 [tool.black]

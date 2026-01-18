@@ -120,6 +120,7 @@ nav:
   # DEEP REFERENCE - Look up when needed
   # ─────────────────────────────────────────────
   - Reference:
+      - AI Deep Context: ODIBI_DEEP_CONTEXT.md
       - Cheatsheet: reference/cheatsheet.md
       - YAML Schema: reference/yaml_schema.md
       - Configuration Guide: reference/configuration.md

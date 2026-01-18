@@ -727,6 +727,7 @@ class CatalogSyncer:
         self.spark = spark
         self.environment = environment
         self._ctx = get_logging_context()
+        self.status = "idle"
 
         # Determine target type
         self.target_type = self._get_target_type()

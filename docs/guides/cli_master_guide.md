@@ -212,6 +212,53 @@ Changes to bronze/customers_raw would affect:
 
 ---
 
+## 🤖 Level 5: AI-Friendly Introspection
+
+These commands help AI tools (and developers) discover available features programmatically.
+
+### List Available Features
+
+```bash
+# List all 52+ transformers
+odibi list transformers
+
+# List all 6 patterns with descriptions
+odibi list patterns
+
+# List all connection types
+odibi list connections
+
+# JSON output (for AI parsing)
+odibi list transformers --format json
+```
+
+### Explain Any Feature
+
+```bash
+# Get detailed docs for a transformer
+odibi explain fill_nulls
+
+# Get detailed docs for a pattern (includes example YAML)
+odibi explain dimension
+
+# Get detailed docs for a connection type
+odibi explain azure_sql
+```
+
+**AI Workflow Example:**
+```bash
+# AI checks what's available
+odibi list transformers --format json | jq '.[] | .name'
+
+# AI looks up specific usage
+odibi explain derive_columns
+
+# AI validates generated config
+odibi validate generated_pipeline.yaml
+```
+
+---
+
 ## 📄 Command Reference
 
 | Command | Description |
@@ -226,4 +273,6 @@ Changes to bronze/customers_raw would affect:
 | `catalog` | Query System Catalog (`runs`, `pipelines`, `nodes`, `state`, `stats`). |
 | `schema` | Schema version tracking (`history`, `diff`). |
 | `lineage` | Cross-pipeline lineage (`upstream`, `downstream`, `impact`). |
+| `list` | List available features (`transformers`, `patterns`, `connections`). |
+| `explain` | Get detailed documentation for any feature. |
 | `init-vscode` | Setup VS Code environment. |

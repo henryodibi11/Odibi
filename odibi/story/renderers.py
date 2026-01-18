@@ -192,7 +192,7 @@ class MarkdownStoryRenderer:
         lines = []
 
         # Header
-        lines.append(f"# 📊 Pipeline Run Story: {metadata.pipeline_name}")
+        lines.append(f"# Pipeline Run Story: {metadata.pipeline_name}")
         lines.append("")
 
         # Execution info
@@ -232,10 +232,10 @@ class MarkdownStoryRenderer:
         lines.append("")
         lines.append(f"- ✅ **Completed:** {metadata.completed_nodes} nodes")
         lines.append(f"- ❌ **Failed:** {metadata.failed_nodes} nodes")
-        lines.append(f"- ⏭️ **Skipped:** {metadata.skipped_nodes} nodes")
-        lines.append(f"- 📊 **Success Rate:** {metadata.get_success_rate():.1f}%")
-        lines.append(f"- 📈 **Total Rows Processed:** {metadata.get_total_rows_processed():,}")
-        lines.append(f"- ⏱️ **Duration:** {metadata.duration:.2f}s")
+        lines.append(f"- Skipped: {metadata.skipped_nodes} nodes")
+        lines.append(f"- Success Rate: {metadata.get_success_rate():.1f}%")
+        lines.append(f"- Total Rows Processed: {metadata.get_total_rows_processed():,}")
+        lines.append(f"- Duration: {metadata.duration:.2f}s")
         lines.append("")
         lines.append("---")
         lines.append("")
@@ -255,7 +255,7 @@ class MarkdownStoryRenderer:
             # Historical Context
             if node.historical_avg_duration and node.duration is not None:
                 diff = node.duration - node.historical_avg_duration
-                icon = "🔼" if diff > 0 else "🔽"
+                icon = "^" if diff > 0 else "v"
                 lines.append(
                     f"**Avg Duration (7d):** {node.historical_avg_duration:.4f}s ({icon} {abs(diff):.4f}s)"
                 )

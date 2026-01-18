@@ -520,7 +520,7 @@ class DocStoryGenerator:
         lines.append("")
         lines.append('*"Where others saw gaps, I built bridges."*')
         lines.append("")
-        lines.append(f"Odibi v{odibi.__version__} · Henry Odibi 🌍")
+        lines.append(f"Odibi v{odibi.__version__} · Henry Odibi (World)")
 
         markdown = "\n".join(lines)
 
