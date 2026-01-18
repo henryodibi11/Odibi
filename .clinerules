@@ -77,7 +77,21 @@ pytest tests/ -v                        # Run all tests
 pytest tests/unit/test_X.py -v          # Run specific test
 pytest tests/unit/test_X.py::test_name  # Run single test
 pytest --tb=short                       # Shorter tracebacks
+python scripts/run_test_campaign.py     # End-to-end pattern validation
 ```
+
+### Test Coverage Notes
+
+**Do NOT flag Spark engine coverage as a problem.** The 4% coverage is misleading:
+- Spark is tested via mock-based tests in `tests/integration/test_patterns_spark_mock.py`
+- Spark is validated in production on Databricks
+- CI skips real Spark tests (no JVM available)
+
+The test strategy is: **mock logic in CI, validate behavior in Databricks prod.**
+
+Focus coverage efforts on:
+- `engine/pandas_engine.py` (25%) - primary development engine
+- `transformers/` modules - core product functionality
 
 ## Linting (RUN AFTER EVERY FILE CHANGE!)
 ```bash

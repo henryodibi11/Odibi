@@ -24,7 +24,7 @@ assert_frame_equal(actual_df, expected_df)
 
 # With options
 assert_frame_equal(
-    actual_df, 
+    actual_df,
     expected_df,
     check_dtype=True,      # Check column types
     check_exact=False,     # Allow float tolerance
@@ -119,8 +119,52 @@ Source pools provide:
 - **Schema definitions**: Explicit, no runtime inference
 - **Test coverage hints**: Know what scenarios each pool covers
 
+## End-to-End Test Campaign
+
+For comprehensive validation of core patterns, run the test campaign:
+
+```bash
+python scripts/run_test_campaign.py
+```
+
+This validates:
+
+| Phase | What It Tests |
+|-------|---------------|
+| Phase 1 | CSV read, Parquet write, schema validation |
+| Phase 3 | State/HWM persistence |
+| Phase 4 | Merge pattern (upsert) |
+| Phase 5 | SCD2 pattern |
+| Phase 6 | Logical path resolution |
+| Phase 11 | 10k row scaling |
+
+All phases run on the Pandas engine. For Spark validation, see [Spark Engine Testing](#spark-engine-testing).
+
+## Spark Engine Testing
+
+The Spark engine is validated in production on Databricks rather than in CI due to JVM/environment complexity.
+
+**Local Spark testing (WSL required on Windows):**
+
+```bash
+wsl -d Ubuntu-20.04 -- bash -c "cd /mnt/d/odibi && python3.9 -m pytest tests/ -k spark"
+```
+
+**Databricks validation:**
+- Deploy pipeline to Databricks workspace
+- Run with `engine: spark` configuration
+- Validate outputs match Pandas engine results
+
+**Mock-based Spark tests (no JVM required):**
+
+```python
+# tests/integration/test_patterns_spark_mock.py
+# Uses mocked SparkSession to test logic without real Spark
+```
+
 ## Related
 
 - [Python API Guide](python_api_guide.md) — Programmatic pipeline execution
 - [Source Pools Design](../source_pools_design.md) — Deterministic test data
 - [Best Practices](best_practices.md) — Testing recommendations
+- [Spark Engine Tutorial](../tutorials/spark_engine.md) — Spark-specific setup

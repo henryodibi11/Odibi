@@ -402,6 +402,21 @@ class DuckDBEngine(Engine):
 register_engine("duckdb", DuckDBEngine)
 ```
 
+## Testing by Engine
+
+| Engine | Test Approach | CI Coverage |
+|--------|---------------|-------------|
+| Pandas | Full pytest suite, test campaign | ✅ 100% |
+| Spark | Mock-based tests + Databricks validation | Partial (mocks only) |
+| Polars | pytest with `HAS_POLARS` skipif markers | ✅ When installed |
+
+**Spark validation strategy:**
+- CI runs mock-based tests (no JVM required)
+- Production validation happens on Databricks
+- Local testing requires WSL on Windows
+
+See [Testing Guide](../guides/testing.md) for details.
+
 ## Best Practices
 
 1. **Match engine to workload** - Use pandas for development, spark for production
