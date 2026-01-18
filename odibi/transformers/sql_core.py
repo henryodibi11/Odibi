@@ -423,7 +423,19 @@ class SortParams(BaseModel):
 
 def sort(context: EngineContext, params: SortParams) -> EngineContext:
     """
-    Sorts the dataset.
+    Sort the dataset by one or more columns.
+
+    Parameters
+    ----------
+    context : EngineContext
+        The engine context containing the DataFrame to sort.
+    params : SortParams
+        Parameters specifying columns to sort by and sort order.
+
+    Returns
+    -------
+    EngineContext
+        The updated engine context with the sorted DataFrame.
     """
     cols = [params.by] if isinstance(params.by, str) else params.by
     direction = "ASC" if params.ascending else "DESC"
@@ -456,7 +468,19 @@ class LimitParams(BaseModel):
 
 def limit(context: EngineContext, params: LimitParams) -> EngineContext:
     """
-    Limits result size.
+    Limit the number of rows returned from the dataset.
+
+    Parameters
+    ----------
+    context : EngineContext
+        The engine context containing the DataFrame to limit.
+    params : LimitParams
+        Parameters specifying the number of rows to return and the offset.
+
+    Returns
+    -------
+    EngineContext
+        The updated engine context with the limited DataFrame.
     """
     return context.sql(f"SELECT * FROM df LIMIT {params.n} OFFSET {params.offset}")
 
@@ -479,7 +503,19 @@ class SampleParams(BaseModel):
 
 def sample(context: EngineContext, params: SampleParams) -> EngineContext:
     """
-    Samples data using random filtering.
+    Return a random sample of rows from the dataset.
+
+    Parameters
+    ----------
+    context : EngineContext
+        The engine context containing the DataFrame to sample from.
+    params : SampleParams
+        Parameters specifying the fraction of rows to return and the random seed.
+
+    Returns
+    -------
+    EngineContext
+        The updated engine context with the sampled DataFrame.
     """
     # Generic SQL sampling: WHERE rand() < fraction
     # Spark uses rand(), DuckDB (Pandas) uses random()
@@ -517,7 +553,19 @@ class DistinctParams(BaseModel):
 
 def distinct(context: EngineContext, params: DistinctParams) -> EngineContext:
     """
-    Returns unique rows (SELECT DISTINCT).
+    Return unique rows from the dataset using SQL DISTINCT.
+
+    Parameters
+    ----------
+    context : EngineContext
+        The engine context containing the DataFrame to deduplicate.
+    params : DistinctParams
+        Parameters specifying which columns to consider for uniqueness. If None, all columns are used.
+
+    Returns
+    -------
+    EngineContext
+        The updated engine context with duplicate rows removed.
     """
     if params.columns:
         cols = ", ".join(params.columns)
@@ -1300,7 +1348,20 @@ def replace_values(context: EngineContext, params: ReplaceValuesParams) -> Engin
 
 
 def _sql_value(val: Optional[str]) -> str:
-    """Convert Python value to SQL literal."""
+    """
+    Convert a Python value to a SQL literal for use in SQL expressions.
+
+    Parameters
+    ----------
+    val : Optional[str]
+        The Python value to convert. If None, returns the SQL NULL literal.
+        Otherwise, returns the value as a single-quoted SQL string.
+
+    Returns
+    -------
+    str
+        The SQL literal representation of the input value.
+    """
     if val is None:
         return "NULL"
     return f"'{val}'"
