@@ -20,7 +20,7 @@ class MultilineString(str):
     pass
 
 
-def multiline_presenter(dumper, data):
+def multiline_presenter(dumper, data) -> Any:
     """YAML representer for MultilineString."""
     return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
 

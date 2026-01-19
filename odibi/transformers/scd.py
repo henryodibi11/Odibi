@@ -187,6 +187,12 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
 
 
 def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
+    """
+    Internal helper for SCD2 logic on Spark engine.
+
+    Compares source and target DataFrames, detects changes, closes old records, and inserts new versions
+    according to SCD Type 2 rules. Handles both table and Delta path targets.
+    """
     from pyspark.sql import functions as F
 
     spark = context.spark
@@ -360,6 +366,12 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
 
 
 def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
+    """
+    Internal helper for SCD2 logic on Pandas engine.
+
+    Handles SCD Type 2 logic using either DuckDB (if available and parquet target) or pure Pandas.
+    Compares source and target, detects changes, closes old records, and inserts new versions.
+    """
     import logging
 
     import pandas as pd

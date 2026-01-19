@@ -424,7 +424,7 @@ class JSONStoryRenderer:
         return str(output_file)
 
 
-def get_renderer(format: str):
+def get_renderer(format: str) -> object:
     """
     Get renderer for specified format.
 

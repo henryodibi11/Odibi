@@ -225,7 +225,10 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
                 variable=var_name,
                 file=abs_path,
             )
-            raise ValueError(f"Missing environment variable: {var_name}")
+            raise ValueError(
+                f"Missing environment variable: {var_name}\n"
+                "Tip: Check your .env file or environment setup. See docs/ODIBI_DEEP_CONTEXT.md#env for help."
+            )
         # Check for problematic characters that could break YAML
         # Note: Colons are NOT checked because URLs (https://) are common and safe
         # when the value is substituted into a quoted YAML string
@@ -255,7 +258,11 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
         data = yaml.safe_load(substituted_content) or {}
     except yaml.YAMLError as e:
         logger.error("YAML parsing failed", path=abs_path, error=str(e))
-        raise
+        raise ValueError(
+            f"YAML parsing failed for file '{abs_path}': {e}\n"
+            "Common causes: indentation errors, missing colons, tabs instead of spaces, or invalid YAML structure.\n"
+            "Tip: Validate your YAML with an online linter or see docs/ODIBI_DEEP_CONTEXT.md#yaml for examples."
+        ) from e
 
     logger.debug("YAML parsed successfully", top_level_keys=list(data.keys()))
 

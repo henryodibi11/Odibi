@@ -379,6 +379,12 @@ def _merge_spark(
     table_properties,
     params,
 ):
+    """
+    Internal helper for merge transformer on Spark engine.
+
+    Handles upsert, append-only, and delete-match strategies using Delta Lake.
+    Resolves target as table or path, manages audit columns, schema evolution, and post-merge optimization.
+    """
     if DeltaTable is None:
         raise ImportError("Spark Merge Transformer requires 'delta-spark' package.")
 
@@ -568,6 +574,12 @@ def _merge_spark(
 
 
 def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params):
+    """
+    Internal helper for merge transformer on Pandas engine.
+
+    Handles upsert, append-only, and delete-match strategies using Pandas and optionally DuckDB.
+    Resolves target as path, manages audit columns, and performs atomic writes.
+    """
     import pandas as pd
 
     # Try using DuckDB for scalability if available

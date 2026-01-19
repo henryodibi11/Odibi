@@ -1,42 +1,5 @@
 {
   "mergeBehavior": "merge",
-  "mcpServers": [
-    {
-      "name": "odibi-knowledge",
-      "command": "python",
-      "args": ["-m", "odibi_mcp.server"]
-    },
-    {
-      "name": "filesystem",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
-    },
-    {
-      "name": "git",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-git"]
-    },
-    {
-      "name": "memory",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"]
-    },
-    {
-      "name": "sequential-thinking",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequentialthinking"]
-    },
-    {
-      "name": "fetch",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-fetch"]
-    },
-    {
-      "name": "context7",
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"]
-    }
-  ],
   "rules": [
     ".continue/rules.md"
   ]

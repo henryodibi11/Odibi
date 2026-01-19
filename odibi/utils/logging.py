@@ -197,7 +197,7 @@ class StructuredLogger:
 logger = StructuredLogger()
 
 
-def configure_logging(structured: bool, level: str):
+def configure_logging(structured: bool, level: str) -> None:
     """Configure the global logger."""
     global logger
     logger = StructuredLogger(structured=structured, level=level)

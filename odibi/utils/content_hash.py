@@ -5,7 +5,7 @@ for change detection in snapshot ingestion patterns.
 """
 
 import hashlib
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Any
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -55,7 +55,7 @@ def compute_dataframe_hash(
 
 
 def compute_spark_dataframe_hash(
-    df,
+    df: Any,
     columns: Optional[List[str]] = None,
     sort_columns: Optional[List[str]] = None,
     distributed: bool = True,

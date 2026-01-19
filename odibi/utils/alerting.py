@@ -4,7 +4,7 @@ import json
 import logging
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from odibi.config import AlertConfig, AlertEvent, AlertType
 
@@ -541,7 +541,7 @@ def send_quarantine_alert(
     node_name: str,
     rows_quarantined: int,
     quarantine_path: str,
-    failed_tests: list,
+    failed_tests: List[Any],
     context: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """Convenience function to send a quarantine alert.
@@ -585,7 +585,7 @@ def send_gate_block_alert(
     required_rate: float,
     failed_rows: int,
     total_rows: int,
-    failure_reasons: list,
+    failure_reasons: List[Any],
     context: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """Convenience function to send a gate block alert.

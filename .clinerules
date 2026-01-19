@@ -1,5 +1,60 @@
 # Odibi Project Rules for Cline
 
+## MCP Tool Selection Guide
+
+**Choose the right tool automatically based on task:**
+
+| Task Type | MCP to Use |
+|-----------|------------|
+| Odibi transformers, patterns, YAML | `odibi-knowledge` tools |
+| Complex planning, tradeoff analysis | `sequential-thinking` |
+| Read/write/search files | `filesystem` |
+| Web documentation, API docs | `fetch` |
+| Remember user preferences/context | `memory` |
+| Git history, commits, branches | `git` |
+
+**Auto-trigger rules:**
+- "explain", "list", "generate YAML", "transformer", "pattern" → use `odibi-knowledge`
+- "plan", "analyze tradeoffs", "step by step" → use `sequential-thinking`
+- "remember", "recall", "my preferences" → use `memory`
+- "fetch docs", "get documentation for" → use `fetch`
+- "create file", "write to", "save as" → use `filesystem`
+
+## CRITICAL: Safe Editing Practices
+
+**NEVER replace entire files.** Make surgical, targeted edits:
+- Edit ONE function/docstring at a time
+- Show the specific change, not the whole file
+- After each edit, verify the file still has all its code
+
+## CRITICAL: Verification After Changes
+
+**After EVERY code change:**
+1. Run `ruff check <file> --fix` to fix lint issues
+2. Run `ruff format <file>` to format
+3. Run relevant tests: `pytest tests/unit/test_<module>.py -v`
+4. If tests fail, fix before moving on
+
+## CRITICAL: What NOT To Do
+
+**NEVER:**
+- Delete code unless explicitly asked
+- Modify multiple unrelated files in one edit
+- Skip running tests after changes
+- Add dependencies without asking
+- Change function signatures without updating all callers
+
+**ALWAYS ask before:**
+- Deleting any function, class, or file
+- Refactoring across multiple files
+- Adding new dependencies
+- Changing public API signatures
+
+## CRITICAL: Handling Errors
+
+**If you broke something:** restore with `git checkout -- <file>`
+**If tests fail:** fix the failing test before proceeding
+
 ## IMPORTANT: File Paths
 Always use absolute paths starting with `D:/odibi/` when creating files.
 Example: `D:/odibi/examples/custom_transformers/data/products.csv`

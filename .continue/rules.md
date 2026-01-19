@@ -1,5 +1,85 @@
 # Odibi Project Rules for Continue
 
+## MCP Tool Selection Guide
+
+**Choose the right tool automatically based on task:**
+
+| Task Type | MCP to Use |
+|-----------|------------|
+| Odibi transformers, patterns, YAML | `odibi-knowledge` tools |
+| Complex planning, tradeoff analysis | `sequential-thinking` |
+| Read/write/search files | `filesystem` |
+| Web documentation, API docs | `fetch` |
+| Remember user preferences/context | `memory` |
+| Git history, commits, branches | `git` |
+
+**Auto-trigger rules:**
+- "explain", "list", "generate YAML", "transformer", "pattern" → use `odibi-knowledge`
+- "plan", "analyze tradeoffs", "step by step" → use `sequential-thinking`
+- "remember", "recall", "my preferences" → use `memory`
+- "fetch docs", "get documentation for" → use `fetch`
+- "create file", "write to", "save as" → use `filesystem`
+
+## CRITICAL: Safe Editing Practices
+
+**NEVER replace entire files.** Make surgical, targeted edits:
+- Edit ONE function/docstring at a time
+- Show the specific change, not the whole file
+- Use diff-style edits when possible
+- After each edit, verify the file still has all its code
+
+**Before editing large files:**
+1. Count functions/classes in the file
+2. After edit, verify the same count exists
+3. If code was accidentally removed, STOP and restore via `git checkout -- <file>`
+
+**Preferred workflow for docstring improvements:**
+1. List each function needing changes
+2. Edit each docstring ONE AT A TIME
+3. Run `ruff check <file>` after each batch
+
+## CRITICAL: Verification After Changes
+
+**After EVERY code change:**
+1. Run `ruff check <file> --fix` to fix lint issues
+2. Run `ruff format <file>` to format
+3. Run relevant tests: `pytest tests/unit/test_<module>.py -v`
+4. If tests fail, fix before moving on
+
+**Before committing or saying "done":**
+- Verify the file is syntactically valid: `python -m py_compile <file>`
+- Check for import errors: `python -c "import odibi.<module>"`
+
+## CRITICAL: What NOT To Do
+
+**NEVER:**
+- Delete code unless explicitly asked
+- Modify multiple unrelated files in one edit
+- Skip running tests after changes
+- Assume imports exist — check first
+- Add dependencies without asking
+- Change function signatures without updating all callers
+- Use `# type: ignore` or `# noqa` to hide errors
+
+**ALWAYS ask before:**
+- Deleting any function, class, or file
+- Refactoring across multiple files
+- Adding new dependencies to pyproject.toml
+- Changing public API signatures
+
+## CRITICAL: Handling Errors
+
+**If you encounter an error:**
+1. Show the full error message
+2. Explain what went wrong
+3. Propose a fix but WAIT for approval before applying
+4. If you broke something, restore with `git checkout -- <file>`
+
+**If tests fail after your change:**
+1. Do NOT proceed to other tasks
+2. Fix the failing test first
+3. If you can't fix it, revert your change
+
 ## IMPORTANT: Use MCP Tools First!
 
 Before writing ANY odibi code, call these odibi-knowledge MCP tools:

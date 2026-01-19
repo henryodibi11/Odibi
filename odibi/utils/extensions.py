@@ -7,7 +7,7 @@ from pathlib import Path
 from odibi.utils.logging import logger
 
 
-def load_extensions(path: Path):
+def load_extensions(path: Path) -> None:
     """Load python extensions (transforms.py, plugins.py) from path."""
     # Add path to sys.path to handle imports within the extensions
     if str(path) not in sys.path:

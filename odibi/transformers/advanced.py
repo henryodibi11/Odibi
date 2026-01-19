@@ -122,6 +122,13 @@ class ExplodeParams(BaseModel):
 
 
 def explode_list_column(context: EngineContext, params: ExplodeParams) -> EngineContext:
+    """
+    Explodes a list/array column into multiple rows.
+
+    For each element in the specified list column, creates a new row.
+    If 'outer' is True, keeps rows with empty lists (like explode_outer).
+    Supports Spark and Pandas engines.
+    """
     ctx = get_logging_context()
     start_time = time.time()
 
@@ -217,6 +224,13 @@ class DictMappingParams(BaseModel):
 
 
 def dict_based_mapping(context: EngineContext, params: DictMappingParams) -> EngineContext:
+    """
+    Maps values in a column using a provided dictionary.
+
+    For each value in the specified column, replaces it with the mapped value.
+    If 'default' is provided, uses it for values not found in the mapping.
+    Supports Spark and Pandas engines.
+    """
     target_col = params.output_column or params.column
 
     if context.engine_type == EngineType.SPARK:
@@ -273,7 +287,10 @@ class RegexReplaceParams(BaseModel):
 
 def regex_replace(context: EngineContext, params: RegexReplaceParams) -> EngineContext:
     """
-    SQL-based Regex replacement.
+    Applies a regex replacement to a column.
+
+    Uses SQL-based REGEXP_REPLACE to replace all matches of the pattern in the specified column
+    with the given replacement string. Works on both Spark and DuckDB/Pandas engines.
     """
     # Spark and DuckDB both support REGEXP_REPLACE(col, pattern, replacement)
     sql_query = f"SELECT *, REGEXP_REPLACE({params.column}, '{params.pattern}', '{params.replacement}') AS {params.column} FROM df"

@@ -2,6 +2,7 @@
 
 import os
 import sys
+from typing import Any
 
 try:
     from opentelemetry import metrics, trace
@@ -70,21 +71,21 @@ class MockMeter:
 # --- Public API ---
 
 
-def get_tracer(name: str):
+def get_tracer(name: str) -> Any:
     """Get a tracer (real or mock)."""
     if AVAILABLE:
         return trace.get_tracer(name)
     return MockTracer()
 
 
-def get_meter(name: str):
+def get_meter(name: str) -> Any:
     """Get a meter (real or mock)."""
     if AVAILABLE:
         return metrics.get_meter(name)
     return MockMeter()
 
 
-def setup_telemetry(service_name: str = "odibi"):
+def setup_telemetry(service_name: str = "odibi") -> None:
     """Configure OpenTelemetry if available and configured.
 
     Checks OTEL_EXPORTER_OTLP_ENDPOINT environment variable.

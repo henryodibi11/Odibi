@@ -140,11 +140,18 @@ def cross_check(context: EngineContext, params: CrossCheckParams) -> Any:
                 missing = set_base - set_curr
                 extra = set_curr - set_base
 
-                msg = f"Schema mismatch: {name} vs {base_name}."
+                msg = (
+                    f"Schema mismatch for input '{name}':\n"
+                    f"  - Compared to reference '{base_name}'\n"
+                )
                 if missing:
-                    msg += f" Missing/Changed: {missing}"
+                    msg += f"  - Missing/Changed fields (expected in '{base_name}', not in '{name}'): {missing}\n"
                 if extra:
-                    msg += f" Extra/Changed: {extra}"
+                    msg += f"  - Extra/Changed fields (found in '{name}', not in '{base_name}'): {extra}\n"
+                msg += (
+                    f"  - Actual schema for '{name}': {schema}\n"
+                    f"  - Expected schema (from '{base_name}'): {base_schema}\n"
+                )
                 failures.append(msg)
 
         if failures:
