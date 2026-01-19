@@ -292,8 +292,17 @@ def regex_replace(context: EngineContext, params: RegexReplaceParams) -> EngineC
     Uses SQL-based REGEXP_REPLACE to replace all matches of the pattern in the specified column
     with the given replacement string. Works on both Spark and DuckDB/Pandas engines.
     """
-    # Spark and DuckDB both support REGEXP_REPLACE(col, pattern, replacement)
-    sql_query = f"SELECT *, REGEXP_REPLACE({params.column}, '{params.pattern}', '{params.replacement}') AS {params.column} FROM df"
+    # Get all columns except the one being replaced, then add the replaced column
+    all_cols = context.df.columns.tolist()
+    other_cols = [c for c in all_cols if c != params.column]
+    other_cols_sql = ", ".join(other_cols) if other_cols else ""
+
+    # Build SELECT with other columns first, then the replaced column
+    if other_cols_sql:
+        sql_query = f"SELECT {other_cols_sql}, REGEXP_REPLACE({params.column}, '{params.pattern}', '{params.replacement}') AS {params.column} FROM df"
+    else:
+        sql_query = f"SELECT REGEXP_REPLACE({params.column}, '{params.pattern}', '{params.replacement}') AS {params.column} FROM df"
+
     return context.sql(sql_query)
 
 
