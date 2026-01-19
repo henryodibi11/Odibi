@@ -401,7 +401,8 @@ class SparkEngine(Engine):
             select_exprs = []
             for c in target_cols:
                 if c in current_cols:
-                    select_exprs.append(col(c))
+                    # Escape column names with backticks to handle special characters
+                    select_exprs.append(col(f"`{c}`"))
                 else:
                     select_exprs.append(lit(None).alias(c))
 
@@ -426,14 +427,16 @@ class SparkEngine(Engine):
                 ctx.warning(f"Column '{c}' not found for anonymization, skipping", column=c)
                 continue
 
+            # Escape column names with backticks to handle special characters
+            escaped_col = f"`{c}`"
             if method == "hash":
                 if salt:
-                    res = res.withColumn(c, sha2(concat(col(c), lit(salt)), 256))
+                    res = res.withColumn(c, sha2(concat(col(escaped_col), lit(salt)), 256))
                 else:
-                    res = res.withColumn(c, sha2(col(c), 256))
+                    res = res.withColumn(c, sha2(col(escaped_col), 256))
 
             elif method == "mask":
-                res = res.withColumn(c, regexp_replace(col(c), ".(?=.{4})", "*"))
+                res = res.withColumn(c, regexp_replace(col(escaped_col), ".(?=.{4})", "*"))
 
             elif method == "redact":
                 res = res.withColumn(c, lit("[REDACTED]"))
@@ -1949,7 +1952,8 @@ class SparkEngine(Engine):
         if missing:
             raise ValueError(f"Columns not found in DataFrame: {', '.join(missing)}")
 
-        aggs = [count(when(col(c).isNull(), c)).alias(c) for c in columns]
+        # Escape column names with backticks to handle special characters (., ,, spaces)
+        aggs = [count(when(col(f"`{c}`").isNull(), c)).alias(c) for c in columns]
         result = df.select(*aggs).collect()[0].asDict()
         return result
 
@@ -2013,13 +2017,15 @@ class SparkEngine(Engine):
                     min_val = bounds.get("min")
                     max_val = bounds.get("max")
 
+                    # Escape column names with backticks to handle special characters
+                    escaped_col = f"`{col_name}`"
                     if min_val is not None:
-                        count = df.filter(col(col_name) < min_val).count()
+                        count = df.filter(col(escaped_col) < min_val).count()
                         if count > 0:
                             failures.append(f"Column '{col_name}' has values < {min_val}")
 
                     if max_val is not None:
-                        count = df.filter(col(col_name) > max_val).count()
+                        count = df.filter(col(escaped_col) > max_val).count()
                         if count > 0:
                             failures.append(f"Column '{col_name}' has values > {max_val}")
                 else:
@@ -2028,7 +2034,9 @@ class SparkEngine(Engine):
         if validation_config.allowed_values:
             for col_name, allowed in validation_config.allowed_values.items():
                 if col_name in df.columns:
-                    count = df.filter(~col(col_name).isin(allowed)).count()
+                    # Escape column names with backticks to handle special characters
+                    escaped_col = f"`{col_name}`"
+                    count = df.filter(~col(escaped_col).isin(allowed)).count()
                     if count > 0:
                         failures.append(f"Column '{col_name}' has invalid values")
                 else:
@@ -2352,7 +2360,9 @@ class SparkEngine(Engine):
 
         aggs = []
         for c in df.columns:
-            aggs.append(mean(when(col(c).isNull(), 1).otherwise(0)).alias(c))
+            # Escape column names with backticks to handle special characters (., ,, spaces)
+            escaped_col = f"`{c}`"
+            aggs.append(mean(when(col(escaped_col).isNull(), 1).otherwise(0)).alias(c))
 
         if not aggs:
             return {}
@@ -2372,11 +2382,13 @@ class SparkEngine(Engine):
         from pyspark.sql import functions as F
         from pyspark.sql.types import StringType
 
+        # Escape column names with backticks to handle special characters
+        escaped_col = f"`{column}`"
         col_type = df.schema[column].dataType
         if isinstance(col_type, StringType):
-            ts_col = self._parse_string_to_timestamp(F.col(column))
+            ts_col = self._parse_string_to_timestamp(F.col(escaped_col))
             return df.filter(ts_col > value)
-        return df.filter(F.col(column) > value)
+        return df.filter(F.col(escaped_col) > value)
 
     def _parse_string_to_timestamp(self, col):
         """Parse string column to timestamp, trying multiple formats.
@@ -2413,18 +2425,21 @@ class SparkEngine(Engine):
         from pyspark.sql import functions as F
         from pyspark.sql.types import StringType
 
+        # Escape column names with backticks to handle special characters
+        escaped_col1 = f"`{col1}`"
+        escaped_col2 = f"`{col2}`"
         col1_type = df.schema[col1].dataType
         col2_type = df.schema[col2].dataType
 
         if isinstance(col1_type, StringType):
-            c1 = self._parse_string_to_timestamp(F.col(col1))
+            c1 = self._parse_string_to_timestamp(F.col(escaped_col1))
         else:
-            c1 = F.col(col1)
+            c1 = F.col(escaped_col1)
 
         if isinstance(col2_type, StringType):
-            c2 = self._parse_string_to_timestamp(F.col(col2))
+            c2 = self._parse_string_to_timestamp(F.col(escaped_col2))
         else:
-            c2 = F.col(col2)
+            c2 = F.col(escaped_col2)
 
         coalesced = F.coalesce(c1, c2)
 
