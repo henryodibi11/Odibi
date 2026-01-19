@@ -685,6 +685,20 @@ class SparkEngine(Engine):
                             error_message=str(e),
                         )
 
+            # Resolve cloudFiles.schemaLocation through connection if it's a relative path
+            if "cloudFiles.schemaLocation" in options:
+                schema_location = options["cloudFiles.schemaLocation"]
+                if not schema_location.startswith(
+                    ("abfss://", "s3://", "gs://", "dbfs://", "hdfs://", "wasbs://")
+                ):
+                    options = options.copy()
+                    options["cloudFiles.schemaLocation"] = connection.get_path(schema_location)
+                    ctx.debug(
+                        "Resolved cloudFiles.schemaLocation through connection",
+                        original=schema_location,
+                        resolved=options["cloudFiles.schemaLocation"],
+                    )
+
             if streaming:
                 reader = self.spark.readStream.format(format)
                 if schema:
