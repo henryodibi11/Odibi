@@ -1556,6 +1556,26 @@ class SparkEngine(Engine):
                     resolved=checkpoint_location,
                 )
 
+        # Extract table_properties from options for Delta column mapping etc.
+        table_properties = options.pop("table_properties", None)
+
+        # For column mapping and other properties that must be set BEFORE write
+        original_configs = {}
+        if table_properties and format == "delta":
+            for prop_name, prop_value in table_properties.items():
+                spark_conf_key = (
+                    f"spark.databricks.delta.properties.defaults.{prop_name.replace('delta.', '')}"
+                )
+                try:
+                    original_configs[spark_conf_key] = self.spark.conf.get(spark_conf_key, None)
+                except Exception:
+                    original_configs[spark_conf_key] = None
+                self.spark.conf.set(spark_conf_key, prop_value)
+            ctx.debug(
+                "Applied table properties as session defaults for streaming",
+                properties=list(table_properties.keys()),
+            )
+
         ctx.debug(
             "Starting streaming write",
             format=format,
@@ -1773,6 +1793,16 @@ class SparkEngine(Engine):
                 elapsed_ms=round(elapsed, 2),
             )
             raise
+        finally:
+            # Restore original session configs
+            for conf_key, original_value in original_configs.items():
+                try:
+                    if original_value is None:
+                        self.spark.conf.unset(conf_key)
+                    else:
+                        self.spark.conf.set(conf_key, original_value)
+                except Exception:
+                    pass  # Best effort cleanup
 
     def execute_sql(self, sql: str, context: Any = None) -> Any:
         """Execute SQL query in Spark.
