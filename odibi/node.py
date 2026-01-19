@@ -497,6 +497,29 @@ class NodeExecutor:
             # Legacy HWM: First Run Query Logic
             read_options = read_config.options.copy() if read_config.options else {}
 
+            # Resolve cloudFiles.schemaLocation through write connection if available
+            # This keeps schema metadata alongside checkpoint in the same location
+            if (
+                "cloudFiles.schemaLocation" in read_options
+                and config.write
+                and config.write.connection
+            ):
+                schema_location = read_options["cloudFiles.schemaLocation"]
+                # Only resolve relative paths (not already absolute cloud paths)
+                if not schema_location.startswith(
+                    ("abfss://", "s3://", "gs://", "dbfs://", "hdfs://", "wasbs://")
+                ):
+                    write_conn = self.connections.get(config.write.connection)
+                    if write_conn and hasattr(write_conn, "get_path"):
+                        read_options["cloudFiles.schemaLocation"] = write_conn.get_path(
+                            schema_location
+                        )
+                        ctx.debug(
+                            "Resolved cloudFiles.schemaLocation through write connection",
+                            original=schema_location,
+                            resolved=read_options["cloudFiles.schemaLocation"],
+                        )
+
             if config.write and config.write.first_run_query:
                 write_config = config.write
                 target_conn = self.connections.get(write_config.connection)

@@ -685,7 +685,8 @@ class SparkEngine(Engine):
                             error_message=str(e),
                         )
 
-            # Resolve cloudFiles.schemaLocation through connection if it's a relative path
+            # Resolve cloudFiles.schemaLocation through read connection if still relative
+            # (Node level resolves via write connection first if available)
             if "cloudFiles.schemaLocation" in options:
                 schema_location = options["cloudFiles.schemaLocation"]
                 if not schema_location.startswith(
@@ -694,7 +695,7 @@ class SparkEngine(Engine):
                     options = options.copy()
                     options["cloudFiles.schemaLocation"] = connection.get_path(schema_location)
                     ctx.debug(
-                        "Resolved cloudFiles.schemaLocation through connection",
+                        "Resolved cloudFiles.schemaLocation through read connection (fallback)",
                         original=schema_location,
                         resolved=options["cloudFiles.schemaLocation"],
                     )
