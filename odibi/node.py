@@ -2803,7 +2803,9 @@ class NodeExecutor:
         return self.engine.get_shape(df)
 
     def _count_rows(self, df: Any) -> Optional[int]:
-        if df is not None and getattr(df, "isStreaming", False):
+        if df is None:
+            return None
+        if getattr(df, "isStreaming", False):
             return None
         return self.engine.count_rows(df)
 
