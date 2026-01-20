@@ -1,5 +1,7 @@
 import pytest
 
+import pandas as pd
+
 pl = pytest.importorskip("polars")
 
 from odibi.context import PolarsContext  # noqa: E402
@@ -9,6 +11,19 @@ from odibi.engine.polars_engine import PolarsEngine  # noqa: E402
 class MockConnection:
     def get_path(self, path):
         return path
+
+
+class MockSqlConnection:
+    """Mock SQL connection with read_table support."""
+
+    def read_table(self, table_name: str, schema: str = "dbo") -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+                "value": [100.0, 200.0, 300.0],
+            }
+        )
 
 
 @pytest.fixture
@@ -128,3 +143,96 @@ def test_polars_anonymize(polars_engine):
     hashed = res_hash.collect()["name"][0]
     assert hashed != "Alice"
     assert len(hashed) == 64  # sha256 hex
+
+
+class TestPolarsAzureSqlRead:
+    """Tests for Polars Azure SQL / SQL Server read support."""
+
+    def test_read_azure_sql_basic(self, polars_engine):
+        """Test basic Azure SQL read returns LazyFrame."""
+        connection = MockSqlConnection()
+        df = polars_engine.read(
+            connection=connection,
+            format="azure_sql",
+            table="Sales.Orders",
+        )
+        assert isinstance(df, pl.LazyFrame)
+        result = df.collect()
+        assert result.shape == (3, 3)
+        assert result.columns == ["id", "name", "value"]
+
+    def test_read_sql_server_format(self, polars_engine):
+        """Test sql_server format alias works."""
+        connection = MockSqlConnection()
+        df = polars_engine.read(
+            connection=connection,
+            format="sql_server",
+            table="dbo.Customers",
+        )
+        assert isinstance(df, pl.LazyFrame)
+        assert df.collect().shape == (3, 3)
+
+    def test_read_sql_format(self, polars_engine):
+        """Test generic sql format works."""
+        connection = MockSqlConnection()
+        df = polars_engine.read(
+            connection=connection,
+            format="sql",
+            path="Products",  # Can use path instead of table
+        )
+        assert isinstance(df, pl.LazyFrame)
+
+    def test_read_azure_sql_with_schema(self, polars_engine):
+        """Test schema.table parsing works correctly."""
+        call_log = []
+
+        class TrackingConnection:
+            def read_table(self, table_name: str, schema: str = "dbo") -> pd.DataFrame:
+                call_log.append({"table": table_name, "schema": schema})
+                return pd.DataFrame({"a": [1]})
+
+        connection = TrackingConnection()
+        polars_engine.read(
+            connection=connection,
+            format="azure_sql",
+            table="Sales.OrderItems",
+        )
+        assert call_log[0]["schema"] == "Sales"
+        assert call_log[0]["table"] == "OrderItems"
+
+    def test_read_azure_sql_default_schema(self, polars_engine):
+        """Test default dbo schema when not specified."""
+        call_log = []
+
+        class TrackingConnection:
+            def read_table(self, table_name: str, schema: str = "dbo") -> pd.DataFrame:
+                call_log.append({"table": table_name, "schema": schema})
+                return pd.DataFrame({"a": [1]})
+
+        connection = TrackingConnection()
+        polars_engine.read(
+            connection=connection,
+            format="azure_sql",
+            table="Customers",  # No schema prefix
+        )
+        assert call_log[0]["schema"] == "dbo"
+        assert call_log[0]["table"] == "Customers"
+
+    def test_read_azure_sql_no_read_table_raises(self, polars_engine):
+        """Test error when connection doesn't support read_table."""
+        connection = MockConnection()  # No read_table method
+        with pytest.raises(ValueError, match="does not support SQL operations"):
+            polars_engine.read(
+                connection=connection,
+                format="azure_sql",
+                table="SomeTable",
+            )
+
+    def test_read_azure_sql_no_table_raises(self, polars_engine):
+        """Test error when neither table nor path provided."""
+        connection = MockSqlConnection()
+        with pytest.raises(ValueError, match="requires 'table' or 'path'"):
+            polars_engine.read(
+                connection=connection,
+                format="azure_sql",
+            )

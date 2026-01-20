@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-01-20
+
+### Added - Engine Parity & Spark Improvements
+
+- **Polars Azure SQL Read Support**: Polars engine now supports reading from Azure SQL/SQL Server databases, completing engine parity across all three engines (Pandas, Spark, Polars)
+  - Supports `azure_sql`, `sql_server`, and `sql` format types
+  - Automatic schema.table parsing with `dbo` default schema
+  - Returns Polars LazyFrame for lazy evaluation
+
+### Fixed
+
+- **Spark cloudFiles.schemaLocation**: Schema location path now correctly resolves through write connection for Auto Loader streaming
+- **Spark Delta Streaming Properties**: Delta table properties (optimizeWrite, autoCompact) now correctly applied for streaming writes
+- **Spark Column Name Escaping**: Column names with special characters now escaped with backticks in Spark engine
+- **regex_replace Transformer**: Fixed duplicate column bug when replacing values
+
+### Changed
+
+- **Python 3.9 Compatibility**: Multiple fixes for CI compatibility including black version pinning and conditional imports
+
 ## [2.8.0] - 2026-01-18
 
 ### Added - AI Assistant MCP Server Enhancements

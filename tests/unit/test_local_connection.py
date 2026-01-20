@@ -33,6 +33,18 @@ class TestLocalConnectionInit:
         assert conn.is_uri is True
         assert conn.base_path is None
 
+    def test_init_windows_path_not_uri(self):
+        """Windows absolute paths should NOT be treated as URIs."""
+        conn = LocalConnection(base_path="C:/Users/test/data")
+        assert conn.is_uri is False
+        assert conn.base_path is not None
+
+    def test_init_windows_path_backslash(self):
+        """Windows paths with backslash should NOT be treated as URIs."""
+        conn = LocalConnection(base_path="D:\\Projects\\data")
+        assert conn.is_uri is False
+        assert conn.base_path is not None
+
     def test_init_local_path_creates_path_object(self):
         """Should create Path object for local paths."""
         conn = LocalConnection(base_path="/local/path")

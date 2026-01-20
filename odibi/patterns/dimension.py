@@ -539,7 +539,10 @@ class DimensionPattern(Pattern):
             source_with_time = context.df.withColumn(valid_from_col, F.current_timestamp())
         else:
             source_df = context.df.copy()
-            source_df[valid_from_col] = datetime.now()
+            # Use timezone-aware timestamp for Delta Lake compatibility
+            from datetime import timezone
+
+            source_df[valid_from_col] = datetime.now(timezone.utc)
             source_with_time = source_df
 
         temp_context = context.with_df(source_with_time)
@@ -612,7 +615,10 @@ class DimensionPattern(Pattern):
         else:
             df = df.copy()
             if load_timestamp:
-                df["load_timestamp"] = datetime.now()
+                # Use timezone-aware timestamp for Delta Lake compatibility
+                from datetime import timezone
+
+                df["load_timestamp"] = datetime.now(timezone.utc)
             if source_system:
                 df["source_system"] = source_system
 
@@ -652,7 +658,10 @@ class DimensionPattern(Pattern):
                 elif col == is_current_col:
                     unknown_values.append(True)
                 elif col == "load_timestamp":
-                    unknown_values.append(datetime.now())
+                    # Use timezone-aware timestamp for Delta Lake compatibility
+                    from datetime import timezone
+
+                    unknown_values.append(datetime.now(timezone.utc))
                 elif col == "source_system":
                     unknown_values.append(audit_config.get("source_system", "Unknown"))
                 else:
@@ -679,7 +688,10 @@ class DimensionPattern(Pattern):
                 elif col == is_current_col:
                     unknown_row[col] = True
                 elif col == "load_timestamp":
-                    unknown_row[col] = datetime.now()
+                    # Use timezone-aware timestamp for Delta Lake compatibility
+                    from datetime import timezone
+
+                    unknown_row[col] = datetime.now(timezone.utc)
                 elif col == "source_system":
                     unknown_row[col] = audit_config.get("source_system", "Unknown")
                 else:

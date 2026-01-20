@@ -24,7 +24,12 @@ class LocalConnection(BaseConnection):
         )
 
         self.base_path_str = base_path
-        self.is_uri = "://" in base_path or ":/" in base_path
+        # Detect URIs: "://" (standard URIs) or "dbfs:/" (Databricks)
+        # Windows paths like "C:/path" or "D:\path" should NOT be treated as URIs
+        # Windows drive letters are single character followed by ":/" which differs from "dbfs:/"
+        self.is_uri = "://" in base_path or (
+            ":/" in base_path and len(base_path.split(":/")[0]) > 1
+        )
 
         if not self.is_uri:
             self.base_path = Path(base_path)

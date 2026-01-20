@@ -73,6 +73,24 @@ class PolarsEngine(Engine):
         """
         options = options or {}
 
+        # SQL Server / Azure SQL Support
+        if format in ["sql", "sql_server", "azure_sql"]:
+            if not hasattr(connection, "read_table"):
+                raise ValueError(
+                    f"Cannot read SQL table: connection type '{type(connection).__name__}' "
+                    "does not support SQL operations. Use a SQL-compatible connection."
+                )
+            table_name = table or path
+            if not table_name:
+                raise ValueError("SQL read requires 'table' or 'path' to specify the table name.")
+            if "." in table_name:
+                schema_name, tbl = table_name.split(".", 1)
+            else:
+                schema_name, tbl = "dbo", table_name
+            # read_table returns Pandas DataFrame, convert to Polars LazyFrame
+            pdf = connection.read_table(table_name=tbl, schema=schema_name)
+            return pl.from_pandas(pdf).lazy()
+
         # Get full path
         if path:
             if connection:
@@ -161,7 +179,7 @@ class PolarsEngine(Engine):
             else:
                 raise ValueError(
                     f"Unsupported format for Polars engine: '{format}'. "
-                    "Supported formats: csv, parquet, json, delta, excel."
+                    "Supported formats: csv, parquet, json, delta, excel, sql, sql_server, azure_sql."
                 )
 
         except Exception as e:

@@ -602,7 +602,10 @@ class FactPattern(Pattern):
             if load_timestamp or source_system:
                 df = df.copy()
             if load_timestamp:
-                df["load_timestamp"] = datetime.now()
+                # Use timezone-aware timestamp for Delta Lake compatibility
+                from datetime import timezone
+
+                df["load_timestamp"] = datetime.now(timezone.utc)
             if source_system:
                 df["source_system"] = source_system
 
@@ -647,7 +650,10 @@ class FactPattern(Pattern):
             df["_rejection_reason"] = reason
 
         if add_columns.get("_rejected_at", False):
-            df["_rejected_at"] = datetime.now()
+            # Use timezone-aware timestamp for Delta Lake compatibility
+            from datetime import timezone
+
+            df["_rejected_at"] = datetime.now(timezone.utc)
 
         if add_columns.get("_source_dimension", False):
             df["_source_dimension"] = dim_table

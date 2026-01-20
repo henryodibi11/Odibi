@@ -592,7 +592,10 @@ class AggregationPattern(Pattern):
             if load_timestamp or source_system:
                 df = df.copy()
             if load_timestamp:
-                df["load_timestamp"] = datetime.now()
+                # Use timezone-aware timestamp for Delta Lake compatibility
+                from datetime import timezone
+
+                df["load_timestamp"] = datetime.now(timezone.utc)
             if source_system:
                 df["source_system"] = source_system
 
