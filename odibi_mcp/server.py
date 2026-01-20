@@ -340,6 +340,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Handle tool calls."""
     knowledge = get_knowledge()
 
+    # Tools that should include CRITICAL_CONTEXT in their response
+    # These are the tools most likely to be called before generating YAML/code
+    CONTEXT_INJECTION_TOOLS = {
+        "list_transformers",
+        "list_patterns",
+        "list_connections",
+        "explain",
+        "get_example",
+        "suggest_pattern",
+        "validate_yaml",
+        "diagnose_error",
+        "query_codebase",
+        "search_docs",
+        "get_engine_differences",
+        "get_validation_rules",
+    }
+
     try:
         if name == "list_transformers":
             result = knowledge.list_transformers()
@@ -401,6 +418,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = knowledge.get_validation_rules()
         else:
             result = {"error": f"Unknown tool: {name}"}
+
+        # Auto-inject CRITICAL_CONTEXT for key tools
+        # This ensures AI always sees correct YAML syntax, no matter which tool it calls
+        if name in CONTEXT_INJECTION_TOOLS:
+            result = knowledge._with_context(result)
 
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 

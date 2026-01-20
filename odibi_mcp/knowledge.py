@@ -24,6 +24,75 @@ sys.path.insert(0, str(ODIBI_ROOT / "_archive"))
 class OdibiKnowledge:
     """Unified knowledge retrieval for odibi."""
 
+    # ==========================================================================
+    # CRITICAL CONTEXT - Auto-injected into EVERY tool response
+    # ==========================================================================
+    # This ensures AI tools ALWAYS have the correct syntax, even if they skip
+    # reading full documentation. This is the "cannot be ignored" context.
+    CRITICAL_CONTEXT = {
+        "yaml_syntax": {
+            "NEVER_USE": ["source:", "sink:", "transform[].name:"],
+            "ALWAYS_USE": ["inputs:", "outputs:", "transform.steps[].function + params"],
+            "format_required": "ALWAYS specify format: csv|parquet|json|delta",
+            "node_names": "alphanumeric + underscore ONLY (no hyphens, dots, spaces)",
+        },
+        "correct_yaml_structure": """# CORRECT STRUCTURE - USE THIS EXACTLY
+project: my_project
+connections:
+  local:
+    type: local
+    base_path: ./data
+story:
+  connection: local
+  path: stories
+system:
+  connection: local
+  path: _system
+pipelines:
+  - name: my_pipeline
+    pattern: dimension
+    nodes:
+      - name: source_node
+        inputs:
+          raw:
+            connection: local
+            path: input.csv
+            format: csv
+        transform:
+          steps:
+            - function: trim_whitespace
+              params:
+                columns: [name, email]
+        outputs:
+          clean:
+            connection: local
+            path: output.parquet
+            format: parquet""",
+        "wrong_patterns": {
+            "WRONG_source_sink": "source: / sink: -- USE inputs: / outputs:",
+            "WRONG_transform_list": "transform: [trim_whitespace] -- USE transform.steps[].function",
+            "WRONG_node_name": "my-node or my.node -- USE my_node",
+            "WRONG_missing_format": "path: data.csv -- MUST include format: csv",
+        },
+        "transformer_signature": """# CORRECT TRANSFORMER SIGNATURE
+from pydantic import BaseModel, Field
+from odibi.context import EngineContext
+from odibi.registry import FunctionRegistry
+
+class MyParams(BaseModel):
+    column: str = Field(..., description="Column name")
+
+def my_transformer(context: EngineContext, params: MyParams) -> EngineContext:
+    sql = f"SELECT *, UPPER({params.column}) AS upper_col FROM df"
+    return context.sql(sql)
+
+FunctionRegistry.register(my_transformer, "my_transformer", MyParams)""",
+        "pipeline_manager": """# CORRECT PIPELINE USAGE
+from odibi.pipeline import PipelineManager
+pm = PipelineManager.from_yaml("config.yaml")  # NOT PipelineManager("config.yaml")
+pm.run("pipeline_name")""",
+    }
+
     # Priority docs for AI tools - most useful for understanding odibi
     PRIORITY_DOCS = [
         "docs/ODIBI_DEEP_CONTEXT.md",  # 2200+ lines of comprehensive context
@@ -1449,6 +1518,32 @@ pipelines:
             "status": "ready",
             "count": self._vector_store.count(),
             "index_dir": str(self.index_dir),
+        }
+
+    # =========================================================================
+    # Auto-Inject Context
+    # =========================================================================
+
+    def _with_context(self, result: dict | list, include_yaml: bool = True) -> dict:
+        """Wrap any result with CRITICAL_CONTEXT to ensure AI always has correct syntax.
+
+        Args:
+            result: The original tool result
+            include_yaml: Whether to include full YAML template (False for large responses)
+
+        Returns:
+            Dict with result + critical context
+        """
+        context = {
+            "CRITICAL_RULES": self.CRITICAL_CONTEXT["yaml_syntax"],
+            "WRONG_PATTERNS_TO_AVOID": self.CRITICAL_CONTEXT["wrong_patterns"],
+        }
+        if include_yaml:
+            context["CORRECT_YAML_TEMPLATE"] = self.CRITICAL_CONTEXT["correct_yaml_structure"]
+
+        return {
+            "_context": context,
+            "result": result,
         }
 
     # =========================================================================

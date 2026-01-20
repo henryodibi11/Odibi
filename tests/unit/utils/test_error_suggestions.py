@@ -1,6 +1,5 @@
 """Tests for centralized error suggestions engine."""
 
-
 from odibi.utils.error_suggestions import (
     ErrorContext,
     ErrorPattern,
