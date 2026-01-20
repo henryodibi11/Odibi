@@ -76,6 +76,8 @@ class NodeExecutionMetadata:
     error_type: Optional[str] = None
     error_traceback: Optional[str] = None
     error_traceback_cleaned: Optional[str] = None
+    error_suggestions: List[str] = field(default_factory=list)
+    error_context: Optional[Dict[str, Any]] = None
     validation_warnings: List[str] = field(default_factory=list)
 
     # Execution steps (troubleshooting)

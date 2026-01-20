@@ -11,6 +11,7 @@ import pandas as pd
 
 from odibi.connections.base import BaseConnection
 from odibi.exceptions import ConnectionError
+from odibi.utils.error_suggestions import get_suggestions_for_connection
 from odibi.utils.logging import logger
 from odibi.utils.logging_context import get_logging_context
 
@@ -406,7 +407,9 @@ class AzureSQL(BaseConnection):
 
         try:
             engine = self.get_engine()
-            result = pd.read_sql(query, engine, params=params)
+            # Use engine.connect() for pandas 2.x compatibility
+            with engine.connect() as conn:
+                result = pd.read_sql(query, conn, params=params)
 
             ctx.info(
                 "SQL query executed successfully",
@@ -626,25 +629,17 @@ class AzureSQL(BaseConnection):
             )
 
     def _get_error_suggestions(self, error_msg: str) -> List[str]:
-        """Generate suggestions based on error message."""
-        suggestions = []
-        error_lower = error_msg.lower()
-
-        if "login failed" in error_lower:
-            suggestions.append("Check username and password")
-            suggestions.append(f"Verify auth_mode is correct (current: {self.auth_mode})")
-            if "identity" in error_lower:
-                suggestions.append("Ensure Managed Identity has access to the database")
-
-        if "firewall" in error_lower or "tcp provider" in error_lower:
-            suggestions.append("Check Azure SQL Server firewall rules")
-            suggestions.append("Ensure client IP is allowed")
-
-        if "driver" in error_lower:
-            suggestions.append(f"Verify ODBC driver '{self.driver}' is installed")
-            suggestions.append("On Linux: sudo apt-get install msodbcsql18")
-
-        return suggestions
+        """Generate suggestions using centralized error suggestion engine."""
+        try:
+            error = Exception(error_msg)
+            return get_suggestions_for_connection(
+                error=error,
+                connection_name=self.name if hasattr(self, "name") else "azure_sql",
+                connection_type="azure_sql",
+                auth_mode=self.auth_mode,
+            )
+        except Exception:
+            return []
 
     def get_spark_options(self) -> Dict[str, str]:
         """Get Spark JDBC options.

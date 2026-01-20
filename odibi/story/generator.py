@@ -10,6 +10,7 @@ import yaml
 from odibi.node import NodeResult
 from odibi.story.metadata import DeltaWriteInfo, NodeExecutionMetadata, PipelineStoryMetadata
 from odibi.story.renderers import HTMLStoryRenderer, JSONStoryRenderer
+from odibi.utils.error_suggestions import ErrorContext, get_suggestions
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -982,6 +983,8 @@ class StoryGenerator:
             error_type=type(result.error).__name__ if result.error else None,
             error_traceback=meta.get("error_traceback"),
             error_traceback_cleaned=meta.get("error_traceback_cleaned"),
+            error_suggestions=self._get_error_suggestions(result, node_name, meta),
+            error_context=self._get_error_context(result, meta),
             validation_warnings=meta.get("validation_warnings", []),
             execution_steps=meta.get("steps", []),
             failed_rows_samples=meta.get("failed_rows_samples", {}),
@@ -996,6 +999,145 @@ class StoryGenerator:
         # schema changes are already in metadata from Node logic
 
         return node_meta
+
+    def _get_error_suggestions(
+        self, result: NodeResult, node_name: str, meta: Dict[str, Any]
+    ) -> List[str]:
+        """Generate actionable error suggestions for the story."""
+        if not result.error:
+            return []
+
+        try:
+            ctx = ErrorContext(
+                node_name=node_name,
+                available_columns=meta.get("schema_in") or result.result_schema,
+                step_index=len(meta.get("steps", [])) - 1 if meta.get("steps") else None,
+            )
+
+            if hasattr(result.error, "suggestions") and result.error.suggestions:
+                return result.error.suggestions
+
+            return get_suggestions(result.error, ctx, include_debug_command=True)
+        except Exception:
+            return []
+
+    def _get_error_context(
+        self, result: NodeResult, meta: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Build rich error context for debugging in stories.
+
+        Captures all high-value debugging context:
+        - Schema diff (expected vs actual columns)
+        - Row progress (how far before failure)
+        - Timing breakdown (per-phase durations)
+        - Data sample at failure (last rows before error)
+        - Config snippet (what was being attempted)
+        - Connection health (did connection succeed)
+        - Package versions (for version-specific bugs)
+        - Retry history (if retries were attempted)
+        """
+        if not result.error:
+            return None
+
+        try:
+            context: Dict[str, Any] = {}
+
+            # 1. Schema info and diff
+            schema_in = meta.get("schema_in")
+            schema_out = result.result_schema
+
+            if schema_in:
+                context["schema_in"] = schema_in
+            if schema_out:
+                context["schema_out"] = schema_out
+
+            if schema_in and schema_out:
+                added = set(schema_out) - set(schema_in)
+                removed = set(schema_in) - set(schema_out)
+                if added or removed:
+                    context["schema_diff"] = {
+                        "columns_added": sorted(list(added)),
+                        "columns_removed": sorted(list(removed)),
+                    }
+
+            # 2. Row progress
+            rows_read = meta.get("rows_read") or result.rows_read
+            if rows_read is not None:
+                context["row_progress"] = {
+                    "rows_read": rows_read,
+                    "rows_at_failure": result.rows_processed,
+                }
+
+            # 3. Timing breakdown (per-phase)
+            phase_timings = meta.get("phase_timings_ms", {})
+            if phase_timings:
+                context["timing_breakdown_ms"] = phase_timings
+                # Add which phase failed
+                steps = meta.get("steps", [])
+                if steps:
+                    last_step = steps[-1]
+                    # Extract phase from step name
+                    for phase in ["read", "transform", "validation", "write"]:
+                        if phase in last_step.lower():
+                            context["failed_phase"] = phase
+                            break
+            context["total_duration_seconds"] = round(result.duration, 3)
+
+            # 4. Data sample at failure
+            sample_in = meta.get("sample_data_in")
+            if sample_in:
+                context["data_sample_at_failure"] = sample_in[:3]
+
+            # 5. Config snapshot (what was being attempted)
+            config_snapshot = meta.get("config_snapshot")
+            if config_snapshot:
+                context["config_snapshot"] = config_snapshot
+
+            # 6. Connection health
+            connection_health = meta.get("connection_health")
+            if connection_health:
+                context["connection_health"] = connection_health
+
+            # 7. Execution steps completed
+            steps = meta.get("steps", [])
+            if steps:
+                context["execution_trace"] = {
+                    "last_step": steps[-1] if steps else None,
+                    "steps_completed": len(steps),
+                    "all_steps": steps,
+                }
+
+            # 8. Package versions
+            context["package_versions"] = self._get_relevant_package_versions()
+
+            # 9. Retry history (if retries were attempted)
+            retry_history = meta.get("retry_history", [])
+            if retry_history:
+                context["retry_history"] = retry_history
+
+            # 10. Delta table state (for write failures)
+            delta_state = meta.get("delta_table_state")
+            if delta_state:
+                context["delta_table_state"] = delta_state
+
+            return context if context else None
+        except Exception:
+            return None
+
+    def _get_relevant_package_versions(self) -> Dict[str, str]:
+        """Get versions of packages relevant to debugging."""
+        versions = {}
+        packages = ["pandas", "polars", "pyspark", "deltalake", "pyodbc", "sqlalchemy"]
+
+        for pkg in packages:
+            try:
+                import importlib.metadata
+
+                versions[pkg] = importlib.metadata.version(pkg)
+            except Exception:
+                pass
+
+        return versions
 
     def _write_remote(self, path: str, content: str) -> None:
         """Write content to remote path using fsspec."""

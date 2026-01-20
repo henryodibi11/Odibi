@@ -23,6 +23,7 @@ from odibi.state import (
     StateManager,
 )
 from odibi.utils.duration import parse_duration
+from odibi.utils.error_suggestions import get_suggestions_for_transform
 from odibi.utils.logging_context import (
     LoggingContext,
     OperationType,
@@ -406,6 +407,10 @@ class NodeExecutor:
                         node_name=config.name,
                         config_file=self.config_file,
                         previous_steps=self._execution_steps,
+                        input_schema=input_schema if input_schema else None,
+                        input_shape=(
+                            (rows_in, len(input_schema) if input_schema else 0) if rows_in else None
+                        ),
                     )
                     error = NodeExecutionError(
                         message=str(e),
@@ -416,16 +421,26 @@ class NodeExecutor:
                 else:
                     error = e
 
+                # Build rich error metadata for stories
+                error_metadata = {
+                    "steps": self._execution_steps.copy(),
+                    "error_traceback": raw_traceback,
+                    "error_traceback_cleaned": cleaned_traceback,
+                    "phase_timings_ms": phase_timer.summary_ms() if phase_timer else {},
+                    "schema_in": input_schema,
+                    "rows_read": rows_in,
+                    "sample_data_in": input_sample[:3] if input_sample else None,
+                    "config_snapshot": self._get_config_snapshot(config),
+                    "connection_health": self._get_connection_health(config),
+                    "delta_table_state": self._get_delta_table_state(config),
+                }
+
                 return NodeResult(
                     node_name=config.name,
                     success=False,
                     duration=duration,
                     error=error,
-                    metadata={
-                        "steps": self._execution_steps.copy(),
-                        "error_traceback": raw_traceback,
-                        "error_traceback_cleaned": cleaned_traceback,
-                    },
+                    metadata=error_metadata,
                 )
 
     def _execute_dry_run(self, config: NodeConfig) -> NodeResult:
@@ -2872,31 +2887,169 @@ class NodeExecutor:
                 return None
 
     def _generate_suggestions(self, error: Exception, config: NodeConfig) -> List[str]:
-        """Generate suggestions."""
-        suggestions = []
-        error_str = str(error).lower()
+        """Generate suggestions using centralized error suggestion engine."""
+        available_columns = None
+        if hasattr(self, "context") and self.context:
+            try:
+                if hasattr(self.context, "get_df"):
+                    df = self.context.get_df(config.name)
+                    if df is not None:
+                        if hasattr(df, "columns"):
+                            available_columns = list(df.columns)
+            except Exception:
+                pass
 
-        if "column" in error_str and "not found" in error_str:
-            suggestions.append("Check that previous nodes output the expected columns")
-            suggestions.append(f"Use 'odibi run-node {config.name} --show-schema' to debug")
+        engine_name = None
+        if hasattr(self, "context") and self.context:
+            engine_name = getattr(self.context, "engine_type", None)
+            if engine_name:
+                engine_name = str(engine_name).split(".")[-1].lower()
 
-        if "validation failed" in error_str:
-            suggestions.append("Check your validation rules against the input data")
-            suggestions.append("Inspect the sample data in the generated story")
+        transformer_name = None
+        if self._execution_steps:
+            last_step = self._execution_steps[-1]
+            if "transform:" in last_step.lower() or "function:" in last_step.lower():
+                transformer_name = last_step.split(":")[-1].strip() if ":" in last_step else None
 
-        if "keyerror" in error.__class__.__name__.lower():
-            suggestions.append("Verify that all referenced DataFrames are registered in context")
-            suggestions.append("Check node dependencies in 'depends_on' list")
+        return get_suggestions_for_transform(
+            error=error,
+            node_name=config.name,
+            transformer_name=transformer_name or "unknown",
+            engine=engine_name or "unknown",
+            available_columns=available_columns,
+            step_index=len(self._execution_steps) - 1 if self._execution_steps else None,
+        )
 
-        if "function" in error_str and "not" in error_str:
-            suggestions.append("Ensure the transform function is decorated with @transform")
-            suggestions.append("Import the module containing the transform function")
+    def _get_config_snapshot(self, config: NodeConfig) -> Optional[Dict[str, Any]]:
+        """Extract relevant config for error debugging (no secrets)."""
+        try:
+            snapshot = {
+                "node_name": config.name,
+            }
 
-        if "connection" in error_str:
-            suggestions.append("Verify connection configuration in project.yaml")
-            suggestions.append("Check network connectivity and credentials")
+            if config.read:
+                snapshot["read"] = {
+                    "connection": config.read.connection,
+                    "format": config.read.format,
+                    "table": getattr(config.read, "table", None),
+                    "path": getattr(config.read, "path", None),
+                }
 
-        return suggestions
+            if config.transform and config.transform.steps:
+                snapshot["transform_steps"] = [
+                    {
+                        "function": step.function,
+                        "params": {
+                            k: v
+                            for k, v in (step.params or {}).items()
+                            if k not in ("password", "key", "secret", "token")
+                        },
+                    }
+                    for step in config.transform.steps
+                ]
+
+            if config.write:
+                snapshot["write"] = {
+                    "connection": config.write.connection,
+                    "format": config.write.format,
+                    "path": getattr(config.write, "path", None),
+                    "mode": str(config.write.mode) if config.write.mode else None,
+                }
+
+            if config.depends_on:
+                snapshot["depends_on"] = config.depends_on
+
+            return snapshot
+        except Exception:
+            return None
+
+    def _get_connection_health(self, config: NodeConfig) -> Optional[Dict[str, Any]]:
+        """Check connection health status for error context."""
+        try:
+            health: Dict[str, Any] = {}
+
+            if config.read and config.read.connection:
+                conn_name = config.read.connection
+                health["read_connection"] = {
+                    "name": conn_name,
+                    "attempted": conn_name in [s for s in self._execution_steps if conn_name in s],
+                }
+                if hasattr(self, "_connection_test_results"):
+                    health["read_connection"]["test_passed"] = self._connection_test_results.get(
+                        conn_name
+                    )
+
+            if config.write and config.write.connection:
+                conn_name = config.write.connection
+                health["write_connection"] = {
+                    "name": conn_name,
+                    "attempted": any(conn_name in s for s in self._execution_steps),
+                }
+
+            return health if health else None
+        except Exception:
+            return None
+
+    def _get_delta_table_state(self, config: NodeConfig) -> Optional[Dict[str, Any]]:
+        """Capture Delta table state for debugging write failures."""
+        if not config.write or config.write.format not in ("delta", "Delta"):
+            return None
+
+        try:
+            conn_name = config.write.connection
+            path = getattr(config.write, "path", None)
+
+            if not conn_name or not path:
+                return None
+
+            connection = self.connections.get(conn_name) if hasattr(self, "connections") else None
+            if not connection:
+                return None
+
+            full_path = None
+            if hasattr(connection, "get_full_path"):
+                full_path = connection.get_full_path(path)
+            elif hasattr(connection, "base_path"):
+                full_path = f"{connection.base_path}/{path}"
+
+            if not full_path:
+                return None
+
+            state: Dict[str, Any] = {"path": full_path}
+
+            try:
+                from deltalake import DeltaTable
+
+                if hasattr(connection, "get_storage_options"):
+                    storage_options = connection.get_storage_options()
+                else:
+                    storage_options = {}
+
+                dt = DeltaTable(full_path, storage_options=storage_options)
+                state["version"] = dt.version()
+                state["table_exists"] = True
+
+                history = dt.history(limit=1)
+                if history:
+                    last_op = history[0]
+                    state["last_operation"] = last_op.get("operation")
+                    state["last_modified"] = str(last_op.get("timestamp"))
+                    state["last_operation_metrics"] = last_op.get("operationMetrics", {})
+
+                metadata = dt.metadata()
+                if metadata:
+                    state["partition_columns"] = metadata.partition_columns
+                    state["num_files"] = len(dt.files())
+
+            except Exception as e:
+                if "not a Delta table" in str(e) or "does not exist" in str(e).lower():
+                    state["table_exists"] = False
+                else:
+                    state["delta_read_error"] = str(e)[:200]
+
+            return state
+        except Exception:
+            return None
 
     def _clean_spark_traceback(self, raw_traceback: str) -> str:
         """Clean Spark/Py4J traceback to show only relevant Python info.
