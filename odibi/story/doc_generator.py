@@ -605,9 +605,7 @@ class DocGenerator:
             output_nodes = [
                 node
                 for node in metadata.nodes
-                if node.status == "success"
-                and node.schema_out
-                and node.rows_written is not None
+                if node.status == "success" and node.schema_out and node.rows_written is not None
             ]
 
             if output_nodes:
