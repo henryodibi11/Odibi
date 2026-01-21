@@ -1515,10 +1515,10 @@ write:
 | **exclude_columns** | List[str] | No | `PydanticUndefined` | Columns to exclude from MERGE (not written to target table) |
 | **staging_schema** | str | No | `staging` | Schema for staging table. Table name: {staging_schema}.{table}_staging |
 | **audit_cols** | Optional[[SqlServerAuditColsConfig](#sqlserverauditcolsconfig)] | No | - | Audit columns for created/updated timestamps |
-| **validations** | Optional[ForwardRef('[SqlServerMergeValidationConfig](#sqlservermergevalidationconfig)')] | No | - | Validation checks before merge (null keys, duplicate keys) |
+| **validations** | Optional[[SqlServerMergeValidationConfig](#sqlservermergevalidationconfig)] | No | - | Validation checks before merge (null keys, duplicate keys) |
 | **auto_create_schema** | bool | No | `False` | Auto-create schema if it doesn't exist (Phase 4). Runs CREATE SCHEMA IF NOT EXISTS. |
 | **auto_create_table** | bool | No | `False` | Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame. |
-| **schema_evolution** | Optional[ForwardRef('[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)')] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
+| **schema_evolution** | Optional[[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
 | **batch_size** | Optional[int] | No | - | Batch size for staging table writes (Phase 4). Chunks large DataFrames for memory efficiency. |
 | **primary_key_on_merge_keys** | bool | No | `False` | Create a clustered primary key on merge_keys when auto-creating table. Enforces uniqueness. |
 | **index_on_merge_keys** | bool | No | `False` | Create a nonclustered index on merge_keys. Use if primary key already exists elsewhere. |
@@ -2113,7 +2113,6 @@ story:
 | **max_sampled_validations** | int | No | `5` | After this many validations, show only counts (no samples) |
 | **async_generation** | bool | No | `False` | Generate stories asynchronously (fire-and-forget). Pipeline returns immediately while story writes in background. Improves multi-pipeline performance by ~5-10s per pipeline. |
 | **generate_lineage** | bool | No | `True` | Generate combined lineage graph from all stories. Creates a unified view of data flow across pipelines. |
-| **docs** | Optional[ForwardRef('[DocsConfig](#docsconfig)')] | No | - | Documentation generation settings. Generates README.md, TECHNICAL_DETAILS.md, NODE_CARDS/*.md from Story data. |
 
 ---
 ## Transformation Reference
@@ -2439,19 +2438,7 @@ Note: Engine will fail if expressions reference non-existent columns.
 
 ---
 #### `distinct` (DistinctParams)
-Return unique rows from the dataset using SQL DISTINCT.
-
-Parameters
-----------
-context : EngineContext
-    The engine context containing the DataFrame to deduplicate.
-params : DistinctParams
-    Parameters specifying which columns to consider for uniqueness. If None, all columns are used.
-
-Returns
--------
-EngineContext
-    The updated engine context with duplicate rows removed.
+Returns unique rows (SELECT DISTINCT).
 
 Configuration for distinct rows.
 
@@ -2552,19 +2539,7 @@ filter_rows:
 
 ---
 #### `limit` (LimitParams)
-Limit the number of rows returned from the dataset.
-
-Parameters
-----------
-context : EngineContext
-    The engine context containing the DataFrame to limit.
-params : LimitParams
-    Parameters specifying the number of rows to return and the offset.
-
-Returns
--------
-EngineContext
-    The updated engine context with the limited DataFrame.
+Limits result size.
 
 Configuration for result limiting.
 
@@ -2682,19 +2657,7 @@ replace_values:
 
 ---
 #### `sample` (SampleParams)
-Return a random sample of rows from the dataset.
-
-Parameters
-----------
-context : EngineContext
-    The engine context containing the DataFrame to sample from.
-params : SampleParams
-    Parameters specifying the fraction of rows to return and the random seed.
-
-Returns
--------
-EngineContext
-    The updated engine context with the sampled DataFrame.
+Samples data using random filtering.
 
 Configuration for random sampling.
 
@@ -2730,19 +2693,7 @@ select_columns:
 
 ---
 #### `sort` (SortParams)
-Sort the dataset by one or more columns.
-
-Parameters
-----------
-context : EngineContext
-    The engine context containing the DataFrame to sort.
-params : SortParams
-    Parameters specifying columns to sort by and sort order.
-
-Returns
--------
-EngineContext
-    The updated engine context with the sorted DataFrame.
+Sorts the dataset.
 
 Configuration for sorting.
 
@@ -3291,12 +3242,6 @@ deduplicate:
 
 ---
 #### `dict_based_mapping` (DictMappingParams)
-Maps values in a column using a provided dictionary.
-
-For each value in the specified column, replaces it with the mapped value.
-If 'default' is provided, uses it for values not found in the mapping.
-Supports Spark and Pandas engines.
-
 Configuration for dictionary mapping.
 
 Scenario: Map status codes to labels
@@ -3320,12 +3265,6 @@ dict_based_mapping:
 
 ---
 #### `explode_list_column` (ExplodeParams)
-Explodes a list/array column into multiple rows.
-
-For each element in the specified list column, creates a new row.
-If 'outer' is True, keeps rows with empty lists (like explode_outer).
-Supports Spark and Pandas engines.
-
 Configuration for exploding lists.
 
 Scenario: Flatten list of items per order
@@ -3488,10 +3427,7 @@ parse_json:
 
 ---
 #### `regex_replace` (RegexReplaceParams)
-Applies a regex replacement to a column.
-
-Uses SQL-based REGEXP_REPLACE to replace all matches of the pattern in the specified column
-with the given replacement string. Works on both Spark and DuckDB/Pandas engines.
+SQL-based Regex replacement.
 
 Configuration for regex replacement.
 
@@ -3713,7 +3649,6 @@ metrics (e.g., date, product, region).
 
 Attributes:
     name: Unique dimension identifier
-    label: Display name for column alias in generated views. Defaults to name.
     source: Source table reference. Supports three formats:
         - `$pipeline.node` (recommended): e.g., `$build_warehouse.dim_customer`
         - `connection.path`: e.g., `gold.dim_customer` or `gold.dims/customer`
@@ -3728,7 +3663,6 @@ Attributes:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique dimension identifier |
-| **label** | Optional[str] | No | - | Display name for column alias (defaults to name) |
 | **source** | Optional[str] | No | - | Source table reference. Formats: $pipeline.node (e.g., $build_warehouse.dim_customer), connection.path (e.g., gold.dim_customer or gold.dims/customer), or bare table_name |
 | **column** | Optional[str] | No | - | Column name (defaults to name) |
 | **expr** | Optional[str] | No | - | Custom SQL expression. Overrides column and grain. Example: YEAR(DATEADD(month, 6, Date)) for fiscal year |
@@ -3772,7 +3706,6 @@ across dimensions (e.g., revenue, order_count, avg_order_value).
 
 Attributes:
     name: Unique metric identifier
-    label: Display name for column alias in generated views. Defaults to name.
     description: Human-readable description
     expr: SQL aggregation expression (e.g., "SUM(total_amount)").
         Optional for derived metrics.
@@ -3790,7 +3723,6 @@ Attributes:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique metric identifier |
-| **label** | Optional[str] | No | - | Display name for column alias (defaults to name) |
 | **description** | Optional[str] | No | - | Human-readable description |
 | **expr** | Optional[str] | No | - | SQL aggregation expression |
 | **source** | Optional[str] | No | - | Source table reference. Formats: $pipeline.node (e.g., $build_warehouse.fact_orders), connection.path (e.g., gold.fact_orders or gold.oee/plant_a/table), or bare table_name |
