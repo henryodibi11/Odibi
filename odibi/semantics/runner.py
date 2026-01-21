@@ -292,10 +292,21 @@ class SemanticLayerRunner:
                 nodes=nodes,
             )
 
+            # Get storage options and determine workspace root
+            storage_options = self._get_storage_options()
+            stories_path = self._get_full_stories_path()
+
+            # For remote storage, use story path as workspace root
+            if "://" in stories_path:
+                workspace_root = stories_path.rsplit("/", 1)[0]
+            else:
+                workspace_root = str(Path.cwd())
+
             doc_generator = DocGenerator(
                 config=docs_config,
                 pipeline_name=self.name,
-                workspace_root=str(Path.cwd()),
+                workspace_root=workspace_root,
+                storage_options=storage_options,
             )
 
             generated = doc_generator.generate(

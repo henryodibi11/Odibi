@@ -17,7 +17,7 @@ RUN_HISTORY updates every run, prepending new entries.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import yaml
 
@@ -49,6 +49,8 @@ class DocGenerator:
         config: DocsConfig,
         pipeline_name: str,
         workspace_root: Optional[str] = None,
+        storage_options: Optional[Dict[str, Any]] = None,
+        write_file: Optional[Callable[[str, str], None]] = None,
     ):
         """
         Initialize documentation generator.
@@ -56,40 +58,147 @@ class DocGenerator:
         Args:
             config: Documentation configuration
             pipeline_name: Name of the pipeline
-            workspace_root: Root directory for output paths (defaults to cwd)
+            workspace_root: Root directory for output paths (defaults to cwd).
+                For remote storage, this should be the full remote path (e.g., abfss://...).
+            storage_options: Credentials for remote storage (e.g., ADLS). Used with fsspec.
+            write_file: Optional callable to write files. If provided, used instead of
+                fsspec/local writes. Signature: (path: str, content: str) -> None
         """
         self.config = config
         self.pipeline_name = pipeline_name
-        self.workspace_root = Path(workspace_root) if workspace_root else Path.cwd()
-        self.output_path = self.workspace_root / config.output_path
+        self.storage_options = storage_options or {}
+        self.write_file_callback = write_file
+
+        # Detect if output is remote (cloud storage)
+        output_path_str = config.output_path
+        if workspace_root and "://" in workspace_root:
+            # Remote workspace root - combine with output path
+            self.is_remote = True
+            self.output_path_str = f"{workspace_root.rstrip('/')}/{output_path_str.lstrip('/')}"
+            self.output_path = None  # Don't use Path for remote
+        elif "://" in output_path_str:
+            # Output path itself is remote
+            self.is_remote = True
+            self.output_path_str = output_path_str
+            self.output_path = None
+        else:
+            # Local filesystem
+            self.is_remote = False
+            self.workspace_root = Path(workspace_root) if workspace_root else Path.cwd()
+            self.output_path = self.workspace_root / output_path_str
+            self.output_path_str = str(self.output_path)
 
         ctx = get_logging_context()
         ctx.debug(
             "DocGenerator initialized",
             pipeline=pipeline_name,
-            output_path=str(self.output_path),
+            output_path=self.output_path_str,
+            is_remote=self.is_remote,
             enabled=config.enabled,
         )
 
-    def _get_state_path(self) -> Path:
+    def _get_state_path(self) -> str:
         """Get path to the pipeline state file."""
-        return self.output_path / ".pipelines.json"
+        if self.is_remote:
+            return f"{self.output_path_str.rstrip('/')}/.pipelines.json"
+        return str(self.output_path / ".pipelines.json")
+
+    def _write_file(self, path: str, content: str) -> None:
+        """Write content to file, handling remote storage if configured."""
+        ctx = get_logging_context()
+
+        # Use callback if provided
+        if self.write_file_callback:
+            self.write_file_callback(path, content)
+            ctx.debug("File written via callback", path=path, size=len(content))
+            return
+
+        if self.is_remote or "://" in path:
+            self._write_remote(path, content)
+        else:
+            # Local filesystem
+            local_path = Path(path)
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_text(content, encoding="utf-8")
+            ctx.debug("File written locally", path=path, size=len(content))
+
+    def _write_remote(self, path: str, content: str) -> None:
+        """Write content to remote path using fsspec."""
+        ctx = get_logging_context()
+        try:
+            import fsspec
+
+            with fsspec.open(path, "w", encoding="utf-8", **self.storage_options) as f:
+                f.write(content)
+            ctx.debug("Remote file written", path=path, size=len(content))
+        except ImportError:
+            # Fallback for Databricks environments without fsspec
+            try:
+                from pyspark.dbutils import DBUtils
+                from pyspark.sql import SparkSession
+
+                spark = SparkSession.builder.getOrCreate()
+                dbutils = DBUtils(spark)
+                dbutils.fs.put(path, content, True)
+                ctx.debug("Remote file written via dbutils", path=path, size=len(content))
+            except Exception as e:
+                ctx.error("Failed to write remote file", path=path, error=str(e))
+                raise RuntimeError(
+                    f"Could not write to {path}. Install 'fsspec' or 'adlfs'."
+                ) from e
+
+    def _read_file(self, path: str) -> Optional[str]:
+        """Read content from file, handling remote storage if configured."""
+        if self.is_remote or "://" in path:
+            return self._read_remote(path)
+        else:
+            local_path = Path(path)
+            if local_path.exists():
+                return local_path.read_text(encoding="utf-8")
+            return None
+
+    def _read_remote(self, path: str) -> Optional[str]:
+        """Read content from remote path using fsspec."""
+        ctx = get_logging_context()
+        try:
+            import fsspec
+
+            try:
+                with fsspec.open(path, "r", encoding="utf-8", **self.storage_options) as f:
+                    return f.read()
+            except FileNotFoundError:
+                return None
+        except ImportError:
+            # Fallback for Databricks
+            try:
+                from pyspark.dbutils import DBUtils
+                from pyspark.sql import SparkSession
+
+                spark = SparkSession.builder.getOrCreate()
+                dbutils = DBUtils(spark)
+                try:
+                    return dbutils.fs.head(path, 1024 * 1024)  # 1MB max
+                except Exception:
+                    return None
+            except Exception as e:
+                ctx.debug("Failed to read remote file", path=path, error=str(e))
+                return None
 
     def _load_pipeline_state(self) -> Dict[str, Any]:
-        """Load aggregated pipeline state from disk."""
+        """Load aggregated pipeline state from storage."""
         state_path = self._get_state_path()
-        if state_path.exists():
+        content = self._read_file(state_path)
+        if content:
             try:
-                return json.loads(state_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+                return json.loads(content)
+            except json.JSONDecodeError:
                 return {"pipelines": {}, "project": None}
         return {"pipelines": {}, "project": None}
 
     def _save_pipeline_state(self, state: Dict[str, Any]) -> None:
-        """Save aggregated pipeline state to disk."""
+        """Save aggregated pipeline state to storage."""
         state_path = self._get_state_path()
-        state_path.parent.mkdir(parents=True, exist_ok=True)
-        state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        self._write_file(state_path, json.dumps(state, indent=2))
 
     def _update_pipeline_state(
         self,
@@ -166,7 +275,9 @@ class DocGenerator:
         is_success = metadata.failed_nodes == 0
 
         # Always update pipeline state (for aggregation)
-        self.output_path.mkdir(parents=True, exist_ok=True)
+        # For local paths, ensure directory exists
+        if not self.is_remote and self.output_path:
+            self.output_path.mkdir(parents=True, exist_ok=True)
         project_state = self._update_pipeline_state(metadata, story_link_url)
 
         # Project-level docs only on success
@@ -181,7 +292,9 @@ class DocGenerator:
 
             if outputs.node_cards:
                 paths = self._generate_node_cards(metadata)
-                generated["node_cards"] = str(self.output_path / "node_cards" / self.pipeline_name)
+                generated["node_cards"] = (
+                    f"{self.output_path_str.rstrip('/')}/node_cards/{self.pipeline_name}"
+                )
                 for name, path in paths.items():
                     generated[f"node_card:{name}"] = path
         else:
@@ -192,7 +305,7 @@ class DocGenerator:
 
         # RUN_MEMO always generated - consolidated into single RUN_HISTORY.md
         if outputs.run_memo:
-            history_path = str(self.output_path / "RUN_HISTORY.md")
+            history_path = f"{self.output_path_str.rstrip('/')}/RUN_HISTORY.md"
             path = self._generate_run_memo(metadata, history_path, story_link_url)
             generated["run_memo"] = path
 
@@ -342,11 +455,11 @@ class DocGenerator:
         )
 
         content = "\n".join(lines)
-        output_file = self.output_path / "README.md"
-        output_file.write_text(content, encoding="utf-8")
+        output_file = f"{self.output_path_str.rstrip('/')}/README.md"
+        self._write_file(output_file, content)
 
-        ctx.debug("README.md generated", path=str(output_file), pipelines=len(pipelines))
-        return str(output_file)
+        ctx.debug("README.md generated", path=output_file, pipelines=len(pipelines))
+        return output_file
 
     def _get_layer_badge(self, layer: str) -> str:
         """Get a simple text badge for a layer."""
@@ -540,19 +653,22 @@ class DocGenerator:
         )
 
         content = "\n".join(lines)
-        output_file = self.output_path / "TECHNICAL_DETAILS.md"
-        output_file.write_text(content, encoding="utf-8")
+        output_file = f"{self.output_path_str.rstrip('/')}/TECHNICAL_DETAILS.md"
+        self._write_file(output_file, content)
 
-        ctx.debug("TECHNICAL_DETAILS.md generated", path=str(output_file))
-        return str(output_file)
+        ctx.debug("TECHNICAL_DETAILS.md generated", path=output_file)
+        return output_file
 
     def _generate_node_cards(self, metadata: PipelineStoryMetadata) -> Dict[str, str]:
         """Generate NODE_CARDS/{pipeline}/*.md for each node."""
         ctx = get_logging_context()
 
         # Use pipeline-specific subfolder
-        cards_dir = self.output_path / "node_cards" / self.pipeline_name
-        cards_dir.mkdir(parents=True, exist_ok=True)
+        cards_dir = f"{self.output_path_str.rstrip('/')}/node_cards/{self.pipeline_name}"
+
+        # For local paths, ensure directory exists
+        if not self.is_remote:
+            Path(cards_dir).mkdir(parents=True, exist_ok=True)
 
         generated: Dict[str, str] = {}
 
@@ -562,9 +678,9 @@ class DocGenerator:
 
             content = self._render_node_card(node)
             filename = f"{self._sanitize_filename(node.node_name)}.md"
-            output_file = cards_dir / filename
-            output_file.write_text(content, encoding="utf-8")
-            generated[node.node_name] = str(output_file)
+            output_file = f"{cards_dir}/{filename}"
+            self._write_file(output_file, content)
+            generated[node.node_name] = output_file
 
         ctx.debug("Node cards generated", count=len(generated), pipeline=self.pipeline_name)
         return generated
@@ -936,13 +1052,11 @@ class DocGenerator:
         )
 
         new_entry = "\n".join(lines)
-        output_file = Path(output_path)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Prepend new entry to existing history (newest first)
         header = f"# Run History: {metadata.pipeline_name}\n\n"
-        if output_file.exists():
-            existing = output_file.read_text(encoding="utf-8")
+        existing = self._read_file(output_path)
+        if existing:
             # Strip old header if present
             if existing.startswith("# Run History:"):
                 existing = existing.split("\n", 2)[-1].lstrip("\n")
@@ -950,10 +1064,10 @@ class DocGenerator:
         else:
             content = header + new_entry
 
-        output_file.write_text(content, encoding="utf-8")
+        self._write_file(output_path, content)
 
-        ctx.debug("RUN_HISTORY.md updated", path=str(output_file))
-        return str(output_file)
+        ctx.debug("RUN_HISTORY.md updated", path=output_path)
+        return output_path
 
     def _normalize_schema(self, schema: Any) -> List[str]:
         """

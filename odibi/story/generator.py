@@ -314,10 +314,20 @@ class StoryGenerator:
         ctx = get_logging_context()
 
         try:
+            # For remote storage, use the story output path as workspace root
+            # so docs go to the same storage location
+            workspace_root = self.workspace_root
+            if self.is_remote:
+                # Extract the container/account base from the story path
+                # e.g., "abfss://container@account.dfs.core.windows.net/stories/"
+                # -> use same base for docs
+                workspace_root = self.output_path_str.rsplit("/", 1)[0]
+
             doc_generator = DocGenerator(
                 config=self.docs_config,
                 pipeline_name=self.pipeline_name,
-                workspace_root=self.workspace_root,
+                workspace_root=workspace_root,
+                storage_options=self.storage_options,
             )
 
             generated = doc_generator.generate(

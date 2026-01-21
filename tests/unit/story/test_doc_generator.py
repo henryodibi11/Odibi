@@ -553,3 +553,113 @@ class TestDocGeneratorIntegration:
             # State file should track both
             state_file = docs_dir / ".pipelines.json"
             assert state_file.exists()
+
+
+class TestDocGeneratorRemoteStorage:
+    """Tests for remote storage support."""
+
+    def test_init_with_remote_workspace_root(self):
+        """Test initialization with remote workspace root detects remote mode."""
+        config = DocsConfig(enabled=True, output_path="docs/generated/")
+
+        generator = DocGenerator(
+            config=config,
+            pipeline_name="test_pipeline",
+            workspace_root="abfss://container@account.dfs.core.windows.net/data",
+            storage_options={"account_key": "test_key"},
+        )
+
+        assert generator.is_remote is True
+        assert "abfss://" in generator.output_path_str
+        assert generator.output_path is None
+        assert generator.storage_options == {"account_key": "test_key"}
+
+    def test_init_with_remote_output_path(self):
+        """Test initialization with remote output path in config."""
+        config = DocsConfig(
+            enabled=True,
+            output_path="abfss://container@account.dfs.core.windows.net/docs/",
+        )
+
+        generator = DocGenerator(
+            config=config,
+            pipeline_name="test_pipeline",
+        )
+
+        assert generator.is_remote is True
+        assert "abfss://" in generator.output_path_str
+
+    def test_init_local_path(self):
+        """Test initialization with local path remains local."""
+        config = DocsConfig(enabled=True, output_path="docs/generated/")
+
+        generator = DocGenerator(
+            config=config,
+            pipeline_name="test_pipeline",
+            workspace_root="/local/path",
+        )
+
+        assert generator.is_remote is False
+        assert generator.output_path is not None
+
+    def test_write_file_uses_callback_when_provided(self, sample_metadata):
+        """Test that write_file callback is used when provided."""
+        import tempfile
+
+        written_files = {}
+
+        def mock_write(path: str, content: str) -> None:
+            written_files[path] = content
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = DocsConfig(
+                enabled=True,
+                output_path="docs/",
+                outputs=DocsOutputConfig(readme=True),
+            )
+
+            generator = DocGenerator(
+                config=config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+                write_file=mock_write,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            # Files should have been written via callback
+            assert len(written_files) > 0
+            # At least README and state file
+            readme_paths = [p for p in written_files.keys() if "README.md" in p]
+            assert len(readme_paths) == 1
+
+    def test_get_state_path_remote(self):
+        """Test state path construction for remote storage."""
+        config = DocsConfig(enabled=True, output_path="docs/generated/")
+
+        generator = DocGenerator(
+            config=config,
+            pipeline_name="test_pipeline",
+            workspace_root="abfss://container@account.dfs.core.windows.net/data",
+        )
+
+        state_path = generator._get_state_path()
+        assert (
+            state_path
+            == "abfss://container@account.dfs.core.windows.net/data/docs/generated/.pipelines.json"
+        )
+
+    def test_output_path_str_construction(self):
+        """Test output path string is correctly constructed for remote."""
+        config = DocsConfig(enabled=True, output_path="docs/generated/")
+
+        generator = DocGenerator(
+            config=config,
+            pipeline_name="test_pipeline",
+            workspace_root="abfss://container@account.dfs.core.windows.net/project",
+        )
+
+        assert (
+            generator.output_path_str
+            == "abfss://container@account.dfs.core.windows.net/project/docs/generated/"
+        )
