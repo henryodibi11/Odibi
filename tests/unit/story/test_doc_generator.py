@@ -171,8 +171,9 @@ class TestDocGenerator:
             assert readme_path.exists()
 
             content = readme_path.read_text()
-            assert "# test_pipeline" in content
-            assert "Success" in content
+            # Project-level README shows project name and pipeline table
+            assert "# TestProject" in content
+            assert "test_pipeline" in content
             assert "load_customers" in content
             assert "transform_customers" in content
             assert "dim_customer" in content
@@ -489,17 +490,17 @@ class TestDocGeneratorIntegration:
             # Verify all expected files
             assert len(result) >= 5  # readme, technical, node_cards dir, 3 cards, memo
 
-            # Verify directory structure
+            # Verify directory structure (node cards in pipeline subfolder)
             docs_dir = Path(tmpdir) / "docs" / "generated"
             assert docs_dir.exists()
             assert (docs_dir / "README.md").exists()
             assert (docs_dir / "TECHNICAL_DETAILS.md").exists()
             assert (docs_dir / "node_cards").exists()
-            assert (docs_dir / "node_cards" / "load_customers.md").exists()
+            assert (docs_dir / "node_cards" / "test_pipeline" / "load_customers.md").exists()
             assert (docs_dir / "RUN_HISTORY.md").exists()
 
     def test_readme_has_node_links(self, docs_config, sample_metadata):
-        """Test that README links to node cards."""
+        """Test that README links to node cards with pipeline subfolder."""
         with tempfile.TemporaryDirectory() as tmpdir:
             generator = DocGenerator(
                 config=docs_config,
@@ -510,5 +511,45 @@ class TestDocGeneratorIntegration:
             result = generator.generate(sample_metadata)
 
             readme = Path(result["readme"]).read_text()
-            assert "[load_customers](node_cards/load_customers.md)" in readme
-            assert "[transform_customers](node_cards/transform_customers.md)" in readme
+            # Node links now include pipeline name in path
+            assert "[load_customers](node_cards/test_pipeline/load_customers.md)" in readme
+            assert (
+                "[transform_customers](node_cards/test_pipeline/transform_customers.md)" in readme
+            )
+
+    def test_multi_pipeline_aggregation(self, docs_config, sample_metadata):
+        """Test that multiple pipelines are aggregated in README."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # First pipeline: bronze
+            bronze_gen = DocGenerator(
+                config=docs_config,
+                pipeline_name="bronze_ingest",
+                workspace_root=tmpdir,
+            )
+            sample_metadata.pipeline_name = "bronze_ingest"
+            sample_metadata.pipeline_layer = "bronze"
+            bronze_gen.generate(sample_metadata)
+
+            # Second pipeline: silver
+            silver_gen = DocGenerator(
+                config=docs_config,
+                pipeline_name="silver_transform",
+                workspace_root=tmpdir,
+            )
+            sample_metadata.pipeline_name = "silver_transform"
+            sample_metadata.pipeline_layer = "silver"
+            result = silver_gen.generate(sample_metadata)
+
+            # README should show both pipelines
+            readme = Path(result["readme"]).read_text()
+            assert "bronze_ingest" in readme
+            assert "silver_transform" in readme
+
+            # Node cards should be in separate folders
+            docs_dir = Path(tmpdir) / "docs" / "generated"
+            assert (docs_dir / "node_cards" / "bronze_ingest").exists()
+            assert (docs_dir / "node_cards" / "silver_transform").exists()
+
+            # State file should track both
+            state_file = docs_dir / ".pipelines.json"
+            assert state_file.exists()

@@ -4,15 +4,17 @@ Documentation Generator
 
 Generates structured markdown documentation from Story artifacts.
 
-- README.md: Stakeholder-facing project overview
-- TECHNICAL_DETAILS.md: Engineer-facing exhaustive details
-- NODE_CARDS/*.md: Per-node transformation documentation
+Project-level docs (aggregate all pipelines):
+- README.md: Stakeholder-facing project overview with all pipelines
+- TECHNICAL_DETAILS.md: Engineer-facing exhaustive details for all pipelines
+- NODE_CARDS/{pipeline}/*.md: Per-node transformation documentation
 - RUN_HISTORY.md: Consolidated run memos (newest first)
 
 Project-level docs update only on successful runs.
 RUN_HISTORY updates every run, prepending new entries.
 """
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -22,6 +24,10 @@ import yaml
 from odibi.config import DocsConfig
 from odibi.story.metadata import NodeExecutionMetadata, PipelineStoryMetadata
 from odibi.utils.logging_context import get_logging_context
+
+
+# Layer ordering for display
+LAYER_ORDER = {"bronze": 1, "silver": 2, "gold": 3, "semantic": 4}
 
 
 class DocGenerator:
@@ -65,6 +71,66 @@ class DocGenerator:
             enabled=config.enabled,
         )
 
+    def _get_state_path(self) -> Path:
+        """Get path to the pipeline state file."""
+        return self.output_path / ".pipelines.json"
+
+    def _load_pipeline_state(self) -> Dict[str, Any]:
+        """Load aggregated pipeline state from disk."""
+        state_path = self._get_state_path()
+        if state_path.exists():
+            try:
+                return json.loads(state_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return {"pipelines": {}, "project": None}
+        return {"pipelines": {}, "project": None}
+
+    def _save_pipeline_state(self, state: Dict[str, Any]) -> None:
+        """Save aggregated pipeline state to disk."""
+        state_path = self._get_state_path()
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    def _update_pipeline_state(
+        self,
+        metadata: PipelineStoryMetadata,
+        story_html_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update state with current pipeline run and return full state."""
+        state = self._load_pipeline_state()
+
+        # Update project info if available
+        if metadata.project:
+            state["project"] = metadata.project
+
+        # Update this pipeline's entry
+        pipeline_entry = {
+            "name": metadata.pipeline_name,
+            "layer": metadata.pipeline_layer,
+            "last_run_id": metadata.run_id,
+            "last_run_time": metadata.started_at,
+            "last_status": "success" if metadata.failed_nodes == 0 else "failed",
+            "total_nodes": metadata.total_nodes,
+            "completed_nodes": metadata.completed_nodes,
+            "failed_nodes": metadata.failed_nodes,
+            "duration": metadata.duration,
+            "story_path": story_html_path,
+            "nodes": [
+                {
+                    "name": n.node_name,
+                    "operation": n.operation,
+                    "status": n.status,
+                    "duration": n.duration,
+                    "rows_out": n.rows_out,
+                }
+                for n in metadata.nodes
+            ],
+        }
+
+        state["pipelines"][metadata.pipeline_name] = pipeline_entry
+        self._save_pipeline_state(state)
+        return state
+
     def generate(
         self,
         metadata: PipelineStoryMetadata,
@@ -73,6 +139,8 @@ class DocGenerator:
     ) -> Dict[str, str]:
         """
         Generate documentation from Story metadata.
+
+        Updates project-level docs that aggregate all pipelines.
 
         Args:
             metadata: Pipeline story metadata from completed run
@@ -97,21 +165,23 @@ class DocGenerator:
         # Determine if this was a successful run
         is_success = metadata.failed_nodes == 0
 
+        # Always update pipeline state (for aggregation)
+        self.output_path.mkdir(parents=True, exist_ok=True)
+        project_state = self._update_pipeline_state(metadata, story_link_url)
+
         # Project-level docs only on success
         if is_success:
-            self.output_path.mkdir(parents=True, exist_ok=True)
-
             if outputs.readme:
-                path = self._generate_readme(metadata, story_link_url)
+                path = self._generate_readme(metadata, story_link_url, project_state)
                 generated["readme"] = path
 
             if outputs.technical_details:
-                path = self._generate_technical_details(metadata)
+                path = self._generate_technical_details(metadata, project_state)
                 generated["technical_details"] = path
 
             if outputs.node_cards:
                 paths = self._generate_node_cards(metadata)
-                generated["node_cards"] = str(self.output_path / "node_cards")
+                generated["node_cards"] = str(self.output_path / "node_cards" / self.pipeline_name)
                 for name, path in paths.items():
                     generated[f"node_card:{name}"] = path
         else:
@@ -122,10 +192,7 @@ class DocGenerator:
 
         # RUN_MEMO always generated - consolidated into single RUN_HISTORY.md
         if outputs.run_memo:
-            # Always use consolidated RUN_HISTORY.md in output_path
-            self.output_path.mkdir(parents=True, exist_ok=True)
             history_path = str(self.output_path / "RUN_HISTORY.md")
-
             path = self._generate_run_memo(metadata, history_path, story_link_url)
             generated["run_memo"] = path
 
@@ -133,6 +200,7 @@ class DocGenerator:
             "Documentation generated",
             artifacts=len(generated),
             is_success=is_success,
+            pipelines_tracked=len(project_state.get("pipelines", {})),
         )
 
         return generated
@@ -140,47 +208,21 @@ class DocGenerator:
     def _generate_readme(
         self,
         metadata: PipelineStoryMetadata,
-        story_html_path: Optional[str] = None,
+        story_html_path: Optional[str],
+        project_state: Dict[str, Any],
     ) -> str:
-        """Generate README.md for the pipeline."""
+        """Generate project-level README.md showing all pipelines."""
         ctx = get_logging_context()
 
+        project_name = project_state.get("project") or "Data Project"
+        pipelines = project_state.get("pipelines", {})
+
         lines = [
-            f"# {metadata.pipeline_name}",
+            f"# {project_name}",
             "",
         ]
 
-        # Layer badge
-        if metadata.pipeline_layer:
-            layer = metadata.pipeline_layer.lower()
-            badge_color = {
-                "bronze": "CD7F32",
-                "silver": "C0C0C0",
-                "gold": "FFD700",
-                "semantic": "9B59B6",
-            }.get(layer, "808080")
-            lines.append(f"![Layer](https://img.shields.io/badge/layer-{layer}-{badge_color})")
-            lines.append("")
-
-        # Last run status
-        status_emoji = "✅" if metadata.failed_nodes == 0 else "❌"
-        lines.extend(
-            [
-                "## Last Run",
-                "",
-                "| Metric | Value |",
-                "|--------|-------|",
-                f"| Status | {status_emoji} {'Success' if metadata.failed_nodes == 0 else 'Failed'} |",
-                f"| Run ID | `{metadata.run_id}` |",
-                f"| Timestamp | {metadata.started_at} |",
-                f"| Duration | {metadata.duration:.2f}s |",
-                f"| Nodes | {metadata.completed_nodes}/{metadata.total_nodes} completed |",
-                f"| Success Rate | {metadata.get_success_rate():.1f}% |",
-                "",
-            ]
-        )
-
-        # Project context
+        # Project context from current metadata
         if metadata.project or metadata.plant or metadata.asset:
             lines.extend(
                 [
@@ -200,27 +242,83 @@ class DocGenerator:
                 lines.append(f"| Business Unit | {metadata.business_unit} |")
             lines.append("")
 
-        # Node summary
+        # Pipelines summary table
         lines.extend(
             [
-                "## Pipeline Nodes",
+                "## Pipelines",
                 "",
-                "| Node | Operation | Status | Duration | Rows Out |",
-                "|------|-----------|--------|----------|----------|",
+                "| Pipeline | Layer | Last Run | Status | Nodes | Duration |",
+                "|----------|-------|----------|--------|-------|----------|",
             ]
         )
 
-        for node in metadata.nodes:
-            status_icon = {"success": "✅", "failed": "❌", "skipped": "⏭️"}.get(node.status, "❓")
-            rows = f"{node.rows_out:,}" if node.rows_out is not None else "-"
-            node_link = (
-                f"[{node.node_name}](node_cards/{self._sanitize_filename(node.node_name)}.md)"
-            )
+        # Sort pipelines by layer order, then by name
+        sorted_pipelines = sorted(
+            pipelines.values(),
+            key=lambda p: (
+                LAYER_ORDER.get((p.get("layer") or "").lower(), 99),
+                p.get("name", ""),
+            ),
+        )
+
+        for p in sorted_pipelines:
+            status_icon = "✅" if p.get("last_status") == "success" else "❌"
+            layer = p.get("layer") or "-"
+            layer_badge = self._get_layer_badge(layer)
+            nodes = f"{p.get('completed_nodes', 0)}/{p.get('total_nodes', 0)}"
+            duration = f"{p.get('duration', 0):.2f}s"
+            last_run = p.get("last_run_time", "-")
+            if isinstance(last_run, str) and "T" in last_run:
+                last_run = last_run.split("T")[0]  # Just the date
+
+            pipeline_link = f"[{p['name']}](#{p['name'].lower().replace('_', '-')})"
             lines.append(
-                f"| {node_link} | `{node.operation}` | {status_icon} | {node.duration:.2f}s | {rows} |"
+                f"| {pipeline_link} | {layer_badge} | {last_run} | {status_icon} | {nodes} | {duration} |"
             )
 
         lines.append("")
+
+        # Per-pipeline details
+        for p in sorted_pipelines:
+            pipeline_name = p["name"]
+            layer = p.get("layer")
+            nodes = p.get("nodes", [])
+
+            lines.extend(
+                [
+                    f"## {pipeline_name}",
+                    "",
+                ]
+            )
+
+            if layer:
+                lines.append(self._get_layer_badge_image(layer))
+                lines.append("")
+
+            lines.extend(
+                [
+                    "| Node | Operation | Status | Duration | Rows Out |",
+                    "|------|-----------|--------|----------|----------|",
+                ]
+            )
+
+            for node in nodes:
+                status_icon = {"success": "✅", "failed": "❌", "skipped": "⏭️"}.get(
+                    node.get("status", ""), "❓"
+                )
+                rows = f"{node['rows_out']:,}" if node.get("rows_out") is not None else "-"
+                node_link = f"[{node['name']}](node_cards/{pipeline_name}/{self._sanitize_filename(node['name'])}.md)"
+                duration = f"{node.get('duration', 0):.2f}s"
+                lines.append(
+                    f"| {node_link} | `{node.get('operation', '-')}` | {status_icon} | {duration} | {rows} |"
+                )
+
+            # Story link if available
+            if p.get("story_path"):
+                lines.append("")
+                lines.append(f"📊 [Full Story Report]({p['story_path']})")
+
+            lines.append("")
 
         # Quick links
         lines.extend(
@@ -228,14 +326,11 @@ class DocGenerator:
                 "## Documentation",
                 "",
                 "- [Technical Details](TECHNICAL_DETAILS.md)",
+                "- [Run History](RUN_HISTORY.md)",
                 "- [Node Cards](node_cards/)",
+                "",
             ]
         )
-
-        if story_html_path:
-            lines.append(f"- [Full Story Report]({story_html_path})")
-
-        lines.append("")
 
         # Footer
         lines.extend(
@@ -250,33 +345,96 @@ class DocGenerator:
         output_file = self.output_path / "README.md"
         output_file.write_text(content, encoding="utf-8")
 
-        ctx.debug("README.md generated", path=str(output_file))
+        ctx.debug("README.md generated", path=str(output_file), pipelines=len(pipelines))
         return str(output_file)
 
-    def _generate_technical_details(self, metadata: PipelineStoryMetadata) -> str:
-        """Generate TECHNICAL_DETAILS.md with exhaustive information."""
+    def _get_layer_badge(self, layer: str) -> str:
+        """Get a simple text badge for a layer."""
+        return layer.lower() if layer else "-"
+
+    def _get_layer_badge_image(self, layer: str) -> str:
+        """Get a shields.io badge for a layer."""
+        layer_lower = layer.lower()
+        badge_color = {
+            "bronze": "CD7F32",
+            "silver": "C0C0C0",
+            "gold": "FFD700",
+            "semantic": "9B59B6",
+        }.get(layer_lower, "808080")
+        return f"![Layer](https://img.shields.io/badge/layer-{layer_lower}-{badge_color})"
+
+    def _generate_technical_details(
+        self,
+        metadata: PipelineStoryMetadata,
+        project_state: Dict[str, Any],
+    ) -> str:
+        """Generate TECHNICAL_DETAILS.md with exhaustive information for all pipelines."""
         ctx = get_logging_context()
 
+        project_name = project_state.get("project") or "Data Project"
+        pipelines = project_state.get("pipelines", {})
+
         lines = [
-            f"# Technical Details: {metadata.pipeline_name}",
+            f"# Technical Details: {project_name}",
             "",
-            "## Execution Summary",
+            "## Project Summary",
             "",
             "| Metric | Value |",
             "|--------|-------|",
-            f"| Pipeline | {metadata.pipeline_name} |",
-            f"| Layer | {metadata.pipeline_layer or 'N/A'} |",
-            f"| Run ID | `{metadata.run_id}` |",
-            f"| Started | {metadata.started_at} |",
-            f"| Completed | {metadata.completed_at} |",
-            f"| Duration | {metadata.duration:.2f}s |",
-            f"| Total Nodes | {metadata.total_nodes} |",
-            f"| Completed | {metadata.completed_nodes} |",
-            f"| Failed | {metadata.failed_nodes} |",
-            f"| Skipped | {metadata.skipped_nodes} |",
-            f"| Total Rows Processed | {metadata.get_total_rows_processed():,} |",
+            f"| Project | {project_name} |",
+            f"| Pipelines | {len(pipelines)} |",
+            f"| Last Updated | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} |",
             "",
         ]
+
+        # Sort pipelines by layer
+        sorted_pipelines = sorted(
+            pipelines.values(),
+            key=lambda p: (
+                LAYER_ORDER.get((p.get("layer") or "").lower(), 99),
+                p.get("name", ""),
+            ),
+        )
+
+        # Generate section for each pipeline
+        for p in sorted_pipelines:
+            pipeline_name = p["name"]
+            lines.extend(
+                [
+                    f"## {pipeline_name}",
+                    "",
+                ]
+            )
+
+            if p.get("layer"):
+                lines.append(self._get_layer_badge_image(p["layer"]))
+                lines.append("")
+
+            lines.extend(
+                [
+                    "### Execution Summary",
+                    "",
+                    "| Metric | Value |",
+                    "|--------|-------|",
+                    f"| Pipeline | {pipeline_name} |",
+                    f"| Layer | {p.get('layer') or 'N/A'} |",
+                    f"| Run ID | `{p.get('last_run_id', 'N/A')}` |",
+                    f"| Last Run | {p.get('last_run_time', 'N/A')} |",
+                    f"| Duration | {p.get('duration', 0):.2f}s |",
+                    f"| Total Nodes | {p.get('total_nodes', 0)} |",
+                    f"| Completed | {p.get('completed_nodes', 0)} |",
+                    f"| Failed | {p.get('failed_nodes', 0)} |",
+                    "",
+                ]
+            )
+
+        # Now add current pipeline's detailed info (SQL, schemas, etc.)
+        lines.extend(
+            [
+                f"## Current Run Details: {metadata.pipeline_name}",
+                "",
+            ]
+        )
 
         # Git info
         if metadata.git_info:
@@ -389,10 +547,11 @@ class DocGenerator:
         return str(output_file)
 
     def _generate_node_cards(self, metadata: PipelineStoryMetadata) -> Dict[str, str]:
-        """Generate NODE_CARDS/*.md for each node."""
+        """Generate NODE_CARDS/{pipeline}/*.md for each node."""
         ctx = get_logging_context()
 
-        cards_dir = self.output_path / "node_cards"
+        # Use pipeline-specific subfolder
+        cards_dir = self.output_path / "node_cards" / self.pipeline_name
         cards_dir.mkdir(parents=True, exist_ok=True)
 
         generated: Dict[str, str] = {}
@@ -407,7 +566,7 @@ class DocGenerator:
             output_file.write_text(content, encoding="utf-8")
             generated[node.node_name] = str(output_file)
 
-        ctx.debug("Node cards generated", count=len(generated))
+        ctx.debug("Node cards generated", count=len(generated), pipeline=self.pipeline_name)
         return generated
 
     def _render_node_card(self, node: NodeExecutionMetadata) -> str:
