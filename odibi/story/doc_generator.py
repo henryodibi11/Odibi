@@ -600,32 +600,53 @@ class DocGenerator:
                     lines.append(f"| {col['node']} | {col['column']} | {col['null_pct']:.1f}% |")
                 lines.append("")
 
-        # Schema summary (final output)
-        final_node = None
-        for node in reversed(metadata.nodes):
-            if node.status == "success" and node.schema_out:
-                final_node = node
-                break
+        # Output schemas - show all nodes that write data (actual project outputs)
+        if self.config.include.schema_tables:
+            output_nodes = [
+                node
+                for node in metadata.nodes
+                if node.status == "success"
+                and node.schema_out
+                and node.rows_written is not None
+            ]
 
-        if final_node and final_node.schema_out and self.config.include.schema_tables:
-            lines.extend(
-                [
-                    "## Output Schema",
-                    "",
-                    f"*From node: {final_node.node_name}*",
-                    "",
-                    "| Column | Type |",
-                    "|--------|------|",
-                ]
-            )
-            for col in final_node.schema_out:
-                # Schema format is typically "name: type" or just "name"
-                if ": " in col:
-                    name, dtype = col.split(": ", 1)
-                else:
-                    name, dtype = col, "unknown"
-                lines.append(f"| {name} | `{dtype}` |")
-            lines.append("")
+            if output_nodes:
+                lines.extend(
+                    [
+                        "## Output Schemas",
+                        "",
+                        "Tables written by this pipeline:",
+                        "",
+                    ]
+                )
+
+                for node in output_nodes:
+                    lines.extend(
+                        [
+                            f"### {node.node_name}",
+                            "",
+                        ]
+                    )
+
+                    if node.rows_written is not None:
+                        lines.append(f"*{node.rows_written:,} rows written*")
+                        lines.append("")
+
+                    lines.extend(
+                        [
+                            "| Column | Type |",
+                            "|--------|------|",
+                        ]
+                    )
+
+                    for col in node.schema_out:
+                        if ": " in col:
+                            name, dtype = col.split(": ", 1)
+                        else:
+                            name, dtype = col, "unknown"
+                        lines.append(f"| {name} | `{dtype}` |")
+
+                    lines.append("")
 
         # Anomalies
         anomalous = metadata.get_anomalous_nodes()
