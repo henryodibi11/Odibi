@@ -193,15 +193,15 @@ environments:
 
 BRONZE_YAML_SAMPLE = """\
 pipelines:
-  - pipeline: bronze
-    description: "Bronze: Read IPS S Curve from SharePoint Excel files"
+  - pipeline: bronze_ingest
+    description: "Bronze: Ingest raw data from source systems"
     layer: bronze
     nodes: []
 """
 
 SILVER_YAML_SAMPLE = """\
 pipelines:
-  - pipeline: silver
+  - pipeline: silver_transform
     description: "Silver: Transform and clean data for analytics"
     layer: silver
     nodes: []
@@ -209,7 +209,7 @@ pipelines:
 
 GOLD_YAML_SAMPLE = """\
 pipelines:
-  - pipeline: gold
+  - pipeline: gold_aggregate
     description: "Gold: Aggregate and prepare data for reporting"
     layer: gold
     nodes: []

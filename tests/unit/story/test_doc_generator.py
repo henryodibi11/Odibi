@@ -223,7 +223,7 @@ class TestDocGenerator:
             assert "is_active" in content
 
     def test_generate_run_memo(self, docs_config, sample_metadata):
-        """Test RUN_MEMO.md generation."""
+        """Test RUN_HISTORY.md generation (consolidated run memos)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             generator = DocGenerator(
                 config=docs_config,
@@ -231,19 +231,19 @@ class TestDocGenerator:
                 workspace_root=tmpdir,
             )
 
-            memo_path = str(Path(tmpdir) / "run_memo.md")
-            result = generator.generate(sample_metadata, run_memo_path=memo_path)
+            result = generator.generate(sample_metadata)
 
             assert "run_memo" in result
             assert Path(result["run_memo"]).exists()
+            assert result["run_memo"].endswith("RUN_HISTORY.md")
 
             content = Path(result["run_memo"]).read_text()
-            assert "Run Memo" in content
+            assert "Run History" in content
             assert "Success" in content
             assert "3/3 nodes" in content
 
     def test_failed_run_skips_project_docs(self, docs_config, failed_metadata):
-        """Test that failed runs don't update project docs."""
+        """Test that failed runs don't update project docs but still update RUN_HISTORY."""
         with tempfile.TemporaryDirectory() as tmpdir:
             generator = DocGenerator(
                 config=docs_config,
@@ -251,19 +251,48 @@ class TestDocGenerator:
                 workspace_root=tmpdir,
             )
 
-            memo_path = str(Path(tmpdir) / "stories" / "run_memo.md")
-            result = generator.generate(failed_metadata, run_memo_path=memo_path)
+            result = generator.generate(failed_metadata)
 
             # README should NOT be generated
             assert "readme" not in result
             assert "technical_details" not in result
             assert "node_cards" not in result
 
-            # But RUN_MEMO should be generated
+            # But RUN_HISTORY should be generated
             assert "run_memo" in result
             content = Path(result["run_memo"]).read_text(encoding="utf-8")
             assert "Failed" in content
             assert "Column 'missing_col' not found" in content
+
+    def test_run_history_consolidates_multiple_runs(self, docs_config, sample_metadata):
+        """Test that multiple runs are consolidated into single RUN_HISTORY.md."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            # First run with explicit run_id
+            sample_metadata.run_id = "20260121_100000"
+            result1 = generator.generate(sample_metadata)
+            content1 = Path(result1["run_memo"]).read_text()
+            assert "Run History" in content1
+            assert "20260121_100000" in content1
+
+            # Second run with different run_id
+            sample_metadata.run_id = "20260121_120000"
+            result2 = generator.generate(sample_metadata)
+
+            # Should be the same file
+            assert result1["run_memo"] == result2["run_memo"]
+
+            # Content should have both runs (newest first)
+            content2 = Path(result2["run_memo"]).read_text()
+            assert "20260121_100000" in content2
+            assert "20260121_120000" in content2
+            # Newest should be first (prepended)
+            assert content2.index("20260121_120000") < content2.index("20260121_100000")
 
     def test_node_card_with_schema_changes(self, docs_config, sample_metadata):
         """Test node card shows schema changes."""
@@ -451,12 +480,10 @@ class TestDocGeneratorIntegration:
             )
 
             story_html = str(Path(tmpdir) / "stories" / "run.html")
-            memo_path = str(Path(tmpdir) / "stories" / "run_memo.md")
 
             result = generator.generate(
                 sample_metadata,
                 story_html_path=story_html,
-                run_memo_path=memo_path,
             )
 
             # Verify all expected files
@@ -469,6 +496,7 @@ class TestDocGeneratorIntegration:
             assert (docs_dir / "TECHNICAL_DETAILS.md").exists()
             assert (docs_dir / "node_cards").exists()
             assert (docs_dir / "node_cards" / "load_customers.md").exists()
+            assert (docs_dir / "RUN_HISTORY.md").exists()
 
     def test_readme_has_node_links(self, docs_config, sample_metadata):
         """Test that README links to node cards."""

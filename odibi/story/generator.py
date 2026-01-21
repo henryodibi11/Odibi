@@ -320,16 +320,10 @@ class StoryGenerator:
                 workspace_root=self.workspace_root,
             )
 
-            # Determine run memo path (alongside story files)
-            run_memo_path = None
-            if not self.is_remote:
-                run_memo_path = str(Path(html_path).with_name(Path(html_path).stem + "_memo.md"))
-
             generated = doc_generator.generate(
                 metadata=metadata,
                 story_html_path=html_path,
                 story_json_path=json_path,
-                run_memo_path=run_memo_path,
             )
 
             if generated:
