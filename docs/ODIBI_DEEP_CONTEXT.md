@@ -1497,7 +1497,7 @@ story:
       schema: true              # Include schema tables
 ```
 
-> **Note:** For remote storage (ADLS), story paths like `abfss://container@account/...` are shown as-is. They're informational — use Azure Storage Explorer or Portal to browse.
+> **Note:** When using remote storage (ADLS, S3, etc.), documentation files are written to the same storage location as stories. The `output_path` is relative to the story connection's base path. Use Azure Storage Explorer, AWS Console, or the appropriate tool to browse generated docs.
 
 **Generated Artifacts:**
 
