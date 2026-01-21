@@ -13,9 +13,10 @@ Usage:
     result = runner.run()  # Uses connection from semantic config
 """
 
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-from odibi.config import ProjectConfig
+from odibi.config import DocsConfig, ProjectConfig
 from odibi.semantics.metrics import SemanticLayerConfig, parse_semantic_config
 from odibi.semantics.story import SemanticStoryGenerator, SemanticStoryMetadata
 from odibi.story.lineage import LineageResult
@@ -211,6 +212,9 @@ class SemanticLayerRunner:
             result["story_paths"] = story_paths
             ctx.info("Semantic story saved", paths=story_paths)
 
+            # Generate project-level docs for semantic layer
+            self._generate_docs(metadata, story_paths.get("html"))
+
         if generate_lineage:
             lineage_result = self._generate_lineage(write_file)
             if lineage_result:
@@ -227,6 +231,89 @@ class SemanticLayerRunner:
         )
 
         return result
+
+    def _generate_docs(
+        self,
+        metadata: SemanticStoryMetadata,
+        story_html_path: Optional[str] = None,
+    ) -> None:
+        """Generate project-level docs for semantic layer."""
+        ctx = get_logging_context()
+
+        # Check if docs are enabled in story config
+        story_config = self.project_config.story
+        if not story_config:
+            return
+
+        docs_config_dict = getattr(story_config, "docs", None)
+        if not docs_config_dict:
+            return
+
+        # Convert to DocsConfig if needed
+        if isinstance(docs_config_dict, dict):
+            docs_config = DocsConfig(**docs_config_dict)
+        elif isinstance(docs_config_dict, DocsConfig):
+            docs_config = docs_config_dict
+        else:
+            return
+
+        if not docs_config.enabled:
+            return
+
+        try:
+            from odibi.story.doc_generator import DocGenerator
+            from odibi.story.metadata import NodeExecutionMetadata, PipelineStoryMetadata
+
+            # Convert semantic metadata to pipeline metadata format
+            nodes = [
+                NodeExecutionMetadata(
+                    node_name=v.view_name,
+                    operation="create_view",
+                    status=v.status,
+                    duration=v.duration,
+                    rows_out=None,  # Views don't have row counts
+                    executed_sql=[v.sql] if v.sql else [],
+                    description=v.description,
+                )
+                for v in metadata.views
+            ]
+
+            pipeline_metadata = PipelineStoryMetadata(
+                pipeline_name=self.name,
+                pipeline_layer="semantic",
+                started_at=metadata.started_at,
+                completed_at=metadata.completed_at,
+                duration=metadata.duration,
+                total_nodes=metadata.views_total,
+                completed_nodes=metadata.views_created,
+                failed_nodes=metadata.views_failed,
+                skipped_nodes=0,
+                project=self.project_config.project,
+                nodes=nodes,
+            )
+
+            doc_generator = DocGenerator(
+                config=docs_config,
+                pipeline_name=self.name,
+                workspace_root=str(Path.cwd()),
+            )
+
+            generated = doc_generator.generate(
+                metadata=pipeline_metadata,
+                story_html_path=story_html_path,
+            )
+
+            if generated:
+                ctx.info(
+                    "Semantic layer docs generated",
+                    artifacts=list(generated.keys()),
+                )
+
+        except Exception as e:
+            ctx.warning(
+                "Semantic layer docs generation failed (non-fatal)",
+                error=str(e),
+            )
 
     def _get_execute_sql_from_connection(self) -> Callable[[str], None]:
         """Get an execute_sql callable from the configured connection."""
