@@ -189,12 +189,21 @@ class Pipeline:
         story_config = story_config or {}
         self.story_config = story_config  # Store for async_generation check
 
+        # Extract docs config if present
+        docs_config = story_config.get("docs")
+        if docs_config and isinstance(docs_config, dict):
+            from odibi.config import DocsConfig
+
+            docs_config = DocsConfig(**docs_config)
+
         self.story_generator = StoryGenerator(
             pipeline_name=pipeline_config.pipeline,
             max_sample_rows=story_config.get("max_sample_rows", 10),
             output_path=story_config.get("output_path", "stories/"),
             storage_options=story_config.get("storage_options", {}),
             catalog_manager=catalog_manager,
+            docs_config=docs_config,
+            workspace_root=str(Path.cwd()),
         )
 
         # Initialize engine
@@ -1804,12 +1813,18 @@ class PipelineManager:
         if hasattr(story_conn, "pandas_storage_options"):
             storage_options = story_conn.pandas_storage_options()
 
+        # Build docs config dict if present
+        docs_config = None
+        if story_cfg.docs:
+            docs_config = story_cfg.docs.model_dump()
+
         return {
             "auto_generate": story_cfg.auto_generate,
             "max_sample_rows": story_cfg.max_sample_rows,
             "output_path": output_path,
             "storage_options": storage_options,
             "async_generation": story_cfg.async_generation,
+            "docs": docs_config,
         }
 
     @classmethod

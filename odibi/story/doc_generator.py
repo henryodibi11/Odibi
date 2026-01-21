@@ -15,7 +15,7 @@ RUN_MEMO generates for every run.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -503,42 +503,46 @@ class DocGenerator:
         # Schema in/out
         if self.config.include.schema_tables:
             if node.schema_in:
-                lines.extend(
-                    [
-                        "## Schema In",
-                        "",
-                        "| Column | Type |",
-                        "|--------|------|",
-                    ]
-                )
-                for col in node.schema_in[:20]:  # Limit to 20
-                    if ": " in col:
-                        name, dtype = col.split(": ", 1)
-                    else:
-                        name, dtype = col, "-"
-                    lines.append(f"| {name} | `{dtype}` |")
-                if len(node.schema_in) > 20:
-                    lines.append(f"| ... | *{len(node.schema_in) - 20} more columns* |")
-                lines.append("")
+                schema_in = self._normalize_schema(node.schema_in)
+                if schema_in:
+                    lines.extend(
+                        [
+                            "## Schema In",
+                            "",
+                            "| Column | Type |",
+                            "|--------|------|",
+                        ]
+                    )
+                    for col in schema_in[:20]:  # Limit to 20
+                        if ": " in col:
+                            name, dtype = col.split(": ", 1)
+                        else:
+                            name, dtype = col, "-"
+                        lines.append(f"| {name} | `{dtype}` |")
+                    if len(schema_in) > 20:
+                        lines.append(f"| ... | *{len(schema_in) - 20} more columns* |")
+                    lines.append("")
 
             if node.schema_out:
-                lines.extend(
-                    [
-                        "## Schema Out",
-                        "",
-                        "| Column | Type |",
-                        "|--------|------|",
-                    ]
-                )
-                for col in node.schema_out[:20]:
-                    if ": " in col:
-                        name, dtype = col.split(": ", 1)
-                    else:
-                        name, dtype = col, "-"
-                    lines.append(f"| {name} | `{dtype}` |")
-                if len(node.schema_out) > 20:
-                    lines.append(f"| ... | *{len(node.schema_out) - 20} more columns* |")
-                lines.append("")
+                schema_out = self._normalize_schema(node.schema_out)
+                if schema_out:
+                    lines.extend(
+                        [
+                            "## Schema Out",
+                            "",
+                            "| Column | Type |",
+                            "|--------|------|",
+                        ]
+                    )
+                    for col in schema_out[:20]:
+                        if ": " in col:
+                            name, dtype = col.split(": ", 1)
+                        else:
+                            name, dtype = col, "-"
+                        lines.append(f"| {name} | `{dtype}` |")
+                    if len(schema_out) > 20:
+                        lines.append(f"| ... | *{len(schema_out) - 20} more columns* |")
+                    lines.append("")
 
         # Transformation stack
         if node.transformation_stack:
@@ -787,6 +791,25 @@ class DocGenerator:
 
         ctx.debug("RUN_MEMO.md generated", path=str(output_file))
         return str(output_file)
+
+    def _normalize_schema(self, schema: Any) -> List[str]:
+        """
+        Normalize schema to a list of "column: type" strings.
+
+        Handles both list format and dict format.
+        """
+        if schema is None:
+            return []
+
+        if isinstance(schema, list):
+            return schema
+
+        if isinstance(schema, dict):
+            # Convert dict to list of "col: type" strings
+            return [f"{k}: {v}" for k, v in schema.items()]
+
+        # Unknown format, return empty
+        return []
 
     def _resolve_story_url(self, story_html_path: Optional[str]) -> Optional[str]:
         """

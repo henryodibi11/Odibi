@@ -11,6 +11,9 @@ connections:
 story:
   connection: delta_lake
   path: stories
+  docs:
+    enabled: true
+    output_path: docs/generated/
 
 system:
   connection: delta_lake
