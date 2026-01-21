@@ -625,7 +625,7 @@ class TestDocGeneratorRemoteStorage:
                 write_file=mock_write,
             )
 
-            result = generator.generate(sample_metadata)
+            generator.generate(sample_metadata)
 
             # Files should have been written via callback
             assert len(written_files) > 0
