@@ -3278,6 +3278,15 @@ class StoryConfig(BaseModel):
         ),
     )
 
+    # Documentation generation
+    docs: Optional["DocsConfig"] = Field(
+        default=None,
+        description=(
+            "Documentation generation settings. "
+            "Generates README.md, TECHNICAL_DETAILS.md, NODE_CARDS/*.md from Story data."
+        ),
+    )
+
     @model_validator(mode="after")
     def check_retention_policy(self):
         if self.retention_days is None and self.retention_count is None:
@@ -3287,6 +3296,69 @@ class StoryConfig(BaseModel):
                 "This controls how long/many story files are kept before cleanup."
             )
         return self
+
+
+class DocsOutputConfig(BaseModel):
+    """Configuration for which documentation artifacts to generate."""
+
+    readme: bool = Field(default=True, description="Generate README.md")
+    technical_details: bool = Field(default=True, description="Generate TECHNICAL_DETAILS.md")
+    node_cards: bool = Field(default=True, description="Generate NODE_CARDS/*.md")
+    run_memo: bool = Field(default=True, description="Generate per-run RUN_MEMO.md")
+
+
+class DocsIncludeConfig(BaseModel):
+    """Configuration for what content to include in documentation."""
+
+    sql: bool = Field(default=True, description="Include executed SQL in node cards")
+    config_snapshot: bool = Field(default=True, description="Include YAML config snapshots")
+    schema_tables: bool = Field(default=True, description="Include schema tables", alias="schema")
+
+    model_config = {"populate_by_name": True}
+
+
+class DocsConfig(BaseModel):
+    """
+    Documentation generation configuration.
+
+    Generates structured markdown documentation from Story artifacts.
+    Project-level docs (README, TECHNICAL_DETAILS, NODE_CARDS) update on successful runs.
+    Per-run docs (RUN_MEMO) generate for every run.
+
+    Example:
+    ```yaml
+    story:
+      connection: local_data
+      path: stories/
+      docs:
+        enabled: true
+        output_path: docs/generated/
+        outputs:
+          readme: true
+          technical_details: true
+          node_cards: true
+          run_memo: true
+        include:
+          sql: true
+          config_snapshot: true
+          schema: true
+          samples: false
+    ```
+    """
+
+    enabled: bool = Field(default=False, description="Enable documentation generation")
+    output_path: str = Field(
+        default="docs/generated/",
+        description="Output directory for project-level docs (relative to workspace)",
+    )
+    outputs: DocsOutputConfig = Field(
+        default_factory=DocsOutputConfig,
+        description="Which artifacts to generate",
+    )
+    include: DocsIncludeConfig = Field(
+        default_factory=DocsIncludeConfig,
+        description="What content to include",
+    )
 
 
 class SyncFromConfig(BaseModel):

@@ -1472,6 +1472,83 @@ results = pm.run("my_pipeline")
 print(f"Story: {results.story_path}")
 ```
 
+### 15.5 Documentation Generation
+
+Generate structured markdown documentation from Story artifacts:
+
+```yaml
+story:
+  connection: local_data
+  path: stories/
+
+  docs:
+    enabled: true
+    output_path: docs/generated/   # Project-level docs location
+
+    outputs:
+      readme: true              # README.md - stakeholder-facing
+      technical_details: true   # TECHNICAL_DETAILS.md - engineer-facing
+      node_cards: true          # NODE_CARDS/*.md - per-node details
+      run_memo: true            # Per-run summary (always generated)
+
+    include:
+      sql: true                 # Include executed SQL in node cards
+      config_snapshot: true     # Include YAML config snapshots
+      schema: true              # Include schema tables
+```
+
+> **Note:** For remote storage (ADLS), story paths like `abfss://container@account/...` are shown as-is. They're informational — use Azure Storage Explorer or Portal to browse.
+
+**Generated Artifacts:**
+
+| Artifact | Scope | Update Policy |
+|----------|-------|---------------|
+| README.md | Project | On successful runs only |
+| TECHNICAL_DETAILS.md | Project | On successful runs only |
+| NODE_CARDS/*.md | Project | On successful runs only |
+| run_*_memo.md | Per-run | Every run (including failures) |
+
+**File Structure:**
+```
+project/
+├── docs/
+│   └── generated/
+│       ├── README.md              # Pipeline overview
+│       ├── TECHNICAL_DETAILS.md   # Full execution details
+│       └── node_cards/
+│           ├── load_customers.md  # Per-node documentation
+│           └── dim_customer.md
+└── stories/
+    └── my_pipeline/
+        └── 2026-01-21/
+            ├── run_14-30-00.html   # Interactive story
+            ├── run_14-30-00.json   # Machine-readable
+            └── run_14-30-00_memo.md  # Run summary
+```
+
+**README.md includes:**
+- Pipeline name and layer badge
+- Last run status and metrics
+- Project context (project, plant, asset)
+- Node summary table with links to NODE_CARDS
+- Links to TECHNICAL_DETAILS and Story HTML
+
+**NODE_CARDS include:**
+- Node description (from config)
+- Operation type and duration
+- Schema in/out with changes highlighted
+- Executed SQL (syntax highlighted)
+- Transformation stack
+- Validation warnings
+- Config snapshot (YAML)
+
+**RUN_MEMO includes:**
+- Run status and timestamp
+- What changed from last successful run
+- Anomalies detected
+- Failed node details with error messages
+- Data quality issues
+
 ---
 
 ## 16. Common Workflows

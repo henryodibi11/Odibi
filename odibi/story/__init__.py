@@ -10,6 +10,7 @@ Components:
 - renderers: HTML/Markdown/JSON output formatters
 """
 
+from odibi.story.doc_generator import DocGenerator
 from odibi.story.doc_story import DocStoryGenerator
 from odibi.story.generator import StoryGenerator
 from odibi.story.lineage import LineageGenerator, LineageResult
@@ -41,6 +42,7 @@ __all__ = [
     "MarkdownStoryRenderer",
     "JSONStoryRenderer",
     "get_renderer",
+    "DocGenerator",
     "DocStoryGenerator",
     "LineageGenerator",
     "LineageResult",

@@ -1,0 +1,486 @@
+"""Tests for the DocGenerator class."""
+
+import tempfile
+from pathlib import Path
+
+import pytest
+
+from odibi.config import DocsConfig, DocsIncludeConfig, DocsOutputConfig
+from odibi.story.doc_generator import DocGenerator
+from odibi.story.metadata import NodeExecutionMetadata, PipelineStoryMetadata
+
+
+@pytest.fixture
+def sample_metadata():
+    """Create sample pipeline metadata for testing."""
+    nodes = [
+        NodeExecutionMetadata(
+            node_name="load_customers",
+            operation="read_csv",
+            status="success",
+            duration=1.5,
+            rows_in=0,
+            rows_out=1000,
+            schema_in=[],
+            schema_out=["customer_id: int", "name: string", "email: string"],
+            transformation_stack=["read_csv", "add_metadata"],
+        ),
+        NodeExecutionMetadata(
+            node_name="transform_customers",
+            operation="sql",
+            status="success",
+            duration=2.3,
+            rows_in=1000,
+            rows_out=950,
+            rows_change=-50,
+            rows_change_pct=-5.0,
+            schema_in=["customer_id: int", "name: string", "email: string"],
+            schema_out=["customer_id: int", "name: string", "email: string", "is_active: bool"],
+            columns_added=["is_active"],
+            executed_sql=[
+                "SELECT *, CASE WHEN status = 'A' THEN true ELSE false END AS is_active FROM customers"
+            ],
+            transformation_stack=["sql_transform"],
+            config_snapshot={"operation": "sql", "sql": "SELECT ..."},
+        ),
+        NodeExecutionMetadata(
+            node_name="dim_customer",
+            operation="dimension",
+            status="success",
+            duration=3.1,
+            rows_in=950,
+            rows_out=950,
+            rows_written=50,
+            schema_in=["customer_id: int", "name: string", "email: string", "is_active: bool"],
+            schema_out=[
+                "customer_sk: bigint",
+                "customer_id: int",
+                "name: string",
+                "email: string",
+                "is_active: bool",
+            ],
+            columns_added=["customer_sk"],
+            description="Customer dimension table with surrogate keys",
+        ),
+    ]
+
+    return PipelineStoryMetadata(
+        pipeline_name="test_pipeline",
+        pipeline_layer="silver",
+        started_at="2026-01-21T10:00:00",
+        completed_at="2026-01-21T10:00:07",
+        duration=6.9,
+        total_nodes=3,
+        completed_nodes=3,
+        failed_nodes=0,
+        skipped_nodes=0,
+        project="TestProject",
+        nodes=nodes,
+    )
+
+
+@pytest.fixture
+def failed_metadata():
+    """Create sample failed pipeline metadata."""
+    nodes = [
+        NodeExecutionMetadata(
+            node_name="load_data",
+            operation="read_csv",
+            status="success",
+            duration=1.0,
+            rows_out=100,
+        ),
+        NodeExecutionMetadata(
+            node_name="transform_data",
+            operation="sql",
+            status="failed",
+            duration=0.5,
+            error_message="Column 'missing_col' not found",
+            error_type="AnalysisException",
+            error_suggestions=["Check column names in SQL", "Verify schema"],
+        ),
+    ]
+
+    return PipelineStoryMetadata(
+        pipeline_name="failed_pipeline",
+        pipeline_layer="bronze",
+        started_at="2026-01-21T11:00:00",
+        completed_at="2026-01-21T11:00:02",
+        duration=1.5,
+        total_nodes=2,
+        completed_nodes=1,
+        failed_nodes=1,
+        skipped_nodes=0,
+        nodes=nodes,
+    )
+
+
+@pytest.fixture
+def docs_config():
+    """Create default docs configuration."""
+    return DocsConfig(
+        enabled=True,
+        output_path="docs/generated/",
+        outputs=DocsOutputConfig(),
+        include=DocsIncludeConfig(schema_tables=True),
+    )
+
+
+class TestDocGenerator:
+    """Tests for DocGenerator class."""
+
+    def test_init(self, docs_config):
+        """Test DocGenerator initialization."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            assert generator.pipeline_name == "test_pipeline"
+            assert generator.config.enabled is True
+
+    def test_generate_disabled(self, sample_metadata):
+        """Test that no docs are generated when disabled."""
+        config = DocsConfig(enabled=False)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+            assert result == {}
+
+    def test_generate_readme(self, docs_config, sample_metadata):
+        """Test README.md generation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            assert "readme" in result
+            readme_path = Path(result["readme"])
+            assert readme_path.exists()
+
+            content = readme_path.read_text()
+            assert "# test_pipeline" in content
+            assert "Success" in content
+            assert "load_customers" in content
+            assert "transform_customers" in content
+            assert "dim_customer" in content
+
+    def test_generate_technical_details(self, docs_config, sample_metadata):
+        """Test TECHNICAL_DETAILS.md generation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            assert "technical_details" in result
+            td_path = Path(result["technical_details"])
+            assert td_path.exists()
+
+            content = td_path.read_text()
+            assert "Technical Details" in content
+            assert "Execution Summary" in content
+            assert "6.9" in content  # duration
+
+    def test_generate_node_cards(self, docs_config, sample_metadata):
+        """Test NODE_CARDS/*.md generation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            assert "node_cards" in result
+            assert "node_card:load_customers" in result
+            assert "node_card:transform_customers" in result
+            assert "node_card:dim_customer" in result
+
+            # Check transform_customers card has SQL
+            transform_card = Path(result["node_card:transform_customers"])
+            assert transform_card.exists()
+
+            content = transform_card.read_text()
+            assert "Executed SQL" in content
+            assert "SELECT" in content
+            assert "is_active" in content
+
+    def test_generate_run_memo(self, docs_config, sample_metadata):
+        """Test RUN_MEMO.md generation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            memo_path = str(Path(tmpdir) / "run_memo.md")
+            result = generator.generate(sample_metadata, run_memo_path=memo_path)
+
+            assert "run_memo" in result
+            assert Path(result["run_memo"]).exists()
+
+            content = Path(result["run_memo"]).read_text()
+            assert "Run Memo" in content
+            assert "Success" in content
+            assert "3/3 nodes" in content
+
+    def test_failed_run_skips_project_docs(self, docs_config, failed_metadata):
+        """Test that failed runs don't update project docs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="failed_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            memo_path = str(Path(tmpdir) / "stories" / "run_memo.md")
+            result = generator.generate(failed_metadata, run_memo_path=memo_path)
+
+            # README should NOT be generated
+            assert "readme" not in result
+            assert "technical_details" not in result
+            assert "node_cards" not in result
+
+            # But RUN_MEMO should be generated
+            assert "run_memo" in result
+            content = Path(result["run_memo"]).read_text(encoding="utf-8")
+            assert "Failed" in content
+            assert "Column 'missing_col' not found" in content
+
+    def test_node_card_with_schema_changes(self, docs_config, sample_metadata):
+        """Test node card shows schema changes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            # Check transform card shows added column
+            transform_card = Path(result["node_card:transform_customers"])
+            content = transform_card.read_text()
+            assert "Schema Changes" in content
+            assert "is_active" in content
+
+    def test_node_card_with_description(self, docs_config, sample_metadata):
+        """Test node card includes description."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            # Check dim_customer card has description
+            dim_card = Path(result["node_card:dim_customer"])
+            content = dim_card.read_text()
+            assert "Customer dimension table" in content
+
+    def test_exclude_sql(self, sample_metadata):
+        """Test excluding SQL from node cards."""
+        config = DocsConfig(
+            enabled=True,
+            output_path="docs/generated/",
+            outputs=DocsOutputConfig(),
+            include=DocsIncludeConfig(sql=False),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            transform_card = Path(result["node_card:transform_customers"])
+            content = transform_card.read_text()
+            assert "Executed SQL" not in content
+
+    def test_exclude_config_snapshot(self, sample_metadata):
+        """Test excluding config snapshot from node cards."""
+        config = DocsConfig(
+            enabled=True,
+            output_path="docs/generated/",
+            outputs=DocsOutputConfig(),
+            include=DocsIncludeConfig(config_snapshot=False),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            transform_card = Path(result["node_card:transform_customers"])
+            content = transform_card.read_text()
+            assert "## Configuration" not in content
+
+    def test_selective_outputs(self, sample_metadata):
+        """Test generating only specific outputs."""
+        config = DocsConfig(
+            enabled=True,
+            output_path="docs/generated/",
+            outputs=DocsOutputConfig(
+                readme=True,
+                technical_details=False,
+                node_cards=False,
+                run_memo=False,
+            ),
+            include=DocsIncludeConfig(schema_tables=True),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            assert "readme" in result
+            assert "technical_details" not in result
+            assert "node_cards" not in result
+            assert "run_memo" not in result
+
+    def test_sanitize_filename(self, docs_config):
+        """Test filename sanitization."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test",
+                workspace_root=tmpdir,
+            )
+
+            assert generator._sanitize_filename("my_node") == "my_node"
+            assert generator._sanitize_filename("My Node") == "my_node"
+            assert generator._sanitize_filename("path/to/node") == "path_to_node"
+            assert generator._sanitize_filename("schema.table") == "schema_table"
+
+
+class TestDocGeneratorStoryUrls:
+    """Tests for story URL resolution."""
+
+    def test_local_path_in_readme(self, sample_metadata):
+        """Test that local paths appear in README."""
+        config = DocsConfig(
+            enabled=True,
+            output_path="docs/",
+            outputs=DocsOutputConfig(),
+            include=DocsIncludeConfig(schema_tables=True),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(
+                sample_metadata,
+                story_html_path="../stories/test_pipeline/2026-01-21/run.html",
+            )
+
+            readme = Path(result["readme"]).read_text(encoding="utf-8")
+            assert "../stories/test_pipeline/2026-01-21/run.html" in readme
+
+    def test_remote_path_shown_as_is(self, sample_metadata):
+        """Test that remote paths are shown as-is (informational, may not be clickable)."""
+        config = DocsConfig(
+            enabled=True,
+            output_path="docs/",
+            outputs=DocsOutputConfig(),
+            include=DocsIncludeConfig(schema_tables=True),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(
+                sample_metadata,
+                story_html_path="abfss://container@account.dfs.core.windows.net/stories/run.html",
+            )
+
+            readme = Path(result["readme"]).read_text(encoding="utf-8")
+            # Remote path is shown as-is
+            assert "abfss://container@account.dfs.core.windows.net/stories/run.html" in readme
+
+
+class TestDocGeneratorIntegration:
+    """Integration tests for DocGenerator."""
+
+    def test_full_generation_flow(self, docs_config, sample_metadata):
+        """Test complete documentation generation flow."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            story_html = str(Path(tmpdir) / "stories" / "run.html")
+            memo_path = str(Path(tmpdir) / "stories" / "run_memo.md")
+
+            result = generator.generate(
+                sample_metadata,
+                story_html_path=story_html,
+                run_memo_path=memo_path,
+            )
+
+            # Verify all expected files
+            assert len(result) >= 5  # readme, technical, node_cards dir, 3 cards, memo
+
+            # Verify directory structure
+            docs_dir = Path(tmpdir) / "docs" / "generated"
+            assert docs_dir.exists()
+            assert (docs_dir / "README.md").exists()
+            assert (docs_dir / "TECHNICAL_DETAILS.md").exists()
+            assert (docs_dir / "node_cards").exists()
+            assert (docs_dir / "node_cards" / "load_customers.md").exists()
+
+    def test_readme_has_node_links(self, docs_config, sample_metadata):
+        """Test that README links to node cards."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            generator = DocGenerator(
+                config=docs_config,
+                pipeline_name="test_pipeline",
+                workspace_root=tmpdir,
+            )
+
+            result = generator.generate(sample_metadata)
+
+            readme = Path(result["readme"]).read_text()
+            assert "[load_customers](node_cards/load_customers.md)" in readme
+            assert "[transform_customers](node_cards/transform_customers.md)" in readme

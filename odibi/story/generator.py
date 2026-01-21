@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from odibi.config import DocsConfig
 from odibi.node import NodeResult
 from odibi.story.metadata import DeltaWriteInfo, NodeExecutionMetadata, PipelineStoryMetadata
 from odibi.story.renderers import HTMLStoryRenderer, JSONStoryRenderer
@@ -41,6 +42,8 @@ class StoryGenerator:
         retention_count: int = 100,
         storage_options: Optional[Dict[str, Any]] = None,
         catalog_manager: Optional[Any] = None,
+        docs_config: Optional[DocsConfig] = None,
+        workspace_root: Optional[str] = None,
     ):
         """Initialize story generator.
 
@@ -52,6 +55,8 @@ class StoryGenerator:
             retention_count: Max number of stories to keep
             storage_options: Credentials for remote storage (e.g. ADLS)
             catalog_manager: System Catalog Manager for historical context
+            docs_config: Documentation generation configuration
+            workspace_root: Root directory for doc output paths
         """
         self.pipeline_name = pipeline_name
         self.max_sample_rows = max_sample_rows
@@ -59,6 +64,8 @@ class StoryGenerator:
         self.is_remote = "://" in output_path
         self.storage_options = storage_options or {}
         self.catalog_manager = catalog_manager
+        self.docs_config = docs_config
+        self.workspace_root = workspace_root
 
         # Track last generated story for alert enrichment
         self._last_story_path: Optional[str] = None
@@ -81,6 +88,7 @@ class StoryGenerator:
             is_remote=self.is_remote,
             retention_days=retention_days,
             retention_count=retention_count,
+            docs_enabled=docs_config.enabled if docs_config else False,
         )
 
     def generate(
@@ -275,6 +283,10 @@ class StoryGenerator:
         self.cleanup()
         self._generate_pipeline_index()
 
+        # Generate documentation if configured
+        if self.docs_config and self.docs_config.enabled:
+            self._generate_docs(metadata, html_path, json_path)
+
         ctx.info(
             "Story generated",
             path=html_path,
@@ -283,6 +295,53 @@ class StoryGenerator:
         )
 
         return html_path
+
+    def _generate_docs(
+        self,
+        metadata: PipelineStoryMetadata,
+        html_path: str,
+        json_path: str,
+    ) -> None:
+        """Generate documentation from story metadata.
+
+        Args:
+            metadata: Pipeline story metadata
+            html_path: Path to generated HTML story
+            json_path: Path to generated JSON story
+        """
+        from odibi.story.doc_generator import DocGenerator
+
+        ctx = get_logging_context()
+
+        try:
+            doc_generator = DocGenerator(
+                config=self.docs_config,
+                pipeline_name=self.pipeline_name,
+                workspace_root=self.workspace_root,
+            )
+
+            # Determine run memo path (alongside story files)
+            run_memo_path = None
+            if not self.is_remote:
+                run_memo_path = str(Path(html_path).with_name(Path(html_path).stem + "_memo.md"))
+
+            generated = doc_generator.generate(
+                metadata=metadata,
+                story_html_path=html_path,
+                story_json_path=json_path,
+                run_memo_path=run_memo_path,
+            )
+
+            if generated:
+                ctx.info(
+                    "Documentation generated",
+                    artifacts=list(generated.keys()),
+                )
+        except Exception as e:
+            ctx.warning(
+                "Documentation generation failed (non-fatal)",
+                error=str(e),
+            )
 
     def get_alert_summary(self) -> Dict[str, Any]:
         """Get a summary of the last generated story for alerts.
