@@ -335,6 +335,64 @@ class DocGenerator:
             "",
         ]
 
+        # Run Health Summary (quick triage info)
+        health = metadata.get_run_health_summary()
+        lines.extend(
+            [
+                "## Run Health",
+                "",
+                "| Metric | Value |",
+                "|--------|-------|",
+                f"| Status | {'✅ Success' if not health['has_failures'] else '❌ Failed'} |",
+                f"| Failed Nodes | {health['failed_count']} |",
+                f"| Anomalies | {health['anomaly_count']} |",
+            ]
+        )
+        if health["first_failure_node"]:
+            lines.append(f"| First Failure | {health['first_failure_node']} |")
+        lines.append("")
+
+        # Data Freshness
+        freshness = metadata.get_freshness_info()
+        if freshness:
+            lines.extend(
+                [
+                    "## Data Freshness",
+                    "",
+                    f"**Latest data:** {freshness['formatted']} (from `{freshness['column']}` in {freshness['node']})",
+                    "",
+                ]
+            )
+
+        # Key Metrics
+        lines.extend(
+            [
+                "## Key Metrics",
+                "",
+                "| Metric | Value |",
+                "|--------|-------|",
+                f"| Total Rows In | {metadata.get_total_rows_in():,} |",
+                f"| Total Rows Processed | {metadata.get_total_rows_processed():,} |",
+                f"| Rows Dropped/Filtered | {metadata.get_rows_dropped():,} |",
+            ]
+        )
+        final_rows = metadata.get_final_output_rows()
+        if final_rows is not None:
+            lines.append(f"| Final Output Rows | {final_rows:,} |")
+        lines.append("")
+
+        # Git info in README (moved from just TECHNICAL_DETAILS)
+        if metadata.git_info:
+            git = metadata.git_info
+            lines.extend(
+                [
+                    "## Version",
+                    "",
+                    f"**Branch:** {git.get('branch', 'N/A')} | **Commit:** `{git.get('commit', 'N/A')[:8]}`",
+                    "",
+                ]
+            )
+
         # Project context from current metadata
         if metadata.project or metadata.plant or metadata.asset:
             lines.extend(
@@ -354,6 +412,25 @@ class DocGenerator:
             if metadata.business_unit:
                 lines.append(f"| Business Unit | {metadata.business_unit} |")
             lines.append("")
+
+        # Pipeline DAG (Mermaid diagram from graph_data)
+        if metadata.graph_data:
+            mermaid_lines = self._render_mermaid_dag(metadata.graph_data)
+            if mermaid_lines:
+                lines.extend(
+                    [
+                        "## Pipeline DAG",
+                        "",
+                        "```mermaid",
+                    ]
+                )
+                lines.extend(mermaid_lines)
+                lines.extend(
+                    [
+                        "```",
+                        "",
+                    ]
+                )
 
         # Pipelines summary table
         lines.extend(
@@ -769,7 +846,7 @@ class DocGenerator:
             lines.append("")
 
         # Schema changes
-        if node.columns_added or node.columns_removed:
+        if node.columns_added or node.columns_removed or node.columns_renamed:
             lines.extend(
                 [
                     "## Schema Changes",
@@ -784,6 +861,11 @@ class DocGenerator:
             if node.columns_removed:
                 lines.append("**Removed:**")
                 for col in node.columns_removed:
+                    lines.append(f"- `{col}`")
+                lines.append("")
+            if node.columns_renamed:
+                lines.append("**Renamed:**")
+                for col in node.columns_renamed:
                     lines.append(f"- `{col}`")
                 lines.append("")
 
@@ -902,10 +984,36 @@ class DocGenerator:
                 ]
             )
 
+            # Use cleaned traceback if available (easier to read)
+            traceback_to_show = node.error_traceback_cleaned or node.error_traceback
+            if traceback_to_show:
+                lines.extend(
+                    [
+                        "**Traceback:**",
+                        "",
+                        "```",
+                        traceback_to_show,
+                        "```",
+                        "",
+                    ]
+                )
+
             if node.error_suggestions:
                 lines.append("**Suggestions:**")
                 for suggestion in node.error_suggestions:
                     lines.append(f"- {suggestion}")
+                lines.append("")
+
+            # Error context (additional debugging info)
+            if node.error_context:
+                lines.extend(
+                    [
+                        "**Context:**",
+                        "",
+                    ]
+                )
+                for key, val in node.error_context.items():
+                    lines.append(f"- **{key}:** {val}")
                 lines.append("")
 
         # Runbook link
@@ -918,6 +1026,174 @@ class DocGenerator:
                     "",
                 ]
             )
+
+        # Sample Data (for LLM to understand what the data looks like)
+        if node.sample_data:
+            lines.extend(
+                [
+                    "## Sample Data",
+                    "",
+                ]
+            )
+            sample_lines = self._render_sample_data_table(node.sample_data, max_rows=5)
+            lines.extend(sample_lines)
+            lines.append("")
+
+        # Null Profile (data quality insight)
+        if node.null_profile:
+            null_lines = self._render_null_profile(node.null_profile)
+            if null_lines:
+                lines.extend(
+                    [
+                        "## Null Profile",
+                        "",
+                    ]
+                )
+                lines.extend(null_lines)
+                lines.append("")
+
+        # Column Statistics (data profiling)
+        if node.column_statistics:
+            stats_lines = self._render_column_statistics(node.column_statistics)
+            if stats_lines:
+                lines.extend(
+                    [
+                        "## Column Statistics",
+                        "",
+                    ]
+                )
+                lines.extend(stats_lines)
+                lines.append("")
+
+        # Failed Rows Samples (actual bad data for debugging)
+        if node.failed_rows_samples:
+            lines.extend(
+                [
+                    "## Failed Rows",
+                    "",
+                ]
+            )
+            lines.extend(self._render_failed_rows_samples(node))
+
+        # Source Files (input lineage)
+        if node.source_files:
+            lines.extend(
+                [
+                    "## Source Files",
+                    "",
+                ]
+            )
+            for src in node.source_files[:10]:  # Limit to 10
+                lines.append(f"- `{src}`")
+            if len(node.source_files) > 10:
+                lines.append(f"- *... {len(node.source_files) - 10} more files*")
+            lines.append("")
+
+        # Delta Info (version and write metrics)
+        if node.delta_info:
+            lines.extend(
+                [
+                    "## Delta Write Info",
+                    "",
+                    "| Metric | Value |",
+                    "|--------|-------|",
+                    f"| Version | {node.delta_info.version} |",
+                    f"| Operation | {node.delta_info.operation or 'N/A'} |",
+                ]
+            )
+            if node.delta_info.read_version is not None:
+                lines.append(f"| Read Version | {node.delta_info.read_version} |")
+            # Add operation metrics if available
+            if node.delta_info.operation_metrics:
+                for key, val in node.delta_info.operation_metrics.items():
+                    lines.append(f"| {key} | {val} |")
+            lines.append("")
+
+        # Duration History (performance trend)
+        if node.duration_history:
+            lines.extend(
+                [
+                    "## Duration History",
+                    "",
+                    "| Run | Duration |",
+                    "|-----|----------|",
+                ]
+            )
+            for entry in node.duration_history[-7:]:  # Last 7 runs
+                run_id = entry.get("run_id", "N/A")
+                dur = entry.get("duration", 0)
+                lines.append(f"| {run_id} | {dur:.2f}s |")
+            lines.append("")
+
+        # Cross-run Comparison (what changed from last success)
+        if node.changed_from_last_success:
+            lines.extend(
+                [
+                    "## Changes from Last Success",
+                    "",
+                ]
+            )
+            if node.changes_detected:
+                lines.append(f"**Changed:** {', '.join(node.changes_detected)}")
+                lines.append("")
+            if node.previous_rows_out is not None and node.rows_out is not None:
+                diff = node.rows_out - node.previous_rows_out
+                icon = "🔺" if diff > 0 else "🔻"
+                lines.append(
+                    f"- Rows: {node.previous_rows_out:,} → {node.rows_out:,} ({icon}{diff:+,})"
+                )
+            if node.previous_duration is not None:
+                diff = node.duration - node.previous_duration
+                icon = "🔺" if diff > 0 else "🔻"
+                lines.append(
+                    f"- Duration: {node.previous_duration:.2f}s → {node.duration:.2f}s ({icon}{diff:+.2f}s)"
+                )
+            if node.previous_sql_hash and node.sql_hash and node.previous_sql_hash != node.sql_hash:
+                lines.append("- SQL logic changed")
+            lines.append("")
+
+        # Execution Steps (troubleshooting)
+        if node.execution_steps:
+            lines.extend(
+                [
+                    "## Execution Steps",
+                    "",
+                ]
+            )
+            for i, step in enumerate(node.execution_steps, 1):
+                lines.append(f"{i}. {step}")
+            lines.append("")
+
+        # Retry History (debugging)
+        if node.retry_history:
+            lines.extend(
+                [
+                    "## Retry History",
+                    "",
+                    "| Attempt | Error | Timestamp |",
+                    "|---------|-------|-----------|",
+                ]
+            )
+            for attempt in node.retry_history:
+                attempt_num = attempt.get("attempt", "?")
+                error = attempt.get("error", "Unknown")[:50]
+                ts = attempt.get("timestamp", "N/A")
+                lines.append(f"| {attempt_num} | {error} | {ts} |")
+            lines.append("")
+
+        # Environment (execution context)
+        if node.environment:
+            lines.extend(
+                [
+                    "## Environment",
+                    "",
+                    "| Key | Value |",
+                    "|-----|-------|",
+                ]
+            )
+            for key, val in list(node.environment.items())[:10]:
+                lines.append(f"| {key} | {val} |")
+            lines.append("")
 
         # Footer
         lines.extend(
@@ -1132,3 +1408,157 @@ class DocGenerator:
             .replace(".", "_")
             .replace(":", "_")
         )
+
+    def _render_mermaid_dag(self, graph_data: Dict[str, Any]) -> List[str]:
+        """Render graph_data as Mermaid flowchart lines."""
+        nodes = graph_data.get("nodes", [])
+        edges = graph_data.get("edges", [])
+
+        if not nodes:
+            return []
+
+        lines = ["flowchart LR"]
+
+        # Define nodes with labels
+        for node in nodes:
+            node_id = node.get("id", "").replace("-", "_").replace(" ", "_")
+            node_type = node.get("type", "")
+            label = node.get("id", node_id)
+
+            # Style based on type
+            if node_type == "source":
+                lines.append(f"    {node_id}[({label})]")  # Stadium shape for sources
+            elif node_type == "sink":
+                lines.append(f"    {node_id}[/{label}/]")  # Parallelogram for sinks
+            else:
+                lines.append(f"    {node_id}[{label}]")  # Rectangle for transforms
+
+        # Define edges
+        for edge in edges:
+            from_id = edge.get("from", "").replace("-", "_").replace(" ", "_")
+            to_id = edge.get("to", "").replace("-", "_").replace(" ", "_")
+            if from_id and to_id:
+                lines.append(f"    {from_id} --> {to_id}")
+
+        return lines
+
+    def _render_sample_data_table(
+        self, sample_data: List[Dict[str, Any]], max_rows: int = 5
+    ) -> List[str]:
+        """Render sample data as a markdown table."""
+        if not sample_data:
+            return []
+
+        lines = []
+        sample = sample_data[:max_rows]
+
+        # Get all columns from all rows
+        all_cols = []
+        for row in sample:
+            for col in row.keys():
+                if col not in all_cols:
+                    all_cols.append(col)
+
+        if not all_cols:
+            return []
+
+        # Header
+        lines.append("| " + " | ".join(all_cols) + " |")
+        lines.append("|" + "|".join(["---"] * len(all_cols)) + "|")
+
+        # Data rows
+        for row in sample:
+            values = []
+            for col in all_cols:
+                val = row.get(col, "")
+                # Truncate long values
+                val_str = str(val) if val is not None else ""
+                if len(val_str) > 30:
+                    val_str = val_str[:27] + "..."
+                values.append(val_str)
+            lines.append("| " + " | ".join(values) + " |")
+
+        if len(sample_data) > max_rows:
+            lines.append(
+                f"| *... {len(sample_data) - max_rows} more rows* |" + " |" * (len(all_cols) - 1)
+            )
+
+        return lines
+
+    def _render_null_profile(self, null_profile: Dict[str, float]) -> List[str]:
+        """Render null profile as markdown table."""
+        if not null_profile:
+            return []
+
+        # Filter to columns with nulls and sort by null percentage
+        cols_with_nulls = [(col, pct) for col, pct in null_profile.items() if pct and pct > 0]
+        if not cols_with_nulls:
+            return []
+
+        cols_with_nulls.sort(key=lambda x: x[1], reverse=True)
+
+        lines = [
+            "| Column | Null % |",
+            "|--------|--------|",
+        ]
+        for col, pct in cols_with_nulls[:15]:  # Top 15
+            lines.append(f"| {col} | {pct:.1f}% |")
+
+        if len(cols_with_nulls) > 15:
+            lines.append(f"| *... {len(cols_with_nulls) - 15} more columns* | |")
+
+        return lines
+
+    def _render_column_statistics(self, stats: Dict[str, Dict[str, Any]]) -> List[str]:
+        """Render column statistics as markdown table."""
+        if not stats:
+            return []
+
+        lines = [
+            "| Column | Min | Max | Mean | StdDev |",
+            "|--------|-----|-----|------|--------|",
+        ]
+
+        for col, col_stats in list(stats.items())[:20]:  # Top 20 columns
+            min_val = col_stats.get("min", "-")
+            max_val = col_stats.get("max", "-")
+            mean_val = col_stats.get("mean", "-")
+            stddev_val = col_stats.get("stddev", "-")
+
+            # Format numeric values
+            if isinstance(mean_val, float):
+                mean_val = f"{mean_val:.2f}"
+            if isinstance(stddev_val, float):
+                stddev_val = f"{stddev_val:.2f}"
+
+            lines.append(f"| {col} | {min_val} | {max_val} | {mean_val} | {stddev_val} |")
+
+        return lines
+
+    def _render_failed_rows_samples(self, node: NodeExecutionMetadata) -> List[str]:
+        """Render failed rows samples for each validation."""
+        if not node.failed_rows_samples:
+            return []
+
+        lines = []
+        for validation_name, samples in node.failed_rows_samples.items():
+            count = node.failed_rows_counts.get(validation_name, len(samples))
+            lines.extend(
+                [
+                    f"### {validation_name}",
+                    "",
+                    f"*{count:,} rows failed*",
+                    "",
+                ]
+            )
+            if samples:
+                lines.extend(self._render_sample_data_table(samples, max_rows=3))
+            lines.append("")
+
+        if node.failed_rows_truncated:
+            lines.append(
+                f"*Note: Sample data truncated. Affected validations: {', '.join(node.truncated_validations)}*"
+            )
+            lines.append("")
+
+        return lines
