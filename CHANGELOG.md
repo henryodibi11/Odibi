@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2026-01-22
+
+### Added - Documentation Generation from Story Artifacts
+
+- **DocGenerator Phase 1**: New documentation generation system that creates LLM-ready markdown from Story artifacts
+  - `README.md`: Project overview with all pipelines, node counts, run status, duration
+  - `TECHNICAL_DETAILS.md`: Engineer-facing exhaustive details, output schemas, SQL queries
+  - `NODE_CARDS/*.md`: Per-node transformation documentation with schemas, SQL, config
+  - `RUN_HISTORY.md`: Consolidated run memos with newest first
+
+- **DocGenerator Phase 2 - Full Metadata Surfacing**: All tracked Story metadata now surfaced for AI consumption
+  - **README.md enhancements**: Run Health Summary, Data Freshness indicator, Key Metrics (rows in/out/dropped), Git info, Pipeline DAG (Mermaid)
+  - **Node Cards enhancements**: Sample Data, Null Profile, Column Statistics, Failed Rows Samples, Source Files, Delta Write Info, Duration History, Cross-run Comparison, Execution Steps, Retry History, Environment
+  - **New helper methods**: `_render_mermaid_dag()`, `_render_sample_data_table()`, `_render_null_profile()`, `_render_column_statistics()`, `_render_failed_rows_samples()`
+
+- **Centralized Error Suggestions Engine**: Rich contextual error suggestions with story integration
+
+- **Remote Storage Support**: DocGenerator now writes to ADLS when connection is configured
+
+- **Semantic Layer Docs**: Semantic layer now included in project-level documentation
+
+### Changed
+
+- **TECHNICAL_DETAILS.md**: Now shows all output schemas instead of just final node
+- **RUN_HISTORY.md**: Multiple runs consolidated into single file (newest first)
+- **Project-level Aggregation**: Docs now aggregate across all pipelines in a project
+
 ## [2.9.0] - 2026-01-20
 
 ### Added - Engine Parity & Spark Improvements
