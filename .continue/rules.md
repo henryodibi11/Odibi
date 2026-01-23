@@ -1,10 +1,10 @@
 # Odibi Project Rules for Continue
 
 ## About Odibi
-Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and 41 MCP tools for AI-assisted development.
+Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and 43 MCP tools for AI-assisted development.
 
 ## MCP Documentation
-- **Tool Reference**: `docs/guides/mcp_guide.md` - All 41 tools with examples
+- **Tool Reference**: `docs/guides/mcp_guide.md` - All 43 tools with examples
 - **AI Recipes**: `docs/guides/mcp_recipes.md` - 10 workflow recipes for common tasks
 - **System Prompt**: `docs/guides/mcp_system_prompt.md` - Prompts and snippets
 
