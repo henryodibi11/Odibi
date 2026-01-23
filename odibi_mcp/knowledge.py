@@ -32,7 +32,11 @@ class OdibiKnowledge:
     CRITICAL_CONTEXT = {
         "yaml_syntax": {
             "NEVER_USE": ["source:", "sink:", "transform[].name:"],
-            "ALWAYS_USE": ["inputs:", "outputs:", "transform.steps[].function + params"],
+            "ALWAYS_USE": [
+                "inputs:",
+                "outputs:",
+                "transform.steps[].function + params",
+            ],
             "format_required": "ALWAYS specify format: csv|parquet|json|delta",
             "node_names": "alphanumeric + underscore ONLY (no hyphens, dots, spaces)",
         },
@@ -163,6 +167,120 @@ pm.run("pipeline_name")""",
         if path.exists():
             return path.read_text(encoding="utf-8")
         return "ODIBI_DEEP_CONTEXT.md not found"
+
+    def bootstrap_context(self) -> dict[str, Any]:
+        """Auto-gather full project context for AI assistants.
+
+        This is the FIRST tool an AI should call when starting work on an odibi project.
+        It returns everything needed to understand the project in one call:
+        - Project configuration summary
+        - Available connections and their types
+        - All pipelines with their outputs
+        - Available transformers (count + categories)
+        - Available patterns
+        - Critical YAML syntax rules
+
+        Returns:
+            Dict with project context, ready for AI consumption.
+        """
+        from odibi_mcp.context import get_project_context
+        from odibi_mcp.tools.schema import list_outputs
+
+        result = {
+            "project": None,
+            "connections": [],
+            "pipelines": [],
+            "framework": {
+                "transformer_count": 0,
+                "patterns": [],
+                "critical_yaml_rules": self.CRITICAL_CONTEXT["yaml_syntax"],
+            },
+            "next_steps": [],
+        }
+
+        # Get project context
+        ctx = get_project_context()
+        if ctx:
+            result["project"] = {
+                "name": ctx.project_name,
+                "config_path": str(ctx.config_path),
+            }
+
+            # List connections
+            for name, conn in ctx.connections.items():
+                conn_type = getattr(conn, "connection_type", type(conn).__name__)
+                result["connections"].append(
+                    {
+                        "name": name,
+                        "type": conn_type,
+                    }
+                )
+
+            # List pipelines with their outputs
+            for pipeline_cfg in ctx.get_pipelines():
+                pipeline_name = pipeline_cfg.get("pipeline", pipeline_cfg.get("name", "unknown"))
+                pattern = pipeline_cfg.get("pattern", "custom")
+
+                # Get outputs for this pipeline
+                try:
+                    outputs_result = list_outputs(pipeline_name)
+                    outputs = outputs_result.get("outputs", [])
+                except Exception:
+                    outputs = []
+
+                result["pipelines"].append(
+                    {
+                        "name": pipeline_name,
+                        "pattern": pattern,
+                        "outputs": outputs,
+                    }
+                )
+        else:
+            result["project"] = {"error": "No ODIBI_CONFIG set - cannot load project context"}
+            result["next_steps"].append(
+                "Set ODIBI_CONFIG environment variable to your pipeline YAML path"
+            )
+
+        # Get framework info
+        try:
+            transformers = self.list_transformers()
+            result["framework"]["transformer_count"] = len(transformers)
+        except Exception:
+            pass
+
+        try:
+            patterns = self.list_patterns()
+            result["framework"]["patterns"] = [p["name"] for p in patterns]
+        except Exception:
+            pass
+
+        # Suggest next steps based on what we found
+        if result["pipelines"]:
+            result["next_steps"].extend(
+                [
+                    "Use preview_source() to see actual data in connections",
+                    "Use lineage_graph(pipeline) to understand data flow",
+                    "Use explain(name) to understand specific transformers/patterns",
+                ]
+            )
+        else:
+            result["next_steps"].extend(
+                [
+                    "Use list_files(connection, path) to explore available data",
+                    "Use suggest_pattern(use_case) to pick the right pattern",
+                    "Use get_example(pattern) to get a working YAML template",
+                ]
+            )
+
+        # Add workflow reminder
+        result["workflow_reminder"] = {
+            "rule": "CONTEXT-FIRST: Always gather full context before suggesting solutions",
+            "before_building": ["list_files", "preview_source", "infer_schema"],
+            "before_modifying": ["list_outputs", "lineage_graph", "node_describe"],
+            "before_suggesting": ["explain", "get_example", "validate_yaml"],
+        }
+
+        return result
 
     def get_doc(self, doc_path: str) -> dict[str, Any]:
         """Get a specific documentation file by path.
@@ -667,10 +785,18 @@ pipelines:
         try:
             config = pyyaml.safe_load(yaml_content)
         except pyyaml.YAMLError as e:
-            return {"valid": False, "errors": [f"YAML parse error: {e}"], "warnings": []}
+            return {
+                "valid": False,
+                "errors": [f"YAML parse error: {e}"],
+                "warnings": [],
+            }
 
         if not isinstance(config, dict):
-            return {"valid": False, "errors": ["Config must be a dictionary"], "warnings": []}
+            return {
+                "valid": False,
+                "errors": ["Config must be a dictionary"],
+                "warnings": [],
+            }
 
         # Check required top-level keys
         required_keys = ["project", "connections", "story", "system", "pipelines"]
@@ -848,17 +974,38 @@ pipelines:
             (self.odibi_root / "docs" / "patterns" / f"{pattern_lower}.md", "pattern"),
             (self.odibi_root / "docs" / "features" / f"{pattern_lower}.md", "feature"),
             (self.odibi_root / "docs" / "guides" / f"{pattern_lower}.md", "guide"),
-            (self.odibi_root / "docs" / "tutorials" / f"{pattern_lower}.md", "tutorial"),
-            (self.odibi_root / "docs" / "reference" / f"{pattern_lower}.md", "reference"),
-            (self.odibi_root / "docs" / "validation" / f"{pattern_lower}.md", "validation"),
-            (self.odibi_root / "docs" / "semantics" / f"{pattern_lower}.md", "semantics"),
+            (
+                self.odibi_root / "docs" / "tutorials" / f"{pattern_lower}.md",
+                "tutorial",
+            ),
+            (
+                self.odibi_root / "docs" / "reference" / f"{pattern_lower}.md",
+                "reference",
+            ),
+            (
+                self.odibi_root / "docs" / "validation" / f"{pattern_lower}.md",
+                "validation",
+            ),
+            (
+                self.odibi_root / "docs" / "semantics" / f"{pattern_lower}.md",
+                "semantics",
+            ),
             (self.odibi_root / "docs" / "learning" / f"{pattern_lower}.md", "learning"),
             (self.odibi_root / "docs" / f"{pattern_lower}.md", "doc"),
             # Then glob patterns for partial matches
-            (self.odibi_root / "docs" / "patterns" / f"*{pattern_lower}*.md", "pattern"),
-            (self.odibi_root / "docs" / "features" / f"*{pattern_lower}*.md", "feature"),
+            (
+                self.odibi_root / "docs" / "patterns" / f"*{pattern_lower}*.md",
+                "pattern",
+            ),
+            (
+                self.odibi_root / "docs" / "features" / f"*{pattern_lower}*.md",
+                "feature",
+            ),
             (self.odibi_root / "docs" / "guides" / f"*{pattern_lower}*.md", "guide"),
-            (self.odibi_root / "docs" / "tutorials" / f"*{pattern_lower}*.md", "tutorial"),
+            (
+                self.odibi_root / "docs" / "tutorials" / f"*{pattern_lower}*.md",
+                "tutorial",
+            ),
             (
                 self.odibi_root
                 / "docs"
@@ -871,7 +1018,10 @@ pipelines:
                 self.odibi_root / "docs" / "examples" / "canonical" / f"*{pattern_lower}*.md",
                 "example",
             ),
-            (self.odibi_root / "docs" / "reference" / f"*{pattern_lower}*.md", "reference"),
+            (
+                self.odibi_root / "docs" / "reference" / f"*{pattern_lower}*.md",
+                "reference",
+            ),
         ]
 
         # Try to find a matching doc
@@ -946,7 +1096,13 @@ pipelines:
         for block in yaml_blocks:
             if any(
                 kw in block
-                for kw in ["nodes:", "pipelines:", "transform:", "pattern:", "function:"]
+                for kw in [
+                    "nodes:",
+                    "pipelines:",
+                    "transform:",
+                    "pattern:",
+                    "function:",
+                ]
             ):
                 meaningful_yaml.append(block.strip())
 
@@ -1047,7 +1203,12 @@ pipelines:
                         available.add(name)
 
         # Top-level docs
-        top_level = ["golden_path", "philosophy", "troubleshooting", "ODIBI_DEEP_CONTEXT"]
+        top_level = [
+            "golden_path",
+            "philosophy",
+            "troubleshooting",
+            "ODIBI_DEEP_CONTEXT",
+        ]
         for name in top_level:
             if (self.odibi_root / "docs" / f"{name}.md").exists():
                 available.add(name)
@@ -1185,7 +1346,14 @@ pipelines:
                     "Want fiscal year/quarter calculations",
                     "Need holiday flags or custom date attributes",
                 ],
-                "keywords": ["date", "calendar", "fiscal", "holiday", "dim_date", "time dimension"],
+                "keywords": [
+                    "date",
+                    "calendar",
+                    "fiscal",
+                    "holiday",
+                    "dim_date",
+                    "time dimension",
+                ],
                 "not_for": "Non-date dimensions",
             },
         }
@@ -1229,7 +1397,7 @@ pipelines:
             "description": recommended["description"],
             "use_when": recommended["use_when"],
             "not_for": recommended["not_for"],
-            "confidence": "high" if best_score >= 2 else "medium" if best_score == 1 else "low",
+            "confidence": ("high" if best_score >= 2 else "medium" if best_score == 1 else "low"),
             "matched_keywords": best[1]["matched"],
             "alternatives": alternatives,
             "yaml_hint": f"pattern: {recommended['name']}",
@@ -1444,6 +1612,16 @@ pipelines:
         Returns:
             List of relevant code chunks with scores
         """
+        import os
+
+        # Check if we should use keyword fallback (for Windows DLL issues)
+        if os.environ.get("ODIBI_USE_TFIDF_EMBEDDINGS", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            return self._query_codebase_keyword_fallback(question, k)
+
         self._init_vector_store()
 
         if self._vector_store is None:
@@ -1467,6 +1645,95 @@ pipelines:
             }
             for r in results
         ]
+
+    def _query_codebase_keyword_fallback(self, question: str, k: int = 8) -> list[dict[str, Any]]:
+        """Keyword-based search fallback when embeddings are not available.
+
+        Searches Python files in the odibi codebase using simple text matching.
+        """
+        import re
+
+        # Extract keywords from question
+        stop_words = {
+            "how",
+            "does",
+            "what",
+            "is",
+            "the",
+            "a",
+            "an",
+            "to",
+            "in",
+            "for",
+            "of",
+            "and",
+            "or",
+            "with",
+        }
+        words = re.findall(r"\b\w+\b", question.lower())
+        keywords = [w for w in words if w not in stop_words and len(w) > 2]
+
+        if not keywords:
+            return [
+                {
+                    "error": "No searchable keywords in question",
+                    "suggestion": "Try using specific terms like 'scd2', 'transformer', 'validation'",
+                }
+            ]
+
+        results = []
+        odibi_src = self.odibi_root / "odibi"
+
+        # Search Python files
+        for py_file in odibi_src.rglob("*.py"):
+            try:
+                content = py_file.read_text(encoding="utf-8", errors="ignore")
+                content_lower = content.lower()
+
+                # Count keyword matches
+                score = sum(content_lower.count(kw) for kw in keywords)
+
+                if score > 0:
+                    # Extract relevant snippets
+                    lines = content.split("\n")
+                    relevant_lines = []
+                    for i, line in enumerate(lines):
+                        if any(kw in line.lower() for kw in keywords):
+                            # Include context
+                            start = max(0, i - 2)
+                            end = min(len(lines), i + 3)
+                            snippet = "\n".join(lines[start:end])
+                            if snippet not in relevant_lines:
+                                relevant_lines.append(snippet)
+                            if len(relevant_lines) >= 2:
+                                break
+
+                    results.append(
+                        {
+                            "name": py_file.stem,
+                            "type": "python_file",
+                            "module": str(py_file.relative_to(self.odibi_root)),
+                            "file": str(py_file),
+                            "score": min(score / 10.0, 1.0),  # Normalize score
+                            "content": "\n---\n".join(relevant_lines)[:1500],
+                            "docstring": "",
+                        }
+                    )
+            except Exception:
+                continue
+
+        # Sort by score and return top k
+        results.sort(key=lambda x: x["score"], reverse=True)
+
+        if not results:
+            return [
+                {
+                    "error": f"No results found for keywords: {keywords}",
+                    "suggestion": "Try search_docs or explain tools instead",
+                }
+            ]
+
+        return results[:k]
 
     def reindex(self, force: bool = False) -> dict[str, Any]:
         """Reindex the odibi codebase.

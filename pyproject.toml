@@ -42,6 +42,7 @@ dependencies = [
     "requests>=2.28.0,<3.0.0",
     "importlib_metadata>=4.0.0",
     "duckdb>=0.9.0,<1.1.0",
+    "openpyxl>=3.1.0,<4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -153,6 +154,10 @@ target-version = ['py39', 'py310', 'py311']
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint.per-file-ignores]
+# server.py requires sys.path manipulation before imports
+"odibi_mcp/server.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.9"

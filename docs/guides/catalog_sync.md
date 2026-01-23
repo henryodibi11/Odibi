@@ -43,10 +43,10 @@ Add `sync_to` to your system configuration:
 
 ```yaml
 system:
-  connection: goat_prod_dm        # Primary - blob storage (Delta tables)
+  connection: adls_prod           # Primary - blob storage (Delta tables)
   environment: prod
   sync_to:
-    connection: goat_qat          # Secondary - SQL Server
+    connection: sql_server_prod   # Secondary - SQL Server
     schema_name: odibi_system
 ```
 
@@ -61,7 +61,7 @@ system:
   connection: adls_prod           # Primary - must be blob/local storage
   path: _odibi_system             # Default path (optional)
   environment: prod
-  
+
   sync_to:
     connection: sql_server_prod   # Target connection
     schema_name: odibi_system     # SQL Server schema
@@ -171,7 +171,7 @@ WHERE date >= DATEADD(day, -7, GETDATE())
 ORDER BY timestamp DESC;
 
 -- Get pipeline success rates
-SELECT 
+SELECT
     pipeline_name,
     COUNT(*) as total_runs,
     SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate

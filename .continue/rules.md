@@ -1,5 +1,13 @@
 # Odibi Project Rules for Continue
 
+## About Odibi
+Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and 41 MCP tools for AI-assisted development.
+
+## MCP Documentation
+- **Tool Reference**: `docs/guides/mcp_guide.md` - All 41 tools with examples
+- **AI Recipes**: `docs/guides/mcp_recipes.md` - 10 workflow recipes for common tasks
+- **System Prompt**: `docs/guides/mcp_system_prompt.md` - Prompts and snippets
+
 ## MCP Tool Selection Guide
 
 **Choose the right tool automatically based on task:**
@@ -7,6 +15,7 @@
 | Task Type | MCP to Use |
 |-----------|------------|
 | Odibi transformers, patterns, YAML | `odibi-knowledge` tools |
+| Query pipeline runs, debug failures | `odibi-knowledge` MCP Facade tools |
 | Complex planning, tradeoff analysis | `sequential-thinking` |
 | Read/write/search files | `filesystem` |
 | Web documentation, API docs | `fetch` |
@@ -15,10 +24,118 @@
 
 **Auto-trigger rules:**
 - "explain", "list", "generate YAML", "transformer", "pattern" → use `odibi-knowledge`
+- "why did pipeline fail", "show sample", "lineage", "schema" → use MCP Facade tools
 - "plan", "analyze tradeoffs", "step by step" → use `sequential-thinking`
 - "remember", "recall", "my preferences" → use `memory`
 - "fetch docs", "get documentation for" → use `fetch`
 - "create file", "write to", "save as" → use `filesystem`
+
+## ⚠️ FIRST THING TO DO (MANDATORY)
+
+**At the START of every conversation, call `bootstrap_context` to auto-gather project context:**
+
+```
+bootstrap_context()  # Returns: project, connections, pipelines, outputs, patterns, YAML rules
+```
+
+This gives you everything needed to understand the project in one call.
+
+---
+
+## ⚠️ CONTEXT-FIRST RULE (MANDATORY)
+
+**Before suggesting ANY solution, the AI MUST gather full context using these workflows.**
+
+### Workflow A: Full Source Understanding (BEFORE Building Anything)
+```
+list_files(connection, path, "*")     # 1. What files exist?
+preview_source(connection, path, 20)   # 2. See ACTUAL data values
+infer_schema(connection, path)         # 3. Get exact column names & types
+```
+**ONLY AFTER seeing real data** may the AI suggest patterns or generate YAML.
+
+### Workflow B: Pipeline Deep Dive (BEFORE Modifying Anything)
+```
+list_outputs(pipeline)                 # 1. What outputs exist?
+output_schema(pipeline, output)        # 2. What's the schema?
+lineage_graph(pipeline, true)          # 3. How do nodes connect?
+node_describe(pipeline, node)          # 4. What does this node do?
+node_sample_in(pipeline, node, 10)     # 5. What data flows in?
+story_read(pipeline)                   # 6. Recent run history?
+```
+
+### Workflow C: Framework Mastery Check (BEFORE Suggesting Solutions)
+```
+explain(name)                          # Verify transformer/pattern understanding
+get_example(pattern_name)              # Get working example
+get_yaml_structure()                   # Verify YAML structure
+```
+**NEVER guess parameters** — always use `explain` first.
+
+### Workflow D: Complete Debug Investigation (BEFORE Suggesting Fixes)
+```
+story_read(pipeline)                   # 1. Which node failed?
+node_describe(pipeline, failed_node)   # 2. What was it supposed to do?
+node_sample_in(pipeline, failed_node)  # 3. What data actually arrived?
+node_failed_rows(pipeline, failed_node)# 4. What rows failed validation?
+diagnose_error(error_message)          # 5. Get AI diagnosis
+```
+
+### Workflow F: New Project Onboarding (Complete Context)
+```
+get_deep_context()                     # Full framework docs
+list_patterns()                        # Available patterns
+list_connections()                     # Available connections
+list_transformers()                    # Available transformers
+list_outputs(pipeline)                 # For each pipeline in scope
+lineage_graph(pipeline)                # Understand data flow
+```
+
+## Anti-Patterns (NEVER DO)
+
+| ❌ Don't | ✅ Do Instead |
+|----------|--------------|
+| Guess column names | Use `preview_source` or `infer_schema` |
+| Assume transformer params | Use `explain` to verify |
+| Generate YAML without validation | Run `validate_yaml` first |
+| Suggest fixes without evidence | Use `node_sample_in` to see data |
+| Skip lineage understanding | Use `lineage_graph` before changes |
+
+## Context Checklist (Verify Before Acting)
+
+- [ ] Seen actual source data (`preview_source`)
+- [ ] Know exact column names/types (`infer_schema`)
+- [ ] Understand the pattern (`explain`)
+- [ ] Validated YAML (`validate_yaml`)
+- [ ] Checked lineage impact (`lineage_graph`)
+
+---
+
+## AI Workflow Recipes (Quick Reference)
+
+### Recipe: Build New Pipeline
+1. `list_files` / `preview_source` → understand source data
+2. `suggest_pattern` → recommend right pattern  
+3. `get_example` → get working YAML template
+4. `list_transformers` / `explain` → find transformers
+5. `validate_yaml` → validate before presenting
+
+### Recipe: Debug Pipeline Failure
+1. `story_read` → check run status
+2. `node_describe` → get failed node details
+3. `node_sample_in` → see what data node received
+4. `node_failed_rows` → see validation failures
+5. `diagnose_error` → get fix suggestions
+
+### Recipe: Explore Available Data
+1. `list_files(connection, path, pattern)` → list files
+2. `preview_source(connection, path, max_rows)` → preview data
+3. `infer_schema(connection, path)` → get column types
+
+### Recipe: Learn About Odibi Feature
+1. `explain(name)` → get specific feature docs
+2. `search_docs(query)` → search documentation
+3. `query_codebase(question)` → search source code
 
 ## CRITICAL: Safe Editing Practices
 
@@ -83,6 +200,54 @@
 ## IMPORTANT: Use MCP Tools First!
 
 Before writing ANY odibi code, call these odibi-knowledge MCP tools:
+
+### MCP Facade Tools (Query Pipelines & Debug)
+
+Use these to query running pipelines, view data, and debug failures:
+
+**Discovery Tools** - Explore data sources:
+| Tool | Parameters | Example |
+|------|------------|---------|
+| `list_files` | `connection`, `path`, `pattern` | `list_files("my_storage", "raw_data", "*.json")` |
+| `preview_source` | `connection`, `path`, `max_rows` | `preview_source("my_storage", "raw_data/file.json", 10)` |
+| `infer_schema` | `connection`, `path` | `infer_schema("my_storage", "raw_data/file.csv")` |
+| `list_tables` | `connection`, `schema`, `pattern` | `list_tables("my_database", "dbo", "*")` |
+| `describe_table` | `connection`, `table`, `schema` | `describe_table("my_database", "dim_date", "dbo")` |
+
+**Story Tools** - Inspect pipeline runs:
+| Tool | Parameters | Example |
+|------|------------|---------|
+| `story_read` | `pipeline` | `story_read("bronze")` |
+| `story_diff` | `pipeline`, `run_a`, `run_b` | `story_diff("bronze", "latest", "previous")` |
+| `node_describe` | `pipeline`, `node` | `node_describe("bronze", "customers_raw")` |
+
+**Sample Tools** - View data:
+| Tool | Parameters | Example |
+|------|------------|---------|
+| `node_sample` | `pipeline`, `node`, `max_rows` | `node_sample("bronze", "customers_raw", 10)` |
+| `node_sample_in` | `pipeline`, `node`, `input_name`, `max_rows` | `node_sample_in("bronze", "customers_raw", "default", 10)` |
+| `node_failed_rows` | `pipeline`, `node`, `max_rows` | `node_failed_rows("bronze", "customers_raw", 50)` |
+
+**Lineage Tools**:
+| Tool | Parameters | Example |
+|------|------------|---------|
+| `lineage_upstream` | `pipeline`, `node`, `depth` | `lineage_upstream("silver", "fact_orders", 3)` |
+| `lineage_downstream` | `pipeline`, `node`, `depth` | `lineage_downstream("bronze", "customers_raw", 3)` |
+| `lineage_graph` | `pipeline`, `include_external` | `lineage_graph("bronze", false)` |
+
+**Schema Tools**:
+| Tool | Parameters | Example |
+|------|------------|---------|
+| `list_outputs` | `pipeline` | `list_outputs("bronze")` |
+| `output_schema` | `pipeline`, `output_name` | `output_schema("bronze", "customers_raw")` |
+
+**Catalog Tools**:
+| Tool | Parameters | Example |
+|------|------------|---------|
+| `node_stats` | `pipeline`, `node` | `node_stats("bronze", "customers_raw")` |
+| `pipeline_stats` | `pipeline` | `pipeline_stats("bronze")` |
+| `failure_summary` | `pipeline`, `max_failures` | `failure_summary("bronze", 10)` |
+| `schema_history` | `pipeline`, `node` | `schema_history("bronze", "customers_raw")` |
 
 ### Core Tools
 - `list_transformers` - See all 52+ available transformers

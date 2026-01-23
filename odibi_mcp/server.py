@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 """MCP Server for Odibi Knowledge.
 
 Exposes odibi knowledge through the Model Context Protocol (MCP).
 """
 
-# ruff: noqa: E402
-from __future__ import annotations
-
+from odibi_mcp.audit.logger import AuditLogger
+from odibi_mcp.audit.entry import AuditEntry
+from datetime import datetime
 import json
 import logging
 import sys
@@ -25,9 +27,52 @@ from mcp.types import (
 
 from .knowledge import get_knowledge
 
+# Import facade tools
+from odibi_mcp.tools.story import story_read, story_diff, node_describe
+from odibi_mcp.tools.sample import node_sample, node_sample_in, node_failed_rows
+from odibi_mcp.tools.catalog import (
+    node_stats,
+    pipeline_stats,
+    failure_summary,
+    schema_history,
+)
+from odibi_mcp.tools.lineage import lineage_upstream, lineage_downstream, lineage_graph
+from odibi_mcp.tools.schema import output_schema, list_outputs
+from odibi_mcp.tools.discovery import (
+    list_files,
+    list_tables,
+    infer_schema,
+    describe_table,
+    preview_source,
+)
+from dataclasses import asdict, is_dataclass
+from pydantic import BaseModel
+
+
+def to_json_serializable(obj):
+    """Convert dataclasses and Pydantic models to JSON-serializable dicts."""
+    if obj is None:
+        return None
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, BaseModel):
+        return obj.model_dump(mode="json")
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return {k: to_json_serializable(v) for k, v in asdict(obj).items()}
+    if isinstance(obj, dict):
+        return {k: to_json_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_json_serializable(v) for v in obj]
+    if hasattr(obj, "__dict__"):
+        return {k: to_json_serializable(v) for k, v in obj.__dict__.items()}
+    return str(obj)
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+audit_logger = AuditLogger(logger)
 # Create MCP server
 server = Server("odibi-knowledge")
 
@@ -148,6 +193,15 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="bootstrap_context",
+            description="AUTO-GATHER full project context. Call this FIRST when starting work on an odibi project. Returns: project config, connections, pipelines with outputs, transformer count, patterns, critical YAML rules, and suggested next steps. No parameters needed - reads from ODIBI_CONFIG.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
             name="get_doc",
             description="Get a specific documentation file by path (e.g., 'docs/patterns/scd2.md', 'docs/guides/best_practices.md').",
             inputSchema={
@@ -227,12 +281,18 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "project_name": {"type": "string", "description": "Project name"},
-                    "input_path": {"type": "string", "description": "Path to input file"},
+                    "input_path": {
+                        "type": "string",
+                        "description": "Path to input file",
+                    },
                     "input_format": {
                         "type": "string",
                         "description": "Format: csv, parquet, json, delta",
                     },
-                    "output_path": {"type": "string", "description": "Path to output file"},
+                    "output_path": {
+                        "type": "string",
+                        "description": "Path to output file",
+                    },
                     "output_format": {
                         "type": "string",
                         "description": "Format: csv, parquet, json, delta",
@@ -332,6 +392,320 @@ async def list_tools() -> list[Tool]:
                 "required": [],
             },
         ),
+        # ============ MCP FACADE TOOLS ============
+        # Story tools
+        Tool(
+            name="story_read",
+            description="Read pipeline execution story (status, duration, errors). Use to check run results.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "run_id": {
+                        "type": "string",
+                        "description": "Optional run ID (defaults to latest)",
+                    },
+                },
+                "required": ["pipeline"],
+            },
+        ),
+        Tool(
+            name="story_diff",
+            description="Compare two pipeline runs to see what changed.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "run_a": {"type": "string", "description": "First run ID"},
+                    "run_b": {"type": "string", "description": "Second run ID"},
+                },
+                "required": ["pipeline", "run_a", "run_b"],
+            },
+        ),
+        Tool(
+            name="node_describe",
+            description="Get node config, inputs, outputs, transform steps.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        # Sample tools
+        Tool(
+            name="node_sample",
+            description="Get sample output data from a node.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                    "max_rows": {
+                        "type": "integer",
+                        "description": "Max rows to return",
+                        "default": 100,
+                    },
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        Tool(
+            name="node_sample_in",
+            description="Get sample input data to a node.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                    "input_name": {
+                        "type": "string",
+                        "description": "Input name",
+                        "default": "default",
+                    },
+                    "max_rows": {
+                        "type": "integer",
+                        "description": "Max rows to return",
+                        "default": 100,
+                    },
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        Tool(
+            name="node_failed_rows",
+            description="Get rows that failed validation for a node.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                    "max_rows": {
+                        "type": "integer",
+                        "description": "Max rows to return",
+                        "default": 50,
+                    },
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        # Catalog tools
+        Tool(
+            name="node_stats",
+            description="Get node statistics (row counts, duration, success rate).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        Tool(
+            name="pipeline_stats",
+            description="Get pipeline-level statistics.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                },
+                "required": ["pipeline"],
+            },
+        ),
+        Tool(
+            name="failure_summary",
+            description="Summarize failures across runs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {
+                        "type": "string",
+                        "description": "Optional pipeline filter",
+                    },
+                    "max_failures": {
+                        "type": "integer",
+                        "description": "Max failures to return",
+                        "default": 100,
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="schema_history",
+            description="View schema changes over time for a node.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        # Lineage tools
+        Tool(
+            name="lineage_upstream",
+            description="Find what feeds into a node (data sources).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                    "depth": {
+                        "type": "integer",
+                        "description": "Max depth",
+                        "default": 3,
+                    },
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        Tool(
+            name="lineage_downstream",
+            description="Find what a node feeds into (consumers).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                    "depth": {
+                        "type": "integer",
+                        "description": "Max depth",
+                        "default": 3,
+                    },
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        Tool(
+            name="lineage_graph",
+            description="Get full lineage DAG for a pipeline.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "include_external": {
+                        "type": "boolean",
+                        "description": "Include external sources",
+                        "default": False,
+                    },
+                },
+                "required": ["pipeline"],
+            },
+        ),
+        # Schema tools
+        Tool(
+            name="output_schema",
+            description="Get schema of a pipeline output.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "output_name": {"type": "string", "description": "Output name"},
+                },
+                "required": ["pipeline", "output_name"],
+            },
+        ),
+        Tool(
+            name="list_outputs",
+            description="List all outputs for a pipeline.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                },
+                "required": ["pipeline"],
+            },
+        ),
+        # Discovery tools
+        Tool(
+            name="list_files",
+            description="List files in a connection path.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Connection name"},
+                    "path": {"type": "string", "description": "Path to list"},
+                    "pattern": {
+                        "type": "string",
+                        "description": "Glob pattern",
+                        "default": "*",
+                    },
+                },
+                "required": ["connection", "path"],
+            },
+        ),
+        Tool(
+            name="list_tables",
+            description="List tables in a SQL connection.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Connection name"},
+                    "schema": {
+                        "type": "string",
+                        "description": "Schema name",
+                        "default": "dbo",
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "description": "Table pattern",
+                        "default": "*",
+                    },
+                },
+                "required": ["connection"],
+            },
+        ),
+        Tool(
+            name="infer_schema",
+            description="Infer schema from a file.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Connection name"},
+                    "path": {"type": "string", "description": "Path to file"},
+                },
+                "required": ["connection", "path"],
+            },
+        ),
+        Tool(
+            name="describe_table",
+            description="Describe a SQL table.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Connection name"},
+                    "table": {"type": "string", "description": "Table name"},
+                    "schema": {
+                        "type": "string",
+                        "description": "Schema name",
+                        "default": "dbo",
+                    },
+                },
+                "required": ["connection", "table"],
+            },
+        ),
+        Tool(
+            name="preview_source",
+            description="Preview source data (first N rows).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Connection name"},
+                    "path": {"type": "string", "description": "Path to source"},
+                    "max_rows": {
+                        "type": "integer",
+                        "description": "Max rows",
+                        "default": 100,
+                    },
+                },
+                "required": ["connection", "path"],
+            },
+        ),
     ]
 
 
@@ -357,6 +731,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         "get_validation_rules",
     }
 
+    start_time = datetime.utcnow()
+    request_id = str(arguments.get("request_id") or f"{name}-{int(start_time.timestamp())}")
+    project = "unknown"  # Could extract this from result in future
+    redacted_args = AuditLogger.redact_args(arguments)
+
     try:
         if name == "list_transformers":
             result = knowledge.list_transformers()
@@ -381,6 +760,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = knowledge.get_index_stats()
         elif name == "get_deep_context":
             return [TextContent(type="text", text=knowledge.get_deep_context())]
+        elif name == "bootstrap_context":
+            result = knowledge.bootstrap_context()
         elif name == "get_doc":
             result = knowledge.get_doc(arguments["doc_path"])
         elif name == "list_docs":
@@ -416,6 +797,142 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = knowledge.get_engine_differences()
         elif name == "get_validation_rules":
             result = knowledge.get_validation_rules()
+        # ============ MCP FACADE TOOL HANDLERS ============
+        # Story tools
+        elif name == "story_read":
+            res = story_read(
+                pipeline=arguments["pipeline"],
+                run_selector=arguments.get("run_id"),
+            )
+            result = to_json_serializable(res)
+        elif name == "story_diff":
+            res = story_diff(
+                pipeline=arguments["pipeline"],
+                run_a=arguments["run_a"],
+                run_b=arguments["run_b"],
+            )
+            result = to_json_serializable(res)
+        elif name == "node_describe":
+            res = node_describe(
+                pipeline=arguments["pipeline"],
+                node=arguments["node"],
+            )
+            result = to_json_serializable(res)
+        # Sample tools
+        elif name == "node_sample":
+            res = node_sample(
+                pipeline=arguments["pipeline"],
+                node=arguments["node"],
+                max_rows=arguments.get("max_rows", 100),
+            )
+            result = to_json_serializable(res)
+        elif name == "node_sample_in":
+            res = node_sample_in(
+                pipeline=arguments["pipeline"],
+                node=arguments["node"],
+                input_name=arguments.get("input_name", "default"),
+                max_rows=arguments.get("max_rows", 100),
+            )
+            result = to_json_serializable(res)
+        elif name == "node_failed_rows":
+            res = node_failed_rows(
+                pipeline=arguments["pipeline"],
+                node=arguments["node"],
+                max_rows=arguments.get("max_rows", 50),
+            )
+            result = to_json_serializable(res)
+        # Catalog tools
+        elif name == "node_stats":
+            res = node_stats(
+                pipeline=arguments["pipeline"],
+                node=arguments["node"],
+            )
+            result = to_json_serializable(res)
+        elif name == "pipeline_stats":
+            res = pipeline_stats(
+                pipeline=arguments["pipeline"],
+            )
+            result = to_json_serializable(res)
+        elif name == "failure_summary":
+            res = failure_summary(
+                pipeline=arguments.get("pipeline"),
+                max_failures=arguments.get("max_failures", 100),
+            )
+            result = to_json_serializable(res)
+        elif name == "schema_history":
+            res = schema_history(
+                pipeline=arguments["pipeline"],
+                node=arguments["node"],
+            )
+            result = to_json_serializable(res)
+        # Lineage tools
+        elif name == "lineage_upstream":
+            res = lineage_upstream(
+                pipeline=arguments["pipeline"],
+                node=arguments["node"],
+                depth=arguments.get("depth", 3),
+            )
+            result = to_json_serializable(res)
+        elif name == "lineage_downstream":
+            res = lineage_downstream(
+                pipeline=arguments["pipeline"],
+                node=arguments["node"],
+                depth=arguments.get("depth", 3),
+            )
+            result = to_json_serializable(res)
+        elif name == "lineage_graph":
+            res = lineage_graph(
+                pipeline=arguments["pipeline"],
+                include_external=arguments.get("include_external", False),
+            )
+            result = to_json_serializable(res)
+        # Schema tools
+        elif name == "output_schema":
+            res = output_schema(
+                pipeline=arguments["pipeline"],
+                output_name=arguments["output_name"],
+            )
+            result = to_json_serializable(res)
+        elif name == "list_outputs":
+            res = list_outputs(
+                pipeline=arguments["pipeline"],
+            )
+            result = to_json_serializable(res)
+        # Discovery tools
+        elif name == "list_files":
+            res = list_files(
+                connection=arguments["connection"],
+                path=arguments["path"],
+                pattern=arguments.get("pattern", "*"),
+            )
+            result = to_json_serializable(res)
+        elif name == "list_tables":
+            res = list_tables(
+                connection=arguments["connection"],
+                schema=arguments.get("schema", "dbo"),
+                pattern=arguments.get("pattern", "*"),
+            )
+            result = to_json_serializable(res)
+        elif name == "infer_schema":
+            res = infer_schema(
+                connection=arguments["connection"],
+                path=arguments["path"],
+            )
+            result = to_json_serializable(res)
+        elif name == "describe_table":
+            res = describe_table(
+                connection=arguments["connection"],
+                table=arguments["table"],
+                schema=arguments.get("schema", "dbo"),
+            )
+            result = to_json_serializable(res)
+        elif name == "preview_source":
+            res = preview_source(
+                connection=arguments["connection"],
+                path=arguments["path"],
+                max_rows=arguments.get("max_rows", 100),
+            )
+            result = to_json_serializable(res)
         else:
             result = {"error": f"Unknown tool: {name}"}
 
@@ -424,16 +941,74 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         if name in CONTEXT_INJECTION_TOOLS:
             result = knowledge._with_context(result)
 
+        duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        audit_logger.log(
+            AuditEntry(
+                timestamp=start_time,
+                request_id=request_id,
+                tool_name=name,
+                project=project,
+                environment="production",
+                connection=None,
+                resource_logical=None,
+                args_summary=redacted_args,
+                duration_ms=duration_ms,
+                success=True,
+                error_type=None,
+                bytes_read_estimate=None,
+                policy_applied={},
+            )
+        )
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     except Exception as e:
+        from odibi_mcp.utils.errors import wrap_exception
+
+        duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        mcp_error = wrap_exception(e, tool_name=name, request_id=request_id)
+
+        audit_logger.log(
+            AuditEntry(
+                timestamp=start_time,
+                request_id=request_id,
+                tool_name=name,
+                project=project,
+                environment="production",
+                connection=None,
+                resource_logical=None,
+                args_summary=redacted_args,
+                duration_ms=duration_ms,
+                success=False,
+                error_type=mcp_error.code.value,
+                bytes_read_estimate=None,
+                policy_applied={},
+            )
+        )
         logger.exception(f"Error in tool {name}")
-        return [TextContent(type="text", text=json.dumps({"error": str(e)}))]
+        error_response = {
+            "error": mcp_error.message,
+            "code": mcp_error.code.value,
+            "tool": mcp_error.tool_name,
+            "request_id": mcp_error.request_id,
+        }
+        if mcp_error.details:
+            error_response["details"] = mcp_error.details
+        return [TextContent(type="text", text=json.dumps(error_response))]
 
 
 async def main():
     """Run the MCP server."""
     logger.info("Starting odibi-knowledge MCP server...")
+
+    # Initialize project context from environment
+    from odibi_mcp.context import initialize_from_env
+
+    ctx = initialize_from_env()
+    if ctx:
+        logger.info(f"Loaded project: {ctx.project_name} from {ctx.config_path}")
+    else:
+        logger.warning("No project config found - facade tools will return empty results")
+
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
