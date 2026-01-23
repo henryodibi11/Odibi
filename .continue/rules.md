@@ -209,10 +209,11 @@ Use these to query running pipelines, view data, and debug failures:
 | Tool | Parameters | Example |
 |------|------------|---------|
 | `list_files` | `connection`, `path`, `pattern` | `list_files("my_storage", "raw_data", "*.json")` |
-| `preview_source` | `connection`, `path`, `max_rows` | `preview_source("my_storage", "raw_data/file.json", 10)` |
+| `preview_source` | `connection`, `path`, `max_rows`, `sheet` | `preview_source("my_storage", "raw_data/file.json", 10)` |
 | `infer_schema` | `connection`, `path` | `infer_schema("my_storage", "raw_data/file.csv")` |
 | `list_tables` | `connection`, `schema`, `pattern` | `list_tables("my_database", "dbo", "*")` |
 | `describe_table` | `connection`, `table`, `schema` | `describe_table("my_database", "dim_date", "dbo")` |
+| `list_sheets` | `connection`, `path` | `list_sheets("my_storage", "data.xlsx")` |
 
 **Story Tools** - Inspect pipeline runs:
 | Tool | Parameters | Example |

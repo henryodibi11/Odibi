@@ -1,6 +1,12 @@
+import asyncio
+
+import pytest
+
+# Skip if mcp is not installed (CI environment)
+pytest.importorskip("mcp", reason="mcp package not installed")
+
 from odibi_mcp.server import call_tool
 from odibi_mcp.audit.logger import AuditLogger
-import asyncio
 
 
 class DummyLogger:

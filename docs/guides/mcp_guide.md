@@ -1,6 +1,6 @@
 # Odibi MCP Server Guide
 
-The **odibi-knowledge** MCP (Model Context Protocol) server exposes 42 tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines.
+The **odibi-knowledge** MCP (Model Context Protocol) server exposes 43 tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines.
 
 ## Quick Start
 
@@ -42,7 +42,7 @@ Use odibi MCP list_transformers
 
 ---
 
-## Available Tools (42 Total)
+## Available Tools (43 Total)
 
 ### 🚀 Start Here: Bootstrap Tool
 
@@ -118,15 +118,16 @@ Use odibi MCP list_transformers
 | `list_outputs` | List pipeline outputs | `{"pipeline": "bronze"}` |
 | `output_schema` | Get output column schema | `{"pipeline": "bronze", "output_name": "my_node"}` |
 
-### Discovery Tools (5)
+### Discovery Tools (6)
 
 | Tool | Description | Example |
 |------|-------------|---------|
 | `list_files` | List files in a connection | `{"connection": "my_conn", "path": "data/", "pattern": "*.csv"}` |
-| `preview_source` | Preview source data | `{"connection": "my_conn", "path": "data.csv", "max_rows": 10}` |
+| `preview_source` | Preview source data (supports sheet param for Excel) | `{"connection": "my_conn", "path": "data.csv", "max_rows": 10}` |
 | `infer_schema` | Infer schema from file | `{"connection": "my_conn", "path": "data.csv"}` |
 | `list_tables` | List SQL tables | `{"connection": "my_sql", "schema": "dbo"}` |
 | `describe_table` | Describe SQL table | `{"connection": "my_sql", "table": "my_table"}` |
+| `list_sheets` | List sheet names in Excel file | `{"connection": "my_conn", "path": "data.xlsx"}` |
 
 ---
 

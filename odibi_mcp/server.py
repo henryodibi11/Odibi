@@ -44,6 +44,7 @@ from odibi_mcp.tools.discovery import (
     infer_schema,
     describe_table,
     preview_source,
+    list_sheets,
 )
 from dataclasses import asdict, is_dataclass
 from pydantic import BaseModel
@@ -691,7 +692,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="preview_source",
-            description="Preview source data (first N rows).",
+            description="Preview source data (first N rows). For Excel files, use 'sheet' parameter to specify which sheet to read. Use list_sheets first to discover available sheets.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -702,6 +703,22 @@ async def list_tools() -> list[Tool]:
                         "description": "Max rows",
                         "default": 100,
                     },
+                    "sheet": {
+                        "type": "string",
+                        "description": "For Excel files: sheet name to read (default: first sheet)",
+                    },
+                },
+                "required": ["connection", "path"],
+            },
+        ),
+        Tool(
+            name="list_sheets",
+            description="List all sheet names in an Excel file (.xlsx, .xls). Use this to discover sheets before calling preview_source with sheet parameter.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Connection name"},
+                    "path": {"type": "string", "description": "Path to Excel file"},
                 },
                 "required": ["connection", "path"],
             },
@@ -931,6 +948,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 connection=arguments["connection"],
                 path=arguments["path"],
                 max_rows=arguments.get("max_rows", 100),
+                sheet=arguments.get("sheet"),
+            )
+            result = to_json_serializable(res)
+        elif name == "list_sheets":
+            res = list_sheets(
+                connection=arguments["connection"],
+                path=arguments["path"],
             )
             result = to_json_serializable(res)
         else:

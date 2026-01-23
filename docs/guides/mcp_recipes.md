@@ -115,7 +115,13 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
    preview_source(connection="<conn>", path="<file>", max_rows=10)
    ```
 
-4. **Infer schema**
+4. **For Excel files, discover sheets first**
+   ```
+   list_sheets(connection="<conn>", path="<file>.xlsx")
+   preview_source(connection="<conn>", path="<file>.xlsx", sheet="<sheet_name>", max_rows=10)
+   ```
+
+5. **Infer schema**
    ```
    infer_schema(connection="<conn>", path="<file>")
    ```

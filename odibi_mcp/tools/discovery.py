@@ -45,6 +45,17 @@ class PreviewResponse:
     schema: SchemaResponse
     truncated: bool
     total_rows: Optional[int]
+    error: Optional[str] = None
+
+
+@dataclass
+class ListSheetsResponse:
+    """Response for list_sheets (Excel files)."""
+
+    connection: str
+    path: str
+    sheets: List[str]
+    error: Optional[str] = None
 
 
 def _is_cloud_connection(conn) -> bool:
@@ -446,12 +457,21 @@ def preview_source(
     path: str,
     format: Optional[str] = None,
     max_rows: int = 100,
+    sheet: Optional[str] = None,
     limits: Optional[DiscoveryLimits] = None,
 ) -> PreviewResponse:
     """
     Preview rows from a source file.
 
     Reads actual data from the connection.
+
+    Args:
+        connection: Connection name from config
+        path: Path to the file within the connection
+        format: Override format detection (csv, parquet, json, xlsx)
+        max_rows: Maximum rows to return (default 100)
+        sheet: For Excel files, specify the sheet name to read
+        limits: Discovery limits configuration
     """
     if limits is None:
         limits = DEFAULT_LIMITS
@@ -523,13 +543,18 @@ def preview_source(
                     df = pd.read_json(full_path)
                     df = df.head(max_rows + 1)
         elif suffix in (".xlsx", ".xls"):
+            # Excel reading with optional sheet name
+            excel_kwargs = {"nrows": max_rows + 1, "engine": "openpyxl"}
+            if sheet:
+                excel_kwargs["sheet_name"] = sheet
+
             if is_cloud:
                 import fsspec
 
                 with fsspec.open(full_path, mode="rb", **storage_options) as f:
-                    df = pd.read_excel(f, nrows=max_rows + 1)
+                    df = pd.read_excel(f, **excel_kwargs)
             else:
-                df = pd.read_excel(full_path, nrows=max_rows + 1)
+                df = pd.read_excel(full_path, **excel_kwargs)
         else:
             return PreviewResponse(
                 connection=connection,
@@ -538,6 +563,20 @@ def preview_source(
                 schema=SchemaResponse(columns=[], row_count=None, partition_columns=[]),
                 truncated=False,
                 total_rows=None,
+                error=f"Unsupported format: {suffix}. Supported: csv, parquet, json, xlsx, xls",
+            )
+
+        # Check if we got an empty dataframe
+        if df.empty:
+            return PreviewResponse(
+                connection=connection,
+                path=path,
+                rows=[],
+                schema=SchemaResponse(columns=[], row_count=0, partition_columns=[]),
+                truncated=False,
+                total_rows=0,
+                error="No data found. For Excel files, try specifying sheet parameter. "
+                "Use list_sheets() to discover available sheets.",
             )
 
         truncated = len(df) > max_rows
@@ -566,7 +605,18 @@ def preview_source(
             total_rows=None,
         )
 
-    except Exception:
+    except ImportError as e:
+        logger.exception(f"Missing dependency for {connection}/{path}: {e}")
+        return PreviewResponse(
+            connection=connection,
+            path=path,
+            rows=[],
+            schema=SchemaResponse(columns=[], row_count=None, partition_columns=[]),
+            truncated=False,
+            total_rows=None,
+            error=f"Missing dependency: {e}. Install with: pip install openpyxl",
+        )
+    except Exception as e:
         logger.exception(f"Error previewing source: {connection}/{path}")
         return PreviewResponse(
             connection=connection,
@@ -575,4 +625,86 @@ def preview_source(
             schema=SchemaResponse(columns=[], row_count=None, partition_columns=[]),
             truncated=False,
             total_rows=None,
+            error=str(e),
+        )
+
+
+def list_sheets(
+    connection: str,
+    path: str,
+) -> ListSheetsResponse:
+    """
+    List all sheet names in an Excel file.
+
+    Use this to discover available sheets before calling preview_source with sheet parameter.
+
+    Args:
+        connection: Connection name from config
+        path: Path to the Excel file (.xlsx or .xls)
+
+    Returns:
+        ListSheetsResponse with list of sheet names
+    """
+    ctx = get_project_context()
+    if not ctx:
+        return ListSheetsResponse(
+            connection=connection,
+            path=path,
+            sheets=[],
+            error="No project context. Set ODIBI_CONFIG environment variable.",
+        )
+
+    try:
+        conn = ctx.get_connection(connection)
+        full_path = conn.get_path(path)
+
+        # Check extension
+        suffix = "." + path.split(".")[-1].lower() if "." in path else ""
+        if suffix not in (".xlsx", ".xls"):
+            return ListSheetsResponse(
+                connection=connection,
+                path=path,
+                sheets=[],
+                error=f"Not an Excel file: {suffix}. Expected .xlsx or .xls",
+            )
+
+        import pandas as pd
+
+        # Get storage options for cloud connections
+        storage_options = {}
+        if hasattr(conn, "pandas_storage_options"):
+            storage_options = conn.pandas_storage_options()
+
+        is_cloud = _is_cloud_connection(conn)
+
+        if is_cloud:
+            import fsspec
+
+            with fsspec.open(full_path, mode="rb", **storage_options) as f:
+                excel_file = pd.ExcelFile(f, engine="openpyxl")
+                sheets = excel_file.sheet_names
+        else:
+            excel_file = pd.ExcelFile(full_path, engine="openpyxl")
+            sheets = excel_file.sheet_names
+
+        return ListSheetsResponse(
+            connection=connection,
+            path=path,
+            sheets=sheets,
+        )
+
+    except ImportError as e:
+        return ListSheetsResponse(
+            connection=connection,
+            path=path,
+            sheets=[],
+            error=f"Missing dependency: {e}. Install with: pip install openpyxl",
+        )
+    except Exception as e:
+        logger.exception(f"Error listing sheets: {connection}/{path}")
+        return ListSheetsResponse(
+            connection=connection,
+            path=path,
+            sheets=[],
+            error=str(e),
         )
