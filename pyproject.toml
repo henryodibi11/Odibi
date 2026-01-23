@@ -81,11 +81,16 @@ polars = [
 ]
 mcp = [
     "mcp>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "fsspec>=2023.1.0",
+    "scikit-learn>=1.0.0",  # TF-IDF fallback for Windows (avoids PyTorch DLL issues)
 ]
 mcp-rag = [
     "mcp>=1.0.0",
-    "chromadb",
-    "sentence-transformers",
+    "python-dotenv>=1.0.0",
+    "fsspec>=2023.1.0",
+    "chromadb>=0.4.0",
+    "sentence-transformers>=2.2.0",
 ]
 
 all = [
