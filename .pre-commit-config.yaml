@@ -67,23 +67,8 @@ repos:
         description: Detects <<<<<<< markers in files
 
   # ============================================================================
-  # PYTHON CODE FORMATTING
-  # Black - The uncompromising Python code formatter
-  # ============================================================================
-  - repo: https://github.com/psf/black
-    rev: 24.1.1  # Use latest stable Black version
-    hooks:
-      # Automatically formats Python code to Black's style
-      # Why: Enforces consistent code style across all contributors
-      # Config: Uses settings from pyproject.toml (line-length=100)
-      - id: black
-        name: Format Python code (Black)
-        description: Auto-format Python files
-        types: [python]
-
-  # ============================================================================
-  # PYTHON LINTING
-  # Ruff - Extremely fast Python linter (replaces flake8, pylint, isort)
+  # PYTHON LINTING AND FORMATTING
+  # Ruff - Extremely fast Python linter and formatter (replaces flake8, pylint, isort, black)
   # ============================================================================
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.2.0  # Use latest stable Ruff version
