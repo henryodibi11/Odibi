@@ -4,6 +4,7 @@ odibi_mcp.audit.logger
 AuditLogger for structured logging of MCP tool calls.
 Implements redaction and structured message per MCP spec.
 """
+
 import logging
 from typing import Dict, Any
 from .entry import AuditEntry

@@ -186,3 +186,6 @@ projects/
 .odibi/
 .aider*
 IPS_S_Curve/
+
+# MCP reference servers (external clone, not a submodule)
+servers/

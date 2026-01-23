@@ -7,6 +7,7 @@ Spec: All 3 conditions must pass to allow a physical ref in the response:
   2. ConnectionPolicy.allow_physical_refs is True
   3. AccessContext.physical_refs_enabled is True
 """
+
 from odibi_mcp.contracts.access import AccessContext
 
 

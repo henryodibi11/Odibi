@@ -4,6 +4,7 @@ odibi_mcp.audit.entry
 AuditEntry dataclass for structured MCP audit logging.
 Matches all required fields per MCP spec including policy/applied audit.
 """
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Dict, Any
