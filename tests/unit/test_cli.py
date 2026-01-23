@@ -241,3 +241,24 @@ class TestInitCommand:
         if result == 0:
             assert not (existing / "existing_file.txt").exists()
             assert (existing / "odibi.yaml").exists()
+
+    def test_init_command_creates_mcp_config(self, tmp_path, monkeypatch):
+        """init should create mcp_config.yaml with project name."""
+        from odibi.cli.init_pipeline import init_pipeline_command
+
+        monkeypatch.chdir(tmp_path)
+
+        args = Namespace(name="my_analytics", template="hello", force=False)
+        result = init_pipeline_command(args)
+
+        if result == 0:
+            mcp_config = tmp_path / "my_analytics" / "mcp_config.yaml"
+            assert mcp_config.exists()
+            content = mcp_config.read_text()
+            # Should have project name in authorized_projects
+            assert "my_analytics" in content
+            # Should have standard MCP sections
+            assert "access:" in content
+            assert "connection_policies:" in content
+            assert "discovery:" in content
+            assert "audit:" in content

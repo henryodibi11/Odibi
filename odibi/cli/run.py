@@ -20,6 +20,17 @@ def run_command(args):
         os.chdir(project_root)
         logger.debug(f"Changed working directory to: {project_root}")
 
+        # Load .env file from project directory if it exists
+        env_file = project_root / ".env"
+        if env_file.exists():
+            try:
+                from dotenv import load_dotenv
+
+                load_dotenv(env_file)
+                logger.debug(f"Loaded environment from: {env_file}")
+            except ImportError:
+                logger.warning("python-dotenv not installed, skipping .env file")
+
         try:
             # Load extensions from config dir (which is now CWD)
             load_extensions(project_root)

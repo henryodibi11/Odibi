@@ -1752,12 +1752,24 @@ class PipelineManager:
                     )
                     # Set project name for tagging all catalog records
                     self.catalog_manager.project = project_config.project
-                    self.catalog_manager.bootstrap()
-                    self._ctx.info(
-                        "System Catalog initialized",
-                        path=base_path,
-                        project=project_config.project,
+
+                    # Skip bootstrap if catalog writes are disabled
+                    skip_catalog = (
+                        getattr(project_config.performance, "skip_catalog_writes", False)
+                        if project_config.performance
+                        else False
                     )
+                    if not skip_catalog:
+                        self.catalog_manager.bootstrap()
+                        self._ctx.info(
+                            "System Catalog initialized",
+                            path=base_path,
+                            project=project_config.project,
+                        )
+                    else:
+                        self._ctx.debug(
+                            "System Catalog bootstrap skipped (skip_catalog_writes=true)"
+                        )
             else:
                 self._ctx.warning(
                     f"System connection '{project_config.system.connection}' not found",
@@ -1852,6 +1864,17 @@ class PipelineManager:
         import importlib.util
         import os
         import sys
+
+        # Load .env file from config directory if it exists
+        env_file = config_dir / ".env"
+        if env_file.exists():
+            try:
+                from dotenv import load_dotenv
+
+                load_dotenv(env_file, override=True)
+                logger.debug(f"Loaded environment from: {env_file}")
+            except ImportError:
+                logger.warning("python-dotenv not installed, skipping .env file")
 
         def load_transforms_module(path):
             if os.path.exists(path):
@@ -2229,7 +2252,14 @@ class PipelineManager:
         )
 
         try:
-            self.catalog_manager.bootstrap()
+            # Skip bootstrap if catalog writes are disabled
+            skip_catalog = (
+                getattr(self.project_config.performance, "skip_catalog_writes", False)
+                if self.project_config.performance
+                else False
+            )
+            if not skip_catalog:
+                self.catalog_manager.bootstrap()
 
             for pipeline_config in to_deploy:
                 self._ctx.debug(

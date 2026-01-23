@@ -1,1 +1,1 @@
-"""Test fixtures and sample data."""
+# tests/fixtures/__init__.py

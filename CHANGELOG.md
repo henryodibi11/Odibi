@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] - 2026-01-23
+
+### Added - MCP Facade for AI Assistants
+
+- **MCP Facade**: Complete Model Context Protocol implementation for AI assistant integration
+  - Read-only interface ensuring AI cannot mutate data or trigger runs
+  - Single-project scoping with deny-by-default access controls
+  - Typed Pydantic responses (no Dict[str, Any])
+
+- **Core Contracts** (`odibi_mcp/contracts/`):
+  - `TruncatedReason` enum for typed truncation responses
+  - `MCPEnvelope`, `PolicyApplied` for standardized responses
+  - `RunSelector` for flexible run targeting (latest, by ID, time-based)
+  - `ResourceRef` with gated physical path exposure
+  - `AccessContext`, `ConnectionPolicy` for unified access control
+  - `TimeWindow`, `SchemaResponse`, `GraphData`, `DiffSummary`, etc.
+
+- **Access Enforcement** (`odibi_mcp/access/`):
+  - Project scoping in `CatalogManager._apply_project_scope()`
+  - Path validation with allow/deny prefix lists
+  - Physical ref gating (3 conditions must pass)
+  - Audit logging with sensitive key redaction
+
+- **MCP Tools**:
+  - **Story**: `story_read`, `story_diff`, `node_describe`
+  - **Sample**: `node_sample`, `node_sample_in`, `node_failed_rows`
+  - **Catalog**: `node_stats`, `pipeline_stats`, `failure_summary`, `schema_history`
+  - **Lineage**: `lineage_upstream`, `lineage_downstream`, `lineage_graph`
+  - **Schema**: `output_schema`, `list_outputs`
+  - **Discovery**: `list_files`, `list_tables`, `infer_schema`, `describe_table`, `preview_source`
+
+- **Error Handling**: Standardized `MCPError` with typed error codes
+
+- **Documentation**:
+  - `odibi_mcp/README.md` with full tool reference
+  - `mcp_config.example.yaml` configuration template
+  - `docs/mcp/examples/basic_usage.py` usage examples
+
+### Changed
+
+- `CatalogManager`: Added `set_access_context()` and `_apply_project_scope()` for MCP integration
+
 ## [2.10.0] - 2026-01-22
 
 ### Added - Documentation Generation from Story Artifacts

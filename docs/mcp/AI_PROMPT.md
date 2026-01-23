@@ -1,6 +1,6 @@
 # Odibi MCP Implementation — AI Assistant Prompt
 
-> **Copy this prompt at the start of each session with Continue/GPT 5.2**
+> **Copy this prompt at the start of each session with Cline, Continue, or other AI coding assistants**
 
 ---
 
@@ -9,10 +9,78 @@
 ```
 You are helping implement the Odibi MCP Facade — a read-only AI interface for the Odibi data engineering framework.
 
-## Key Files (Read These First)
-- Specification: docs/mcp/SPEC.md (full v4.1 design)
-- Implementation Plan: docs/mcp/IMPLEMENTATION_PLAN.md (atomic tasks)
-- Progress Checklist: docs/mcp/CHECKLIST.md (track completion)
+## Your Available Tools (USE THESE EXACT NAMES)
+
+### Filesystem Tools (Primary)
+| Tool | When to Use |
+|------|-------------|
+| `read_file` | Read spec files, existing code, dependencies |
+| `create_new_file` | Create new Python modules (contracts, tools, tests) |
+| `edit_existing_file` | Line-based edits (add/delete/replace lines) |
+| `single_find_and_replace` | Find and replace exact strings |
+| `ls` | List directory contents |
+| `file_glob_search` | Find files by pattern (e.g., `*.py`, `test_*.py`) |
+| `filesystem_directory_tree` | Get JSON tree view of project structure |
+| `view_diff` | Check working directory changes before commit |
+
+### Terminal Tools
+| Tool | When to Use |
+|------|-------------|
+| `run_terminal_command` | Run pytest, ruff, python -c, any CLI command |
+
+### Odibi Knowledge Tools (USE FOR CONTEXT)
+| Tool | When to Use |
+|------|-------------|
+| `odibi_knowledge_get_deep_context` | Get full 2,200+ line framework docs |
+| `odibi_knowledge_list_transformers` | See all built-in transformers |
+| `odibi_knowledge_list_patterns` | See all DWH patterns |
+| `odibi_knowledge_list_connections` | See all connection types |
+| `odibi_knowledge_explain` | Get detailed docs for any feature |
+| `odibi_knowledge_validate_yaml` | Validate pipeline YAML |
+| `odibi_knowledge_query_codebase` | Semantic search over odibi code |
+
+### Sequential Thinking (USE FOR PLANNING)
+| Tool | When to Use |
+|------|-------------|
+| `sequential_thinking_sequentialthinking` | Multi-step planning, debugging, architecture decisions |
+
+**USE sequential_thinking BEFORE implementing:**
+- Planning implementation order across multiple files
+- Debugging complex issues with multiple causes
+- Analyzing task dependencies
+- Breaking down large tasks into atomic steps
+
+### Git Tools (After Implementation)
+| Tool | When to Use |
+|------|-------------|
+| `git_status` | Check what files changed |
+| `git_diff_unstaged` | Review changes before staging |
+| `git_add` | Stage files for commit |
+| `git_commit` | Commit completed phase |
+
+## Step 1: Read Spec Files First
+Before starting ANY task, run these tools:
+```
+read_file docs/mcp/SPEC.md
+read_file docs/mcp/IMPLEMENTATION_PLAN.md
+read_file docs/mcp/CHECKLIST.md
+```
+
+## Step 2: Understand Existing Code
+```
+ls odibi_mcp/
+ls odibi_mcp/contracts/
+read_file odibi_mcp/server.py
+read_file odibi_mcp/knowledge.py
+file_glob_search pattern="*.py" path="odibi_mcp/"
+```
+
+## Step 3: Use Sequential Thinking for Planning
+Before implementing, call:
+```
+sequential_thinking_sequentialthinking
+```
+With thought: "I need to implement [TASK]. Let me analyze dependencies, existing code patterns, and plan the implementation."
 
 ## Core Principles (MUST Follow)
 1. READ-ONLY: MCP never mutates data, triggers runs, or alters state
@@ -32,7 +100,33 @@ You are helping implement the Odibi MCP Facade — a read-only AI interface for 
 - Follow existing Odibi patterns (check odibi/config.py for examples)
 - Add type hints to all functions
 - No Dict[str, Any] in response models — use typed classes
-- Run tests after each task
+
+## Step 4: Implement the Task
+For new files:
+```
+create_new_file path="odibi_mcp/contracts/[filename].py" content="..."
+```
+
+For existing files:
+```
+edit_existing_file path="odibi_mcp/contracts/[filename].py" edits=[...]
+```
+
+## Step 5: Verify Implementation
+After writing code, ALWAYS run:
+```
+run_terminal_command command="python -c \"from odibi_mcp.contracts.[module] import [Class]; print('OK')\""
+run_terminal_command command="pytest tests/unit/mcp/test_[module].py -v"
+run_terminal_command command="ruff check odibi_mcp/"
+```
+
+## Step 6: Update Checklist & Commit
+```
+single_find_and_replace path="docs/mcp/CHECKLIST.md" find="- [ ] **[TASK_ID].**" replace="- [x] **[TASK_ID].**"
+git_status
+git_add files=["odibi_mcp/contracts/[file].py", "docs/mcp/CHECKLIST.md"]
+git_commit message="feat(mcp): implement [TASK_ID] - [description]"
+```
 
 ## Current Task
 I am working on task [TASK_ID] from the implementation plan.
@@ -50,9 +144,12 @@ Please implement this task following the specification.
 ```
 I'm starting Phase [N]: [PHASE_NAME].
 
-Please read:
-- docs/mcp/SPEC.md — Section: [RELEVANT_SECTION]
-- docs/mcp/IMPLEMENTATION_PLAN.md — Phase [N] tasks
+Execute these tools in order:
+1. sequential_thinking_sequentialthinking → Plan the phase
+2. read_file docs/mcp/SPEC.md → Focus on: [RELEVANT_SECTION]
+3. read_file docs/mcp/IMPLEMENTATION_PLAN.md → Find Phase [N] tasks
+4. ls odibi_mcp/ → See current structure
+5. file_glob_search pattern="[RELEVANT_PATTERN]" path="odibi_mcp/"
 
 Let's begin with task [N]a.
 ```
@@ -66,10 +163,14 @@ Task: [TASK_DESCRIPTION]
 File: [FILE_PATH]
 Dependencies: [LIST_DEPENDENCIES]
 
-Reference the spec at docs/mcp/SPEC.md for the exact model/contract definition.
-
-After implementation, I will run:
-[VERIFICATION_COMMAND]
+Execute this workflow:
+1. sequential_thinking_sequentialthinking → Plan implementation
+2. read_file docs/mcp/SPEC.md → Get exact model definition
+3. read_file [DEPENDENCY_FILES] → Understand dependencies
+4. create_new_file OR edit_existing_file → Implement
+5. run_terminal_command command="pytest tests/unit/mcp/[TEST_FILE] -v"
+6. run_terminal_command command="ruff check odibi_mcp/"
+7. single_find_and_replace → Mark task complete in CHECKLIST.md
 ```
 
 ### Fixing a Failed Test
@@ -77,26 +178,32 @@ After implementation, I will run:
 ```
 Task [TASK_ID] failed verification.
 
-Command run:
-[VERIFICATION_COMMAND]
-
 Error output:
 [PASTE_ERROR]
 
-Please fix the implementation.
+Execute this workflow:
+1. sequential_thinking_sequentialthinking → Analyze the error
+2. read_file [FAILING_FILE] → Understand current implementation
+3. file_glob_search pattern="*[related]*" → Find related code
+4. edit_existing_file → Apply fix
+5. run_terminal_command command="pytest [TEST] -v" → Re-verify
 ```
 
 ### Reviewing Before Commit
 
 ```
-I've completed Phase [N]. Before committing, please review:
+I've completed Phase [N]. Execute this review:
 
-1. All files in odibi_mcp/[FOLDER]/ follow the spec
-2. All tests pass: pytest tests/unit/mcp/ -v
-3. No type errors: python -c "from odibi_mcp import *"
-4. Ruff is clean: ruff check odibi_mcp/
+1. ls odibi_mcp/[FOLDER]/ → Verify files exist
+2. run_terminal_command command="pytest tests/unit/mcp/ -v"
+3. run_terminal_command command="python -c \"from odibi_mcp import *\""
+4. run_terminal_command command="ruff check odibi_mcp/"
+5. view_diff → Review all changes
+6. git_status → Check status
+7. git_add files=[...] → Stage files
+8. git_commit message="feat(mcp): complete Phase [N]"
 
-List any issues found.
+Report any failures.
 ```
 
 ---
@@ -129,31 +236,75 @@ List any issues found.
 
 ## Quick Reference: Verification Commands
 
-```bash
+```
 # Check imports work
-python -c "from odibi_mcp.contracts.enums import TruncatedReason; print('OK')"
+run_terminal_command command="python -c \"from odibi_mcp.contracts.enums import TruncatedReason; print('OK')\""
 
 # Run specific test
-pytest tests/unit/mcp/test_envelope.py -v
+run_terminal_command command="pytest tests/unit/mcp/test_envelope.py -v"
 
 # Run all MCP tests
-pytest tests/unit/mcp/ -v
-
-# Check types
-python -c "from odibi_mcp import *"
+run_terminal_command command="pytest tests/unit/mcp/ -v"
 
 # Lint check
-ruff check odibi_mcp/
+run_terminal_command command="ruff check odibi_mcp/"
 
 # Format check
-ruff format odibi_mcp/ --check
+run_terminal_command command="ruff format odibi_mcp/ --check"
+```
+
+---
+
+## Quick Reference: Common Tool Patterns
+
+### Exploring the codebase
+```
+ls odibi_mcp/
+ls odibi_mcp/contracts/
+file_glob_search pattern="*.py" path="odibi_mcp/"
+file_glob_search pattern="test_*.py" path="tests/unit/mcp/"
+odibi_knowledge_query_codebase query="Pydantic model"
+```
+
+### Reading files
+```
+read_file docs/mcp/SPEC.md
+read_file docs/mcp/IMPLEMENTATION_PLAN.md
+read_file docs/mcp/CHECKLIST.md
+read_file odibi/config.py  # For patterns
+```
+
+### Creating new files
+```
+create_new_file path="odibi_mcp/contracts/new_model.py" content="..."
+```
+
+### Editing existing files
+```
+edit_existing_file path="odibi_mcp/contracts/enums.py" edits=[{"type": "insert", "line": 10, "content": "..."}]
+single_find_and_replace path="docs/mcp/CHECKLIST.md" find="- [ ]" replace="- [x]"
+```
+
+### Verifying changes
+```
+run_terminal_command command="pytest tests/unit/mcp/ -v"
+run_terminal_command command="ruff check odibi_mcp/"
+run_terminal_command command="python -c \"from odibi_mcp import *\""
+```
+
+### Git workflow
+```
+git_status
+view_diff
+git_add files=["odibi_mcp/contracts/enums.py"]
+git_commit message="feat(mcp): add TruncatedReason enum"
 ```
 
 ---
 
 ## Reminders
 
-- [ ] Mark completed tasks in `CHECKLIST.md`
-- [ ] Commit after each phase
-- [ ] Run `ruff check .` before pushing
-- [ ] Update `CHANGELOG.md` when done
+After each task:
+1. `single_find_and_replace` → Mark task complete in CHECKLIST.md
+2. `run_terminal_command` → Verify with pytest and ruff
+3. `git_commit` → Commit after each phase (not each task)

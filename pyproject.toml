@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odibi"
-version = "2.11.0"
+version = "2.11.1"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
     {name = "Henry Odibi", email = "odibiengineering@gmail.com"}
@@ -161,8 +161,12 @@ line-length = 100
 target-version = "py39"
 
 [tool.ruff.lint.per-file-ignores]
-# server.py requires sys.path manipulation before imports
+# These files require env vars or sys.path manipulation before imports
 "odibi_mcp/server.py" = ["E402"]
+"odibi_mcp/contracts/envelope.py" = ["E402"]
+"odibi_mcp/test_all_tools.py" = ["E402", "F841"]
+"run_mcp.py" = ["E402"]
+"tests/unit/mcp/test_server_audit.py" = ["F841"]
 
 [tool.mypy]
 python_version = "3.9"

@@ -1,0 +1,68 @@
+# Odibi MCP Configuration Example
+# Copy to mcp_config.yaml and customize
+
+# Project configuration - point to your odibi.yaml
+project:
+  # Path to your odibi.yaml project config
+  config_path: ./odibi.yaml
+
+  # Or specify individual paths if not using odibi.yaml
+  # story_path: ./stories
+  # catalog_connection: sql_warehouse
+
+# Access control settings
+access:
+  # Projects this MCP instance is authorized to access
+  authorized_projects:
+    - my_project
+    - shared_project
+
+  # Environment (production, staging, development)
+  environment: production
+
+  # Enable physical path exposure (requires all 3 gates)
+  physical_refs_enabled: false
+
+# Connection policies (deny-by-default)
+connection_policies:
+  # ADLS connection
+  adls_main:
+    connection: adls_main
+    allowed_path_prefixes:
+      - /data/bronze/
+      - /data/silver/
+    denied_path_prefixes:
+      - /data/bronze/pii/
+      - /data/bronze/secrets/
+    max_depth: 5
+    allow_physical_refs: false
+
+  # SQL Server connection
+  sql_warehouse:
+    connection: sql_warehouse
+    allowed_path_prefixes:
+      - dbo.
+      - analytics.
+    max_depth: 3
+    allow_physical_refs: false
+
+# Discovery limits
+discovery:
+  max_files_per_request: 1000
+  max_tables_per_request: 500
+  max_schema_columns: 500
+  max_preview_rows: 100
+  max_preview_bytes: 1000000  # 1MB
+  max_path_depth: 5
+  schema_inference_bytes: 10000000  # 10MB
+
+# Audit logging
+audit:
+  enabled: true
+  log_level: INFO
+  redact_sensitive_keys:
+    - password
+    - token
+    - secret
+    - key
+    - credential

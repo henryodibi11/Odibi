@@ -159,6 +159,97 @@ class PandasEngine(Engine):
                 delay = base_delay * (2**attempt) + random.uniform(0, 0.1)
                 time.sleep(delay)
 
+    def _read_delta_with_duckdb(
+        self,
+        path: str,
+        storage_options: dict,
+        version: Optional[int],
+        timestamp: Optional[str],
+        post_read_query: Optional[str],
+        ctx,
+    ) -> pd.DataFrame:
+        """Read Delta table using DuckDB (supports DeletionVectors and ColumnMapping).
+
+        DuckDB's delta extension supports advanced Delta features that the Python
+        deltalake library doesn't yet support. This is used as a fallback when
+        deltalake fails with unsupported reader features.
+
+        Args:
+            path: Path to Delta table
+            storage_options: Storage authentication options (for ADLS, S3, etc.)
+            version: Specific version to read (time travel)
+            timestamp: Specific timestamp to read (time travel)
+            post_read_query: Optional pandas query to apply after reading
+            ctx: Logging context
+
+        Returns:
+            DataFrame with Delta table contents
+        """
+        try:
+            import duckdb
+        except ImportError:
+            raise ImportError(
+                "DuckDB is required to read Delta tables with DeletionVectors or ColumnMapping. "
+                "Install with 'pip install duckdb>=1.0.0'."
+            )
+
+        ctx.debug("Reading Delta table with DuckDB", path=path)
+
+        conn = duckdb.connect(":memory:")
+
+        # Install and load the delta extension
+        conn.execute("INSTALL delta")
+        conn.execute("LOAD delta")
+
+        # Configure storage options for cloud paths
+        if storage_options:
+            # Azure ADLS configuration
+            if "account_name" in storage_options:
+                account = storage_options["account_name"]
+                if "account_key" in storage_options:
+                    conn.execute(
+                        f"SET azure_storage_account_name = '{account}';"
+                        f"SET azure_storage_account_key = '{storage_options['account_key']}';"
+                    )
+                elif "sas_token" in storage_options:
+                    sas = storage_options["sas_token"]
+                    if sas.startswith("?"):
+                        sas = sas[1:]
+                    conn.execute(
+                        f"SET azure_storage_account_name = '{account}';"
+                        f"SET azure_storage_sas_token = '{sas}';"
+                    )
+                # For Azure Identity (DefaultCredential), DuckDB uses env vars automatically
+
+            # AWS S3 configuration
+            if "AWS_ACCESS_KEY_ID" in storage_options:
+                conn.execute(
+                    f"SET s3_access_key_id = '{storage_options['AWS_ACCESS_KEY_ID']}';"
+                    f"SET s3_secret_access_key = '{storage_options['AWS_SECRET_ACCESS_KEY']}';"
+                )
+                if "AWS_REGION" in storage_options:
+                    conn.execute(f"SET s3_region = '{storage_options['AWS_REGION']}';")
+
+        # Build the delta_scan query
+        # Note: DuckDB delta_scan doesn't support version/timestamp time travel yet
+        if version is not None or timestamp is not None:
+            ctx.warning(
+                "DuckDB delta_scan does not support time travel yet. "
+                "Reading latest version instead.",
+                requested_version=version,
+                requested_timestamp=timestamp,
+            )
+
+        query = f"SELECT * FROM delta_scan('{path}')"
+        ctx.debug("Executing DuckDB query", query=query)
+
+        df = conn.execute(query).fetchdf()
+        conn.close()
+
+        ctx.debug("Delta table read via DuckDB", rows=len(df), columns=len(df.columns))
+
+        return self._process_df(df, post_read_query)
+
     def _resolve_path(self, path: Optional[str], connection: Any) -> str:
         """Resolve path to full URI, avoiding double-prefixing for cloud URIs.
 
@@ -868,42 +959,68 @@ class PandasEngine(Engine):
             version = options.get("versionAsOf")
             timestamp = options.get("timestampAsOf")
 
-            if timestamp is not None:
-                from datetime import datetime as dt_module
+            # Try deltalake first, fall back to DuckDB for unsupported features
+            # (e.g., DeletionVectors, ColumnMapping)
+            try:
+                if timestamp is not None:
+                    from datetime import datetime as dt_module
 
-                if isinstance(timestamp, str):
-                    ts = dt_module.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    if isinstance(timestamp, str):
+                        ts = dt_module.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    else:
+                        ts = timestamp
+                    dt = DeltaTable(full_path, storage_options=storage_opts)
+                    dt.load_with_datetime(ts)
+                    ctx.debug("Delta table loaded with timestamp", timestamp=str(ts))
+                elif version is not None:
+                    dt = DeltaTable(full_path, storage_options=storage_opts, version=version)
+                    ctx.debug("Delta table loaded with version", version=version)
                 else:
-                    ts = timestamp
-                dt = DeltaTable(full_path, storage_options=storage_opts)
-                dt.load_with_datetime(ts)
-                ctx.debug("Delta table loaded with timestamp", timestamp=str(ts))
-            elif version is not None:
-                dt = DeltaTable(full_path, storage_options=storage_opts, version=version)
-                ctx.debug("Delta table loaded with version", version=version)
-            else:
-                dt = DeltaTable(full_path, storage_options=storage_opts)
-                ctx.debug("Delta table loaded (latest version)")
+                    dt = DeltaTable(full_path, storage_options=storage_opts)
+                    ctx.debug("Delta table loaded (latest version)")
 
-            if self.use_arrow:
-                import inspect
+                if self.use_arrow:
+                    import inspect
 
-                sig = inspect.signature(dt.to_pandas)
+                    sig = inspect.signature(dt.to_pandas)
 
-                if "arrow_options" in sig.parameters:
-                    return self._process_df(
-                        dt.to_pandas(
-                            partitions=None, arrow_options={"types_mapper": pd.ArrowDtype}
-                        ),
-                        post_read_query,
+                    if "arrow_options" in sig.parameters:
+                        return self._process_df(
+                            dt.to_pandas(
+                                partitions=None, arrow_options={"types_mapper": pd.ArrowDtype}
+                            ),
+                            post_read_query,
+                        )
+                    else:
+                        return self._process_df(
+                            dt.to_pyarrow_table().to_pandas(types_mapper=pd.ArrowDtype),
+                            post_read_query,
+                        )
+                else:
+                    return self._process_df(dt.to_pandas(), post_read_query)
+
+            except Exception as e:
+                # Check if this is a DeltaProtocolError for unsupported features
+                error_msg = str(e).lower()
+                unsupported_features = (
+                    "deletionvectors" in error_msg
+                    or "columnmapping" in error_msg
+                    or "reader features" in error_msg
+                    or "not yet supported" in error_msg
+                )
+
+                if unsupported_features:
+                    ctx.warning(
+                        "Delta table uses features not supported by deltalake library, "
+                        "falling back to DuckDB",
+                        path=str(full_path),
+                        error=str(e),
+                    )
+                    return self._read_delta_with_duckdb(
+                        full_path, storage_opts, version, timestamp, post_read_query, ctx
                     )
                 else:
-                    return self._process_df(
-                        dt.to_pyarrow_table().to_pandas(types_mapper=pd.ArrowDtype),
-                        post_read_query,
-                    )
-            else:
-                return self._process_df(dt.to_pandas(), post_read_query)
+                    raise
         elif format == "avro":
             ctx.debug("Reading Avro file", path=str(full_path))
             try:

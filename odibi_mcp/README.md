@@ -1,111 +1,90 @@
-# Odibi Knowledge MCP Server
+# Odibi MCP Facade
 
-MCP (Model Context Protocol) server that provides AI tools (Cline, Claude Desktop, Cursor) with **perfect retrieval** of odibi knowledge.
+A read-only Model Context Protocol (MCP) interface for AI assistants to interact with the Odibi data engineering framework.
 
-## Tools (13 total)
+## Overview
 
-### Structured (Deterministic - Perfect Retrieval)
+The MCP Facade provides AI assistants with safe, read-only access to:
+- Pipeline metadata and stories
+- Data catalogs and run statistics
+- Schema information and lineage
+- Source discovery (with access controls)
 
-| Tool | What it returns |
-|------|-----------------|
-| `list_transformers` | All 52 transformers with params |
-| `list_patterns` | All 6 DWH patterns |
-| `list_connections` | All 7 connection types |
-| `explain(name)` | Full docs for any transformer/pattern/connection |
-| `get_transformer_signature` | **Exact** custom transformer code pattern |
-| `get_yaml_structure` | **Exact** YAML pipeline structure |
+## Key Principles
 
-### Documentation (137 markdown files accessible)
+1. **READ-ONLY**: MCP never mutates data, triggers runs, or alters state
+2. **SINGLE-PROJECT**: Each request operates within one project context
+3. **DENY-BY-DEFAULT**: Path discovery requires explicit allowlists
+4. **TYPED RESPONSES**: All responses use Pydantic models
+5. **PHYSICAL REFS GATED**: 3 conditions must pass to expose physical paths
 
-| Tool | What it returns |
-|------|-----------------|
-| `get_deep_context` | Full ODIBI_DEEP_CONTEXT.md (2299 lines, 62KB) |
-| `get_doc(path)` | Any doc by path (e.g., `docs/patterns/scd2.md`) |
-| `list_docs(category)` | List docs by category (patterns, tutorials, guides, features, reference, examples, context) |
-| `search_docs(query)` | Search all docs for a keyword |
+## Tools Available
 
-### Semantic (RAG - 6402 indexed chunks)
+### Story Tools (`odibi_mcp/tools/story.py`)
+- `story_read` - Read pipeline run metadata
+- `story_diff` - Compare two pipeline runs
+- `node_describe` - Get detailed node information
 
-| Tool | Purpose |
-|------|---------|
-| `query_codebase(question)` | Semantic search over indexed codebase |
-| `reindex(force=False)` | Rebuild the vector index |
-| `get_index_stats` | Check index status |
+### Sample Tools (`odibi_mcp/tools/sample.py`)
+- `node_sample` - Get sample output data
+- `node_sample_in` - Get sample input data
+- `node_failed_rows` - Get validation failures
 
-## Installation
+### Catalog Tools (`odibi_mcp/tools/catalog.py`)
+- `node_stats` - Node-level statistics
+- `pipeline_stats` - Pipeline-level statistics
+- `failure_summary` - Failure aggregations
+- `schema_history` - Schema change history
 
-### For Cline
+### Lineage Tools (`odibi_mcp/tools/lineage.py`)
+- `lineage_upstream` - Trace data sources
+- `lineage_downstream` - Trace data consumers
+- `lineage_graph` - Full lineage graph
 
-Add to your `cline_mcp_settings.json`:
+### Schema Tools (`odibi_mcp/tools/schema.py`)
+- `output_schema` - Get output schema
+- `list_outputs` - List pipeline outputs
 
-```json
-{
-  "mcpServers": {
-    "odibi-knowledge": {
-      "command": "python",
-      "args": ["-m", "odibi_mcp.server"],
-      "cwd": "D:/odibi",
-      "disabled": false
-    }
-  }
-}
+### Discovery Tools (`odibi_mcp/tools/discovery.py`)
+- `list_files` - List files (access controlled)
+- `list_tables` - List database tables
+- `infer_schema` - Infer schema from source
+- `describe_table` - Get table schema
+- `preview_source` - Preview source data
+
+## Access Control
+
+### AccessContext
+```python
+from odibi_mcp.contracts.access import AccessContext, ConnectionPolicy
+
+ctx = AccessContext(
+    authorized_projects={"my_project"},
+    environment="production",
+    connection_policies={
+        "adls_main": ConnectionPolicy(
+            connection="adls_main",
+            allowed_path_prefixes=["/data/bronze/"],
+            allow_physical_refs=False,
+        )
+    },
+    physical_refs_enabled=False,
+)
 ```
 
-### For Claude Desktop
+### Physical Ref Gating
 
-Add to your Claude Desktop config:
+Physical paths are only exposed when ALL conditions pass:
+1. Caller requests `include_physical=True`
+2. `ConnectionPolicy.allow_physical_refs=True`
+3. `AccessContext.physical_refs_enabled=True`
 
-```json
-{
-  "mcpServers": {
-    "odibi-knowledge": {
-      "command": "python",
-      "args": ["-m", "odibi_mcp.server"],
-      "cwd": "D:/odibi"
-    }
-  }
-}
-```
-
-## Usage Examples
-
-Once configured, AI tools can call:
-
-```
-# Get exact patterns (deterministic)
-list_transformers           → All 52 transformers with params
-get_yaml_structure          → Exact YAML template
-get_transformer_signature   → Exact function signature
-
-# Access documentation
-get_deep_context            → Full 2299-line framework docs
-get_doc("patterns/scd2.md") → SCD2 pattern documentation
-search_docs("validation")   → Find all docs mentioning validation
-list_docs(category="guides") → List all guide documents
-
-# Explain anything
-explain("scd2")             → Pattern + transformer docs for SCD2
-explain("local")            → Connection type documentation
-```
-
-## What This Solves
-
-AI tools like Cline don't auto-embed repository context. This MCP server provides:
-
-1. **Perfect retrieval** for common patterns (transformer signatures, YAML structure)
-2. **Full documentation access** (137 markdown files, 62KB deep context)
-3. **Semantic search** for exploratory questions (6402 indexed code chunks)
-
-## RAG Setup (Optional)
-
-Semantic search requires:
+## Running the Server
 
 ```bash
-pip install chromadb sentence-transformers
+python -m odibi_mcp.server
 ```
 
-Then:
-```
-reindex(force=True)
-query_codebase("how does validation work?")
-```
+## Configuration
+
+See `mcp_config.example.yaml` for configuration options.

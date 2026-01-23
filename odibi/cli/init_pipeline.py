@@ -202,6 +202,58 @@ jobs:
         with open(target_dir / ".gitignore", "w") as f:
             f.write("data/\nlogs/\n__pycache__/\n*.pyc\n.odibi/\nstories/\n")
 
+        # Create MCP config template for AI assistant integration
+        mcp_config_content = """# Odibi MCP Configuration
+# Model Context Protocol settings for AI assistant integration
+# See: https://henryodibi11.github.io/Odibi/mcp/
+
+# Access control settings
+access:
+  # Projects this MCP instance is authorized to access
+  authorized_projects:
+    - {project_name}
+
+  # Environment (production, staging, development)
+  environment: development
+
+  # Enable physical path exposure (requires all 3 gates)
+  physical_refs_enabled: false
+
+# Connection policies (deny-by-default)
+connection_policies:
+  local:
+    connection: local
+    allowed_path_prefixes:
+      - /data/
+      - /sample_data/
+    denied_path_prefixes: []
+    max_depth: 5
+    allow_physical_refs: false
+
+# Discovery limits
+discovery:
+  max_files_per_request: 1000
+  max_tables_per_request: 500
+  max_schema_columns: 500
+  max_preview_rows: 100
+  max_preview_bytes: 1000000  # 1MB
+  max_path_depth: 5
+  schema_inference_bytes: 10000000  # 10MB
+
+# Audit logging
+audit:
+  enabled: true
+  log_level: INFO
+  redact_sensitive_keys:
+    - password
+    - token
+    - secret
+    - key
+    - credential
+""".format(project_name=project_name)
+        with open(target_dir / "mcp_config.yaml", "w") as f:
+            f.write(mcp_config_content)
+
         # Generate README.md
         readme_content = f"""# {project_name}
 
@@ -223,6 +275,7 @@ odibi story last
 ## Project Structure
 
 - `odibi.yaml` - Pipeline configuration
+- `mcp_config.yaml` - MCP settings for AI assistant integration
 - `sample_data/` - Source CSV files
 - `data/` - Output data (created on first run)
 
