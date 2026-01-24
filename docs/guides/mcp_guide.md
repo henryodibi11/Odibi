@@ -111,12 +111,13 @@ Use odibi MCP list_transformers
 | `lineage_downstream` | Find downstream dependents | `{"pipeline": "bronze", "node": "my_node", "depth": 3}` |
 | `lineage_graph` | Full pipeline lineage graph | `{"pipeline": "bronze", "include_external": true}` |
 
-### Schema Tools (2)
+### Schema Tools (3)
 
 | Tool | Description | Example |
 |------|-------------|---------|
 | `list_outputs` | List pipeline outputs | `{"pipeline": "bronze"}` |
 | `output_schema` | Get output column schema | `{"pipeline": "bronze", "output_name": "my_node"}` |
+| `compare_schemas` | Compare schemas between two sources | `{"source_connection": "raw", "source_path": "data.csv", "target_connection": "bronze", "target_path": "output.parquet"}` |
 
 ### Discovery Tools (8)
 

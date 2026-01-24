@@ -1,11 +1,11 @@
 # Odibi Project Rules for Continue
 
 ## About Odibi
-Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and 45 MCP tools for AI-assisted development.
+Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and 46 MCP tools for AI-assisted development.
 
 ## MCP Documentation
-- **Tool Reference**: `docs/guides/mcp_guide.md` - All 45 tools with examples
-- **AI Recipes**: `docs/guides/mcp_recipes.md` - 10 workflow recipes for common tasks
+- **Tool Reference**: `docs/guides/mcp_guide.md` - All 46 tools with examples
+- **AI Recipes**: `docs/guides/mcp_recipes.md` - 14 workflow recipes for common tasks
 - **System Prompt**: `docs/guides/mcp_system_prompt.md` - Prompts and snippets
 
 ## MCP Tool Selection Guide
@@ -243,6 +243,7 @@ Use these to query running pipelines, view data, and debug failures:
 |------|------------|---------|
 | `list_outputs` | `pipeline` | `list_outputs("bronze")` |
 | `output_schema` | `pipeline`, `output_name` | `output_schema("bronze", "customers_raw")` |
+| `compare_schemas` | `source_connection`, `source_path`, `target_connection`, `target_path` | `compare_schemas("raw", "data.csv", "bronze", "output.parquet")` |
 
 **Catalog Tools**:
 | Tool | Parameters | Example |

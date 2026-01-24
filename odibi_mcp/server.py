@@ -37,7 +37,7 @@ from odibi_mcp.tools.catalog import (
     schema_history,
 )
 from odibi_mcp.tools.lineage import lineage_upstream, lineage_downstream, lineage_graph
-from odibi_mcp.tools.schema import output_schema, list_outputs
+from odibi_mcp.tools.schema import output_schema, list_outputs, compare_schemas
 from odibi_mcp.tools.discovery import (
     list_files,
     list_tables,
@@ -787,6 +787,39 @@ async def list_tools() -> list[Tool]:
                 "required": ["connection"],
             },
         ),
+        Tool(
+            name="compare_schemas",
+            description="Compare schemas between two data sources. Returns differences in columns, types, and nullability. Use to validate source-to-target compatibility before building pipelines.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source_connection": {
+                        "type": "string",
+                        "description": "Connection name for source",
+                    },
+                    "source_path": {"type": "string", "description": "Path to source file/table"},
+                    "target_connection": {
+                        "type": "string",
+                        "description": "Connection name for target",
+                    },
+                    "target_path": {"type": "string", "description": "Path to target file/table"},
+                    "source_sheet": {
+                        "type": "string",
+                        "description": "Optional sheet name for Excel source",
+                    },
+                    "target_sheet": {
+                        "type": "string",
+                        "description": "Optional sheet name for Excel target",
+                    },
+                },
+                "required": [
+                    "source_connection",
+                    "source_path",
+                    "target_connection",
+                    "target_path",
+                ],
+            },
+        ),
     ]
 
 
@@ -977,6 +1010,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         elif name == "list_outputs":
             res = list_outputs(
                 pipeline=arguments["pipeline"],
+            )
+            result = to_json_serializable(res)
+        elif name == "compare_schemas":
+            res = compare_schemas(
+                source_connection=arguments["source_connection"],
+                source_path=arguments["source_path"],
+                target_connection=arguments["target_connection"],
+                target_path=arguments["target_path"],
+                source_sheet=arguments.get("source_sheet"),
+                target_sheet=arguments.get("target_sheet"),
             )
             result = to_json_serializable(res)
         # Discovery tools

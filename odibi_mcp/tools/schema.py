@@ -2,7 +2,7 @@
 """Schema-related MCP tools - wired to real pipeline outputs."""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 from pathlib import Path
 
@@ -11,6 +11,148 @@ from odibi_mcp.contracts.resources import ResourceRef
 from odibi_mcp.context import get_project_context
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ColumnDiff:
+    """Difference for a single column."""
+
+    column: str
+    status: str  # "added", "removed", "type_changed", "nullable_changed"
+    source_type: Optional[str] = None
+    target_type: Optional[str] = None
+    source_nullable: Optional[bool] = None
+    target_nullable: Optional[bool] = None
+
+
+@dataclass
+class SchemaDiffResponse:
+    """Response for compare_schemas."""
+
+    source_name: str
+    target_name: str
+    is_compatible: bool
+    added_columns: List[str] = field(default_factory=list)
+    removed_columns: List[str] = field(default_factory=list)
+    type_changes: List[ColumnDiff] = field(default_factory=list)
+    nullable_changes: List[ColumnDiff] = field(default_factory=list)
+    common_columns: List[str] = field(default_factory=list)
+    summary: str = ""
+
+
+def compare_schemas(
+    source_connection: str,
+    source_path: str,
+    target_connection: str,
+    target_path: str,
+    source_sheet: Optional[str] = None,
+    target_sheet: Optional[str] = None,
+) -> SchemaDiffResponse:
+    """
+    Compare schemas between two data sources.
+
+    Useful for validating source-to-target compatibility before building pipelines.
+    Returns differences in columns, types, and nullability.
+
+    Args:
+        source_connection: Connection name for source
+        source_path: Path to source file/table
+        target_connection: Connection name for target
+        target_path: Path to target file/table
+        source_sheet: Optional sheet name for Excel source
+        target_sheet: Optional sheet name for Excel target
+    """
+    from odibi_mcp.tools.discovery import infer_schema
+
+    # Get source schema
+    source_schema = infer_schema(
+        connection=source_connection,
+        path=source_path,
+        sheet=source_sheet,
+    )
+
+    # Get target schema
+    target_schema = infer_schema(
+        connection=target_connection,
+        path=target_path,
+        sheet=target_sheet,
+    )
+
+    # Build column maps
+    source_cols = {col.name: col for col in source_schema.columns}
+    target_cols = {col.name: col for col in target_schema.columns}
+
+    source_names = set(source_cols.keys())
+    target_names = set(target_cols.keys())
+
+    # Calculate differences
+    added = sorted(target_names - source_names)
+    removed = sorted(source_names - target_names)
+    common = sorted(source_names & target_names)
+
+    type_changes = []
+    nullable_changes = []
+
+    for col_name in common:
+        src_col = source_cols[col_name]
+        tgt_col = target_cols[col_name]
+
+        # Normalize types for comparison
+        src_type = src_col.dtype.lower().replace("int64", "int").replace("float64", "float")
+        tgt_type = tgt_col.dtype.lower().replace("int64", "int").replace("float64", "float")
+
+        if src_type != tgt_type:
+            type_changes.append(
+                ColumnDiff(
+                    column=col_name,
+                    status="type_changed",
+                    source_type=src_col.dtype,
+                    target_type=tgt_col.dtype,
+                )
+            )
+
+        if src_col.nullable != tgt_col.nullable:
+            nullable_changes.append(
+                ColumnDiff(
+                    column=col_name,
+                    status="nullable_changed",
+                    source_nullable=src_col.nullable,
+                    target_nullable=tgt_col.nullable,
+                )
+            )
+
+    # Determine compatibility
+    is_compatible = len(removed) == 0 and len(type_changes) == 0
+
+    # Build summary
+    summary_parts = []
+    if is_compatible:
+        summary_parts.append("Schemas are compatible.")
+    else:
+        summary_parts.append("Schemas have breaking differences.")
+
+    if added:
+        summary_parts.append(f"{len(added)} columns added in target.")
+    if removed:
+        summary_parts.append(f"{len(removed)} columns missing in target (BREAKING).")
+    if type_changes:
+        summary_parts.append(f"{len(type_changes)} type mismatches (BREAKING).")
+    if nullable_changes:
+        summary_parts.append(f"{len(nullable_changes)} nullability changes.")
+    if not any([added, removed, type_changes, nullable_changes]):
+        summary_parts.append("Schemas are identical.")
+
+    return SchemaDiffResponse(
+        source_name=f"{source_connection}/{source_path}",
+        target_name=f"{target_connection}/{target_path}",
+        is_compatible=is_compatible,
+        added_columns=added,
+        removed_columns=removed,
+        type_changes=type_changes,
+        nullable_changes=nullable_changes,
+        common_columns=common,
+        summary=" ".join(summary_parts),
+    )
 
 
 @dataclass

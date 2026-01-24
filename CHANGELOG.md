@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0] - 2026-01-23
+
+### Added - Schema Comparison & New Recipes
+
+- **New MCP Tool**: `compare_schemas` - Compare schemas between two data sources
+  - Returns differences in columns, types, and nullability
+  - Identifies breaking vs non-breaking changes
+  - Supports Excel sheets via `source_sheet`/`target_sheet` params
+  - Provides compatibility summary for quick assessment
+
+- **New AI Workflow Recipes** (4 new recipes, 14 total):
+  - Recipe 11: "Analyze Unknown Connection" - Full discovery workflow for storage/database
+  - Recipe 12: "Compare Source vs Target Schema" - Schema compatibility check
+  - Recipe 13: "Catalog a Database" - AI-powered data cataloging
+  - Recipe 14: "Suggest Pipeline from Discovered Data" - End-to-end pipeline generation
+
+### Changed
+
+- Total MCP tools: 45 → 46
+- Documentation updates across mcp_guide.md, mcp_recipes.md, mcp_system_prompt.md, rules.md
+
+## [2.12.0] - 2026-01-23
+
+### Added - Exploration Mode & Discovery Tools
+
+- **Exploration Mode**: Minimal config format for data exploration without full pipeline setup
+  - Only requires `connections:` block - no pipelines, story, or system needed
+  - Enables AI to explore data sources before building pipelines
+
+- **New Discovery Tools**:
+  - `discover_database` - Crawl SQL database with schemas and samples in one call
+  - `discover_storage` - Crawl file storage recursively with schemas and samples
+  - Both tools support recursive scanning for nested folders (Excel files in subdirs)
+
+- **Enhanced `list_sheets`**: List all sheet names in Excel files for discovery
+
+### Fixed
+
+- `FileInfo` contract: Fixed field names (`logical_name`/`physical_path` not `name`/`path`)
+
 ## [2.11.0] - 2026-01-23
 
 ### Added - MCP Facade for AI Assistants

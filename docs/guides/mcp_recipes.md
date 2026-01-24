@@ -601,3 +601,175 @@ Before suggesting ANY pipeline changes, verify:
 6. **Prefer specific tools** - Use `explain` over `get_deep_context` for focused questions
 7. **Never guess - always verify** - If unsure about column names, types, or parameters, use the tools to check
 8. **Build complete mental models** - Use the Context-First Workflows before taking action
+
+---
+
+## Recipe 11: "Analyze Unknown Connection"
+
+**When user says:** "What's in this connection?", "Explore [connection]", "Analyze [connection]", "Catalog [connection]"
+
+**For Storage Connections:**
+
+```
+# Step 1: Discover all files recursively
+discover_storage(connection="<conn>", path="", recursive=true, max_files=50)
+
+# Step 2: For interesting files, get detailed schemas
+preview_source(connection="<conn>", path="<file>", max_rows=20)
+infer_schema(connection="<conn>", path="<file>")
+
+# Step 3: For Excel files, discover sheets first
+list_sheets(connection="<conn>", path="<file>.xlsx")
+preview_source(connection="<conn>", path="<file>.xlsx", sheet="<sheet_name>")
+```
+
+**For Database Connections:**
+
+```
+# Step 1: Discover all tables with schemas and samples
+discover_database(connection="<sql_conn>", schema="dbo", max_tables=50, sample_rows=5)
+
+# Step 2: For interesting tables, get more detail
+describe_table(connection="<sql_conn>", table="<table>", schema="dbo")
+preview_source(connection="<sql_conn>", path="<table>", max_rows=20)
+```
+
+**AI should summarize:**
+- File/table inventory (count by type/format)
+- Key tables/files and their purposes
+- Column patterns (potential keys, dimensions, facts)
+- Data quality observations (nulls, duplicates)
+- Suggested next steps (which tables to load first, recommended patterns)
+
+---
+
+## Recipe 12: "Compare Source vs Target Schema"
+
+**When user says:** "Compare schemas", "Is source compatible with target?", "What's different between..."
+
+**Steps:**
+
+```
+# Direct comparison with one call
+compare_schemas(
+    source_connection="<source_conn>",
+    source_path="<source_path>",
+    target_connection="<target_conn>",
+    target_path="<target_path>",
+    source_sheet="<optional_sheet>",  # For Excel
+    target_sheet="<optional_sheet>"
+)
+```
+
+**Response should include:**
+- Compatibility status (breaking vs non-breaking)
+- Added columns (in target, not in source)
+- Removed columns (in source, missing in target - BREAKING)
+- Type mismatches (BREAKING)
+- Nullability changes
+- Suggestions for handling differences
+
+**Example conversation:**
+> User: "Is my staging table compatible with the production target?"
+>
+> AI: Let me compare the schemas...
+> [calls compare_schemas with source and target]
+>
+> The schemas have 2 breaking differences:
+> - Column `customer_id` type changed: `string` → `int` (BREAKING)
+> - Column `created_date` is missing in target (BREAKING)
+>
+> You'll need to either:
+> 1. Add a type cast in your transform: `CAST(customer_id AS INT)`
+> 2. Add the missing column to the target table
+
+---
+
+## Recipe 13: "Catalog a Database"
+
+**When user says:** "Catalog [database]", "Document all tables in...", "Create data dictionary for..."
+
+**Steps:**
+
+```
+# Step 1: Discover all tables
+discover_database(connection="<sql_conn>", schema="dbo", max_tables=100, sample_rows=3)
+
+# Step 2: For each important table, AI analyzes:
+# - Column names and types
+# - Sample values
+# - Potential keys (columns ending in _id, unique values)
+# - Table purpose (dim_, fact_, stg_, etc.)
+# - Relationships (FK patterns)
+
+# Step 3: Output structured catalog
+```
+
+**AI Output Format:**
+
+```yaml
+catalog:
+  connection: <connection_name>
+  schema: dbo
+  tables:
+    - name: dim_customer
+      purpose: Customer master data (dimension table)
+      row_count: 15000
+      primary_key: customer_id
+      columns:
+        - name: customer_id
+          type: int
+          role: primary_key
+        - name: customer_name
+          type: varchar
+          role: business_name
+      relationships:
+        - references: fact_orders.customer_id
+
+    - name: fact_orders
+      purpose: Sales transactions (fact table)
+      row_count: 1500000
+      primary_key: order_id
+      foreign_keys:
+        - customer_id → dim_customer.customer_id
+        - product_id → dim_product.product_id
+```
+
+---
+
+## Recipe 14: "Suggest Pipeline from Discovered Data"
+
+**When user says:** "Build pipeline for what you found", "Create pipeline from discovery", "Load this as..."
+
+**Prerequisites:** AI has already run discovery tools and understands the source data.
+
+**Steps:**
+
+```
+# Step 1: Confirm understanding
+preview_source(connection="<conn>", path="<file>")
+infer_schema(connection="<conn>", path="<file>")
+
+# Step 2: Recommend pattern based on data shape
+suggest_pattern(use_case="<inferred from data>")
+
+# Step 3: Get pattern example
+get_example(pattern_name="<suggested_pattern>")
+
+# Step 4: Find relevant transformers
+list_transformers()
+explain(name="<transformer_name>")
+
+# Step 5: Generate YAML
+generate_pipeline_yaml(...)  # Or manually construct
+
+# Step 6: Validate before presenting
+validate_yaml(yaml_content="<generated>")
+```
+
+**AI should propose:**
+- Pattern choice with reasoning
+- Input configuration (connection, path, format)
+- Required transforms (type casts, renames, null handling)
+- Output configuration
+- Validation rules (if applicable)
