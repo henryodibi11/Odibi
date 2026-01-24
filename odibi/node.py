@@ -800,8 +800,6 @@ class NodeExecutor:
         # Fallback: bare column
         return column
 
-    # ... rest of class ...
-
     def _generate_incremental_sql_filter(
         self,
         inc: IncrementalConfig,
@@ -983,6 +981,7 @@ class NodeExecutor:
 
         # Get the SQL format for proper column quoting
         sql_format = config.read.format if config.read else None
+        engine_name = getattr(self.engine, "name", None)
 
         if inc.mode == IncrementalMode.ROLLING_WINDOW:
             if not inc.lookback or not inc.unit:
@@ -1003,7 +1002,7 @@ class NodeExecutor:
 
             if delta:
                 cutoff = now - delta
-                quoted_col = self._quote_sql_column(inc.column, sql_format)
+                quoted_col = self._quote_sql_column(inc.column, sql_format, engine_name)
                 col_expr, cutoff_expr = self._get_date_expr(quoted_col, cutoff, inc.date_format)
 
                 if inc.fallback_column:
@@ -1041,7 +1040,7 @@ class NodeExecutor:
                         except ValueError:
                             hwm_str = last_hwm.replace("T", " ")
 
-                    quoted_col = self._quote_sql_column(inc.column, sql_format)
+                    quoted_col = self._quote_sql_column(inc.column, sql_format, engine_name)
                     if inc.fallback_column:
                         quoted_fallback = self._quote_sql_column(inc.fallback_column, sql_format)
                         return f"COALESCE({quoted_col}, {quoted_fallback}) > '{hwm_str}'"
