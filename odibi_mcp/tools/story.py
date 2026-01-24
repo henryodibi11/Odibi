@@ -150,6 +150,22 @@ def story_read(
 
     Loads actual story JSON from the configured story path.
     """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return StoryReadResult(
+            pipeline=pipeline,
+            status="unavailable",
+            duration_seconds=0.0,
+            run_id=None,
+            start_time=None,
+            end_time=None,
+            nodes=[],
+            node_count=0,
+            success_count=0,
+            failure_count=0,
+            error_message="Story tools require full project.yaml (exploration mode active)",
+        )
+
     fs, story_path = _find_story_file(pipeline, run_selector)
 
     if not fs or not story_path:
@@ -243,6 +259,23 @@ def node_describe(
 
     Returns detailed node information from the story.
     """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return NodeDescribeResult(
+            pipeline=pipeline,
+            node=node,
+            operation="unknown",
+            inputs=[],
+            outputs=[],
+            transform_steps=[],
+            validations=[],
+            duration=0.0,
+            row_count_in=None,
+            row_count_out=None,
+            status="unavailable",
+            error="Story tools require full project.yaml (exploration mode active)",
+        )
+
     fs, story_path = _find_story_file(pipeline, run_selector)
 
     if not fs or not story_path:
@@ -332,6 +365,18 @@ def story_diff(
     """
     Compute DiffSummary for two pipeline runs.
     """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return DiffSummary(
+            schema_diff=SchemaChange(run_id="unavailable", timestamp=None),
+            row_count_diff=0,
+            null_count_changes={},
+            distinct_count_changes={},
+            sample_diff_included=False,
+            sample_diff=None,
+            error="Story tools require full project.yaml (exploration mode active)",
+        )
+
     fs_a, story_a_path = _find_story_file(pipeline, {"run_id": run_a})
     fs_b, story_b_path = _find_story_file(pipeline, {"run_id": run_b})
 

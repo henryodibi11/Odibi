@@ -4,12 +4,15 @@
 import os
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Literal
 from dataclasses import dataclass, field
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+# Mode type for context
+ContextMode = Literal["full", "exploration"]
 
 
 @dataclass
@@ -27,6 +30,7 @@ class MCPProjectContext:
     story_connection: Optional[str] = None
     story_path: Optional[str] = None
     catalog_connection: Optional[str] = None
+    mode: ContextMode = "full"  # "full" or "exploration"
     _initialized: bool = False
 
     @classmethod
@@ -81,6 +85,57 @@ class MCPProjectContext:
         )
 
         return ctx
+
+    @classmethod
+    def from_exploration_config(cls, config_path: str) -> "MCPProjectContext":
+        """
+        Load project context in exploration mode - connections only.
+
+        This is a lightweight mode for data discovery without requiring
+        full pipeline, story, or system configuration.
+
+        Example mcp_config.yaml:
+        ```yaml
+        project: my_exploration  # optional
+        connections:
+          my_sql:
+            type: azure_sql
+            connection_string: ${SQL_CONN}
+          local:
+            type: local
+            path: ./data
+        ```
+        """
+        path = Path(config_path)
+
+        if not path.exists():
+            raise FileNotFoundError(f"Exploration config not found: {path}")
+
+        with open(path) as f:
+            config = yaml.safe_load(f)
+
+        # Validate minimal requirements
+        if "connections" not in config:
+            raise ValueError("Exploration config must have 'connections' section")
+
+        project_name = config.get("project", "exploration")
+
+        ctx = cls(
+            project_name=project_name,
+            config_path=path,
+            config=config,
+            story_connection=None,
+            story_path=None,
+            catalog_connection=None,
+            mode="exploration",
+        )
+
+        logger.info(f"Loaded exploration mode config: {path}")
+        return ctx
+
+    def is_exploration_mode(self) -> bool:
+        """Check if running in exploration mode (connections only)."""
+        return self.mode == "exploration"
 
     def initialize_connections(self) -> None:
         """Initialize all connections from config."""
@@ -200,6 +255,41 @@ def set_project_context(ctx: MCPProjectContext) -> None:
     _project_context = ctx
 
 
+def _is_full_project_config(config: Dict[str, Any]) -> bool:
+    """Check if config has full project structure (pipelines, story, system)."""
+    return all(key in config for key in ["pipelines", "story", "system"])
+
+
+def _is_exploration_config(config: Dict[str, Any]) -> bool:
+    """Check if config is exploration mode (connections only, no pipelines)."""
+    return "connections" in config and "pipelines" not in config
+
+
+def _load_config_auto(config_path: str) -> MCPProjectContext:
+    """
+    Auto-detect config type and load appropriately.
+
+    - If config has pipelines/story/system -> full mode
+    - If config has only connections -> exploration mode
+    """
+    path = Path(config_path)
+
+    with open(path) as f:
+        config = yaml.safe_load(f)
+
+    if _is_full_project_config(config):
+        logger.info(f"Detected full project config: {path}")
+        return MCPProjectContext.from_odibi_yaml(str(path))
+    elif _is_exploration_config(config):
+        logger.info(f"Detected exploration config: {path}")
+        return MCPProjectContext.from_exploration_config(str(path))
+    else:
+        # Has pipelines but missing story/system - try as full config
+        # (will fail with helpful Pydantic error if incomplete)
+        logger.info(f"Loading as project config: {path}")
+        return MCPProjectContext.from_odibi_yaml(str(path))
+
+
 def initialize_from_env() -> Optional[MCPProjectContext]:
     """Initialize project context from MCP_CONFIG or ODIBI_CONFIG env var."""
     global _project_context
@@ -214,19 +304,16 @@ def initialize_from_env() -> Optional[MCPProjectContext]:
         return _project_context
 
     if odibi_config and Path(odibi_config).exists():
-        logger.info(f"Loading odibi config from: {odibi_config}")
-        _project_context = MCPProjectContext.from_odibi_yaml(odibi_config)
+        logger.info(f"Loading config from: {odibi_config}")
+        _project_context = _load_config_auto(odibi_config)
         _project_context.initialize_connections()
         return _project_context
 
-    # Try default locations
-    for default_path in ["./odibi.yaml", "./mcp_config.yaml"]:
+    # Try default locations - check for exploration config first
+    for default_path in ["./odibi.yaml", "./mcp_config.yaml", "./exploration.yaml"]:
         if Path(default_path).exists():
             logger.info(f"Loading config from default: {default_path}")
-            if default_path.endswith("mcp_config.yaml"):
-                _project_context = MCPProjectContext.from_mcp_config(default_path)
-            else:
-                _project_context = MCPProjectContext.from_odibi_yaml(default_path)
+            _project_context = _load_config_auto(default_path)
             _project_context.initialize_connections()
             return _project_context
 

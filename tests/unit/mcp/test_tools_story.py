@@ -27,8 +27,21 @@ def test_story_read_basic(monkeypatch, tmp_path):
 
     # Mock project context - patch directly in the story module
     class MockContext:
+        story_connection = "local"
+        story_path = "stories"
+
         def get_story_base_path(self):
             return tmp_path / "stories"
+
+        def is_exploration_mode(self):
+            return False
+
+        def get_connection(self, name):
+            class MockConn:
+                def get_path(self, path):
+                    return str(tmp_path / path)
+
+            return MockConn()
 
     monkeypatch.setattr(story_module, "get_project_context", lambda: MockContext())
 

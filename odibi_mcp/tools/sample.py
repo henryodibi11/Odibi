@@ -156,6 +156,18 @@ def node_sample(
 
     Reads sample_data from the story JSON (embedded during pipeline run).
     """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return SampleResult(
+            pipeline=pipeline,
+            node=node,
+            rows=[],
+            truncated=False,
+            truncated_reason=None,
+            original_row_count=0,
+            error="Sample tools require full project.yaml (exploration mode active)",
+        )
+
     story = _find_story_and_load(pipeline, run_selector)
 
     if not story:
@@ -222,6 +234,18 @@ def node_sample_in(
 
     Reads sample_in from the story JSON (embedded during pipeline run).
     """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return SampleResult(
+            pipeline=pipeline,
+            node=f"{node}.{input_name}",
+            rows=[],
+            truncated=False,
+            truncated_reason=None,
+            original_row_count=0,
+            error="Sample tools require full project.yaml (exploration mode active)",
+        )
+
     story = _find_story_and_load(pipeline, run_selector)
 
     if not story:
@@ -287,6 +311,18 @@ def node_failed_rows(
 
     Reads failed_rows_samples from the story JSON (embedded during pipeline run).
     """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return SampleResult(
+            pipeline=pipeline,
+            node=node,
+            rows=[],
+            truncated=False,
+            truncated_reason=None,
+            original_row_count=0,
+            error="Sample tools require full project.yaml (exploration mode active)",
+        )
+
     story = _find_story_and_load(pipeline, run_selector)
 
     if not story:

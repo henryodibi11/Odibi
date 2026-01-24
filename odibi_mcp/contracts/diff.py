@@ -12,3 +12,4 @@ class DiffSummary(BaseModel):
     distinct_count_changes: Dict[str, int]  # column -> delta
     sample_diff_included: bool = False
     sample_diff: Optional[List[Dict[str, Any]]] = None
+    error: Optional[str] = None  # Error message if diff failed

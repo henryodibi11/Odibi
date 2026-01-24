@@ -79,7 +79,7 @@ def lineage_upstream(
     Traces dependencies from the pipeline config.
     """
     ctx = get_project_context()
-    if not ctx:
+    if not ctx or ctx.is_exploration_mode():
         return LineageResult(
             source=ResourceRef(
                 kind="node", logical_name=f"{pipeline}/{node}", connection="unknown"
@@ -166,7 +166,7 @@ def lineage_downstream(
     Finds nodes that depend on this node.
     """
     ctx = get_project_context()
-    if not ctx:
+    if not ctx or ctx.is_exploration_mode():
         return LineageResult(
             source=ResourceRef(
                 kind="node", logical_name=f"{pipeline}/{node}", connection="unknown"
@@ -248,7 +248,7 @@ def lineage_graph(
     Returns nodes and edges for visualization.
     """
     ctx = get_project_context()
-    if not ctx:
+    if not ctx or ctx.is_exploration_mode():
         return GraphData(nodes=[], edges=[])
 
     pipeline_config = ctx.get_pipeline(pipeline)
