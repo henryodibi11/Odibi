@@ -621,6 +621,8 @@ class SQLServerConnectionConfig(BaseConnectionConfig):
       type: "sql_server"
       host: "server.database.windows.net"
       database: "dw"
+      port: 1433
+      driver: "ODBC Driver 17 for SQL Server"
       auth:
         mode: "sql_login"
         username: "dw_writer"
@@ -632,6 +634,7 @@ class SQLServerConnectionConfig(BaseConnectionConfig):
     host: str
     database: str
     port: int = 1433
+    driver: str = "ODBC Driver 18 for SQL Server"
     auth: SQLServerAuthConfig = Field(
         default_factory=lambda: SQLMsiAuth(mode=SQLServerAuthMode.AAD_MSI)
     )
