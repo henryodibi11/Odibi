@@ -171,6 +171,63 @@ Use odibi MCP query_codebase with question="how does merge pattern work?"
 
 ---
 
+## Exploration Mode (New!)
+
+**Exploration mode** lets AI explore your data sources without a full pipeline configuration. Perfect for:
+- Initial data discovery and profiling
+- Working with an analyst to understand source data
+- Quick data exploration before building pipelines
+
+### Exploration Config
+
+Create a minimal `exploration.yaml` (or `mcp_config.yaml`):
+
+```yaml
+# exploration.yaml - just connections, no pipelines needed
+project: my_exploration  # optional
+
+connections:
+  my_sql:
+    type: azure_sql
+    connection_string: ${SQL_CONN}
+  my_adls:
+    type: azure_adls
+    account_name: mystorageaccount
+    container: raw
+  local:
+    type: local
+    path: ./data/samples
+```
+
+### What Works in Exploration Mode
+
+| Tool | Works | Description |
+|------|-------|-------------|
+| `list_files` | ✅ | Browse any connection |
+| `list_tables` | ✅ | List SQL database tables |
+| `describe_table` | ✅ | Get column info from SQL |
+| `preview_source` | ✅ | Sample data from files/tables |
+| `infer_schema` | ✅ | Auto-detect types |
+| `list_sheets` | ✅ | Excel sheet names |
+| `story_read` | ❌ | Needs full project.yaml |
+| `node_sample` | ❌ | Needs full project.yaml |
+| `lineage_*` | ❌ | Needs full project.yaml |
+
+### Example Workflow
+
+1. **Create exploration.yaml** with your connections
+2. **Set environment variable**: `ODIBI_CONFIG=./exploration.yaml`
+3. **Ask AI to explore**:
+   ```
+   Use odibi MCP list_tables with connection="my_sql", schema="dbo"
+   Use odibi MCP preview_source with connection="my_sql", source="dbo.customers", limit=10
+   Use odibi MCP describe_table with connection="my_sql", table="dbo.orders"
+   ```
+
+When ready to build pipelines, graduate to a full `project.yaml` with pipelines, story, and system sections.
+
+---
+
 ## Configuration
 
 ### Project Configuration

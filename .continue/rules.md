@@ -481,3 +481,28 @@ system:                      # Required
   path: _system
 pipelines: []                # Required - list of pipeline configs
 ```
+
+## Exploration Mode (Data Discovery)
+
+For data exploration without building pipelines, use a minimal config:
+
+```yaml
+# exploration.yaml - connections only, no pipelines needed
+project: my_exploration  # optional
+connections:
+  my_sql:
+    type: azure_sql
+    connection_string: ${SQL_CONN}
+  local:
+    type: local
+    path: ./data
+```
+
+**Discovery tools work in exploration mode:**
+- `list_files`, `preview_source`, `infer_schema`
+- `list_tables`, `describe_table`, `list_sheets`
+
+**These tools require full project.yaml:**
+- `story_read`, `node_sample`, `lineage_*`, `node_describe`
+
+Use exploration mode to understand data before building pipelines.

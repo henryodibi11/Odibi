@@ -78,6 +78,13 @@ When helping users:
 4. **Validate before presenting** - always run validate_yaml on generated configs
 5. **Explain your reasoning** - tell users which tools you're using and why
 
+## Exploration Mode
+
+If the project only has connections (no pipelines), you're in **exploration mode**:
+- Discovery tools work: `list_files`, `preview_source`, `list_tables`, `describe_table`, `infer_schema`, `list_sheets`
+- Story/lineage tools return "exploration mode active" - that's expected
+- Use this mode to explore data before building pipelines
+
 ## Quick Tool Reference
 
 - Need to understand a feature? → `explain(name="...")`
