@@ -1,10 +1,10 @@
 # Odibi Project Rules for Continue
 
 ## About Odibi
-Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and 43 MCP tools for AI-assisted development.
+Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and 45 MCP tools for AI-assisted development.
 
 ## MCP Documentation
-- **Tool Reference**: `docs/guides/mcp_guide.md` - All 43 tools with examples
+- **Tool Reference**: `docs/guides/mcp_guide.md` - All 45 tools with examples
 - **AI Recipes**: `docs/guides/mcp_recipes.md` - 10 workflow recipes for common tasks
 - **System Prompt**: `docs/guides/mcp_system_prompt.md` - Prompts and snippets
 
@@ -214,6 +214,8 @@ Use these to query running pipelines, view data, and debug failures:
 | `list_tables` | `connection`, `schema`, `pattern` | `list_tables("my_database", "dbo", "*")` |
 | `describe_table` | `connection`, `table`, `schema` | `describe_table("my_database", "dim_date", "dbo")` |
 | `list_sheets` | `connection`, `path` | `list_sheets("my_storage", "data.xlsx")` |
+| `discover_database` | `connection`, `schema`, `max_tables`, `sample_rows` | `discover_database("my_sql", "dbo", 50, 5)` |
+| `discover_storage` | `connection`, `path`, `pattern`, `max_files`, `sample_rows` | `discover_storage("my_adls", "raw/", "*", 20, 5)` |
 
 **Story Tools** - Inspect pipeline runs:
 | Tool | Parameters | Example |

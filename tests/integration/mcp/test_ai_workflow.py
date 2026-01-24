@@ -34,8 +34,21 @@ def test_ai_investigates_pipeline_failure(monkeypatch, tmp_path):
         json.dump(story_data, f)
 
     class MockContext:
+        story_connection = "local"
+        story_path = "stories"
+
         def get_story_base_path(self):
             return tmp_path / "stories"
+
+        def is_exploration_mode(self):
+            return False
+
+        def get_connection(self, name):
+            class MockConn:
+                def get_path(self, path):
+                    return str(tmp_path / path)
+
+            return MockConn()
 
     monkeypatch.setattr(story_module, "get_project_context", lambda: MockContext())
 
@@ -49,7 +62,7 @@ def test_ai_investigates_pipeline_failure(monkeypatch, tmp_path):
 
     # Step 3: Read story
     story = story_module.story_read(pipeline="sales_pipeline")
-    assert story.status == "FAILED"
+    assert story.status.lower() == "failed"
 
     # Step 4: Describe failing node
     node = story_module.node_describe(
@@ -128,8 +141,21 @@ def test_ai_compares_runs(monkeypatch, tmp_path):
             json.dump(story_data, f)
 
     class MockContext:
+        story_connection = "local"
+        story_path = "stories"
+
         def get_story_base_path(self):
             return tmp_path / "stories"
+
+        def is_exploration_mode(self):
+            return False
+
+        def get_connection(self, name):
+            class MockConn:
+                def get_path(self, path):
+                    return str(tmp_path / path)
+
+            return MockConn()
 
     monkeypatch.setattr(story_module, "get_project_context", lambda: MockContext())
 

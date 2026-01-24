@@ -26,15 +26,28 @@ def test_story_read_e2e(monkeypatch, tmp_path):
         json.dump(story_data, f)
 
     class MockContext:
+        story_connection = "local"
+        story_path = "stories"
+
         def get_story_base_path(self):
             return tmp_path / "stories"
+
+        def is_exploration_mode(self):
+            return False
+
+        def get_connection(self, name):
+            class MockConn:
+                def get_path(self, path):
+                    return str(tmp_path / path)
+
+            return MockConn()
 
     monkeypatch.setattr(story_module, "get_project_context", lambda: MockContext())
 
     result = story_module.story_read(pipeline="test_pipe")
 
     assert result.pipeline == "test_pipe"
-    assert result.status == "SUCCESS"
+    assert result.status.lower() == "success"
     assert len(result.nodes) == 3
 
 
@@ -63,8 +76,21 @@ def test_node_describe_e2e(monkeypatch, tmp_path):
         json.dump(story_data, f)
 
     class MockContext:
+        story_connection = "local"
+        story_path = "stories"
+
         def get_story_base_path(self):
             return tmp_path / "stories"
+
+        def is_exploration_mode(self):
+            return False
+
+        def get_connection(self, name):
+            class MockConn:
+                def get_path(self, path):
+                    return str(tmp_path / path)
+
+            return MockConn()
 
     monkeypatch.setattr(story_module, "get_project_context", lambda: MockContext())
 
@@ -99,8 +125,21 @@ def test_story_diff_e2e(monkeypatch, tmp_path):
             json.dump(story_data, f)
 
     class MockContext:
+        story_connection = "local"
+        story_path = "stories"
+
         def get_story_base_path(self):
             return tmp_path / "stories"
+
+        def is_exploration_mode(self):
+            return False
+
+        def get_connection(self, name):
+            class MockConn:
+                def get_path(self, path):
+                    return str(tmp_path / path)
+
+            return MockConn()
 
     monkeypatch.setattr(story_module, "get_project_context", lambda: MockContext())
 

@@ -1,6 +1,6 @@
 # Odibi MCP Server Guide
 
-The **odibi-knowledge** MCP (Model Context Protocol) server exposes 43 tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines.
+The **odibi-knowledge** MCP (Model Context Protocol) server exposes 45 tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines.
 
 ## Quick Start
 
@@ -42,7 +42,7 @@ Use odibi MCP list_transformers
 
 ---
 
-## Available Tools (43 Total)
+## Available Tools (45 Total)
 
 ### 🚀 Start Here: Bootstrap Tool
 
@@ -118,7 +118,7 @@ Use odibi MCP list_transformers
 | `list_outputs` | List pipeline outputs | `{"pipeline": "bronze"}` |
 | `output_schema` | Get output column schema | `{"pipeline": "bronze", "output_name": "my_node"}` |
 
-### Discovery Tools (6)
+### Discovery Tools (8)
 
 | Tool | Description | Example |
 |------|-------------|---------|
@@ -128,6 +128,8 @@ Use odibi MCP list_transformers
 | `list_tables` | List SQL tables | `{"connection": "my_sql", "schema": "dbo"}` |
 | `describe_table` | Describe SQL table | `{"connection": "my_sql", "table": "my_table"}` |
 | `list_sheets` | List sheet names in Excel file | `{"connection": "my_conn", "path": "data.xlsx"}` |
+| `discover_database` | **Crawl SQL database** - get all tables with schemas and samples in one call | `{"connection": "my_sql", "schema": "dbo"}` |
+| `discover_storage` | **Crawl file storage** - get all files with schemas and samples in one call | `{"connection": "my_adls", "path": "raw/"}` |
 
 ---
 

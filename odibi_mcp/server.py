@@ -45,6 +45,8 @@ from odibi_mcp.tools.discovery import (
     describe_table,
     preview_source,
     list_sheets,
+    discover_database,
+    discover_storage,
 )
 from dataclasses import asdict, is_dataclass
 from pydantic import BaseModel
@@ -723,6 +725,63 @@ async def list_tools() -> list[Tool]:
                 "required": ["connection", "path"],
             },
         ),
+        Tool(
+            name="discover_database",
+            description="Crawl a SQL database to discover all tables with schemas and sample data. Returns comprehensive overview of all tables in one call.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "SQL connection name"},
+                    "schema": {
+                        "type": "string",
+                        "default": "dbo",
+                        "description": "Database schema to scan",
+                    },
+                    "max_tables": {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Maximum tables to discover",
+                    },
+                    "sample_rows": {
+                        "type": "integer",
+                        "default": 5,
+                        "description": "Sample rows per table",
+                    },
+                },
+                "required": ["connection"],
+            },
+        ),
+        Tool(
+            name="discover_storage",
+            description="Crawl a storage connection to discover all data files with schemas and samples. Returns comprehensive overview of files grouped by format.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Storage connection name"},
+                    "path": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Base path to scan",
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "default": "*",
+                        "description": "File pattern (e.g., '*.csv')",
+                    },
+                    "max_files": {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum files to discover",
+                    },
+                    "sample_rows": {
+                        "type": "integer",
+                        "default": 5,
+                        "description": "Sample rows per file",
+                    },
+                },
+                "required": ["connection"],
+            },
+        ),
     ]
 
 
@@ -955,6 +1014,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             res = list_sheets(
                 connection=arguments["connection"],
                 path=arguments["path"],
+            )
+            result = to_json_serializable(res)
+        elif name == "discover_database":
+            res = discover_database(
+                connection=arguments["connection"],
+                schema=arguments.get("schema", "dbo"),
+                max_tables=arguments.get("max_tables", 50),
+                sample_rows=arguments.get("sample_rows", 5),
+            )
+            result = to_json_serializable(res)
+        elif name == "discover_storage":
+            res = discover_storage(
+                connection=arguments["connection"],
+                path=arguments.get("path", ""),
+                pattern=arguments.get("pattern", "*"),
+                max_files=arguments.get("max_files", 20),
+                sample_rows=arguments.get("sample_rows", 5),
             )
             result = to_json_serializable(res)
         else:

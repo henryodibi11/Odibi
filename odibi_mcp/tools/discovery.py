@@ -708,3 +708,320 @@ def list_sheets(
             sheets=[],
             error=str(e),
         )
+
+
+@dataclass
+class TableDiscoveryInfo:
+    """Detailed info about a discovered table."""
+
+    name: str
+    schema_name: str
+    row_count: Optional[int]
+    columns: List[ColumnSpec]
+    sample_rows: List[dict]
+
+
+@dataclass
+class DiscoverDatabaseResponse:
+    """Response for discover_database."""
+
+    connection: str
+    schema_name: str
+    tables: List[TableDiscoveryInfo]
+    total_tables: int
+    error: Optional[str] = None
+
+
+def discover_database(
+    connection: str,
+    schema: str = "dbo",
+    max_tables: int = 50,
+    sample_rows: int = 5,
+) -> DiscoverDatabaseResponse:
+    """
+    Discover all tables in a SQL database with schemas and samples.
+
+    Crawls the database to provide comprehensive overview:
+    - Lists all tables in the schema
+    - Gets column info for each table
+    - Samples rows from each table
+
+    Use for initial data exploration before building pipelines.
+    """
+    ctx = get_project_context()
+    if not ctx:
+        return DiscoverDatabaseResponse(
+            connection=connection,
+            schema_name=schema,
+            tables=[],
+            total_tables=0,
+            error="No project context available",
+        )
+
+    try:
+        conn = ctx.get_connection(connection)
+
+        if not hasattr(conn, "execute_query"):
+            return DiscoverDatabaseResponse(
+                connection=connection,
+                schema_name=schema,
+                tables=[],
+                total_tables=0,
+                error=f"Connection '{connection}' is not a SQL database",
+            )
+
+        # Get all tables
+        tables_query = f"""
+        SELECT TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = '{schema}'
+        AND TABLE_TYPE = 'BASE TABLE'
+        ORDER BY TABLE_NAME
+        """
+        table_rows = conn.execute_query(tables_query)
+        table_names = [
+            row[0] if isinstance(row, tuple) else row.get("TABLE_NAME") for row in table_rows
+        ]
+
+        total_tables = len(table_names)
+        table_names = table_names[:max_tables]
+
+        discovered_tables = []
+
+        for table_name in table_names:
+            try:
+                # Get columns
+                cols_query = f"""
+                SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
+                ORDER BY ORDINAL_POSITION
+                """
+                col_rows = conn.execute_query(cols_query)
+
+                columns = []
+                for col_row in col_rows:
+                    if isinstance(col_row, tuple):
+                        col_name, col_type, nullable = col_row
+                    else:
+                        col_name = col_row.get("COLUMN_NAME")
+                        col_type = col_row.get("DATA_TYPE")
+                        nullable = col_row.get("IS_NULLABLE")
+
+                    columns.append(
+                        ColumnSpec(
+                            name=col_name,
+                            dtype=col_type,
+                            nullable=nullable == "YES",
+                        )
+                    )
+
+                # Get row count
+                count_query = f"SELECT COUNT(*) FROM [{schema}].[{table_name}]"
+                count_result = conn.execute_query(count_query)
+                row_count = (
+                    count_result[0][0]
+                    if count_result and isinstance(count_result[0], tuple)
+                    else count_result[0].get("", 0)
+                    if count_result
+                    else 0
+                )
+
+                # Get sample rows
+                sample_query = f"SELECT TOP {sample_rows} * FROM [{schema}].[{table_name}]"
+                sample_result = conn.execute_query(sample_query)
+
+                # Convert to dicts
+                col_names = [c.name for c in columns]
+                samples = []
+                for row in sample_result[:sample_rows]:
+                    if isinstance(row, tuple):
+                        samples.append(dict(zip(col_names, row)))
+                    else:
+                        samples.append(dict(row))
+
+                discovered_tables.append(
+                    TableDiscoveryInfo(
+                        name=table_name,
+                        schema_name=schema,
+                        row_count=row_count,
+                        columns=columns,
+                        sample_rows=samples,
+                    )
+                )
+
+            except Exception as e:
+                logger.warning(f"Error discovering table {table_name}: {e}")
+                discovered_tables.append(
+                    TableDiscoveryInfo(
+                        name=table_name,
+                        schema_name=schema,
+                        row_count=None,
+                        columns=[],
+                        sample_rows=[],
+                    )
+                )
+
+        return DiscoverDatabaseResponse(
+            connection=connection,
+            schema_name=schema,
+            tables=discovered_tables,
+            total_tables=total_tables,
+        )
+
+    except Exception as e:
+        logger.exception(f"Error discovering database: {connection}")
+        return DiscoverDatabaseResponse(
+            connection=connection,
+            schema_name=schema,
+            tables=[],
+            total_tables=0,
+            error=str(e),
+        )
+
+
+@dataclass
+class FileDiscoveryInfo:
+    """Detailed info about a discovered file."""
+
+    path: str
+    format: str
+    size_bytes: Optional[int]
+    columns: List[ColumnSpec]
+    sample_rows: List[dict]
+    row_count: Optional[int] = None
+
+
+@dataclass
+class DiscoverStorageResponse:
+    """Response for discover_storage."""
+
+    connection: str
+    base_path: str
+    files: List[FileDiscoveryInfo]
+    total_files: int
+    by_format: dict  # {"csv": 5, "parquet": 3, ...}
+    error: Optional[str] = None
+
+
+def discover_storage(
+    connection: str,
+    path: str = "",
+    pattern: str = "*",
+    max_files: int = 20,
+    sample_rows: int = 5,
+) -> DiscoverStorageResponse:
+    """
+    Discover files in storage with schemas and samples.
+
+    Crawls the storage path to provide comprehensive overview:
+    - Lists all matching files
+    - Infers schema for each file
+    - Samples rows from each file
+
+    Use for initial data exploration before building pipelines.
+    """
+    ctx = get_project_context()
+    if not ctx:
+        return DiscoverStorageResponse(
+            connection=connection,
+            base_path=path,
+            files=[],
+            total_files=0,
+            by_format={},
+            error="No project context available",
+        )
+
+    try:
+        # Verify connection exists
+        ctx.get_connection(connection)
+
+        # List files first
+        files_response = list_files(
+            connection=connection,
+            path=path,
+            pattern=pattern,
+            limits=DiscoveryLimits(max_files_per_request=max_files * 2),
+        )
+
+        if not files_response.files:
+            return DiscoverStorageResponse(
+                connection=connection,
+                base_path=path,
+                files=[],
+                total_files=0,
+                by_format={},
+            )
+
+        # Filter to supported formats
+        supported_formats = {"csv", "parquet", "json", "xlsx", "xls"}
+        data_files = [
+            f
+            for f in files_response.files
+            if any(f.name.lower().endswith(f".{fmt}") for fmt in supported_formats)
+        ]
+
+        total_files = len(data_files)
+        data_files = data_files[:max_files]
+
+        discovered_files = []
+        format_counts: dict = {}
+
+        for file_info in data_files:
+            file_path = file_info.path or file_info.name
+            file_ext = Path(file_info.name).suffix.lower().lstrip(".")
+
+            format_counts[file_ext] = format_counts.get(file_ext, 0) + 1
+
+            try:
+                # Infer schema
+                schema_resp = infer_schema(connection=connection, path=file_path)
+
+                # Preview data
+                preview_resp = preview_source(
+                    connection=connection,
+                    path=file_path,
+                    limit=sample_rows,
+                )
+
+                discovered_files.append(
+                    FileDiscoveryInfo(
+                        path=file_path,
+                        format=file_ext,
+                        size_bytes=file_info.size_bytes,
+                        columns=schema_resp.columns,
+                        sample_rows=preview_resp.rows[:sample_rows],
+                        row_count=preview_resp.total_rows,
+                    )
+                )
+
+            except Exception as e:
+                logger.warning(f"Error discovering file {file_path}: {e}")
+                discovered_files.append(
+                    FileDiscoveryInfo(
+                        path=file_path,
+                        format=file_ext,
+                        size_bytes=file_info.size_bytes,
+                        columns=[],
+                        sample_rows=[],
+                    )
+                )
+
+        return DiscoverStorageResponse(
+            connection=connection,
+            base_path=path,
+            files=discovered_files,
+            total_files=total_files,
+            by_format=format_counts,
+        )
+
+    except Exception as e:
+        logger.exception(f"Error discovering storage: {connection}/{path}")
+        return DiscoverStorageResponse(
+            connection=connection,
+            base_path=path,
+            files=[],
+            total_files=0,
+            by_format={},
+            error=str(e),
+        )
