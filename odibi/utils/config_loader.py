@@ -232,12 +232,15 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
         # Check for problematic characters that could break YAML
         # Note: Colons are NOT checked because URLs (https://) are common and safe
         # when the value is substituted into a quoted YAML string
-        if any(c in value for c in ["\n", "\r", "#"]):
+        if any(c in value for c in ["\n", "\r"]):
             logger.warning(
-                "Environment variable contains YAML-sensitive characters",
+                "Environment variable contains newline characters",
                 variable=var_name,
-                has_newline="\n" in value or "\r" in value,
-                has_hash="#" in value,
+            )
+        elif "#" in value:
+            logger.debug(
+                "Environment variable contains # (handled correctly)",
+                variable=var_name,
             )
         logger.debug("Environment variable substituted", variable=var_name, length=len(value))
         return value

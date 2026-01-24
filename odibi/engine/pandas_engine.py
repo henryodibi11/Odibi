@@ -1476,12 +1476,18 @@ class PandasEngine(Engine):
                     "name",
                     "description",
                     "configuration",
+                    "writer_properties",
                 ]
             }
 
             def do_write():
                 write_deltalake(
-                    full_path, df, mode=delta_mode, storage_options=storage_opts, **write_kwargs
+                    full_path,
+                    df,
+                    mode=delta_mode,
+                    storage_options=storage_opts,
+                    engine="rust",
+                    **write_kwargs,
                 )
 
             self._retry_delta_operation(do_write)
