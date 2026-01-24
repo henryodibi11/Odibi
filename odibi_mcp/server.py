@@ -753,7 +753,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="discover_storage",
-            description="Crawl a storage connection to discover all data files with schemas and samples. Returns comprehensive overview of files grouped by format.",
+            description="Crawl a storage connection recursively to discover all data files with schemas and samples. Returns comprehensive overview of files grouped by format.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -766,7 +766,7 @@ async def list_tools() -> list[Tool]:
                     "pattern": {
                         "type": "string",
                         "default": "*",
-                        "description": "File pattern (e.g., '*.csv')",
+                        "description": "File pattern (e.g., '*.csv', '*.xlsx')",
                     },
                     "max_files": {
                         "type": "integer",
@@ -777,6 +777,11 @@ async def list_tools() -> list[Tool]:
                         "type": "integer",
                         "default": 5,
                         "description": "Sample rows per file",
+                    },
+                    "recursive": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Scan subdirectories recursively",
                     },
                 },
                 "required": ["connection"],
@@ -1031,6 +1036,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 pattern=arguments.get("pattern", "*"),
                 max_files=arguments.get("max_files", 20),
                 sample_rows=arguments.get("sample_rows", 5),
+                recursive=arguments.get("recursive", True),
             )
             result = to_json_serializable(res)
         else:

@@ -904,18 +904,66 @@ class DiscoverStorageResponse:
     error: Optional[str] = None
 
 
+def _list_files_recursive(
+    connection: str,
+    base_path: str,
+    pattern: str,
+    max_files: int,
+    ctx,
+) -> List[FileInfo]:
+    """Recursively list files in a directory."""
+    from odibi_mcp.contracts.discovery import FileInfo as ContractFileInfo
+
+    all_files: List[ContractFileInfo] = []
+    dirs_to_scan = [base_path]
+
+    conn = ctx.get_connection(connection)
+    is_local = not _is_cloud_connection(conn)
+
+    while dirs_to_scan and len(all_files) < max_files:
+        current_path = dirs_to_scan.pop(0)
+
+        files_response = list_files(
+            connection=connection,
+            path=current_path,
+            pattern="*",  # Get all to find subdirs
+            limits=DiscoveryLimits(max_files_per_request=200),
+        )
+
+        for f in files_response.files:
+            if f.is_directory:
+                # Add subdirectory to scan queue
+                subdir_path = f.physical_path or f.logical_name
+                if is_local:
+                    # For local, construct full path
+                    subdir_path = str(Path(current_path) / f.logical_name)
+                dirs_to_scan.append(subdir_path)
+            else:
+                # Check if file matches pattern
+                import fnmatch
+
+                if pattern == "*" or fnmatch.fnmatch(f.logical_name.lower(), pattern.lower()):
+                    all_files.append(f)
+
+            if len(all_files) >= max_files:
+                break
+
+    return all_files
+
+
 def discover_storage(
     connection: str,
     path: str = "",
     pattern: str = "*",
     max_files: int = 20,
     sample_rows: int = 5,
+    recursive: bool = True,
 ) -> DiscoverStorageResponse:
     """
     Discover files in storage with schemas and samples.
 
     Crawls the storage path to provide comprehensive overview:
-    - Lists all matching files
+    - Lists all matching files (recursively by default)
     - Infers schema for each file
     - Samples rows from each file
 
@@ -936,15 +984,25 @@ def discover_storage(
         # Verify connection exists
         ctx.get_connection(connection)
 
-        # List files first
-        files_response = list_files(
-            connection=connection,
-            path=path,
-            pattern=pattern,
-            limits=DiscoveryLimits(max_files_per_request=max_files * 2),
-        )
+        # List files - recursively or just top level
+        if recursive:
+            file_list = _list_files_recursive(
+                connection=connection,
+                base_path=path,
+                pattern=pattern,
+                max_files=max_files * 2,
+                ctx=ctx,
+            )
+        else:
+            files_response = list_files(
+                connection=connection,
+                path=path,
+                pattern=pattern,
+                limits=DiscoveryLimits(max_files_per_request=max_files * 2),
+            )
+            file_list = files_response.files
 
-        if not files_response.files:
+        if not file_list:
             return DiscoverStorageResponse(
                 connection=connection,
                 base_path=path,
@@ -957,7 +1015,7 @@ def discover_storage(
         supported_formats = {"csv", "parquet", "json", "xlsx", "xls"}
         data_files = [
             f
-            for f in files_response.files
+            for f in file_list
             if any(f.logical_name.lower().endswith(f".{fmt}") for fmt in supported_formats)
         ]
 
