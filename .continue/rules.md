@@ -214,8 +214,8 @@ Use these to query running pipelines, view data, and debug failures:
 | `list_tables` | `connection`, `schema`, `pattern` | `list_tables("my_database", "dbo", "*")` |
 | `describe_table` | `connection`, `table`, `schema` | `describe_table("my_database", "dim_date", "dbo")` |
 | `list_sheets` | `connection`, `path` | `list_sheets("my_storage", "data.xlsx")` |
-| `discover_database` | `connection`, `schema`, `max_tables`, `sample_rows` | `discover_database("my_sql", "dbo", 50, 5)` |
-| `discover_storage` | `connection`, `path`, `pattern`, `max_files`, `sample_rows` | `discover_storage("my_adls", "raw/", "*", 20, 5)` |
+| `discover_database` | `connection`, `schema`, `max_tables`, `sample_rows` | `discover_database("my_sql", "dbo")` (shallow, no samples by default) |
+| `discover_storage` | `connection`, `path`, `pattern`, `max_files`, `sample_rows`, `recursive` | `discover_storage("my_adls", "raw/")` (shallow, no samples by default) |
 
 **Story Tools** - Inspect pipeline runs:
 | Tool | Parameters | Example |

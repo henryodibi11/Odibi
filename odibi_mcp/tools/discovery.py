@@ -735,18 +735,24 @@ class DiscoverDatabaseResponse:
 def discover_database(
     connection: str,
     schema: str = "dbo",
-    max_tables: int = 50,
-    sample_rows: int = 5,
+    max_tables: int = 20,
+    sample_rows: int = 0,
 ) -> DiscoverDatabaseResponse:
     """
-    Discover all tables in a SQL database with schemas and samples.
+    Discover tables in a SQL database (structure-first by default).
 
-    Crawls the database to provide comprehensive overview:
-    - Lists all tables in the schema
-    - Gets column info for each table
-    - Samples rows from each table
+    Returns table names, columns, and row counts. Samples are OFF by default
+    to keep responses lightweight. Use preview_source for detailed samples.
 
-    Use for initial data exploration before building pipelines.
+    Two-step pattern:
+    1. discover_database(conn) -> see what tables exist (structure only)
+    2. preview_source(conn, table) -> get samples for specific tables
+
+    Args:
+        connection: SQL connection name
+        schema: Database schema (default: dbo)
+        max_tables: Max tables to discover (default: 20, shallow)
+        sample_rows: Rows to sample per table (default: 0 = none)
     """
     ctx = get_project_context()
     if not ctx:
@@ -955,19 +961,29 @@ def discover_storage(
     connection: str,
     path: str = "",
     pattern: str = "*",
-    max_files: int = 20,
-    sample_rows: int = 5,
-    recursive: bool = True,
+    max_files: int = 10,
+    sample_rows: int = 0,
+    recursive: bool = False,
 ) -> DiscoverStorageResponse:
     """
-    Discover files in storage with schemas and samples.
+    Discover files in storage (structure-first, shallow by default).
 
-    Crawls the storage path to provide comprehensive overview:
-    - Lists all matching files (recursively by default)
-    - Infers schema for each file
-    - Samples rows from each file
+    Returns file names, formats, and schemas. Samples are OFF by default
+    to keep responses lightweight. Recursive scanning is OFF by default.
 
-    Use for initial data exploration before building pipelines.
+    Two-step pattern:
+    1. discover_storage(conn) -> see what files exist (shallow, no samples)
+    2. preview_source(conn, path) -> get samples for specific files
+
+    For deep scanning, explicitly set recursive=True and increase max_files.
+
+    Args:
+        connection: Storage connection name
+        path: Base path to scan (default: root)
+        pattern: File pattern (default: * = all supported formats)
+        max_files: Max files to discover (default: 10, shallow)
+        sample_rows: Rows to sample per file (default: 0 = none)
+        recursive: Scan subdirectories (default: False = shallow)
     """
     ctx = get_project_context()
     if not ctx:

@@ -727,7 +727,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="discover_database",
-            description="Crawl a SQL database to discover all tables with schemas and sample data. Returns comprehensive overview of all tables in one call.",
+            description="Discover tables in a SQL database (structure-first, shallow by default). Returns table names, columns, row counts. Samples OFF by default - use preview_source for samples.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -739,13 +739,13 @@ async def list_tools() -> list[Tool]:
                     },
                     "max_tables": {
                         "type": "integer",
-                        "default": 50,
-                        "description": "Maximum tables to discover",
+                        "default": 20,
+                        "description": "Maximum tables to discover (default: 20, shallow)",
                     },
                     "sample_rows": {
                         "type": "integer",
-                        "default": 5,
-                        "description": "Sample rows per table",
+                        "default": 0,
+                        "description": "Sample rows per table (default: 0 = none, use preview_source instead)",
                     },
                 },
                 "required": ["connection"],
@@ -753,7 +753,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="discover_storage",
-            description="Crawl a storage connection recursively to discover all data files with schemas and samples. Returns comprehensive overview of files grouped by format.",
+            description="Discover files in storage (structure-first, shallow by default). Returns file names, formats, schemas. Samples and recursion OFF by default - use preview_source for samples.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -770,18 +770,18 @@ async def list_tools() -> list[Tool]:
                     },
                     "max_files": {
                         "type": "integer",
-                        "default": 20,
-                        "description": "Maximum files to discover",
+                        "default": 10,
+                        "description": "Maximum files to discover (default: 10, shallow)",
                     },
                     "sample_rows": {
                         "type": "integer",
-                        "default": 5,
-                        "description": "Sample rows per file",
+                        "default": 0,
+                        "description": "Sample rows per file (default: 0 = none, use preview_source instead)",
                     },
                     "recursive": {
                         "type": "boolean",
-                        "default": True,
-                        "description": "Scan subdirectories recursively",
+                        "default": False,
+                        "description": "Scan subdirectories (default: false = shallow)",
                     },
                 },
                 "required": ["connection"],

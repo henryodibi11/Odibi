@@ -608,30 +608,38 @@ Before suggesting ANY pipeline changes, verify:
 
 **When user says:** "What's in this connection?", "Explore [connection]", "Analyze [connection]", "Catalog [connection]"
 
+**Two-Step Pattern:** Structure first, samples second.
+
 **For Storage Connections:**
 
 ```
-# Step 1: Discover all files recursively
-discover_storage(connection="<conn>", path="", recursive=true, max_files=50)
+# Step 1: Discover structure (shallow, no samples by default)
+discover_storage(connection="<conn>", path="")
+# Returns: file names, formats, schemas - lightweight response
 
-# Step 2: For interesting files, get detailed schemas
+# Step 2: For interesting files, get samples
 preview_source(connection="<conn>", path="<file>", max_rows=20)
-infer_schema(connection="<conn>", path="<file>")
 
 # Step 3: For Excel files, discover sheets first
 list_sheets(connection="<conn>", path="<file>.xlsx")
 preview_source(connection="<conn>", path="<file>.xlsx", sheet="<sheet_name>")
+
+# Optional: Deep scan if needed
+discover_storage(connection="<conn>", path="", recursive=true, max_files=50)
 ```
 
 **For Database Connections:**
 
 ```
-# Step 1: Discover all tables with schemas and samples
-discover_database(connection="<sql_conn>", schema="dbo", max_tables=50, sample_rows=5)
+# Step 1: Discover structure (shallow, no samples by default)
+discover_database(connection="<sql_conn>", schema="dbo")
+# Returns: table names, columns, row counts - lightweight response
 
-# Step 2: For interesting tables, get more detail
-describe_table(connection="<sql_conn>", table="<table>", schema="dbo")
+# Step 2: For interesting tables, get samples
 preview_source(connection="<sql_conn>", path="<table>", max_rows=20)
+
+# Optional: Include samples if context budget allows
+discover_database(connection="<sql_conn>", schema="dbo", sample_rows=3)
 ```
 
 **AI should summarize:**

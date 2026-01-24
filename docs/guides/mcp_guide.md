@@ -129,8 +129,8 @@ Use odibi MCP list_transformers
 | `list_tables` | List SQL tables | `{"connection": "my_sql", "schema": "dbo"}` |
 | `describe_table` | Describe SQL table | `{"connection": "my_sql", "table": "my_table"}` |
 | `list_sheets` | List sheet names in Excel file | `{"connection": "my_conn", "path": "data.xlsx"}` |
-| `discover_database` | **Crawl SQL database** - get all tables with schemas and samples in one call | `{"connection": "my_sql", "schema": "dbo"}` |
-| `discover_storage` | **Crawl file storage** - get all files with schemas and samples in one call | `{"connection": "my_adls", "path": "raw/"}` |
+| `discover_database` | **Discover SQL tables** (structure-first, shallow). Samples OFF by default - use preview_source | `{"connection": "my_sql", "schema": "dbo"}` |
+| `discover_storage` | **Discover files** (structure-first, shallow). Samples/recursion OFF by default - use preview_source | `{"connection": "my_adls", "path": "raw/"}` |
 
 ---
 
