@@ -407,11 +407,9 @@ class AzureSQL(BaseConnection):
 
         try:
             engine = self.get_engine()
-            # Get raw DBAPI connection for pandas compatibility
+            # Use SQLAlchemy connection directly (preferred by pandas)
             with engine.connect() as conn:
-                # Use the underlying DBAPI connection
-                raw_conn = conn.connection
-                result = pd.read_sql(query, raw_conn, params=params)
+                result = pd.read_sql(query, conn, params=params)
 
             ctx.info(
                 "SQL query executed successfully",
