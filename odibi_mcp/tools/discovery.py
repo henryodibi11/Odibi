@@ -958,7 +958,7 @@ def discover_storage(
         data_files = [
             f
             for f in files_response.files
-            if any(f.name.lower().endswith(f".{fmt}") for fmt in supported_formats)
+            if any(f.logical_name.lower().endswith(f".{fmt}") for fmt in supported_formats)
         ]
 
         total_files = len(data_files)
@@ -968,8 +968,8 @@ def discover_storage(
         format_counts: dict = {}
 
         for file_info in data_files:
-            file_path = file_info.path or file_info.name
-            file_ext = Path(file_info.name).suffix.lower().lstrip(".")
+            file_path = file_info.physical_path or file_info.logical_name
+            file_ext = Path(file_info.logical_name).suffix.lower().lstrip(".")
 
             format_counts[file_ext] = format_counts.get(file_ext, 0) + 1
 
