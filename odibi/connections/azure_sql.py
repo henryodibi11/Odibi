@@ -465,7 +465,7 @@ class AzureSQL(BaseConnection):
     def read_sql_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
         """
         Execute a SQL query and return results as DataFrame.
-        
+
         Use this for custom SELECT queries (e.g., to exclude unsupported columns).
 
         Args:

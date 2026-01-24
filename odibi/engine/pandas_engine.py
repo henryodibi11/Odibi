@@ -1051,13 +1051,13 @@ class PandasEngine(Engine):
                 return self._process_df(pd.DataFrame(records), post_read_query)
         elif format in ["sql", "sql_server", "azure_sql"]:
             ctx.debug("Reading SQL table", table=str(full_path), format=format)
-            
+
             # Check if a query was provided (use as source query, not post-read filter)
             source_query = post_read_query
             if source_query and hasattr(connection, "read_sql_query"):
                 ctx.debug("Executing SQL source query", query_length=len(source_query))
                 return connection.read_sql_query(source_query)
-            
+
             if not hasattr(connection, "read_table"):
                 ctx.error(
                     "Connection does not support SQL operations",
