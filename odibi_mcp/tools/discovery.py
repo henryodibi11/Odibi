@@ -732,6 +732,84 @@ class DiscoverDatabaseResponse:
     error: Optional[str] = None
 
 
+@dataclass
+class ListSchemasResponse:
+    """Response for list_schemas."""
+
+    connection: str
+    schemas: List[dict]  # [{name, table_count}]
+    error: Optional[str] = None
+
+
+def list_schemas(connection: str) -> ListSchemasResponse:
+    """
+    List all schemas in a SQL database with table counts.
+
+    Call this FIRST before discover_database to see what schemas exist.
+
+    Args:
+        connection: SQL connection name
+    """
+    ctx = get_project_context()
+    if not ctx:
+        return ListSchemasResponse(
+            connection=connection,
+            schemas=[],
+            error="No project context available",
+        )
+
+    try:
+        conn = ctx.get_connection(connection)
+
+        # Check for SQL execution capability
+        execute_fn = None
+        if hasattr(conn, "execute_sql"):
+            execute_fn = conn.execute_sql
+        elif hasattr(conn, "execute"):
+            execute_fn = conn.execute
+        elif hasattr(conn, "execute_query"):
+            execute_fn = conn.execute_query
+
+        if execute_fn is None:
+            return ListSchemasResponse(
+                connection=connection,
+                schemas=[],
+                error=f"Connection '{connection}' is not a SQL database",
+            )
+
+        # Query schemas with table counts
+        schema_query = """
+        SELECT 
+            s.name AS schema_name,
+            COUNT(t.name) AS table_count
+        FROM sys.schemas s
+        LEFT JOIN sys.tables t ON t.schema_id = s.schema_id
+        WHERE s.name NOT IN ('sys', 'INFORMATION_SCHEMA', 'guest')
+        GROUP BY s.name
+        ORDER BY table_count DESC, s.name
+        """
+        rows = execute_fn(schema_query) or []
+
+        schemas = []
+        for row in rows:
+            if isinstance(row, dict):
+                schemas.append(
+                    {"name": row.get("schema_name"), "table_count": row.get("table_count", 0)}
+                )
+            else:
+                schemas.append({"name": row[0], "table_count": row[1]})
+
+        return ListSchemasResponse(connection=connection, schemas=schemas)
+
+    except Exception as e:
+        logger.exception(f"Error listing schemas: {connection}")
+        return ListSchemasResponse(
+            connection=connection,
+            schemas=[],
+            error=str(e),
+        )
+
+
 def discover_database(
     connection: str,
     schema: str = "dbo",
@@ -767,7 +845,16 @@ def discover_database(
     try:
         conn = ctx.get_connection(connection)
 
-        if not hasattr(conn, "execute_query"):
+        # Check for SQL execution capability (AzureSQL uses execute_sql, others may use execute)
+        execute_fn = None
+        if hasattr(conn, "execute_sql"):
+            execute_fn = conn.execute_sql
+        elif hasattr(conn, "execute"):
+            execute_fn = conn.execute
+        elif hasattr(conn, "execute_query"):
+            execute_fn = conn.execute_query
+
+        if execute_fn is None:
             return DiscoverDatabaseResponse(
                 connection=connection,
                 schema_name=schema,
@@ -784,10 +871,15 @@ def discover_database(
         AND TABLE_TYPE = 'BASE TABLE'
         ORDER BY TABLE_NAME
         """
-        table_rows = conn.execute_query(tables_query)
-        table_names = [
-            row[0] if isinstance(row, tuple) else row.get("TABLE_NAME") for row in table_rows
-        ]
+        table_rows = execute_fn(tables_query)
+        # Handle various row types: tuple, dict, or SQLAlchemy Row (supports index access)
+        table_names = []
+        for row in table_rows or []:
+            if isinstance(row, dict):
+                table_names.append(row.get("TABLE_NAME"))
+            else:
+                # tuple or SQLAlchemy Row - use index access
+                table_names.append(row[0])
 
         total_tables = len(table_names)
         table_names = table_names[:max_tables]
@@ -803,16 +895,17 @@ def discover_database(
                 WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
                 ORDER BY ORDINAL_POSITION
                 """
-                col_rows = conn.execute_query(cols_query)
+                col_rows = execute_fn(cols_query)
 
                 columns = []
-                for col_row in col_rows:
-                    if isinstance(col_row, tuple):
-                        col_name, col_type, nullable = col_row
-                    else:
+                for col_row in col_rows or []:
+                    if isinstance(col_row, dict):
                         col_name = col_row.get("COLUMN_NAME")
                         col_type = col_row.get("DATA_TYPE")
                         nullable = col_row.get("IS_NULLABLE")
+                    else:
+                        # tuple or SQLAlchemy Row - use index access
+                        col_name, col_type, nullable = col_row[0], col_row[1], col_row[2]
 
                     columns.append(
                         ColumnSpec(
@@ -824,27 +917,30 @@ def discover_database(
 
                 # Get row count
                 count_query = f"SELECT COUNT(*) FROM [{schema}].[{table_name}]"
-                count_result = conn.execute_query(count_query)
-                row_count = (
-                    count_result[0][0]
-                    if count_result and isinstance(count_result[0], tuple)
-                    else count_result[0].get("", 0)
-                    if count_result
-                    else 0
-                )
+                count_result = execute_fn(count_query)
+                row_count = 0
+                if count_result:
+                    first_row = count_result[0]
+                    # SQLAlchemy Row or tuple - use index access
+                    row_count = first_row[0] if first_row else 0
 
                 # Get sample rows
                 sample_query = f"SELECT TOP {sample_rows} * FROM [{schema}].[{table_name}]"
-                sample_result = conn.execute_query(sample_query)
+                sample_result = execute_fn(sample_query) or []
 
-                # Convert to dicts
+                # Convert to dicts - SQLAlchemy Row supports _asdict() or index access
                 col_names = [c.name for c in columns]
                 samples = []
                 for row in sample_result[:sample_rows]:
-                    if isinstance(row, tuple):
-                        samples.append(dict(zip(col_names, row)))
+                    if isinstance(row, dict):
+                        samples.append(row)
+                    elif hasattr(row, "_asdict"):
+                        samples.append(row._asdict())
                     else:
-                        samples.append(dict(row))
+                        # Use index access with column names
+                        samples.append(
+                            dict(zip(col_names, [row[i] for i in range(len(col_names))]))
+                        )
 
                 discovered_tables.append(
                     TableDiscoveryInfo(

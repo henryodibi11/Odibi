@@ -31,14 +31,24 @@ class OdibiKnowledge:
     # reading full documentation. This is the "cannot be ignored" context.
     CRITICAL_CONTEXT = {
         "yaml_syntax": {
-            "NEVER_USE": ["source:", "sink:", "transform[].name:"],
+            "NEVER_USE": ["source:", "sink:", "inputs:", "outputs:", "sql:"],
             "ALWAYS_USE": [
-                "inputs:",
-                "outputs:",
+                "read:",
+                "write:",
+                "query: (for SQL pushdown, inside read:)",
                 "transform.steps[].function + params",
             ],
-            "format_required": "ALWAYS specify format: csv|parquet|json|delta",
+            "format_required": "ALWAYS specify format: csv|parquet|json|delta|sql",
             "node_names": "alphanumeric + underscore ONLY (no hyphens, dots, spaces)",
+            "sql_read_example": """read:
+  connection: my_db
+  format: sql
+  query: "SELECT * FROM schema.table WHERE condition"
+# OR for direct table:
+read:
+  connection: my_db
+  format: sql
+  table: schema.table_name""",
         },
         "correct_yaml_structure": """# CORRECT STRUCTURE - USE THIS EXACTLY
 project: my_project
@@ -53,30 +63,31 @@ system:
   connection: local
   path: _system
 pipelines:
-  - name: my_pipeline
+  - pipeline: my_pipeline
     pattern: dimension
     nodes:
       - name: source_node
-        inputs:
-          raw:
-            connection: local
-            path: input.csv
-            format: csv
+        read:
+          connection: local
+          path: input.csv
+          format: csv
         transform:
           steps:
             - function: trim_whitespace
               params:
                 columns: [name, email]
-        outputs:
-          clean:
-            connection: local
-            path: output.parquet
-            format: parquet""",
+        write:
+          connection: local
+          path: output.parquet
+          format: parquet""",
         "wrong_patterns": {
-            "WRONG_source_sink": "source: / sink: -- USE inputs: / outputs:",
+            "WRONG_source_sink": "source: / sink: -- USE read: / write:",
+            "WRONG_inputs_outputs": "inputs: / outputs: -- USE read: / write:",
+            "WRONG_sql_key": "sql: -- USE query: inside read: block",
             "WRONG_transform_list": "transform: [trim_whitespace] -- USE transform.steps[].function",
             "WRONG_node_name": "my-node or my.node -- USE my_node",
             "WRONG_missing_format": "path: data.csv -- MUST include format: csv",
+            "WRONG_pipeline_key": "name: my_pipeline -- USE pipeline: my_pipeline",
         },
         "transformer_signature": """# CORRECT TRANSFORMER SIGNATURE
 from pydantic import BaseModel, Field
@@ -570,56 +581,79 @@ FOR MORE DETAILS, use these MCP tools:
         """Return the exact YAML structure for odibi pipelines."""
         return """# CRITICAL: Odibi YAML Pipeline Structure
 
+## Project Config (project.yaml)
 ```yaml
 project: my_project          # Required: project name
 
 connections:                 # Required: connection definitions
   my_data:
     type: local
-    path: ./data
+    base_path: ./data
+  my_db:
+    type: azure_sql
+    server: myserver.database.windows.net
+    database: mydb
 
-story:                       # Required: execution story output
+story:                       # Recommended: execution story output
   connection: my_data
   path: stories
 
-system:                      # Required: system data (checksums, etc.)
+system:                      # Recommended: system data (checksums, etc.)
   connection: my_data
   path: _system
 
-pipelines:                   # Required: list of pipeline definitions
-  - name: my_pipeline
+imports:                     # Optional: import pipeline files
+  - pipelines/bronze/orders.yaml
+  - pipelines/silver/customers.yaml
+```
+
+## Pipeline File (imported files MUST have top-level 'pipelines:' key)
+```yaml
+pipelines:
+  - pipeline: my_pipeline      # Use 'pipeline:' not 'name:'
+    layer: bronze
     nodes:
-      - name: source_node
-        inputs:                        # Use 'inputs:' for reading data
-          input_1:
-            connection: my_data
-            path: input.csv
-            format: csv                # REQUIRED: csv, parquet, json, delta
+      - name: load_data        # alphanumeric + underscore ONLY
+        read:                  # Use 'read:' not 'inputs:'
+          connection: my_data
+          path: input.csv
+          format: csv          # REQUIRED: csv, parquet, json, delta, sql
         transform:
           steps:
             - function: add_column
               params:
                 column_name: new_col
                 value: "'default'"
-        outputs:                       # Use 'outputs:' for writing data
-          output_1:
-            connection: my_data
-            path: output.parquet
-            format: parquet
+        write:                 # Use 'write:' not 'outputs:'
+          connection: my_data
+          path: output.parquet
+          format: parquet
 ```
 
-IMPORTANT:
-- All 5 top-level keys are required: project, connections, story, system, pipelines
-- Node names must be alphanumeric + underscore only (no hyphens, dots, spaces)
-- Transforms use `steps:` with `function:` and `params:` (NOT the short syntax)
-- Always specify `format:` in inputs/outputs (csv, parquet, json, delta)
-- Use `inputs:` and `outputs:` (not `source:` and `sink:`)
+## SQL Source Read (CORRECT syntax)
+```yaml
+      - name: load_from_sql
+        read:
+          connection: my_db
+          format: sql           # MUST be 'sql' for database sources
+          query: |              # Use 'query:' not 'sql:'
+            SELECT CustomerID, Name, City
+            FROM dbo.Customers
+            WHERE IsActive = 1
+        write:
+          connection: my_data
+          format: delta
+          table: bronze.customers
+```
 
-FOR MORE DETAILS, use these MCP tools:
-- `get_doc("docs/reference/yaml_schema.md")` - Complete YAML reference
-- `get_doc("docs/reference/configuration.md")` - All config options
-- `list_transformers` - Available transform functions
-- `explain("<name>")` - Details on any transformer/pattern/connection
+## CRITICAL RULES:
+- Use `read:` and `write:` (NOT `inputs:` or `outputs:` or `source:` or `sink:`)
+- Use `query:` inside read block (NOT `sql:`)
+- Use `pipeline:` for pipeline name (NOT `name:` at pipeline level)
+- Node names: alphanumeric + underscore ONLY (no hyphens, dots, spaces)
+- Imported pipeline files MUST have top-level `pipelines:` key
+
+## RECOMMENDED: Use `generate_sql_pipeline` tool instead of writing YAML manually!
 """
 
     # =========================================================================

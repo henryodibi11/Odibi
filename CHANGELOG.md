@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] - 2026-01-23
+
+### Added - AI-Proof YAML Builder Tools
+
+Solves the recurring problem of AI tools generating incorrect Odibi YAML by providing
+programmatic generation that uses the actual Pydantic models.
+
+- **New MCP Tool**: `generate_sql_pipeline` - Generate correct YAML for SQL database ingestion
+  - Uses correct schema: `read:` with `format: sql` and `query:` 
+  - Sanitizes node names to alphanumeric + underscore
+  - Creates proper top-level `pipelines:` key for imported files
+  - Takes discovered tables from `discover_database` or `list_tables`
+  - Returns YAML + suggested imports for project.yaml
+
+- **New MCP Tool**: `validate_odibi_config` - Enhanced YAML validation using Pydantic models
+  - Catches `inputs:` vs `read:` confusion
+  - Catches `sql:` vs `query:` mistakes  
+  - Validates node name format
+  - Checks for missing `pipelines:` key in imported files
+  - Provides actionable error messages with fix suggestions
+
+- **New MCP Tool**: `generate_project_yaml` - Generate project.yaml with correct structure
+  - Connections, story, system, imports all correctly formatted
+
+### Fixed - Wrong YAML Guidance in MCP
+
+- **BREAKING FIX**: Corrected `CRITICAL_CONTEXT` in knowledge.py
+  - Was: "ALWAYS_USE inputs: / outputs:" - **WRONG**
+  - Now: "ALWAYS_USE read: / write: / query:" - **CORRECT**
+  
+- Updated `get_yaml_structure` to show correct examples:
+  - `read:` / `write:` instead of `inputs:` / `outputs:`
+  - `query:` inside `read:` block instead of `sql:`
+  - `pipeline:` for pipeline name instead of `name:`
+  - SQL source read examples with correct syntax
+
+### Changed
+
+- Total MCP tools: 46 → 49
+- YAML validation now catches 8+ common AI mistakes
+- Context injection includes `generate_sql_pipeline` and `validate_odibi_config`
+
 ## [2.13.1] - 2026-01-23
 
 ### Changed - Safer Discovery Defaults

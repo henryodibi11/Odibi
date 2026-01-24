@@ -126,11 +126,13 @@ Use odibi MCP list_transformers
 | `list_files` | List files in a connection | `{"connection": "my_conn", "path": "data/", "pattern": "*.csv"}` |
 | `preview_source` | Preview source data (supports sheet param for Excel) | `{"connection": "my_conn", "path": "data.csv", "max_rows": 10}` |
 | `infer_schema` | Infer schema from file | `{"connection": "my_conn", "path": "data.csv"}` |
+| `list_schemas` | **List schemas** in SQL database with table counts. Call FIRST before discover_database | `{"connection": "my_sql"}` |
 | `list_tables` | List SQL tables | `{"connection": "my_sql", "schema": "dbo"}` |
 | `describe_table` | Describe SQL table | `{"connection": "my_sql", "table": "my_table"}` |
 | `list_sheets` | List sheet names in Excel file | `{"connection": "my_conn", "path": "data.xlsx"}` |
 | `discover_database` | **Discover SQL tables** (structure-first, shallow). Samples OFF by default - use preview_source | `{"connection": "my_sql", "schema": "dbo"}` |
 | `discover_storage` | **Discover files** (structure-first, shallow). Samples/recursion OFF by default - use preview_source | `{"connection": "my_adls", "path": "raw/"}` |
+| `debug_env` | Debug environment setup - shows .env loading, env vars, and connection status | `{}` |
 
 ---
 

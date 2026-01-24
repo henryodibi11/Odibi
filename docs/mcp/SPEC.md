@@ -539,10 +539,14 @@ class ListFilesResponse(BaseModel):
 | Tool | Parameters | Returns |
 |------|------------|---------|
 | `list_files` | `connection, path?, limit=100, next_token?, include_physical: bool = False` | ListFilesResponse |
+| `list_schemas` | `connection` | ListSchemasResponse — List all schemas with table counts. **Call FIRST before discover_database** |
 | `list_tables` | `connection, schema?, limit=100` | ListTablesResponse |
 | `infer_schema` | `connection, path, format, max_rows=100, max_bytes=1MB` | SchemaResponse |
 | `describe_table` | `connection, table` | SchemaResponse |
 | `preview_source` | `connection, path, format, limit=5, columns?: List[str]` | PreviewResponse |
+| `discover_database` | `connection, schema?, max_tables=20, sample_rows=0` | DiscoverDatabaseResponse — Structure-first discovery |
+| `discover_storage` | `connection, path?, pattern?, max_files=20, sample_rows=0, recursive=False` | DiscoverStorageResponse — File discovery |
+| `debug_env` | (none) | DebugEnvResponse — Shows .env loading, env vars set, connection status |
 
 **Discovery Limits:**
 

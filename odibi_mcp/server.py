@@ -10,6 +10,7 @@ from odibi_mcp.audit.entry import AuditEntry
 from datetime import datetime
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,29 @@ from pathlib import Path
 ODIBI_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ODIBI_ROOT))
 sys.path.insert(0, str(ODIBI_ROOT / "_archive"))
+
+# Load .env file if present (checks cwd, then ODIBI_CONFIG dir, then odibi root)
+_dotenv_loaded = False
+_dotenv_path = None
+try:
+    from dotenv import load_dotenv
+
+    # Try multiple locations for .env
+    env_locations = [
+        Path.cwd() / ".env",
+        Path(os.environ.get("ODIBI_CONFIG", "")).parent / ".env"
+        if os.environ.get("ODIBI_CONFIG")
+        else None,
+        ODIBI_ROOT / ".env",
+    ]
+    for env_path in env_locations:
+        if env_path and env_path.exists():
+            load_dotenv(env_path, override=True)
+            _dotenv_loaded = True
+            _dotenv_path = str(env_path)
+            break
+except ImportError:
+    pass  # dotenv not installed, rely on system env vars
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -46,7 +70,13 @@ from odibi_mcp.tools.discovery import (
     preview_source,
     list_sheets,
     discover_database,
+    list_schemas,
     discover_storage,
+)
+from odibi_mcp.tools.yaml_builder import (
+    generate_sql_pipeline,
+    validate_odibi_config,
+    generate_project_yaml,
 )
 from dataclasses import asdict, is_dataclass
 from pydantic import BaseModel
@@ -84,6 +114,15 @@ server = Server("odibi-knowledge")
 async def list_tools() -> list[Tool]:
     """List available tools."""
     return [
+        Tool(
+            name="debug_env",
+            description="Debug environment setup - shows if .env was loaded, which env vars are set (without values), and connection status.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
         Tool(
             name="list_transformers",
             description="List all 52+ odibi transformers with their parameters. Use when you need to know what transformers are available.",
@@ -726,6 +765,17 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="list_schemas",
+            description="List all schemas in a SQL database with table counts. Call FIRST before discover_database to see what schemas exist.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "SQL connection name"},
+                },
+                "required": ["connection"],
+            },
+        ),
+        Tool(
             name="discover_database",
             description="Discover tables in a SQL database (structure-first, shallow by default). Returns table names, columns, row counts. Samples OFF by default - use preview_source for samples.",
             inputSchema={
@@ -820,6 +870,156 @@ async def list_tools() -> list[Tool]:
                 ],
             },
         ),
+        # ============ YAML BUILDER TOOLS ============
+        Tool(
+            name="generate_sql_pipeline",
+            description="""Generate CORRECT Odibi pipeline YAML for SQL database ingestion.
+
+ALWAYS use this instead of manually writing YAML for SQL sources!
+
+This tool:
+1. Uses the CORRECT schema (read: with format: sql and query:)
+2. Generates valid node names (sanitized to alphanumeric + underscore)
+3. Creates proper top-level 'pipelines:' key for imported files
+4. Validates before outputting
+
+Input discovered tables from discover_database or list_tables.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline_name": {
+                        "type": "string",
+                        "description": "Name for the pipeline (e.g., 'bronze_customers')",
+                    },
+                    "source_connection": {
+                        "type": "string",
+                        "description": "SQL database connection name",
+                    },
+                    "target_connection": {
+                        "type": "string",
+                        "description": "Target storage connection name",
+                    },
+                    "tables": {
+                        "type": "array",
+                        "description": "Tables to ingest",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "schema": {"type": "string", "default": "dbo"},
+                                "table": {"type": "string", "description": "Table name"},
+                                "where": {"type": "string", "description": "Optional WHERE clause"},
+                                "columns": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Columns to select (default: all)",
+                                },
+                                "primary_key": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Primary key columns",
+                                },
+                                "incremental_column": {
+                                    "type": "string",
+                                    "description": "Column for incremental loading",
+                                },
+                            },
+                            "required": ["table"],
+                        },
+                    },
+                    "target_format": {
+                        "type": "string",
+                        "default": "delta",
+                        "description": "Output format (delta, parquet, csv)",
+                    },
+                    "target_schema": {
+                        "type": "string",
+                        "description": "Schema prefix for target tables",
+                    },
+                    "layer": {
+                        "type": "string",
+                        "default": "bronze",
+                        "description": "Pipeline layer (bronze, silver, gold)",
+                    },
+                    "node_prefix": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Prefix for node names",
+                    },
+                },
+                "required": ["pipeline_name", "source_connection", "target_connection", "tables"],
+            },
+        ),
+        Tool(
+            name="validate_odibi_config",
+            description="""Validate Odibi YAML config using actual Pydantic models.
+
+BETTER than validate_yaml! This catches:
+- Wrong keys (inputs: instead of read:, sql: instead of query:)
+- Missing required fields (format:, connection:)
+- Invalid node names
+- Missing top-level 'pipelines:' key in imported files
+
+Use BEFORE saving any Odibi YAML config.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "yaml_content": {
+                        "type": "string",
+                        "description": "The YAML content to validate",
+                    },
+                    "check_imports": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Also validate imported pipeline files",
+                    },
+                },
+                "required": ["yaml_content"],
+            },
+        ),
+        Tool(
+            name="generate_project_yaml",
+            description="""Generate a complete project.yaml file with connections, story, system config.
+
+Use to create a new Odibi project with correct structure.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_name": {
+                        "type": "string",
+                        "description": "Project name",
+                    },
+                    "connections": {
+                        "type": "array",
+                        "description": "Connection definitions",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string", "description": "Connection name"},
+                                "type": {
+                                    "type": "string",
+                                    "description": "Connection type (local, azure_sql, adls, etc.)",
+                                },
+                            },
+                            "required": ["name", "type"],
+                        },
+                    },
+                    "imports": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Pipeline files to import (e.g., ['pipelines/bronze/orders.yaml'])",
+                    },
+                    "story_connection": {
+                        "type": "string",
+                        "description": "Connection for story output (defaults to first connection)",
+                    },
+                    "system_connection": {
+                        "type": "string",
+                        "description": "Connection for system data (defaults to first connection)",
+                    },
+                },
+                "required": ["project_name", "connections"],
+            },
+        ),
     ]
 
 
@@ -838,6 +1038,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         "get_example",
         "suggest_pattern",
         "validate_yaml",
+        "validate_odibi_config",
+        "generate_sql_pipeline",
         "diagnose_error",
         "query_codebase",
         "search_docs",
@@ -851,7 +1053,27 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     redacted_args = AuditLogger.redact_args(arguments)
 
     try:
-        if name == "list_transformers":
+        if name == "debug_env":
+            # Debug tool to check environment setup
+            from odibi_mcp.context import get_project_context
+
+            ctx = get_project_context()
+            debug_info = {
+                "dotenv_loaded": _dotenv_loaded,
+                "dotenv_path": _dotenv_path,
+                "odibi_config": os.environ.get("ODIBI_CONFIG", "NOT SET"),
+                "sql_user_set": "SQL_USER" in os.environ
+                and os.environ["SQL_USER"] != "${SQL_USER}",
+                "sql_password_set": "SQL_PASSWORD" in os.environ
+                and os.environ["SQL_PASSWORD"] != "${SQL_PASSWORD}",
+                "cwd": str(Path.cwd()),
+                "connections_initialized": list(ctx.connections.keys()) if ctx else [],
+                "connections_defined": list(ctx.config.get("connections", {}).keys())
+                if ctx
+                else [],
+            }
+            return [TextContent(type="text", text=json.dumps(debug_info, indent=2))]
+        elif name == "list_transformers":
             result = knowledge.list_transformers()
         elif name == "list_patterns":
             result = knowledge.list_patterns()
@@ -1064,6 +1286,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 path=arguments["path"],
             )
             result = to_json_serializable(res)
+        elif name == "list_schemas":
+            res = list_schemas(connection=arguments["connection"])
+            result = to_json_serializable(res)
         elif name == "discover_database":
             res = discover_database(
                 connection=arguments["connection"],
@@ -1082,6 +1307,34 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 recursive=arguments.get("recursive", True),
             )
             result = to_json_serializable(res)
+        # ============ YAML BUILDER TOOL HANDLERS ============
+        elif name == "generate_sql_pipeline":
+            res = generate_sql_pipeline(
+                pipeline_name=arguments["pipeline_name"],
+                source_connection=arguments["source_connection"],
+                target_connection=arguments["target_connection"],
+                tables=arguments["tables"],
+                target_format=arguments.get("target_format", "delta"),
+                target_schema=arguments.get("target_schema"),
+                layer=arguments.get("layer", "bronze"),
+                node_prefix=arguments.get("node_prefix", ""),
+            )
+            result = to_json_serializable(res)
+        elif name == "validate_odibi_config":
+            res = validate_odibi_config(
+                yaml_content=arguments["yaml_content"],
+                check_imports=arguments.get("check_imports", False),
+            )
+            result = to_json_serializable(res)
+        elif name == "generate_project_yaml":
+            yaml_content = generate_project_yaml(
+                project_name=arguments["project_name"],
+                connections=arguments["connections"],
+                imports=arguments.get("imports"),
+                story_connection=arguments.get("story_connection"),
+                system_connection=arguments.get("system_connection"),
+            )
+            return [TextContent(type="text", text=yaml_content)]
         else:
             result = {"error": f"Unknown tool: {name}"}
 

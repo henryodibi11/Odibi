@@ -631,6 +631,10 @@ discover_storage(connection="<conn>", path="", recursive=true, max_files=50)
 **For Database Connections:**
 
 ```
+# Step 0: List available schemas FIRST
+list_schemas(connection="<sql_conn>")
+# Returns: schema names with table counts - know what exists before diving in
+
 # Step 1: Discover structure (shallow, no samples by default)
 discover_database(connection="<sql_conn>", schema="dbo")
 # Returns: table names, columns, row counts - lightweight response
@@ -700,7 +704,10 @@ compare_schemas(
 **Steps:**
 
 ```
-# Step 1: Discover all tables
+# Step 0: List available schemas
+list_schemas(connection="<sql_conn>")
+
+# Step 1: Discover all tables in each schema
 discover_database(connection="<sql_conn>", schema="dbo", max_tables=100, sample_rows=3)
 
 # Step 2: For each important table, AI analyzes:

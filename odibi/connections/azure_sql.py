@@ -407,9 +407,11 @@ class AzureSQL(BaseConnection):
 
         try:
             engine = self.get_engine()
-            # Use engine.connect() for pandas 2.x compatibility
+            # Get raw DBAPI connection for pandas compatibility
             with engine.connect() as conn:
-                result = pd.read_sql(query, conn, params=params)
+                # Use the underlying DBAPI connection
+                raw_conn = conn.connection
+                result = pd.read_sql(query, raw_conn, params=params)
 
             ctx.info(
                 "SQL query executed successfully",
@@ -459,6 +461,21 @@ class AzureSQL(BaseConnection):
             query = f"SELECT * FROM [{table_name}]"
 
         return self.read_sql(query)
+
+    def read_sql_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
+        """
+        Execute a SQL query and return results as DataFrame.
+        
+        Use this for custom SELECT queries (e.g., to exclude unsupported columns).
+
+        Args:
+            query: SQL SELECT query
+            params: Optional parameters for parameterized query
+
+        Returns:
+            Query results as pandas DataFrame
+        """
+        return self.read_sql(query, params)
 
     def write_table(
         self,
@@ -580,14 +597,15 @@ class AzureSQL(BaseConnection):
             engine = self.get_engine()
             from sqlalchemy import text
 
-            with engine.connect() as conn:
+            # Use begin() for proper transaction handling in SQLAlchemy 1.4+
+            with engine.begin() as conn:
                 result = conn.execute(text(sql), params or {})
-                # Fetch all results before commit to avoid cursor invalidation
+                # Fetch all results before transaction ends
                 if result.returns_rows:
                     rows = result.fetchall()
                 else:
                     rows = None
-                conn.commit()
+                # Transaction auto-commits on exit from begin() context
 
                 ctx.info(
                     "SQL statement executed successfully",
