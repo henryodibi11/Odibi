@@ -185,11 +185,11 @@ class AzureSQL(BaseConnection):
 
         dsn = (
             f"Driver={{{self.driver}}};"
-            f"Server=tcp:{self.server},1433;"
+            f"Server=tcp:{self.server},{self.port};"
             f"Database={self.database};"
             f"Encrypt=yes;"
             f"TrustServerCertificate=yes;"
-            f"Connection Timeout=30;"
+            f"Connection Timeout={self.timeout};"
         )
 
         pwd = self.get_password()

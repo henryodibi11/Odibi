@@ -249,7 +249,11 @@ def create_sql_server_connection(name: str, config: Dict[str, Any]) -> Any:
     key_vault_name = auth_config.get("key_vault_name") or config.get("key_vault_name")
     secret_name = auth_config.get("secret_name") or config.get("secret_name")
 
-    auth_mode = config.get("auth_mode")
+    # Check auth.mode first, then top-level auth_mode
+    auth_mode = auth_config.get("mode") or config.get("auth_mode")
+    # Normalize sql_login -> sql
+    if auth_mode == "sql_login":
+        auth_mode = "sql"
     if not auth_mode:
         if username and password:
             auth_mode = "sql"
