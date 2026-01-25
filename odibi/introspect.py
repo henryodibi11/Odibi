@@ -1059,7 +1059,9 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                         ):
                             pass  # Skip duplicate
                         else:
-                            lines.append(f"{model.docstring}\n")
+                            docstring_text = model.docstring.rstrip()
+                            lines.append(docstring_text)
+                            lines.append("")  # Blank line for proper markdown separation
 
                     lines.append("[Back to Catalog](#nodeconfig)")
                     lines.append("")
@@ -1140,7 +1142,10 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                 lines.append("")
 
             if model.docstring:
-                lines.append(f"{model.docstring}\n")
+                # Ensure docstring ends with content, then add blank line
+                docstring_text = model.docstring.rstrip()
+                lines.append(docstring_text)
+                lines.append("")  # Blank line after docstring for proper markdown separation
                 if model.group == "Transformation":
                     lines.append("[Back to Catalog](#nodeconfig)")
                     lines.append("")
