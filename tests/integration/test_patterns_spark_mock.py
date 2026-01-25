@@ -369,11 +369,12 @@ def test_spark_smart_read_sql_jdbc(mock_context, mock_engine, mock_connections, 
     passed_options = call_args.kwargs
 
     # With SQL pushdown, SparkEngine.read receives 'filter' option and converts it to 'query'
-    # The filter should be "`updated_at` >= '2023-10-24 12:00:00'" (rolling window uses >=)
+    # The filter should be "updated_at >= '2023-10-24 12:00:00'" (rolling window uses >=)
+    # Note: format="sql" uses bare column names (no backticks) - backticks only for delta+spark
     # SparkEngine builds query: "SELECT * FROM schema.orders WHERE <filter>"
     expected_date = "2023-10-24 12:00:00"
     assert "query" in passed_options, f"Expected 'query' in options but got: {passed_options}"
-    assert f"`updated_at` >= '{expected_date}'" in passed_options["query"]
+    assert f"updated_at >= '{expected_date}'" in passed_options["query"]
     # dbtable should NOT be present when query is used
     assert "dbtable" not in passed_options
 
