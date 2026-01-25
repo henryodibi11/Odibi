@@ -75,9 +75,7 @@ class PolarsEngine(Engine):
 
         # SQL Server / Azure SQL Support
         if format in ["sql", "sql_server", "azure_sql"]:
-            if not hasattr(connection, "read_table") and not hasattr(
-                connection, "read_sql_query"
-            ):
+            if not hasattr(connection, "read_table") and not hasattr(connection, "read_sql_query"):
                 raise ValueError(
                     f"Cannot read SQL table: connection type '{type(connection).__name__}' "
                     "does not support SQL operations. Use a SQL-compatible connection."

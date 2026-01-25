@@ -1052,9 +1052,7 @@ class PandasEngine(Engine):
         elif format in ["sql", "sql_server", "azure_sql"]:
             ctx.debug("Reading SQL table", table=str(full_path), format=format)
 
-            if not hasattr(connection, "read_table") and not hasattr(
-                connection, "read_sql_query"
-            ):
+            if not hasattr(connection, "read_table") and not hasattr(connection, "read_sql_query"):
                 ctx.error(
                     "Connection does not support SQL operations",
                     connection_type=type(connection).__name__,
