@@ -2203,7 +2203,7 @@ The models below describe the `params` required for each transformer.
 
 ### 📂 Common Operations
 
-#### CaseWhenCase
+#### CaseWhenCase {#casewhencase}
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2212,7 +2212,7 @@ The models below describe the `params` required for each transformer.
 | **value** | str | Yes | - | - |
 
 ---
-#### `add_prefix` (AddPrefixParams)
+#### `add_prefix` (AddPrefixParams) {#addprefixparams}
 Adds a prefix to column names.
 
 Configuration for adding a prefix to column names.
@@ -2239,7 +2239,7 @@ add_prefix:
 | **exclude** | Optional[List[str]] | No | - | Columns to exclude from prefixing |
 
 ---
-#### `add_suffix` (AddSuffixParams)
+#### `add_suffix` (AddSuffixParams) {#addsuffixparams}
 Adds a suffix to column names.
 
 Configuration for adding a suffix to column names.
@@ -2266,7 +2266,7 @@ add_suffix:
 | **exclude** | Optional[List[str]] | No | - | Columns to exclude from suffixing |
 
 ---
-#### `case_when` (CaseWhenParams)
+#### `case_when` (CaseWhenParams) {#casewhenparams}
 Implements structured CASE WHEN logic.
 
 Configuration for conditional logic.
@@ -2292,7 +2292,7 @@ case_when:
 | **output_col** | str | Yes | - | Name of the resulting column |
 
 ---
-#### `cast_columns` (CastColumnsParams)
+#### `cast_columns` (CastColumnsParams) {#castcolumnsparams}
 Casts specific columns to new types while keeping others intact.
 
 Configuration for column type casting.
@@ -2314,7 +2314,7 @@ cast_columns:
 | **casts** | Dict[str, SimpleType \| str] | Yes | - | Map of column to target SQL type |
 
 ---
-#### `clean_text` (CleanTextParams)
+#### `clean_text` (CleanTextParams) {#cleantextparams}
 Applies string cleaning operations (Trim/Case) via SQL.
 
 Configuration for text cleaning.
@@ -2336,7 +2336,7 @@ clean_text:
 | **case** | Literal['lower', 'upper', 'preserve'] | No | `preserve` | Case conversion |
 
 ---
-#### `coalesce_columns` (CoalesceColumnsParams)
+#### `coalesce_columns` (CoalesceColumnsParams) {#coalescecolumnsparams}
 Returns the first non-null value from a list of columns.
 Useful for fallback/priority scenarios.
 
@@ -2365,7 +2365,7 @@ coalesce_columns:
 | **drop_source** | bool | No | `False` | Drop the source columns after coalescing |
 
 ---
-#### `concat_columns` (ConcatColumnsParams)
+#### `concat_columns` (ConcatColumnsParams) {#concatcolumnsparams}
 Concatenates multiple columns into one string.
 NULLs are skipped (treated as empty string) using CONCAT_WS behavior.
 
@@ -2388,7 +2388,7 @@ concat_columns:
 | **output_col** | str | Yes | - | Resulting column name |
 
 ---
-#### `convert_timezone` (ConvertTimezoneParams)
+#### `convert_timezone` (ConvertTimezoneParams) {#converttimezoneparams}
 Converts a timestamp from one timezone to another.
 Assumes the input column is a naive timestamp representing time in source_tz,
 or a timestamp with timezone.
@@ -2413,7 +2413,7 @@ convert_timezone:
 | **output_col** | Optional[str] | No | - | Name of the result column (default: {col}_{target_tz}) |
 
 ---
-#### `date_add` (DateAddParams)
+#### `date_add` (DateAddParams) {#dateaddparams}
 Adds an interval to a date/timestamp column.
 
 Configuration for date addition.
@@ -2435,7 +2435,7 @@ date_add:
 | **unit** | Literal['day', 'month', 'year', 'hour', 'minute', 'second'] | Yes | - | - |
 
 ---
-#### `date_diff` (DateDiffParams)
+#### `date_diff` (DateDiffParams) {#datediffparams}
 Calculates difference between two dates/timestamps.
 Returns the elapsed time in the specified unit (as float for sub-day units).
 
@@ -2458,7 +2458,7 @@ date_diff:
 | **unit** | Literal['day', 'hour', 'minute', 'second'] | No | `day` | - |
 
 ---
-#### `date_trunc` (DateTruncParams)
+#### `date_trunc` (DateTruncParams) {#datetruncparams}
 Truncates a date/timestamp to the specified precision.
 
 Configuration for date truncation.
@@ -2478,7 +2478,7 @@ date_trunc:
 | **unit** | Literal['year', 'month', 'day', 'hour', 'minute', 'second'] | Yes | - | - |
 
 ---
-#### `derive_columns` (DeriveColumnsParams)
+#### `derive_columns` (DeriveColumnsParams) {#derivecolumnsparams}
 Appends new columns based on SQL expressions.
 
 Design:
@@ -2504,7 +2504,7 @@ Note: Engine will fail if expressions reference non-existent columns.
 | **derivations** | Dict[str, str] | Yes | - | Map of column name to SQL expression |
 
 ---
-#### `distinct` (DistinctParams)
+#### `distinct` (DistinctParams) {#distinctparams}
 Return unique rows from the dataset using SQL DISTINCT.
 
 Parameters
@@ -2534,7 +2534,7 @@ distinct:
 | **columns** | Optional[List[str]] | No | - | Columns to project (if None, keeps all columns unique) |
 
 ---
-#### `drop_columns` (DropColumnsParams)
+#### `drop_columns` (DropColumnsParams) {#dropcolumnsparams}
 Removes the specified columns from the DataFrame.
 
 Configuration for dropping specific columns (blacklist).
@@ -2552,7 +2552,7 @@ drop_columns:
 | **columns** | List[str] | Yes | - | List of column names to drop |
 
 ---
-#### `extract_date_parts` (ExtractDateParams)
+#### `extract_date_parts` (ExtractDateParams) {#extractdateparams}
 Extracts date parts using ANSI SQL extract/functions.
 
 Configuration for extracting date parts.
@@ -2574,7 +2574,7 @@ extract_date_parts:
 | **parts** | Literal[typing.Literal['year', 'month', 'day', 'hour']] | No | `['year', 'month', 'day']` | - |
 
 ---
-#### `fill_nulls` (FillNullsParams)
+#### `fill_nulls` (FillNullsParams) {#fillnullsparams}
 Replaces null values with specified defaults using COALESCE.
 
 Configuration for filling null values.
@@ -2594,7 +2594,7 @@ fill_nulls:
 | **values** | Dict[str, str \| int \| float \| bool] | Yes | - | Map of column to fill value |
 
 ---
-#### `filter_rows` (FilterRowsParams)
+#### `filter_rows` (FilterRowsParams) {#filterrowsparams}
 Filters rows using a standard SQL WHERE clause.
 
 Design:
@@ -2622,7 +2622,7 @@ filter_rows:
 | **condition** | str | Yes | - | SQL WHERE clause (e.g., 'age > 18 AND status = "active"') |
 
 ---
-#### `limit` (LimitParams)
+#### `limit` (LimitParams) {#limitparams}
 Limit the number of rows returned from the dataset.
 
 Parameters
@@ -2654,7 +2654,7 @@ limit:
 | **offset** | int | No | `0` | Number of rows to skip |
 
 ---
-#### `normalize_column_names` (NormalizeColumnNamesParams)
+#### `normalize_column_names` (NormalizeColumnNamesParams) {#normalizecolumnnamesparams}
 Normalizes column names to a consistent style.
 Useful for cleaning up messy source data with spaces, mixed case, or special characters.
 
@@ -2676,7 +2676,7 @@ normalize_column_names:
 | **remove_special** | bool | No | `True` | Remove special characters except underscores |
 
 ---
-#### `normalize_schema` (NormalizeSchemaParams)
+#### `normalize_schema` (NormalizeSchemaParams) {#normalizeschemaparams}
 Structural transformation to rename, drop, and reorder columns.
 
 Note: This is one of the few that might behave better with native API in some cases,
@@ -2702,7 +2702,7 @@ normalize_schema:
 | **select_order** | Optional[List[str]] | No | - | Final column order; any missing columns appended after |
 
 ---
-#### `rename_columns` (RenameColumnsParams)
+#### `rename_columns` (RenameColumnsParams) {#renamecolumnsparams}
 Renames columns according to the provided mapping.
 Columns not in the mapping are kept unchanged.
 
@@ -2724,7 +2724,7 @@ rename_columns:
 | **mapping** | Dict[str, str] | Yes | - | Map of old column name to new column name |
 
 ---
-#### `replace_values` (ReplaceValuesParams)
+#### `replace_values` (ReplaceValuesParams) {#replacevaluesparams}
 Replaces values in specified columns according to the mapping.
 Supports replacing to NULL.
 
@@ -2757,7 +2757,7 @@ replace_values:
 | **mapping** | Dict[str, Optional[str]] | Yes | - | Map of old value to new value (use null for NULL) |
 
 ---
-#### `sample` (SampleParams)
+#### `sample` (SampleParams) {#sampleparams}
 Return a random sample of rows from the dataset.
 
 Parameters
@@ -2789,7 +2789,7 @@ sample:
 | **seed** | Optional[int] | No | - | - |
 
 ---
-#### `select_columns` (SelectColumnsParams)
+#### `select_columns` (SelectColumnsParams) {#selectcolumnsparams}
 Keeps only the specified columns, dropping all others.
 
 Configuration for selecting specific columns (whitelist).
@@ -2807,7 +2807,7 @@ select_columns:
 | **columns** | List[str] | Yes | - | List of column names to keep |
 
 ---
-#### `sort` (SortParams)
+#### `sort` (SortParams) {#sortparams}
 Sort the dataset by one or more columns.
 
 Parameters
@@ -2839,7 +2839,7 @@ sort:
 | **ascending** | bool | No | `True` | Sort order |
 
 ---
-#### `split_part` (SplitPartParams)
+#### `split_part` (SplitPartParams) {#splitpartparams}
 Extracts the Nth part of a string after splitting by a delimiter.
 
 Configuration for splitting strings.
@@ -2861,7 +2861,7 @@ split_part:
 | **index** | int | Yes | - | 1-based index of the token to extract |
 
 ---
-#### `trim_whitespace` (TrimWhitespaceParams)
+#### `trim_whitespace` (TrimWhitespaceParams) {#trimwhitespaceparams}
 Trims leading and trailing whitespace from string columns.
 
 Configuration for trimming whitespace from string columns.
@@ -2886,7 +2886,7 @@ trim_whitespace:
 ---
 ### 📂 Relational Algebra
 
-#### `aggregate` (AggregateParams)
+#### `aggregate` (AggregateParams) {#aggregateparams}
 Performs grouping and aggregation via SQL.
 
 Configuration for aggregation.
@@ -2909,7 +2909,7 @@ aggregate:
 | **aggregations** | Dict[str, AggFunc] | Yes | - | Map of column to aggregation function (sum, avg, min, max, count) |
 
 ---
-#### `join` (JoinParams)
+#### `join` (JoinParams) {#joinparams}
 Joins the current dataset with another dataset from the context.
 
 Configuration for joining datasets.
@@ -2941,7 +2941,7 @@ join:
 | **prefix** | Optional[str] | No | - | Prefix for columns from right dataset to avoid collisions |
 
 ---
-#### `pivot` (PivotParams)
+#### `pivot` (PivotParams) {#pivotparams}
 Pivots row values into columns.
 
 Configuration for pivoting data.
@@ -2975,7 +2975,7 @@ pivot:
 | **values** | Optional[List[str]] | No | - | Specific values to pivot (for Spark optimization) |
 
 ---
-#### `union` (UnionParams)
+#### `union` (UnionParams) {#unionparams}
 Unions current dataset with others.
 
 Configuration for unioning datasets.
@@ -3002,7 +3002,7 @@ union:
 | **by_name** | bool | No | `True` | Match columns by name (UNION ALL BY NAME) |
 
 ---
-#### `unpivot` (UnpivotParams)
+#### `unpivot` (UnpivotParams) {#unpivotparams}
 Unpivots columns into rows (Melt/Stack).
 
 Configuration for unpivoting (melting) data.
@@ -3028,7 +3028,7 @@ unpivot:
 ---
 ### 📂 Data Quality
 
-#### `cross_check` (CrossCheckParams)
+#### `cross_check` (CrossCheckParams) {#crosscheckparams}
 Perform cross-node validation checks.
 
 Does not return a DataFrame (returns None).
@@ -3064,7 +3064,7 @@ params:
 ---
 ### 📂 Warehousing Patterns
 
-#### AuditColumnsConfig
+#### AuditColumnsConfig {#auditcolumnsconfig}
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3073,7 +3073,7 @@ params:
 | **updated_col** | Optional[str] | No | - | Column to update on every merge |
 
 ---
-#### `merge` (MergeParams)
+#### `merge` (MergeParams) {#mergeparams}
 Merge transformer implementation.
 Handles Upsert, Append-Only, and Delete-Match strategies.
 
@@ -3194,7 +3194,7 @@ transform:
 | **table_properties** | Optional[dict] | No | - | Delta table properties for initial table creation (e.g., column mapping) |
 
 ---
-#### `scd2` (SCD2Params)
+#### `scd2` (SCD2Params) {#scd2params}
 Implements SCD Type 2 Logic.
 
 Returns the FULL history dataset (to be written via Overwrite).
@@ -3256,7 +3256,7 @@ to persist the result (typically with `mode: overwrite` to the same location as 
 ---
 ### 📂 Manufacturing & IoT
 
-#### PhaseConfig
+#### PhaseConfig {#phaseconfig}
 Configuration for a single phase.
 
 [Back to Catalog](#nodeconfig)
@@ -3267,7 +3267,7 @@ Configuration for a single phase.
 | **start_threshold** | Optional[int] | No | - | Override default start threshold for this phase (seconds) |
 
 ---
-#### `detect_sequential_phases` (DetectSequentialPhasesParams)
+#### `detect_sequential_phases` (DetectSequentialPhasesParams) {#detectsequentialphasesparams}
 Detect and analyze sequential manufacturing phases.
 
 For each group (e.g., batch), this transformer:
@@ -3351,7 +3351,7 @@ detect_sequential_phases:
 ---
 ### 📂 Advanced & Feature Engineering
 
-#### ShiftDefinition
+#### ShiftDefinition {#shiftdefinition}
 Definition of a single shift.
 
 [Back to Catalog](#nodeconfig)
@@ -3363,7 +3363,7 @@ Definition of a single shift.
 | **end** | str | Yes | - | End time in HH:MM format (e.g., '14:00') |
 
 ---
-#### `deduplicate` (DeduplicateParams)
+#### `deduplicate` (DeduplicateParams) {#deduplicateparams}
 Deduplicates data using Window functions.
 
 Configuration for deduplication.
@@ -3383,7 +3383,7 @@ deduplicate:
 | **order_by** | Optional[str] | No | - | SQL Order by clause (e.g. 'updated_at DESC') to determine which record to keep (first one is kept) |
 
 ---
-#### `dict_based_mapping` (DictMappingParams)
+#### `dict_based_mapping` (DictMappingParams) {#dictmappingparams}
 Maps values in a column using a provided dictionary.
 
 For each value in the specified column, replaces it with the mapped value.
@@ -3413,7 +3413,7 @@ dict_based_mapping:
 | **output_column** | Optional[str] | No | - | Name of output column. If not provided, overwrites source column. |
 
 ---
-#### `explode_list_column` (ExplodeParams)
+#### `explode_list_column` (ExplodeParams) {#explodeparams}
 Explodes a list/array column into multiple rows.
 
 For each element in the specified list column, creates a new row.
@@ -3437,7 +3437,7 @@ explode_list_column:
 | **outer** | bool | No | `False` | If True, keep rows with empty lists (explode_outer behavior). If False, drops them. |
 
 ---
-#### `generate_numeric_key` (NumericKeyParams)
+#### `generate_numeric_key` (NumericKeyParams) {#numerickeyparams}
 Generates a deterministic BIGINT surrogate key from a hash of columns.
 
 This is useful when:
@@ -3483,7 +3483,7 @@ The generated key is:
 | **coalesce_with** | Optional[str] | No | - | Existing column to coalesce with (keep existing value if not null) |
 
 ---
-#### `generate_surrogate_key` (SurrogateKeyParams)
+#### `generate_surrogate_key` (SurrogateKeyParams) {#surrogatekeyparams}
 Generates a deterministic surrogate key (MD5) from a combination of columns.
 Handles NULLs by treating them as empty strings to ensure consistency.
 
@@ -3506,7 +3506,7 @@ generate_surrogate_key:
 | **output_col** | str | No | `surrogate_key` | Name of the output column |
 
 ---
-#### `geocode` (GeocodeParams)
+#### `geocode` (GeocodeParams) {#geocodeparams}
 Geocoding Stub.
 
 Configuration for geocoding.
@@ -3526,7 +3526,7 @@ geocode:
 | **output_col** | str | No | `lat_long` | Name of the output column for coordinates |
 
 ---
-#### `hash_columns` (HashParams)
+#### `hash_columns` (HashParams) {#hashparams}
 Hashes columns for PII/Anonymization.
 
 Configuration for column hashing.
@@ -3546,7 +3546,7 @@ hash_columns:
 | **algorithm** | HashAlgorithm | No | `HashAlgorithm.SHA256` | Hashing algorithm. Options: 'sha256', 'md5' |
 
 ---
-#### `normalize_json` (NormalizeJsonParams)
+#### `normalize_json` (NormalizeJsonParams) {#normalizejsonparams}
 Flattens a nested JSON/Struct column.
 
 Configuration for JSON normalization.
@@ -3566,7 +3566,7 @@ normalize_json:
 | **sep** | str | No | `_` | Separator for nested fields (e.g., 'parent_child') |
 
 ---
-#### `parse_json` (ParseJsonParams)
+#### `parse_json` (ParseJsonParams) {#parsejsonparams}
 Parses a JSON string column into a Struct/Map column.
 
 Configuration for JSON parsing.
@@ -3588,7 +3588,7 @@ parse_json:
 | **output_col** | Optional[str] | No | - | - |
 
 ---
-#### `regex_replace` (RegexReplaceParams)
+#### `regex_replace` (RegexReplaceParams) {#regexreplaceparams}
 Applies a regex replacement to a column.
 
 Uses SQL-based REGEXP_REPLACE to replace all matches of the pattern in the specified column
@@ -3613,7 +3613,7 @@ regex_replace:
 | **replacement** | str | Yes | - | String to replace matches with |
 
 ---
-#### `sessionize` (SessionizeParams)
+#### `sessionize` (SessionizeParams) {#sessionizeparams}
 Assigns session IDs based on inactivity threshold.
 
 Configuration for sessionization.
@@ -3636,7 +3636,7 @@ sessionize:
 | **session_col** | str | No | `session_id` | Output column name for the generated session ID |
 
 ---
-#### `split_events_by_period` (SplitEventsByPeriodParams)
+#### `split_events_by_period` (SplitEventsByPeriodParams) {#spliteventsbyperiodparams}
 Splits events that span multiple time periods into individual segments.
 
 For events spanning multiple days/hours/shifts, this creates separate rows
@@ -3688,7 +3688,7 @@ split_events_by_period:
 | **shift_col** | Optional[str] | No | `shift_name` | Output column name for shift name (only used when period='shift') |
 
 ---
-#### `unpack_struct` (UnpackStructParams)
+#### `unpack_struct` (UnpackStructParams) {#unpackstructparams}
 Flattens a struct/dict column into top-level columns.
 
 Configuration for unpacking structs.
@@ -3706,7 +3706,7 @@ unpack_struct:
 | **column** | str | Yes | - | Struct/Dictionary column to unpack/flatten into individual columns |
 
 ---
-#### `validate_and_flag` (ValidateAndFlagParams)
+#### `validate_and_flag` (ValidateAndFlagParams) {#validateandflagparams}
 Validates rules and appends a column with a list/string of failed rule names.
 
 Configuration for validation flagging.
@@ -3728,7 +3728,7 @@ validate_and_flag:
 | **flag_col** | str | No | `_issues` | Name of the column to store failed rules |
 
 ---
-#### `window_calculation` (WindowCalculationParams)
+#### `window_calculation` (WindowCalculationParams) {#windowcalculationparams}
 Generic wrapper for Window functions.
 
 Configuration for window functions.

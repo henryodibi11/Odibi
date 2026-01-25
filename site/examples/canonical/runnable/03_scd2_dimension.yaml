@@ -27,7 +27,7 @@ pipelines:
           connection: bronze
           format: csv
           path: customers.csv
-
+        
         pattern:
           type: dimension
           params:
@@ -41,7 +41,7 @@ pipelines:
               - city
             target: silver.dim_customer
             unknown_member: true
-
+        
         write:
           connection: silver
           format: delta

@@ -1038,11 +1038,13 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                         lines.append("")
 
                     # Header with Function Name if available (preferred for transformers)
+                    # Add explicit anchor {#classname} so cross-references work
                     header_name = model.name
+                    anchor = model.name.lower()
                     if model.function_name:
                         header_name = f"`{model.function_name}` ({model.name})"
 
-                    lines.append(f"#### {header_name}")
+                    lines.append(f"#### {header_name} {{#{anchor}}}")
 
                     # Function Docstring (Design/Impl details)
                     if model.function_doc:

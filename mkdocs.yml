@@ -40,6 +40,17 @@ plugins:
             show_root_heading: true
             show_source: true
 
+markdown_extensions:
+  - attr_list  # Enables {#custom-anchor} syntax for headings
+  - toc:
+      permalink: true
+  - tables
+  - fenced_code
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+
 nav:
   # ─────────────────────────────────────────────
   # GOLDEN PATH - Primary entry point

@@ -27,7 +27,7 @@ pipelines:
           connection: source
           format: csv
           path: customers_v2.csv
-
+        
         pattern:
           type: dimension
           params:
@@ -41,7 +41,7 @@ pipelines:
               - city
             target: target.dim_customer
             unknown_member: true
-
+        
         write:
           connection: target
           format: delta

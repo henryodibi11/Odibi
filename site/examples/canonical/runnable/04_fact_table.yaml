@@ -44,7 +44,7 @@ pipelines:
           path: customers.csv
           options:
             header: true
-
+        
         pattern:
           type: dimension
           params:
@@ -57,13 +57,13 @@ pipelines:
               - tier
               - city
             unknown_member: true
-
+        
         write:
           connection: gold
           format: parquet
           path: dim_customer
           mode: overwrite
-
+      
       # ------------------------------------------
       # Product Dimension (SCD1)
       # ------------------------------------------
@@ -74,7 +74,7 @@ pipelines:
           path: products.csv
           options:
             header: true
-
+        
         pattern:
           type: dimension
           params:
@@ -86,13 +86,13 @@ pipelines:
               - category
               - price
             unknown_member: true
-
+        
         write:
           connection: gold
           format: parquet
           path: dim_product
           mode: overwrite
-
+      
       # ------------------------------------------
       # Date Dimension (Generated)
       # ------------------------------------------
@@ -104,7 +104,7 @@ pipelines:
             end_date: "2025-12-31"
             fiscal_year_start_month: 1
             unknown_member: true
-
+        
         write:
           connection: gold
           format: parquet
@@ -123,19 +123,19 @@ pipelines:
           connection: gold
           format: parquet
           path: dim_customer
-
+      
       - name: dim_product
         read:
           connection: gold
           format: parquet
           path: dim_product
-
+      
       - name: dim_date
         read:
           connection: gold
           format: parquet
           path: dim_date
-
+      
       # ------------------------------------------
       # Sales Fact Table
       # ------------------------------------------
@@ -147,40 +147,40 @@ pipelines:
           path: orders.csv
           options:
             header: true
-
+        
         pattern:
           type: fact
           params:
             grain:
               - order_id
               - line_item_id
-
+            
             dimensions:
               - source_column: customer_id
                 dimension_table: dim_customer
                 dimension_key: customer_id
                 surrogate_key: customer_sk
-
+              
               - source_column: product_id
                 dimension_table: dim_product
                 dimension_key: product_id
                 surrogate_key: product_sk
-
+              
               - source_column: order_date
                 dimension_table: dim_date
                 dimension_key: full_date
                 surrogate_key: date_sk
-
+            
             orphan_handling: unknown
-
+            
             measures:
               - quantity
               - amount
-
+            
             audit:
               load_timestamp: true
               source_system: "orders_csv"
-
+        
         write:
           connection: gold
           format: parquet
