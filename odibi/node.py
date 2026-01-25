@@ -776,20 +776,26 @@ class NodeExecutor:
     ) -> str:
         """Quote a column name for SQL to handle spaces and special characters.
 
-        - Spark/Databricks: uses backticks (`column`)
-        - SQL Server dialects: uses brackets ([column])
-        - DuckDB (Pandas/Polars): uses double quotes ("column") or bare
-        - Default: bare column
-        """
-        # Spark / Databricks
-        if engine_name and "spark" in engine_name.lower():
-            return f"`{column}`"
+        IMPORTANT: The format (source database) takes priority over engine.
+        When Spark reads from SQL Server, the SQL pushdown goes to SQL Server,
+        so we must use SQL Server quoting ([column]), not Spark quoting.
 
-        # SQL Server dialects
+        Priority:
+        1. SQL Server dialects: uses brackets ([column])
+        2. Delta/Spark SQL (when format is delta): uses backticks (`column`)
+        3. DuckDB/Polars/Pandas in-memory: uses double quotes ("column")
+        4. Default: bare column
+        """
+        # SQL Server dialects - format takes priority over engine
+        # The SQL filter is pushed to the SOURCE database
         if format in ("sql_server", "azure_sql", "mssql"):
             return f"[{column}]"
 
-        # DuckDB / Polars / Pandas
+        # Delta format with Spark engine - uses Spark SQL syntax
+        if format == "delta" and engine_name and "spark" in engine_name.lower():
+            return f"`{column}`"
+
+        # DuckDB / Polars / Pandas in-memory filtering
         if engine_name and (
             "duckdb" in engine_name.lower()
             or "polars" in engine_name.lower()
