@@ -1,0 +1,27 @@
+project: wideworldimporters
+
+connections:
+  wideworld_sql:
+    type: sql_server
+    host: engineeringdatabase.database.windows.net
+    database: WideWorldImporters-Standard
+    port: 1433
+    driver: "ODBC Driver 17 for SQL Server"
+    auth:
+      username: ${SQL_USER}
+      password: ${SQL_PASSWORD}
+
+  local_data:
+    type: local
+    path: ./data
+
+story:
+  connection: local_data
+  path: stories
+
+system:
+  connection: local_data
+  path: _system
+
+imports:
+  - pipelines/bronze/sales.yaml

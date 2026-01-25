@@ -1052,13 +1052,7 @@ class PandasEngine(Engine):
         elif format in ["sql", "sql_server", "azure_sql"]:
             ctx.debug("Reading SQL table", table=str(full_path), format=format)
 
-            # Check if a query was provided (use as source query, not post-read filter)
-            source_query = post_read_query
-            if source_query and hasattr(connection, "read_sql_query"):
-                ctx.debug("Executing SQL source query", query_length=len(source_query))
-                return connection.read_sql_query(source_query)
-
-            if not hasattr(connection, "read_table"):
+            if not hasattr(connection, "read_table") and not hasattr(connection, "read_sql_query"):
                 ctx.error(
                     "Connection does not support SQL operations",
                     connection_type=type(connection).__name__,
@@ -1074,6 +1068,22 @@ class PandasEngine(Engine):
                 schema, tbl = table_name.split(".", 1)
             else:
                 schema, tbl = "dbo", table_name
+
+            # Build SQL query with optional WHERE clause for incremental pushdown
+            # post_read_query contains the SQL filter condition (e.g., "[DateInserted] > '2025-01-01'")
+            if schema:
+                base_query = f"SELECT * FROM [{schema}].[{tbl}]"
+            else:
+                base_query = f"SELECT * FROM [{tbl}]"
+
+            if post_read_query and hasattr(connection, "read_sql_query"):
+                # Treat post_read_query as a WHERE clause condition for SQL pushdown
+                full_query = f"{base_query} WHERE {post_read_query}"
+                ctx.debug(
+                    "Executing SQL query with incremental filter",
+                    query=full_query,
+                )
+                return connection.read_sql_query(full_query)
 
             ctx.debug("Executing SQL read", schema=schema, table=tbl)
             return connection.read_table(table_name=tbl, schema=schema)

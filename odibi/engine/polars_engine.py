@@ -75,7 +75,7 @@ class PolarsEngine(Engine):
 
         # SQL Server / Azure SQL Support
         if format in ["sql", "sql_server", "azure_sql"]:
-            if not hasattr(connection, "read_table"):
+            if not hasattr(connection, "read_table") and not hasattr(connection, "read_sql_query"):
                 raise ValueError(
                     f"Cannot read SQL table: connection type '{type(connection).__name__}' "
                     "does not support SQL operations. Use a SQL-compatible connection."
@@ -87,8 +87,22 @@ class PolarsEngine(Engine):
                 schema_name, tbl = table_name.split(".", 1)
             else:
                 schema_name, tbl = "dbo", table_name
-            # read_table returns Pandas DataFrame, convert to Polars LazyFrame
-            pdf = connection.read_table(table_name=tbl, schema=schema_name)
+
+            # Check for incremental SQL filter in options
+            sql_filter = options.get("filter")
+
+            if sql_filter and hasattr(connection, "read_sql_query"):
+                # Build query with WHERE clause for SQL pushdown
+                if schema_name:
+                    base_query = f"SELECT * FROM [{schema_name}].[{tbl}]"
+                else:
+                    base_query = f"SELECT * FROM [{tbl}]"
+                full_query = f"{base_query} WHERE {sql_filter}"
+                pdf = connection.read_sql_query(full_query)
+            else:
+                # read_table returns Pandas DataFrame
+                pdf = connection.read_table(table_name=tbl, schema=schema_name)
+
             return pl.from_pandas(pdf).lazy()
 
         # Get full path

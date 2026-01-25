@@ -358,7 +358,7 @@ class TestPandasEngineWrite:
         """Delta write with modes and partition warning."""
         calls = {}
 
-        def write_deltalake(path, df, mode=None, partition_by=None, storage_options=None):
+        def write_deltalake(path, df, mode=None, partition_by=None, storage_options=None, **kwargs):
             calls.setdefault("writes", []).append(
                 dict(
                     path=path, mode=mode, partition_by=partition_by, storage_options=storage_options

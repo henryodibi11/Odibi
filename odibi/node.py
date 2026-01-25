@@ -768,15 +768,130 @@ class NodeExecutor:
 
         return dataframes
 
-    def _quote_sql_column(self, column: str, format: Optional[str] = None) -> str:
+    def _quote_sql_column(
+        self,
+        column: str,
+        format: Optional[str] = None,
+        engine_name: Optional[str] = None,
+    ) -> str:
         """Quote a column name for SQL to handle spaces and special characters.
 
-        Uses [] for SQL Server dialects, backticks for others.
+        - Spark/Databricks: uses backticks (`column`)
+        - SQL Server dialects: uses brackets ([column])
+        - DuckDB (Pandas/Polars): uses double quotes ("column") or bare
+        - Default: bare column
         """
-        if format in ("sql_server", "azure_sql"):
-            return f"[{column}]"
-        else:
+        # Spark / Databricks
+        if engine_name and "spark" in engine_name.lower():
             return f"`{column}`"
+
+        # SQL Server dialects
+        if format in ("sql_server", "azure_sql", "mssql"):
+            return f"[{column}]"
+
+        # DuckDB / Polars / Pandas
+        if engine_name and (
+            "duckdb" in engine_name.lower()
+            or "polars" in engine_name.lower()
+            or "pandas" in engine_name.lower()
+        ):
+            return f'"{column}"'
+
+        # Fallback: bare column
+        return column
+
+    def _generate_incremental_sql_filter(
+        self,
+        inc: IncrementalConfig,
+        config: NodeConfig,
+        ctx: Optional["LoggingContext"] = None,
+    ) -> Optional[str]:
+        """Generate SQL WHERE clause for incremental filtering (pushdown to SQL source).
+
+        Returns a SQL filter string or None if no filter should be applied.
+        """
+        if ctx is None:
+            ctx = get_logging_context()
+
+        # Check if target table exists - if not, this is first run (full load)
+        if config.write:
+            target_conn = self.connections.get(config.write.connection)
+            table_to_check = config.write.table or config.write.register_table
+            if target_conn and not self._cached_table_exists(
+                target_conn, table_to_check, config.write.path
+            ):
+                ctx.debug("First run detected - skipping incremental SQL pushdown")
+                return None
+
+        sql_format = config.read.format if config.read else None
+        engine_name = getattr(self.engine, "name", None)
+
+        if inc.mode == IncrementalMode.ROLLING_WINDOW:
+            if not inc.lookback or not inc.unit:
+                return None
+
+            now = datetime.now()
+
+            delta = None
+            if inc.unit == "hour":
+                delta = timedelta(hours=inc.lookback)
+            elif inc.unit == "day":
+                delta = timedelta(days=inc.lookback)
+            elif inc.unit == "month":
+                delta = timedelta(days=inc.lookback * 30)
+            elif inc.unit == "year":
+                delta = timedelta(days=inc.lookback * 365)
+
+            if delta:
+                cutoff = now - delta
+                quoted_col = self._quote_sql_column(inc.column, sql_format, engine_name)
+                col_expr, cutoff_expr = self._get_date_expr(quoted_col, cutoff, inc.date_format)
+
+                if inc.fallback_column:
+                    quoted_fallback = self._quote_sql_column(
+                        inc.fallback_column, sql_format, engine_name
+                    )
+                    fallback_expr, _ = self._get_date_expr(quoted_fallback, cutoff, inc.date_format)
+                    return f"COALESCE({col_expr}, {fallback_expr}) >= {cutoff_expr}"
+                else:
+                    return f"{col_expr} >= {cutoff_expr}"
+
+        elif inc.mode == IncrementalMode.STATEFUL:
+            state_key = inc.state_key or f"{config.name}_hwm"
+
+            if self.state_manager:
+                last_hwm = self.state_manager.get_hwm(state_key)
+                if last_hwm is not None:
+                    if inc.watermark_lag:
+                        from odibi.utils.duration import parse_duration
+
+                        lag_delta = parse_duration(inc.watermark_lag)
+                        if lag_delta and isinstance(last_hwm, str):
+                            try:
+                                hwm_dt = datetime.fromisoformat(last_hwm)
+                                last_hwm = (hwm_dt - lag_delta).isoformat()
+                            except ValueError:
+                                pass
+
+                    hwm_str = str(last_hwm)
+                    if isinstance(last_hwm, str) and "T" in last_hwm:
+                        try:
+                            hwm_dt = datetime.fromisoformat(last_hwm)
+                            hwm_str = hwm_dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                        except ValueError:
+                            hwm_str = last_hwm.replace("T", " ")
+
+                    quoted_col = self._quote_sql_column(inc.column, sql_format, engine_name)
+
+                    if inc.fallback_column:
+                        quoted_fallback = self._quote_sql_column(
+                            inc.fallback_column, sql_format, engine_name
+                        )
+                        return f"COALESCE({quoted_col}, {quoted_fallback}) > '{hwm_str}'"
+                    else:
+                        return f"{quoted_col} > '{hwm_str}'"
+
+        return None
 
     def _get_date_expr(
         self, quoted_col: str, cutoff: datetime, date_format: Optional[str]
@@ -866,6 +981,7 @@ class NodeExecutor:
 
         # Get the SQL format for proper column quoting
         sql_format = config.read.format if config.read else None
+        engine_name = getattr(self.engine, "name", None)
 
         if inc.mode == IncrementalMode.ROLLING_WINDOW:
             if not inc.lookback or not inc.unit:
@@ -886,7 +1002,7 @@ class NodeExecutor:
 
             if delta:
                 cutoff = now - delta
-                quoted_col = self._quote_sql_column(inc.column, sql_format)
+                quoted_col = self._quote_sql_column(inc.column, sql_format, engine_name)
                 col_expr, cutoff_expr = self._get_date_expr(quoted_col, cutoff, inc.date_format)
 
                 if inc.fallback_column:
@@ -924,7 +1040,7 @@ class NodeExecutor:
                         except ValueError:
                             hwm_str = last_hwm.replace("T", " ")
 
-                    quoted_col = self._quote_sql_column(inc.column, sql_format)
+                    quoted_col = self._quote_sql_column(inc.column, sql_format, engine_name)
                     if inc.fallback_column:
                         quoted_fallback = self._quote_sql_column(inc.fallback_column, sql_format)
                         return f"COALESCE({quoted_col}, {quoted_fallback}) > '{hwm_str}'"
