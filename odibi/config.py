@@ -1090,12 +1090,13 @@ class ReadConfig(BaseModel):
 
         # 2. Format-specific rules
         has_query = self.options and "query" in self.options
+        has_sql_file = bool(self.sql_file)
 
         if self.format == ReadFormat.SQL:
-            if not (self.table or self.query or has_query):
+            if not (self.table or self.query or has_query or has_sql_file):
                 raise ValueError(
-                    f"ReadConfig validation failed: For format='sql', either 'table' or 'query' is required. "
-                    f"Got table={self.table}, query={self.query}. "
+                    f"ReadConfig validation failed: For format='sql', either 'table', 'query', or 'sql_file' is required. "
+                    f"Got table={self.table}, query={self.query}, sql_file={self.sql_file}. "
                     f"Example: table: 'dbo.Customers' or query: 'SELECT * FROM dbo.Customers WHERE active = 1'"
                 )
         elif self.format in [ReadFormat.CSV, ReadFormat.PARQUET, ReadFormat.JSON]:
@@ -1104,11 +1105,11 @@ class ReadConfig(BaseModel):
                 # But usually file formats need path.
                 pass
 
-        if not self.table and not self.path and not has_query:
+        if not self.table and not self.path and not has_query and not has_sql_file:
             raise ValueError(
                 "ReadConfig validation failed: No data source specified. "
                 "Provide one of: 'table' (for database/catalog), 'path' (for files), "
-                "or 'query' (for SQL). Example: table: 'schema.table_name'"
+                "'query' (for SQL), or 'sql_file' (for external SQL file). Example: table: 'schema.table_name'"
             )
 
         return self
