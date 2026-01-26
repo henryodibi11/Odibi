@@ -1018,6 +1018,10 @@ class ReadConfig(BaseModel):
         default=None,
         description="SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector.",
     )
+    sql_file: Optional[str] = Field(
+        default=None,
+        description="Path to external .sql file containing the query, relative to the YAML file defining the node. Mutually exclusive with 'query'.",
+    )
     filter: Optional[str] = Field(
         default=None,
         description="SQL WHERE clause filter (pushed down to source for SQL formats). Example: \"DAY > '2022-12-31'\"",
@@ -1034,6 +1038,16 @@ class ReadConfig(BaseModel):
         description="Options for archiving bad records (e.g. badRecordsPath for Spark)",
     )
     options: Dict[str, Any] = Field(default_factory=dict, description="Format-specific options")
+
+    @model_validator(mode="after")
+    def validate_query_exclusivity(self):
+        """Ensure query and sql_file are mutually exclusive."""
+        if self.query and self.sql_file:
+            raise ValueError(
+                "ReadConfig validation failed: 'query' and 'sql_file' are mutually exclusive. "
+                "Use 'query' for inline SQL or 'sql_file' for external SQL files, not both."
+            )
+        return self
 
     @model_validator(mode="after")
     def move_query_to_options(self):

@@ -1,4 +1,4 @@
-"""Tests for sql_file resolution in transform steps."""
+"""Tests for sql_file resolution in transform steps and read config."""
 
 import tempfile
 from pathlib import Path
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from odibi.config import NodeConfig, TransformConfig, TransformStep
+from odibi.config import NodeConfig, ReadConfig, TransformConfig, TransformStep
 from odibi.node import NodeExecutor
 
 
@@ -191,3 +191,80 @@ class TestGetStepName:
         name = executor._get_step_name(step)
 
         assert name == "sql_file:pipelines/silver/sql/transform.sql"
+
+
+class TestReadConfigSqlFile:
+    """Test sql_file support in ReadConfig."""
+
+    def test_read_sql_file_resolves_correctly(self, mock_context, mock_engine, connections):
+        """sql_file in read config resolves and sets query in options."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "odibi.yaml"
+            sql_dir = Path(tmpdir) / "sql"
+            sql_dir.mkdir()
+            sql_file = sql_dir / "read_query.sql"
+            sql_file.write_text("SELECT * FROM customers WHERE active = 1", encoding="utf-8")
+
+            mock_engine.read = MagicMock(return_value=pd.DataFrame({"id": [1, 2]}))
+
+            executor = NodeExecutor(
+                mock_context,
+                mock_engine,
+                connections,
+                config_file=str(config_file),
+            )
+
+            config = NodeConfig(
+                name="test_read_sql_file",
+                read=ReadConfig(
+                    connection="src",
+                    format="sql",
+                    table="customers",
+                    sql_file="sql/read_query.sql",
+                ),
+            )
+
+            result = executor.execute(config)
+
+            assert result.success
+            mock_engine.read.assert_called_once()
+            call_kwargs = mock_engine.read.call_args[1]
+            assert call_kwargs["options"]["query"] == "SELECT * FROM customers WHERE active = 1"
+
+    def test_read_query_and_sql_file_mutually_exclusive(self):
+        """query and sql_file cannot both be specified."""
+        with pytest.raises(ValueError) as exc_info:
+            ReadConfig(
+                connection="src",
+                format="sql",
+                table="customers",
+                query="SELECT * FROM customers",
+                sql_file="sql/query.sql",
+            )
+
+        error_msg = str(exc_info.value)
+        assert "mutually exclusive" in error_msg.lower()
+        assert "query" in error_msg
+        assert "sql_file" in error_msg
+
+    def test_read_sql_file_only_is_valid(self):
+        """sql_file alone (without query) is valid."""
+        config = ReadConfig(
+            connection="src",
+            format="sql",
+            table="customers",
+            sql_file="sql/query.sql",
+        )
+        assert config.sql_file == "sql/query.sql"
+        assert config.query is None
+
+    def test_read_query_only_is_valid(self):
+        """query alone (without sql_file) is valid."""
+        config = ReadConfig(
+            connection="src",
+            format="sql",
+            table="customers",
+            query="SELECT * FROM customers",
+        )
+        assert config.query == "SELECT * FROM customers"
+        assert config.sql_file is None

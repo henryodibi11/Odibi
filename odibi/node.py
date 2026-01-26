@@ -578,6 +578,13 @@ class NodeExecutor:
                     )
                     self._execution_steps.append(f"Incremental SQL pushdown: {incremental_filter}")
 
+            # Resolve sql_file to query if specified
+            if read_config.sql_file:
+                resolved_query = self._resolve_sql_file(read_config.sql_file)
+                read_options["query"] = resolved_query
+                ctx.debug("Resolved sql_file to query", sql_file=read_config.sql_file)
+                self._execution_steps.append(f"Resolved sql_file: {read_config.sql_file}")
+
             # Execute Read
             df = self.engine.read(
                 connection=connection,

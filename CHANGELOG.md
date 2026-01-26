@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.1] - 2026-01-26
+
+### Added - `sql_file` Support for Read Configuration
+
+Enables external SQL files for read queries, keeping large source queries in separate `.sql` files for better maintainability.
+
+- **New Field**: `read.sql_file` - Path to external `.sql` file (relative to YAML)
+  - Mutually exclusive with `read.query`
+  - Uses same resolution logic as `transform.steps[].sql_file`
+  - Better git diffs, IDE syntax highlighting, cleaner YAML
+
+**Example:**
+```yaml
+read:
+  connection: enterprise_dw
+  format: sql_server
+  sql_file: sql/source/profit_center.sql  # NEW
+```
+
+### Changed
+
+- Added validation: `query` and `sql_file` cannot be used together in `ReadConfig`
+- Added 4 new tests for read `sql_file` functionality
+
 ## [2.14.0] - 2026-01-23
 
 ### Added - AI-Proof YAML Builder Tools

@@ -765,6 +765,7 @@ to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
 | **streaming** | bool | No | `False` | Enable streaming read (Spark only) |
 | **schema_ddl** | Optional[str] | No | - | Schema for streaming reads from file sources (required for Avro, JSON, CSV). Use Spark DDL format: 'col1 STRING, col2 INT, col3 TIMESTAMP'. Not required for Delta (schema is inferred from table metadata). |
 | **query** | Optional[str] | No | - | SQL query to filter at source (pushdown). Mutually exclusive with table/path if supported by connector. |
+| **sql_file** | Optional[str] | No | - | Path to external .sql file containing the query, relative to the YAML file defining the node. Mutually exclusive with 'query'. |
 | **filter** | Optional[str] | No | - | SQL WHERE clause filter (pushed down to source for SQL formats). Example: "DAY > '2022-12-31'" |
 | **incremental** | Optional[[IncrementalConfig](#incrementalconfig)] | No | - | Automatic incremental loading strategy (CDC-like). If set, generates query based on target state (HWM). |
 | **time_travel** | Optional[[TimeTravelConfig](#timetravelconfig)] | No | - | Time travel options (Delta only) |
