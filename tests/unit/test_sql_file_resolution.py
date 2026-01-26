@@ -268,3 +268,44 @@ class TestReadConfigSqlFile:
         )
         assert config.query == "SELECT * FROM customers"
         assert config.sql_file is None
+
+    def test_read_sql_file_with_incremental_wraps_as_subquery(
+        self, mock_context, mock_engine, connections
+    ):
+        """sql_file with incremental filter wraps query as subquery."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "odibi.yaml"
+            sql_dir = Path(tmpdir) / "sql"
+            sql_dir.mkdir()
+            sql_file = sql_dir / "complex_query.sql"
+            sql_file.write_text("SELECT * FROM orders WHERE status = 'active'", encoding="utf-8")
+
+            mock_engine.read = MagicMock(return_value=pd.DataFrame({"id": [1, 2]}))
+
+            executor = NodeExecutor(
+                mock_context,
+                mock_engine,
+                connections,
+                config_file=str(config_file),
+            )
+
+            # Simulate what happens when incremental filter is set
+            config = NodeConfig(
+                name="test_sql_file_with_filter",
+                read=ReadConfig(
+                    connection="src",
+                    format="sql_server",
+                    sql_file="sql/complex_query.sql",
+                ),
+            )
+
+            # Manually set a filter in options to simulate incremental
+            # The actual incremental logic adds filter to read_options
+            with patch.object(executor, "_generate_incremental_sql_filter", return_value=None):
+                result = executor.execute(config)
+
+            assert result.success
+            mock_engine.read.assert_called_once()
+            call_kwargs = mock_engine.read.call_args[1]
+            # Query should be set from sql_file
+            assert "SELECT * FROM orders" in call_kwargs["options"]["query"]

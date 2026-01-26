@@ -581,6 +581,26 @@ class NodeExecutor:
             # Resolve sql_file to query if specified
             if read_config.sql_file:
                 resolved_query = self._resolve_sql_file(read_config.sql_file)
+
+                # If incremental filter exists, wrap as subquery to apply filter cleanly
+                incremental_filter = read_options.get("filter")
+                if incremental_filter:
+                    # Wrap user's query as subquery, apply filter to outer query
+                    resolved_query = (
+                        f"SELECT * FROM ({resolved_query}) AS _sql_file_subquery "
+                        f"WHERE {incremental_filter}"
+                    )
+                    # Remove filter from options since it's now in the query
+                    del read_options["filter"]
+                    ctx.debug(
+                        "Wrapped sql_file query with incremental filter",
+                        sql_file=read_config.sql_file,
+                        filter=incremental_filter,
+                    )
+                    self._execution_steps.append(
+                        f"Wrapped sql_file with filter: {incremental_filter}"
+                    )
+
                 read_options["query"] = resolved_query
                 ctx.debug("Resolved sql_file to query", sql_file=read_config.sql_file)
                 self._execution_steps.append(f"Resolved sql_file: {read_config.sql_file}")

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.3] - 2026-01-26
+
+### Fixed
+
+- **sql_file + incremental now works correctly**: When using `sql_file` with `incremental` config, the query is now wrapped as a subquery with the incremental filter applied to the outer query. This fixes the "Incorrect syntax near 'AND'" error that occurred when the sql_file query already contained a WHERE clause.
+
+```sql
+-- Before (broken): tried to append AND to existing WHERE
+-- After (fixed): wraps as subquery
+SELECT * FROM (
+  SELECT ... FROM table WHERE existing_condition
+) AS _sql_file_subquery 
+WHERE ReportDate >= '2025-10-26'
+```
+
 ## [2.15.2] - 2026-01-26
 
 ### Fixed
