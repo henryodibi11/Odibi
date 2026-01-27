@@ -197,6 +197,7 @@ TYPE_ALIASES = {
         "DeltaConnectionConfig",
         "SQLServerConnectionConfig",
         "HttpConnectionConfig",
+        "CustomConnectionConfig",
     ],
     "AzureBlobAuthConfig": [
         "AzureBlobKeyVaultAuth",

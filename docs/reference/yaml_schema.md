@@ -42,7 +42,7 @@ alerts:
 | --- | --- | --- | --- | --- |
 | **project** | str | Yes | - | Project name |
 | **engine** | EngineType | No | `EngineType.PANDAS` | Execution engine |
-| **connections** | Dict[str, [LocalConnectionConfig](#localconnectionconfig) \| [AzureBlobConnectionConfig](#azureblobconnectionconfig) \| [DeltaConnectionConfig](#deltaconnectionconfig) \| [SQLServerConnectionConfig](#sqlserverconnectionconfig) \| [HttpConnectionConfig](#httpconnectionconfig) \| [CustomConnectionConfig](#customconnectionconfig)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig) |
+| **connections** | Dict[str, [ConnectionConfig](#connections)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig), [CustomConnectionConfig](#customconnectionconfig) |
 | **pipelines** | List[[PipelineConfig](#pipelineconfig)] | Yes | - | Pipeline definitions (at least one required) |
 | **story** | [StoryConfig](#storyconfig) | Yes | - | Story generation configuration (mandatory) |
 | **system** | [SystemConfig](#systemconfig) | Yes | - | System Catalog configuration (mandatory) |
@@ -3187,6 +3187,7 @@ transform:
 | **strategy** | MergeStrategy | No | `MergeStrategy.UPSERT` | Merge behavior: 'upsert', 'append_only', 'delete_match' |
 | **audit_cols** | Optional[[AuditColumnsConfig](#auditcolumnsconfig)] | No | - | {'created_col': '...', 'updated_col': '...'} |
 | **optimize_write** | bool | No | `False` | Run OPTIMIZE after write (Spark) |
+| **vacuum_hours** | Optional[int] | No | - | Hours to retain for VACUUM after merge (Spark only). Set to 168 for 7 days. None disables VACUUM. |
 | **zorder_by** | Optional[List[str]] | No | - | Columns to Z-Order by |
 | **cluster_by** | Optional[List[str]] | No | - | Columns to Liquid Cluster by (Delta) |
 | **update_condition** | Optional[str] | No | - | SQL condition for update clause (e.g. 'source.ver > target.ver') |

@@ -356,6 +356,32 @@ This:
 2. Performs the merge operation
 3. Registers the Delta table as `silver.orders` in the metastore
 
+### Pattern: Post-Merge Optimization (Spark Only)
+
+Run Delta Lake maintenance operations after the merge completes:
+
+```yaml
+transform:
+  steps:
+    - function: merge
+      params:
+        connection: adls_prod
+        path: sales/silver/orders
+        keys: [order_id]
+        strategy: upsert
+        optimize_write: true          # Run OPTIMIZE after merge
+        zorder_by: [customer_id]      # Optional: Z-ORDER by columns
+        vacuum_hours: 168             # Optional: VACUUM retaining 7 days
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `optimize_write` | bool | Run `OPTIMIZE` to compact small files (default: false) |
+| `zorder_by` | list[str] | Columns to Z-ORDER by for faster filtered queries |
+| `vacuum_hours` | int | Hours to retain for `VACUUM`. Set to 168 for 7 days. `None` disables VACUUM. |
+
+**Note:** These operations run only on Spark with Delta Lake. They are skipped silently on Pandas.
+
 ---
 
 ## Debugging

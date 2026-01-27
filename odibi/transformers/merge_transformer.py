@@ -155,6 +155,10 @@ class MergeParams(BaseModel):
         None, description="{'created_col': '...', 'updated_col': '...'}"
     )
     optimize_write: bool = Field(False, description="Run OPTIMIZE after write (Spark)")
+    vacuum_hours: Optional[int] = Field(
+        None,
+        description="Hours to retain for VACUUM after merge (Spark only). Set to 168 for 7 days. None disables VACUUM.",
+    )
     zorder_by: Optional[List[str]] = Field(None, description="Columns to Z-Order by")
     cluster_by: Optional[List[str]] = Field(
         None, description="Columns to Liquid Cluster by (Delta)"
@@ -300,6 +304,7 @@ def merge(context, params=None, current=None, **kwargs):
 
     # Optimization params
     optimize_write = merge_params.optimize_write
+    vacuum_hours = merge_params.vacuum_hours
     zorder_by = merge_params.zorder_by
     cluster_by = merge_params.cluster_by
 
@@ -312,6 +317,7 @@ def merge(context, params=None, current=None, **kwargs):
             strategy,
             audit_cols,
             optimize_write,
+            vacuum_hours,
             zorder_by,
             cluster_by,
             merge_params.update_condition,
@@ -371,6 +377,7 @@ def _merge_spark(
     strategy,
     audit_cols,
     optimize_write,
+    vacuum_hours,
     zorder_by,
     cluster_by,
     update_condition,
@@ -541,11 +548,10 @@ def _merge_spark(
                         writer.saveAsTable(target)
 
         # --- Post-Merge Optimization ---
+        is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
+
         if optimize_write or zorder_by:
             try:
-                # Identify if target is table or path
-                is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
-
                 if is_path:
                     sql = f"OPTIMIZE delta.`{target}`"
                 else:
@@ -563,6 +569,21 @@ def _merge_spark(
                 spark.sql(sql)
             except Exception as e:
                 get_logging_context().warning(f"Optimization failed for {target}: {e}")
+
+        # --- Post-Merge VACUUM ---
+        if vacuum_hours is not None and vacuum_hours > 0:
+            try:
+                if is_path:
+                    vacuum_sql = f"VACUUM delta.`{target}` RETAIN {vacuum_hours} HOURS"
+                else:
+                    vacuum_sql = f"VACUUM {target} RETAIN {vacuum_hours} HOURS"
+
+                spark.sql(vacuum_sql)
+                get_logging_context().debug(
+                    f"VACUUM completed for {target}", retention_hours=vacuum_hours
+                )
+            except Exception as e:
+                get_logging_context().warning(f"VACUUM failed for {target}: {e}")
 
     if source_df.isStreaming:
         # For streaming, wraps logic in foreachBatch

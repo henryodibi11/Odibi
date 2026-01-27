@@ -434,6 +434,9 @@ write:
 | `created_col` | str | No | Audit column for inserts |
 | `updated_col` | str | No | Audit column for updates |
 | `soft_delete_col` | str | No | Column for soft delete flag |
+| `optimize_write` | bool | No | Run OPTIMIZE after merge (Spark only) |
+| `vacuum_hours` | int | No | Hours to retain for VACUUM (Spark only). 168 = 7 days. |
+| `zorder_by` | list | No | Columns to Z-ORDER by after merge |
 
 **Strategies:**
 | Strategy | Behavior |

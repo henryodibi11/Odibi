@@ -17,6 +17,22 @@ def test_merge_params_conditions():
     assert p.delete_condition == "s.deleted = true"
 
 
+def test_merge_params_vacuum_hours():
+    """Test vacuum_hours parameter in MergeParams."""
+    # Default is None
+    p = MergeParams(target="t", keys=["id"])
+    assert p.vacuum_hours is None
+
+    # Can set to 168 (7 days)
+    p = MergeParams(target="t", keys=["id"], vacuum_hours=168)
+    assert p.vacuum_hours == 168
+
+    # Can combine with optimize_write
+    p = MergeParams(target="t", keys=["id"], optimize_write=True, vacuum_hours=72)
+    assert p.optimize_write is True
+    assert p.vacuum_hours == 72
+
+
 def test_merge_spark_conditions():
     """Test that conditions are passed to Delta merger."""
     # Mock dependencies

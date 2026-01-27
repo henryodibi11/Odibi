@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.4] - 2026-01-27
+
+### Added
+
+- **`vacuum_hours` parameter for merge transformer**: Run Delta Lake VACUUM after merge operations to clean up old files.
+  - `vacuum_hours: 168` retains 7 days of history
+  - Spark only - silently skipped on Pandas
+
+```yaml
+- function: merge
+  params:
+    target: silver.orders
+    keys: [order_id]
+    optimize_write: true    # Run OPTIMIZE
+    vacuum_hours: 168       # Run VACUUM retaining 7 days
+    zorder_by: [customer_id]
+```
+
+### Fixed
+
+- **Docs formatting**: Simplified `ConnectionConfig` type display in yaml_schema.md by adding `CustomConnectionConfig` to type aliases, preventing long Union types from breaking table rendering.
+
+### Documentation
+
+- Added "Post-Merge Optimization" pattern to merge_upsert.md
+- Updated ODIBI_DEEP_CONTEXT.md with new MergeParams fields
+- Regenerated yaml_schema.md with `vacuum_hours` parameter
+
 ## [2.15.3] - 2026-01-26
 
 ### Fixed

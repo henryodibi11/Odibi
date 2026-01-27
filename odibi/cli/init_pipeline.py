@@ -250,9 +250,7 @@ audit:
     - secret
     - key
     - credential
-""".format(
-            project_name=project_name
-        )
+""".format(project_name=project_name)
         with open(target_dir / "mcp_config.yaml", "w") as f:
             f.write(mcp_config_content)
 
