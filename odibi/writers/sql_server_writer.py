@@ -2318,11 +2318,22 @@ class SqlServerMergeWriter:
         row_count = df.count()
 
         staging_full_path = None
+        staging_dir = None
         try:
-            # Step 1: Write DataFrame to staging storage as Parquet
-            staging_full_path = staging_connection.get_path(staging_file)
-            self.ctx.debug("Writing staging file", path=staging_full_path)
-            df.write.mode("overwrite").parquet(staging_full_path)
+            # Step 1: Write DataFrame to staging storage as CSV
+            # Note: Azure SQL Database only supports CSV with BULK INSERT
+            # PARQUET is only supported in Azure Synapse and SQL Server 2022+
+            # Coalesce to 1 partition to get a single file for BULK INSERT
+            staging_dir = staging_file.replace(".parquet", "")
+            staging_full_path = staging_connection.get_path(staging_dir)
+            self.ctx.debug("Writing staging file (CSV)", path=staging_full_path)
+
+            # Write as single CSV file (coalesce to 1)
+            df.coalesce(1).write.mode("overwrite").option("header", "true").csv(staging_full_path)
+
+            # Find the actual CSV file name (Spark writes part-00000-xxx.csv)
+            # We'll use wildcard in BULK INSERT to handle this
+            csv_pattern = f"{staging_dir}/*.csv"
 
             # Step 2: Truncate target table
             if table_exists:
@@ -2332,8 +2343,8 @@ class SqlServerMergeWriter:
             self._execute_bulk_insert(
                 target_table=target_table,
                 external_data_source=external_data_source,
-                staging_file=staging_file,
-                file_format="PARQUET",
+                staging_file=csv_pattern,
+                file_format="CSV",
             )
 
             self.ctx.info(
@@ -2343,17 +2354,9 @@ class SqlServerMergeWriter:
             )
 
         finally:
-            # Step 4: Cleanup staging file
+            # Step 4: Cleanup staging directory
             if not keep_files and staging_full_path:
-                try:
-                    self.ctx.debug("Cleaning up staging file", path=staging_full_path)
-                    staging_connection.delete(staging_file)
-                except Exception as e:
-                    self.ctx.warning(
-                        "Failed to cleanup staging file",
-                        path=staging_full_path,
-                        error=str(e),
-                    )
+                self._cleanup_staging_files(staging_connection, staging_dir, staging_full_path)
 
         return OverwriteResult(rows_written=row_count, strategy="bulk_copy")
 
@@ -2423,10 +2426,18 @@ class SqlServerMergeWriter:
         row_count = df.count()
 
         staging_full_path = None
+        staging_dir = None
         try:
-            # Write to staging storage
-            staging_full_path = staging_connection.get_path(staging_file)
-            df.write.mode("overwrite").parquet(staging_full_path)
+            # Write to staging storage as CSV
+            # Azure SQL Database only supports CSV with BULK INSERT
+            staging_dir = staging_file.replace(".parquet", "")
+            staging_full_path = staging_connection.get_path(staging_dir)
+
+            # Write as single CSV file (coalesce to 1)
+            df.coalesce(1).write.mode("overwrite").option("header", "true").csv(staging_full_path)
+
+            # CSV pattern for BULK INSERT
+            csv_pattern = f"{staging_dir}/*.csv"
 
             # Ensure staging table exists (create from DataFrame schema)
             if not self.check_table_exists(staging_table):
@@ -2437,8 +2448,8 @@ class SqlServerMergeWriter:
             self._execute_bulk_insert(
                 target_table=staging_table,
                 external_data_source=external_data_source,
-                staging_file=staging_file,
-                file_format="PARQUET",
+                staging_file=csv_pattern,
+                file_format="CSV",
             )
 
             self.ctx.debug(
@@ -2449,10 +2460,7 @@ class SqlServerMergeWriter:
 
         finally:
             if not keep_files and staging_full_path:
-                try:
-                    staging_connection.delete(staging_file)
-                except Exception:
-                    pass
+                self._cleanup_staging_files(staging_connection, staging_dir, staging_full_path)
 
         return row_count
 
@@ -2500,6 +2508,67 @@ class SqlServerMergeWriter:
 
         self.ctx.debug("Executing BULK INSERT", table=target_table)
         self.connection.execute_sql(sql)
+
+    def _cleanup_staging_files(
+        self,
+        staging_connection: Any,
+        staging_path: str,
+        full_path: str,
+    ) -> None:
+        """
+        Clean up staging files/directories after bulk copy.
+
+        Handles both single files and Spark's directory output structure.
+        Uses fsspec or Spark to delete since connection may not have delete method.
+        """
+        try:
+            self.ctx.debug("Cleaning up staging files", path=full_path)
+
+            # Try using the connection's delete method if available
+            if hasattr(staging_connection, "delete"):
+                staging_connection.delete(staging_path)
+                return
+
+            # Try using fsspec for cloud storage cleanup
+            try:
+                import fsspec
+
+                # Parse the full path to get the filesystem
+                if "dfs.core.windows.net" in full_path or "blob.core.windows.net" in full_path:
+                    # Azure ADLS/Blob - use abfs or az protocol
+                    conn_config = staging_connection.config
+                    account_name = getattr(conn_config, "account_name", None)
+                    auth = getattr(conn_config, "auth", None)
+
+                    storage_options = {"account_name": account_name}
+
+                    auth_mode = getattr(auth, "mode", None) if auth else None
+                    if auth_mode == "account_key":
+                        storage_options["account_key"] = getattr(auth, "account_key", None)
+                    elif auth_mode == "sas":
+                        storage_options["sas_token"] = getattr(auth, "sas_token", None)
+
+                    fs = fsspec.filesystem("abfs", **storage_options)
+                    # Delete recursively (handles directories)
+                    if fs.exists(full_path):
+                        fs.rm(full_path, recursive=True)
+                    return
+            except ImportError:
+                pass
+
+            # Fallback: log warning but don't fail
+            self.ctx.warning(
+                "Could not cleanup staging files - no delete method available",
+                path=full_path,
+                suggestion="Files will remain in staging. Clean up manually or set keep_staging_files=true",
+            )
+
+        except Exception as e:
+            self.ctx.warning(
+                "Failed to cleanup staging files",
+                path=full_path,
+                error=str(e),
+            )
 
     def setup_bulk_copy_external_source(
         self,

@@ -6,9 +6,11 @@ High-performance data loading to SQL Server using ADLS staging and BULK INSERT, 
 
 Traditional JDBC writes insert data row-by-row, which is slow for large datasets. Bulk copy:
 
-1. Stages data as Parquet files in Azure Data Lake Storage (ADLS)
-2. Uses SQL Server's `BULK INSERT` with `OPENROWSET` to load data directly from storage
+1. Stages data as CSV files in Azure Data Lake Storage (ADLS)
+2. Uses SQL Server's `BULK INSERT` to load data directly from storage
 3. Leverages SQL Server's parallel loading capabilities for maximum throughput
+
+**Note:** CSV format is used because Azure SQL Database only supports CSV with BULK INSERT. PARQUET format is only available in Azure Synapse and SQL Server 2022+.
 
 This approach is ideal for:
 - Loading millions of rows in seconds
