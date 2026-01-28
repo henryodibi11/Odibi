@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **JDBC bulk copy column ordering**: DataFrame columns are now automatically reordered to match target table column order before writing. This fixes NULL values appearing when using `useBulkCopyForBatchInsert` with existing tables that have different column ordering than the DataFrame.
 
+- **exclude_columns now respected during auto_create_table**: When using `auto_create_table: true` with `exclude_columns`, the excluded columns are now filtered out before table creation. Previously, excluded columns would still be created in the target table.
+
 ### Documentation
 
 - Updated `docs/features/bulk_copy.md` with two-tier performance optimization:

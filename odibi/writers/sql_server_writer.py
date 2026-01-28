@@ -1393,6 +1393,16 @@ class SqlServerMergeWriter:
                     target_table=target_table,
                 )
 
+                # Filter out excluded columns before creating table
+                df_for_create = df
+                if options.exclude_columns:
+                    cols_to_keep = [c for c in df.columns if c not in options.exclude_columns]
+                    df_for_create = df.select(*cols_to_keep)
+                    self.ctx.debug(
+                        "Excluded columns from table creation",
+                        excluded=options.exclude_columns,
+                    )
+
                 # Create table using JDBC write with overwrite mode (initial load)
                 # useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol (5-10x faster)
                 staging_jdbc_options = {
@@ -1401,9 +1411,11 @@ class SqlServerMergeWriter:
                     "batchsize": str(options.batch_size or 10000),
                     "useBulkCopyForBatchInsert": "true",
                 }
-                df.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
+                df_for_create.write.format("jdbc").options(**staging_jdbc_options).mode(
+                    "overwrite"
+                ).save()
 
-                row_count = df.count()
+                row_count = df_for_create.count()
 
                 # Add audit columns if configured (JDBC doesn't create them automatically)
                 if options.audit_cols:
