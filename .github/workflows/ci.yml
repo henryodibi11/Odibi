@@ -41,9 +41,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .[all,dev]
 
-      # Step 4: Run code formatting check with Black
-      - name: Check code formatting (Black)
-        run: black --check odibi/ tests/
+      # Step 4: Run code formatting check with Ruff (matches pre-commit)
+      - name: Check code formatting (Ruff)
+        run: ruff format --check odibi/ tests/
 
       # Step 5: Run linting with Ruff
       - name: Lint code (Ruff)
