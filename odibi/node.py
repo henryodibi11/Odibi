@@ -2204,6 +2204,18 @@ class NodeExecutor:
                                 available=list(self.connections.keys()),
                             )
 
+                    # Pass bulk copy context for staging path organization
+                    project_name = (
+                        getattr(self.project_config, "project", "unknown")
+                        if self.project_config
+                        else "unknown"
+                    )
+                    write_options["_bulk_copy_context"] = {
+                        "project": project_name,
+                        "pipeline": self.pipeline_name or "unknown",
+                        "node": config.name or "unknown",
+                    }
+
             # Extract merge_options bulk_copy staging connection
             if write_config.merge_options:
                 if getattr(write_config.merge_options, "bulk_copy", False):
@@ -2218,6 +2230,19 @@ class NodeExecutor:
                                 "Bulk copy staging connection resolved for merge",
                                 connection=staging_conn_name,
                             )
+
+                    # Pass bulk copy context for staging path organization
+                    if "_bulk_copy_context" not in write_options:
+                        project_name = (
+                            getattr(self.project_config, "project", "unknown")
+                            if self.project_config
+                            else "unknown"
+                        )
+                        write_options["_bulk_copy_context"] = {
+                            "project": project_name,
+                            "pipeline": self.pipeline_name or "unknown",
+                            "node": config.name or "unknown",
+                        }
 
             if write_config.format == "delta":
                 merged_props = {}

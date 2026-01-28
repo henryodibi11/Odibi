@@ -968,6 +968,9 @@ class SparkEngine(Engine):
                         external_data_source=external_data_source,
                     )
 
+                    # Get bulk copy context for staging path organization
+                    bulk_copy_context = options.get("_bulk_copy_context", {})
+
                     try:
                         result = writer.bulk_copy_spark(
                             df=df,
@@ -975,6 +978,7 @@ class SparkEngine(Engine):
                             staging_connection=staging_connection,
                             external_data_source=external_data_source,
                             options=overwrite_options,
+                            bulk_copy_context=bulk_copy_context,
                         )
                         elapsed = (time.time() - start_time) * 1000
                         ctx.log_file_io(path=target_identifier, format=format, mode="write")

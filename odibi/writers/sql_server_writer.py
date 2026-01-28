@@ -2242,6 +2242,7 @@ class SqlServerMergeWriter:
         staging_connection: Any,
         external_data_source: Optional[str] = None,
         options: Optional[SqlServerOverwriteOptions] = None,
+        bulk_copy_context: Optional[Dict[str, str]] = None,
     ) -> OverwriteResult:
         """
         Execute high-performance bulk copy operation for Spark DataFrame.
@@ -2255,6 +2256,7 @@ class SqlServerMergeWriter:
             staging_connection: Connection to staging storage (ADLS/Blob)
             external_data_source: SQL Server external data source name (auto-generated if auto_setup=True)
             options: Overwrite options
+            bulk_copy_context: Dict with project/pipeline/node for staging path organization
 
         Returns:
             OverwriteResult with row count
@@ -2262,7 +2264,6 @@ class SqlServerMergeWriter:
         import uuid
 
         options = options or SqlServerOverwriteOptions()
-        staging_path_prefix = options.staging_path or "odibi_staging/bulk"
         keep_files = options.keep_staging_files
 
         # Determine external data source name
@@ -2281,8 +2282,17 @@ class SqlServerMergeWriter:
         if options.auto_setup:
             self.setup_bulk_copy_external_source(staging_connection, external_data_source)
 
-        # Generate unique staging file path
-        staging_file = f"{staging_path_prefix}/{uuid.uuid4()}.parquet"
+        # Build staging path with context for organization and debugging
+        staging_path_prefix = options.staging_path or "odibi_staging/bulk"
+        if bulk_copy_context:
+            project = bulk_copy_context.get("project", "unknown")
+            pipeline = bulk_copy_context.get("pipeline", "unknown")
+            node = bulk_copy_context.get("node", "unknown")
+            staging_file = (
+                f"{staging_path_prefix}/{project}/{pipeline}/{node}/{uuid.uuid4()}.parquet"
+            )
+        else:
+            staging_file = f"{staging_path_prefix}/{uuid.uuid4()}.parquet"
 
         # Auto-create schema if needed
         if options.auto_create_schema:
@@ -2354,6 +2364,7 @@ class SqlServerMergeWriter:
         staging_connection: Any,
         external_data_source: Optional[str] = None,
         options: Optional[SqlServerMergeOptions] = None,
+        bulk_copy_context: Optional[Dict[str, str]] = None,
     ) -> int:
         """
         Bulk copy DataFrame to staging table for MERGE operations.
@@ -2366,6 +2377,7 @@ class SqlServerMergeWriter:
             staging_connection: Connection to staging storage
             external_data_source: SQL Server external data source name (auto-generated if auto_setup=True)
             options: Merge options
+            bulk_copy_context: Dict with project/pipeline/node for staging path organization
 
         Returns:
             Number of rows written
@@ -2373,7 +2385,6 @@ class SqlServerMergeWriter:
         import uuid
 
         options = options or SqlServerMergeOptions()
-        staging_path_prefix = options.staging_path or "odibi_staging/bulk"
         keep_files = options.keep_staging_files
 
         # Determine external data source name
@@ -2391,7 +2402,17 @@ class SqlServerMergeWriter:
         if options.auto_setup:
             self.setup_bulk_copy_external_source(staging_connection, external_data_source)
 
-        staging_file = f"{staging_path_prefix}/{uuid.uuid4()}.parquet"
+        # Build staging path with context for organization and debugging
+        staging_path_prefix = options.staging_path or "odibi_staging/bulk"
+        if bulk_copy_context:
+            project = bulk_copy_context.get("project", "unknown")
+            pipeline = bulk_copy_context.get("pipeline", "unknown")
+            node = bulk_copy_context.get("node", "unknown")
+            staging_file = (
+                f"{staging_path_prefix}/{project}/{pipeline}/{node}/{uuid.uuid4()}.parquet"
+            )
+        else:
+            staging_file = f"{staging_path_prefix}/{uuid.uuid4()}.parquet"
 
         self.ctx.info(
             "Bulk loading staging table (Spark)",
