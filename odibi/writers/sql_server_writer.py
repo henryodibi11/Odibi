@@ -370,47 +370,87 @@ class SqlServerMergeWriter:
         target_hashes: List[Dict[str, Any]],
         merge_keys: List[str],
         hash_column: str,
+        jdbc_options: Optional[Dict[str, str]] = None,
+        target_table: Optional[str] = None,
     ):
         """
         Filter Spark DataFrame to only rows that are new or changed.
 
         Args:
             source_df: Source Spark DataFrame
-            target_hashes: List of dicts with target keys and hashes
+            target_hashes: List of dicts with target keys and hashes (legacy, ignored if jdbc_options provided)
             merge_keys: Key columns
             hash_column: Hash column name
+            jdbc_options: JDBC options for direct Spark read (preferred)
+            target_table: Target table name for direct JDBC read
 
         Returns:
             Filtered DataFrame with only new/changed rows
         """
         from pyspark.sql import functions as F
 
-        if not target_hashes:
-            # No existing data, all rows are new
-            return source_df
-
-        # Get SparkSession from DataFrame
         spark = source_df.sparkSession
 
-        # Create DataFrame from target hashes
-        target_df = spark.createDataFrame(target_hashes)
+        # Prefer direct JDBC read for large tables (avoids driver memory bottleneck)
+        if jdbc_options and target_table:
+            escaped_table = self.get_escaped_table_name(target_table)
+            key_cols = ", ".join([self.escape_column(k) for k in merge_keys])
+            hash_col = self.escape_column(hash_column)
 
-        # Rename hash column in target to avoid collision
+            # Check if hash column exists
+            existing_columns = self.get_table_columns(target_table)
+            if existing_columns and hash_column not in existing_columns:
+                self.ctx.info(
+                    "Hash column not found in target, all rows treated as new",
+                    hash_column=hash_column,
+                )
+                return source_df
+
+            query = f"(SELECT {key_cols}, {hash_col} FROM {escaped_table}) AS target_hashes"
+            target_df = (
+                spark.read.format("jdbc").options(**jdbc_options).option("dbtable", query).load()
+            )
+
+            if target_df.count() == 0:
+                return source_df
+
+            # Rename hash column in target to avoid collision
+            target_hash_col = f"_target_{hash_column}"
+            target_df = target_df.withColumnRenamed(hash_column, target_hash_col)
+
+            # Left join source with target on merge keys
+            join_condition = [source_df[k] == target_df[k] for k in merge_keys]
+            joined = source_df.join(target_df, join_condition, "left")
+
+            # Filter to rows where:
+            # 1. No match in target (new rows) - target hash is null
+            # 2. Hash differs (changed rows)
+            changed = joined.filter(
+                F.col(target_hash_col).isNull() | (F.col(hash_column) != F.col(target_hash_col))
+            )
+
+            # Drop the target columns
+            for k in merge_keys:
+                changed = changed.drop(target_df[k])
+            changed = changed.drop(target_hash_col)
+
+            return changed
+
+        # Fallback: use pre-fetched target_hashes (legacy path)
+        if not target_hashes:
+            return source_df
+
+        target_df = spark.createDataFrame(target_hashes)
         target_hash_col = f"_target_{hash_column}"
         target_df = target_df.withColumnRenamed(hash_column, target_hash_col)
 
-        # Left join source with target on merge keys
         join_condition = [source_df[k] == target_df[k] for k in merge_keys]
         joined = source_df.join(target_df, join_condition, "left")
 
-        # Filter to rows where:
-        # 1. No match in target (new rows) - target hash is null
-        # 2. Hash differs (changed rows)
         changed = joined.filter(
             F.col(target_hash_col).isNull() | (F.col(hash_column) != F.col(target_hash_col))
         )
 
-        # Drop the target columns
         for k in merge_keys:
             changed = changed.drop(target_df[k])
         changed = changed.drop(target_hash_col)
@@ -1527,11 +1567,15 @@ class SqlServerMergeWriter:
                     columns.append(hash_column)
 
             if hash_column:
-                # Read target hashes and filter source
-                target_hashes = self.read_target_hashes(target_table, merge_keys, hash_column)
+                # Filter to changed rows using direct JDBC read (avoids driver memory bottleneck)
                 original_count = df_to_write.count()
                 df_to_write = self.filter_changed_rows_spark(
-                    df_to_write, target_hashes, merge_keys, hash_column
+                    df_to_write,
+                    [],  # Legacy param, not used when jdbc_options provided
+                    merge_keys,
+                    hash_column,
+                    jdbc_options=jdbc_options,
+                    target_table=target_table,
                 )
                 filtered_count = df_to_write.count()
                 self.ctx.info(

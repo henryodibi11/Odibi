@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **exclude_columns now respected during auto_create_table**: When using `auto_create_table: true` with `exclude_columns`, the excluded columns are now filtered out before table creation. Previously, excluded columns would still be created in the target table.
 
+- **Incremental merge now uses direct JDBC read for hash comparison**: The `incremental: true` option now reads target hashes via Spark JDBC instead of fetching all rows to the driver. This eliminates driver memory bottleneck and dramatically reduces the number of Spark jobs for large tables.
+
 ### Documentation
 
 - Updated `docs/features/bulk_copy.md` with two-tier performance optimization:
