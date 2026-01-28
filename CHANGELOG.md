@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Azure SQL Database detection**: Bulk copy (`bulk_copy: true`) now detects Azure SQL Database and raises a clear error, since file-based bulk loading is only supported on Azure Synapse and SQL Server 2022+. Users automatically get the JDBC bulk copy protocol (5-10x faster) without any configuration.
 
+- **JDBC bulk copy column ordering**: DataFrame columns are now automatically reordered to match target table column order before writing. This fixes NULL values appearing when using `useBulkCopyForBatchInsert` with existing tables that have different column ordering than the DataFrame.
+
 ### Documentation
 
 - Updated `docs/features/bulk_copy.md` with two-tier performance optimization:
