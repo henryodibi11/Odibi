@@ -2669,9 +2669,7 @@ class SqlServerMergeWriter:
         if "SharedAccessSignature" in parts:
             return parts["SharedAccessSignature"]
 
-        raise ValueError(
-            "Connection string must contain AccountKey or SharedAccessSignature"
-        )
+        raise ValueError("Connection string must contain AccountKey or SharedAccessSignature")
 
     def _create_external_data_source(
         self,
