@@ -36,6 +36,6 @@ def test_docs_are_synced():
         existing_content = existing_content.replace("\r\n", "\n")
         generated_content = generated_content.replace("\r\n", "\n")
 
-        assert existing_content == generated_content, (
-            "docs/reference/yaml_schema.md is out of sync with code. Run 'python odibi/introspect.py' to update."
-        )
+        assert (
+            existing_content == generated_content
+        ), "docs/reference/yaml_schema.md is out of sync with code. Run 'python odibi/introspect.py' to update."
