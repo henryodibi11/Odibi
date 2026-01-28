@@ -411,7 +411,12 @@ class SqlServerMergeWriter:
                 spark.read.format("jdbc").options(**jdbc_options).option("dbtable", query).load()
             )
 
-            if target_df.count() == 0:
+            # Cache target hashes to avoid multiple JDBC reads during join
+            target_df = target_df.cache()
+
+            # Check if target is empty using limit(1) instead of count() - much faster
+            if target_df.limit(1).count() == 0:
+                target_df.unpersist()
                 return source_df
 
             # Rename hash column in target to avoid collision
@@ -433,6 +438,10 @@ class SqlServerMergeWriter:
             for k in merge_keys:
                 changed = changed.drop(target_df[k])
             changed = changed.drop(target_hash_col)
+
+            # Unpersist target hashes after join is planned
+            # Note: actual unpersist happens after the action triggers
+            target_df.unpersist()
 
             return changed
 
