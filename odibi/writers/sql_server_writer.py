@@ -2230,3 +2230,221 @@ class SqlServerMergeWriter:
         )
 
         return OverwriteResult(rows_written=row_count, strategy=strategy.value)
+
+    # =========================================================================
+    # Bulk Copy Methods (High-Performance BULK INSERT via staging files)
+    # =========================================================================
+
+    def bulk_copy_spark(
+        self,
+        df: Any,
+        target_table: str,
+        staging_connection: Any,
+        external_data_source: str,
+        options: Optional[SqlServerOverwriteOptions] = None,
+    ) -> OverwriteResult:
+        """
+        Execute high-performance bulk copy operation for Spark DataFrame.
+
+        Writes DataFrame to staging storage (ADLS/Blob), then uses SQL Server
+        BULK INSERT for 10-50x faster loads compared to JDBC.
+
+        Args:
+            df: Spark DataFrame to write
+            target_table: Target table name
+            staging_connection: Connection to staging storage (ADLS/Blob)
+            external_data_source: SQL Server external data source name
+            options: Overwrite options
+
+        Returns:
+            OverwriteResult with row count
+        """
+        import uuid
+
+        options = options or SqlServerOverwriteOptions()
+        staging_path_prefix = options.staging_path or "odibi_staging/bulk"
+        keep_files = options.keep_staging_files
+
+        # Generate unique staging file path
+        staging_file = f"{staging_path_prefix}/{uuid.uuid4()}.parquet"
+
+        # Auto-create schema if needed
+        if options.auto_create_schema:
+            schema, _ = self.parse_table_name(target_table)
+            if not self.check_schema_exists(schema):
+                self.create_schema(schema)
+
+        self.ctx.info(
+            "Starting bulk copy operation (Spark)",
+            target_table=target_table,
+            staging_file=staging_file,
+            external_data_source=external_data_source,
+        )
+
+        table_exists = self.check_table_exists(target_table)
+
+        # Auto-create table if needed
+        if options.auto_create_table and not table_exists:
+            self.create_table_from_spark(df, target_table, options.audit_cols)
+            table_exists = True
+
+        # Cache row count before write
+        row_count = df.count()
+
+        staging_full_path = None
+        try:
+            # Step 1: Write DataFrame to staging storage as Parquet
+            staging_full_path = staging_connection.get_path(staging_file)
+            self.ctx.debug("Writing staging file", path=staging_full_path)
+            df.write.mode("overwrite").parquet(staging_full_path)
+
+            # Step 2: Truncate target table
+            if table_exists:
+                self.truncate_table(target_table)
+
+            # Step 3: Execute BULK INSERT from staging file
+            self._execute_bulk_insert(
+                target_table=target_table,
+                external_data_source=external_data_source,
+                staging_file=staging_file,
+                file_format="PARQUET",
+            )
+
+            self.ctx.info(
+                "Bulk copy completed (Spark)",
+                target_table=target_table,
+                rows_written=row_count,
+            )
+
+        finally:
+            # Step 4: Cleanup staging file
+            if not keep_files and staging_full_path:
+                try:
+                    self.ctx.debug("Cleaning up staging file", path=staging_full_path)
+                    staging_connection.delete(staging_file)
+                except Exception as e:
+                    self.ctx.warning(
+                        "Failed to cleanup staging file",
+                        path=staging_full_path,
+                        error=str(e),
+                    )
+
+        return OverwriteResult(rows_written=row_count, strategy="bulk_copy")
+
+    def bulk_copy_to_staging_spark(
+        self,
+        df: Any,
+        staging_table: str,
+        staging_connection: Any,
+        external_data_source: str,
+        options: Optional[SqlServerMergeOptions] = None,
+    ) -> int:
+        """
+        Bulk copy DataFrame to staging table for MERGE operations.
+
+        Used when merge_options.bulk_copy=True for fast staging table loads.
+
+        Args:
+            df: Spark DataFrame to write
+            staging_table: Staging table name
+            staging_connection: Connection to staging storage
+            external_data_source: SQL Server external data source name
+            options: Merge options
+
+        Returns:
+            Number of rows written
+        """
+        import uuid
+
+        options = options or SqlServerMergeOptions()
+        staging_path_prefix = options.staging_path or "odibi_staging/bulk"
+        keep_files = options.keep_staging_files
+
+        staging_file = f"{staging_path_prefix}/{uuid.uuid4()}.parquet"
+
+        self.ctx.info(
+            "Bulk loading staging table (Spark)",
+            staging_table=staging_table,
+            staging_file=staging_file,
+        )
+
+        row_count = df.count()
+
+        staging_full_path = None
+        try:
+            # Write to staging storage
+            staging_full_path = staging_connection.get_path(staging_file)
+            df.write.mode("overwrite").parquet(staging_full_path)
+
+            # Ensure staging table exists (create from DataFrame schema)
+            if not self.check_table_exists(staging_table):
+                self.create_table_from_spark(df, staging_table)
+
+            # Truncate and bulk load
+            self.truncate_staging(staging_table)
+            self._execute_bulk_insert(
+                target_table=staging_table,
+                external_data_source=external_data_source,
+                staging_file=staging_file,
+                file_format="PARQUET",
+            )
+
+            self.ctx.debug(
+                "Staging table bulk load completed",
+                staging_table=staging_table,
+                rows=row_count,
+            )
+
+        finally:
+            if not keep_files and staging_full_path:
+                try:
+                    staging_connection.delete(staging_file)
+                except Exception:
+                    pass
+
+        return row_count
+
+    def _execute_bulk_insert(
+        self,
+        target_table: str,
+        external_data_source: str,
+        staging_file: str,
+        file_format: str = "PARQUET",
+    ) -> None:
+        """
+        Execute SQL Server BULK INSERT from external data source.
+
+        Args:
+            target_table: Target table name
+            external_data_source: Name of external data source in SQL Server
+            staging_file: Path to staging file (relative to data source root)
+            file_format: File format (PARQUET, CSV)
+        """
+        escaped_table = self.get_escaped_table_name(target_table)
+
+        if file_format.upper() == "PARQUET":
+            # Use OPENROWSET with BULK for Parquet files
+            sql = f"""
+            INSERT INTO {escaped_table}
+            SELECT * FROM OPENROWSET(
+                BULK '{staging_file}',
+                DATA_SOURCE = '{external_data_source}',
+                FORMAT = 'PARQUET'
+            ) AS data
+            """
+        else:
+            # Standard BULK INSERT for CSV
+            sql = f"""
+            BULK INSERT {escaped_table}
+            FROM '{staging_file}'
+            WITH (
+                DATA_SOURCE = '{external_data_source}',
+                FORMAT = 'CSV',
+                FIRSTROW = 2,
+                FIELDTERMINATOR = ',',
+                ROWTERMINATOR = '\\n'
+            )
+            """
+
+        self.ctx.debug("Executing BULK INSERT", table=target_table)
+        self.connection.execute_sql(sql)

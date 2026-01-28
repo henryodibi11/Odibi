@@ -933,6 +933,76 @@ class SparkEngine(Engine):
                 overwrite_options = options.get("overwrite_options")
                 writer = SqlServerMergeWriter(connection)
 
+                # Check if bulk_copy is enabled
+                use_bulk_copy = getattr(overwrite_options, "bulk_copy", False)
+
+                if use_bulk_copy:
+                    # Bulk copy mode - use staging files + BULK INSERT
+                    staging_conn_name = getattr(overwrite_options, "staging_connection", None)
+                    external_data_source = getattr(overwrite_options, "external_data_source", None)
+
+                    if not staging_conn_name:
+                        raise ValueError(
+                            "bulk_copy=True requires 'staging_connection' to be set. "
+                            "Specify an ADLS/Blob connection for staging files."
+                        )
+                    if not external_data_source:
+                        raise ValueError(
+                            "bulk_copy=True requires 'external_data_source' to be set. "
+                            "This is the SQL Server external data source name pointing "
+                            "to your staging storage."
+                        )
+
+                    # Get staging connection from options (passed from node executor)
+                    staging_connection = options.get("_staging_connection")
+                    if not staging_connection:
+                        raise ValueError(
+                            f"Staging connection '{staging_conn_name}' not found. "
+                            "Ensure the connection is defined in your project config."
+                        )
+
+                    ctx.debug(
+                        "Executing SQL Server bulk copy overwrite",
+                        target=table,
+                        staging_connection=staging_conn_name,
+                        external_data_source=external_data_source,
+                    )
+
+                    try:
+                        result = writer.bulk_copy_spark(
+                            df=df,
+                            target_table=table,
+                            staging_connection=staging_connection,
+                            external_data_source=external_data_source,
+                            options=overwrite_options,
+                        )
+                        elapsed = (time.time() - start_time) * 1000
+                        ctx.log_file_io(path=target_identifier, format=format, mode="write")
+                        ctx.info(
+                            "SQL Server bulk copy completed",
+                            target=target_identifier,
+                            strategy="bulk_copy",
+                            rows_written=result.rows_written,
+                            elapsed_ms=round(elapsed, 2),
+                        )
+                        return {
+                            "mode": "overwrite",
+                            "strategy": "bulk_copy",
+                            "rows_written": result.rows_written,
+                        }
+
+                    except Exception as e:
+                        elapsed = (time.time() - start_time) * 1000
+                        ctx.error(
+                            "SQL Server bulk copy failed",
+                            target=target_identifier,
+                            error_type=type(e).__name__,
+                            error_message=str(e),
+                            elapsed_ms=round(elapsed, 2),
+                        )
+                        raise
+
+                # Standard JDBC-based overwrite
                 ctx.debug(
                     "Executing SQL Server enhanced overwrite",
                     target=table,

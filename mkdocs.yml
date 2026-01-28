@@ -180,6 +180,7 @@ nav:
       - Engines: features/engines.md
       - Transformers: features/transformers.md
       - Loading Patterns: features/patterns.md
+      - Bulk Copy (SQL Server): features/bulk_copy.md
       - Configuration: features/configuration.md
       - State Management: features/state.md
       - Stories: features/stories.md

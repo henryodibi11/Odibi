@@ -1559,6 +1559,11 @@ write:
 | **incremental** | bool | No | `False` | Enable incremental merge optimization. When True, reads target table's keys and hashes to determine which rows changed, then only writes changed rows to staging. Significantly faster when few rows change between runs. |
 | **hash_column** | Optional[str] | No | - | Name of pre-computed hash column in DataFrame for change detection. Used when incremental=True. If not specified, will auto-detect '_hash_diff' column. |
 | **change_detection_columns** | Optional[List[str]] | No | - | Columns to use for computing change detection hash. Used when incremental=True and no hash_column is specified. If None, uses all non-key columns. |
+| **bulk_copy** | bool | No | `False` | Enable bulk copy mode for fast staging table loads. Writes data to ADLS as staging file, then uses BULK INSERT. 10-50x faster than JDBC for large datasets. Requires staging_connection. |
+| **staging_connection** | Optional[str] | No | - | Connection name for staging files (ADLS/Blob storage). Required when bulk_copy=True. The connection must have write access. |
+| **staging_path** | Optional[str] | No | - | Path prefix for staging files. Defaults to 'odibi_staging/bulk'. Files are automatically cleaned up after successful load. |
+| **external_data_source** | Optional[str] | No | - | SQL Server external data source name for BULK INSERT. Must be pre-configured in SQL Server to point to the staging storage. Example: 'CREATE EXTERNAL DATA SOURCE OdibiBulkStaging WITH (...)' |
+| **keep_staging_files** | bool | No | `False` | Keep staging files after load (for debugging). Default deletes after success. |
 
 ---
 ### `SqlServerMergeValidationConfig`
@@ -1619,6 +1624,11 @@ write:
 | **auto_create_table** | bool | No | `False` | Auto-create target table if it doesn't exist (Phase 4). Infers schema from DataFrame. |
 | **schema_evolution** | Optional[[SqlServerSchemaEvolutionConfig](#sqlserverschemaevolutionconfig)] | No | - | Schema evolution configuration (Phase 4). Controls handling of schema differences. |
 | **batch_size** | Optional[int] | No | - | Batch size for writes (Phase 4). Chunks large DataFrames for memory efficiency. |
+| **bulk_copy** | bool | No | `False` | Enable bulk copy mode for fast writes. Writes data to ADLS as staging file, then uses BULK INSERT. 10-50x faster than JDBC for large datasets. Requires staging_connection. |
+| **staging_connection** | Optional[str] | No | - | Connection name for staging files (ADLS/Blob storage). Required when bulk_copy=True. The connection must have write access. |
+| **staging_path** | Optional[str] | No | - | Path prefix for staging files. Defaults to 'odibi_staging/bulk'. Files are automatically cleaned up after successful load. |
+| **external_data_source** | Optional[str] | No | - | SQL Server external data source name for BULK INSERT. Must be pre-configured in SQL Server to point to the staging storage. Example: 'CREATE EXTERNAL DATA SOURCE OdibiBulkStaging WITH (...)' |
+| **keep_staging_files** | bool | No | `False` | Keep staging files after load (for debugging). Default deletes after success. |
 
 ---
 ### `SqlServerSchemaEvolutionConfig`

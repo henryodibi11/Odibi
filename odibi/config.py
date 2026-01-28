@@ -2044,6 +2044,40 @@ class SqlServerMergeOptions(BaseModel):
             "and no hash_column is specified. If None, uses all non-key columns."
         ),
     )
+    bulk_copy: bool = Field(
+        default=False,
+        description=(
+            "Enable bulk copy mode for fast staging table loads. "
+            "Writes data to ADLS as staging file, then uses BULK INSERT. "
+            "10-50x faster than JDBC for large datasets. Requires staging_connection."
+        ),
+    )
+    staging_connection: Optional[str] = Field(
+        default=None,
+        description=(
+            "Connection name for staging files (ADLS/Blob storage). "
+            "Required when bulk_copy=True. The connection must have write access."
+        ),
+    )
+    staging_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Path prefix for staging files. Defaults to 'odibi_staging/bulk'. "
+            "Files are automatically cleaned up after successful load."
+        ),
+    )
+    external_data_source: Optional[str] = Field(
+        default=None,
+        description=(
+            "SQL Server external data source name for BULK INSERT. "
+            "Must be pre-configured in SQL Server to point to the staging storage. "
+            "Example: 'CREATE EXTERNAL DATA SOURCE OdibiBulkStaging WITH (...)'"
+        ),
+    )
+    keep_staging_files: bool = Field(
+        default=False,
+        description="Keep staging files after load (for debugging). Default deletes after success.",
+    )
 
 
 class SqlServerOverwriteStrategy(str, Enum):
@@ -2174,6 +2208,40 @@ class SqlServerOverwriteOptions(BaseModel):
     batch_size: Optional[int] = Field(
         default=None,
         description="Batch size for writes (Phase 4). Chunks large DataFrames for memory efficiency.",
+    )
+    bulk_copy: bool = Field(
+        default=False,
+        description=(
+            "Enable bulk copy mode for fast writes. "
+            "Writes data to ADLS as staging file, then uses BULK INSERT. "
+            "10-50x faster than JDBC for large datasets. Requires staging_connection."
+        ),
+    )
+    staging_connection: Optional[str] = Field(
+        default=None,
+        description=(
+            "Connection name for staging files (ADLS/Blob storage). "
+            "Required when bulk_copy=True. The connection must have write access."
+        ),
+    )
+    staging_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Path prefix for staging files. Defaults to 'odibi_staging/bulk'. "
+            "Files are automatically cleaned up after successful load."
+        ),
+    )
+    external_data_source: Optional[str] = Field(
+        default=None,
+        description=(
+            "SQL Server external data source name for BULK INSERT. "
+            "Must be pre-configured in SQL Server to point to the staging storage. "
+            "Example: 'CREATE EXTERNAL DATA SOURCE OdibiBulkStaging WITH (...)'"
+        ),
+    )
+    keep_staging_files: bool = Field(
+        default=False,
+        description="Keep staging files after load (for debugging). Default deletes after success.",
     )
 
 

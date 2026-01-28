@@ -2185,6 +2185,40 @@ class NodeExecutor:
                 write_options["overwrite_options"] = write_config.overwrite_options
                 ctx.debug("Overwrite options configured")
 
+                # If bulk_copy is enabled, resolve and pass the staging connection
+                if getattr(write_config.overwrite_options, "bulk_copy", False):
+                    staging_conn_name = getattr(
+                        write_config.overwrite_options, "staging_connection", None
+                    )
+                    if staging_conn_name and self.connections:
+                        staging_conn = self.connections.get(staging_conn_name)
+                        if staging_conn:
+                            write_options["_staging_connection"] = staging_conn
+                            ctx.debug(
+                                "Bulk copy staging connection resolved",
+                                connection=staging_conn_name,
+                            )
+                        else:
+                            ctx.warning(
+                                f"Staging connection '{staging_conn_name}' not found",
+                                available=list(self.connections.keys()),
+                            )
+
+            # Extract merge_options bulk_copy staging connection
+            if write_config.merge_options:
+                if getattr(write_config.merge_options, "bulk_copy", False):
+                    staging_conn_name = getattr(
+                        write_config.merge_options, "staging_connection", None
+                    )
+                    if staging_conn_name and self.connections:
+                        staging_conn = self.connections.get(staging_conn_name)
+                        if staging_conn:
+                            write_options["_staging_connection"] = staging_conn
+                            ctx.debug(
+                                "Bulk copy staging connection resolved for merge",
+                                connection=staging_conn_name,
+                            )
+
             if write_config.format == "delta":
                 merged_props = {}
                 if self.performance_config and hasattr(
