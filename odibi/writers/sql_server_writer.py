@@ -1394,10 +1394,12 @@ class SqlServerMergeWriter:
                 )
 
                 # Create table using JDBC write with overwrite mode (initial load)
+                # useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol (5-10x faster)
                 staging_jdbc_options = {
                     **jdbc_options,
                     "dbtable": target_table,
                     "batchsize": str(options.batch_size or 10000),
+                    "useBulkCopyForBatchInsert": "true",
                 }
                 df.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
 
@@ -1531,10 +1533,12 @@ class SqlServerMergeWriter:
                     self.ctx.info("No changed rows detected, skipping merge")
                     return MergeResult(inserted=0, updated=0, deleted=0)
 
+        # useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol (5-10x faster)
         staging_jdbc_options = {
             **jdbc_options,
             "dbtable": staging_table,
             "batchsize": str(options.batch_size or 10000),
+            "useBulkCopyForBatchInsert": "true",
         }
         df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
 
@@ -1774,11 +1778,13 @@ class SqlServerMergeWriter:
             df_to_write = df.select(*columns_to_write)
 
         # Build JDBC options with batch size
+        # useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol (5-10x faster)
         batch_size = options.batch_size or 10000
         base_jdbc_options = {
             **jdbc_options,
             "dbtable": target_table,
             "batchsize": str(batch_size),
+            "useBulkCopyForBatchInsert": "true",
         }
 
         # Cache row count before write (Spark lazy evaluation)

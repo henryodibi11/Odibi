@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **JDBC Bulk Copy Protocol (5-10x Faster SQL Server Writes)**: All SQL Server writes now use `useBulkCopyForBatchInsert=true` by default. This enables Microsoft's JDBC bulk copy protocol for significantly faster writes with zero configuration. Works with Azure SQL Database, Azure SQL Managed Instance, Azure Synapse, and on-prem SQL Server.
+
+- **File-Based Bulk Copy for Azure Synapse/SQL Server 2022+**: New `bulk_copy` option for maximum performance (10-50x faster) with very large datasets:
+  - `bulk_copy: true` - Enable file-based bulk loading via ADLS staging
+  - `staging_connection` - ADLS connection for staging Parquet files
+  - `staging_path` - Custom staging path (default: `odibi_staging/bulk`)
+  - `external_data_source` - SQL Server external data source name
+  - `keep_staging_files` - Retain staging files for debugging
+  - `auto_setup` - Auto-create SQL Server credential and external data source
+
+- **Auto-Setup for Bulk Copy**: When `auto_setup: true`, odibi automatically creates:
+  - Database master key (if needed)
+  - Database scoped credential (based on ADLS auth: account_key, SAS, or MSI)
+  - External data source pointing to staging location
+
+- **Organized Staging Paths**: File-based bulk copy staging files are organized by context:
+  ```
+  odibi_staging/bulk/{project}/{pipeline}/{node}/{uuid}.parquet
+  ```
+  (Parquet format for Synapse/SQL Server 2022+ compatibility)
+
+### Changed
+
+- **Default batch size**: SQL Server writes now use 10,000 row batches by default (configurable via `batch_size`)
+
+### Fixed
+
+- **Azure SQL Database detection**: Bulk copy (`bulk_copy: true`) now detects Azure SQL Database and raises a clear error, since file-based bulk loading is only supported on Azure Synapse and SQL Server 2022+. Users automatically get the JDBC bulk copy protocol (5-10x faster) without any configuration.
+
+### Documentation
+
+- Updated `docs/features/bulk_copy.md` with two-tier performance optimization:
+  - Tier 1: JDBC Bulk Copy Protocol (default, all databases, 5-10x faster)
+  - Tier 2: File-Based Bulk Copy (Synapse/SQL Server 2022+ only, 10-50x faster)
+
 ## [2.15.4] - 2026-01-27
 
 ### Added

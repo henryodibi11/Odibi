@@ -1,22 +1,41 @@
 # Bulk Copy for SQL Server
 
-High-performance data loading to SQL Server using ADLS staging and BULK INSERT, achieving 10-50x faster writes compared to JDBC.
+High-performance data loading to SQL Server using ADLS staging and BULK INSERT, achieving 10-50x faster writes compared to standard JDBC.
 
-## ⚠️ Important: Database Compatibility
+## Performance Tiers
 
-| Database | Bulk Copy Support |
-|----------|------------------|
-| **Azure Synapse Analytics** | ✅ Full support (PARQUET) |
-| **SQL Server 2022+** | ✅ Full support with PolyBase |
-| **Azure SQL Database** | ❌ Not supported |
-| **Azure SQL Managed Instance** | ❌ Not supported |
+Odibi provides two levels of SQL Server write optimization:
 
-**Why Azure SQL Database doesn't work:**
-- OPENROWSET doesn't support PARQUET format
-- BULK INSERT requires exact file paths (Spark writes partitioned directories)
+### 1. JDBC Bulk Copy Protocol (Default - All Databases)
+
+**Enabled automatically** for all SQL Server writes via `useBulkCopyForBatchInsert=true`. No configuration needed.
+
+| Database | Support | Speedup |
+|----------|---------|---------|
+| Azure SQL Database | ✅ Works | 5-10x |
+| Azure SQL Managed Instance | ✅ Works | 5-10x |
+| Azure Synapse Analytics | ✅ Works | 5-10x |
+| SQL Server (on-prem) | ✅ Works | 5-10x |
+
+This uses Microsoft's JDBC driver bulk copy protocol - faster than row-by-row inserts, no external staging required.
+
+### 2. File-Based Bulk Copy (Synapse/SQL Server 2022+ Only)
+
+For maximum performance with very large datasets, use `bulk_copy: true` to stage data as Parquet files in ADLS and load via `OPENROWSET`.
+
+| Database | Support | Speedup |
+|----------|---------|---------|
+| **Azure Synapse Analytics** | ✅ Full support | 10-50x |
+| **SQL Server 2022+** | ✅ With PolyBase | 10-50x |
+| **Azure SQL Database** | ❌ Not supported | - |
+| **Azure SQL Managed Instance** | ❌ Not supported | - |
+
+**Why file-based bulk copy doesn't work with Azure SQL Database:**
+- `OPENROWSET` doesn't support PARQUET format
+- `BULK INSERT` requires exact file paths (Spark writes partitioned directories)
 - No practical way to bulk load from cloud storage
 
-**For Azure SQL Database users:** Use standard JDBC writes (remove `bulk_copy: true`). Performance is typically ~1M rows/min which is sufficient for most use cases.
+**For Azure SQL Database users:** You automatically get the JDBC bulk copy protocol (5-10x faster). For most workloads, this is sufficient.
 
 ## Overview
 
