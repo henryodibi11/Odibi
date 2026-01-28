@@ -149,6 +149,7 @@ class NodeExecutor:
         self._validation_warnings: List[str] = []
         self._read_row_count: Optional[int] = None  # Cache row count from read phase
         self._table_exists_cache: Dict[str, bool] = {}  # Cache table existence checks
+        self._persisted_dfs: List[Any] = []  # Track persisted Spark DataFrames for cleanup
 
     def _cached_table_exists(
         self,
@@ -443,6 +444,16 @@ class NodeExecutor:
                     metadata=error_metadata,
                 )
 
+            finally:
+                # Clean up persisted Spark DataFrames to free memory
+                for df in self._persisted_dfs:
+                    try:
+                        if hasattr(df, "unpersist"):
+                            df.unpersist()
+                    except Exception:
+                        pass  # Best effort cleanup
+                self._persisted_dfs.clear()
+
     def _execute_dry_run(self, config: NodeConfig) -> NodeResult:
         """Simulate execution."""
         self._execution_steps.append("Dry run: Skipping actual execution")
@@ -622,6 +633,16 @@ class NodeExecutor:
                 ctx.info("Streaming read enabled")
                 self._execution_steps.append("Streaming read enabled")
 
+            # Persist Spark DataFrames to avoid recomputation on multiple count/action calls
+            if (
+                df is not None
+                and hasattr(df, "persist")
+                and not getattr(df, "isStreaming", False)
+                and not read_config.streaming
+            ):
+                df = df.persist()
+                self._persisted_dfs.append(df)
+
             row_count = self._count_rows(df) if df is not None else 0
             metrics.rows_out = row_count
             # Cache row count to avoid redundant counting in schema_capture phase
@@ -783,6 +804,11 @@ class NodeExecutor:
                     f"Expected either: 1) A pipeline reference string like '$pipeline_name.node_name', or "
                     f"2) A read config dict with 'connection', 'format', and 'table'/'path' keys."
                 )
+
+            # Persist Spark DataFrames to avoid recomputation on multiple count/action calls
+            if df is not None and hasattr(df, "persist") and not getattr(df, "isStreaming", False):
+                df = df.persist()
+                self._persisted_dfs.append(df)
 
             dataframes[name] = df
             row_count = self._count_rows(df) if df is not None else 0
