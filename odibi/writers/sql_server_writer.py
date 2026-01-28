@@ -1777,6 +1777,17 @@ class SqlServerMergeWriter:
             )
             df_to_write = df.select(*columns_to_write)
 
+        # Reorder DataFrame columns to match target table order
+        # Required for useBulkCopyForBatchInsert which is strict about column alignment
+        if table_exists:
+            target_cols = list(self.get_table_columns(target_table).keys())
+            df_cols = df_to_write.columns
+            # Only include columns that exist in both DataFrame and target table
+            ordered_cols = [c for c in target_cols if c in df_cols]
+            # Add any new columns from DataFrame not in target (for schema evolution)
+            new_cols = [c for c in df_cols if c not in target_cols]
+            df_to_write = df_to_write.select(ordered_cols + new_cols)
+
         # Build JDBC options with batch size
         # useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol (5-10x faster)
         batch_size = options.batch_size or 10000
