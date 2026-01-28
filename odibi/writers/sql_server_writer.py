@@ -64,6 +64,26 @@ PANDAS_TO_SQL_TYPE_MAP: Dict[str, str] = {
     "category": "NVARCHAR(MAX)",
 }
 
+SPARK_TO_SQL_TYPE_MAP: Dict[str, str] = {
+    "ByteType": "TINYINT",
+    "ShortType": "SMALLINT",
+    "IntegerType": "INT",
+    "LongType": "BIGINT",
+    "FloatType": "REAL",
+    "DoubleType": "FLOAT",
+    "DecimalType": "DECIMAL",
+    "StringType": "NVARCHAR(MAX)",
+    "BinaryType": "VARBINARY(MAX)",
+    "BooleanType": "BIT",
+    "DateType": "DATE",
+    "TimestampType": "DATETIME2",
+    "TimestampNTZType": "DATETIME2",
+    "ArrayType": "NVARCHAR(MAX)",
+    "MapType": "NVARCHAR(MAX)",
+    "StructType": "NVARCHAR(MAX)",
+    "NullType": "NVARCHAR(1)",
+}
+
 
 @dataclass
 class MergeResult:
@@ -717,6 +737,96 @@ class SqlServerMergeWriter:
             if pattern in dtype_str:
                 return sql_type
         return "NVARCHAR(MAX)"
+
+    def infer_sql_type_spark(self, dtype: Any) -> str:
+        """Infer SQL Server type from Spark DataType."""
+        dtype_str = type(dtype).__name__
+        if dtype_str in SPARK_TO_SQL_TYPE_MAP:
+            return SPARK_TO_SQL_TYPE_MAP[dtype_str]
+        # Handle DecimalType with precision
+        if dtype_str == "DecimalType":
+            precision = getattr(dtype, "precision", 18)
+            scale = getattr(dtype, "scale", 0)
+            return f"DECIMAL({precision},{scale})"
+        return "NVARCHAR(MAX)"
+
+    def create_table_from_spark(
+        self,
+        df: Any,
+        table: str,
+        audit_cols: Optional[SqlServerAuditColsConfig] = None,
+    ) -> None:
+        """
+        Create a SQL Server table from Spark DataFrame schema.
+
+        Args:
+            df: Spark DataFrame
+            table: Target table name
+            audit_cols: Optional audit column config to add created_ts/updated_ts columns
+        """
+        schema_name, table_name = self.parse_table_name(table)
+        columns = []
+        existing_cols = set()
+        for field in df.schema.fields:
+            sql_type = self.infer_sql_type_spark(field.dataType)
+            escaped_col = self.escape_column(field.name)
+            columns.append(f"{escaped_col} {sql_type} NULL")
+            existing_cols.add(field.name)
+
+        if audit_cols:
+            if audit_cols.created_col and audit_cols.created_col not in existing_cols:
+                escaped_col = self.escape_column(audit_cols.created_col)
+                columns.append(f"{escaped_col} DATETIME2 NULL")
+                self.ctx.debug(f"Adding audit column: {audit_cols.created_col}")
+            if audit_cols.updated_col and audit_cols.updated_col not in existing_cols:
+                escaped_col = self.escape_column(audit_cols.updated_col)
+                columns.append(f"{escaped_col} DATETIME2 NULL")
+                self.ctx.debug(f"Adding audit column: {audit_cols.updated_col}")
+
+        columns_sql = ",\n    ".join(columns)
+        sql = f"CREATE TABLE [{schema_name}].[{table_name}] (\n    {columns_sql}\n)"
+        self.ctx.info("Creating table from Spark DataFrame", table=table)
+        self.connection.execute_sql(sql)
+
+    def handle_schema_evolution_spark(
+        self, df: Any, table: str, evolution_config: Any
+    ) -> List[str]:
+        """
+        Handle schema evolution for Spark DataFrame.
+
+        Returns list of columns to write (may be subset if mode=ignore).
+        """
+        if evolution_config is None:
+            return [f.name for f in df.schema.fields]
+
+        mode = evolution_config.mode
+        existing_cols = self.get_table_columns(table)
+        df_cols = {f.name for f in df.schema.fields}
+        table_cols = set(existing_cols.keys())
+
+        new_cols = df_cols - table_cols
+
+        if mode == SqlServerSchemaEvolutionMode.STRICT:
+            if new_cols:
+                raise ValueError(
+                    f"Schema evolution mode is 'strict' but DataFrame has new columns "
+                    f"not in target table: {new_cols}"
+                )
+            return list(df_cols)
+
+        elif mode == SqlServerSchemaEvolutionMode.EVOLVE:
+            if new_cols and evolution_config.add_columns:
+                new_cols_with_types = {}
+                schema_dict = {f.name: f.dataType for f in df.schema.fields}
+                for col in new_cols:
+                    new_cols_with_types[col] = self.infer_sql_type_spark(schema_dict[col])
+                self.add_columns(table, new_cols_with_types)
+            return list(df_cols)
+
+        elif mode == SqlServerSchemaEvolutionMode.IGNORE:
+            return [c for c in df_cols if c in table_cols]
+
+        return list(df_cols)
 
     def create_table_from_pandas(
         self,
@@ -1643,42 +1753,62 @@ class SqlServerMergeWriter:
                 self.create_schema(schema)
 
         self.ctx.info(
-            "Starting SQL Server overwrite",
+            "Starting SQL Server overwrite (Spark)",
             target_table=target_table,
             strategy=strategy.value,
         )
 
         table_exists = self.check_table_exists(target_table)
 
+        # Auto-create table if needed
+        if options.auto_create_table and not table_exists:
+            self.create_table_from_spark(df, target_table, options.audit_cols)
+            table_exists = True
+
+        # Handle schema evolution
+        df_to_write = df
+        if options.schema_evolution and table_exists:
+            columns_to_write = self.handle_schema_evolution_spark(
+                df, target_table, options.schema_evolution
+            )
+            df_to_write = df.select(*columns_to_write)
+
+        # Build JDBC options with batch size
+        batch_size = options.batch_size or 10000
+        base_jdbc_options = {
+            **jdbc_options,
+            "dbtable": target_table,
+            "batchsize": str(batch_size),
+        }
+
+        # Cache row count before write (Spark lazy evaluation)
+        row_count = df_to_write.count()
+
         if strategy == SqlServerOverwriteStrategy.DROP_CREATE:
             if table_exists:
                 self.drop_table(target_table)
-
-            jdbc_options_with_table = {**jdbc_options, "dbtable": target_table}
-            df.write.format("jdbc").options(**jdbc_options_with_table).mode("overwrite").save()
+            df_to_write.write.format("jdbc").options(**base_jdbc_options).mode("overwrite").save()
 
         elif strategy == SqlServerOverwriteStrategy.TRUNCATE_INSERT:
             if table_exists:
                 self.truncate_table(target_table)
-                jdbc_options_with_table = {**jdbc_options, "dbtable": target_table}
-                df.write.format("jdbc").options(**jdbc_options_with_table).mode("append").save()
+                df_to_write.write.format("jdbc").options(**base_jdbc_options).mode("append").save()
             else:
-                jdbc_options_with_table = {**jdbc_options, "dbtable": target_table}
-                df.write.format("jdbc").options(**jdbc_options_with_table).mode("overwrite").save()
+                df_to_write.write.format("jdbc").options(**base_jdbc_options).mode(
+                    "overwrite"
+                ).save()
 
         elif strategy == SqlServerOverwriteStrategy.DELETE_INSERT:
             if table_exists:
                 self.delete_from_table(target_table)
-                jdbc_options_with_table = {**jdbc_options, "dbtable": target_table}
-                df.write.format("jdbc").options(**jdbc_options_with_table).mode("append").save()
+                df_to_write.write.format("jdbc").options(**base_jdbc_options).mode("append").save()
             else:
-                jdbc_options_with_table = {**jdbc_options, "dbtable": target_table}
-                df.write.format("jdbc").options(**jdbc_options_with_table).mode("overwrite").save()
-
-        row_count = df.count()
+                df_to_write.write.format("jdbc").options(**base_jdbc_options).mode(
+                    "overwrite"
+                ).save()
 
         self.ctx.info(
-            "Overwrite completed",
+            "Overwrite completed (Spark)",
             target_table=target_table,
             strategy=strategy.value,
             rows_written=row_count,
