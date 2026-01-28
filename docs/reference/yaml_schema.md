@@ -1586,8 +1586,9 @@ write:
 | **bulk_copy** | bool | No | `False` | Enable bulk copy mode for fast staging table loads. Writes data to ADLS as staging file, then uses BULK INSERT. 10-50x faster than JDBC for large datasets. Requires staging_connection. |
 | **staging_connection** | Optional[str] | No | - | Connection name for staging files (ADLS/Blob storage). Required when bulk_copy=True. The connection must have write access. |
 | **staging_path** | Optional[str] | No | - | Path prefix for staging files. Defaults to 'odibi_staging/bulk'. Files are automatically cleaned up after successful load. |
-| **external_data_source** | Optional[str] | No | - | SQL Server external data source name for BULK INSERT. Must be pre-configured in SQL Server to point to the staging storage. Example: 'CREATE EXTERNAL DATA SOURCE OdibiBulkStaging WITH (...)' |
+| **external_data_source** | Optional[str] | No | - | SQL Server external data source name for BULK INSERT. If not specified and auto_setup=True, will be auto-generated as 'odibi_{staging_connection}'. |
 | **keep_staging_files** | bool | No | `False` | Keep staging files after load (for debugging). Default deletes after success. |
+| **auto_setup** | bool | No | `False` | Auto-create SQL Server external data source and credential if they don't exist. Reads auth credentials from staging_connection and creates matching SQL objects. Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL). |
 
 ---
 ### `SqlServerMergeValidationConfig`
@@ -1653,8 +1654,9 @@ write:
 | **bulk_copy** | bool | No | `False` | Enable bulk copy mode for fast writes. Writes data to ADLS as staging file, then uses BULK INSERT. 10-50x faster than JDBC for large datasets. Requires staging_connection. |
 | **staging_connection** | Optional[str] | No | - | Connection name for staging files (ADLS/Blob storage). Required when bulk_copy=True. The connection must have write access. |
 | **staging_path** | Optional[str] | No | - | Path prefix for staging files. Defaults to 'odibi_staging/bulk'. Files are automatically cleaned up after successful load. |
-| **external_data_source** | Optional[str] | No | - | SQL Server external data source name for BULK INSERT. Must be pre-configured in SQL Server to point to the staging storage. Example: 'CREATE EXTERNAL DATA SOURCE OdibiBulkStaging WITH (...)' |
+| **external_data_source** | Optional[str] | No | - | SQL Server external data source name for BULK INSERT. If not specified and auto_setup=True, will be auto-generated as 'odibi_{staging_connection}'. |
 | **keep_staging_files** | bool | No | `False` | Keep staging files after load (for debugging). Default deletes after success. |
+| **auto_setup** | bool | No | `False` | Auto-create SQL Server external data source and credential if they don't exist. Reads auth credentials from staging_connection and creates matching SQL objects. Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL). |
 
 ---
 ### `SqlServerSchemaEvolutionConfig`

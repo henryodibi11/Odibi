@@ -2240,7 +2240,7 @@ class SqlServerMergeWriter:
         df: Any,
         target_table: str,
         staging_connection: Any,
-        external_data_source: str,
+        external_data_source: Optional[str] = None,
         options: Optional[SqlServerOverwriteOptions] = None,
     ) -> OverwriteResult:
         """
@@ -2253,7 +2253,7 @@ class SqlServerMergeWriter:
             df: Spark DataFrame to write
             target_table: Target table name
             staging_connection: Connection to staging storage (ADLS/Blob)
-            external_data_source: SQL Server external data source name
+            external_data_source: SQL Server external data source name (auto-generated if auto_setup=True)
             options: Overwrite options
 
         Returns:
@@ -2264,6 +2264,22 @@ class SqlServerMergeWriter:
         options = options or SqlServerOverwriteOptions()
         staging_path_prefix = options.staging_path or "odibi_staging/bulk"
         keep_files = options.keep_staging_files
+
+        # Determine external data source name
+        if not external_data_source:
+            if options.auto_setup:
+                # Auto-generate name from staging connection
+                conn_name = getattr(staging_connection, "name", "staging")
+                external_data_source = f"odibi_{conn_name}"
+            else:
+                raise ValueError(
+                    "external_data_source is required when bulk_copy=True. "
+                    "Either provide external_data_source or set auto_setup=True."
+                )
+
+        # Auto-setup external data source if needed
+        if options.auto_setup:
+            self.setup_bulk_copy_external_source(staging_connection, external_data_source)
 
         # Generate unique staging file path
         staging_file = f"{staging_path_prefix}/{uuid.uuid4()}.parquet"
@@ -2336,7 +2352,7 @@ class SqlServerMergeWriter:
         df: Any,
         staging_table: str,
         staging_connection: Any,
-        external_data_source: str,
+        external_data_source: Optional[str] = None,
         options: Optional[SqlServerMergeOptions] = None,
     ) -> int:
         """
@@ -2348,7 +2364,7 @@ class SqlServerMergeWriter:
             df: Spark DataFrame to write
             staging_table: Staging table name
             staging_connection: Connection to staging storage
-            external_data_source: SQL Server external data source name
+            external_data_source: SQL Server external data source name (auto-generated if auto_setup=True)
             options: Merge options
 
         Returns:
@@ -2359,6 +2375,21 @@ class SqlServerMergeWriter:
         options = options or SqlServerMergeOptions()
         staging_path_prefix = options.staging_path or "odibi_staging/bulk"
         keep_files = options.keep_staging_files
+
+        # Determine external data source name
+        if not external_data_source:
+            if options.auto_setup:
+                conn_name = getattr(staging_connection, "name", "staging")
+                external_data_source = f"odibi_{conn_name}"
+            else:
+                raise ValueError(
+                    "external_data_source is required when bulk_copy=True. "
+                    "Either provide external_data_source or set auto_setup=True."
+                )
+
+        # Auto-setup external data source if needed
+        if options.auto_setup:
+            self.setup_bulk_copy_external_source(staging_connection, external_data_source)
 
         staging_file = f"{staging_path_prefix}/{uuid.uuid4()}.parquet"
 
@@ -2448,3 +2479,231 @@ class SqlServerMergeWriter:
 
         self.ctx.debug("Executing BULK INSERT", table=target_table)
         self.connection.execute_sql(sql)
+
+    def setup_bulk_copy_external_source(
+        self,
+        staging_connection: Any,
+        external_data_source_name: str,
+    ) -> bool:
+        """
+        Auto-create SQL Server external data source and credential for bulk copy.
+
+        Creates the necessary SQL objects (master key, credential, external data source)
+        based on the staging connection's authentication configuration.
+
+        Args:
+            staging_connection: ADLS/Blob connection with auth config
+            external_data_source_name: Name for the external data source
+
+        Returns:
+            True if setup completed (created or already exists)
+
+        Raises:
+            ValueError: If auth method is not supported for auto-setup
+        """
+        # Check if external data source already exists
+        if self._check_external_data_source_exists(external_data_source_name):
+            self.ctx.debug(
+                "External data source already exists",
+                name=external_data_source_name,
+            )
+            return True
+
+        # Extract connection details
+        conn_config = staging_connection.config
+        account_name = getattr(conn_config, "account_name", None)
+        container = getattr(conn_config, "container", None)
+        auth = getattr(conn_config, "auth", None)
+
+        if not account_name or not container:
+            raise ValueError(
+                "staging_connection must have account_name and container for auto_setup"
+            )
+
+        # Build storage URL
+        storage_url = f"https://{account_name}.blob.core.windows.net/{container}"
+
+        # Determine credential based on auth mode
+        credential_name = f"odibi_{external_data_source_name}_cred"
+        auth_mode = getattr(auth, "mode", None) if auth else None
+
+        self.ctx.info(
+            "Setting up bulk copy external data source",
+            external_data_source=external_data_source_name,
+            storage_url=storage_url,
+            auth_mode=str(auth_mode),
+        )
+
+        # Ensure master key exists
+        self._ensure_master_key()
+
+        # Create credential based on auth type
+        if auth_mode == "account_key":
+            account_key = getattr(auth, "account_key", None)
+            if not account_key:
+                raise ValueError("account_key auth requires account_key value")
+            self._create_credential_with_key(credential_name, account_key)
+
+        elif auth_mode == "sas":
+            sas_token = getattr(auth, "sas_token", None)
+            if not sas_token:
+                raise ValueError("sas auth requires sas_token value")
+            # Remove leading '?' if present
+            if sas_token.startswith("?"):
+                sas_token = sas_token[1:]
+            self._create_credential_with_sas(credential_name, sas_token)
+
+        elif auth_mode == "connection_string":
+            # Extract account key or SAS from connection string
+            conn_str = getattr(auth, "connection_string", None)
+            if not conn_str:
+                raise ValueError("connection_string auth requires connection_string value")
+            secret = self._extract_secret_from_connection_string(conn_str)
+            self._create_credential_with_key(credential_name, secret)
+
+        elif auth_mode == "aad_msi":
+            # For MSI, create external data source without credential
+            # Azure SQL's managed identity handles auth
+            credential_name = None
+            self.ctx.info(
+                "Using Managed Identity - no credential needed",
+                note="Ensure Azure SQL has Storage Blob Data Reader role on storage account",
+            )
+
+        elif auth_mode == "key_vault":
+            raise ValueError(
+                "key_vault auth requires resolving the secret first. "
+                "Consider using account_key or sas auth mode with resolved values."
+            )
+
+        else:
+            raise ValueError(
+                f"Unsupported auth mode for auto_setup: {auth_mode}. "
+                "Supported: account_key, sas, connection_string, aad_msi"
+            )
+
+        # Create external data source
+        self._create_external_data_source(
+            name=external_data_source_name,
+            location=storage_url,
+            credential_name=credential_name,
+        )
+
+        self.ctx.info(
+            "Bulk copy external data source created",
+            external_data_source=external_data_source_name,
+            credential=credential_name,
+        )
+
+        return True
+
+    def _check_external_data_source_exists(self, name: str) -> bool:
+        """Check if an external data source exists."""
+        sql = f"""
+        SELECT 1 FROM sys.external_data_sources
+        WHERE name = '{name}'
+        """
+        result = self.connection.execute_sql(sql, fetch=True)
+        return len(result) > 0 if result else False
+
+    def _ensure_master_key(self) -> None:
+        """Ensure database master key exists."""
+        # Check if master key exists
+        check_sql = "SELECT 1 FROM sys.symmetric_keys WHERE name = '##MS_DatabaseMasterKey##'"
+        result = self.connection.execute_sql(check_sql, fetch=True)
+
+        if not result or len(result) == 0:
+            # Create master key with random password (not exposed)
+            import secrets
+
+            password = secrets.token_urlsafe(32)
+            create_sql = f"CREATE MASTER KEY ENCRYPTION BY PASSWORD = '{password}'"
+            self.connection.execute_sql(create_sql)
+            self.ctx.debug("Created database master key")
+
+    def _create_credential_with_key(self, name: str, key: str) -> None:
+        """Create database scoped credential with storage account key."""
+        # Drop if exists
+        drop_sql = f"""
+        IF EXISTS (SELECT 1 FROM sys.database_scoped_credentials WHERE name = '{name}')
+            DROP DATABASE SCOPED CREDENTIAL [{name}]
+        """
+        self.connection.execute_sql(drop_sql)
+
+        # Create credential - for account key, use SHARED ACCESS SIGNATURE identity
+        create_sql = f"""
+        CREATE DATABASE SCOPED CREDENTIAL [{name}]
+        WITH IDENTITY = 'SHARED ACCESS SIGNATURE',
+        SECRET = '{key}'
+        """
+        self.connection.execute_sql(create_sql)
+        self.ctx.debug("Created credential with account key", name=name)
+
+    def _create_credential_with_sas(self, name: str, sas_token: str) -> None:
+        """Create database scoped credential with SAS token."""
+        # Drop if exists
+        drop_sql = f"""
+        IF EXISTS (SELECT 1 FROM sys.database_scoped_credentials WHERE name = '{name}')
+            DROP DATABASE SCOPED CREDENTIAL [{name}]
+        """
+        self.connection.execute_sql(drop_sql)
+
+        create_sql = f"""
+        CREATE DATABASE SCOPED CREDENTIAL [{name}]
+        WITH IDENTITY = 'SHARED ACCESS SIGNATURE',
+        SECRET = '{sas_token}'
+        """
+        self.connection.execute_sql(create_sql)
+        self.ctx.debug("Created credential with SAS token", name=name)
+
+    def _extract_secret_from_connection_string(self, conn_str: str) -> str:
+        """Extract account key or SAS token from connection string."""
+        # Parse connection string
+        parts = dict(part.split("=", 1) for part in conn_str.split(";") if "=" in part)
+
+        # Try account key first
+        if "AccountKey" in parts:
+            return parts["AccountKey"]
+
+        # Try SAS token
+        if "SharedAccessSignature" in parts:
+            return parts["SharedAccessSignature"]
+
+        raise ValueError(
+            "Connection string must contain AccountKey or SharedAccessSignature"
+        )
+
+    def _create_external_data_source(
+        self,
+        name: str,
+        location: str,
+        credential_name: Optional[str] = None,
+    ) -> None:
+        """Create external data source for BULK operations."""
+        # Drop if exists
+        drop_sql = f"""
+        IF EXISTS (SELECT 1 FROM sys.external_data_sources WHERE name = '{name}')
+            DROP EXTERNAL DATA SOURCE [{name}]
+        """
+        self.connection.execute_sql(drop_sql)
+
+        # Create external data source
+        if credential_name:
+            create_sql = f"""
+            CREATE EXTERNAL DATA SOURCE [{name}]
+            WITH (
+                TYPE = BLOB_STORAGE,
+                LOCATION = '{location}',
+                CREDENTIAL = [{credential_name}]
+            )
+            """
+        else:
+            # MSI auth - no credential
+            create_sql = f"""
+            CREATE EXTERNAL DATA SOURCE [{name}]
+            WITH (
+                TYPE = BLOB_STORAGE,
+                LOCATION = '{location}'
+            )
+            """
+        self.connection.execute_sql(create_sql)

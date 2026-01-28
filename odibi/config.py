@@ -2070,13 +2070,20 @@ class SqlServerMergeOptions(BaseModel):
         default=None,
         description=(
             "SQL Server external data source name for BULK INSERT. "
-            "Must be pre-configured in SQL Server to point to the staging storage. "
-            "Example: 'CREATE EXTERNAL DATA SOURCE OdibiBulkStaging WITH (...)'"
+            "If not specified and auto_setup=True, will be auto-generated as 'odibi_{staging_connection}'."
         ),
     )
     keep_staging_files: bool = Field(
         default=False,
         description="Keep staging files after load (for debugging). Default deletes after success.",
+    )
+    auto_setup: bool = Field(
+        default=False,
+        description=(
+            "Auto-create SQL Server external data source and credential if they don't exist. "
+            "Reads auth credentials from staging_connection and creates matching SQL objects. "
+            "Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL)."
+        ),
     )
 
 
@@ -2235,13 +2242,20 @@ class SqlServerOverwriteOptions(BaseModel):
         default=None,
         description=(
             "SQL Server external data source name for BULK INSERT. "
-            "Must be pre-configured in SQL Server to point to the staging storage. "
-            "Example: 'CREATE EXTERNAL DATA SOURCE OdibiBulkStaging WITH (...)'"
+            "If not specified and auto_setup=True, will be auto-generated as 'odibi_{staging_connection}'."
         ),
     )
     keep_staging_files: bool = Field(
         default=False,
         description="Keep staging files after load (for debugging). Default deletes after success.",
+    )
+    auto_setup: bool = Field(
+        default=False,
+        description=(
+            "Auto-create SQL Server external data source and credential if they don't exist. "
+            "Reads auth credentials from staging_connection and creates matching SQL objects. "
+            "Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL)."
+        ),
     )
 
 
