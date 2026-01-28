@@ -2317,34 +2317,39 @@ class SqlServerMergeWriter:
         # Cache row count before write
         row_count = df.count()
 
+        # Check if this is Azure SQL Database (not Synapse)
+        # Azure SQL Database doesn't support PARQUET with OPENROWSET
+        is_azure_sql_db = self._is_azure_sql_database()
+
+        if is_azure_sql_db:
+            raise NotImplementedError(
+                "bulk_copy is not supported for Azure SQL Database.\n\n"
+                "Azure SQL Database limitations:\n"
+                "  - OPENROWSET doesn't support PARQUET format\n"
+                "  - BULK INSERT requires exact file paths (no wildcards)\n"
+                "  - Spark writes partitioned files which don't work with BULK INSERT\n\n"
+                "Solutions:\n"
+                "  1. Remove 'bulk_copy: true' to use standard JDBC writes\n"
+                "  2. Use Azure Synapse Analytics for true bulk loading (PARQUET supported)\n"
+                "  3. Use Azure Data Factory for bulk data movement\n\n"
+                "Standard JDBC writes work well for most use cases (~1M rows/min)."
+            )
+
+        # For Azure Synapse or SQL Server 2022+, use PARQUET with OPENROWSET
         staging_full_path = None
-        staging_dir = None
         try:
-            # Step 1: Write DataFrame to staging storage as CSV
-            # Note: Azure SQL Database only supports CSV with BULK INSERT
-            # PARQUET is only supported in Azure Synapse and SQL Server 2022+
-            # Coalesce to 1 partition to get a single file for BULK INSERT
-            staging_dir = staging_file.replace(".parquet", "")
-            staging_full_path = staging_connection.get_path(staging_dir)
-            self.ctx.debug("Writing staging file (CSV)", path=staging_full_path)
+            staging_full_path = staging_connection.get_path(staging_file)
+            self.ctx.debug("Writing staging file (Parquet)", path=staging_full_path)
+            df.write.mode("overwrite").parquet(staging_full_path)
 
-            # Write as single CSV file (coalesce to 1)
-            df.coalesce(1).write.mode("overwrite").option("header", "true").csv(staging_full_path)
-
-            # Find the actual CSV file name (Spark writes part-00000-xxx.csv)
-            # We'll use wildcard in BULK INSERT to handle this
-            csv_pattern = f"{staging_dir}/*.csv"
-
-            # Step 2: Truncate target table
             if table_exists:
                 self.truncate_table(target_table)
 
-            # Step 3: Execute BULK INSERT from staging file
             self._execute_bulk_insert(
                 target_table=target_table,
                 external_data_source=external_data_source,
-                staging_file=csv_pattern,
-                file_format="CSV",
+                staging_file=staging_file,
+                file_format="PARQUET",
             )
 
             self.ctx.info(
@@ -2354,9 +2359,8 @@ class SqlServerMergeWriter:
             )
 
         finally:
-            # Step 4: Cleanup staging directory
             if not keep_files and staging_full_path:
-                self._cleanup_staging_files(staging_connection, staging_dir, staging_full_path)
+                self._cleanup_staging_files(staging_connection, staging_file, staging_full_path)
 
         return OverwriteResult(rows_written=row_count, strategy="bulk_copy")
 
@@ -2425,31 +2429,27 @@ class SqlServerMergeWriter:
 
         row_count = df.count()
 
+        # Check if this is Azure SQL Database (not Synapse)
+        if self._is_azure_sql_database():
+            raise NotImplementedError(
+                "bulk_copy for MERGE is not supported for Azure SQL Database.\n\n"
+                "Remove 'bulk_copy: true' from merge_options to use standard JDBC staging."
+            )
+
         staging_full_path = None
-        staging_dir = None
         try:
-            # Write to staging storage as CSV
-            # Azure SQL Database only supports CSV with BULK INSERT
-            staging_dir = staging_file.replace(".parquet", "")
-            staging_full_path = staging_connection.get_path(staging_dir)
+            staging_full_path = staging_connection.get_path(staging_file)
+            df.write.mode("overwrite").parquet(staging_full_path)
 
-            # Write as single CSV file (coalesce to 1)
-            df.coalesce(1).write.mode("overwrite").option("header", "true").csv(staging_full_path)
-
-            # CSV pattern for BULK INSERT
-            csv_pattern = f"{staging_dir}/*.csv"
-
-            # Ensure staging table exists (create from DataFrame schema)
             if not self.check_table_exists(staging_table):
                 self.create_table_from_spark(df, staging_table)
 
-            # Truncate and bulk load
             self.truncate_staging(staging_table)
             self._execute_bulk_insert(
                 target_table=staging_table,
                 external_data_source=external_data_source,
-                staging_file=csv_pattern,
-                file_format="CSV",
+                staging_file=staging_file,
+                file_format="PARQUET",
             )
 
             self.ctx.debug(
@@ -2460,7 +2460,7 @@ class SqlServerMergeWriter:
 
         finally:
             if not keep_files and staging_full_path:
-                self._cleanup_staging_files(staging_connection, staging_dir, staging_full_path)
+                self._cleanup_staging_files(staging_connection, staging_file, staging_full_path)
 
         return row_count
 
@@ -2508,6 +2508,51 @@ class SqlServerMergeWriter:
 
         self.ctx.debug("Executing BULK INSERT", table=target_table)
         self.connection.execute_sql(sql)
+
+    def _is_azure_sql_database(self) -> bool:
+        """
+        Check if connected to Azure SQL Database (not Synapse).
+
+        Azure SQL Database doesn't support PARQUET with OPENROWSET.
+        Azure Synapse does support PARQUET.
+
+        Returns:
+            True if Azure SQL Database, False for Synapse or on-prem SQL Server
+        """
+        try:
+            # Query to check database edition
+            sql = "SELECT SERVERPROPERTY('EngineEdition') AS EngineEdition"
+            result = self.connection.execute_sql(sql, fetch=True)
+
+            if result and len(result) > 0:
+                # Get the engine edition value
+                row = result[0]
+                if isinstance(row, dict):
+                    engine_edition = row.get("EngineEdition")
+                else:
+                    engine_edition = row[0] if row else None
+
+                # Engine Edition values:
+                # 5 = Azure SQL Database
+                # 6 = Azure Synapse Analytics (dedicated SQL pool)
+                # 8 = Azure SQL Managed Instance
+                # 1-4 = On-prem SQL Server editions
+                if engine_edition == 5:
+                    return True  # Azure SQL Database
+                elif engine_edition == 6:
+                    return False  # Azure Synapse - supports PARQUET
+                elif engine_edition == 8:
+                    return True  # Azure SQL MI - same limitations as Azure SQL DB
+
+            # Default: assume it might work (on-prem or unknown)
+            return False
+
+        except Exception as e:
+            self.ctx.warning(
+                "Could not detect database type, assuming Synapse/on-prem",
+                error=str(e),
+            )
+            return False
 
     def _cleanup_staging_files(
         self,

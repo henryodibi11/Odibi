@@ -2,15 +2,29 @@
 
 High-performance data loading to SQL Server using ADLS staging and BULK INSERT, achieving 10-50x faster writes compared to JDBC.
 
+## ⚠️ Important: Database Compatibility
+
+| Database | Bulk Copy Support |
+|----------|------------------|
+| **Azure Synapse Analytics** | ✅ Full support (PARQUET) |
+| **SQL Server 2022+** | ✅ Full support with PolyBase |
+| **Azure SQL Database** | ❌ Not supported |
+| **Azure SQL Managed Instance** | ❌ Not supported |
+
+**Why Azure SQL Database doesn't work:**
+- OPENROWSET doesn't support PARQUET format
+- BULK INSERT requires exact file paths (Spark writes partitioned directories)
+- No practical way to bulk load from cloud storage
+
+**For Azure SQL Database users:** Use standard JDBC writes (remove `bulk_copy: true`). Performance is typically ~1M rows/min which is sufficient for most use cases.
+
 ## Overview
 
-Traditional JDBC writes insert data row-by-row, which is slow for large datasets. Bulk copy:
+For **Azure Synapse** and **SQL Server 2022+**, bulk copy:
 
-1. Stages data as CSV files in Azure Data Lake Storage (ADLS)
-2. Uses SQL Server's `BULK INSERT` to load data directly from storage
-3. Leverages SQL Server's parallel loading capabilities for maximum throughput
-
-**Note:** CSV format is used because Azure SQL Database only supports CSV with BULK INSERT. PARQUET format is only available in Azure Synapse and SQL Server 2022+.
+1. Stages data as Parquet files in Azure Data Lake Storage (ADLS)
+2. Uses `OPENROWSET` with PARQUET format for parallel loading
+3. Achieves 10-50x faster writes compared to JDBC
 
 This approach is ideal for:
 - Loading millions of rows in seconds
