@@ -1065,6 +1065,9 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                             docstring_text = model.docstring.rstrip()
                             lines.append(docstring_text)
                             lines.append("")  # Blank line for proper markdown separation
+                            # Add extra blank line if docstring ends with code fence (mkdocs fix)
+                            if docstring_text.rstrip().endswith("```"):
+                                lines.append("")
 
                     lines.append("[Back to Catalog](#nodeconfig)")
                     lines.append("")
@@ -1149,6 +1152,9 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
                 docstring_text = model.docstring.rstrip()
                 lines.append(docstring_text)
                 lines.append("")  # Blank line after docstring for proper markdown separation
+                # Add extra blank line if docstring ends with code fence (mkdocs rendering fix)
+                if docstring_text.rstrip().endswith("```"):
+                    lines.append("")
                 if model.group == "Transformation":
                     lines.append("[Back to Catalog](#nodeconfig)")
                     lines.append("")

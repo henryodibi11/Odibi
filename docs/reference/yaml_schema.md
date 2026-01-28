@@ -38,6 +38,7 @@ alerts:
 # ... connections and pipelines ...
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **project** | str | Yes | - | Project name |
@@ -76,6 +77,7 @@ pipelines:
       - name: "node1"
         ...
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -376,6 +378,7 @@ These are the built-in functions you can use in two ways:
   # ...
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique node name |
@@ -453,6 +456,7 @@ system:
     path: _odibi_system_replica
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection for primary system tables. Must be blob storage (azure_blob) or local filesystem - NOT SQL Server. Delta tables require storage backends. |
@@ -480,6 +484,7 @@ sync_from:
   path: .odibi/system/
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name for the source system data |
@@ -504,6 +509,7 @@ local_data:
   type: "local"
   base_path: "./data"
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -544,6 +550,7 @@ delta_local:
 #   format: "delta"
 #   path: "bronze/orders"
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -598,6 +605,7 @@ adls_msi:
     client_id: "00000000-0000-0000-0000-000000000000"
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['azure_blob'] | No | `ConnectionType.AZURE_BLOB` | - |
@@ -640,6 +648,7 @@ sql_dw_login:
     password: "${DW_PASSWORD}"
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['sql_server'] | No | `ConnectionType.SQL_SERVER` | - |
@@ -667,6 +676,7 @@ api_source:
     mode: "bearer"
     token: "${API_TOKEN}"
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -866,6 +876,7 @@ time_travel:
   as_of_timestamp: "2023-10-01T12:00:00Z"
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **as_of_version** | Optional[int] | No | - | Version number to time travel to |
@@ -918,6 +929,7 @@ transform:
     - operation: "drop_duplicates"
       params: { subset: ["user_id"] }
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -987,6 +999,7 @@ transform:
         source_table: dbo.Customers
         soft_delete_col: null  # removes rows instead of flagging
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1072,6 +1085,7 @@ validation:
     on_fail: abort
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **mode** | ValidationAction | No | `ValidationAction.FAIL` | Execution mode: 'fail' (stop pipeline) or 'warn' (log only) |
@@ -1112,6 +1126,7 @@ validation:
     sample_fraction: 0.1
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection for quarantine writes |
@@ -1140,6 +1155,7 @@ quarantine:
     _failed_tests: true
     _original_node: false
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1175,6 +1191,7 @@ gate:
     change_threshold: 0.5
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **require_pass_rate** | float | No | `0.95` | Minimum percentage of rows passing ALL tests |
@@ -1200,6 +1217,7 @@ gate:
       min_pass_rate: 1.0
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **test** | str | Yes | - | Test name or type to apply threshold to |
@@ -1222,6 +1240,7 @@ gate:
     max: 1000000
     change_threshold: 0.5
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1275,6 +1294,7 @@ write:
     "delta.autoOptimize.optimizeWrite": "true"
     "delta.autoOptimize.autoCompact": "true"
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1391,6 +1411,7 @@ write:
       available_now: true
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **output_mode** | Literal['append', 'update', 'complete'] | No | `append` | Output mode for streaming writes. 'append' - Only new rows. 'update' - Updated rows only. 'complete' - Entire result table (requires aggregation). |
@@ -1420,6 +1441,7 @@ trigger:
   once: true
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **processing_time** | Optional[str] | No | - | Trigger interval as duration string (e.g., '10 seconds', '1 minute') |
@@ -1439,6 +1461,7 @@ auto_optimize:
   enabled: true
   vacuum_retention_hours: 168
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1505,6 +1528,7 @@ audit_cols:
   created_col: created_ts
   updated_col: updated_ts
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1582,6 +1606,7 @@ merge_options:
     fail_on_validation_error: true
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **check_null_keys** | bool | No | `True` | Fail if merge_keys contain NULL values |
@@ -1615,6 +1640,7 @@ write:
       updated_col: updated_ts
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **strategy** | SqlServerOverwriteStrategy | No | `SqlServerOverwriteStrategy.TRUNCATE_INSERT` | Overwrite strategy: truncate_insert, drop_create, delete_insert |
@@ -1645,6 +1671,7 @@ merge_options:
     mode: evolve
     add_columns: true
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1749,6 +1776,7 @@ contracts:
     values: [pending, approved, rejected]
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['accepted_values'] | No | `TestType.ACCEPTED_VALUES` | - |
@@ -1769,6 +1797,7 @@ contracts:
     condition: "amount > 0"
     threshold: 0.01  # Allow up to 1% failures
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1797,6 +1826,7 @@ contracts:
     on_fail: warn
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['distribution'] | No | `TestType.DISTRIBUTION` | - |
@@ -1823,6 +1853,7 @@ contracts:
     max_age: "24h"  # Fail if no data newer than 24 hours
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['freshness'] | No | `TestType.FRESHNESS` | - |
@@ -1846,6 +1877,7 @@ contracts:
   - type: not_null
     columns: [order_id, customer_id, created_at]
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1871,6 +1903,7 @@ contracts:
     min: 0
     max: 150
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1898,6 +1931,7 @@ contracts:
     pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['regex_match'] | No | `TestType.REGEX_MATCH` | - |
@@ -1922,6 +1956,7 @@ contracts:
     min: 1000
     max: 100000
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -1949,6 +1984,7 @@ contracts:
     strict: true  # Fail if extra columns present
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['schema'] | No | `TestType.SCHEMA` | - |
@@ -1974,6 +2010,7 @@ contracts:
   - type: unique
     columns: [customer_id, order_date]  # Composite uniqueness
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -2001,6 +2038,7 @@ contracts:
     lookback_days: 7
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['volume_drop'] | No | `TestType.VOLUME_DROP` | - |
@@ -2023,6 +2061,7 @@ lineage:
   url: "http://localhost:5000"
   namespace: "my_project"
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -2061,6 +2100,7 @@ alerts:
       channel: "#data-alerts"
 ```
 
+
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | AlertType | Yes | - | - |
@@ -2080,6 +2120,7 @@ logging:
   level: "INFO"
   structured: true
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -2133,6 +2174,7 @@ retry:
   max_attempts: 3
   backoff: "exponential"
 ```
+
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -2241,6 +2283,7 @@ add_prefix:
   columns: ["id", "name", "value"]
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2268,6 +2311,7 @@ add_suffix:
   columns: ["id", "name", "value"]
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2294,6 +2338,7 @@ case_when:
       value: "'Senior'"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2318,6 +2363,7 @@ cast_columns:
     tags: "ARRAY<STRING>"  # Raw SQL types allowed
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2337,6 +2383,7 @@ clean_text:
   trim: true
   case: "lower"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2367,6 +2414,7 @@ coalesce_columns:
   output_col: "last_change_at"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2389,6 +2437,7 @@ concat_columns:
   separator: " "
   output_col: "full_name"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2414,6 +2463,7 @@ convert_timezone:
   target_tz: "America/New_York"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2436,6 +2486,7 @@ date_add:
   value: 1
   unit: "day"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2460,6 +2511,7 @@ date_diff:
   unit: "day"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2480,6 +2532,7 @@ date_trunc:
   col: "created_at"
   unit: "month"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2538,6 +2591,7 @@ distinct:
   columns: ["category", "status"]
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2555,6 +2609,7 @@ Example:
 drop_columns:
   columns: ["_internal_id", "_temp_flag", "_processing_date"]
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2575,6 +2630,7 @@ extract_date_parts:
   prefix: "created"
   parts: ["year", "month"]
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2597,6 +2653,7 @@ fill_nulls:
     count: 0
     description: "N/A"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2625,6 +2682,7 @@ Example (Null Check):
 filter_rows:
   condition: "email IS NOT NULL AND email != ''"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2657,6 +2715,7 @@ limit:
   offset: 0
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2677,6 +2736,7 @@ normalize_column_names:
   style: "snake_case"
   lowercase: true
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2704,6 +2764,7 @@ normalize_schema:
   select_order: ["id", "new_col", "created_at"]
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2727,6 +2788,7 @@ rename_columns:
     order_date: date
     total_amount: amount
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2760,6 +2822,7 @@ replace_values:
     "UK": "GBR"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2792,6 +2855,7 @@ sample:
   seed: 42
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2810,6 +2874,7 @@ Example:
 select_columns:
   columns: ["id", "name", "created_at"]
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2842,6 +2907,7 @@ sort:
   ascending: false
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2862,6 +2928,7 @@ split_part:
   delimiter: "@"
   index: 2  # Extracts domain
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2888,6 +2955,7 @@ trim_whitespace:
   columns: ["name", "address", "city"]
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -2911,6 +2979,7 @@ aggregate:
     employee_id: "count"
     age: "avg"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2941,6 +3010,7 @@ join:
   how: "inner"
   prefix: "ord"  # Result cols: ord_date, ord_amount...
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -2975,6 +3045,7 @@ pivot:
   agg_col: "amount"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3005,6 +3076,7 @@ union:
   by_name: false
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3026,6 +3098,7 @@ unpivot:
   var_name: "month"
   value_name: "sales"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -3063,6 +3136,7 @@ params:
   type: "schema_match"
   inputs: ["staging_orders", "prod_orders"]
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -3344,6 +3418,7 @@ detect_sequential_phases:
   phases: [LoadTime, CookTime]
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3387,6 +3462,7 @@ deduplicate:
   order_by: "updated_at DESC"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3415,6 +3491,7 @@ dict_based_mapping:
   output_column: "status_desc"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3440,6 +3517,7 @@ explode_list_column:
   column: "items"
   outer: true  # Keep orders with empty items list
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -3509,6 +3587,7 @@ generate_surrogate_key:
   output_col: "unique_id"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3530,6 +3609,7 @@ geocode:
   output_col: "lat_long"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3549,6 +3629,7 @@ hash_columns:
   columns: ["email", "ssn"]
   algorithm: "sha256"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -3570,6 +3651,7 @@ normalize_json:
   sep: "_"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3590,6 +3672,7 @@ parse_json:
   json_schema: "id INT, name STRING"
   output_col: "parsed_struct"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -3616,6 +3699,7 @@ regex_replace:
   replacement: ""
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3637,6 +3721,7 @@ sessionize:
   user_col: "user_id"
   threshold_seconds: 1800
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -3688,6 +3773,7 @@ split_events_by_period:
       end: "06:00"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3711,6 +3797,7 @@ unpack_struct:
   column: "user_info"
 ```
 
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3731,6 +3818,7 @@ validate_and_flag:
     age_check: "age >= 0"
     email_format: "email LIKE '%@%'"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
@@ -3753,6 +3841,7 @@ window_calculation:
   partition_by: ["region"]
   order_by: "date ASC"
 ```
+
 
 [Back to Catalog](#nodeconfig)
 
