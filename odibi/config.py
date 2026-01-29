@@ -2103,6 +2103,14 @@ class SqlServerMergeOptions(BaseModel):
             "Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL)."
         ),
     )
+    force_recreate: bool = Field(
+        default=False,
+        description=(
+            "Force recreation of external data source and credential even if they exist. "
+            "Use when you've rotated SAS tokens or storage keys and need to update SQL Server. "
+            "Has no effect if auto_setup=False."
+        ),
+    )
     csv_options: Optional[Dict[str, str]] = Field(
         default=None,
         description=(
@@ -2281,6 +2289,14 @@ class SqlServerOverwriteOptions(BaseModel):
             "Auto-create SQL Server external data source and credential if they don't exist. "
             "Reads auth credentials from staging_connection and creates matching SQL objects. "
             "Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL)."
+        ),
+    )
+    force_recreate: bool = Field(
+        default=False,
+        description=(
+            "Force recreation of external data source and credential even if they exist. "
+            "Use when you've rotated SAS tokens or storage keys and need to update SQL Server. "
+            "Has no effect if auto_setup=False."
         ),
     )
     csv_options: Optional[Dict[str, str]] = Field(
