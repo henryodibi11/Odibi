@@ -3010,7 +3010,7 @@ class SqlServerMergeWriter:
         self,
         staging_connection: Any,
         external_data_source_name: str,
-        force_recreate: bool = True,
+        force_recreate: bool = False,
     ) -> bool:
         """
         Auto-create SQL Server external data source and credential for bulk copy.
@@ -3021,7 +3021,7 @@ class SqlServerMergeWriter:
         Args:
             staging_connection: ADLS/Blob connection with auth config
             external_data_source_name: Name for the external data source
-            force_recreate: If True, recreate even if exists (fixes misconfigured sources)
+            force_recreate: If True, recreate even if exists (default False for parallel safety)
 
         Returns:
             True if setup completed (created or already exists)
