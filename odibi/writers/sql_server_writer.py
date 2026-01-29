@@ -2727,6 +2727,7 @@ class SqlServerMergeWriter:
         else:
             # Standard BULK INSERT for CSV
             # Use hex row terminator 0x0a for Linux/Databricks-generated CSV files
+            # FIELDQUOTE handles embedded commas and special characters in quoted fields
             sql = f"""
             BULK INSERT {escaped_table}
             FROM '{staging_file}'
@@ -2735,7 +2736,8 @@ class SqlServerMergeWriter:
                 FORMAT = 'CSV',
                 FIRSTROW = 2,
                 FIELDTERMINATOR = ',',
-                ROWTERMINATOR = '0x0a'
+                ROWTERMINATOR = '0x0a',
+                FIELDQUOTE = '"'
             )
             """
 
