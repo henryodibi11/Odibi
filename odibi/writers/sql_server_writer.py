@@ -2753,8 +2753,8 @@ class SqlServerMergeWriter:
         else:
             # Standard BULK INSERT for CSV
             # Use hex row terminator 0x0a for Linux/Databricks-generated CSV files
-            # FIELDQUOTE handles embedded commas and special characters in quoted fields
-            # CODEPAGE 65001 = UTF-8 for proper Unicode character handling
+            # Note: FIELDQUOTE and CODEPAGE removed - they cause IID_IColumnsInfo errors
+            # on some Azure SQL configurations. FORMAT='CSV' handles quoting automatically.
             sql = f"""
             BULK INSERT {escaped_table}
             FROM '{staging_file}'
@@ -2763,9 +2763,7 @@ class SqlServerMergeWriter:
                 FORMAT = 'CSV',
                 FIRSTROW = 2,
                 FIELDTERMINATOR = ',',
-                ROWTERMINATOR = '0x0a',
-                FIELDQUOTE = '"',
-                CODEPAGE = '65001'
+                ROWTERMINATOR = '0x0a'
             )
             """
 
