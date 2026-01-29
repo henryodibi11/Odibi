@@ -3043,12 +3043,26 @@ class SqlServerMergeWriter:
 
     def _check_external_data_source_exists(self, name: str) -> bool:
         """Check if an external data source exists."""
-        sql = f"""
-        SELECT 1 FROM sys.external_data_sources
-        WHERE name = '{name}'
-        """
-        result = self.connection.execute_sql(sql)
-        return len(result) > 0 if result else False
+        try:
+            sql = f"""
+            SELECT 1 FROM sys.external_data_sources
+            WHERE name = '{name}'
+            """
+            result = self.connection.execute_sql(sql)
+            exists = len(result) > 0 if result else False
+            self.ctx.debug(
+                "Checked external data source existence",
+                name=name,
+                exists=exists,
+            )
+            return exists
+        except Exception as e:
+            self.ctx.warning(
+                "Failed to check external data source, will try to create",
+                name=name,
+                error=str(e)[:100],
+            )
+            return False
 
     def _ensure_master_key(self) -> None:
         """Ensure database master key exists."""
@@ -3122,6 +3136,13 @@ class SqlServerMergeWriter:
         credential_name: Optional[str] = None,
     ) -> None:
         """Create external data source for BULK operations."""
+        self.ctx.info(
+            "Creating external data source",
+            name=name,
+            location=location,
+            credential=credential_name,
+        )
+
         # Drop if exists
         drop_sql = f"""
         IF EXISTS (SELECT 1 FROM sys.external_data_sources WHERE name = '{name}')
@@ -3148,4 +3169,15 @@ class SqlServerMergeWriter:
                 LOCATION = '{location}'
             )
             """
-        self.connection.execute_sql(create_sql)
+
+        try:
+            self.connection.execute_sql(create_sql)
+            self.ctx.info("External data source created successfully", name=name)
+        except Exception as e:
+            self.ctx.error(
+                "Failed to create external data source",
+                name=name,
+                location=location,
+                error=str(e)[:200],
+            )
+            raise
