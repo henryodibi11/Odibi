@@ -881,10 +881,29 @@ class SparkEngine(Engine):
                 from odibi.writers.sql_server_writer import SqlServerMergeWriter
 
                 writer = SqlServerMergeWriter(connection)
+
+                # Check if bulk_copy is enabled for merge staging
+                staging_connection = None
+                if merge_options and getattr(merge_options, "bulk_copy", False):
+                    staging_conn_name = getattr(merge_options, "staging_connection", None)
+                    if not staging_conn_name:
+                        raise ValueError(
+                            "bulk_copy=True requires 'staging_connection' to be set. "
+                            "Specify an ADLS/Blob connection for staging files."
+                        )
+                    # Get staging connection from options (passed from node executor)
+                    staging_connection = options.get("_staging_connection")
+                    if not staging_connection:
+                        raise ValueError(
+                            f"Staging connection '{staging_conn_name}' not found. "
+                            "Ensure the connection is defined in your project config."
+                        )
+
                 ctx.debug(
                     "Executing SQL Server MERGE",
                     target=table,
                     merge_keys=merge_keys,
+                    bulk_copy=staging_connection is not None,
                 )
 
                 try:
@@ -895,6 +914,7 @@ class SparkEngine(Engine):
                         merge_keys=merge_keys,
                         options=merge_options,
                         jdbc_options=jdbc_options,
+                        staging_connection=staging_connection,
                     )
                     elapsed = (time.time() - start_time) * 1000
                     ctx.log_file_io(path=target_identifier, format=format, mode="write")

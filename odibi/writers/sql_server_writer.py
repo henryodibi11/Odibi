@@ -1410,6 +1410,7 @@ class SqlServerMergeWriter:
         merge_keys: List[str],
         options: Optional[SqlServerMergeOptions] = None,
         jdbc_options: Optional[Dict[str, Any]] = None,
+        staging_connection: Optional[Any] = None,
     ) -> MergeResult:
         """
         Execute full merge operation: validation + staging write + MERGE.
@@ -1421,6 +1422,7 @@ class SqlServerMergeWriter:
             merge_keys: Key columns for ON clause
             options: Merge options
             jdbc_options: JDBC connection options
+            staging_connection: Optional ADLS/Blob connection for bulk copy staging
 
         Returns:
             MergeResult with counts
@@ -1598,14 +1600,32 @@ class SqlServerMergeWriter:
                     self.ctx.info("No changed rows detected, skipping merge")
                     return MergeResult(inserted=0, updated=0, deleted=0)
 
-        # useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol (5-10x faster)
-        staging_jdbc_options = {
-            **jdbc_options,
-            "dbtable": staging_table,
-            "batchsize": str(options.batch_size or 10000),
-            "useBulkCopyForBatchInsert": "true",
-        }
-        df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode("overwrite").save()
+        # Write to staging table - use bulk_copy if enabled, otherwise JDBC
+        if options.bulk_copy and staging_connection:
+            # Bulk copy mode: write to ADLS, then BULK INSERT to staging table
+            self.ctx.info(
+                "Using bulk copy for staging table load",
+                staging_connection=options.staging_connection,
+            )
+
+            self.bulk_copy_to_staging_spark(
+                df=df_to_write,
+                staging_table=staging_table,
+                staging_connection=staging_connection,
+                external_data_source=options.external_data_source,
+                options=options,
+            )
+        else:
+            # Standard JDBC write - useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol
+            staging_jdbc_options = {
+                **jdbc_options,
+                "dbtable": staging_table,
+                "batchsize": str(options.batch_size or 10000),
+                "useBulkCopyForBatchInsert": "true",
+            }
+            df_to_write.write.format("jdbc").options(**staging_jdbc_options).mode(
+                "overwrite"
+            ).save()
 
         self.ctx.debug("Staging write completed", staging_table=staging_table)
 
@@ -2400,39 +2420,62 @@ class SqlServerMergeWriter:
         row_count = df.count()
 
         # Check if this is Azure SQL Database (not Synapse)
-        # Azure SQL Database doesn't support PARQUET with OPENROWSET
+        # Azure SQL Database doesn't support PARQUET with OPENROWSET, so use CSV
         is_azure_sql_db = self._is_azure_sql_database()
 
-        if is_azure_sql_db:
-            raise NotImplementedError(
-                "bulk_copy is not supported for Azure SQL Database.\n\n"
-                "Azure SQL Database limitations:\n"
-                "  - OPENROWSET doesn't support PARQUET format\n"
-                "  - BULK INSERT requires exact file paths (no wildcards)\n"
-                "  - Spark writes partitioned files which don't work with BULK INSERT\n\n"
-                "Solutions:\n"
-                "  1. Remove 'bulk_copy: true' to use standard JDBC writes\n"
-                "  2. Use Azure Synapse Analytics for true bulk loading (PARQUET supported)\n"
-                "  3. Use Azure Data Factory for bulk data movement\n\n"
-                "Standard JDBC writes work well for most use cases (~1M rows/min)."
-            )
-
-        # For Azure Synapse or SQL Server 2022+, use PARQUET with OPENROWSET
         staging_full_path = None
         try:
-            staging_full_path = staging_connection.get_path(staging_file)
-            self.ctx.debug("Writing staging file (Parquet)", path=staging_full_path)
-            df.write.mode("overwrite").parquet(staging_full_path)
+            if is_azure_sql_db:
+                # Azure SQL Database: Use CSV format with single file
+                staging_file = staging_file.replace(".parquet", ".csv")
+                staging_full_path = staging_connection.get_path(staging_file)
+                self.ctx.debug(
+                    "Writing staging file (CSV for Azure SQL DB)",
+                    path=staging_full_path,
+                )
+                # Coalesce to single file for BULK INSERT compatibility
+                # Use robust CSV options to handle special characters
+                self._write_csv_for_bulk_insert(df, staging_full_path)
 
-            if table_exists:
-                self.truncate_table(target_table)
+                # Find the actual CSV file (Spark creates a directory with part files)
+                actual_csv_file = self._find_single_csv_file(staging_connection, staging_full_path)
+                if actual_csv_file:
+                    staging_file = actual_csv_file.replace(
+                        staging_connection.get_path(""), ""
+                    ).lstrip("/")
 
-            self._execute_bulk_insert(
-                target_table=target_table,
-                external_data_source=external_data_source,
-                staging_file=staging_file,
-                file_format="PARQUET",
-            )
+                if table_exists:
+                    self.truncate_table(target_table)
+
+                try:
+                    self._execute_bulk_insert(
+                        target_table=target_table,
+                        external_data_source=external_data_source,
+                        staging_file=staging_file,
+                        file_format="CSV",
+                    )
+                except Exception as bulk_error:
+                    self.ctx.warning(
+                        "BULK INSERT failed, this may be due to CSV parsing issues",
+                        error=str(bulk_error)[:200],
+                        suggestion="Check for special characters in data",
+                    )
+                    raise
+            else:
+                # Azure Synapse or SQL Server 2022+: use PARQUET with OPENROWSET
+                staging_full_path = staging_connection.get_path(staging_file)
+                self.ctx.debug("Writing staging file (Parquet)", path=staging_full_path)
+                df.write.mode("overwrite").parquet(staging_full_path)
+
+                if table_exists:
+                    self.truncate_table(target_table)
+
+                self._execute_bulk_insert(
+                    target_table=target_table,
+                    external_data_source=external_data_source,
+                    staging_file=staging_file,
+                    file_format="PARQUET",
+                )
 
             self.ctx.info(
                 "Bulk copy completed (Spark)",
@@ -2512,27 +2555,61 @@ class SqlServerMergeWriter:
         row_count = df.count()
 
         # Check if this is Azure SQL Database (not Synapse)
-        if self._is_azure_sql_database():
-            raise NotImplementedError(
-                "bulk_copy for MERGE is not supported for Azure SQL Database.\n\n"
-                "Remove 'bulk_copy: true' from merge_options to use standard JDBC staging."
-            )
+        is_azure_sql_db = self._is_azure_sql_database()
 
         staging_full_path = None
         try:
-            staging_full_path = staging_connection.get_path(staging_file)
-            df.write.mode("overwrite").parquet(staging_full_path)
+            if is_azure_sql_db:
+                # Azure SQL Database: Use CSV format with single file
+                staging_file = staging_file.replace(".parquet", ".csv")
+                staging_full_path = staging_connection.get_path(staging_file)
+                self.ctx.debug(
+                    "Writing staging file (CSV for Azure SQL DB)",
+                    path=staging_full_path,
+                )
+                # Use robust CSV options to handle special characters
+                self._write_csv_for_bulk_insert(df, staging_full_path)
 
-            if not self.check_table_exists(staging_table):
-                self.create_table_from_spark(df, staging_table)
+                # Find the actual CSV file (Spark creates a directory with part files)
+                actual_csv_file = self._find_single_csv_file(staging_connection, staging_full_path)
+                if actual_csv_file:
+                    staging_file = actual_csv_file.replace(
+                        staging_connection.get_path(""), ""
+                    ).lstrip("/")
 
-            self.truncate_staging(staging_table)
-            self._execute_bulk_insert(
-                target_table=staging_table,
-                external_data_source=external_data_source,
-                staging_file=staging_file,
-                file_format="PARQUET",
-            )
+                if not self.check_table_exists(staging_table):
+                    self.create_table_from_spark(df, staging_table)
+
+                self.truncate_staging(staging_table)
+                try:
+                    self._execute_bulk_insert(
+                        target_table=staging_table,
+                        external_data_source=external_data_source,
+                        staging_file=staging_file,
+                        file_format="CSV",
+                    )
+                except Exception as bulk_error:
+                    self.ctx.warning(
+                        "BULK INSERT to staging failed, this may be due to CSV parsing issues",
+                        error=str(bulk_error)[:200],
+                        suggestion="Check for special characters in data or disable bulk_copy",
+                    )
+                    raise
+            else:
+                # Azure Synapse or SQL Server 2022+: use PARQUET
+                staging_full_path = staging_connection.get_path(staging_file)
+                df.write.mode("overwrite").parquet(staging_full_path)
+
+                if not self.check_table_exists(staging_table):
+                    self.create_table_from_spark(df, staging_table)
+
+                self.truncate_staging(staging_table)
+                self._execute_bulk_insert(
+                    target_table=staging_table,
+                    external_data_source=external_data_source,
+                    staging_file=staging_file,
+                    file_format="PARQUET",
+                )
 
             self.ctx.debug(
                 "Staging table bulk load completed",
@@ -2635,6 +2712,108 @@ class SqlServerMergeWriter:
                 error=str(e),
             )
             return False
+
+    def _write_csv_for_bulk_insert(
+        self,
+        df: Any,
+        output_path: str,
+    ) -> None:
+        """
+        Write Spark DataFrame to CSV with robust options for BULK INSERT.
+
+        Uses settings that handle:
+        - Embedded quotes, commas, newlines in string fields
+        - NULL values
+        - Unicode characters
+
+        Args:
+            df: Spark DataFrame to write
+            output_path: ADLS/Blob path to write to
+        """
+        (
+            df.coalesce(1)
+            .write.mode("overwrite")
+            .option("header", "true")
+            .option("quote", '"')
+            .option("escape", '"')
+            .option("escapeQuotes", "true")
+            .option("nullValue", "")
+            .option("emptyValue", "")
+            .option("encoding", "UTF-8")
+            .option("lineSep", "\n")
+            .csv(output_path)
+        )
+        self.ctx.debug("CSV file written with robust options", path=output_path)
+
+    def _find_single_csv_file(
+        self,
+        staging_connection: Any,
+        directory_path: str,
+    ) -> Optional[str]:
+        """
+        Find the single CSV file written by Spark in a directory.
+
+        Spark writes CSV to a directory with part files like:
+        - part-00000-xxx.csv
+        - _SUCCESS
+        - _committed_xxx
+
+        This method finds the actual data file.
+
+        Args:
+            staging_connection: ADLS/Blob connection
+            directory_path: Path to the directory Spark wrote to
+
+        Returns:
+            Full path to the CSV file, or None if not found
+        """
+        try:
+            import fsspec
+
+            conn_config = staging_connection.config
+            account_name = getattr(conn_config, "account_name", None)
+            auth = getattr(conn_config, "auth", None)
+
+            storage_options = {"account_name": account_name}
+
+            auth_mode = getattr(auth, "mode", None) if auth else None
+            if auth_mode == "account_key":
+                storage_options["account_key"] = getattr(auth, "account_key", None)
+            elif auth_mode == "sas":
+                storage_options["sas_token"] = getattr(auth, "sas_token", None)
+
+            fs = fsspec.filesystem("abfs", **storage_options)
+
+            # List files in directory
+            files = fs.ls(directory_path)
+            for f in files:
+                if isinstance(f, dict):
+                    f = f.get("name", "")
+                # Find the part file (the actual CSV data)
+                if "part-" in f and f.endswith(".csv"):
+                    self.ctx.debug("Found CSV part file", file=f)
+                    return f
+
+            self.ctx.warning(
+                "No CSV part file found in directory",
+                directory=directory_path,
+                files=files[:5] if files else [],
+            )
+            return None
+
+        except ImportError:
+            self.ctx.warning(
+                "fsspec not available, cannot find CSV file",
+                suggestion="pip install fsspec adlfs",
+            )
+            return None
+        except Exception as e:
+            self.ctx.warning(
+                "Failed to find CSV file in directory",
+                directory=directory_path,
+                error=str(e),
+            )
+            return None
 
     def _cleanup_staging_files(
         self,
