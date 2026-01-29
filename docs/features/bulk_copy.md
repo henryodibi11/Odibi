@@ -19,31 +19,32 @@ Odibi provides two levels of SQL Server write optimization:
 
 This uses Microsoft's JDBC driver bulk copy protocol - faster than row-by-row inserts, no external staging required.
 
-### 2. File-Based Bulk Copy (Synapse/SQL Server 2022+ Only)
+### 2. File-Based Bulk Copy (All Azure SQL Platforms)
 
-For maximum performance with very large datasets, use `bulk_copy: true` to stage data as Parquet files in ADLS and load via `OPENROWSET`.
+For maximum performance with very large datasets, use `bulk_copy: true` to stage data in ADLS and load via `BULK INSERT`.
 
-| Database | Support | Speedup |
-|----------|---------|---------|
-| **Azure Synapse Analytics** | ✅ Full support | 10-50x |
-| **SQL Server 2022+** | ✅ With PolyBase | 10-50x |
-| **Azure SQL Database** | ❌ Not supported | - |
-| **Azure SQL Managed Instance** | ❌ Not supported | - |
+| Database | Format | Support | Speedup |
+|----------|--------|---------|---------|
+| **Azure Synapse Analytics** | Parquet | ✅ Full support | 10-50x |
+| **SQL Server 2022+** | Parquet | ✅ With PolyBase | 10-50x |
+| **Azure SQL Database** | CSV | ✅ Supported | 10-50x |
+| **Azure SQL Managed Instance** | CSV | ✅ Supported | 10-50x |
 
-**Why file-based bulk copy doesn't work with Azure SQL Database:**
-- `OPENROWSET` doesn't support PARQUET format
-- `BULK INSERT` requires exact file paths (Spark writes partitioned directories)
-- No practical way to bulk load from cloud storage
+**Auto-detection:** Odibi automatically detects your database type and uses the optimal format:
+- **Synapse/SQL Server 2022+**: Parquet (faster, columnar)
+- **Azure SQL DB/MI**: CSV with proper escaping and `0x0a` row terminators for Linux compatibility
 
-**For Azure SQL Database users:** You automatically get the JDBC bulk copy protocol (5-10x faster). For most workloads, this is sufficient.
+**First-run optimization:** On initial load (empty target table), odibi skips the staging table and MERGE, doing a direct BULK INSERT to target for maximum speed.
 
 ## Overview
 
-For **Azure Synapse** and **SQL Server 2022+**, bulk copy:
+Bulk copy works by:
 
-1. Stages data as Parquet files in Azure Data Lake Storage (ADLS)
-2. Uses `OPENROWSET` with PARQUET format for parallel loading
-3. Achieves 10-50x faster writes compared to JDBC
+1. Writing data to Azure Data Lake Storage (ADLS) as a staging file
+2. Using SQL Server `BULK INSERT` to load directly from blob storage
+3. Achieving 10-50x faster writes compared to JDBC
+
+The format is auto-selected based on your database type (Parquet for Synapse, CSV for Azure SQL DB).
 
 This approach is ideal for:
 - Loading millions of rows in seconds
@@ -275,18 +276,25 @@ connections:
       account_key: ${STORAGE_ACCOUNT_KEY}
 ```
 
-### SAS Token
+### SAS Token (Recommended for Azure SQL DB)
+
+**Important:** For Azure SQL Database BULK INSERT, use SAS token authentication. The SAS token must have:
+- **Resource types:** Container AND Object (both required)
+- **Permissions:** Read, List
 
 ```yaml
 connections:
   adls_staging:
-    type: azure_blob
+    type: azure_adls  # or azure_blob
     account_name: mystorageaccount
     container: datalake
     auth:
-      mode: sas
-      sas_token: ${STORAGE_SAS_TOKEN}
+      mode: sas_token
+      sas_token: ${STORAGE_SAS_TOKEN}  # Without leading '?' - odibi handles it
 ```
+
+The external data source location must include the container:
+`https://account.blob.core.windows.net/container`
 
 ### Managed Identity (Azure SQL Only)
 
@@ -372,9 +380,28 @@ If `keep_staging_files: false` but files remain:
 - Check the staging connection has delete permissions
 - Check logs for cleanup errors
 
+## Technical Details
+
+### CSV Format for Azure SQL DB
+
+When targeting Azure SQL Database, odibi writes CSV files with:
+- **Quote character:** `"`
+- **Escape character:** `"` (doubled quotes)
+- **Row terminator:** `0x0a` (hex format for Linux/Databricks compatibility)
+- **Encoding:** UTF-8
+
+These settings ensure proper handling of embedded quotes, newlines, and special characters.
+
+### ODBC Driver
+
+For Databricks, use ODBC Driver 18 (preferred over 17):
+- TLS 1.3 support
+- Better connection resilience
+- Note: May require `TrustServerCertificate=yes` for Azure SQL
+
 ## Limitations
 
-- **Spark engine only**: Bulk copy requires PySpark for JDBC connection pooling
+- **Spark engine only**: Bulk copy requires PySpark for Parquet/CSV writing
 - **ADLS/Blob staging required**: Cannot use local filesystem for staging
 - **SQL Server 2017+**: Requires external data source support
 
