@@ -2682,7 +2682,7 @@ class SqlServerMergeWriter:
         try:
             # Query to check database edition
             sql = "SELECT SERVERPROPERTY('EngineEdition') AS EngineEdition"
-            result = self.connection.execute_sql(sql, fetch=True)
+            result = self.connection.execute_sql(sql)
 
             if result and len(result) > 0:
                 # Get the engine edition value
@@ -3014,14 +3014,14 @@ class SqlServerMergeWriter:
         SELECT 1 FROM sys.external_data_sources
         WHERE name = '{name}'
         """
-        result = self.connection.execute_sql(sql, fetch=True)
+        result = self.connection.execute_sql(sql)
         return len(result) > 0 if result else False
 
     def _ensure_master_key(self) -> None:
         """Ensure database master key exists."""
         # Check if master key exists
         check_sql = "SELECT 1 FROM sys.symmetric_keys WHERE name = '##MS_DatabaseMasterKey##'"
-        result = self.connection.execute_sql(check_sql, fetch=True)
+        result = self.connection.execute_sql(check_sql)
 
         if not result or len(result) == 0:
             # Create master key with random password (not exposed)
