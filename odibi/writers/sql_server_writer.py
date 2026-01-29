@@ -2850,8 +2850,8 @@ class SqlServerMergeWriter:
             output_path: ADLS/Blob path to write to
             custom_options: Optional dict of CSV options to override defaults
         """
-        from pyspark.sql.functions import col, regexp_replace
-        from pyspark.sql.types import StringType
+        from pyspark.sql.functions import col, regexp_replace, when
+        from pyspark.sql.types import StringType, DecimalType
 
         # Sanitize string columns: replace newlines and carriage returns with spaces
         # SQL Server BULK INSERT can't handle embedded newlines in CSV fields
@@ -2864,6 +2864,17 @@ class SqlServerMergeWriter:
                         regexp_replace(col(field.name), r"\r\n", " "),
                         r"[\r\n]",
                         " ",
+                    ),
+                )
+            elif isinstance(field.dataType, DecimalType):
+                # Cast decimal to string to avoid scientific notation (e.g., 3.479E-7)
+                # SQL Server BULK INSERT can't parse scientific notation
+                # format_number handles this but adds commas, so we use cast + regex
+                scale = field.dataType.scale or 14
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).otherwise(
+                        col(field.name).cast(f"decimal(38,{scale})").cast("string")
                     ),
                 )
 
