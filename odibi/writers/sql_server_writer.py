@@ -2381,8 +2381,22 @@ class SqlServerMergeWriter:
                 )
 
         # Auto-setup external data source if needed
+        self.ctx.info(
+            "Bulk copy overwrite setup check",
+            auto_setup=options.auto_setup,
+            external_data_source=external_data_source,
+            staging_connection_type=type(staging_connection).__name__,
+        )
         if options.auto_setup:
-            self.setup_bulk_copy_external_source(staging_connection, external_data_source)
+            try:
+                self.setup_bulk_copy_external_source(staging_connection, external_data_source)
+            except Exception as setup_error:
+                self.ctx.error(
+                    "Failed to setup bulk copy external data source (overwrite)",
+                    error=str(setup_error),
+                    external_data_source=external_data_source,
+                )
+                raise
 
         # Build staging path with context for organization and debugging
         staging_path_prefix = options.staging_path or "odibi_staging/bulk"
@@ -2531,8 +2545,22 @@ class SqlServerMergeWriter:
                 )
 
         # Auto-setup external data source if needed
+        self.ctx.info(
+            "Bulk copy merge staging setup check",
+            auto_setup=options.auto_setup,
+            external_data_source=external_data_source,
+            staging_connection_type=type(staging_connection).__name__,
+        )
         if options.auto_setup:
-            self.setup_bulk_copy_external_source(staging_connection, external_data_source)
+            try:
+                self.setup_bulk_copy_external_source(staging_connection, external_data_source)
+            except Exception as setup_error:
+                self.ctx.error(
+                    "Failed to setup bulk copy external data source (merge staging)",
+                    error=str(setup_error),
+                    external_data_source=external_data_source,
+                )
+                raise
 
         # Build staging path with context for organization and debugging
         staging_path_prefix = options.staging_path or "odibi_staging/bulk"
@@ -2935,6 +2963,7 @@ class SqlServerMergeWriter:
         self,
         staging_connection: Any,
         external_data_source_name: str,
+        force_recreate: bool = True,
     ) -> bool:
         """
         Auto-create SQL Server external data source and credential for bulk copy.
@@ -2945,6 +2974,7 @@ class SqlServerMergeWriter:
         Args:
             staging_connection: ADLS/Blob connection with auth config
             external_data_source_name: Name for the external data source
+            force_recreate: If True, recreate even if exists (fixes misconfigured sources)
 
         Returns:
             True if setup completed (created or already exists)
@@ -2952,13 +2982,26 @@ class SqlServerMergeWriter:
         Raises:
             ValueError: If auth method is not supported for auto-setup
         """
+        self.ctx.info(
+            "Checking bulk copy external data source setup",
+            name=external_data_source_name,
+            force_recreate=force_recreate,
+        )
+
         # Check if external data source already exists
-        if self._check_external_data_source_exists(external_data_source_name):
-            self.ctx.debug(
-                "External data source already exists",
+        exists = self._check_external_data_source_exists(external_data_source_name)
+        if exists and not force_recreate:
+            self.ctx.info(
+                "External data source already exists, skipping setup",
                 name=external_data_source_name,
             )
             return True
+
+        if exists:
+            self.ctx.info(
+                "External data source exists but force_recreate=True, will recreate",
+                name=external_data_source_name,
+            )
 
         # Extract connection details - AzureADLS stores properties directly
         account_name = getattr(staging_connection, "account", None)
@@ -2998,7 +3041,13 @@ class SqlServerMergeWriter:
             # Remove leading '?' if present
             if sas_token.startswith("?"):
                 sas_token = sas_token[1:]
+            self.ctx.info(
+                "Creating SAS token credential",
+                credential_name=credential_name,
+                sas_token_prefix=sas_token[:20] + "..." if len(sas_token) > 20 else sas_token,
+            )
             self._create_credential_with_sas(credential_name, sas_token)
+            self.ctx.info("SAS token credential created successfully")
 
         elif auth_mode == "managed_identity":
             # For MSI, create external data source without credential
@@ -3080,22 +3129,18 @@ class SqlServerMergeWriter:
             self.ctx.debug("Created database master key")
 
     def _create_credential_with_key(self, name: str, key: str) -> None:
-        """Create database scoped credential with storage account key."""
-        # Drop if exists
-        drop_sql = f"""
-        IF EXISTS (SELECT 1 FROM sys.database_scoped_credentials WHERE name = '{name}')
-            DROP DATABASE SCOPED CREDENTIAL [{name}]
-        """
-        self.connection.execute_sql(drop_sql)
+        """Create database scoped credential with storage account key.
 
-        # Create credential - for account key, use SHARED ACCESS SIGNATURE identity
-        create_sql = f"""
-        CREATE DATABASE SCOPED CREDENTIAL [{name}]
-        WITH IDENTITY = 'SHARED ACCESS SIGNATURE',
-        SECRET = '{key}'
+        NOTE: Azure SQL Database BULK INSERT only supports SAS tokens, not account keys.
+        This method generates a user-delegation SAS or advises using sas_token auth mode.
         """
-        self.connection.execute_sql(create_sql)
-        self.ctx.debug("Created credential with account key", name=name)
+        # Azure SQL BULK INSERT does NOT support storage account keys directly.
+        # The IDENTITY='SHARED ACCESS SIGNATURE' only works with actual SAS tokens.
+        raise ValueError(
+            "Azure SQL Database BULK INSERT does not support storage account keys (direct_key). "
+            "Please use auth_mode='sas_token' with a valid SAS token, or auth_mode='managed_identity'. "
+            "You can generate a SAS token in Azure Portal: Storage Account → Shared Access Signature."
+        )
 
     def _create_credential_with_sas(self, name: str, sas_token: str) -> None:
         """Create database scoped credential with SAS token."""
