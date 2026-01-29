@@ -3002,6 +3002,9 @@ class SqlServerMergeWriter:
                 "External data source exists but force_recreate=True, will recreate",
                 name=external_data_source_name,
             )
+            # MUST drop external data source FIRST before dropping credential
+            # because the data source references the credential
+            self._drop_external_data_source(external_data_source_name)
 
         # Extract connection details - AzureADLS stores properties directly
         account_name = getattr(staging_connection, "account", None)
@@ -3112,6 +3115,16 @@ class SqlServerMergeWriter:
                 error=str(e)[:100],
             )
             return False
+
+    def _drop_external_data_source(self, name: str) -> None:
+        """Drop external data source if it exists."""
+        self.ctx.info("Dropping external data source", name=name)
+        drop_sql = f"""
+        IF EXISTS (SELECT 1 FROM sys.external_data_sources WHERE name = '{name}')
+            DROP EXTERNAL DATA SOURCE [{name}]
+        """
+        self.connection.execute_sql(drop_sql)
+        self.ctx.info("External data source dropped", name=name)
 
     def _ensure_master_key(self) -> None:
         """Ensure database master key exists."""
