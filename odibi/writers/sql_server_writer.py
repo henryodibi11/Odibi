@@ -2440,9 +2440,9 @@ class SqlServerMergeWriter:
                 # Find the actual CSV file (Spark creates a directory with part files)
                 actual_csv_file = self._find_single_csv_file(staging_connection, staging_full_path)
                 if actual_csv_file:
-                    staging_file = actual_csv_file.replace(
-                        staging_connection.get_path(""), ""
-                    ).lstrip("/")
+                    staging_file = self._extract_relative_path_from_fsspec(
+                        actual_csv_file, staging_connection
+                    )
 
                 if table_exists:
                     self.truncate_table(target_table)
@@ -2574,9 +2574,9 @@ class SqlServerMergeWriter:
                 # Find the actual CSV file (Spark creates a directory with part files)
                 actual_csv_file = self._find_single_csv_file(staging_connection, staging_full_path)
                 if actual_csv_file:
-                    staging_file = actual_csv_file.replace(
-                        staging_connection.get_path(""), ""
-                    ).lstrip("/")
+                    staging_file = self._extract_relative_path_from_fsspec(
+                        actual_csv_file, staging_connection
+                    )
 
                 if not self.check_table_exists(staging_table):
                     self.create_table_from_spark(df, staging_table)
@@ -2732,6 +2732,25 @@ class SqlServerMergeWriter:
                 error=str(e)[:100],
             )
             return True
+
+    def _extract_relative_path_from_fsspec(self, fsspec_path: str, staging_connection: Any) -> str:
+        """
+        Extract relative path from fsspec path for BULK INSERT.
+
+        fsspec returns paths like 'container/path/to/file.csv'
+        We need just 'path/to/file.csv' relative to container root.
+
+        Args:
+            fsspec_path: Path returned by fsspec (e.g., 'container/folder/file.csv')
+            staging_connection: ADLS connection to get container name
+
+        Returns:
+            Relative path suitable for BULK INSERT
+        """
+        container = getattr(staging_connection, "container", "")
+        if fsspec_path.startswith(f"{container}/"):
+            return fsspec_path[len(container) + 1 :]
+        return fsspec_path
 
     def _write_csv_for_bulk_insert(
         self,
