@@ -2874,6 +2874,31 @@ class SqlServerMergeWriter:
             output_path: ADLS/Blob path to write to
             custom_options: Optional dict of CSV options to override defaults
         """
+        # TEMPORARY DEBUG: Skip all sanitization to test if it's causing 7301 error
+        # Set to False to re-enable sanitization
+        SKIP_SANITIZATION = True
+
+        if SKIP_SANITIZATION:
+            self.ctx.warning("BULK INSERT sanitization DISABLED for debugging")
+            default_options = {
+                "header": "true",
+                "quote": '"',
+                "escape": '"',
+                "escapeQuotes": "true",
+                "nullValue": "",
+                "emptyValue": "",
+                "encoding": "UTF-8",
+                "lineSep": "\n",
+            }
+            if custom_options:
+                default_options.update(custom_options)
+            writer = df.coalesce(1).write.mode("overwrite")
+            for key, value in default_options.items():
+                writer = writer.option(key, value)
+            writer.csv(output_path)
+            self.ctx.debug("Wrote CSV without sanitization", path=output_path)
+            return
+
         from pyspark.sql.functions import col, regexp_replace, when, date_format, format_string
         from pyspark.sql.types import (
             StringType,
