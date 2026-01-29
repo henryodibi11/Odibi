@@ -1437,7 +1437,8 @@ class SqlServerMergeWriter:
                 self.create_schema(schema)
 
         # Check if table exists, auto-create if configured
-        if not self.check_table_exists(target_table):
+        table_exists = self.check_table_exists(target_table)
+        if not table_exists:
             if options.auto_create_table:
                 self.ctx.info(
                     "Auto-creating target table from Spark DataFrame",
@@ -1454,19 +1455,36 @@ class SqlServerMergeWriter:
                         excluded=options.exclude_columns,
                     )
 
-                # Create table using JDBC write with overwrite mode (initial load)
-                # useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol (5-10x faster)
-                staging_jdbc_options = {
-                    **jdbc_options,
-                    "dbtable": target_table,
-                    "batchsize": str(options.batch_size or 10000),
-                    "useBulkCopyForBatchInsert": "true",
-                }
-                df_for_create.write.format("jdbc").options(**staging_jdbc_options).mode(
-                    "overwrite"
-                ).save()
-
-                row_count = df_for_create.count()
+                # Use bulk_copy for initial load if enabled (much faster for large datasets)
+                if options.bulk_copy and staging_connection:
+                    self.ctx.info(
+                        "Using BULK INSERT for initial load (first run optimization)",
+                        staging_connection=options.staging_connection,
+                    )
+                    # Create empty table first, then bulk insert
+                    self.create_table_from_spark(df_for_create, target_table)
+                    result = self.bulk_copy_spark(
+                        df=df_for_create,
+                        target_table=target_table,
+                        staging_connection=staging_connection,
+                        external_data_source=options.external_data_source,
+                        auto_setup=options.auto_setup,
+                        keep_files=options.keep_staging_files,
+                    )
+                    row_count = result.rows_written
+                else:
+                    # Fallback: JDBC write with overwrite mode (initial load)
+                    # useBulkCopyForBatchInsert enables MS JDBC bulk copy protocol (5-10x faster)
+                    staging_jdbc_options = {
+                        **jdbc_options,
+                        "dbtable": target_table,
+                        "batchsize": str(options.batch_size or 10000),
+                        "useBulkCopyForBatchInsert": "true",
+                    }
+                    df_for_create.write.format("jdbc").options(**staging_jdbc_options).mode(
+                        "overwrite"
+                    ).save()
+                    row_count = df_for_create.count()
 
                 # Add audit columns if configured (JDBC doesn't create them automatically)
                 if options.audit_cols:
@@ -1689,6 +1707,10 @@ class SqlServerMergeWriter:
         table_exists = self.check_table_exists(target_table)
         if not table_exists:
             if options.auto_create_table:
+                self.ctx.info(
+                    "Auto-creating target table and loading initial data (Pandas)",
+                    target_table=target_table,
+                )
                 self.create_table_from_pandas(df, target_table, audit_cols=options.audit_cols)
                 if options.primary_key_on_merge_keys or options.index_on_merge_keys:
                     # Fix MAX columns in merge keys - SQL Server can't index MAX types
@@ -1697,6 +1719,22 @@ class SqlServerMergeWriter:
                     self.create_primary_key(target_table, merge_keys)
                 elif options.index_on_merge_keys:
                     self.create_index(target_table, merge_keys)
+
+                # First run optimization: direct INSERT instead of staging + MERGE
+                schema, table_name = self.parse_table_name(target_table)
+                row_count = len(df)
+                self.connection.write_table(
+                    df=df,
+                    table_name=table_name,
+                    schema=schema,
+                    if_exists="append",
+                )
+                self.ctx.info(
+                    "Initial data loaded directly (skipped MERGE)",
+                    target_table=target_table,
+                    rows=row_count,
+                )
+                return MergeResult(inserted=row_count, updated=0, deleted=0)
             else:
                 raise ValueError(
                     f"Target table '{target_table}' does not exist. "
@@ -2712,7 +2750,8 @@ class SqlServerMergeWriter:
         """
         try:
             # Query to check database edition
-            sql = "SELECT SERVERPROPERTY('EngineEdition') AS EngineEdition"
+            # Cast to int to avoid pyodbc sql_variant type error (-150)
+            sql = "SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS EngineEdition"
             result = self.connection.execute_sql(sql)
 
             if result and len(result) > 0:
