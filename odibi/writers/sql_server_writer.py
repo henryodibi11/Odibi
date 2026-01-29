@@ -2465,6 +2465,16 @@ class SqlServerMergeWriter:
             external_data_source=external_data_source,
         )
 
+        # Configure Spark with staging connection credentials (SAS token, etc.)
+        # This must be done before any ADLS operations to override cluster defaults
+        if hasattr(staging_connection, "configure_spark"):
+            spark = df.sparkSession
+            staging_connection.configure_spark(spark)
+            self.ctx.debug(
+                "Configured Spark with staging connection credentials",
+                auth_mode=getattr(staging_connection, "auth_mode", "unknown"),
+            )
+
         table_exists = self.check_table_exists(target_table)
 
         # Auto-create table if needed
@@ -2622,6 +2632,16 @@ class SqlServerMergeWriter:
             staging_table=staging_table,
             staging_file=staging_file,
         )
+
+        # Configure Spark with staging connection credentials (SAS token, etc.)
+        # This must be done before any ADLS operations to override cluster defaults
+        if hasattr(staging_connection, "configure_spark"):
+            spark = df.sparkSession
+            staging_connection.configure_spark(spark)
+            self.ctx.debug(
+                "Configured Spark with staging connection credentials",
+                auth_mode=getattr(staging_connection, "auth_mode", "unknown"),
+            )
 
         row_count = df.count()
 
