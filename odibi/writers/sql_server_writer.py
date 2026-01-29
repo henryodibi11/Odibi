@@ -2850,14 +2850,24 @@ class SqlServerMergeWriter:
             output_path: ADLS/Blob path to write to
             custom_options: Optional dict of CSV options to override defaults
         """
-        from pyspark.sql.functions import col, regexp_replace, when
-        from pyspark.sql.types import StringType, DecimalType
+        from pyspark.sql.functions import col, regexp_replace, when, date_format, format_string
+        from pyspark.sql.types import (
+            StringType,
+            DecimalType,
+            FloatType,
+            DoubleType,
+            BooleanType,
+            TimestampType,
+            DateType,
+        )
 
-        # Sanitize string columns: replace newlines and carriage returns with spaces
-        # SQL Server BULK INSERT can't handle embedded newlines in CSV fields
+        # Sanitize columns for SQL Server BULK INSERT compatibility
         df_clean = df
+        sanitized_cols = {"string": [], "decimal": [], "float": [], "boolean": [], "timestamp": []}
+
         for field in df.schema.fields:
             if isinstance(field.dataType, StringType):
+                # Replace newlines - BULK INSERT can't handle embedded newlines
                 df_clean = df_clean.withColumn(
                     field.name,
                     regexp_replace(
@@ -2866,10 +2876,10 @@ class SqlServerMergeWriter:
                         " ",
                     ),
                 )
+                sanitized_cols["string"].append(field.name)
+
             elif isinstance(field.dataType, DecimalType):
-                # Cast decimal to string to avoid scientific notation (e.g., 3.479E-7)
-                # SQL Server BULK INSERT can't parse scientific notation
-                # format_number handles this but adds commas, so we use cast + regex
+                # Avoid scientific notation (e.g., 3.479E-7 -> 0.0000003479)
                 scale = field.dataType.scale or 14
                 df_clean = df_clean.withColumn(
                     field.name,
@@ -2877,10 +2887,49 @@ class SqlServerMergeWriter:
                         col(field.name).cast(f"decimal(38,{scale})").cast("string")
                     ),
                 )
+                sanitized_cols["decimal"].append(field.name)
+
+            elif isinstance(field.dataType, (FloatType, DoubleType)):
+                # Float/Double can also have scientific notation - format to fixed precision
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).otherwise(
+                        format_string("%.15f", col(field.name))
+                    ),
+                )
+                sanitized_cols["float"].append(field.name)
+
+            elif isinstance(field.dataType, BooleanType):
+                # SQL Server expects 1/0 for bit columns, not true/false
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).when(col(field.name), "1").otherwise("0"),
+                )
+                sanitized_cols["boolean"].append(field.name)
+
+            elif isinstance(field.dataType, TimestampType):
+                # Format timestamps consistently - SQL Server parses ISO format well
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).otherwise(
+                        date_format(col(field.name), "yyyy-MM-dd HH:mm:ss.SSS")
+                    ),
+                )
+                sanitized_cols["timestamp"].append(field.name)
+
+            elif isinstance(field.dataType, DateType):
+                # Format dates consistently
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).otherwise(
+                        date_format(col(field.name), "yyyy-MM-dd")
+                    ),
+                )
+                sanitized_cols["timestamp"].append(field.name)
 
         self.ctx.debug(
-            "Sanitized string columns for BULK INSERT",
-            string_columns=[f.name for f in df.schema.fields if isinstance(f.dataType, StringType)],
+            "Sanitized columns for BULK INSERT",
+            **{k: v for k, v in sanitized_cols.items() if v},
         )
 
         # Default options for robust CSV handling
