@@ -2720,16 +2720,18 @@ class SqlServerMergeWriter:
                     )
                     return True  # Azure SQL MI - same limitations as Azure SQL DB
 
-            # Default: assume it might work (on-prem or unknown)
-            self.ctx.debug("Could not determine database type, assuming Synapse/on-prem")
-            return False
+            # Default: assume Azure SQL DB (safer - CSV works everywhere)
+            self.ctx.debug("Could not determine database type, defaulting to Azure SQL DB (CSV)")
+            return True
 
         except Exception as e:
+            # Detection failed - default to Azure SQL DB (CSV works everywhere,
+            # PARQUET only works on Synapse)
             self.ctx.warning(
-                "Could not detect database type, assuming Synapse/on-prem",
-                error=str(e),
+                "Could not detect database type, defaulting to Azure SQL DB (CSV)",
+                error=str(e)[:100],
             )
-            return False
+            return True
 
     def _write_csv_for_bulk_insert(
         self,
