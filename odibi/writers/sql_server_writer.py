@@ -2880,11 +2880,13 @@ class SqlServerMergeWriter:
 
             elif isinstance(field.dataType, DecimalType):
                 # Avoid scientific notation (e.g., 3.479E-7 -> 0.0000003479)
+                # Cast to double then format with fixed precision - this prevents E notation
                 scale = field.dataType.scale or 14
+                format_spec = f"%.{scale}f"
                 df_clean = df_clean.withColumn(
                     field.name,
                     when(col(field.name).isNull(), None).otherwise(
-                        col(field.name).cast(f"decimal(38,{scale})").cast("string")
+                        format_string(format_spec, col(field.name).cast("double"))
                     ),
                 )
                 sanitized_cols["decimal"].append(field.name)
