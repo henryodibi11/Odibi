@@ -1467,6 +1467,7 @@ class SqlServerMergeWriter:
                     overwrite_opts = SqlServerOverwriteOptions(
                         auto_setup=options.auto_setup,
                         keep_staging_files=options.keep_staging_files,
+                        force_recreate=getattr(options, "force_recreate", False),
                     )
                     result = self.bulk_copy_spark(
                         df=df_for_create,
