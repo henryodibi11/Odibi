@@ -2431,10 +2431,7 @@ class SqlServerMergeWriter:
         )
         if options.auto_setup:
             try:
-                force_recreate = getattr(options, "force_recreate", False)
-                self.setup_bulk_copy_external_source(
-                    staging_connection, external_data_source, force_recreate=force_recreate
-                )
+                self.setup_bulk_copy_external_source(staging_connection, external_data_source)
             except Exception as setup_error:
                 self.ctx.error(
                     "Failed to setup bulk copy external data source (overwrite)",
@@ -2467,16 +2464,6 @@ class SqlServerMergeWriter:
             staging_file=staging_file,
             external_data_source=external_data_source,
         )
-
-        # Configure Spark with staging connection credentials (SAS token, etc.)
-        # This must be done before any ADLS operations to override cluster defaults
-        if hasattr(staging_connection, "configure_spark"):
-            spark = df.sparkSession
-            staging_connection.configure_spark(spark)
-            self.ctx.debug(
-                "Configured Spark with staging connection credentials",
-                auth_mode=getattr(staging_connection, "auth_mode", "unknown"),
-            )
 
         table_exists = self.check_table_exists(target_table)
 
@@ -2609,10 +2596,7 @@ class SqlServerMergeWriter:
         )
         if options.auto_setup:
             try:
-                force_recreate = getattr(options, "force_recreate", False)
-                self.setup_bulk_copy_external_source(
-                    staging_connection, external_data_source, force_recreate=force_recreate
-                )
+                self.setup_bulk_copy_external_source(staging_connection, external_data_source)
             except Exception as setup_error:
                 self.ctx.error(
                     "Failed to setup bulk copy external data source (merge staging)",
@@ -2638,16 +2622,6 @@ class SqlServerMergeWriter:
             staging_table=staging_table,
             staging_file=staging_file,
         )
-
-        # Configure Spark with staging connection credentials (SAS token, etc.)
-        # This must be done before any ADLS operations to override cluster defaults
-        if hasattr(staging_connection, "configure_spark"):
-            spark = df.sparkSession
-            staging_connection.configure_spark(spark)
-            self.ctx.debug(
-                "Configured Spark with staging connection credentials",
-                auth_mode=getattr(staging_connection, "auth_mode", "unknown"),
-            )
 
         row_count = df.count()
 
@@ -2753,14 +2727,12 @@ class SqlServerMergeWriter:
         else:
             # Standard BULK INSERT for CSV
             # Use hex row terminator 0x0a for Linux/Databricks-generated CSV files
-            # Note: Removed FORMAT='CSV' - some users report it causes IID_IColumnsInfo errors
-            # Using DATAFILETYPE='char' instead for better compatibility
             sql = f"""
             BULK INSERT {escaped_table}
             FROM '{staging_file}'
             WITH (
                 DATA_SOURCE = '{external_data_source}',
-                DATAFILETYPE = 'char',
+                FORMAT = 'CSV',
                 FIRSTROW = 2,
                 FIELDTERMINATOR = ',',
                 ROWTERMINATOR = '0x0a'
@@ -2874,115 +2846,6 @@ class SqlServerMergeWriter:
             output_path: ADLS/Blob path to write to
             custom_options: Optional dict of CSV options to override defaults
         """
-        # TEMPORARY DEBUG: Skip all sanitization to test if it's causing 7301 error
-        # Set to False to re-enable sanitization
-        SKIP_SANITIZATION = True
-
-        if SKIP_SANITIZATION:
-            self.ctx.warning("BULK INSERT sanitization DISABLED for debugging")
-            default_options = {
-                "header": "true",
-                "quote": '"',
-                "escape": '"',
-                "escapeQuotes": "true",
-                "nullValue": "",
-                "emptyValue": "",
-                "encoding": "UTF-8",
-                "lineSep": "\n",
-            }
-            if custom_options:
-                default_options.update(custom_options)
-            writer = df.coalesce(1).write.mode("overwrite")
-            for key, value in default_options.items():
-                writer = writer.option(key, value)
-            writer.csv(output_path)
-            self.ctx.debug("Wrote CSV without sanitization", path=output_path)
-            return
-
-        from pyspark.sql.functions import col, regexp_replace, when, date_format, format_string
-        from pyspark.sql.types import (
-            StringType,
-            DecimalType,
-            FloatType,
-            DoubleType,
-            BooleanType,
-            TimestampType,
-            DateType,
-        )
-
-        # Sanitize columns for SQL Server BULK INSERT compatibility
-        df_clean = df
-        sanitized_cols = {"string": [], "decimal": [], "float": [], "boolean": [], "timestamp": []}
-
-        for field in df.schema.fields:
-            if isinstance(field.dataType, StringType):
-                # Replace newlines - BULK INSERT can't handle embedded newlines
-                df_clean = df_clean.withColumn(
-                    field.name,
-                    regexp_replace(
-                        regexp_replace(col(field.name), r"\r\n", " "),
-                        r"[\r\n]",
-                        " ",
-                    ),
-                )
-                sanitized_cols["string"].append(field.name)
-
-            elif isinstance(field.dataType, DecimalType):
-                # Avoid scientific notation (e.g., 3.479E-7 -> 0.0000003479)
-                # Cast to double then format with fixed precision - this prevents E notation
-                scale = field.dataType.scale or 14
-                format_spec = f"%.{scale}f"
-                df_clean = df_clean.withColumn(
-                    field.name,
-                    when(col(field.name).isNull(), None).otherwise(
-                        format_string(format_spec, col(field.name).cast("double"))
-                    ),
-                )
-                sanitized_cols["decimal"].append(field.name)
-
-            elif isinstance(field.dataType, (FloatType, DoubleType)):
-                # Float/Double can also have scientific notation - format to fixed precision
-                df_clean = df_clean.withColumn(
-                    field.name,
-                    when(col(field.name).isNull(), None).otherwise(
-                        format_string("%.15f", col(field.name))
-                    ),
-                )
-                sanitized_cols["float"].append(field.name)
-
-            elif isinstance(field.dataType, BooleanType):
-                # SQL Server expects 1/0 for bit columns, not true/false
-                df_clean = df_clean.withColumn(
-                    field.name,
-                    when(col(field.name).isNull(), None).when(col(field.name), "1").otherwise("0"),
-                )
-                sanitized_cols["boolean"].append(field.name)
-
-            elif isinstance(field.dataType, TimestampType):
-                # Format timestamps consistently - SQL Server parses ISO format well
-                df_clean = df_clean.withColumn(
-                    field.name,
-                    when(col(field.name).isNull(), None).otherwise(
-                        date_format(col(field.name), "yyyy-MM-dd HH:mm:ss.SSS")
-                    ),
-                )
-                sanitized_cols["timestamp"].append(field.name)
-
-            elif isinstance(field.dataType, DateType):
-                # Format dates consistently
-                df_clean = df_clean.withColumn(
-                    field.name,
-                    when(col(field.name).isNull(), None).otherwise(
-                        date_format(col(field.name), "yyyy-MM-dd")
-                    ),
-                )
-                sanitized_cols["timestamp"].append(field.name)
-
-        self.ctx.debug(
-            "Sanitized columns for BULK INSERT",
-            **{k: v for k, v in sanitized_cols.items() if v},
-        )
-
         # Default options for robust CSV handling
         default_options = {
             "header": "true",
@@ -2999,7 +2862,7 @@ class SqlServerMergeWriter:
         if custom_options:
             default_options.update(custom_options)
 
-        writer = df_clean.coalesce(1).write.mode("overwrite")
+        writer = df.coalesce(1).write.mode("overwrite")
         for key, value in default_options.items():
             writer = writer.option(key, value)
         writer.csv(output_path)
