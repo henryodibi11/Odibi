@@ -2785,17 +2785,16 @@ class SqlServerMergeWriter:
         try:
             import fsspec
 
-            conn_config = staging_connection.config
-            account_name = getattr(conn_config, "account_name", None)
-            auth = getattr(conn_config, "auth", None)
+            # AzureADLS stores properties directly, not in a .config object
+            account_name = getattr(staging_connection, "account", None)
+            auth_mode = getattr(staging_connection, "auth_mode", None)
 
             storage_options = {"account_name": account_name}
 
-            auth_mode = getattr(auth, "mode", None) if auth else None
-            if auth_mode == "account_key":
-                storage_options["account_key"] = getattr(auth, "account_key", None)
-            elif auth_mode == "sas":
-                storage_options["sas_token"] = getattr(auth, "sas_token", None)
+            if auth_mode == "direct_key":
+                storage_options["account_key"] = getattr(staging_connection, "account_key", None)
+            elif auth_mode == "sas_token":
+                storage_options["sas_token"] = getattr(staging_connection, "sas_token", None)
 
             fs = fsspec.filesystem("abfs", **storage_options)
 
@@ -2857,17 +2856,20 @@ class SqlServerMergeWriter:
                 # Parse the full path to get the filesystem
                 if "dfs.core.windows.net" in full_path or "blob.core.windows.net" in full_path:
                     # Azure ADLS/Blob - use abfs or az protocol
-                    conn_config = staging_connection.config
-                    account_name = getattr(conn_config, "account_name", None)
-                    auth = getattr(conn_config, "auth", None)
+                    # AzureADLS stores properties directly, not in a .config object
+                    account_name = getattr(staging_connection, "account", None)
+                    auth_mode = getattr(staging_connection, "auth_mode", None)
 
                     storage_options = {"account_name": account_name}
 
-                    auth_mode = getattr(auth, "mode", None) if auth else None
-                    if auth_mode == "account_key":
-                        storage_options["account_key"] = getattr(auth, "account_key", None)
-                    elif auth_mode == "sas":
-                        storage_options["sas_token"] = getattr(auth, "sas_token", None)
+                    if auth_mode == "direct_key":
+                        storage_options["account_key"] = getattr(
+                            staging_connection, "account_key", None
+                        )
+                    elif auth_mode == "sas_token":
+                        storage_options["sas_token"] = getattr(
+                            staging_connection, "sas_token", None
+                        )
 
                     fs = fsspec.filesystem("abfs", **storage_options)
                     # Delete recursively (handles directories)
@@ -2920,23 +2922,19 @@ class SqlServerMergeWriter:
             )
             return True
 
-        # Extract connection details
-        conn_config = staging_connection.config
-        account_name = getattr(conn_config, "account_name", None)
-        container = getattr(conn_config, "container", None)
-        auth = getattr(conn_config, "auth", None)
+        # Extract connection details - AzureADLS stores properties directly
+        account_name = getattr(staging_connection, "account", None)
+        container = getattr(staging_connection, "container", None)
+        auth_mode = getattr(staging_connection, "auth_mode", None)
 
         if not account_name or not container:
-            raise ValueError(
-                "staging_connection must have account_name and container for auto_setup"
-            )
+            raise ValueError("staging_connection must have account and container for auto_setup")
 
         # Build storage URL
         storage_url = f"https://{account_name}.blob.core.windows.net/{container}"
 
         # Determine credential based on auth mode
         credential_name = f"odibi_{external_data_source_name}_cred"
-        auth_mode = getattr(auth, "mode", None) if auth else None
 
         self.ctx.info(
             "Setting up bulk copy external data source",
@@ -2949,30 +2947,22 @@ class SqlServerMergeWriter:
         self._ensure_master_key()
 
         # Create credential based on auth type
-        if auth_mode == "account_key":
-            account_key = getattr(auth, "account_key", None)
+        if auth_mode == "direct_key":
+            account_key = getattr(staging_connection, "account_key", None)
             if not account_key:
-                raise ValueError("account_key auth requires account_key value")
+                raise ValueError("direct_key auth requires account_key value")
             self._create_credential_with_key(credential_name, account_key)
 
-        elif auth_mode == "sas":
-            sas_token = getattr(auth, "sas_token", None)
+        elif auth_mode == "sas_token":
+            sas_token = getattr(staging_connection, "sas_token", None)
             if not sas_token:
-                raise ValueError("sas auth requires sas_token value")
+                raise ValueError("sas_token auth requires sas_token value")
             # Remove leading '?' if present
             if sas_token.startswith("?"):
                 sas_token = sas_token[1:]
             self._create_credential_with_sas(credential_name, sas_token)
 
-        elif auth_mode == "connection_string":
-            # Extract account key or SAS from connection string
-            conn_str = getattr(auth, "connection_string", None)
-            if not conn_str:
-                raise ValueError("connection_string auth requires connection_string value")
-            secret = self._extract_secret_from_connection_string(conn_str)
-            self._create_credential_with_key(credential_name, secret)
-
-        elif auth_mode == "aad_msi":
+        elif auth_mode == "managed_identity":
             # For MSI, create external data source without credential
             # Azure SQL's managed identity handles auth
             credential_name = None
@@ -2982,15 +2972,20 @@ class SqlServerMergeWriter:
             )
 
         elif auth_mode == "key_vault":
-            raise ValueError(
-                "key_vault auth requires resolving the secret first. "
-                "Consider using account_key or sas auth mode with resolved values."
-            )
+            # Key vault mode - try to get the resolved key
+            resolved_key = getattr(staging_connection, "_cached_key", None)
+            if resolved_key:
+                self._create_credential_with_key(credential_name, resolved_key)
+            else:
+                raise ValueError(
+                    "key_vault auth requires the key to be resolved first. "
+                    "Ensure the connection has been validated before use."
+                )
 
         else:
             raise ValueError(
                 f"Unsupported auth mode for auto_setup: {auth_mode}. "
-                "Supported: account_key, sas, connection_string, aad_msi"
+                "Supported: direct_key, sas_token, managed_identity, key_vault"
             )
 
         # Create external data source
