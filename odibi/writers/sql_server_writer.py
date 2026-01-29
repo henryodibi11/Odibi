@@ -2457,6 +2457,11 @@ class SqlServerMergeWriter:
                     staging_file = self._extract_relative_path_from_fsspec(
                         actual_csv_file, staging_connection
                     )
+                else:
+                    # If no specific file found, prepend container to staging_file
+                    container = getattr(staging_connection, "container", "")
+                    if container and not staging_file.startswith(f"{container}/"):
+                        staging_file = f"{container}/{staging_file}"
 
                 if table_exists:
                     self.truncate_table(target_table)
@@ -2605,6 +2610,11 @@ class SqlServerMergeWriter:
                     staging_file = self._extract_relative_path_from_fsspec(
                         actual_csv_file, staging_connection
                     )
+                else:
+                    # If no specific file found, prepend container to staging_file
+                    container = getattr(staging_connection, "container", "")
+                    if container and not staging_file.startswith(f"{container}/"):
+                        staging_file = f"{container}/{staging_file}"
 
                 if not self.check_table_exists(staging_table):
                     self.create_table_from_spark(df, staging_table)
@@ -2763,21 +2773,23 @@ class SqlServerMergeWriter:
 
     def _extract_relative_path_from_fsspec(self, fsspec_path: str, staging_connection: Any) -> str:
         """
-        Extract relative path from fsspec path for BULK INSERT.
+        Extract path from fsspec for BULK INSERT.
 
         fsspec returns paths like 'container/path/to/file.csv'
-        We need just 'path/to/file.csv' relative to container root.
+        For BULK INSERT with BLOB_STORAGE external data source (which points to storage account
+        without container), we need the full path INCLUDING container: 'container/path/to/file.csv'
 
         Args:
             fsspec_path: Path returned by fsspec (e.g., 'container/folder/file.csv')
             staging_connection: ADLS connection to get container name
 
         Returns:
-            Relative path suitable for BULK INSERT
+            Path suitable for BULK INSERT (includes container)
         """
         container = getattr(staging_connection, "container", "")
-        if fsspec_path.startswith(f"{container}/"):
-            return fsspec_path[len(container) + 1 :]
+        # Ensure path includes container prefix for BULK INSERT
+        if not fsspec_path.startswith(f"{container}/"):
+            return f"{container}/{fsspec_path}"
         return fsspec_path
 
     def _write_csv_for_bulk_insert(
@@ -3014,8 +3026,9 @@ class SqlServerMergeWriter:
         if not account_name or not container:
             raise ValueError("staging_connection must have account and container for auto_setup")
 
-        # Build storage URL
-        storage_url = f"https://{account_name}.blob.core.windows.net/{container}"
+        # Build storage URL - for BLOB_STORAGE type, location should NOT include container
+        # The container is part of the file path in BULK INSERT
+        storage_url = f"https://{account_name}.blob.core.windows.net"
 
         # Determine credential based on auth mode
         credential_name = f"odibi_{external_data_source_name}_cred"
