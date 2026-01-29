@@ -2692,19 +2692,36 @@ class SqlServerMergeWriter:
                 else:
                     engine_edition = row[0] if row else None
 
+                # Convert to int for comparison (might be returned as string or Decimal)
+                try:
+                    engine_edition = int(engine_edition) if engine_edition else None
+                except (TypeError, ValueError):
+                    pass
+
+                self.ctx.debug(
+                    "Detected SQL Server engine edition",
+                    engine_edition=engine_edition,
+                    engine_type=type(engine_edition).__name__,
+                )
+
                 # Engine Edition values:
                 # 5 = Azure SQL Database
                 # 6 = Azure Synapse Analytics (dedicated SQL pool)
                 # 8 = Azure SQL Managed Instance
                 # 1-4 = On-prem SQL Server editions
                 if engine_edition == 5:
+                    self.ctx.info("Detected Azure SQL Database - will use CSV for bulk copy")
                     return True  # Azure SQL Database
                 elif engine_edition == 6:
                     return False  # Azure Synapse - supports PARQUET
                 elif engine_edition == 8:
+                    self.ctx.info(
+                        "Detected Azure SQL Managed Instance - will use CSV for bulk copy"
+                    )
                     return True  # Azure SQL MI - same limitations as Azure SQL DB
 
             # Default: assume it might work (on-prem or unknown)
+            self.ctx.debug("Could not determine database type, assuming Synapse/on-prem")
             return False
 
         except Exception as e:
