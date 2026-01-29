@@ -1303,7 +1303,7 @@ write:
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based outputs |
 | **register_table** | Optional[str] | No | - | Register file output as external table (Spark/Delta only) |
-| **mode** | WriteMode | No | `WriteMode.OVERWRITE` | Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once' |
+| **mode** | WriteMode | No | `WriteMode.OVERWRITE` | Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once', 'merge'. Use 'append_once' for idempotent Bronze ingestion (requires 'keys' in options). See WriteMode enum for details. |
 | **partition_by** | List[str] | No | `PydanticUndefined` | List of columns to physically partition the output by (folder structure). Use for low-cardinality columns (e.g. date, country). |
 | **zorder_by** | List[str] | No | `PydanticUndefined` | List of columns to Z-Order by. Improves read performance for high-cardinality columns used in filters/joins (Delta only). |
 | **table_properties** | Dict[str, str] | No | `PydanticUndefined` | Delta table properties. Overrides global performance.delta_table_properties. Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names. |

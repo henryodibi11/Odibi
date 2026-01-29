@@ -199,7 +199,7 @@ tracked_columns:
 
 **What it is:** The processing tool that actually does the data work. Different engines handle different data sizes.
 
-**Real-world analogy:** 
+**Real-world analogy:**
 - **Pandas** = Kitchen blender. Great for small batches, easy to use.
 - **Polars** = Food processor. Faster than a blender, handles bigger jobs.
 - **Spark** = Industrial food processing plant. Handles massive volumes across many machines.
@@ -223,7 +223,7 @@ engine: spark  # For big data (millions+ rows)
 - **ETL** (Extract, Transform, Load): Clean data BEFORE storing it.
 - **ELT** (Extract, Load, Transform): Store raw data first, clean it AFTER.
 
-**Real-world analogy:** 
+**Real-world analogy:**
 - **ETL** = Sorting mail before putting it in your filing cabinet.
 - **ELT** = Dumping all mail in a box, then sorting when you need something.
 
@@ -346,18 +346,32 @@ nodes:
 
 **Example:**
 ```yaml
-# Idempotent merge - safe to rerun
-write_mode: merge
-merge_keys:
-  - order_id
+# Idempotent append_once - RECOMMENDED for Bronze
+# Only inserts rows where keys don't exist
+write:
+  mode: append_once
+  options:
+    keys: [order_id]
+# Running twice with same data = no duplicates!
+
+# Idempotent merge - for Silver/Gold with updates
+write:
+  mode: merge
+  merge_keys: [order_id]
 # Running twice with same data = same result
 
-# NOT idempotent - DON'T do this for reruns
-write_mode: append
+# NOT idempotent - DON'T use for reruns
+write:
+  mode: append
 # Running twice = duplicate rows!
 ```
 
 **Why it matters:** Pipelines fail and get retried. If your pipeline isn't idempotent, retrying it corrupts your data (duplicates, wrong totals). Idempotent pipelines are safe to rerun.
+
+**Recommended modes by layer:**
+- **Bronze:** `append_once` (idempotent ingestion)
+- **Silver/Gold:** `upsert` or `merge` (updates existing, inserts new)
+- **Full refresh:** `overwrite` (replaces all data)
 
 **Learn more:** [Write Modes](../reference/yaml_schema.md)
 
@@ -509,14 +523,14 @@ nodes:
   - name: load_customers
     source: raw/customers.csv
     target: bronze.customers
-    
+
   - name: clean_customers
     source: bronze.customers
     target: silver.customers
     transformations:
       - type: trim_strings
       - type: standardize_phone
-      
+
   - name: customer_metrics
     source: silver.customers
     target: gold.customer_360
@@ -602,17 +616,17 @@ tracked_columns:
 pipeline:
   name: daily_sales_pipeline
   schedule: "0 6 * * *"  # 6 AM daily
-  
+
   nodes:
     - name: extract_sales
       source: pos_system.transactions
       target: bronze.sales
-      
+
     - name: clean_sales
       source: bronze.sales
       target: silver.sales
       depends_on: [extract_sales]
-      
+
     - name: aggregate_sales
       source: silver.sales
       target: gold.daily_summary
@@ -845,11 +859,11 @@ transformations:
     mapping:
       cust_nm: customer_name
       ord_dt: order_date
-      
+
   - type: add_column
     name: order_year
     expression: "year(order_date)"
-    
+
   - type: filter
     condition: "order_total > 0"
 ```
@@ -884,18 +898,18 @@ validation:
     - column: order_id
       rule: not_null
       severity: error
-      
+
     # Must be a valid email format
     - column: email
       rule: regex
       pattern: "^[^@]+@[^@]+$"
       severity: warning
-      
+
     # Must be a real date
     - column: order_date
       rule: not_in_future
       severity: error
-      
+
     # Must be positive
     - column: quantity
       rule: positive

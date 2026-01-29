@@ -30,13 +30,31 @@ class ConnectionType(str, Enum):
 
 
 class WriteMode(str, Enum):
-    """Write modes for output operations."""
+    """Write modes for output operations.
+
+    Values:
+    * `overwrite` - Replace all existing data. Use for full refresh, dimensions.
+    * `append` - Add rows without checking for duplicates. Use for true append-only logs.
+    * `upsert` - Update existing rows by key, insert new. Use for Silver/Gold with updates.
+    * `append_once` - Insert only rows where keys don't exist (idempotent). **Recommended for Bronze ingestion.** Requires `keys` in write options. Safe to retry/rerun without creating duplicates.
+    * `merge` - SQL Server MERGE via staging table + T-SQL MERGE statement.
+
+    **Choosing the right mode:**
+
+    | Mode | Existing Keys | New Keys | Use Case |
+    |------|--------------|----------|----------|
+    | overwrite | Deleted | Inserted | Full refresh, dimensions |
+    | append | Duplicated | Inserted | True append-only logs |
+    | upsert | Updated | Inserted | Silver/Gold with updates |
+    | append_once | Skipped | Inserted | Idempotent Bronze ingestion |
+    | merge | Updated | Inserted | SQL Server targets |
+    """
 
     OVERWRITE = "overwrite"
     APPEND = "append"
     UPSERT = "upsert"
     APPEND_ONCE = "append_once"
-    MERGE = "merge"  # SQL Server MERGE (staging table + T-SQL MERGE)
+    MERGE = "merge"
 
 
 class DeleteDetectionMode(str, Enum):
@@ -2454,7 +2472,7 @@ class WriteConfig(BaseModel):
     )
     mode: WriteMode = Field(
         default=WriteMode.OVERWRITE,
-        description="Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once'",
+        description="Write mode. Options: 'overwrite', 'append', 'upsert', 'append_once', 'merge'. Use 'append_once' for idempotent Bronze ingestion (requires 'keys' in options). See WriteMode enum for details.",
     )
     partition_by: List[str] = Field(
         default_factory=list,
