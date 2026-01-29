@@ -2103,6 +2103,14 @@ class SqlServerMergeOptions(BaseModel):
             "Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL)."
         ),
     )
+    csv_options: Optional[Dict[str, str]] = Field(
+        default=None,
+        description=(
+            "Custom CSV options for bulk copy when writing to Azure SQL Database. "
+            "Passed to Spark CSV writer. Defaults: quote='\"', escape='\"', escapeQuotes='true', "
+            "nullValue='', emptyValue='', encoding='UTF-8'. Override any option here."
+        ),
+    )
 
 
 class SqlServerOverwriteStrategy(str, Enum):
@@ -2273,6 +2281,14 @@ class SqlServerOverwriteOptions(BaseModel):
             "Auto-create SQL Server external data source and credential if they don't exist. "
             "Reads auth credentials from staging_connection and creates matching SQL objects. "
             "Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL)."
+        ),
+    )
+    csv_options: Optional[Dict[str, str]] = Field(
+        default=None,
+        description=(
+            "Custom CSV options for bulk copy when writing to Azure SQL Database. "
+            "Passed to Spark CSV writer. Defaults: quote='\"', escape='\"', escapeQuotes='true', "
+            "nullValue='', emptyValue='', encoding='UTF-8'. Override any option here."
         ),
     )
 

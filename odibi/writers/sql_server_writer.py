@@ -2433,9 +2433,9 @@ class SqlServerMergeWriter:
                     "Writing staging file (CSV for Azure SQL DB)",
                     path=staging_full_path,
                 )
-                # Coalesce to single file for BULK INSERT compatibility
                 # Use robust CSV options to handle special characters
-                self._write_csv_for_bulk_insert(df, staging_full_path)
+                csv_opts = getattr(options, "csv_options", None)
+                self._write_csv_for_bulk_insert(df, staging_full_path, csv_opts)
 
                 # Find the actual CSV file (Spark creates a directory with part files)
                 actual_csv_file = self._find_single_csv_file(staging_connection, staging_full_path)
@@ -2568,7 +2568,8 @@ class SqlServerMergeWriter:
                     path=staging_full_path,
                 )
                 # Use robust CSV options to handle special characters
-                self._write_csv_for_bulk_insert(df, staging_full_path)
+                csv_opts = getattr(options, "csv_options", None)
+                self._write_csv_for_bulk_insert(df, staging_full_path, csv_opts)
 
                 # Find the actual CSV file (Spark creates a directory with part files)
                 actual_csv_file = self._find_single_csv_file(staging_connection, staging_full_path)
@@ -2717,6 +2718,7 @@ class SqlServerMergeWriter:
         self,
         df: Any,
         output_path: str,
+        custom_options: Optional[Dict[str, str]] = None,
     ) -> None:
         """
         Write Spark DataFrame to CSV with robust options for BULK INSERT.
@@ -2729,21 +2731,34 @@ class SqlServerMergeWriter:
         Args:
             df: Spark DataFrame to write
             output_path: ADLS/Blob path to write to
+            custom_options: Optional dict of CSV options to override defaults
         """
-        (
-            df.coalesce(1)
-            .write.mode("overwrite")
-            .option("header", "true")
-            .option("quote", '"')
-            .option("escape", '"')
-            .option("escapeQuotes", "true")
-            .option("nullValue", "")
-            .option("emptyValue", "")
-            .option("encoding", "UTF-8")
-            .option("lineSep", "\n")
-            .csv(output_path)
+        # Default options for robust CSV handling
+        default_options = {
+            "header": "true",
+            "quote": '"',
+            "escape": '"',
+            "escapeQuotes": "true",
+            "nullValue": "",
+            "emptyValue": "",
+            "encoding": "UTF-8",
+            "lineSep": "\n",
+        }
+
+        # Merge with custom options (custom takes precedence)
+        if custom_options:
+            default_options.update(custom_options)
+
+        writer = df.coalesce(1).write.mode("overwrite")
+        for key, value in default_options.items():
+            writer = writer.option(key, value)
+        writer.csv(output_path)
+
+        self.ctx.debug(
+            "CSV file written with options",
+            path=output_path,
+            options=list(default_options.keys()),
         )
-        self.ctx.debug("CSV file written with robust options", path=output_path)
 
     def _find_single_csv_file(
         self,
