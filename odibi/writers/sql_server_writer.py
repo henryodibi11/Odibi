@@ -2850,6 +2850,28 @@ class SqlServerMergeWriter:
             output_path: ADLS/Blob path to write to
             custom_options: Optional dict of CSV options to override defaults
         """
+        from pyspark.sql.functions import col, regexp_replace
+        from pyspark.sql.types import StringType
+
+        # Sanitize string columns: replace newlines and carriage returns with spaces
+        # SQL Server BULK INSERT can't handle embedded newlines in CSV fields
+        df_clean = df
+        for field in df.schema.fields:
+            if isinstance(field.dataType, StringType):
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    regexp_replace(
+                        regexp_replace(col(field.name), r"\r\n", " "),
+                        r"[\r\n]",
+                        " ",
+                    ),
+                )
+
+        self.ctx.debug(
+            "Sanitized string columns for BULK INSERT",
+            string_columns=[f.name for f in df.schema.fields if isinstance(f.dataType, StringType)],
+        )
+
         # Default options for robust CSV handling
         default_options = {
             "header": "true",
@@ -2866,7 +2888,7 @@ class SqlServerMergeWriter:
         if custom_options:
             default_options.update(custom_options)
 
-        writer = df.coalesce(1).write.mode("overwrite")
+        writer = df_clean.coalesce(1).write.mode("overwrite")
         for key, value in default_options.items():
             writer = writer.option(key, value)
         writer.csv(output_path)
