@@ -1463,13 +1463,17 @@ class SqlServerMergeWriter:
                     )
                     # Create empty table first, then bulk insert
                     self.create_table_from_spark(df_for_create, target_table)
+                    # Create overwrite options from merge options for bulk_copy_spark
+                    overwrite_opts = SqlServerOverwriteOptions(
+                        auto_setup=options.auto_setup,
+                        keep_staging_files=options.keep_staging_files,
+                    )
                     result = self.bulk_copy_spark(
                         df=df_for_create,
                         target_table=target_table,
                         staging_connection=staging_connection,
                         external_data_source=options.external_data_source,
-                        auto_setup=options.auto_setup,
-                        keep_files=options.keep_staging_files,
+                        options=overwrite_opts,
                     )
                     row_count = result.rows_written
                 else:
