@@ -2753,14 +2753,14 @@ class SqlServerMergeWriter:
         else:
             # Standard BULK INSERT for CSV
             # Use hex row terminator 0x0a for Linux/Databricks-generated CSV files
-            # Note: FIELDQUOTE and CODEPAGE removed - they cause IID_IColumnsInfo errors
-            # on some Azure SQL configurations. FORMAT='CSV' handles quoting automatically.
+            # Note: Removed FORMAT='CSV' - some users report it causes IID_IColumnsInfo errors
+            # Using DATAFILETYPE='char' instead for better compatibility
             sql = f"""
             BULK INSERT {escaped_table}
             FROM '{staging_file}'
             WITH (
                 DATA_SOURCE = '{external_data_source}',
-                FORMAT = 'CSV',
+                DATAFILETYPE = 'char',
                 FIRSTROW = 2,
                 FIELDTERMINATOR = ',',
                 ROWTERMINATOR = '0x0a'
