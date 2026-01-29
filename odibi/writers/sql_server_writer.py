@@ -2431,7 +2431,11 @@ class SqlServerMergeWriter:
         )
         if options.auto_setup:
             try:
-                self.setup_bulk_copy_external_source(staging_connection, external_data_source)
+                self.setup_bulk_copy_external_source(
+                    staging_connection,
+                    external_data_source,
+                    force_recreate=getattr(options, "force_recreate", False),
+                )
             except Exception as setup_error:
                 self.ctx.error(
                     "Failed to setup bulk copy external data source (overwrite)",
@@ -2606,7 +2610,11 @@ class SqlServerMergeWriter:
         )
         if options.auto_setup:
             try:
-                self.setup_bulk_copy_external_source(staging_connection, external_data_source)
+                self.setup_bulk_copy_external_source(
+                    staging_connection,
+                    external_data_source,
+                    force_recreate=getattr(options, "force_recreate", False),
+                )
             except Exception as setup_error:
                 self.ctx.error(
                     "Failed to setup bulk copy external data source (merge staging)",

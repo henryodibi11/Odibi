@@ -352,7 +352,11 @@ class AzureADLS(BaseConnection):
 
         elif self.auth_mode == "sas_token":
             # Use get_storage_key() which handles KV fallback for SAS
-            return {**base_options, "sas_token": self.get_storage_key()}
+            # Strip leading '?' if present for fsspec compatibility
+            sas_token = self.get_storage_key()
+            if sas_token and sas_token.startswith("?"):
+                sas_token = sas_token[1:]
+            return {**base_options, "sas_token": sas_token}
 
         elif self.auth_mode == "service_principal":
             return {
@@ -406,6 +410,11 @@ class AzureADLS(BaseConnection):
             )
 
             sas_token = self.get_storage_key()
+
+            # Strip leading '?' if present - FixedSASTokenProvider expects token without it
+            if sas_token and sas_token.startswith("?"):
+                sas_token = sas_token[1:]
+                ctx.debug("Stripped leading '?' from SAS token for Spark configuration")
 
             sas_token_key = f"fs.azure.sas.fixed.token.{self.account}.dfs.core.windows.net"
             spark.conf.set(sas_token_key, sas_token)
