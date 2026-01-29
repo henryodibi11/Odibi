@@ -388,9 +388,23 @@ When targeting Azure SQL Database, odibi writes CSV files with:
 - **Quote character:** `"`
 - **Escape character:** `"` (doubled quotes)
 - **Row terminator:** `0x0a` (hex format for Linux/Databricks compatibility)
-- **Encoding:** UTF-8
+- **Encoding:** UTF-8 (CODEPAGE 65001)
+- **Field quote:** Enabled for proper parsing
 
-These settings ensure proper handling of embedded quotes, newlines, and special characters.
+### Automatic Data Sanitization
+
+Odibi automatically sanitizes data before CSV export to prevent BULK INSERT errors:
+
+| Data Type | Issue | Automatic Fix |
+|-----------|-------|---------------|
+| **String** | Embedded newlines break row parsing | Replaced with spaces |
+| **Decimal** | Scientific notation (3.479E-7) not parseable | Formatted as fixed-point (0.00000034790000) |
+| **Float/Double** | Scientific notation | Formatted to %.15f |
+| **Boolean** | true/false not recognized | Converted to 1/0 |
+| **Timestamp** | Inconsistent formats | Formatted as yyyy-MM-dd HH:mm:ss.SSS |
+| **Date** | Inconsistent formats | Formatted as yyyy-MM-dd |
+
+This happens transparently - no configuration needed.
 
 ### ODBC Driver
 
