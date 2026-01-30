@@ -2517,6 +2517,8 @@ class SqlServerMergeWriter:
                 # staging_file is already relative to container (no prefix needed)
 
                 if table_exists:
+                    # Validate schema match before BULK INSERT
+                    self._validate_bulk_insert_schema(df, target_table)
                     self.truncate_table(target_table)
 
                 try:
@@ -2540,6 +2542,8 @@ class SqlServerMergeWriter:
                 df.write.mode("overwrite").parquet(staging_full_path)
 
                 if table_exists:
+                    # Validate schema match before BULK INSERT
+                    self._validate_bulk_insert_schema(df, target_table)
                     self.truncate_table(target_table)
 
                 self._execute_bulk_insert(
@@ -2681,6 +2685,9 @@ class SqlServerMergeWriter:
 
                 if not self.check_table_exists(staging_table):
                     self.create_table_from_spark(df, staging_table)
+                else:
+                    # Validate schema match before BULK INSERT to avoid cryptic 7301 errors
+                    self._validate_bulk_insert_schema(df, staging_table)
 
                 self.truncate_staging(staging_table)
                 try:
@@ -2704,6 +2711,9 @@ class SqlServerMergeWriter:
 
                 if not self.check_table_exists(staging_table):
                     self.create_table_from_spark(df, staging_table)
+                else:
+                    # Validate schema match before BULK INSERT to avoid cryptic 7301 errors
+                    self._validate_bulk_insert_schema(df, staging_table)
 
                 self.truncate_staging(staging_table)
                 self._execute_bulk_insert(
@@ -2770,6 +2780,80 @@ class SqlServerMergeWriter:
 
         self.ctx.debug("Executing BULK INSERT", table=target_table)
         self.connection.execute_sql(sql)
+
+    def _validate_bulk_insert_schema(self, df: Any, target_table: str) -> None:
+        """
+        Validate that DataFrame columns match target table columns for BULK INSERT.
+
+        BULK INSERT requires exact column match (count and order). If there's a mismatch,
+        SQL Server returns a cryptic 7301 IID_IColumnsInfo error that looks like an
+        authentication issue but is actually a schema problem.
+
+        Args:
+            df: Spark DataFrame being inserted
+            target_table: Target table name
+
+        Raises:
+            ValueError: If columns don't match, with clear instructions
+        """
+        # Get DataFrame columns
+        df_columns = [c.lower() for c in df.columns]
+
+        # Get table columns
+        table_columns_dict = self.get_table_columns(target_table)
+        table_columns = [c.lower() for c in table_columns_dict.keys()]
+
+        # Check for mismatches
+        df_set = set(df_columns)
+        table_set = set(table_columns)
+
+        missing_in_df = table_set - df_set
+        extra_in_df = df_set - table_set
+
+        if missing_in_df or extra_in_df:
+            error_parts = [
+                f"Schema mismatch between DataFrame and table '{target_table}'.",
+                "BULK INSERT requires exact column match.",
+            ]
+            if missing_in_df:
+                error_parts.append(
+                    f"Columns in table but NOT in DataFrame: {sorted(missing_in_df)}"
+                )
+            if extra_in_df:
+                error_parts.append(f"Columns in DataFrame but NOT in table: {sorted(extra_in_df)}")
+            error_parts.append(
+                f"Fix: DROP TABLE [{target_table}] to let odibi recreate it with the correct schema, "
+                "or add the missing columns to your source data."
+            )
+
+            self.ctx.error(
+                "BULK INSERT schema validation failed",
+                target_table=target_table,
+                df_columns=sorted(df_set),
+                table_columns=sorted(table_set),
+                missing_in_df=sorted(missing_in_df) if missing_in_df else None,
+                extra_in_df=sorted(extra_in_df) if extra_in_df else None,
+            )
+            raise ValueError("\n".join(error_parts))
+
+        # Also check column count (redundant but explicit)
+        if len(df_columns) != len(table_columns):
+            self.ctx.error(
+                "BULK INSERT column count mismatch",
+                df_count=len(df_columns),
+                table_count=len(table_columns),
+            )
+            raise ValueError(
+                f"Column count mismatch: DataFrame has {len(df_columns)} columns, "
+                f"table has {len(table_columns)}. "
+                f"DROP TABLE [{target_table}] to recreate with correct schema."
+            )
+
+        self.ctx.debug(
+            "BULK INSERT schema validation passed",
+            target_table=target_table,
+            column_count=len(df_columns),
+        )
 
     def _is_azure_sql_database(self) -> bool:
         """
