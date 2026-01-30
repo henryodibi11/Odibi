@@ -2413,6 +2413,14 @@ class SqlServerMergeWriter:
         options = options or SqlServerOverwriteOptions()
         keep_files = options.keep_staging_files
 
+        # Warn if audit_cols is configured - BULK INSERT can't populate them
+        if options.audit_cols:
+            self.ctx.warning(
+                "audit_cols configured with bulk_copy overwrite - audit columns will be NULL. "
+                "BULK INSERT cannot call GETUTCDATE(). Consider using MERGE mode for audit columns.",
+                audit_cols=str(options.audit_cols),
+            )
+
         # Determine external data source name
         if not external_data_source:
             if options.auto_setup:
