@@ -1450,12 +1450,21 @@ class SqlServerMergeWriter:
             staging_table=staging_table,
         )
 
-        # Build column lists
-        source_cols = [f"[{c}]" for c in columns]
-        target_cols = list(source_cols)
-        select_cols = [f"source.[{c}]" for c in columns]
+        # Exclude audit columns from source columns (they'll be added with GETUTCDATE())
+        audit_col_names = set()
+        if options.audit_cols:
+            if options.audit_cols.created_col:
+                audit_col_names.add(options.audit_cols.created_col)
+            if options.audit_cols.updated_col:
+                audit_col_names.add(options.audit_cols.updated_col)
 
-        # Add audit columns if configured
+        # Build column lists, excluding audit columns from source
+        filtered_columns = [c for c in columns if c not in audit_col_names]
+        source_cols = [f"[{c}]" for c in filtered_columns]
+        target_cols = list(source_cols)
+        select_cols = [f"source.[{c}]" for c in filtered_columns]
+
+        # Add audit columns with GETUTCDATE() if configured
         if options.audit_cols:
             if options.audit_cols.created_col:
                 target_cols.append(f"[{options.audit_cols.created_col}]")
