@@ -1159,18 +1159,33 @@ class CatalogSyncer:
                 # Convert values to SQL-safe format
                 safe_record = {}
                 for k, v in record.items():
-                    if isinstance(v, (dict, list)):
+                    if v is None:
+                        safe_record[k] = None
+                    elif isinstance(v, (dict, list)):
                         safe_record[k] = json.dumps(v, default=str)
                     elif isinstance(v, datetime):
                         safe_record[k] = v.isoformat()
                     elif isinstance(v, float) and (v != v):  # NaN check (NaN != NaN)
                         safe_record[k] = None
-                    elif pd is not None and (v is pd.NaT or (hasattr(pd, "isna") and pd.isna(v))):
-                        # Handle pandas NaT (Not a Time) and other NA values
+                    elif isinstance(v, str) and v in ("NaT", "None", "nan", "NaN", "<NA>"):
+                        # Handle stringified null-like values
                         safe_record[k] = None
-                    elif isinstance(v, str) and v == "NaT":
-                        # Handle stringified NaT
-                        safe_record[k] = None
+                    elif pd is not None:
+                        # Handle pandas NA values (NaT, NA, NaN, etc.)
+                        try:
+                            if pd.isna(v):
+                                safe_record[k] = None
+                                continue
+                        except (TypeError, ValueError):
+                            pass
+                        # Check for NaTType explicitly
+                        if hasattr(pd, "_libs") and hasattr(pd._libs, "tslibs"):
+                            from pandas._libs.tslibs.nattype import NaTType
+
+                            if isinstance(v, NaTType):
+                                safe_record[k] = None
+                                continue
+                        safe_record[k] = v
                     else:
                         safe_record[k] = v
                 try:
