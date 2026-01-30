@@ -2496,24 +2496,31 @@ class SqlServerMergeWriter:
 
         # Use blob endpoint (wasbs://) for SAS token auth to avoid ADLS Gen2 ACL checks
         # The dfs endpoint (abfss://) triggers getAccessControl which fails with SAS tokens
-        use_blob_endpoint = getattr(staging_connection, "auth_mode", None) == "sas_token"
-        if use_blob_endpoint:
-            self.ctx.debug(
-                "Using blob endpoint (wasbs://) for staging to avoid ACL checks",
-                auth_mode="sas_token",
-            )
+        staging_auth_mode = getattr(staging_connection, "auth_mode", None)
+        use_blob_endpoint = staging_auth_mode == "sas_token"
+        self.ctx.info(
+            "Staging endpoint selection",
+            auth_mode=staging_auth_mode,
+            use_blob_endpoint=use_blob_endpoint,
+            connection_type=type(staging_connection).__name__,
+        )
 
         staging_full_path = None
         try:
             if is_azure_sql_db:
                 # Azure SQL Database: Use CSV format with single file
                 staging_file = staging_file.replace(".parquet", ".csv")
-                staging_full_path = staging_connection.get_path(
-                    staging_file, use_blob_endpoint=use_blob_endpoint
-                )
-                self.ctx.debug(
+                # Only pass use_blob_endpoint if the connection supports it (AzureADLS)
+                if use_blob_endpoint and hasattr(staging_connection, "uri"):
+                    staging_full_path = staging_connection.get_path(
+                        staging_file, use_blob_endpoint=True
+                    )
+                else:
+                    staging_full_path = staging_connection.get_path(staging_file)
+                self.ctx.info(
                     "Writing staging file (CSV for Azure SQL DB)",
                     path=staging_full_path,
+                    expected_scheme="wasbs://" if use_blob_endpoint else "abfss://",
                 )
                 # Use robust CSV options to handle special characters
                 csv_opts = getattr(options, "csv_options", None)
@@ -2548,9 +2555,12 @@ class SqlServerMergeWriter:
                     raise
             else:
                 # Azure Synapse or SQL Server 2022+: use PARQUET with OPENROWSET
-                staging_full_path = staging_connection.get_path(
-                    staging_file, use_blob_endpoint=use_blob_endpoint
-                )
+                if use_blob_endpoint and hasattr(staging_connection, "uri"):
+                    staging_full_path = staging_connection.get_path(
+                        staging_file, use_blob_endpoint=True
+                    )
+                else:
+                    staging_full_path = staging_connection.get_path(staging_file)
                 self.ctx.debug("Writing staging file (Parquet)", path=staging_full_path)
                 df.write.mode("overwrite").parquet(staging_full_path)
 
@@ -2687,12 +2697,17 @@ class SqlServerMergeWriter:
             if is_azure_sql_db:
                 # Azure SQL Database: Use CSV format with single file
                 staging_file = staging_file.replace(".parquet", ".csv")
-                staging_full_path = staging_connection.get_path(
-                    staging_file, use_blob_endpoint=use_blob_endpoint
-                )
-                self.ctx.debug(
+                # Only pass use_blob_endpoint if the connection supports it (AzureADLS)
+                if use_blob_endpoint and hasattr(staging_connection, "uri"):
+                    staging_full_path = staging_connection.get_path(
+                        staging_file, use_blob_endpoint=True
+                    )
+                else:
+                    staging_full_path = staging_connection.get_path(staging_file)
+                self.ctx.info(
                     "Writing staging file (CSV for Azure SQL DB)",
                     path=staging_full_path,
+                    expected_scheme="wasbs://" if use_blob_endpoint else "abfss://",
                 )
                 # Use robust CSV options to handle special characters
                 csv_opts = getattr(options, "csv_options", None)
@@ -2729,9 +2744,12 @@ class SqlServerMergeWriter:
                     raise
             else:
                 # Azure Synapse or SQL Server 2022+: use PARQUET
-                staging_full_path = staging_connection.get_path(
-                    staging_file, use_blob_endpoint=use_blob_endpoint
-                )
+                if use_blob_endpoint and hasattr(staging_connection, "uri"):
+                    staging_full_path = staging_connection.get_path(
+                        staging_file, use_blob_endpoint=True
+                    )
+                else:
+                    staging_full_path = staging_connection.get_path(staging_file)
                 df.write.mode("overwrite").parquet(staging_full_path)
 
                 if not self.check_table_exists(staging_table):
