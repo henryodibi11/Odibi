@@ -330,37 +330,6 @@ class TestAzureADLSSparkIntegration:
         expected_key = "fs.azure.account.key.myaccount.dfs.core.windows.net"
         mock_spark.conf.set.assert_called_once_with(expected_key, "test-key-123")
 
-    def test_configure_spark_sas_token(self):
-        """Test configure_spark sets SAS config for both abfss and wasbs endpoints."""
-        conn = AzureADLS(
-            account="myaccount",
-            container="mycontainer",
-            auth_mode="sas_token",
-            sas_token="sv=2024-01-01&ss=b&srt=sco&sp=rwdlacupyx",
-        )
-
-        mock_spark = MagicMock()
-        conn.configure_spark(mock_spark)
-
-        # Check ABFS (dfs endpoint) config
-        mock_spark.conf.set.assert_any_call(
-            "fs.azure.account.auth.type.myaccount.dfs.core.windows.net", "SAS"
-        )
-        mock_spark.conf.set.assert_any_call(
-            "fs.azure.sas.token.provider.type.myaccount.dfs.core.windows.net",
-            "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
-        )
-        mock_spark.conf.set.assert_any_call(
-            "fs.azure.sas.fixed.token.myaccount.dfs.core.windows.net",
-            "sv=2024-01-01&ss=b&srt=sco&sp=rwdlacupyx",
-        )
-
-        # Check WASB (blob endpoint) config - used for staging to avoid ACL checks
-        mock_spark.conf.set.assert_any_call(
-            "fs.azure.sas.mycontainer.myaccount.blob.core.windows.net",
-            "sv=2024-01-01&ss=b&srt=sco&sp=rwdlacupyx",
-        )
-
     def test_configure_spark_service_principal(self):
         """Test configure_spark sets OAuth config for service_principal."""
         conn = AzureADLS(
@@ -493,35 +462,3 @@ class TestAzureADLSURIGeneration:
         path = conn.get_path("test/file.parquet")
 
         assert path == conn.uri("test/file.parquet")
-
-    def test_uri_blob_endpoint(self):
-        """Test URI generation with blob endpoint (wasbs://)."""
-        conn = AzureADLS(
-            account="myaccount",
-            container="mycontainer",
-            auth_mode="sas_token",
-            sas_token="sv=2024-01-01&ss=b&srt=sco",
-        )
-
-        # Default: dfs endpoint (abfss://)
-        dfs_uri = conn.uri("folder/file.csv")
-        assert dfs_uri == "abfss://mycontainer@myaccount.dfs.core.windows.net/folder/file.csv"
-
-        # Blob endpoint (wasbs://) - avoids ACL checks with SAS tokens
-        blob_uri = conn.uri("folder/file.csv", use_blob_endpoint=True)
-        assert blob_uri == "wasbs://mycontainer@myaccount.blob.core.windows.net/folder/file.csv"
-
-    def test_get_path_blob_endpoint(self):
-        """Test get_path with blob endpoint for SAS token staging."""
-        conn = AzureADLS(
-            account="mystorageaccount",
-            container="datalake",
-            path_prefix="staging",
-            auth_mode="sas_token",
-            sas_token="sv=2024-01-01&ss=b&srt=sco",
-        )
-
-        # With blob endpoint - used for bulk copy staging to avoid ADLS Gen2 ACL checks
-        path = conn.get_path("bulk/file.csv", use_blob_endpoint=True)
-        expected = "wasbs://datalake@mystorageaccount.blob.core.windows.net/staging/bulk/file.csv"
-        assert path == expected
