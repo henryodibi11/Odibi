@@ -100,11 +100,11 @@ def _snapshot_diff_spark(
             "detect_deletes: Could not determine target table path. Skipping. "
             "Provide 'connection' and 'path' params, or ensure the node has a 'write' block."
         )
-        return context
+        return _ensure_delete_column(context, config)
 
     if not DeltaTable.isDeltaTable(spark, table_path):
         logger.info("detect_deletes: Target is not a Delta table. Skipping snapshot_diff.")
-        return context
+        return _ensure_delete_column(context, config)
 
     dt = DeltaTable.forPath(spark, table_path)
     current_version = dt.history(1).collect()[0]["version"]
@@ -180,13 +180,13 @@ def _snapshot_diff_pandas(
             "detect_deletes: Could not determine target table path. Skipping. "
             "Provide 'connection' and 'path' params, or ensure the node has a 'write' block."
         )
-        return context
+        return _ensure_delete_column(context, config)
 
     try:
         dt = DeltaTable(table_path)
     except Exception as e:
         logger.info(f"detect_deletes: Target is not a Delta table ({e}). Skipping.")
-        return context
+        return _ensure_delete_column(context, config)
 
     current_version = dt.version()
 
