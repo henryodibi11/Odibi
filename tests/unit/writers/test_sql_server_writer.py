@@ -914,7 +914,12 @@ class TestExecuteMerge:
     def test_returns_merge_result(self):
         """Should return MergeResult with counts."""
         conn = create_mock_connection()
-        conn.execute_sql.return_value = [{"inserted": 10, "updated": 5, "deleted": 2}]
+        # First call: COUNT(*) to check if target is empty
+        # Second call: MERGE result
+        conn.execute_sql.side_effect = [
+            [(1,)],  # COUNT(*) - target has data, use MERGE
+            [{"inserted": 10, "updated": 5, "deleted": 2}],  # MERGE result
+        ]
         writer = SqlServerMergeWriter(conn)
 
         result = writer.execute_merge(
@@ -932,7 +937,10 @@ class TestExecuteMerge:
     def test_handles_tuple_result(self):
         """Should handle tuple-style result rows."""
         conn = create_mock_connection()
-        conn.execute_sql.return_value = [(10, 5, 2)]
+        conn.execute_sql.side_effect = [
+            [(1,)],  # COUNT(*) - target has data
+            [(10, 5, 2)],  # MERGE result as tuple
+        ]
         writer = SqlServerMergeWriter(conn)
 
         result = writer.execute_merge(
@@ -949,7 +957,10 @@ class TestExecuteMerge:
     def test_handles_empty_result(self):
         """Should return empty MergeResult for no results."""
         conn = create_mock_connection()
-        conn.execute_sql.return_value = []
+        conn.execute_sql.side_effect = [
+            [(1,)],  # COUNT(*) - target has data
+            [],  # MERGE result (empty)
+        ]
         writer = SqlServerMergeWriter(conn)
 
         result = writer.execute_merge(
@@ -966,6 +977,7 @@ class TestExecuteMerge:
     def test_raises_on_error(self):
         """Should propagate database errors."""
         conn = create_mock_connection()
+        # Error happens on COUNT(*) query
         conn.execute_sql.side_effect = Exception("Database error")
         writer = SqlServerMergeWriter(conn)
 

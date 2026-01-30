@@ -207,7 +207,12 @@ class TestSqlServerMergeWriter:
 
     def test_execute_merge_returns_counts(self, writer, mock_connection):
         """Should parse and return merge counts."""
-        mock_connection.execute_sql.return_value = [{"inserted": 10, "updated": 5, "deleted": 2}]
+        # First call: COUNT(*) to check if target is empty (returns non-zero so MERGE is used)
+        # Second call: MERGE result
+        mock_connection.execute_sql.side_effect = [
+            [(1,)],  # COUNT(*) - target has 1 row, use MERGE
+            [{"inserted": 10, "updated": 5, "deleted": 2}],  # MERGE result
+        ]
 
         result = writer.execute_merge(
             target_table="oee.oee_fact",
@@ -222,7 +227,11 @@ class TestSqlServerMergeWriter:
 
     def test_execute_merge_handles_tuple_result(self, writer, mock_connection):
         """Should handle tuple result format."""
-        mock_connection.execute_sql.return_value = [(10, 5, 2)]
+        # First call: COUNT(*), Second call: MERGE result as tuple
+        mock_connection.execute_sql.side_effect = [
+            [(1,)],  # COUNT(*) - target has data
+            [(10, 5, 2)],  # MERGE result as tuple
+        ]
 
         result = writer.execute_merge(
             target_table="oee.oee_fact",
@@ -968,9 +977,10 @@ class TestMergePolars:
         import polars as pl
 
         mock_connection.execute_sql.side_effect = [
-            [],
-            [],
-            [{"inserted": 2, "updated": 0, "deleted": 0}],
+            [],  # check_table_exists
+            [],  # create_table
+            [(1,)],  # COUNT(*) for execute_merge - target has data
+            [{"inserted": 2, "updated": 0, "deleted": 0}],  # MERGE result
         ]
         df = pl.DataFrame({"key": [1, 2], "value": [10, 20]})
 
@@ -1064,8 +1074,9 @@ class TestBatchProcessing:
         import polars as pl
 
         mock_connection.execute_sql.side_effect = [
-            [(1,)],
-            [{"inserted": 50, "updated": 0, "deleted": 0}],
+            [(1,)],  # check_table_exists
+            [(1,)],  # COUNT(*) for execute_merge - target has data
+            [{"inserted": 50, "updated": 0, "deleted": 0}],  # MERGE result
         ]
         df = pl.DataFrame({"key": list(range(50)), "value": list(range(50))})
 
@@ -1286,7 +1297,8 @@ class TestAuditColumnCreation:
         """Audit columns should be included in MERGE SQL even if not in DataFrame."""
         mock_connection.execute_sql.side_effect = [
             [(1,)],  # check_table_exists - table exists
-            [{"inserted": 2, "updated": 0, "deleted": 0}],  # execute_merge
+            [(1,)],  # COUNT(*) for execute_merge - target has data
+            [{"inserted": 2, "updated": 0, "deleted": 0}],  # MERGE result
         ]
         mock_connection.write_table = MagicMock()
 

@@ -3070,12 +3070,95 @@ class SqlServerMergeWriter:
         - Embedded quotes, commas, newlines in string fields
         - NULL values
         - Unicode characters
+        - Scientific notation in decimal/float columns
 
         Args:
             df: Spark DataFrame to write
             output_path: ADLS/Blob path to write to
             custom_options: Optional dict of CSV options to override defaults
         """
+        from pyspark.sql.functions import col, regexp_replace, when, date_format, format_string
+        from pyspark.sql.types import (
+            StringType,
+            DecimalType,
+            FloatType,
+            DoubleType,
+            BooleanType,
+            TimestampType,
+            DateType,
+        )
+
+        # Sanitize columns for SQL Server BULK INSERT compatibility
+        df_clean = df
+        sanitized_cols = {"string": [], "decimal": [], "float": [], "boolean": [], "timestamp": []}
+
+        for field in df.schema.fields:
+            if isinstance(field.dataType, StringType):
+                # Replace newlines - BULK INSERT can't handle embedded newlines
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    regexp_replace(
+                        regexp_replace(col(field.name), "[\r\n]+", " "),
+                        "[\r]+",
+                        " ",
+                    ),
+                )
+                sanitized_cols["string"].append(field.name)
+
+            elif isinstance(field.dataType, DecimalType):
+                # Avoid scientific notation (e.g., 3.479E-7 -> 0.0000003479)
+                scale = field.dataType.scale or 14
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).otherwise(
+                        col(field.name).cast(f"decimal(38,{scale})").cast("string")
+                    ),
+                )
+                sanitized_cols["decimal"].append(field.name)
+
+            elif isinstance(field.dataType, (FloatType, DoubleType)):
+                # Float/Double can also have scientific notation - format to fixed precision
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).otherwise(
+                        format_string("%.15f", col(field.name))
+                    ),
+                )
+                sanitized_cols["float"].append(field.name)
+
+            elif isinstance(field.dataType, BooleanType):
+                # SQL Server expects 1/0 for bit columns, not true/false
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).when(col(field.name), "1").otherwise("0"),
+                )
+                sanitized_cols["boolean"].append(field.name)
+
+            elif isinstance(field.dataType, TimestampType):
+                # Format timestamps consistently - SQL Server parses ISO format well
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).otherwise(
+                        date_format(col(field.name), "yyyy-MM-dd HH:mm:ss.SSS")
+                    ),
+                )
+                sanitized_cols["timestamp"].append(field.name)
+
+            elif isinstance(field.dataType, DateType):
+                # Format dates consistently
+                df_clean = df_clean.withColumn(
+                    field.name,
+                    when(col(field.name).isNull(), None).otherwise(
+                        date_format(col(field.name), "yyyy-MM-dd")
+                    ),
+                )
+                sanitized_cols["timestamp"].append(field.name)
+
+        self.ctx.debug(
+            "Sanitized columns for BULK INSERT",
+            **{k: v for k, v in sanitized_cols.items() if v},
+        )
+
         # Default options for robust CSV handling
         default_options = {
             "header": "true",
@@ -3092,7 +3175,7 @@ class SqlServerMergeWriter:
         if custom_options:
             default_options.update(custom_options)
 
-        writer = df.coalesce(1).write.mode("overwrite")
+        writer = df_clean.coalesce(1).write.mode("overwrite")
         for key, value in default_options.items():
             writer = writer.option(key, value)
         writer.csv(output_path)
