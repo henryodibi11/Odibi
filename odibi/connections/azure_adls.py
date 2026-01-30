@@ -430,8 +430,26 @@ class AzureADLS(BaseConnection):
             # Also configure WASB (blob endpoint) for staging operations
             # wasbs:// uses different config keys and avoids ACL checks entirely
             # Format: fs.azure.sas.<container>.<account>.blob.core.windows.net = <sas_token>
+            # IMPORTANT: WASB requires hadoopConfiguration, not spark.conf.set()
             wasb_sas_key = f"fs.azure.sas.{self.container}.{self.account}.blob.core.windows.net"
+
+            # Set via both spark.conf and hadoopConfiguration for compatibility
             spark.conf.set(wasb_sas_key, sas_token)
+
+            # WASB driver reads from Hadoop config, not Spark conf
+            # Use sparkContext._jsc to access Java SparkContext's Hadoop Configuration
+            try:
+                hadoop_conf = spark.sparkContext._jsc.hadoopConfiguration()
+                hadoop_conf.set(wasb_sas_key, sas_token)
+                ctx.info(
+                    "Set WASB SAS token via hadoopConfiguration",
+                    key=wasb_sas_key,
+                )
+            except Exception as e:
+                ctx.warning(
+                    "Failed to set hadoopConfiguration for WASB, using spark.conf only",
+                    error=str(e),
+                )
 
             ctx.debug(
                 "Set Spark config for SAS token (abfss + wasbs)",
