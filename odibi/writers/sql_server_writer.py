@@ -1456,13 +1456,15 @@ class SqlServerMergeWriter:
                     )
 
                 # Use bulk_copy for initial load if enabled (much faster for large datasets)
-                if options.bulk_copy and staging_connection:
+                # Skip first-run optimization if audit_cols is configured - BULK INSERT
+                # can't populate audit columns, so we need to use MERGE path instead
+                if options.bulk_copy and staging_connection and not options.audit_cols:
                     self.ctx.info(
                         "Using BULK INSERT for initial load (first run optimization)",
                         staging_connection=options.staging_connection,
                     )
                     # Create empty table first, then bulk insert
-                    self.create_table_from_spark(df_for_create, target_table, options.audit_cols)
+                    self.create_table_from_spark(df_for_create, target_table)
                     # Create overwrite options from merge options for bulk_copy_spark
                     overwrite_opts = SqlServerOverwriteOptions(
                         auto_setup=options.auto_setup,
@@ -2781,7 +2783,12 @@ class SqlServerMergeWriter:
         self.ctx.debug("Executing BULK INSERT", table=target_table)
         self.connection.execute_sql(sql)
 
-    def _validate_bulk_insert_schema(self, df: Any, target_table: str) -> None:
+    def _validate_bulk_insert_schema(
+        self,
+        df: Any,
+        target_table: str,
+        ignore_columns: Optional[List[str]] = None,
+    ) -> None:
         """
         Validate that DataFrame columns match target table columns for BULK INSERT.
 
@@ -2792,6 +2799,8 @@ class SqlServerMergeWriter:
         Args:
             df: Spark DataFrame being inserted
             target_table: Target table name
+            ignore_columns: Optional list of columns to ignore in validation
+                (e.g., audit columns that are filled by SQL, not from DataFrame)
 
         Raises:
             ValueError: If columns don't match, with clear instructions
@@ -2803,9 +2812,12 @@ class SqlServerMergeWriter:
         table_columns_dict = self.get_table_columns(target_table)
         table_columns = [c.lower() for c in table_columns_dict.keys()]
 
+        # Remove ignored columns from table set (audit columns filled by SQL)
+        ignore_set = set(c.lower() for c in (ignore_columns or []))
+
         # Check for mismatches
         df_set = set(df_columns)
-        table_set = set(table_columns)
+        table_set = set(table_columns) - ignore_set
 
         missing_in_df = table_set - df_set
         extra_in_df = df_set - table_set
