@@ -380,6 +380,27 @@ If `keep_staging_files: false` but files remain:
 - Check the staging connection has delete permissions
 - Check logs for cleanup errors
 
+### "getAccessControl" or "AuthenticationFailed" errors with SAS token
+
+If you see errors like:
+```
+Operation failed: "Server failed to authenticate the request"
+action=getAccessControl
+```
+
+This happens when using SAS tokens with **ADLS Gen2 + Hierarchical Namespace enabled**. The dfs endpoint (`abfss://`) triggers ACL checks that SAS tokens don't support.
+
+**Odibi v2.5+ automatically handles this** by using the blob endpoint (`wasbs://`) for staging writes when `auth_mode: sas_token`. The blob endpoint bypasses ACL checks entirely.
+
+If you're still seeing this error:
+1. Ensure you're using a recent odibi version
+2. Check that your staging connection has `auth_mode: sas_token` (not `direct_key`)
+3. For Databricks: The first run may fail if the cluster cached old filesystem config - restart the cluster
+
+Alternative solutions:
+- Use `auth_mode: service_principal` instead of SAS (supports ACL operations)
+- Disable hierarchical namespace on your storage account (not recommended for production)
+
 ## Technical Details
 
 ### CSV Format for Azure SQL DB

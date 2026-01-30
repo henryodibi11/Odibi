@@ -396,7 +396,7 @@ class AzureADLS(BaseConnection):
             )
 
         elif self.auth_mode == "sas_token":
-            # SAS Token Configuration
+            # SAS Token Configuration for ABFS (dfs endpoint)
             # fs.azure.sas.token.provider.type -> FixedSASTokenProvider
             # fs.azure.sas.fixed.token -> <token>
             provider_key = f"fs.azure.account.auth.type.{self.account}.dfs.core.windows.net"
@@ -427,10 +427,17 @@ class AzureADLS(BaseConnection):
             )
             spark.conf.set("fs.azure.skip.user.group.metadata.during.initialization", "true")
 
+            # Also configure WASB (blob endpoint) for staging operations
+            # wasbs:// uses different config keys and avoids ACL checks entirely
+            # Format: fs.azure.sas.<container>.<account>.blob.core.windows.net = <sas_token>
+            wasb_sas_key = f"fs.azure.sas.{self.container}.{self.account}.blob.core.windows.net"
+            spark.conf.set(wasb_sas_key, sas_token)
+
             ctx.debug(
-                "Set Spark config for SAS token",
+                "Set Spark config for SAS token (abfss + wasbs)",
                 auth_type_key=provider_key,
                 provider_key=sas_provider_key,
+                wasb_sas_key=wasb_sas_key,
             )
 
         elif self.auth_mode == "service_principal":
@@ -476,14 +483,17 @@ class AzureADLS(BaseConnection):
             auth_mode=self.auth_mode,
         )
 
-    def uri(self, path: str) -> str:
-        """Build abfss:// URI for given path.
+    def uri(self, path: str, use_blob_endpoint: bool = False) -> str:
+        """Build abfss:// or wasbs:// URI for given path.
 
         Args:
             path: Relative path within container
+            use_blob_endpoint: If True, use wasbs:// (blob endpoint) instead of
+                abfss:// (dfs endpoint). The blob endpoint avoids ACL checks that
+                fail with SAS tokens on ADLS Gen2 with hierarchical namespace.
 
         Returns:
-            Full abfss:// URI
+            Full abfss:// or wasbs:// URI
 
         Example:
             >>> conn = AzureADLS(
@@ -492,18 +502,28 @@ class AzureADLS(BaseConnection):
             ... )
             >>> conn.uri("folder/file.csv")
             'abfss://data@myaccount.dfs.core.windows.net/folder/file.csv'
+            >>> conn.uri("folder/file.csv", use_blob_endpoint=True)
+            'wasbs://data@myaccount.blob.core.windows.net/folder/file.csv'
         """
         if self.path_prefix:
             full_path = posixpath.join(self.path_prefix, path.lstrip("/"))
         else:
             full_path = path.lstrip("/")
 
+        if use_blob_endpoint:
+            return f"wasbs://{self.container}@{self.account}.blob.core.windows.net/{full_path}"
         return f"abfss://{self.container}@{self.account}.dfs.core.windows.net/{full_path}"
 
-    def get_path(self, relative_path: str) -> str:
-        """Get full abfss:// URI for relative path."""
+    def get_path(self, relative_path: str, use_blob_endpoint: bool = False) -> str:
+        """Get full abfss:// or wasbs:// URI for relative path.
+
+        Args:
+            relative_path: Path relative to container/path_prefix
+            use_blob_endpoint: If True, use wasbs:// (blob endpoint) to avoid
+                ACL checks that fail with SAS tokens on ADLS Gen2.
+        """
         ctx = get_logging_context()
-        full_uri = self.uri(relative_path)
+        full_uri = self.uri(relative_path, use_blob_endpoint=use_blob_endpoint)
 
         ctx.debug(
             "Resolved ADLS path",
@@ -511,6 +531,7 @@ class AzureADLS(BaseConnection):
             container=self.container,
             relative_path=relative_path,
             full_uri=full_uri,
+            use_blob_endpoint=use_blob_endpoint,
         )
 
         return full_uri
