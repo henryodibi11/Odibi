@@ -1336,6 +1336,8 @@ class SqlServerMergeWriter:
         """
         Execute MERGE operation and return counts.
 
+        If target table is empty, uses fast INSERT instead of MERGE for better performance.
+
         Args:
             target_table: Target table name
             staging_table: Staging table name
@@ -1346,6 +1348,24 @@ class SqlServerMergeWriter:
         Returns:
             MergeResult with insert/update/delete counts
         """
+        options = options or SqlServerMergeOptions()
+
+        # Check if target table is empty - use fast INSERT instead of MERGE
+        count_result = self.connection.execute_sql(
+            f"SELECT COUNT(*) FROM [{target_table.replace('.', '].[')}]"
+        )
+        target_row_count = count_result[0][0] if count_result else 0
+
+        if target_row_count == 0:
+            # Target is empty - use INSERT...SELECT which is much faster than MERGE
+            return self._execute_insert_from_staging(
+                target_table=target_table,
+                staging_table=staging_table,
+                columns=columns,
+                options=options,
+            )
+
+        # Target has data - use full MERGE
         sql = self.build_merge_sql(
             target_table=target_table,
             staging_table=staging_table,
@@ -1396,6 +1416,83 @@ class SqlServerMergeWriter:
         except Exception as e:
             self.ctx.error(
                 "MERGE failed",
+                target_table=target_table,
+                error_type=type(e).__name__,
+                error_message=str(e),
+            )
+            raise
+
+    def _execute_insert_from_staging(
+        self,
+        target_table: str,
+        staging_table: str,
+        columns: List[str],
+        options: SqlServerMergeOptions,
+    ) -> MergeResult:
+        """
+        Execute fast INSERT from staging to empty target table.
+
+        Used when target table is empty - much faster than MERGE since no row comparisons.
+        Supports audit_cols by adding GETUTCDATE() for created_ts/updated_ts.
+
+        Args:
+            target_table: Target table name
+            staging_table: Staging table name
+            columns: DataFrame columns (without audit columns)
+            options: Merge options with audit_cols config
+
+        Returns:
+            MergeResult with insert count
+        """
+        self.ctx.info(
+            "Target table is empty - using fast INSERT instead of MERGE",
+            target_table=target_table,
+            staging_table=staging_table,
+        )
+
+        # Build column lists
+        source_cols = [f"[{c}]" for c in columns]
+        target_cols = list(source_cols)
+        select_cols = [f"source.[{c}]" for c in columns]
+
+        # Add audit columns if configured
+        if options.audit_cols:
+            if options.audit_cols.created_col:
+                target_cols.append(f"[{options.audit_cols.created_col}]")
+                select_cols.append("GETUTCDATE()")
+            if options.audit_cols.updated_col:
+                target_cols.append(f"[{options.audit_cols.updated_col}]")
+                select_cols.append("GETUTCDATE()")
+
+        schema, table = self.parse_table_name(target_table)
+        staging_schema, staging_name = self.parse_table_name(staging_table)
+
+        sql = f"""
+        INSERT INTO [{schema}].[{table}] ({", ".join(target_cols)})
+        SELECT {", ".join(select_cols)}
+        FROM [{staging_schema}].[{staging_name}] AS source
+        """
+
+        try:
+            self.connection.execute_sql(sql)
+
+            # Get row count from staging table
+            count_result = self.connection.execute_sql(
+                f"SELECT COUNT(*) FROM [{staging_schema}].[{staging_name}]"
+            )
+            inserted_count = count_result[0][0] if count_result else 0
+
+            self.ctx.info(
+                "Fast INSERT completed (empty target optimization)",
+                target_table=target_table,
+                inserted=inserted_count,
+            )
+
+            return MergeResult(inserted=inserted_count, updated=0, deleted=0)
+
+        except Exception as e:
+            self.ctx.error(
+                "Fast INSERT failed",
                 target_table=target_table,
                 error_type=type(e).__name__,
                 error_message=str(e),
