@@ -419,6 +419,14 @@ class AzureADLS(BaseConnection):
             sas_token_key = f"fs.azure.sas.fixed.token.{self.account}.dfs.core.windows.net"
             spark.conf.set(sas_token_key, sas_token)
 
+            # Disable ACL/namespace checks that SAS tokens don't support
+            # The getAccessControl operation fails with SAS tokens on ADLS Gen2
+            # These settings tell the driver to skip those checks
+            spark.conf.set(
+                f"fs.azure.account.hns.enabled.{self.account}.dfs.core.windows.net", "false"
+            )
+            spark.conf.set("fs.azure.skip.user.group.metadata.during.initialization", "true")
+
             ctx.debug(
                 "Set Spark config for SAS token",
                 auth_type_key=provider_key,
