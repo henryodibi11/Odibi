@@ -1,6 +1,28 @@
 # Odibi MCP Server Guide
 
-The **odibi-knowledge** MCP (Model Context Protocol) server exposes 45 tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines.
+The **odibi-knowledge** MCP (Model Context Protocol) server exposes 49 tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines.
+
+## Smart Discovery Tools (New!)
+
+These tools enable the "Lazy Bronze" workflow - point at a data source and get a working bronze layer:
+
+| Tool | Description |
+|------|-------------|
+| `map_environment` | Scout a connection (storage or SQL) to understand what exists. Returns folder structure, file patterns, table counts, and recommendations. |
+| `profile_source` | Self-correcting profiler that figures out how to read a file or table. Detects encoding, delimiter, skip rows, schema. Iterates until data looks right. |
+| `generate_bronze_node` | Generate Odibi YAML for a bronze layer node from a profile result. |
+| `test_node` | Test a node definition in-memory without persisting. Validates output and suggests fixes. |
+
+### Lazy Bronze Workflow
+
+```
+1. map_environment(connection)          → What's here?
+2. profile_source(connection, path)     → How do I read it?
+3. generate_bronze_node(profile)        → Give me the YAML
+4. test_node(yaml)                      → Verify it works
+5. [iterate if needed]                  → Fix issues
+6. Save to project                      → Done!
+```
 
 ## Quick Start
 
@@ -23,8 +45,13 @@ mcpServers:
     args:
       - D:/odibi/run_mcp.py  # Path to odibi
     env:
-      ODIBI_CONFIG: C:/Users/yourname/project/odibi.yaml  # Your project config
+      ODIBI_CONFIG: C:/Users/yourname/project/exploration.yaml  # Connections for discovery
+      ODIBI_PROJECTS_DIR: C:/Users/yourname/project/projects    # Auto-discover generated projects
 ```
+
+**Environment Variables:**
+- `ODIBI_CONFIG` - Path to exploration.yaml (connections for data discovery)
+- `ODIBI_PROJECTS_DIR` - Path to projects folder (for auto-discovery of generated projects)
 
 #### Other MCP Clients
 
@@ -119,34 +146,53 @@ Use odibi MCP list_transformers
 | `output_schema` | Get output column schema | `{"pipeline": "bronze", "output_name": "my_node"}` |
 | `compare_schemas` | Compare schemas between two sources | `{"source_connection": "raw", "source_path": "data.csv", "target_connection": "bronze", "target_path": "output.parquet"}` |
 
-### Discovery Tools (8)
+### Discovery Tools (12)
 
 | Tool | Description | Example |
 |------|-------------|---------|
-| `list_files` | List files in a connection | `{"connection": "my_conn", "path": "data/", "pattern": "*.csv"}` |
-| `preview_source` | Preview source data (supports sheet param for Excel) | `{"connection": "my_conn", "path": "data.csv", "max_rows": 10}` |
-| `infer_schema` | Infer schema from file | `{"connection": "my_conn", "path": "data.csv"}` |
-| `list_schemas` | **List schemas** in SQL database with table counts. Call FIRST before discover_database | `{"connection": "my_sql"}` |
-| `list_tables` | List SQL tables | `{"connection": "my_sql", "schema": "dbo"}` |
-| `describe_table` | Describe SQL table | `{"connection": "my_sql", "table": "my_table"}` |
+| `map_environment` | **Scout connection** - understand what exists, detect patterns. Call FIRST | `{"connection": "my_adls", "path": "raw/"}` |
+| `profile_source` | **Self-correcting profiler** - figures out encoding, delimiter, skip rows | `{"connection": "my_adls", "path": "raw/data.csv"}` |
+| `profile_folder` | **Batch profiler** - profile all files in a folder, group by options | `{"connection": "my_adls", "folder_path": "raw/", "pattern": "*.csv"}` |
+| `generate_bronze_node` | **Generate bronze YAML** from profile result | `{"profile": {...}, "output_connection": "bronze"}` |
+| `test_node` | **Test node in-memory** - validate before saving | `{"node_yaml": "...", "max_rows": 100}` |
+| `list_schemas` | List schemas in SQL database with table counts | `{"connection": "my_sql"}` |
+| `describe_table` | Describe SQL table (quick metadata) | `{"connection": "my_sql", "table": "my_table"}` |
 | `list_sheets` | List sheet names in Excel file | `{"connection": "my_conn", "path": "data.xlsx"}` |
-| `discover_database` | **Discover SQL tables** (structure-first, shallow). Samples OFF by default - use preview_source | `{"connection": "my_sql", "schema": "dbo"}` |
-| `discover_storage` | **Discover files** (structure-first, shallow). Samples/recursion OFF by default - use preview_source | `{"connection": "my_adls", "path": "raw/"}` |
 | `debug_env` | Debug environment setup - shows .env loading, env vars, and connection status | `{}` |
 
 ---
 
 ## Common Workflows
 
-### 1. Explore Available Data
+### 1. Lazy Bronze (Recommended!)
+
+Point at a data source and get a working bronze layer:
 
 ```
-Use odibi MCP list_files with connection="my_adls", path="raw/", pattern="*.csv"
-Use odibi MCP preview_source with connection="my_adls", path="raw/customers.csv", max_rows=5
-Use odibi MCP infer_schema with connection="my_adls", path="raw/customers.csv"
+Use odibi MCP map_environment with connection="raw_adls", path="/"
+→ "Found 12 CSVs in Reliability_Report/, 3 parquet files in Daily/"
+
+Use odibi MCP profile_source with connection="raw_adls", path="Reliability_Report/IP24.csv"
+→ {encoding: "windows-1252", delimiter: "\t", skipRows: 5, schema: [...], confidence: 0.94}
+
+Use odibi MCP generate_bronze_node with profile={...from above...}
+→ YAML node definition ready to use
+
+Use odibi MCP test_node with node_yaml="..."
+→ {status: "success", rows_read: 1234, ready_to_save: true}
 ```
 
-### 2. Build a New Pipeline
+### 2. Explore Available Data
+
+```
+Use odibi MCP map_environment with connection="my_adls", path="raw/"
+→ Shows all files, tables, patterns detected
+
+Use odibi MCP profile_source with connection="my_adls", path="raw/customers.csv"
+→ Returns full schema, sample data, encoding, delimiter, AI suggestions
+```
+
+### 3. Build a New Pipeline
 
 ```
 Use odibi MCP get_yaml_structure
@@ -155,7 +201,7 @@ Use odibi MCP get_example with pattern_name="dimension"
 Use odibi MCP list_transformers
 ```
 
-### 3. Debug a Failed Run
+### 4. Debug a Failed Run
 
 ```
 Use odibi MCP story_read with pipeline="bronze"
@@ -165,7 +211,7 @@ Use odibi MCP node_failed_rows with pipeline="bronze", node="failed_node"
 Use odibi MCP diagnose_error with error_message="<the error message>"
 ```
 
-### 4. Understand the Framework
+### 5. Understand the Framework
 
 ```
 Use odibi MCP get_deep_context
@@ -208,28 +254,36 @@ connections:
 
 | Tool | Works | Description |
 |------|-------|-------------|
-| `list_files` | ✅ | Browse any connection |
-| `list_tables` | ✅ | List SQL database tables |
+| `map_environment` | ✅ | Scout any connection (files, tables, patterns) |
+| `profile_source` | ✅ | Profile any file/table with full schema |
+| `profile_folder` | ✅ | Batch profile all files in a folder |
 | `describe_table` | ✅ | Get column info from SQL |
-| `preview_source` | ✅ | Sample data from files/tables |
-| `infer_schema` | ✅ | Auto-detect types |
+| `list_schemas` | ✅ | List SQL schemas with table counts |
 | `list_sheets` | ✅ | Excel sheet names |
-| `story_read` | ❌ | Needs full project.yaml |
-| `node_sample` | ❌ | Needs full project.yaml |
-| `lineage_*` | ❌ | Needs full project.yaml |
+| `generate_bronze_node` | ✅ | Generate YAML from profile |
+| `test_node` | ✅ | Test generated YAML |
+| `list_projects` | ✅ | List all projects in ODIBI_PROJECTS_DIR |
+| `story_read` | ✅* | Auto-discovers from ODIBI_PROJECTS_DIR |
+| `node_sample` | ✅* | Auto-discovers from ODIBI_PROJECTS_DIR |
+| `lineage_*` | ✅* | Auto-discovers from ODIBI_PROJECTS_DIR |
+
+*These tools auto-discover projects from `ODIBI_PROJECTS_DIR` by pipeline name.
 
 ### Example Workflow
 
 1. **Create exploration.yaml** with your connections
-2. **Set environment variable**: `ODIBI_CONFIG=./exploration.yaml`
+2. **Set environment variables**:
+   - `ODIBI_CONFIG=./exploration.yaml`
+   - `ODIBI_PROJECTS_DIR=./projects`
 3. **Ask AI to explore**:
    ```
-   Use odibi MCP list_tables with connection="my_sql", schema="dbo"
-   Use odibi MCP preview_source with connection="my_sql", source="dbo.customers", limit=10
-   Use odibi MCP describe_table with connection="my_sql", table="dbo.orders"
+   Use odibi MCP map_environment with connection="my_sql"
+   Use odibi MCP profile_source with connection="my_sql", path="dbo.customers"
+   Use odibi MCP generate_bronze_node → saves to projects/ folder
    ```
-
-When ready to build pipelines, graduate to a full `project.yaml` with pipelines, story, and system sections.
+4. **Run pipeline**: `python -m odibi run projects/my_project.yaml`
+5. **Ask AI to sample**: `Use odibi MCP node_sample with pipeline="my_pipeline", node="my_node"`
+   - Automatically finds the project in ODIBI_PROJECTS_DIR
 
 ---
 

@@ -1,10 +1,10 @@
 # Odibi Project Rules for Continue
 
 ## About Odibi
-Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and 46 MCP tools for AI-assisted development.
+Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and ~50 MCP tools for AI-assisted development.
 
 ## MCP Documentation
-- **Tool Reference**: `docs/guides/mcp_guide.md` - All 46 tools with examples
+- **Tool Reference**: `docs/guides/mcp_guide.md` - All tools with examples
 - **AI Recipes**: `docs/guides/mcp_recipes.md` - 14 workflow recipes for common tasks
 - **System Prompt**: `docs/guides/mcp_system_prompt.md` - Prompts and snippets
 
@@ -48,9 +48,8 @@ This gives you everything needed to understand the project in one call.
 
 ### Workflow A: Full Source Understanding (BEFORE Building Anything)
 ```
-list_files(connection, path, "*")     # 1. What files exist?
-preview_source(connection, path, 20)   # 2. See ACTUAL data values
-infer_schema(connection, path)         # 3. Get exact column names & types
+map_environment(connection, path)      # 1. Scout what files/tables exist
+profile_source(connection, path)       # 2. See schema, sample data, encoding, AI suggestions
 ```
 **ONLY AFTER seeing real data** may the AI suggest patterns or generate YAML.
 
@@ -95,30 +94,36 @@ lineage_graph(pipeline)                # Understand data flow
 
 | ❌ Don't | ✅ Do Instead |
 |----------|--------------|
-| Guess column names | Use `preview_source` or `infer_schema` |
+| Guess column names | Use `profile_source` to see real schema |
 | Assume transformer params | Use `explain` to verify |
-| Generate YAML without validation | Run `validate_yaml` first |
+| Generate YAML without validation | Run `test_node` or `validate_yaml` first |
 | Suggest fixes without evidence | Use `node_sample_in` to see data |
 | Skip lineage understanding | Use `lineage_graph` before changes |
 
 ## Context Checklist (Verify Before Acting)
 
-- [ ] Seen actual source data (`preview_source`)
-- [ ] Know exact column names/types (`infer_schema`)
+- [ ] Seen actual source data (`profile_source`)
+- [ ] Know exact column names/types (`profile_source`)
 - [ ] Understand the pattern (`explain`)
-- [ ] Validated YAML (`validate_yaml`)
+- [ ] Validated YAML (`test_node` or `validate_yaml`)
 - [ ] Checked lineage impact (`lineage_graph`)
 
 ---
 
 ## AI Workflow Recipes (Quick Reference)
 
-### Recipe: Build New Pipeline
-1. `list_files` / `preview_source` → understand source data
-2. `suggest_pattern` → recommend right pattern  
-3. `get_example` → get working YAML template
-4. `list_transformers` / `explain` → find transformers
-5. `validate_yaml` → validate before presenting
+### Recipe: Build New Pipeline (Lazy Bronze)
+1. `map_environment(connection, path)` → scout what exists
+2. `profile_source(connection, path)` → get schema, encoding, AI suggestions
+3. `generate_bronze_node(profile)` → generate YAML
+4. `test_node(yaml)` → validate before saving
+5. `suggest_pattern` / `get_example` → for complex patterns
+
+**CRITICAL: When displaying `generate_bronze_node` response:**
+- Always show the COMPLETE `yaml_content` field from the response
+- This is a full runnable project YAML with connections, system, story, and pipelines
+- Do NOT truncate or show only the pipeline portion
+- The user needs the complete YAML to save and run with `python -m odibi run <file>.yaml`
 
 ### Recipe: Debug Pipeline Failure
 1. `story_read` → check run status
@@ -128,9 +133,9 @@ lineage_graph(pipeline)                # Understand data flow
 5. `diagnose_error` → get fix suggestions
 
 ### Recipe: Explore Available Data
-1. `list_files(connection, path, pattern)` → list files
-2. `preview_source(connection, path, max_rows)` → preview data
-3. `infer_schema(connection, path)` → get column types
+1. `map_environment(connection, path)` → scout files/tables
+2. `profile_source(connection, path)` → get full schema and samples
+3. `profile_folder(connection, folder)` → batch profile all files
 
 ### Recipe: Learn About Odibi Feature
 1. `explain(name)` → get specific feature docs
@@ -205,17 +210,21 @@ Before writing ANY odibi code, call these odibi-knowledge MCP tools:
 
 Use these to query running pipelines, view data, and debug failures:
 
-**Discovery Tools** - Explore data sources:
+**Smart Discovery Tools** - Lazy Bronze workflow:
 | Tool | Parameters | Example |
 |------|------------|---------|
-| `list_files` | `connection`, `path`, `pattern` | `list_files("my_storage", "raw_data", "*.json")` |
-| `preview_source` | `connection`, `path`, `max_rows`, `sheet` | `preview_source("my_storage", "raw_data/file.json", 10)` |
-| `infer_schema` | `connection`, `path` | `infer_schema("my_storage", "raw_data/file.csv")` |
-| `list_tables` | `connection`, `schema`, `pattern` | `list_tables("my_database", "dbo", "*")` |
+| `map_environment` | `connection`, `path` | `map_environment("my_adls", "raw/")` |
+| `profile_source` | `connection`, `path` | `profile_source("my_adls", "raw/data.csv")` |
+| `profile_folder` | `connection`, `folder_path`, `pattern` | `profile_folder("my_adls", "raw/", "*.csv")` |
+| `generate_bronze_node` | `profile`, `node_name`, `local_output` | `generate_bronze_node(profile_result)` → **ALWAYS display full `yaml_content`** |
+| `test_node` | `node_yaml`, `max_rows` | `test_node(yaml_content, 100)` |
+
+**Discovery Tools** - Quick lookups:
+| Tool | Parameters | Example |
+|------|------------|---------|
 | `describe_table` | `connection`, `table`, `schema` | `describe_table("my_database", "dim_date", "dbo")` |
 | `list_sheets` | `connection`, `path` | `list_sheets("my_storage", "data.xlsx")` |
-| `discover_database` | `connection`, `schema`, `max_tables`, `sample_rows` | `discover_database("my_sql", "dbo")` (shallow, no samples by default) |
-| `discover_storage` | `connection`, `path`, `pattern`, `max_files`, `sample_rows`, `recursive` | `discover_storage("my_adls", "raw/")` (shallow, no samples by default) |
+| `list_schemas` | `connection` | `list_schemas("my_database")` |
 
 **Story Tools** - Inspect pipeline runs:
 | Tool | Parameters | Example |
@@ -458,17 +467,24 @@ transform:
 ```yaml
 nodes:
   - name: my_node
-    inputs:                          # NOT 'source:'
-      input_1:
-        connection: my_connection
-        path: data/input.csv
-        format: csv                  # REQUIRED: csv, parquet, json, delta
-    outputs:                         # NOT 'sink:'
-      output_1:
-        connection: my_connection
-        path: data/output.parquet
-        format: parquet              # REQUIRED
+    read:                            # Flat structure, NOT nested under 'default:'
+      connection: my_connection
+      path: data/input.csv
+      format: csv                    # REQUIRED: csv, parquet, json, delta, sql
+      options:                       # Optional - use pandas-compatible names
+        sep: "\t"                    # NOT 'delimiter'
+        skiprows: 3                  # NOT 'skipRows' (lowercase!)
+        encoding: utf-8
+    write:                           # Flat structure, NOT nested
+      connection: my_connection
+      path: data/output
+      format: delta                  # REQUIRED: delta, parquet, csv
 ```
+
+**Option name mapping (use pandas names):**
+- `delimiter` → `sep`
+- `skipRows` → `skiprows`
+- `header: 'true'` → `header: 0` (or omit, defaults to first row)
 
 ## CRITICAL: YAML Project Structure
 
@@ -501,11 +517,22 @@ connections:
     path: ./data
 ```
 
-**Discovery tools work in exploration mode:**
-- `list_files`, `preview_source`, `infer_schema`
-- `list_tables`, `describe_table`, `list_sheets`
+**Environment Variables:**
+- `ODIBI_CONFIG` - Path to exploration.yaml (connections for discovery)
+- `ODIBI_PROJECTS_DIR` - Path to projects folder (for auto-discovery of generated projects)
 
-**These tools require full project.yaml:**
-- `story_read`, `node_sample`, `lineage_*`, `node_describe`
+**Smart discovery tools work in exploration mode:**
+- `map_environment`, `profile_source`, `profile_folder`
+- `generate_bronze_node`, `test_node`
+- `describe_table`, `list_sheets`, `list_schemas`
+- `list_projects` - Lists all projects in ODIBI_PROJECTS_DIR
 
-Use exploration mode to understand data before building pipelines.
+**These tools auto-discover projects from ODIBI_PROJECTS_DIR:**
+- `story_read`, `node_sample`, `node_sample_in`, `node_failed_rows`
+- `lineage_*`, `node_describe`, `list_outputs`, `output_schema`
+
+**Workflow:**
+1. Use exploration.yaml for data discovery (`map_environment`, `profile_source`)
+2. Generate project YAML with `generate_bronze_node` → saves to projects/ folder
+3. Run pipeline: `python -m odibi run projects/my_project.yaml`
+4. Sampling tools auto-discover the project by pipeline name

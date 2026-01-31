@@ -872,15 +872,31 @@ class PandasEngine(Engine):
                     path=str(full_path),
                 )
                 read_kwargs["encoding"] = "latin1"
-                if is_glob and isinstance(full_path, list):
-                    df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
-                    df.attrs["odibi_source_files"] = full_path
-                    return self._process_df(df, post_read_query)
+                try:
+                    if is_glob and isinstance(full_path, list):
+                        df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
+                        df.attrs["odibi_source_files"] = full_path
+                        return self._process_df(df, post_read_query)
 
-                df = pd.read_csv(full_path, **read_kwargs)
-                if hasattr(df, "attrs"):
-                    df.attrs["odibi_source_files"] = [str(full_path)]
-                return self._process_df(df, post_read_query)
+                    df = pd.read_csv(full_path, **read_kwargs)
+                    if hasattr(df, "attrs"):
+                        df.attrs["odibi_source_files"] = [str(full_path)]
+                    return self._process_df(df, post_read_query)
+                except pd.errors.ParserError:
+                    ctx.warning(
+                        "ParserError after encoding fix, retrying with on_bad_lines='skip'",
+                        path=str(full_path),
+                    )
+                    read_kwargs["on_bad_lines"] = "skip"
+                    if is_glob and isinstance(full_path, list):
+                        df = self._read_parallel(pd.read_csv, full_path, **read_kwargs)
+                        df.attrs["odibi_source_files"] = full_path
+                        return self._process_df(df, post_read_query)
+
+                    df = pd.read_csv(full_path, **read_kwargs)
+                    if hasattr(df, "attrs"):
+                        df.attrs["odibi_source_files"] = [str(full_path)]
+                    return self._process_df(df, post_read_query)
             except pd.errors.ParserError:
                 ctx.warning(
                     "ParserError, retrying with on_bad_lines='skip'",

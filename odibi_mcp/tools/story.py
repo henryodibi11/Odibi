@@ -13,7 +13,7 @@ import fsspec
 from odibi_mcp.contracts.selectors import RunSelector, DEFAULT_RUN_SELECTOR
 from odibi_mcp.contracts.diff import DiffSummary
 from odibi_mcp.contracts.schema import SchemaChange
-from odibi_mcp.context import get_project_context
+from odibi_mcp.context import get_project_context, get_context_for_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -81,10 +81,13 @@ class NodeDescribeResult:
 
 
 def _find_story_file(
-    pipeline: str, run_selector: Optional[RunSelector] = None
+    pipeline: str, run_selector: Optional[RunSelector] = None, ctx=None
 ) -> tuple[Optional[fsspec.AbstractFileSystem], Optional[str]]:
     """Find the story file for a pipeline run. Returns (filesystem, path) tuple."""
-    ctx = get_project_context()
+    if not ctx:
+        ctx = get_context_for_pipeline(pipeline)
+    if not ctx:
+        ctx = get_project_context()
     if not ctx:
         return None, None
 
@@ -149,8 +152,12 @@ def story_read(
     Read story metadata for a pipeline run.
 
     Loads actual story JSON from the configured story path.
+    Uses project discovery to find the correct project context.
     """
-    ctx = get_project_context()
+    # Try to find the right project context for this pipeline
+    ctx = get_context_for_pipeline(pipeline)
+    if not ctx:
+        ctx = get_project_context()
     if ctx and ctx.is_exploration_mode():
         return StoryReadResult(
             pipeline=pipeline,
@@ -166,7 +173,7 @@ def story_read(
             error_message="Story tools require full project.yaml (exploration mode active)",
         )
 
-    fs, story_path = _find_story_file(pipeline, run_selector)
+    fs, story_path = _find_story_file(pipeline, run_selector, ctx=ctx)
 
     if not fs or not story_path:
         return StoryReadResult(

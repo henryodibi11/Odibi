@@ -63,15 +63,16 @@ from odibi_mcp.tools.catalog import (
 from odibi_mcp.tools.lineage import lineage_upstream, lineage_downstream, lineage_graph
 from odibi_mcp.tools.schema import output_schema, list_outputs, compare_schemas
 from odibi_mcp.tools.discovery import (
-    list_files,
-    list_tables,
-    infer_schema,
     describe_table,
-    preview_source,
     list_sheets,
-    discover_database,
     list_schemas,
-    discover_storage,
+)
+from odibi_mcp.tools.smart import (
+    map_environment,
+    profile_source,
+    profile_folder,
+    generate_bronze_node,
+    test_node,
 )
 from odibi_mcp.tools.yaml_builder import (
     generate_sql_pipeline,
@@ -117,6 +118,15 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="debug_env",
             description="Debug environment setup - shows if .env was loaded, which env vars are set (without values), and connection status.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="list_projects",
+            description="List all project YAML files in the projects directory. Shows project name and pipelines defined in each.",
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -663,57 +673,9 @@ async def list_tools() -> list[Tool]:
                 "required": ["pipeline"],
             },
         ),
-        # Discovery tools
-        Tool(
-            name="list_files",
-            description="List files in a connection path.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "connection": {"type": "string", "description": "Connection name"},
-                    "path": {"type": "string", "description": "Path to list"},
-                    "pattern": {
-                        "type": "string",
-                        "description": "Glob pattern",
-                        "default": "*",
-                    },
-                },
-                "required": ["connection", "path"],
-            },
-        ),
-        Tool(
-            name="list_tables",
-            description="List tables in a SQL connection.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "connection": {"type": "string", "description": "Connection name"},
-                    "schema": {
-                        "type": "string",
-                        "description": "Schema name",
-                        "default": "dbo",
-                    },
-                    "pattern": {
-                        "type": "string",
-                        "description": "Table pattern",
-                        "default": "*",
-                    },
-                },
-                "required": ["connection"],
-            },
-        ),
-        Tool(
-            name="infer_schema",
-            description="Infer schema from a file.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "connection": {"type": "string", "description": "Connection name"},
-                    "path": {"type": "string", "description": "Path to file"},
-                },
-                "required": ["connection", "path"],
-            },
-        ),
+        # Discovery tools (kept: describe_table, list_sheets, list_schemas)
+        # NOTE: list_files, list_tables, infer_schema, preview_source, discover_database, discover_storage
+        # have been consolidated into smart tools: map_environment and profile_source
         Tool(
             name="describe_table",
             description="Describe a SQL table.",
@@ -732,27 +694,6 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
-            name="preview_source",
-            description="Preview source data (first N rows). For Excel files, use 'sheet' parameter to specify which sheet to read. Use list_sheets first to discover available sheets.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "connection": {"type": "string", "description": "Connection name"},
-                    "path": {"type": "string", "description": "Path to source"},
-                    "max_rows": {
-                        "type": "integer",
-                        "description": "Max rows",
-                        "default": 100,
-                    },
-                    "sheet": {
-                        "type": "string",
-                        "description": "For Excel files: sheet name to read (default: first sheet)",
-                    },
-                },
-                "required": ["connection", "path"],
-            },
-        ),
-        Tool(
             name="list_sheets",
             description="List all sheet names in an Excel file (.xlsx, .xls). Use this to discover sheets before calling preview_source with sheet parameter.",
             inputSchema={
@@ -766,73 +707,11 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="list_schemas",
-            description="List all schemas in a SQL database with table counts. Call FIRST before discover_database to see what schemas exist.",
+            description="List all schemas in a SQL database with table counts. Use before map_environment to see what schemas exist.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "connection": {"type": "string", "description": "SQL connection name"},
-                },
-                "required": ["connection"],
-            },
-        ),
-        Tool(
-            name="discover_database",
-            description="Discover tables in a SQL database (structure-first, shallow by default). Returns table names, columns, row counts. Samples OFF by default - use preview_source for samples.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "connection": {"type": "string", "description": "SQL connection name"},
-                    "schema": {
-                        "type": "string",
-                        "default": "dbo",
-                        "description": "Database schema to scan",
-                    },
-                    "max_tables": {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Maximum tables to discover (default: 20, shallow)",
-                    },
-                    "sample_rows": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Sample rows per table (default: 0 = none, use preview_source instead)",
-                    },
-                },
-                "required": ["connection"],
-            },
-        ),
-        Tool(
-            name="discover_storage",
-            description="Discover files in storage (structure-first, shallow by default). Returns file names, formats, schemas. Samples and recursion OFF by default - use preview_source for samples.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "connection": {"type": "string", "description": "Storage connection name"},
-                    "path": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Base path to scan",
-                    },
-                    "pattern": {
-                        "type": "string",
-                        "default": "*",
-                        "description": "File pattern (e.g., '*.csv', '*.xlsx')",
-                    },
-                    "max_files": {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Maximum files to discover (default: 10, shallow)",
-                    },
-                    "sample_rows": {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Sample rows per file (default: 0 = none, use preview_source instead)",
-                    },
-                    "recursive": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Scan subdirectories (default: false = shallow)",
-                    },
                 },
                 "required": ["connection"],
             },
@@ -868,6 +747,169 @@ async def list_tools() -> list[Tool]:
                     "target_connection",
                     "target_path",
                 ],
+            },
+        ),
+        # ============ SMART DISCOVERY TOOLS ============
+        Tool(
+            name="map_environment",
+            description="""STEP 1 of Lazy Bronze workflow. Scout a connection to understand what exists.
+
+For storage: scans folders, detects file patterns, groups by format.
+For SQL: lists schemas, tables, row counts.
+
+Returns suggested_sources - use these paths with profile_source next.
+
+WORKFLOW: map_environment → profile_source → generate_bronze_node → test_node""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Connection name from config"},
+                    "path": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Base path to scan (storage only)",
+                    },
+                },
+                "required": ["connection"],
+            },
+        ),
+        Tool(
+            name="profile_source",
+            description="""STEP 2 of Lazy Bronze workflow. Self-correcting profiler that figures out how to read a file or table.
+
+For CSV files: auto-detects encoding, delimiter, skip rows (handles messy SAP exports).
+For parquet/SQL: extracts schema directly.
+
+Returns ready_for dict - pass this directly to generate_bronze_node.
+
+WORKFLOW: map_environment → profile_source → generate_bronze_node → test_node""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {"type": "string", "description": "Connection name"},
+                    "path": {"type": "string", "description": "Path to file or schema.table"},
+                    "max_attempts": {
+                        "type": "integer",
+                        "default": 5,
+                        "description": "Max profiling attempts",
+                    },
+                },
+                "required": ["connection", "path"],
+            },
+        ),
+        Tool(
+            name="profile_folder",
+            description="""BATCH profiling for folders with many files. Use instead of looping through profile_source one by one.
+
+Profiles all files in a folder (or matching a pattern), groups them by detected options, and identifies which files share the same configuration.
+
+Returns:
+- options_groups: Files grouped by encoding/delimiter/skipRows
+- consistent_options: True if all files use same options
+- recommended_options: Options from the largest group
+- file_profiles: Individual profile summaries
+
+WORKFLOW: map_environment → profile_folder → generate_bronze_node (per file or bulk)""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {
+                        "type": "string",
+                        "description": "Connection name (storage only: ADLS, S3, local)",
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Folder path to scan",
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "default": "*",
+                        "description": "File pattern (e.g., '*.csv', 'IP24*')",
+                    },
+                    "max_files": {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Max files to profile",
+                    },
+                    "max_attempts": {
+                        "type": "integer",
+                        "default": 3,
+                        "description": "Max profiling attempts per file",
+                    },
+                },
+                "required": ["connection"],
+            },
+        ),
+        Tool(
+            name="generate_bronze_node",
+            description="""STEP 3 of Lazy Bronze workflow. Generate COMPLETE runnable Odibi project YAML.
+
+Takes the ready_for output from profile_source as the 'profile' parameter.
+Returns a complete project config with:
+- connections (auto-detected from context)
+- system/story config (uses local connection)
+- pipeline with bronze node
+
+The output YAML can be saved and run directly: python -m odibi run <file>.yaml
+
+Set include_project=false to generate just a pipeline (for import into existing project).
+
+WORKFLOW: map_environment → profile_source → generate_bronze_node → save & run""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "profile": {
+                        "type": "object",
+                        "description": "The ready_for dict from profile_source response",
+                    },
+                    "node_name": {
+                        "type": "string",
+                        "description": "Optional node name (auto-generated if not provided)",
+                    },
+                    "output_connection": {
+                        "type": "string",
+                        "description": "Output connection name (defaults to source connection)",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Optional output path (auto-generated if not provided)",
+                    },
+                    "include_project": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "If true (default), generates complete project YAML. If false, generates just pipeline.",
+                    },
+                    "local_output": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "If true (default), forces output to local connection for testing. Set false to write to source connection.",
+                    },
+                },
+                "required": ["profile"],
+            },
+        ),
+        Tool(
+            name="test_node",
+            description="""STEP 4 of Lazy Bronze workflow. Test a node definition in-memory before saving.
+
+Reads source with the specified options, validates output.
+Returns ready_to_save=true if successful, or suggestions for fixes if not.
+
+If test fails: adjust options in YAML and re-test, or re-run profile_source.
+
+WORKFLOW: map_environment → profile_source → generate_bronze_node → test_node""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "node_yaml": {"type": "string", "description": "Node YAML definition to test"},
+                    "max_rows": {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Max rows to read",
+                    },
+                },
+                "required": ["node_yaml"],
             },
         ),
         # ============ YAML BUILDER TOOLS ============
@@ -1055,7 +1097,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     try:
         if name == "debug_env":
             # Debug tool to check environment setup
-            from odibi_mcp.context import get_project_context
+            from odibi_mcp.context import get_project_context, list_projects as list_projects_fn
 
             ctx = get_project_context()
             debug_info = {
@@ -1073,6 +1115,17 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 else [],
             }
             return [TextContent(type="text", text=json.dumps(debug_info, indent=2))]
+        elif name == "list_projects":
+            from odibi_mcp.context import list_projects as list_projects_fn, get_projects_dir
+
+            projects = list_projects_fn()
+            projects_dir = get_projects_dir()
+            result = {
+                "projects_dir": str(projects_dir) if projects_dir else None,
+                "count": len(projects),
+                "projects": projects,
+            }
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
         elif name == "list_transformers":
             result = knowledge.list_transformers()
         elif name == "list_patterns":
@@ -1244,40 +1297,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 target_sheet=arguments.get("target_sheet"),
             )
             result = to_json_serializable(res)
-        # Discovery tools
-        elif name == "list_files":
-            res = list_files(
-                connection=arguments["connection"],
-                path=arguments["path"],
-                pattern=arguments.get("pattern", "*"),
-            )
-            result = to_json_serializable(res)
-        elif name == "list_tables":
-            res = list_tables(
-                connection=arguments["connection"],
-                schema=arguments.get("schema", "dbo"),
-                pattern=arguments.get("pattern", "*"),
-            )
-            result = to_json_serializable(res)
-        elif name == "infer_schema":
-            res = infer_schema(
-                connection=arguments["connection"],
-                path=arguments["path"],
-            )
-            result = to_json_serializable(res)
+        # Discovery tools (kept: describe_table, list_sheets, list_schemas)
         elif name == "describe_table":
             res = describe_table(
                 connection=arguments["connection"],
                 table=arguments["table"],
                 schema=arguments.get("schema", "dbo"),
-            )
-            result = to_json_serializable(res)
-        elif name == "preview_source":
-            res = preview_source(
-                connection=arguments["connection"],
-                path=arguments["path"],
-                max_rows=arguments.get("max_rows", 100),
-                sheet=arguments.get("sheet"),
             )
             result = to_json_serializable(res)
         elif name == "list_sheets":
@@ -1289,22 +1314,43 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         elif name == "list_schemas":
             res = list_schemas(connection=arguments["connection"])
             result = to_json_serializable(res)
-        elif name == "discover_database":
-            res = discover_database(
-                connection=arguments["connection"],
-                schema=arguments.get("schema", "dbo"),
-                max_tables=arguments.get("max_tables", 50),
-                sample_rows=arguments.get("sample_rows", 5),
-            )
-            result = to_json_serializable(res)
-        elif name == "discover_storage":
-            res = discover_storage(
+        # ============ SMART DISCOVERY TOOL HANDLERS ============
+        elif name == "map_environment":
+            res = map_environment(
                 connection=arguments["connection"],
                 path=arguments.get("path", ""),
+            )
+            result = to_json_serializable(res)
+        elif name == "profile_source":
+            res = profile_source(
+                connection=arguments["connection"],
+                path=arguments["path"],
+                max_attempts=arguments.get("max_attempts", 5),
+            )
+            result = to_json_serializable(res)
+        elif name == "profile_folder":
+            res = profile_folder(
+                connection=arguments["connection"],
+                folder_path=arguments.get("folder_path", ""),
                 pattern=arguments.get("pattern", "*"),
-                max_files=arguments.get("max_files", 20),
-                sample_rows=arguments.get("sample_rows", 5),
-                recursive=arguments.get("recursive", True),
+                max_files=arguments.get("max_files", 50),
+                max_attempts=arguments.get("max_attempts", 3),
+            )
+            result = to_json_serializable(res)
+        elif name == "generate_bronze_node":
+            res = generate_bronze_node(
+                profile=arguments["profile"],
+                node_name=arguments.get("node_name"),
+                output_connection=arguments.get("output_connection"),
+                output_path=arguments.get("output_path"),
+                include_project=arguments.get("include_project", True),
+                local_output=arguments.get("local_output", True),
+            )
+            result = to_json_serializable(res)
+        elif name == "test_node":
+            res = test_node(
+                node_yaml=arguments["node_yaml"],
+                max_rows=arguments.get("max_rows", 100),
             )
             result = to_json_serializable(res)
         # ============ YAML BUILDER TOOL HANDLERS ============

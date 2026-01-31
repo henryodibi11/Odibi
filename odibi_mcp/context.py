@@ -242,6 +242,8 @@ class MCPProjectContext:
 
 # Global context - initialized on server startup
 _project_context: Optional[MCPProjectContext] = None
+_projects_dir: Optional[Path] = None
+_project_cache: Dict[str, MCPProjectContext] = {}  # Cache loaded projects by pipeline name
 
 
 def get_project_context() -> Optional[MCPProjectContext]:
@@ -253,6 +255,99 @@ def set_project_context(ctx: MCPProjectContext) -> None:
     """Set the global project context."""
     global _project_context
     _project_context = ctx
+
+
+def get_projects_dir() -> Optional[Path]:
+    """Get the projects directory path."""
+    return _projects_dir
+
+
+def set_projects_dir(path: Path) -> None:
+    """Set the projects directory path."""
+    global _projects_dir
+    _projects_dir = path
+
+
+def list_projects() -> list[Dict[str, Any]]:
+    """List all project YAML files in the projects directory."""
+    if not _projects_dir or not _projects_dir.exists():
+        return []
+
+    projects = []
+    for yaml_file in _projects_dir.glob("*.yaml"):
+        try:
+            with open(yaml_file) as f:
+                config = yaml.safe_load(f)
+            if _is_full_project_config(config):
+                pipelines = config.get("pipelines", [])
+                pipeline_names = [p.get("pipeline", p.get("name", "unknown")) for p in pipelines]
+                projects.append(
+                    {
+                        "path": str(yaml_file),
+                        "project": config.get("project", yaml_file.stem),
+                        "pipelines": pipeline_names,
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Failed to parse project file {yaml_file}: {e}")
+    return projects
+
+
+def find_project_by_pipeline(pipeline_name: str) -> Optional[MCPProjectContext]:
+    """Find and load a project context by pipeline name.
+
+    Searches the projects directory for a YAML file containing the specified pipeline.
+    Results are cached to avoid re-loading.
+    """
+    # Check cache first
+    if pipeline_name in _project_cache:
+        return _project_cache[pipeline_name]
+
+    # Check current context
+    ctx = get_project_context()
+    if ctx and ctx.config.get("pipelines"):
+        for p in ctx.config.get("pipelines", []):
+            if p.get("pipeline") == pipeline_name or p.get("name") == pipeline_name:
+                return ctx
+
+    # Search projects directory
+    if not _projects_dir or not _projects_dir.exists():
+        return None
+
+    for yaml_file in _projects_dir.glob("*.yaml"):
+        try:
+            with open(yaml_file) as f:
+                config = yaml.safe_load(f)
+            if not _is_full_project_config(config):
+                continue
+            for p in config.get("pipelines", []):
+                if p.get("pipeline") == pipeline_name or p.get("name") == pipeline_name:
+                    # Found it - load the project context
+                    logger.info(f"Found pipeline '{pipeline_name}' in {yaml_file}")
+                    project_ctx = MCPProjectContext.from_odibi_yaml(str(yaml_file))
+                    project_ctx.initialize_connections()
+                    _project_cache[pipeline_name] = project_ctx
+                    return project_ctx
+        except Exception as e:
+            logger.warning(f"Failed to search project file {yaml_file}: {e}")
+
+    return None
+
+
+def get_context_for_pipeline(pipeline_name: str) -> Optional[MCPProjectContext]:
+    """Get the appropriate context for a pipeline.
+
+    First checks the global context, then searches the projects directory.
+    """
+    # Try global context first
+    ctx = get_project_context()
+    if ctx and ctx.config.get("pipelines"):
+        for p in ctx.config.get("pipelines", []):
+            if p.get("pipeline") == pipeline_name or p.get("name") == pipeline_name:
+                return ctx
+
+    # Fall back to project discovery
+    return find_project_by_pipeline(pipeline_name)
 
 
 def _is_full_project_config(config: Dict[str, Any]) -> bool:
@@ -291,8 +386,23 @@ def _load_config_auto(config_path: str) -> MCPProjectContext:
 
 
 def initialize_from_env() -> Optional[MCPProjectContext]:
-    """Initialize project context from MCP_CONFIG or ODIBI_CONFIG env var."""
-    global _project_context
+    """Initialize project context from MCP_CONFIG or ODIBI_CONFIG env var.
+
+    Also initializes ODIBI_PROJECTS_DIR for project discovery.
+    """
+    global _project_context, _projects_dir
+
+    # Initialize projects directory from env var
+    projects_dir = os.environ.get("ODIBI_PROJECTS_DIR")
+    if projects_dir and Path(projects_dir).exists():
+        _projects_dir = Path(projects_dir)
+        logger.info(f"Projects directory set to: {_projects_dir}")
+    else:
+        # Default to ./projects if it exists
+        default_projects = Path("./projects")
+        if default_projects.exists():
+            _projects_dir = default_projects
+            logger.info(f"Using default projects directory: {_projects_dir}")
 
     mcp_config = os.environ.get("MCP_CONFIG")
     odibi_config = os.environ.get("ODIBI_CONFIG")
