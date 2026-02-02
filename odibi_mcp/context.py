@@ -351,8 +351,11 @@ def get_context_for_pipeline(pipeline_name: str) -> Optional[MCPProjectContext]:
 
 
 def _is_full_project_config(config: Dict[str, Any]) -> bool:
-    """Check if config has full project structure (pipelines, story, system)."""
-    return all(key in config for key in ["pipelines", "story", "system"])
+    """Check if config has full project structure (pipelines or imports, story, system)."""
+    has_pipelines = "pipelines" in config or "imports" in config
+    has_story = "story" in config
+    has_system = "system" in config
+    return has_pipelines and has_story and has_system
 
 
 def _is_exploration_config(config: Dict[str, Any]) -> bool:

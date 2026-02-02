@@ -79,6 +79,7 @@ from odibi_mcp.tools.yaml_builder import (
     validate_odibi_config,
     generate_project_yaml,
 )
+from odibi_mcp.tools.diagnose import diagnose, diagnose_path
 from dataclasses import asdict, is_dataclass
 from pydantic import BaseModel
 
@@ -1062,6 +1063,34 @@ Use to create a new Odibi project with correct structure.""",
                 "required": ["project_name", "connections"],
             },
         ),
+        Tool(
+            name="diagnose",
+            description="""Diagnose the MCP environment - check paths, env vars, connections, and story files.
+
+ALWAYS call this tool first when something fails or returns "not found".
+Returns detailed status of the environment with issues and suggestions.""",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="diagnose_path",
+            description="""Diagnose a specific path - check if it exists, list contents.
+
+Use to explore the filesystem when trying to find files or understand directory structure.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to diagnose (can be relative or absolute)",
+                    },
+                },
+                "required": ["path"],
+            },
+        ),
     ]
 
 
@@ -1381,6 +1410,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 system_connection=arguments.get("system_connection"),
             )
             return [TextContent(type="text", text=yaml_content)]
+        elif name == "diagnose":
+            res = diagnose()
+            result = to_json_serializable(res)
+        elif name == "diagnose_path":
+            result = diagnose_path(path=arguments["path"])
         else:
             result = {"error": f"Unknown tool: {name}"}
 
