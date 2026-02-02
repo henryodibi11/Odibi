@@ -1,6 +1,6 @@
 # Odibi MCP Server Guide
 
-The **odibi-knowledge** MCP (Model Context Protocol) server exposes 49 tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines.
+The **odibi-knowledge** MCP (Model Context Protocol) server exposes 53 knowledge tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines. Execution is done via shell commands.
 
 ## Smart Discovery Tools (New!)
 
@@ -69,7 +69,7 @@ Use odibi MCP list_transformers
 
 ---
 
-## Available Tools (45 Total)
+## Available Tools (53 Total)
 
 ### 🚀 Start Here: Bootstrap Tool
 
@@ -159,6 +159,22 @@ Use odibi MCP list_transformers
 | `describe_table` | Describe SQL table (quick metadata) | `{"connection": "my_sql", "table": "my_table"}` |
 | `list_sheets` | List sheet names in Excel file | `{"connection": "my_conn", "path": "data.xlsx"}` |
 | `debug_env` | Debug environment setup - shows .env loading, env vars, and connection status | `{}` |
+| `diagnose` | Diagnose MCP environment - check paths, env vars, connections | `{}` |
+| `diagnose_path` | Check if a specific path exists and list contents | `{"path": "projects/data"}` |
+
+### Execution - Use Shell!
+
+Execution tools have been removed. **Use shell commands instead:**
+
+```powershell
+python -m odibi run X.yaml          # Run pipeline
+python -m odibi run X.yaml --dry-run # Validate
+python -m odibi doctor              # Check environment
+python -m odibi story last          # View last run
+Get-ChildItem -Recurse -Filter "*.yaml"  # Find files
+```
+
+> **Agent Behavior:** Execute shell commands directly. Don't show commands and wait - run them yourself.
 
 ---
 

@@ -1,599 +1,127 @@
-# Odibi Project Rules for Continue
+# Odibi Rules for Continue
 
-## About Odibi
-Odibi is a declarative data pipeline framework with 52+ transformers, 6 DWH patterns, and ~50 MCP tools for AI-assisted development.
+## 🔴 USE SHELL FOR EVERYTHING
 
-## MCP Documentation
-- **Tool Reference**: `docs/guides/mcp_guide.md` - All tools with examples
-- **AI Recipes**: `docs/guides/mcp_recipes.md` - 14 workflow recipes for common tasks
-- **System Prompt**: `docs/guides/mcp_system_prompt.md` - Prompts and snippets
+**Shell for execution. MCP for odibi knowledge only.**
 
-## MCP Tool Selection Guide
-
-**Choose the right tool automatically based on task:**
-
-| Task Type | MCP to Use |
-|-----------|------------|
-| Odibi transformers, patterns, YAML | `odibi-knowledge` tools |
-| Query pipeline runs, debug failures | `odibi-knowledge` MCP Facade tools |
-| Complex planning, tradeoff analysis | `sequential-thinking` |
-| Read/write/search files | `filesystem` |
-| Web documentation, API docs | `fetch` |
-| Remember user preferences/context | `memory` |
-| Git history, commits, branches | `git` |
-
-**Auto-trigger rules:**
-- "explain", "list", "generate YAML", "transformer", "pattern" → use `odibi-knowledge`
-- "why did pipeline fail", "show sample", "lineage", "schema" → use MCP Facade tools
-- "plan", "analyze tradeoffs", "step by step" → use `sequential-thinking`
-- "remember", "recall", "my preferences" → use `memory`
-- "fetch docs", "get documentation for" → use `fetch`
-- "create file", "write to", "save as" → use `filesystem`
-
-## ⚠️ FIRST THING TO DO (MANDATORY)
-
-**At the START of every conversation, call `bootstrap_context` to auto-gather project context:**
-
-```
-bootstrap_context()  # Returns: project, connections, pipelines, outputs, patterns, YAML rules
+### Shell Commands
+```powershell
+python -m odibi run X.yaml          # Run pipeline
+python -m odibi run X.yaml --dry-run # Validate
+python -m odibi doctor              # Check environment
+python -m odibi story last          # View last run
+python -m odibi list transformers   # List features
+Get-ChildItem -Recurse -Filter "*.yaml"  # Find files
+Get-Content file.yaml               # Read file
+Set-Content -Path "file.yaml" -Value $content  # Write file
 ```
 
-This gives you everything needed to understand the project in one call.
+### MCP Tools (Knowledge Only)
+- `diagnose()` - See environment, paths, connections
+- `profile_source(connection, path)` - Analyze source schema
+- `generate_bronze_node(profile)` - Generate pipeline YAML
+- `map_environment(connection, path)` - Discover files/tables
+- `explain(name)` - Get transformer/pattern docs
+- `list_transformers()` - All 52+ transformers
+- `list_patterns()` - All 6 DWH patterns
+- `get_deep_context()` - Full framework docs
+
+**Rule: Runs code or files → Shell. Needs odibi knowledge → MCP.**
 
 ---
 
-## ⚠️ CONTEXT-FIRST RULE (MANDATORY)
+## 🚨 AGENT BEHAVIOR (BE LIKE AMP)
 
-**Before suggesting ANY solution, the AI MUST gather full context using these workflows.**
+**You are an AUTONOMOUS agent. Take action. Figure things out. Don't ask for permission.**
 
-### Workflow A: Full Source Understanding (BEFORE Building Anything)
-```
-map_environment(connection, path)      # 1. Scout what files/tables exist
-profile_source(connection, path)       # 2. See schema, sample data, encoding, AI suggestions
-```
-**ONLY AFTER seeing real data** may the AI suggest patterns or generate YAML.
+### DO THIS:
+- **Run commands yourself** - Don't show commands and wait, execute them
+- **Read files to understand** - Use `Get-Content` to see what's there
+- **Search when lost** - Use `Get-ChildItem -Recurse` to find files
+- **Try things** - If unsure, try it and see what happens
+- **Fix and retry** - If something fails, diagnose, fix, and run again
+- **Chain actions** - Do step 1, then step 2, then step 3 without stopping
 
-### Workflow B: Pipeline Deep Dive (BEFORE Modifying Anything)
-```
-list_outputs(pipeline)                 # 1. What outputs exist?
-output_schema(pipeline, output)        # 2. What's the schema?
-lineage_graph(pipeline, true)          # 3. How do nodes connect?
-node_describe(pipeline, node)          # 4. What does this node do?
-node_sample_in(pipeline, node, 10)     # 5. What data flows in?
-story_read(pipeline)                   # 6. Recent run history?
-```
+### DON'T DO THIS:
+- ❌ Show a command and say "run this" - run it yourself
+- ❌ Say "I can't" without trying first
+- ❌ Ask "should I continue?" - just continue
+- ❌ Stop after one error - diagnose and fix it
+- ❌ Wait for permission to explore files
 
-### Workflow C: Framework Mastery Check (BEFORE Suggesting Solutions)
+### When stuck:
+```powershell
+python -m odibi doctor          # Check environment
+Get-ChildItem -Recurse -Filter "*.yaml"  # Find files
+Get-Content some_file.yaml      # Read and understand
 ```
-explain(name)                          # Verify transformer/pattern understanding
-get_example(pattern_name)              # Get working example
-get_yaml_structure()                   # Verify YAML structure
-```
-**NEVER guess parameters** — always use `explain` first.
-
-### Workflow D: Complete Debug Investigation (BEFORE Suggesting Fixes)
-```
-story_read(pipeline)                   # 1. Which node failed?
-node_describe(pipeline, failed_node)   # 2. What was it supposed to do?
-node_sample_in(pipeline, failed_node)  # 3. What data actually arrived?
-node_failed_rows(pipeline, failed_node)# 4. What rows failed validation?
-diagnose_error(error_message)          # 5. Get AI diagnosis
-```
-
-### Workflow F: New Project Onboarding (Complete Context)
-```
-get_deep_context()                     # Full framework docs
-list_patterns()                        # Available patterns
-list_connections()                     # Available connections
-list_transformers()                    # Available transformers
-list_outputs(pipeline)                 # For each pipeline in scope
-lineage_graph(pipeline)                # Understand data flow
-```
-
-## Anti-Patterns (NEVER DO)
-
-| ❌ Don't | ✅ Do Instead |
-|----------|--------------|
-| Guess column names | Use `profile_source` to see real schema |
-| Assume transformer params | Use `explain` to verify |
-| Generate YAML without validation | Run `test_node` or `validate_yaml` first |
-| Suggest fixes without evidence | Use `node_sample_in` to see data |
-| Skip lineage understanding | Use `lineage_graph` before changes |
-
-## Context Checklist (Verify Before Acting)
-
-- [ ] Seen actual source data (`profile_source`)
-- [ ] Know exact column names/types (`profile_source`)
-- [ ] Understand the pattern (`explain`)
-- [ ] Validated YAML (`test_node` or `validate_yaml`)
-- [ ] Checked lineage impact (`lineage_graph`)
 
 ---
 
-## AI Workflow Recipes (Quick Reference)
+## 🚫 YAML RULES
 
-### Recipe: Build New Pipeline (Lazy Bronze)
-1. `map_environment(connection, path)` → scout what exists
-2. `profile_source(connection, path)` → get schema, encoding, AI suggestions
-3. `generate_bronze_node(profile)` → generate YAML
-4. `test_node(yaml)` → validate before saving
-5. `suggest_pattern` / `get_example` → for complex patterns
+1. Use `generate_bronze_node` MCP tool to create YAML - don't write manually
+2. Use the `yaml_content` field from response AS-IS
+3. Pipeline files need `pipelines:` list (not `pipeline:` singular)
+4. Run `python -m odibi run X.yaml --dry-run` to validate
 
-**CRITICAL: When displaying `generate_bronze_node` response:**
-- Always show the COMPLETE `yaml_content` field from the response
-- This is a full runnable project YAML with connections, system, story, and pipelines
-- Do NOT truncate or show only the pipeline portion
-- The user needs the complete YAML to save and run with `python -m odibi run <file>.yaml`
-
-### Recipe: Debug Pipeline Failure
-1. `story_read` → check run status
-2. `node_describe` → get failed node details
-3. `node_sample_in` → see what data node received
-4. `node_failed_rows` → see validation failures
-5. `diagnose_error` → get fix suggestions
-
-### Recipe: Explore Available Data
-1. `map_environment(connection, path)` → scout files/tables
-2. `profile_source(connection, path)` → get full schema and samples
-3. `profile_folder(connection, folder)` → batch profile all files
-
-### Recipe: Learn About Odibi Feature
-1. `explain(name)` → get specific feature docs
-2. `search_docs(query)` → search documentation
-3. `query_codebase(question)` → search source code
-
-## CRITICAL: Safe Editing Practices
-
-**NEVER replace entire files.** Make surgical, targeted edits:
-- Edit ONE function/docstring at a time
-- Show the specific change, not the whole file
-- Use diff-style edits when possible
-- After each edit, verify the file still has all its code
-
-**Before editing large files:**
-1. Count functions/classes in the file
-2. After edit, verify the same count exists
-3. If code was accidentally removed, STOP and restore via `git checkout -- <file>`
-
-**Preferred workflow for docstring improvements:**
-1. List each function needing changes
-2. Edit each docstring ONE AT A TIME
-3. Run `ruff check <file>` after each batch
-
-## CRITICAL: Verification After Changes
-
-**After EVERY code change:**
-1. Run `ruff check <file> --fix` to fix lint issues
-2. Run `ruff format <file>` to format
-3. Run relevant tests: `pytest tests/unit/test_<module>.py -v`
-4. If tests fail, fix before moving on
-
-**Before committing or saying "done":**
-- Verify the file is syntactically valid: `python -m py_compile <file>`
-- Check for import errors: `python -c "import odibi.<module>"`
-
-## CRITICAL: What NOT To Do
-
-**NEVER:**
-- Delete code unless explicitly asked
-- Modify multiple unrelated files in one edit
-- Skip running tests after changes
-- Assume imports exist — check first
-- Add dependencies without asking
-- Change function signatures without updating all callers
-- Use `# type: ignore` or `# noqa` to hide errors
-
-**ALWAYS ask before:**
-- Deleting any function, class, or file
-- Refactoring across multiple files
-- Adding new dependencies to pyproject.toml
-- Changing public API signatures
-
-## CRITICAL: Handling Errors
-
-**If you encounter an error:**
-1. Show the full error message
-2. Explain what went wrong
-3. Propose a fix but WAIT for approval before applying
-4. If you broke something, restore with `git checkout -- <file>`
-
-**If tests fail after your change:**
-1. Do NOT proceed to other tasks
-2. Fix the failing test first
-3. If you can't fix it, revert your change
-
-## IMPORTANT: Use MCP Tools First!
-
-Before writing ANY odibi code, call these odibi-knowledge MCP tools:
-
-### MCP Facade Tools (Query Pipelines & Debug)
-
-Use these to query running pipelines, view data, and debug failures:
-
-**Smart Discovery Tools** - Lazy Bronze workflow:
-| Tool | Parameters | Example |
-|------|------------|---------|
-| `map_environment` | `connection`, `path` | `map_environment("my_adls", "raw/")` |
-| `profile_source` | `connection`, `path` | `profile_source("my_adls", "raw/data.csv")` |
-| `profile_folder` | `connection`, `folder_path`, `pattern` | `profile_folder("my_adls", "raw/", "*.csv")` |
-| `generate_bronze_node` | `profile`, `node_name`, `local_output` | `generate_bronze_node(profile_result)` → **ALWAYS display full `yaml_content`** |
-| `test_node` | `node_yaml`, `max_rows` | `test_node(yaml_content, 100)` |
-
-**Discovery Tools** - Quick lookups:
-| Tool | Parameters | Example |
-|------|------------|---------|
-| `describe_table` | `connection`, `table`, `schema` | `describe_table("my_database", "dim_date", "dbo")` |
-| `list_sheets` | `connection`, `path` | `list_sheets("my_storage", "data.xlsx")` |
-| `list_schemas` | `connection` | `list_schemas("my_database")` |
-
-**Story Tools** - Inspect pipeline runs:
-| Tool | Parameters | Example |
-|------|------------|---------|
-| `story_read` | `pipeline` | `story_read("bronze")` |
-| `story_diff` | `pipeline`, `run_a`, `run_b` | `story_diff("bronze", "latest", "previous")` |
-| `node_describe` | `pipeline`, `node` | `node_describe("bronze", "customers_raw")` |
-
-**Sample Tools** - View data:
-| Tool | Parameters | Example |
-|------|------------|---------|
-| `node_sample` | `pipeline`, `node`, `max_rows` | `node_sample("bronze", "customers_raw", 10)` |
-| `node_sample_in` | `pipeline`, `node`, `input_name`, `max_rows` | `node_sample_in("bronze", "customers_raw", "default", 10)` |
-| `node_failed_rows` | `pipeline`, `node`, `max_rows` | `node_failed_rows("bronze", "customers_raw", 50)` |
-
-**Lineage Tools**:
-| Tool | Parameters | Example |
-|------|------------|---------|
-| `lineage_upstream` | `pipeline`, `node`, `depth` | `lineage_upstream("silver", "fact_orders", 3)` |
-| `lineage_downstream` | `pipeline`, `node`, `depth` | `lineage_downstream("bronze", "customers_raw", 3)` |
-| `lineage_graph` | `pipeline`, `include_external` | `lineage_graph("bronze", false)` |
-
-**Schema Tools**:
-| Tool | Parameters | Example |
-|------|------------|---------|
-| `list_outputs` | `pipeline` | `list_outputs("bronze")` |
-| `output_schema` | `pipeline`, `output_name` | `output_schema("bronze", "customers_raw")` |
-| `compare_schemas` | `source_connection`, `source_path`, `target_connection`, `target_path` | `compare_schemas("raw", "data.csv", "bronze", "output.parquet")` |
-
-**Catalog Tools**:
-| Tool | Parameters | Example |
-|------|------------|---------|
-| `node_stats` | `pipeline`, `node` | `node_stats("bronze", "customers_raw")` |
-| `pipeline_stats` | `pipeline` | `pipeline_stats("bronze")` |
-| `failure_summary` | `pipeline`, `max_failures` | `failure_summary("bronze", 10)` |
-| `schema_history` | `pipeline`, `node` | `schema_history("bronze", "customers_raw")` |
-
-### Core Tools
-- `list_transformers` - See all 52+ available transformers
-- `list_patterns` - See all 6 DWH patterns
-- `list_connections` - See all connection types
-- `explain(name)` - Get docs for any transformer/pattern/connection
-
-### Code Generation Tools
-- `get_transformer_signature` - Get exact function signature for custom transformers
-- `get_yaml_structure` - Get exact YAML pipeline structure
-- `generate_transformer` - Generate complete transformer Python code
-- `generate_pipeline_yaml` - Generate complete pipeline YAML config
-- `validate_yaml` - Validate YAML before saving
-
-### Decision Support Tools
-- `suggest_pattern` - Recommend the right pattern for your use case
-- `get_engine_differences` - Spark vs Pandas vs Polars SQL differences
-- `get_validation_rules` - All validation rule types with examples
-
-### Documentation Tools
-- `get_deep_context` - Get full framework documentation (2300+ lines)
-- `get_doc(path)` - Get any specific doc (e.g., "docs/patterns/scd2.md")
-- `search_docs(query)` - Search all docs for a term
-- `get_example(name)` - Get working example for any pattern/transformer
-
-### Debugging Tools
-- `diagnose_error` - Diagnose odibi errors and get fix suggestions
-- `query_codebase` - Semantic search over odibi code (RAG)
-
-**Example workflow for creating a custom transformer:**
-1. Call `get_transformer_signature` to get the exact pattern
-2. Call `list_transformers` to see if similar exists
-3. Write the code following the exact signature
-4. Call `get_yaml_structure` before writing YAML config
-
-**Fallback order if MCP times out:**
-1. Try CLI commands: `python -m odibi list transformers --format json`
-2. Read `docs/ODIBI_DEEP_CONTEXT.md` for comprehensive reference
-
-## Required Reading
-
-Before making changes to odibi, read `docs/ODIBI_DEEP_CONTEXT.md` for complete framework context (2,200+ lines covering all features).
-
-## File Paths
-
-Use paths relative to the workspace root. The workspace is wherever ODIBI_CONFIG points to.
-For this laptop: `C:/Users/hodibi/OneDrive - Ingredion/Desktop/Repos/Odibi`
-
-## CRITICAL: Proactive Troubleshooting Behavior
-
-**When a tool fails or returns "not found":**
-
-1. **DO NOT give up immediately.** Instead:
-   - Use `diagnose` tool to check environment, paths, and connections
-   - Use filesystem tools to explore the actual directory structure
-   - Create and run a Python script to investigate the issue
-
-2. **When `node_sample` or `story_read` fails:**
-   ```
-   diagnose()                           # Check paths, env vars, connections
-   # Then use filesystem to explore:
-   filesystem.list_directory("projects/data/_stories")
-   filesystem.list_directory("projects/data/_system")
-   ```
-
-3. **When paths seem wrong:**
-   - Check if the path exists using filesystem tools
-   - Check the connection's `base_path` configuration
-   - Run a quick Python script to verify:
-   ```python
-   from pathlib import Path
-   print(Path("projects/data/_stories").exists())
-   print(list(Path("projects/data").iterdir()))
-   ```
-
-4. **When environment variables aren't working:**
-   - Run `diagnose()` to see what's actually set
-   - Create a debug script to check env loading
-
-5. **When connections fail:**
-   - Check the .env file exists and is properly formatted
-   - Verify no quotes around values in .env
-   - Check for Base64 padding issues (keys should be 88 chars ending in ==)
-
-**NEVER say "I can't do this" without first:**
-- Calling `diagnose()` to understand the environment
-- Using filesystem tools to explore available files
-- Attempting to run a diagnostic Python script
-
-**Example troubleshooting workflow:**
-```
-# Step 1: Something failed - run diagnose
-diagnose()
-
-# Step 2: Check actual file structure
-filesystem.list_directory("projects/data")
-filesystem.list_directory("projects/data/_stories")
-
-# Step 3: If still unclear, create a test script
-filesystem.write_file("debug_check.py", '''
-import os
-from pathlib import Path
-print("CWD:", os.getcwd())
-print("Stories exist:", Path("projects/data/_stories").exists())
-for p in Path("projects/data").rglob("*.json"):
-    print("Found:", p)
-''')
-# Then run: python debug_check.py
-```
-
-## Project Structure
-
-```
-odibi/
-├── engine/          # Engine implementations (spark.py, pandas.py, polars.py)
-├── patterns/        # DWH patterns (dimension.py, fact.py, scd2.py, etc.)
-├── transformers/    # SQL transforms (must work on all engines)
-├── validation/      # Data quality, quarantine, FK validation
-├── connections/     # Storage connections (local, azure, delta, etc.)
-├── cli/             # CLI commands
-├── config.py        # All Pydantic config models (source of truth)
-├── context.py       # Engine contexts (Spark temp views, DuckDB)
-├── pipeline.py      # Pipeline orchestration
-tests/unit/          # Tests matching source structure
-docs/                # Documentation
-```
-
-## Key Patterns
-
-1. **Engine Parity**: All code must work on Pandas, Spark, AND Polars
-2. **SQL-based transforms**: Use SQL (DuckDB for Pandas, Spark SQL for Spark)
-3. **Pydantic models**: All config uses Pydantic for validation
-4. **Structured logging**: Use `get_logging_context()` for logs
-
-## Critical Runtime Behavior
-
-- Spark: Node outputs registered via `createOrReplaceTempView(node_name)`
-- Pandas: SQL executed via DuckDB (different syntax than Spark SQL)
-- Node names: Must be alphanumeric + underscore only (Spark compatibility)
-
-## Adding New Features
-
-### New Transformer
-1. Check existing: `python -m odibi list transformers`
-2. Add to `odibi/transformers/` following existing patterns
-3. Register in `odibi/transformers/__init__.py`
-4. Add tests in `tests/unit/transformers/`
-5. Must work on Pandas AND Spark (engine parity)
-
-### New Pattern
-1. Check existing: `python -m odibi list patterns`
-2. Add to `odibi/patterns/` extending `Pattern` base class
-3. Register in `odibi/patterns/__init__.py`
-4. Add tests
-
-### New Connection
-1. Check existing: `python -m odibi list connections`
-2. Add to `odibi/connections/`
-3. Register in `odibi/connections/factory.py`
-
-## Testing
-
-```bash
-pytest tests/ -v                        # Run all tests
-pytest tests/unit/test_X.py -v          # Run specific test
-pytest tests/unit/test_X.py::test_name  # Run single test
-pytest --tb=short                       # Shorter tracebacks
-```
-
-## Linting (RUN AFTER EVERY FILE CHANGE!)
-
-```bash
-ruff check <file> --fix                 # Fix lint issues
-ruff format <file>                      # Format code
-```
-**ALWAYS run both commands after creating or modifying any Python file.**
-
-## Don't
-
-- Don't add features without tests
-- Don't break engine parity (if Pandas has it, Spark/Polars need it too)
-- Don't use hyphens, dots, or spaces in node names
-- Don't suppress linter errors with `# type: ignore` without good reason
-- Don't hardcode paths - use connection configs
-- Don't use emojis in Python code (Windows encoding issues with charmap codec)
-
-## Code Style
-
-- No comments explaining obvious code
-- Docstrings for public functions
-- Type hints for function signatures
-- Follow existing patterns in the codebase
-
-## Debugging Tips
-
-```bash
-python -m odibi run config.yaml --dry-run         # Test without writing
-python -m odibi run config.yaml --log-level DEBUG # Verbose logging
-python -m odibi story last                        # View last execution report
-python -m odibi doctor                            # Check environment health
-```
-
-## CRITICAL: Transformer Function Signature
-
-```python
-# CORRECT signature - params is a Pydantic model
-def my_transformer(context: EngineContext, params: MyParams) -> EngineContext:
-    sql = f"SELECT *, {params.column} as new_col FROM df"
-    return context.sql(sql)
-
-# WRONG - do NOT use this pattern
-def my_transformer(context, current, column, value):  # WRONG!
-```
-
-## CRITICAL: Custom Transformer Pattern
-
-```python
-from pydantic import BaseModel, Field
-from odibi.context import EngineContext
-from odibi.registry import FunctionRegistry
-
-class MyParams(BaseModel):
-    column: str = Field(..., description="Column name")
-    value: str = Field(default="x", description="Default value")
-
-def my_transformer(context: EngineContext, params: MyParams) -> EngineContext:
-    sql = f"SELECT *, NULLIF({params.column}, '{params.value}') AS result FROM df"
-    return context.sql(sql)
-
-# Register it
-FunctionRegistry.register(my_transformer, "my_transformer", MyParams)
-```
-
-## CRITICAL: Running Pipelines
-
-```python
-# CORRECT
-from odibi.pipeline import PipelineManager
-pm = PipelineManager.from_yaml("config.yaml")
-pm.run("pipeline_name")
-
-# WRONG
-pm = PipelineManager("config.yaml")  # WRONG!
-```
-
-## CRITICAL: YAML Transform Syntax
-
+**Correct structure:**
 ```yaml
-# CORRECT - use steps with function and params
-transform:
-  steps:
-    - function: my_transformer
-      params:
-        column: name
-        value: "N/A"
-
-# WRONG - this syntax does NOT work
-transform:
-  - my_transformer:
-      column: name  # WRONG!
+pipelines:
+  - pipeline: my_pipeline
+    nodes:
+      - name: my_node
+        read:
+          connection: my_conn
+          path: data.csv
+          format: csv
 ```
 
-## CRITICAL: YAML Input/Output Syntax
+---
 
-```yaml
-nodes:
-  - name: my_node
-    read:                            # Flat structure, NOT nested under 'default:'
-      connection: my_connection
-      path: data/input.csv
-      format: csv                    # REQUIRED: csv, parquet, json, delta, sql
-      options:                       # Optional - use pandas-compatible names
-        sep: "\t"                    # NOT 'delimiter'
-        skiprows: 3                  # NOT 'skipRows' (lowercase!)
-        encoding: utf-8
-    write:                           # Flat structure, NOT nested
-      connection: my_connection
-      path: data/output
-      format: delta                  # REQUIRED: delta, parquet, csv
-```
+## Workflow: New Pipeline
 
-**Option name mapping (use pandas names):**
-- `delimiter` → `sep`
-- `skipRows` → `skiprows`
-- `header: 'true'` → `header: 0` (or omit, defaults to first row)
+1. `map_environment(connection, path)` → see what files exist
+2. `profile_source(connection, path)` → get schema, sample
+3. `generate_bronze_node(profile)` → get YAML
+4. Save YAML with shell: `Set-Content -Path "pipeline.yaml" -Value $yaml`
+5. Run: `python -m odibi run pipeline.yaml`
 
-## CRITICAL: YAML Project Structure
+---
 
-```yaml
-# Every pipeline YAML needs these top-level keys:
-project: my_project          # Required
-connections: {}              # Required
-story:                       # Required
-  connection: conn_name
-  path: stories
-system:                      # Required
-  connection: conn_name
-  path: _system
-pipelines: []                # Required - list of pipeline configs
-```
+## Workflow: Debug Failure
 
-## Exploration Mode (Data Discovery)
+1. `python -m odibi story last` → see what failed
+2. Check the error message
+3. Fix YAML or source data
+4. Retry: `python -m odibi run X.yaml`
 
-For data exploration without building pipelines, use a minimal config:
+---
 
-```yaml
-# exploration.yaml - connections only, no pipelines needed
-project: my_exploration  # optional
-connections:
-  my_sql:
-    type: azure_sql
-    connection_string: ${SQL_CONN}
-  local:
-    type: local
-    path: ./data
-```
+## Need More Context?
 
-**Environment Variables:**
-- `ODIBI_CONFIG` - Path to exploration.yaml (connections for discovery)
-- `ODIBI_PROJECTS_DIR` - Path to projects folder (for auto-discovery of generated projects)
+**If you need odibi framework details:**
+1. Use MCP: `explain("transformer_name")` or `explain("pattern_name")`
+2. Use MCP: `get_deep_context()` for full framework docs
+3. Use MCP: `diagnose()` to see environment, paths, and connections
 
-**Smart discovery tools work in exploration mode:**
-- `map_environment`, `profile_source`, `profile_folder`
-- `generate_bronze_node`, `test_node`
-- `describe_table`, `list_sheets`, `list_schemas`
-- `list_projects` - Lists all projects in ODIBI_PROJECTS_DIR
+**If you don't know where things are:**
+1. Ask the user: "Where is your odibi repo?" or "Where are your project files?"
+2. Use shell to explore: `Get-ChildItem -Recurse -Filter "*.yaml"`
+3. Use MCP: `diagnose()` shows configured paths
 
-**These tools auto-discover projects from ODIBI_PROJECTS_DIR:**
-- `story_read`, `node_sample`, `node_sample_in`, `node_failed_rows`
-- `lineage_*`, `node_describe`, `list_outputs`, `output_schema`
+**The MCP server knows the paths** - use `diagnose()` to discover them.
 
-**Workflow:**
-1. Use exploration.yaml for data discovery (`map_environment`, `profile_source`)
-2. Generate project YAML with `generate_bronze_node` → saves to projects/ folder
-3. Run pipeline: `python -m odibi run projects/my_project.yaml`
-4. Sampling tools auto-discover the project by pipeline name
+---
+
+## Quick Reference
+
+| Need | Command/Tool |
+|------|--------------|
+| Run pipeline | `python -m odibi run X.yaml` |
+| Validate | `python -m odibi run X.yaml --dry-run` |
+| Health check | `python -m odibi doctor` |
+| Find YAML | `Get-ChildItem -Recurse -Filter "*.yaml"` |
+| Profile data | MCP: `profile_source()` |
+| Generate YAML | MCP: `generate_bronze_node()` |
+| Explain feature | MCP: `explain("scd2")` |

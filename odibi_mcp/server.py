@@ -80,6 +80,8 @@ from odibi_mcp.tools.yaml_builder import (
     generate_project_yaml,
 )
 from odibi_mcp.tools.diagnose import diagnose, diagnose_path
+
+# Removed execution tools - use shell instead (run_python, run_odibi, find_path, execute_pipeline)
 from dataclasses import asdict, is_dataclass
 from pydantic import BaseModel
 
@@ -1091,6 +1093,9 @@ Use to explore the filesystem when trying to find files or understand directory 
                 "required": ["path"],
             },
         ),
+        # ============ EXECUTION TOOLS REMOVED ============
+        # Use shell instead: python -m odibi run X.yaml
+        # Removed: run_python, run_odibi, find_path, execute_pipeline
     ]
 
 
@@ -1415,6 +1420,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = to_json_serializable(res)
         elif name == "diagnose_path":
             result = diagnose_path(path=arguments["path"])
+        # Execution tools removed - use shell instead
         else:
             result = {"error": f"Unknown tool: {name}"}
 
