@@ -39,6 +39,41 @@ You are helping implement the Odibi MCP Facade — a read-only AI interface for 
 | `odibi_knowledge_validate_yaml` | Validate pipeline YAML |
 | `odibi_knowledge_query_codebase` | Semantic search over odibi code |
 
+### Odibi Data Discovery Tools (USE FOR EXPLORATION)
+| Tool | When to Use |
+|------|-------------|
+| `map_environment` | List schemas/tables (SQL) or folders/files (ADLS) from a connection |
+| `profile_source` | Profile a table or file - get schema, sample rows, data quality info |
+| `generate_bronze_node` | Generate YAML for a bronze layer node from profile results |
+| `test_node` | Test a node definition in-memory |
+
+**Note:** Discovery tools accept either a connection name OR inline connection spec:
+```python
+# Named connection
+map_environment("wwi")
+
+# Inline spec (no config file needed)
+map_environment({"type": "azure_sql", "server": "...", "database": "...", "username": "${SQL_USER}", "password": "${SQL_PASSWORD}"})
+```
+
+### Odibi Download Tools (USE FOR LOCAL ANALYSIS)
+| Tool | When to Use |
+|------|-------------|
+| `download_sql` | Download SQL query results to local file (Parquet/CSV/JSON) for analysis |
+| `download_table` | Download entire table to local file (convenience wrapper) |
+| `download_file` | Copy ADLS/storage file to local filesystem |
+
+```python
+# Download SQL query results
+download_sql("wwi", "SELECT * FROM Sales.Orders WHERE OrderDate > '2024-01-01'", "./orders.parquet", limit=5000)
+
+# Download entire table
+download_table("wwi", "Sales.Orders", "./data/orders.parquet")
+
+# Download storage file
+download_file("raw_adls", "reports/daily.csv", "./local/daily.csv")
+```
+
 ### Sequential Thinking (USE FOR PLANNING)
 | Tool | When to Use |
 |------|-------------|

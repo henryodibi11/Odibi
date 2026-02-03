@@ -752,6 +752,228 @@ class ReadFormat(str, Enum):
     DELTA = "delta"
     JSON = "json"
     SQL = "sql"
+    API = "api"
+
+
+# =============================================================================
+# API Format Configuration (format: api)
+# =============================================================================
+
+
+class ApiPaginationType(str, Enum):
+    """Pagination strategies for API fetching.
+
+    Values:
+    * `offset_limit` - Uses offset/skip and limit params (most common)
+    * `page_number` - Uses page number and page size params
+    * `cursor` - Uses cursor token from response for next page
+    * `link_header` - Follows RFC 5988 Link headers (GitHub, etc.)
+    """
+
+    OFFSET_LIMIT = "offset_limit"
+    PAGE_NUMBER = "page_number"
+    CURSOR = "cursor"
+    LINK_HEADER = "link_header"
+
+
+class ApiPaginationConfig(BaseModel):
+    """Pagination configuration for API data sources.
+
+    **When to Use:** Configure how to paginate through API results.
+
+    Example (offset/limit pagination):
+    ```yaml
+    read:
+      format: api
+      options:
+        pagination:
+          type: offset_limit
+          offset_param: skip
+          limit_param: limit
+          limit: 1000
+          max_pages: 100
+    ```
+
+    Example (cursor-based pagination):
+    ```yaml
+    read:
+      format: api
+      options:
+        pagination:
+          type: cursor
+          cursor_path: meta.next_cursor
+          cursor_param: cursor
+    ```
+
+    Example (link header pagination - GitHub style):
+    ```yaml
+    read:
+      format: api
+      options:
+        pagination:
+          type: link_header
+          limit: 100
+    ```
+    """
+
+    type: ApiPaginationType = Field(
+        default=ApiPaginationType.OFFSET_LIMIT,
+        description="Pagination strategy to use",
+    )
+    offset_param: str = Field(
+        default="offset", description="Query param name for offset (offset_limit type)"
+    )
+    limit_param: str = Field(default="limit", description="Query param name for limit")
+    limit: int = Field(default=100, description="Number of records per page")
+    max_pages: Optional[int] = Field(
+        default=None, description="Maximum pages to fetch (None = unlimited)"
+    )
+    cursor_path: Optional[str] = Field(
+        default=None, description="Dotted path to cursor in response (cursor type)"
+    )
+    cursor_param: Optional[str] = Field(
+        default=None, description="Query param name for cursor (cursor type)"
+    )
+    page_param: str = Field(
+        default="page", description="Query param name for page number (page_number type)"
+    )
+    start_page: int = Field(default=1, description="Starting page number (page_number type)")
+
+
+class ApiResponseConfig(BaseModel):
+    """Response parsing configuration for API data sources.
+
+    **When to Use:** Configure how to extract data from API responses.
+
+    **Date Variables:** Use these in `add_fields` for automatic date injection:
+
+    | Variable | Description | Example Value |
+    |----------|-------------|---------------|
+    | `$now` | Current UTC timestamp | `2024-01-15T10:30:00+00:00` |
+    | `$today` | Today's date | `2024-01-15` |
+    | `$yesterday` | Yesterday's date | `2024-01-14` |
+    | `$date` | Alias for `$today` | `2024-01-15` |
+    | `$7_days_ago` | 7 days before today | `2024-01-08` |
+    | `$30_days_ago` | 30 days before today | `2023-12-16` |
+    | `$90_days_ago` | 90 days before today | `2023-10-17` |
+    | `$start_of_week` | Monday of current week | `2024-01-15` |
+    | `$start_of_month` | First of current month | `2024-01-01` |
+    | `$start_of_year` | First of current year | `2024-01-01` |
+
+    Example:
+    ```yaml
+    read:
+      format: api
+      options:
+        response:
+          items_path: results
+          add_fields:
+            _fetched_at: "$now"
+            _load_date: "$today"
+    ```
+    """
+
+    items_path: str = Field(
+        default="",
+        description="Dotted path to items array in response (e.g., 'results', 'data.items'). Empty = response is the array.",
+    )
+    add_fields: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Fields to add to each record. Supports date variables: $now, $today, $yesterday, $7_days_ago, etc.",
+    )
+
+
+class ApiRetryConfig(BaseModel):
+    """Retry configuration for API requests.
+
+    Example:
+    ```yaml
+    read:
+      format: api
+      options:
+        retry:
+          max_retries: 3
+          backoff_factor: 2.0
+          retry_codes: [429, 500, 502, 503]
+    ```
+    """
+
+    max_retries: int = Field(default=3, description="Maximum retry attempts")
+    backoff_factor: float = Field(default=2.0, description="Exponential backoff multiplier")
+    retry_codes: List[int] = Field(
+        default=[429, 500, 502, 503, 504],
+        description="HTTP status codes to retry on",
+    )
+
+
+class ApiRateLimitConfig(BaseModel):
+    """Rate limiting configuration for API requests.
+
+    Example:
+    ```yaml
+    read:
+      format: api
+      options:
+        rate_limit:
+          requests_per_second: 10
+    ```
+    """
+
+    requests_per_second: Optional[float] = Field(
+        default=None, description="Max requests per second (None = no limit)"
+    )
+
+
+class ApiOptionsConfig(BaseModel):
+    """Complete options configuration for API data sources (format: api).
+
+    **When to Use:** Pull data from REST APIs with pagination, retry, and rate limiting.
+
+    **See Also:** [API Data Sources Guide](../guides/api_data_sources.md)
+
+    Example:
+    ```yaml
+    nodes:
+      - name: api_data
+        read:
+          connection: my_api
+          format: api
+          path: /v1/records
+          options:
+            pagination:
+              type: offset_limit
+              limit: 1000
+              max_pages: 100
+            response:
+              items_path: data.records
+              add_fields:
+                _source: "my_api"
+                _fetched_at: "$now"
+            retry:
+              max_retries: 3
+            rate_limit:
+              requests_per_second: 5
+    ```
+    """
+
+    pagination: Optional[ApiPaginationConfig] = Field(
+        default=None, description="Pagination configuration"
+    )
+    response: Optional[ApiResponseConfig] = Field(
+        default=None, description="Response parsing configuration"
+    )
+    retry: Optional[ApiRetryConfig] = Field(default=None, description="Retry configuration")
+    rate_limit: Optional[ApiRateLimitConfig] = Field(
+        default=None, description="Rate limiting configuration"
+    )
+    method: str = Field(default="GET", description="HTTP method (GET, POST)")
+    headers: Optional[Dict[str, str]] = Field(default=None, description="Additional HTTP headers")
+    params: Optional[Dict[str, str]] = Field(
+        default=None, description="Additional query parameters"
+    )
+    json_body: Optional[Dict[str, Any]] = Field(
+        default=None, description="JSON body for POST requests"
+    )
 
 
 class TimeTravelConfig(BaseModel):

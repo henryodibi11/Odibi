@@ -135,6 +135,12 @@ GROUP_MAPPING = {
     "SqlServerAuditColsConfig": "Operation",
     "SqlServerMergeValidationConfig": "Operation",
     "SqlServerSchemaEvolutionConfig": "Operation",
+    # API Format (format: api)
+    "ApiPaginationConfig": "Operation",
+    "ApiResponseConfig": "Operation",
+    "ApiRetryConfig": "Operation",
+    "ApiRateLimitConfig": "Operation",
+    "ApiOptionsConfig": "Operation",
 }
 
 # Map modules to readable Categories

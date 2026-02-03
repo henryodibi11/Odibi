@@ -1469,6 +1469,190 @@ auto_optimize:
 | **vacuum_retention_hours** | int | No | `168` | Hours to retain history for VACUUM (default 7 days). Set to 0 to disable VACUUM. |
 
 ---
+### `ApiOptionsConfig`
+Complete options configuration for API data sources (format: api).
+
+**When to Use:** Pull data from REST APIs with pagination, retry, and rate limiting.
+
+**See Also:** [API Data Sources Guide](../guides/api_data_sources.md)
+
+Example:
+```yaml
+nodes:
+  - name: api_data
+    read:
+      connection: my_api
+      format: api
+      path: /v1/records
+      options:
+        pagination:
+          type: offset_limit
+          limit: 1000
+          max_pages: 100
+        response:
+          items_path: data.records
+          add_fields:
+            _source: "my_api"
+            _fetched_at: "$now"
+        retry:
+          max_retries: 3
+        rate_limit:
+          requests_per_second: 5
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **pagination** | Optional[[ApiPaginationConfig](#apipaginationconfig)] | No | - | Pagination configuration |
+| **response** | Optional[[ApiResponseConfig](#apiresponseconfig)] | No | - | Response parsing configuration |
+| **retry** | Optional[[ApiRetryConfig](#apiretryconfig)] | No | - | Retry configuration |
+| **rate_limit** | Optional[[ApiRateLimitConfig](#apiratelimitconfig)] | No | - | Rate limiting configuration |
+| **method** | str | No | `GET` | HTTP method (GET, POST) |
+| **headers** | Optional[Dict[str, str]] | No | - | Additional HTTP headers |
+| **params** | Optional[Dict[str, str]] | No | - | Additional query parameters |
+| **json_body** | Optional[Dict[str, Any]] | No | - | JSON body for POST requests |
+
+---
+### `ApiPaginationConfig`
+> *Used in: [ApiOptionsConfig](#apioptionsconfig)*
+
+Pagination configuration for API data sources.
+
+**When to Use:** Configure how to paginate through API results.
+
+Example (offset/limit pagination):
+```yaml
+read:
+  format: api
+  options:
+    pagination:
+      type: offset_limit
+      offset_param: skip
+      limit_param: limit
+      limit: 1000
+      max_pages: 100
+```
+
+Example (cursor-based pagination):
+```yaml
+read:
+  format: api
+  options:
+    pagination:
+      type: cursor
+      cursor_path: meta.next_cursor
+      cursor_param: cursor
+```
+
+Example (link header pagination - GitHub style):
+```yaml
+read:
+  format: api
+  options:
+    pagination:
+      type: link_header
+      limit: 100
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | ApiPaginationType | No | `ApiPaginationType.OFFSET_LIMIT` | Pagination strategy to use |
+| **offset_param** | str | No | `offset` | Query param name for offset (offset_limit type) |
+| **limit_param** | str | No | `limit` | Query param name for limit |
+| **limit** | int | No | `100` | Number of records per page |
+| **max_pages** | Optional[int] | No | - | Maximum pages to fetch (None = unlimited) |
+| **cursor_path** | Optional[str] | No | - | Dotted path to cursor in response (cursor type) |
+| **cursor_param** | Optional[str] | No | - | Query param name for cursor (cursor type) |
+| **page_param** | str | No | `page` | Query param name for page number (page_number type) |
+| **start_page** | int | No | `1` | Starting page number (page_number type) |
+
+---
+### `ApiRateLimitConfig`
+> *Used in: [ApiOptionsConfig](#apioptionsconfig)*
+
+Rate limiting configuration for API requests.
+
+Example:
+```yaml
+read:
+  format: api
+  options:
+    rate_limit:
+      requests_per_second: 10
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **requests_per_second** | Optional[float] | No | - | Max requests per second (None = no limit) |
+
+---
+### `ApiResponseConfig`
+> *Used in: [ApiOptionsConfig](#apioptionsconfig)*
+
+Response parsing configuration for API data sources.
+
+**When to Use:** Configure how to extract data from API responses.
+
+**Date Variables:** Use these in `add_fields` for automatic date injection:
+
+| Variable | Description | Example Value |
+|----------|-------------|---------------|
+| `$now` | Current UTC timestamp | `2024-01-15T10:30:00+00:00` |
+| `$today` | Today's date | `2024-01-15` |
+| `$yesterday` | Yesterday's date | `2024-01-14` |
+| `$date` | Alias for `$today` | `2024-01-15` |
+| `$7_days_ago` | 7 days before today | `2024-01-08` |
+| `$30_days_ago` | 30 days before today | `2023-12-16` |
+| `$90_days_ago` | 90 days before today | `2023-10-17` |
+| `$start_of_week` | Monday of current week | `2024-01-15` |
+| `$start_of_month` | First of current month | `2024-01-01` |
+| `$start_of_year` | First of current year | `2024-01-01` |
+
+Example:
+```yaml
+read:
+  format: api
+  options:
+    response:
+      items_path: results
+      add_fields:
+        _fetched_at: "$now"
+        _load_date: "$today"
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **items_path** | str | No | - | Dotted path to items array in response (e.g., 'results', 'data.items'). Empty = response is the array. |
+| **add_fields** | Optional[Dict[str, Any]] | No | - | Fields to add to each record. Supports date variables: $now, $today, $yesterday, $7_days_ago, etc. |
+
+---
+### `ApiRetryConfig`
+> *Used in: [ApiOptionsConfig](#apioptionsconfig)*
+
+Retry configuration for API requests.
+
+Example:
+```yaml
+read:
+  format: api
+  options:
+    retry:
+      max_retries: 3
+      backoff_factor: 2.0
+      retry_codes: [429, 500, 502, 503]
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **max_retries** | int | No | `3` | Maximum retry attempts |
+| **backoff_factor** | float | No | `2.0` | Exponential backoff multiplier |
+| **retry_codes** | List[int] | No | `[429, 500, 502, 503, 504]` | HTTP status codes to retry on |
+
+---
 ### `PrivacyConfig`
 > *Used in: [NodeConfig](#nodeconfig)*
 
@@ -1589,6 +1773,8 @@ write:
 | **external_data_source** | Optional[str] | No | - | SQL Server external data source name for BULK INSERT. If not specified and auto_setup=True, will be auto-generated as 'odibi_{staging_connection}'. |
 | **keep_staging_files** | bool | No | `False` | Keep staging files after load (for debugging). Default deletes after success. |
 | **auto_setup** | bool | No | `False` | Auto-create SQL Server external data source and credential if they don't exist. Reads auth credentials from staging_connection and creates matching SQL objects. Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL). |
+| **force_recreate** | bool | No | `False` | Force recreation of external data source and credential even if they exist. Use when you've rotated SAS tokens or storage keys and need to update SQL Server. Has no effect if auto_setup=False. |
+| **csv_options** | Optional[Dict[str, str]] | No | - | Custom CSV options for bulk copy when writing to Azure SQL Database. Passed to Spark CSV writer. Defaults: quote='"', escape='"', escapeQuotes='true', nullValue='', emptyValue='', encoding='UTF-8'. Override any option here. |
 
 ---
 ### `SqlServerMergeValidationConfig`
@@ -1657,6 +1843,8 @@ write:
 | **external_data_source** | Optional[str] | No | - | SQL Server external data source name for BULK INSERT. If not specified and auto_setup=True, will be auto-generated as 'odibi_{staging_connection}'. |
 | **keep_staging_files** | bool | No | `False` | Keep staging files after load (for debugging). Default deletes after success. |
 | **auto_setup** | bool | No | `False` | Auto-create SQL Server external data source and credential if they don't exist. Reads auth credentials from staging_connection and creates matching SQL objects. Requires elevated SQL permissions (ALTER ANY EXTERNAL DATA SOURCE, CONTROL). |
+| **force_recreate** | bool | No | `False` | Force recreation of external data source and credential even if they exist. Use when you've rotated SAS tokens or storage keys and need to update SQL Server. Has no effect if auto_setup=False. |
+| **csv_options** | Optional[Dict[str, str]] | No | - | Custom CSV options for bulk copy when writing to Azure SQL Database. Passed to Spark CSV writer. Defaults: quote='"', escape='"', escapeQuotes='true', nullValue='', emptyValue='', encoding='UTF-8'. Override any option here. |
 
 ---
 ### `SqlServerSchemaEvolutionConfig`

@@ -81,57 +81,12 @@ Get-ChildItem -Recurse -Filter "*.yaml" # Find files
 Get-Content file.yaml                   # Read file
 ```
 
-### MCP Tools - Data Discovery (EXPLORE DATA SOURCES)
-
-**map_environment** - Explore what exists in a connection
-```
-map_environment("raw_adls")                        # List root folders/files
-map_environment("raw_adls", "raw data")            # Drill into folder
-map_environment("raw_adls", "raw data/subfolder")  # Drill deeper
-map_environment("wwi")                             # List SQL schemas/tables
-```
-
-**profile_source** - Get schema and sample data from a file or table
-```
-profile_source("raw_adls", "raw data/sales.csv")   # Profile a file
-profile_source("wwi", "Sales.Orders")              # Profile a SQL table
-```
-
-**generate_bronze_node** - Generate pipeline YAML from profile result
-
-### MCP Tools - Download Data (GET DATA LOCALLY)
-
-**download_sql** - Run SQL query, save results locally
-```
-download_sql("wwi", "SELECT * FROM Sales.Orders WHERE Year=2024", "./orders.parquet")
-download_sql("wwi", "SELECT TOP 100 * FROM Customers", "./customers.csv", limit=100)
-```
-
-**download_table** - Download entire table (no SQL needed)
-```
-download_table("wwi", "Sales.Orders", "./orders.parquet")
-download_table("wwi", "Dimension.Customer", "./customers.csv", limit=5000)
-```
-
-**download_file** - Copy file from ADLS/cloud storage to local
-```
-download_file("raw_adls", "reports/daily.csv", "./local/daily.csv")
-download_file("raw_adls", "raw data/sales.xlsx", "./sales.xlsx")
-```
-
-Output format detected from extension: .parquet (default), .csv, .json, .xlsx
-Default limit: 10,000 rows for SQL downloads
-
-### MCP Tools - Pipeline Analysis (USE AFTER RUNNING PIPELINES)
-Use these only after a pipeline has been executed:
-- `node_sample(pipeline, node)` - Sample output of a completed node
-- `node_describe(pipeline, node)` - Describe a completed node's output
-- `story_read(pipeline)` - Read pipeline run history
-
-### MCP Tools - Knowledge
+### MCP Tools (Dynamic Operations)
 - `diagnose()` - Environment, paths, connections
+- `profile_source(connection, path)` - Analyze source schema
+- `generate_bronze_node(profile)` - Generate pipeline YAML
+- `map_environment(connection, path)` - Discover files/tables
 - `explain(name)` - Transformer/pattern docs
-- `bootstrap_context()` - Get full project context
 
 ---
 
@@ -223,52 +178,22 @@ The odibi repo has comprehensive docs. Read these files directly.
 
 ## YAML Rules
 
-**ALWAYS use `generate_bronze_node` MCP tool** - it generates complete, runnable YAMLs.
+1. Use `generate_bronze_node` MCP tool or copy from canonical examples
+2. Pipeline files need `pipelines:` list (not `pipeline:` singular)
+3. Validate with `python -m odibi run X.yaml --dry-run`
+4. Node names: alphanumeric + underscore only (Spark requirement)
 
-If generating YAML manually, use this EXACT structure:
+Correct structure:
 ```yaml
-project: my_project
-
-connections:
-  local:
-    type: local
-    base_path: ./data
-  raw_adls:
-    type: azure_adls
-    account_name: mystorageaccount
-    account_key: ${AZURE_STORAGE_ACCOUNT_KEY}
-    container: mycontainer
-
-story:
-  connection: local
-  path: stories
-
-system:
-  connection: local
-  path: _system
-
 pipelines:
   - pipeline: my_pipeline
     nodes:
       - name: my_node
         read:
-          connection: raw_adls
+          connection: my_conn
           path: data.csv
           format: csv
-        write:
-          connection: local
-          path: bronze/my_node
-          format: delta
 ```
-
-**Common mistakes to avoid:**
-- `source:` / `sink:` → USE `read:` / `write:`
-- `inputs:` / `outputs:` → USE `read:` / `write:`
-- `sql:` → USE `query:` inside `read:` block
-- Missing `format:` → ALWAYS include format (csv, parquet, delta, sql)
-- Node names with `-` or `.` → USE `_` only (Spark requirement)
-
-**Validate:** `python -m odibi run X.yaml --dry-run`
 
 ---
 
@@ -297,3 +222,4 @@ pipelines:
 2. Search files: `Get-ChildItem -Recurse -Filter "*.yaml"`
 3. Check environment: `python -m odibi doctor`
 4. Use MCP: `diagnose()` shows paths and connections
+

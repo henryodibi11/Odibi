@@ -664,6 +664,52 @@ class SparkEngine(Engine):
                 )
                 return df
 
+            # API format: delegate to ApiFetcher, convert to Spark
+            if format == "api":
+                if streaming:
+                    ctx.error("Streaming not supported for API format")
+                    raise ValueError("Streaming not supported for API format")
+
+                from odibi.connections.api_fetcher import create_api_fetcher
+                from odibi.connections.http import HttpConnection
+
+                ctx.debug("Reading API via ApiFetcher", endpoint=str(path))
+
+                if not isinstance(connection, HttpConnection):
+                    raise ValueError(
+                        f"Cannot read API data: connection type '{type(connection).__name__}' "
+                        "is not an HttpConnection. Use an HTTP connection for API format."
+                    )
+
+                # Extract API-specific options
+                api_options = options.copy()
+                params = api_options.pop("params", {})
+                max_records = api_options.pop("max_records", None)
+
+                # Create fetcher with connection's base_url and headers
+                fetcher = create_api_fetcher(
+                    base_url=connection.base_url,
+                    headers=connection.headers,
+                    options=api_options,
+                )
+
+                # Fetch data as Pandas DataFrame
+                pdf = fetcher.fetch_dataframe(
+                    endpoint=str(full_path),
+                    params=params,
+                    max_records=max_records,
+                )
+
+                # Convert Pandas DataFrame to Spark DataFrame
+                df = self.spark.createDataFrame(pdf)
+                elapsed = (time.time() - start_time) * 1000
+                ctx.info(
+                    f"API read completed: {path}",
+                    elapsed_ms=round(elapsed, 2),
+                    row_count=len(pdf),
+                )
+                return df
+
             # Auto-detect encoding for CSV (Batch only)
             if not streaming and format == "csv" and options.get("auto_encoding"):
                 options = options.copy()

@@ -1,0 +1,72 @@
+# OpenFDA Food Recall Enforcement Pipeline
+# Fetches food recall data from the FDA Recall Enterprise System (RES)
+#
+# API Documentation: https://open.fda.gov/apis/food/enforcement/
+# Data is updated weekly by FDA
+#
+# Run with: python -m odibi run examples/openfda_food_recalls.yaml
+
+project: openfda_food_recalls
+
+connections:
+  openfda:
+    type: http
+    base_url: "https://api.fda.gov"
+    headers:
+      User-Agent: "odibi-pipeline/1.0"
+
+  local_bronze:
+    type: local
+    base_path: ./data/bronze
+
+story:
+  connection: local_bronze
+  path: stories
+
+system:
+  connection: local_bronze
+  path: _system_catalog
+
+pipelines:
+  - pipeline: fda_food_recalls
+    description: "Weekly pull of FDA food recall enforcement reports"
+    nodes:
+      - name: bronze_fda_food_recalls
+        description: "Raw FDA food recall enforcement reports"
+        read:
+          connection: openfda
+          format: api
+          path: /food/enforcement.json
+          options:
+            params:
+              limit: 1000
+
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 1000
+              max_pages: 3  # Start small for testing (~3k records)
+              stop_on_empty: true
+
+            response:
+              items_path: results
+              add_fields:
+                _odibi_fetched_at: "$now"
+
+            http:
+              timeout_s: 60
+              retries:
+                max_attempts: 5
+                backoff:
+                  base_s: 1.0
+                  max_s: 30.0
+                retry_on_status: [429, 500, 502, 503, 504]
+              rate_limit:
+                type: auto
+
+        write:
+          connection: local_bronze
+          format: parquet
+          path: fda_food_recalls
+          mode: overwrite

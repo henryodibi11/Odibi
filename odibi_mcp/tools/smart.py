@@ -438,34 +438,40 @@ def _validate_dataframe(df, sample_text: str = "") -> ValidationResult:
     )
 
 
-def map_environment(connection: str, path: str = "") -> MapEnvironmentResponse:
+def map_environment(connection: str | dict, path: str = "") -> MapEnvironmentResponse:
     """
     Scout a connection to understand what exists.
 
     For storage: scans folders, detects file patterns, groups by format.
     For SQL: lists schemas, tables, row counts.
+
+    Args:
+        connection: Either a connection name (str) or inline spec (dict).
+            Inline spec example:
+            {
+                "type": "azure_sql",
+                "server": "myserver.database.windows.net",
+                "database": "MyDB",
+                "driver": "ODBC Driver 17 for SQL Server",
+                "username": "${SQL_USER}",
+                "password": "${SQL_PASSWORD}"
+            }
+        path: Optional path to scan (for storage connections)
     """
-    ctx = get_project_context()
-    if not ctx:
-        return MapEnvironmentResponse(
-            connection=connection,
-            connection_type="unknown",
-            scanned_at=datetime.now(),
-            summary={},
-            structure=[],
-            errors=["No project context available. Set ODIBI_CONFIG env var."],
-        )
+    from odibi_mcp.context import resolve_connection
+
+    conn_name = connection if isinstance(connection, str) else "inline"
 
     try:
-        conn = ctx.get_connection(connection)
+        conn, conn_name = resolve_connection(connection)
     except Exception as e:
         return MapEnvironmentResponse(
-            connection=connection,
+            connection=conn_name,
             connection_type="unknown",
             scanned_at=datetime.now(),
             summary={},
             structure=[],
-            errors=[f"Connection not found: {e}"],
+            errors=[f"Connection error: {e}"],
         )
 
     scanned_at = datetime.now()
@@ -513,9 +519,7 @@ def _map_storage(connection: str, conn, path: str, scanned_at: datetime) -> MapE
             fs = fsspec.filesystem("file")
             fs_path = full_path
 
-        # List all files recursively (limit depth)
-        folders: Dict[str, List[str]] = {}
-
+        # List items at this level
         try:
             items = fs.ls(fs_path, detail=True)
         except Exception as e:
@@ -528,6 +532,10 @@ def _map_storage(connection: str, conn, path: str, scanned_at: datetime) -> MapE
                 errors=[f"Failed to list path: {e}"],
             )
 
+        # Track folders and subfolders separately
+        folders: Dict[str, List[str]] = {}  # folder -> list of files
+        subfolders: Dict[str, List[str]] = {}  # folder -> list of subfolder names
+
         for item in items:
             name = item.get("name", "").split("/")[-1]
             item_type = item.get("type", "file")
@@ -536,12 +544,17 @@ def _map_storage(connection: str, conn, path: str, scanned_at: datetime) -> MapE
                 # Scan subdirectory
                 try:
                     sub_items = fs.ls(item["name"], detail=True)
-                    sub_files = [
-                        si.get("name", "").split("/")[-1]
-                        for si in sub_items
-                        if si.get("type") != "directory"
-                    ]
+                    sub_files = []
+                    sub_dirs = []
+                    for si in sub_items:
+                        si_name = si.get("name", "").split("/")[-1]
+                        if si.get("type") == "directory":
+                            sub_dirs.append(si_name)
+                        else:
+                            sub_files.append(si_name)
                     folders[name] = sub_files
+                    if sub_dirs:
+                        subfolders[name] = sub_dirs
                 except Exception:
                     folders[name] = []
             else:
@@ -570,6 +583,9 @@ def _map_storage(connection: str, conn, path: str, scanned_at: datetime) -> MapE
             # Detect pattern
             pattern = _detect_pattern(files)
 
+            # Get subfolder info for this folder
+            folder_subfolders = subfolders.get(folder_path, [])
+
             folder_info = FolderInfo(
                 path=folder_path or "(root)",
                 file_count=file_count,
@@ -577,6 +593,11 @@ def _map_storage(connection: str, conn, path: str, scanned_at: datetime) -> MapE
                 formats=folder_formats,
                 sample_files=files[:5],
             )
+            # Add subfolder info if present (FolderInfo may not have this field, add to sample_files note)
+            if folder_subfolders and file_count == 0:
+                # Override sample_files to show subfolders when no files
+                folder_info.sample_files = [f"[FOLDER] {sf}/" for sf in folder_subfolders[:5]]
+                folder_info.pattern = f"contains {len(folder_subfolders)} subfolder(s) - drill deeper with map_environment"
             structure.append(folder_info)
 
             # Suggest first file of each format
@@ -585,6 +606,14 @@ def _map_storage(connection: str, conn, path: str, scanned_at: datetime) -> MapE
                 full_file_path = full_file_path.strip("/")
                 if full_file_path not in suggested_sources:
                     suggested_sources.append(full_file_path)
+
+            # If folder has subfolders but no files, suggest drilling into first subfolder
+            if folder_subfolders and file_count == 0:
+                for sf in folder_subfolders[:2]:
+                    drill_path = f"{path}/{folder_path}/{sf}" if folder_path else f"{path}/{sf}"
+                    drill_path = drill_path.strip("/")
+                    if drill_path not in suggested_sources:
+                        suggested_sources.append(drill_path)
 
         # Generate recommendations
         recommendations = []
@@ -646,8 +675,8 @@ def _map_sql(connection: str, conn, scanned_at: datetime) -> MapEnvironmentRespo
         # Try different execute methods based on connection type
         if hasattr(conn, "execute_sql"):
             result = conn.execute_sql(query)
-        elif hasattr(conn, "execute_query"):
-            result = conn.execute_query(query)
+        elif hasattr(conn, "execute"):
+                        result = conn.execute(query)
         elif hasattr(conn, "read_sql_query"):
             df = conn.read_sql_query(query)
             result = df.values.tolist()
@@ -659,11 +688,14 @@ def _map_sql(connection: str, conn, scanned_at: datetime) -> MapEnvironmentRespo
         total_tables = 0
 
         for row in result:
-            if isinstance(row, tuple):
-                schema_name, table_count = row
-            else:
+            if isinstance(row, (tuple, list)):
+                schema_name, table_count = row[0], row[1]
+            elif hasattr(row, "get"):
                 schema_name = row.get("TABLE_SCHEMA")
                 table_count = row.get("table_count")
+            else:
+                # pyodbc.Row or similar - access by index
+                schema_name, table_count = row[0], row[1]
 
             total_tables += table_count
 
@@ -676,15 +708,20 @@ def _map_sql(connection: str, conn, scanned_at: datetime) -> MapEnvironmentRespo
             """
             if hasattr(conn, "execute_sql"):
                 tables_result = conn.execute_sql(tables_query)
-            elif hasattr(conn, "execute_query"):
-                tables_result = conn.execute_query(tables_query)
+            elif hasattr(conn, "execute"):
+                tables_result = conn.execute(tables_query)
             elif hasattr(conn, "read_sql_query"):
                 tables_result = conn.read_sql_query(tables_query).values.tolist()
             else:
                 tables_result = []
-            sample_tables = [
-                r[0] if isinstance(r, tuple) else r.get("TABLE_NAME") for r in tables_result
-            ]
+            sample_tables = []
+            for r in tables_result:
+                if isinstance(r, (tuple, list)):
+                    sample_tables.append(r[0])
+                elif hasattr(r, "get"):
+                    sample_tables.append(r.get("TABLE_NAME"))
+                else:
+                    sample_tables.append(r[0])
 
             schema_info = SchemaInfo(
                 name=schema_name,
@@ -730,35 +767,44 @@ def _map_sql(connection: str, conn, scanned_at: datetime) -> MapEnvironmentRespo
         )
 
 
-def profile_source(connection: str, path: str, max_attempts: int = 5) -> ProfileSourceResponse:
+def profile_source(connection: str | dict, path: str, max_attempts: int = 5) -> ProfileSourceResponse:
     """
     Self-correcting profiler that figures out how to read a source.
 
     Iterates through encoding/delimiter combinations until data looks right.
+
+    Args:
+        connection: Either a connection name (str) or inline spec (dict).
+            Inline spec example:
+            {
+                "type": "azure_sql",
+                "server": "myserver.database.windows.net",
+                "database": "MyDB",
+                "driver": "ODBC Driver 17 for SQL Server",
+                "username": "${SQL_USER}",
+                "password": "${SQL_PASSWORD}"
+            }
+        path: Path to the source (e.g., "schema.table" for SQL, "folder/file.csv" for storage)
+        max_attempts: Max attempts for CSV encoding/delimiter detection
     """
-    ctx = get_project_context()
-    if not ctx:
-        return ProfileSourceResponse(
-            connection=connection,
-            path=path,
-            source_type="unknown",
-            errors=["No project context available"],
-        )
+    from odibi_mcp.context import resolve_connection
+
+    conn_name = connection if isinstance(connection, str) else "inline"
 
     try:
-        conn = ctx.get_connection(connection)
+        conn, conn_name = resolve_connection(connection)
     except Exception as e:
         return ProfileSourceResponse(
-            connection=connection,
+            connection=conn_name,
             path=path,
             source_type="unknown",
-            errors=[f"Connection not found: {e}"],
+            errors=[f"Connection error: {e}"],
         )
 
     if _is_sql_connection(conn):
-        return _profile_sql_table(connection, conn, path)
+        return _profile_sql_table(conn_name, conn, path)
     else:
-        return _profile_file(connection, conn, path, max_attempts)
+        return _profile_file(conn_name, conn, path, max_attempts)
 
 
 def _profile_file(connection: str, conn, path: str, max_attempts: int) -> ProfileSourceResponse:
@@ -1424,19 +1470,27 @@ def _profile_sql_table(connection: str, conn, path: str) -> ProfileSourceRespons
         ORDER BY ORDINAL_POSITION
         """
 
-        result = conn.execute_query(columns_query)
+        if hasattr(conn, "execute_sql"):
+            result = conn.execute_sql(columns_query)
+        elif hasattr(conn, "execute"):
+            result = conn.execute(columns_query)
+        else:
+            result = conn.read_sql_query(columns_query).values.tolist()
 
         schema = []
         candidate_keys = []
         candidate_watermarks = []
 
         for row in result:
-            if isinstance(row, tuple):
-                col_name, dtype, nullable = row
-            else:
+            if isinstance(row, (tuple, list)):
+                col_name, dtype, nullable = row[0], row[1], row[2]
+            elif hasattr(row, "get"):
                 col_name = row.get("COLUMN_NAME")
                 dtype = row.get("DATA_TYPE")
                 nullable = row.get("IS_NULLABLE")
+            else:
+                # pyodbc.Row - access by index
+                col_name, dtype, nullable = row[0], row[1], row[2]
 
             col_info = ColumnInfo(
                 name=col_name,
@@ -1455,14 +1509,22 @@ def _profile_sql_table(connection: str, conn, path: str) -> ProfileSourceRespons
 
         # Get sample rows
         sample_query = f"SELECT TOP 10 * FROM [{schema_name}].[{table_name}]"
-        sample_result = conn.execute_query(sample_query)
+        if hasattr(conn, "execute_sql"):
+            sample_result = conn.execute_sql(sample_query)
+        elif hasattr(conn, "execute"):
+            sample_result = conn.execute(sample_query)
+        else:
+            sample_result = conn.read_sql_query(sample_query).values.tolist()
 
         sample_rows = []
         for row in sample_result:
-            if isinstance(row, tuple):
+            if isinstance(row, (tuple, list)):
                 sample_rows.append(dict(zip([c.name for c in schema], row)))
-            else:
+            elif hasattr(row, "get"):
                 sample_rows.append(dict(row))
+            else:
+                # pyodbc.Row - convert to dict via column names
+                sample_rows.append(dict(zip([c.name for c in schema], row)))
 
         return ProfileSourceResponse(
             connection=connection,
@@ -2474,16 +2536,20 @@ def generate_bronze_node(
 
     if include_project:
         # Build complete runnable PROJECT YAML
-        # Get connection config from context
+        # Get connection config from context - USE RAW CONFIG to preserve all settings
         connection_configs = {}
+        
         if ctx and hasattr(ctx, "config") and ctx.config.get("connections"):
-            # Use raw connection configs from config dict (preserves YAML structure)
-            connection_configs = dict(ctx.config.get("connections", {}))
-        elif ctx and hasattr(ctx, "raw_connections") and ctx.raw_connections:
-            # Use raw connection configs if available
-            connection_configs = ctx.raw_connections
-        elif ctx and hasattr(ctx, "connections") and ctx.connections:
-            # Build minimal connection configs
+            # Use raw connection configs from config dict (preserves full YAML structure)
+            raw_connections = ctx.config.get("connections", {})
+            for conn_name, conn_config in raw_connections.items():
+                # Deep copy to avoid modifying original
+                connection_configs[conn_name] = dict(conn_config)
+            logger.debug(f"Using raw config connections: {list(connection_configs.keys())}")
+        
+        # If no raw config, try to reconstruct from connection objects
+        if not connection_configs and ctx and hasattr(ctx, "connections") and ctx.connections:
+            logger.warning("No raw config found, reconstructing connections from objects")
             for conn_name, conn_obj in ctx.connections.items():
                 conn_type = type(conn_obj).__name__
                 if conn_type == "LocalConnection":
@@ -2503,9 +2569,14 @@ def generate_bronze_node(
                         "type": "azure_sql",
                         "server": getattr(conn_obj, "server", ""),
                         "database": getattr(conn_obj, "database", ""),
+                        "driver": getattr(conn_obj, "driver", "ODBC Driver 17 for SQL Server"),
                         "username": "${SQL_USER}",
                         "password": "${SQL_PASSWORD}",
                     }
+                else:
+                    # Unknown type - add minimal config with warning
+                    connection_configs[conn_name] = {"type": conn_type}
+                    warnings.append(f"Unknown connection type '{conn_type}' for '{conn_name}' - config may be incomplete")
 
         # Ensure we have a local connection for system/story
         if "local" not in connection_configs:
@@ -2514,8 +2585,11 @@ def generate_bronze_node(
                 "path": "./data",
             }
 
+        # Use project name from config if available, otherwise generate from node name
+        project_name = ctx.project_name if ctx and ctx.project_name else f"{node_name}_project"
+        
         yaml_dict = {
-            "project": f"{node_name}_project",
+            "project": project_name,
             "connections": connection_configs,
             "system": {
                 "connection": "local",
@@ -2523,7 +2597,7 @@ def generate_bronze_node(
             },
             "story": {
                 "connection": "local",
-                "path": "_stories",
+                "path": "stories",
             },
             "pipelines": [pipeline_config],
         }
@@ -2750,3 +2824,317 @@ def test_node(node_yaml: str, max_rows: int = 100) -> TestNodeResponse:
             ],
             fixes=fixes,
         )
+
+
+# =============================================================================
+# Download Tools - For AI Local Analysis
+# =============================================================================
+
+
+def download_sql(
+    connection: str | dict,
+    query: str,
+    output_path: str,
+    limit: int = 10000,
+) -> dict:
+    """
+    Run a SQL query and save results to a local file.
+
+    Enables AI assistants to download data locally for analysis.
+    Saves as Parquet by default for efficiency; format detected from output_path extension.
+
+    Args:
+        connection: Either a connection name (str) or inline spec (dict).
+            Inline spec example:
+            {
+                "type": "azure_sql",
+                "server": "myserver.database.windows.net",
+                "database": "MyDB",
+                "driver": "ODBC Driver 17 for SQL Server",
+                "username": "${SQL_USER}",
+                "password": "${SQL_PASSWORD}"
+            }
+        query: SQL query to execute (will have LIMIT/TOP applied)
+        output_path: Local path to save results (e.g., "./data/results.parquet")
+        limit: Max rows to download (default 10000 to prevent huge downloads)
+
+    Returns:
+        Dict with status, rows_saved, output_path, columns, errors
+
+    Example:
+        download_sql("wwi", "SELECT * FROM Sales.Orders", "./data/orders.parquet")
+        download_sql("wwi", "SELECT * FROM Sales.Orders WHERE OrderDate > '2024-01-01'", "./orders.csv", limit=5000)
+    """
+    import pandas as pd
+    from pathlib import Path
+
+    from odibi_mcp.context import resolve_connection
+
+    conn_name = connection if isinstance(connection, str) else "inline"
+
+    try:
+        conn, conn_name = resolve_connection(connection)
+    except Exception as e:
+        return {
+            "status": "error",
+            "connection": conn_name,
+            "errors": [f"Connection error: {e}"],
+        }
+
+    if not _is_sql_connection(conn):
+        return {
+            "status": "error",
+            "connection": conn_name,
+            "errors": [f"download_sql requires a SQL connection, got: {type(conn).__name__}"],
+        }
+
+    try:
+        # Apply limit to query if not already present
+        query_upper = query.upper().strip()
+        if "TOP " not in query_upper and "LIMIT " not in query_upper:
+            # For SQL Server, inject TOP after SELECT
+            if query_upper.startswith("SELECT"):
+                query = query[:6] + f" TOP {limit} " + query[6:]
+            else:
+                # Fallback: wrap in subquery
+                query = f"SELECT TOP {limit} * FROM ({query}) AS limited_query"
+
+        # Execute query using available method
+        if hasattr(conn, "read_sql"):
+            df = conn.read_sql(query)
+        elif hasattr(conn, "read_sql_query"):
+            df = conn.read_sql_query(query)
+        elif hasattr(conn, "execute_sql"):
+            result = conn.execute_sql(query)
+            # Convert result to DataFrame
+            if hasattr(result, "fetchall"):
+                rows = result.fetchall()
+                columns = [desc[0] for desc in result.description]
+                df = pd.DataFrame(rows, columns=columns)
+            else:
+                # Result is list of rows
+                if result:
+                    first = result[0]
+                    if isinstance(first, (tuple, list)):
+                        # Need column names from a DESCRIBE or assume numbered
+                        df = pd.DataFrame(result)
+                    elif hasattr(first, "keys"):
+                        df = pd.DataFrame([dict(r) for r in result])
+                    else:
+                        # pyodbc.Row - get column names from cursor_description
+                        if hasattr(first, "cursor_description"):
+                            columns = [desc[0] for desc in first.cursor_description]
+                            df = pd.DataFrame([tuple(r) for r in result], columns=columns)
+                        else:
+                            df = pd.DataFrame(result)
+                else:
+                    df = pd.DataFrame()
+        elif hasattr(conn, "execute"):
+            # Use execute + pandas
+            result = conn.execute(query)
+            if hasattr(result, "fetchall"):
+                rows = result.fetchall()
+                if result.description:
+                    columns = [desc[0] for desc in result.description]
+                    df = pd.DataFrame(rows, columns=columns)
+                else:
+                    df = pd.DataFrame(rows)
+            else:
+                df = pd.DataFrame(result) if result else pd.DataFrame()
+        else:
+            return {
+                "status": "error",
+                "connection": conn_name,
+                "errors": ["Connection does not support SQL execution methods"],
+            }
+
+        # Determine output format from extension
+        output_path_obj = Path(output_path)
+        output_path_obj.parent.mkdir(parents=True, exist_ok=True)
+        suffix = output_path_obj.suffix.lower()
+
+        if suffix == ".csv":
+            df.to_csv(output_path, index=False)
+        elif suffix == ".json":
+            df.to_json(output_path, orient="records", indent=2)
+        elif suffix in (".xlsx", ".xls"):
+            df.to_excel(output_path, index=False)
+        else:
+            # Default to parquet
+            if not suffix or suffix not in (".parquet", ".pq"):
+                output_path = str(output_path_obj.with_suffix(".parquet"))
+            df.to_parquet(output_path, index=False)
+
+        return {
+            "status": "success",
+            "connection": conn_name,
+            "rows_saved": len(df),
+            "columns": list(df.columns),
+            "output_path": str(output_path),
+            "format": suffix.lstrip(".") if suffix else "parquet",
+        }
+
+    except Exception as e:
+        logger.exception(f"Error downloading SQL: {query[:100]}...")
+        return {
+            "status": "error",
+            "connection": conn_name,
+            "query": query[:200] + "..." if len(query) > 200 else query,
+            "errors": [str(e)],
+        }
+
+
+def download_table(
+    connection: str | dict,
+    table: str,
+    output_path: str,
+    limit: int = 10000,
+) -> dict:
+    """
+    Download a full table (with row limit) to a local file.
+
+    Convenience wrapper around download_sql for downloading entire tables.
+
+    Args:
+        connection: Either a connection name (str) or inline spec (dict)
+        table: Table name in schema.table format (e.g., "Sales.Orders" or "dbo.Customers")
+        output_path: Local path to save results
+        limit: Max rows to download (default 10000)
+
+    Returns:
+        Dict with status, rows_saved, output_path, columns, errors
+
+    Example:
+        download_table("wwi", "Sales.Orders", "./data/orders.parquet")
+        download_table("wwi", "Dimension.Customer", "./customers.csv", limit=5000)
+    """
+    # Parse table name to ensure proper quoting
+    if "." in table:
+        schema, tbl = table.split(".", 1)
+        query = f"SELECT * FROM [{schema}].[{tbl}]"
+    else:
+        query = f"SELECT * FROM [{table}]"
+
+    return download_sql(connection, query, output_path, limit)
+
+
+def download_file(
+    connection: str | dict,
+    source_path: str,
+    output_path: str,
+) -> dict:
+    """
+    Copy a file from ADLS/storage to local filesystem.
+
+    For AI assistants to download files for local analysis.
+
+    Args:
+        connection: Either a connection name (str) or inline spec (dict).
+            Inline spec example for ADLS:
+            {
+                "type": "azure_adls",
+                "account_name": "mystorageaccount",
+                "container": "mycontainer",
+                "account_key": "${AZURE_STORAGE_ACCOUNT_KEY}"
+            }
+        source_path: Path within the storage connection (e.g., "raw/data.csv")
+        output_path: Local path to save the file
+
+    Returns:
+        Dict with status, source_path, output_path, bytes_copied, errors
+
+    Example:
+        download_file("raw_adls", "reports/daily.csv", "./data/daily.csv")
+        download_file("raw_adls", "exports/data.parquet", "./local/data.parquet")
+    """
+    import fsspec
+    from pathlib import Path
+
+    from odibi_mcp.context import resolve_connection
+
+    conn_name = connection if isinstance(connection, str) else "inline"
+
+    try:
+        conn, conn_name = resolve_connection(connection)
+    except Exception as e:
+        return {
+            "status": "error",
+            "connection": conn_name,
+            "errors": [f"Connection error: {e}"],
+        }
+
+    if not _is_storage_connection(conn):
+        return {
+            "status": "error",
+            "connection": conn_name,
+            "errors": [
+                f"download_file requires a storage connection, got: {type(conn).__name__}. "
+                "For SQL, use download_sql or download_table instead."
+            ],
+        }
+
+    try:
+        storage_options = {}
+        if hasattr(conn, "pandas_storage_options"):
+            storage_options = conn.pandas_storage_options()
+
+        full_source_path = conn.get_path(source_path)
+
+        # Create output directory if needed
+        output_path_obj = Path(output_path)
+        output_path_obj.parent.mkdir(parents=True, exist_ok=True)
+
+        # Determine source filesystem
+        if full_source_path.startswith(("abfss://", "abfs://", "az://")):
+            fs = fsspec.filesystem("abfs", **storage_options)
+            # Normalize path for fsspec
+            if "://" in full_source_path:
+                fs_path = full_source_path.split("://", 1)[1]
+                if "@" in fs_path.split("/")[0]:
+                    parts = fs_path.split("/", 1)
+                    container = parts[0].split("@")[0]
+                    rest = parts[1] if len(parts) > 1 else ""
+                    fs_path = f"{container}/{rest}"
+            else:
+                fs_path = full_source_path
+        elif full_source_path.startswith("s3://"):
+            fs = fsspec.filesystem("s3", **storage_options)
+            fs_path = full_source_path.replace("s3://", "")
+        elif full_source_path.startswith("gs://"):
+            fs = fsspec.filesystem("gcs", **storage_options)
+            fs_path = full_source_path.replace("gs://", "")
+        else:
+            # Local filesystem - just copy
+            fs = fsspec.filesystem("file")
+            fs_path = full_source_path
+
+        # Download the file
+        with fs.open(fs_path, "rb") as remote_f:
+            content = remote_f.read()
+
+        with open(output_path, "wb") as local_f:
+            local_f.write(content)
+
+        return {
+            "status": "success",
+            "connection": conn_name,
+            "source_path": source_path,
+            "output_path": str(output_path_obj.absolute()),
+            "bytes_copied": len(content),
+        }
+
+    except FileNotFoundError as e:
+        return {
+            "status": "error",
+            "connection": conn_name,
+            "source_path": source_path,
+            "errors": [f"File not found: {e}"],
+        }
+    except Exception as e:
+        logger.exception(f"Error downloading file: {source_path}")
+        return {
+            "status": "error",
+            "connection": conn_name,
+            "source_path": source_path,
+            "errors": [str(e)],
+        }

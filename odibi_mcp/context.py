@@ -432,3 +432,112 @@ def initialize_from_env() -> Optional[MCPProjectContext]:
 
     logger.warning("No project config found. MCP tools will return empty results.")
     return None
+
+
+def resolve_connection(connection: str | dict) -> tuple[Any, str]:
+    """
+    Resolve a connection from either a name or inline spec.
+
+    Args:
+        connection: Either a connection name (str) or inline spec (dict)
+
+    Returns:
+        Tuple of (connection_object, connection_name)
+
+    Examples:
+        # Named connection (from config)
+        conn, name = resolve_connection("wwi")
+
+        # Inline spec
+        conn, name = resolve_connection({
+            "type": "azure_sql",
+            "server": "myserver.database.windows.net",
+            "database": "MyDB",
+            "driver": "ODBC Driver 17 for SQL Server",
+            "username": "${SQL_USER}",
+            "password": "${SQL_PASSWORD}"
+        })
+    """
+    import hashlib
+
+    ctx = get_project_context()
+
+    # Named connection - look up from config
+    if isinstance(connection, str):
+        if ctx is None:
+            raise ValueError(
+                f"No project config loaded. Set ODIBI_CONFIG env var or provide inline connection spec."
+            )
+        conn = ctx.get_connection(connection)
+        return conn, connection
+
+    # Inline connection spec
+    if isinstance(connection, dict):
+        from odibi.connections.factory import register_builtins
+        from odibi.plugins import get_connection_factory, load_plugins
+
+        register_builtins()
+        load_plugins()
+
+        # Resolve env vars in the spec
+        resolved_spec = _resolve_env_vars_standalone(connection)
+
+        # Validate no plaintext secrets
+        _validate_no_plaintext_secrets(connection, resolved_spec)
+
+        conn_type = resolved_spec.get("type", "local")
+        factory = get_connection_factory(conn_type)
+
+        if not factory:
+            raise ValueError(f"Unknown connection type: {conn_type}")
+
+        # Generate a stable name for caching
+        spec_hash = hashlib.md5(str(sorted(connection.items())).encode()).hexdigest()[:8]
+        conn_name = f"adhoc_{conn_type}_{spec_hash}"
+
+        # Check if already cached in context
+        if ctx and conn_name in ctx.connections:
+            return ctx.connections[conn_name], conn_name
+
+        # Create the connection
+        conn = factory(conn_name, resolved_spec)
+
+        # Cache it if we have a context
+        if ctx:
+            ctx.connections[conn_name] = conn
+            logger.info(f"Created ad-hoc connection: {conn_name}")
+
+        return conn, conn_name
+
+    raise TypeError(f"connection must be str or dict, got {type(connection)}")
+
+
+def _resolve_env_vars_standalone(config: dict) -> dict:
+    """Resolve ${ENV_VAR} placeholders in config values (standalone version)."""
+    resolved = {}
+    for key, value in config.items():
+        if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+            env_var = value[2:-1]
+            resolved[key] = os.environ.get(env_var, value)
+        elif isinstance(value, dict):
+            resolved[key] = _resolve_env_vars_standalone(value)
+        else:
+            resolved[key] = value
+    return resolved
+
+
+def _validate_no_plaintext_secrets(original: dict, resolved: dict) -> None:
+    """Validate that secrets are provided via env vars, not plaintext."""
+    secret_keys = {"password", "account_key", "sas_token", "connection_string", "secret"}
+
+    for key in secret_keys:
+        if key in original:
+            original_val = original[key]
+            # If it's not an env var reference, it's plaintext
+            if isinstance(original_val, str) and not (
+                original_val.startswith("${") and original_val.endswith("}")
+            ):
+                raise ValueError(
+                    f"Security: '{key}' must use env var syntax like ${{ENV_VAR}}, "
+                    f"not plaintext. Example: {key}: ${{MY_SECRET}}"
+                )

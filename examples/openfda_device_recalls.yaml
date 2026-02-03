@@ -1,0 +1,55 @@
+# OpenFDA Device Recall Enforcement Pipeline
+# API Documentation: https://open.fda.gov/apis/device/enforcement/
+
+project: openfda_device_recalls
+
+connections:
+  openfda:
+    type: http
+    base_url: "https://api.fda.gov"
+    headers:
+      User-Agent: "odibi-pipeline/1.0"
+
+  local_bronze:
+    type: local
+    base_path: ./data/bronze
+
+story:
+  connection: local_bronze
+  path: stories
+
+system:
+  connection: local_bronze
+  path: _system_catalog
+
+pipelines:
+  - pipeline: fda_device_recalls
+    description: "FDA device recall enforcement reports"
+    nodes:
+      - name: bronze_fda_device_recalls
+        description: "Raw FDA device recall enforcement reports"
+        read:
+          connection: openfda
+          format: api
+          path: /device/enforcement.json
+          options:
+            params:
+              limit: 1000
+
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 1000
+              max_pages: 3  # Start small for testing
+
+            response:
+              items_path: results
+              add_fields:
+                _odibi_fetched_at: "$now"
+
+        write:
+          connection: local_bronze
+          format: parquet
+          path: fda_device_recalls
+          mode: overwrite

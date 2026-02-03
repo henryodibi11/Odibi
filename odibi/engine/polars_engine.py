@@ -190,10 +190,46 @@ class PolarsEngine(Engine):
                 ctx.info(f"Excel read completed (via Pandas): {path}", row_count=len(pdf))
                 return pl.from_pandas(pdf).lazy()
 
+            elif format == "api":
+                # API format: delegate to Pandas (uses ApiFetcher), convert to Polars
+                from odibi.connections.api_fetcher import create_api_fetcher
+                from odibi.connections.http import HttpConnection
+
+                ctx = get_logging_context().with_context(engine="polars")
+                ctx.debug("Reading API via ApiFetcher", endpoint=str(path))
+
+                if not isinstance(connection, HttpConnection):
+                    raise ValueError(
+                        f"Cannot read API data: connection type '{type(connection).__name__}' "
+                        "is not an HttpConnection. Use an HTTP connection for API format."
+                    )
+
+                # Extract API-specific options
+                api_options = options.copy()
+                params = api_options.pop("params", {})
+                max_records = api_options.pop("max_records", None)
+
+                # Create fetcher with connection's base_url and headers
+                fetcher = create_api_fetcher(
+                    base_url=connection.base_url,
+                    headers=connection.headers,
+                    options=api_options,
+                )
+
+                # Fetch data as Pandas DataFrame
+                pdf = fetcher.fetch_dataframe(
+                    endpoint=str(full_path),
+                    params=params,
+                    max_records=max_records,
+                )
+
+                ctx.info(f"API read completed: {path}", row_count=len(pdf))
+                return pl.from_pandas(pdf).lazy()
+
             else:
                 raise ValueError(
                     f"Unsupported format for Polars engine: '{format}'. "
-                    "Supported formats: csv, parquet, json, delta, excel, sql, sql_server, azure_sql."
+                    "Supported formats: csv, parquet, json, delta, excel, api, sql, sql_server, azure_sql."
                 )
 
         except Exception as e:

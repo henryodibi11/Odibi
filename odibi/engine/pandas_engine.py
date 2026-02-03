@@ -1103,11 +1103,51 @@ class PandasEngine(Engine):
 
             ctx.debug("Executing SQL read", schema=schema, table=tbl)
             return connection.read_table(table_name=tbl, schema=schema)
+        elif format == "api":
+            endpoint = str(full_path)
+            ctx.debug("Reading from API", endpoint=endpoint)
+
+            from odibi.connections.api_fetcher import create_api_fetcher
+            from odibi.connections.http import HttpConnection
+
+            if not isinstance(connection, HttpConnection):
+                ctx.error(
+                    "API format requires HttpConnection",
+                    connection_type=type(connection).__name__,
+                )
+                raise ValueError(
+                    f"Cannot read API data: connection type '{type(connection).__name__}' "
+                    "is not an HttpConnection. Use an HTTP connection for API format."
+                )
+
+            # Extract API-specific options
+            api_options = options.copy()
+            params = api_options.pop("params", {})
+            max_records = api_options.pop("max_records", None)
+
+            # Create fetcher with connection's base_url and headers
+            fetcher = create_api_fetcher(
+                base_url=connection.base_url,
+                headers=connection.headers,
+                options=api_options,
+            )
+
+            # Fetch data
+            df = fetcher.fetch_dataframe(
+                endpoint=endpoint,
+                params=params,
+                max_records=max_records,
+            )
+
+            if hasattr(df, "attrs"):
+                df.attrs["odibi_source_api"] = f"{connection.base_url}/{endpoint}"
+
+            return self._process_df(df, post_read_query)
         else:
             ctx.error("Unsupported format", format=format)
             raise ValueError(
                 f"Unsupported format for Pandas engine: '{format}'. "
-                "Supported formats: csv, parquet, json, excel, delta, sql, sql_server, azure_sql."
+                "Supported formats: csv, parquet, json, excel, delta, sql, api."
             )
 
     def write(

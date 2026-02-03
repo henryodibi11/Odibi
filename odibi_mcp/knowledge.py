@@ -578,82 +578,46 @@ FOR MORE DETAILS, use these MCP tools:
 """
 
     def get_yaml_structure(self) -> str:
-        """Return the exact YAML structure for odibi pipelines."""
-        return """# CRITICAL: Odibi YAML Pipeline Structure
+        """Return compact YAML structure (~400 tokens). Use explain() for details."""
+        return """# Odibi YAML Quick Reference
 
-## Project Config (project.yaml)
+## Required Structure
 ```yaml
-project: my_project          # Required: project name
-
-connections:                 # Required: connection definitions
-  my_data:
-    type: local
-    base_path: ./data
-  my_db:
-    type: azure_sql
-    server: myserver.database.windows.net
-    database: mydb
-
-story:                       # Recommended: execution story output
-  connection: my_data
-  path: stories
-
-system:                      # Recommended: system data (checksums, etc.)
-  connection: my_data
-  path: _system
-
-imports:                     # Optional: import pipeline files
-  - pipelines/bronze/orders.yaml
-  - pipelines/silver/customers.yaml
-```
-
-## Pipeline File (imported files MUST have top-level 'pipelines:' key)
-```yaml
+project: my_project
+connections:
+  local: { type: local, base_path: ./data }
+  my_sql: { type: azure_sql, server: x, database: x, username: ${SQL_USER}, password: ${SQL_PASSWORD} }
+story: { connection: local, path: stories }
+system: { connection: local, path: _system }
 pipelines:
-  - pipeline: my_pipeline      # Use 'pipeline:' not 'name:'
-    layer: bronze
+  - pipeline: my_pipeline
     nodes:
-      - name: load_data        # alphanumeric + underscore ONLY
-        read:                  # Use 'read:' not 'inputs:'
-          connection: my_data
-          path: input.csv
-          format: csv          # REQUIRED: csv, parquet, json, delta, sql
-        transform:
-          steps:
-            - function: add_column
-              params:
-                column_name: new_col
-                value: "'default'"
-        write:                 # Use 'write:' not 'outputs:'
-          connection: my_data
-          path: output.parquet
-          format: parquet
+      - name: my_node              # alphanumeric + underscore ONLY
+        read: { connection: local, path: data.csv, format: csv }
+        write: { connection: local, path: output, format: delta }
 ```
 
-## SQL Source Read (CORRECT syntax)
-```yaml
-      - name: load_from_sql
-        read:
-          connection: my_db
-          format: sql           # MUST be 'sql' for database sources
-          query: |              # Use 'query:' not 'sql:'
-            SELECT CustomerID, Name, City
-            FROM dbo.Customers
-            WHERE IsActive = 1
-        write:
-          connection: my_data
-          format: delta
-          table: bronze.customers
-```
+## Node Options
+- `read:` connection, path, format (csv/parquet/delta/sql/xlsx), options, query (for sql)
+- `write:` connection, path, format, mode (overwrite/append/merge), partition_by, z_order_by
+- `transformer:` scd2, merge, deduplicate + `params:`
+- `pattern:` dimension, fact, aggregation + `params:`
+- `transform: { steps: [{ sql: "..." }, { function: x, params: {} }] }`
+- `validation: { rules: [{ type: not_null, columns: [id] }], on_failure: quarantine }`
+- `depends_on: [other_node]`, `tags: [daily]`, `enabled: true`, `cache: true`
 
-## CRITICAL RULES:
-- Use `read:` and `write:` (NOT `inputs:` or `outputs:` or `source:` or `sink:`)
-- Use `query:` inside read block (NOT `sql:`)
-- Use `pipeline:` for pipeline name (NOT `name:` at pipeline level)
-- Node names: alphanumeric + underscore ONLY (no hyphens, dots, spaces)
-- Imported pipeline files MUST have top-level `pipelines:` key
+## Common Mistakes
+- `source:/sink:` → USE `read:/write:`
+- `sql:` → USE `query:` inside read block
+- `name:` at pipeline level → USE `pipeline:`
+- Missing `format:` → ALWAYS include
 
-## RECOMMENDED: Use `generate_sql_pipeline` tool instead of writing YAML manually!
+## Need More Details? Use explain():
+- Patterns: explain("scd2"), explain("merge"), explain("dimension"), explain("fact")
+- Transformers: explain("deduplicate"), explain("add_column"), explain("clean_text")
+- Features: explain("validation"), explain("incremental"), explain("write")
+
+## Generate Complete YAML: Use generate_bronze_node(profile) after profile_source()
 """
 
     # =========================================================================

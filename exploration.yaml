@@ -1,0 +1,53 @@
+# Exploration config for testing MCP smart discovery tools
+project: exploration_test
+engine: pandas
+
+connections:
+  # Azure Data Lake Storage
+  raw_adls:
+    type: azure_blob
+    account_name: globaldigitalopsteamprod
+    container: digital-manufacturing
+    validation_mode: eager
+    auth:
+      mode: direct_key
+      account_key: ${AZURE_STORAGE_ACCOUNT_KEY}
+
+  # SQL Databases
+  wwi:
+    type: azure_sql
+    server: engineeringdatabase.database.windows.net
+    database: WideWorldImporters-Standard
+    username: ${SQL_USER}
+    password: ${SQL_PASSWORD}
+
+  wwi_dw:
+    type: azure_sql
+    server: engineeringdatabase.database.windows.net
+    database: WideWorldImportersDW-Standard
+    username: ${SQL_USER}
+    password: ${SQL_PASSWORD}
+
+  # Local filesystem for testing
+  local:
+    type: local
+    base_path: ./data
+
+  # Projects data (for story/system access)
+  projects_local:
+    type: local
+    base_path: ./projects/data
+
+system:
+  connection: projects_local
+  path: _system
+
+story:
+  connection: projects_local
+  path: _stories
+  generate_lineage: false
+  auto_generate: false
+  max_sample_rows: 10
+
+imports:
+  - projects/bronze_mm60.yaml

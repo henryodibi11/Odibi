@@ -73,6 +73,9 @@ from odibi_mcp.tools.smart import (
     profile_folder,
     generate_bronze_node,
     test_node,
+    download_sql,
+    download_table,
+    download_file,
 )
 from odibi_mcp.tools.yaml_builder import (
     generate_sql_pipeline,
@@ -138,7 +141,11 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="list_transformers",
-            description="List all 52+ odibi transformers with their parameters. Use when you need to know what transformers are available.",
+            description="""List all 52+ odibi transformers with brief descriptions.
+
+Returns transformer names and what they do. Use to find which transformer to use.
+
+NEXT STEP: Call explain("<transformer_name>") for params and YAML example.""",
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -147,7 +154,11 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="list_patterns",
-            description="List all 6 odibi DWH patterns (dimension, fact, scd2, merge, aggregation, date_dimension). Use when you need pattern info.",
+            description="""List all 6 odibi DWH patterns: dimension, fact, scd2, merge, aggregation, date_dimension.
+
+Returns pattern names and descriptions. Use to choose the right pattern.
+
+NEXT STEP: Call explain("<pattern_name>") for full params and YAML example.""",
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -156,7 +167,11 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="list_connections",
-            description="List all odibi connection types (local, azure_adls, sql_server, delta, etc.).",
+            description="""List all odibi connection types: local, azure_adls, azure_sql, delta, http, etc.
+
+Returns connection types and required config fields.
+
+NEXT STEP: Call explain("<connection_type>") for full config example.""",
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -165,13 +180,21 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="explain",
-            description="Get detailed documentation for a specific transformer, pattern, or connection by name.",
+            description="""Get detailed docs, params, and YAML example for any odibi feature.
+
+USE FOR: transformers, patterns, connections, validation, incremental, write modes.
+
+EXAMPLES:
+- explain("scd2") → SCD Type 2 pattern with full YAML
+- explain("deduplicate") → Deduplicate transformer with params
+- explain("azure_adls") → ADLS connection config
+- explain("validation") → Data quality rules""",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name": {
                         "type": "string",
-                        "description": "Name of the transformer, pattern, or connection to explain",
+                        "description": "Feature name: transformer, pattern, connection, or topic",
                     },
                 },
                 "required": ["name"],
@@ -188,7 +211,18 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_yaml_structure",
-            description="Get the EXACT YAML structure for odibi pipeline configs. ALWAYS use this before writing YAML configs.",
+            description="""Get compact YAML structure reference for odibi pipelines.
+
+Returns quick reference with required structure and available options.
+
+WHEN TO DRILL DEEPER with explain():
+- Need SCD2/merge/dimension pattern details → explain("scd2"), explain("merge")
+- Need transformer params → explain("deduplicate"), explain("add_column")
+- Need validation rules → explain("validation")
+- Need incremental loading → explain("incremental")
+- Need write modes/partitioning → explain("write")
+
+For generating complete YAMLs automatically, use generate_bronze_node instead.""",
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -755,22 +789,41 @@ async def list_tools() -> list[Tool]:
         # ============ SMART DISCOVERY TOOLS ============
         Tool(
             name="map_environment",
-            description="""STEP 1 of Lazy Bronze workflow. Scout a connection to understand what exists.
+            description="""🔍 SCOUT a connection to discover what data exists. START HERE for any new data source.
 
-For storage: scans folders, detects file patterns, groups by format.
-For SQL: lists schemas, tables, row counts.
+BEHAVIOR - BE PERSISTENT:
+1. Call with path="" to see root level
+2. If you see "[FOLDER]" entries or "contains N subfolder(s)" → ALWAYS drill deeper by calling again with that folder path
+3. Keep drilling until you find actual files (CSV, Parquet, Excel, JSON)
+4. NEVER stop at the first level if you only see folders
 
-Returns suggested_sources - use these paths with profile_source next.
+DECISION TREE:
+- See folders only? → DRILL DEEPER: map_environment(conn, "folder_name")
+- See files? → PROFILE THEM: profile_source(conn, "folder/file.csv")
+- See mixed? → Profile the files, drill into remaining folders
+- SQL connection? → You'll get schemas/tables → profile_source(conn, "Schema.Table")
 
-WORKFLOW: map_environment → profile_source → generate_bronze_node → test_node""",
+EXAMPLES:
+  map_environment("raw_adls", "")           # Start at root
+  map_environment("raw_adls", "raw data")   # Drill into folder
+  map_environment("raw_adls", "raw data/sales")  # Drill deeper
+  map_environment("wwi", "")                # SQL: shows schemas + tables
+
+NEXT ACTIONS (pick one):
+- Folder shows subfolders → map_environment(conn, "path/to/subfolder")
+- Found files → profile_source(conn, "path/to/file.csv")
+- Want to download → download_file(conn, "path/to/file", "./local.parquet")
+- SQL table → profile_source(conn, "Schema.TableName")
+
+⚠️ DO NOT GIVE UP if you only see folders. Keep calling until you find data files.""",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "connection": {"type": "string", "description": "Connection name from config"},
+                    "connection": {"type": "string", "description": "Connection name from exploration.yaml"},
                     "path": {
                         "type": "string",
                         "default": "",
-                        "description": "Base path to scan (storage only)",
+                        "description": "Path to explore. '' for root. 'folder/subfolder' to drill deeper.",
                     },
                 },
                 "required": ["connection"],
@@ -778,23 +831,43 @@ WORKFLOW: map_environment → profile_source → generate_bronze_node → test_n
         ),
         Tool(
             name="profile_source",
-            description="""STEP 2 of Lazy Bronze workflow. Self-correcting profiler that figures out how to read a file or table.
+            description="""📊 PROFILE a file or SQL table to get schema, sample data, and ready-to-use config.
 
-For CSV files: auto-detects encoding, delimiter, skip rows (handles messy SAP exports).
-For parquet/SQL: extracts schema directly.
+WHEN TO USE:
+- After map_environment finds files you want to onboard
+- When you know the exact file path or table name
+- Before generating pipeline YAML
 
-Returns ready_for dict - pass this directly to generate_bronze_node.
+WHAT YOU GET:
+- schema: column names, types, nullability, patterns detected
+- sample_rows: 10 rows of actual data
+- file_options: encoding, delimiter, skip_rows (auto-detected for CSV)
+- candidate_keys: likely primary key columns
+- candidate_watermarks: likely incremental loading columns
+- ready_for: pre-filled dict for generate_bronze_node()
 
-WORKFLOW: map_environment → profile_source → generate_bronze_node → test_node""",
+EXAMPLES:
+  profile_source("raw_adls", "raw data/sales/orders.csv")
+  profile_source("raw_adls", "exports/data.parquet")
+  profile_source("wwi", "Sales.Orders")      # SQL table
+  profile_source("wwi_dw", "Fact.Sale")      # SQL fact table
+
+DECISION TREE after profiling:
+- confidence > 0.8 + no errors → generate_bronze_node(profile.ready_for)
+- errors/warnings about encoding → profile_source again or adjust options
+- want to analyze locally first → download_file() or download_sql()
+- need more context → map_environment() on parent folder
+
+NEXT ACTION: Pass ready_for dict to generate_bronze_node() to create runnable pipeline YAML.""",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "connection": {"type": "string", "description": "Connection name"},
-                    "path": {"type": "string", "description": "Path to file or schema.table"},
+                    "connection": {"type": "string", "description": "Connection name from exploration.yaml"},
+                    "path": {"type": "string", "description": "File path (e.g., 'folder/file.csv') or SQL table (e.g., 'Sales.Orders')"},
                     "max_attempts": {
                         "type": "integer",
                         "default": 5,
-                        "description": "Max profiling attempts",
+                        "description": "Max profiling attempts for tricky CSV files",
                     },
                 },
                 "required": ["connection", "path"],
@@ -802,23 +875,36 @@ WORKFLOW: map_environment → profile_source → generate_bronze_node → test_n
         ),
         Tool(
             name="profile_folder",
-            description="""BATCH profiling for folders with many files. Use instead of looping through profile_source one by one.
+            description="""📁 BATCH PROFILE many files at once. Use when a folder has multiple similar files.
 
-Profiles all files in a folder (or matching a pattern), groups them by detected options, and identifies which files share the same configuration.
+WHEN TO USE (instead of profile_source):
+- Folder has 5+ files you need to onboard
+- Want to check if all files share same encoding/delimiter
+- Need to find outlier files with different formats
 
-Returns:
-- options_groups: Files grouped by encoding/delimiter/skipRows
-- consistent_options: True if all files use same options
-- recommended_options: Options from the largest group
-- file_profiles: Individual profile summaries
+WHAT YOU GET:
+- options_groups: Files clustered by encoding/delimiter/skip_rows
+- consistent_options: True if all files match (great for bulk ingestion)
+- recommended_options: Best options based on majority
+- file_profiles: Summary of each file profiled
 
-WORKFLOW: map_environment → profile_folder → generate_bronze_node (per file or bulk)""",
+EXAMPLES:
+  profile_folder("raw_adls", "raw data/sales", "*.csv")       # All CSVs
+  profile_folder("raw_adls", "exports/2024", "IP24*.csv")     # Pattern match
+  profile_folder("local", "data/invoices", "*", max_files=20) # First 20 files
+
+DECISION TREE:
+- consistent_options=true → generate_bronze_node for the whole folder
+- consistent_options=false → review options_groups, decide per-group
+- errors on some files → check those files individually with profile_source
+
+NEXT ACTION: Use recommended_options with generate_bronze_node() for bulk pipeline.""",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "connection": {
                         "type": "string",
-                        "description": "Connection name (storage only: ADLS, S3, local)",
+                        "description": "Storage connection name (ADLS, S3, local)",
                     },
                     "folder_path": {
                         "type": "string",
@@ -828,17 +914,17 @@ WORKFLOW: map_environment → profile_folder → generate_bronze_node (per file 
                     "pattern": {
                         "type": "string",
                         "default": "*",
-                        "description": "File pattern (e.g., '*.csv', 'IP24*')",
+                        "description": "File pattern glob (e.g., '*.csv', 'IP24*', '*.parquet')",
                     },
                     "max_files": {
                         "type": "integer",
                         "default": 50,
-                        "description": "Max files to profile",
+                        "description": "Max files to profile (increase for larger folders)",
                     },
                     "max_attempts": {
                         "type": "integer",
                         "default": 3,
-                        "description": "Max profiling attempts per file",
+                        "description": "Retry attempts per file for tricky CSVs",
                     },
                 },
                 "required": ["connection"],
@@ -846,19 +932,35 @@ WORKFLOW: map_environment → profile_folder → generate_bronze_node (per file 
         ),
         Tool(
             name="generate_bronze_node",
-            description="""STEP 3 of Lazy Bronze workflow. Generate COMPLETE runnable Odibi project YAML.
+            description="""⚡ GENERATE RUNNABLE YAML from profile results. The final step in data onboarding.
 
-Takes the ready_for output from profile_source as the 'profile' parameter.
-Returns a complete project config with:
-- connections (auto-detected from context)
-- system/story config (uses local connection)
-- pipeline with bronze node
+THIS IS THE PAYOFF - You get a complete, validated Odibi project YAML that you can:
+1. Save to a .yaml file
+2. Run immediately: python -m odibi run <file>.yaml
 
-The output YAML can be saved and run directly: python -m odibi run <file>.yaml
+HOW TO USE:
+1. Get ready_for dict from profile_source() or profile_folder()
+2. Pass it here: generate_bronze_node(profile=ready_for_dict)
+3. Save the yaml_content to a file
+4. Run it!
 
-Set include_project=false to generate just a pipeline (for import into existing project).
+EXAMPLES:
+  generate_bronze_node(profile=ready_for_dict)
+  generate_bronze_node(profile=ready_for_dict, node_name="sales_orders")
+  generate_bronze_node(profile=ready_for_dict, local_output=False)  # Write to cloud
 
-WORKFLOW: map_environment → profile_source → generate_bronze_node → save & run""",
+WHAT'S INCLUDED:
+- project: auto-named from source
+- connections: FULL configs pulled from exploration.yaml
+- story + system: for run tracking and catalog
+- pipeline: with your bronze node (source → bronze layer)
+
+DECISION TREE:
+- YAML generated successfully → Save it and run with odibi
+- validation errors → Fix the profile and regenerate
+- want to test first → test_node(yaml_content)
+
+NEXT ACTION: Save yaml_content to file, then run: python -m odibi run <file>.yaml""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -894,14 +996,29 @@ WORKFLOW: map_environment → profile_source → generate_bronze_node → save &
         ),
         Tool(
             name="test_node",
-            description="""STEP 4 of Lazy Bronze workflow. Test a node definition in-memory before saving.
+            description="""🧪 TEST a node YAML before running. Validates in-memory without writing output.
 
-Reads source with the specified options, validates output.
-Returns ready_to_save=true if successful, or suggestions for fixes if not.
+WHEN TO USE:
+- Before running a generated pipeline for the first time
+- After manually editing YAML to check it still works
+- When debugging encoding/delimiter issues
 
-If test fails: adjust options in YAML and re-test, or re-run profile_source.
+WHAT IT DOES:
+1. Reads source with specified options
+2. Applies any transformers
+3. Validates output schema and data quality
+4. Reports issues with actionable fixes
 
-WORKFLOW: map_environment → profile_source → generate_bronze_node → test_node""",
+RETURNS:
+- ready_to_save=true → Safe to run the pipeline
+- ready_to_save=false → Check errors[] and fixes[] for what to change
+
+DECISION TREE:
+- ready_to_save=true → Run the pipeline: python -m odibi run <file>.yaml
+- encoding error → Re-profile with different encoding or update YAML
+- schema mismatch → Check source file hasn't changed
+
+WORKFLOW: map_environment → profile_source → generate_bronze_node → test_node → RUN""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1065,12 +1182,165 @@ Use to create a new Odibi project with correct structure.""",
                 "required": ["project_name", "connections"],
             },
         ),
+        # ============ DOWNLOAD TOOLS - For AI Local Analysis ============
+        Tool(
+            name="download_sql",
+            description="""⬇️ DOWNLOAD SQL query results to local file. For ad-hoc analysis without building pipelines.
+
+WHEN TO USE:
+- Quick data extraction for analysis
+- Testing queries before building pipelines
+- Getting samples for development
+- Exporting filtered subsets
+
+FORMAT (auto-detected from extension):
+- .parquet → Fast, compressed (recommended)
+- .csv → Human readable, Excel-compatible
+- .json → For APIs/JavaScript
+- .xlsx → Direct Excel workbook
+
+EXAMPLES:
+  download_sql("wwi", "SELECT * FROM Sales.Orders WHERE OrderYear=2024", "./data/orders.parquet")
+  download_sql("wwi", "SELECT TOP 100 * FROM Sales.Customers", "./data/customers.csv")
+  download_sql("wwi_dw", "SELECT * FROM Fact.Sale", "C:/full/path/to/sales.parquet", limit=50000)
+
+PATH TIPS:
+- "./" prefix → relative to workspace root (recommended)
+- Full absolute path → any folder you want
+
+⚠️ AVOID bare paths like "data/file.csv" without "./" - they resolve unpredictably.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {
+                        "oneOf": [
+                            {"type": "string", "description": "Connection name from config"},
+                            {"type": "object", "description": "Inline connection spec with type, server, database, etc."},
+                        ],
+                        "description": "SQL connection name or inline spec",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "SQL query to execute",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Where to save. Use './data/file.csv' (relative to workspace) or full path 'C:/Users/name/Downloads/file.csv'. AVOID bare 'Downloads/file.csv'.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 10000,
+                        "description": "Max rows to download (default 10000)",
+                    },
+                },
+                "required": ["connection", "query", "output_path"],
+            },
+        ),
+        Tool(
+            name="download_table",
+            description="""⬇️ DOWNLOAD entire SQL table. Shortcut for download_sql("SELECT * FROM table").
+
+WHEN TO USE:
+- Quick export without writing SQL
+- Reference/dimension tables (usually small)
+- Full table snapshots for testing
+
+EXAMPLES:
+  download_table("wwi", "Sales.Orders", "./data/orders.parquet")
+  download_table("wwi", "Dimension.Customer", "./data/customers.csv")
+  download_table("wwi_dw", "Dimension.Date", "C:/any/folder/dates.parquet", limit=50000)
+
+⚠️ Use "./" for workspace-relative, or full absolute path. Limit default: 10,000 rows.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {
+                        "oneOf": [
+                            {"type": "string", "description": "Connection name from config"},
+                            {"type": "object", "description": "Inline connection spec"},
+                        ],
+                        "description": "SQL connection name or inline spec",
+                    },
+                    "table": {
+                        "type": "string",
+                        "description": "Table name in schema.table format (e.g., 'Sales.Orders')",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Where to save. Use './data/file.csv' (relative to workspace) or full path 'C:/Users/name/Downloads/file.csv'.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 10000,
+                        "description": "Max rows to download",
+                    },
+                },
+                "required": ["connection", "table", "output_path"],
+            },
+        ),
+        Tool(
+            name="download_file",
+            description="""⬇️ DOWNLOAD file from cloud storage (ADLS/S3/GCS) to local. Raw byte copy.
+
+WHEN TO USE:
+- After map_environment finds files you want locally
+- Get Excel/CSV/Parquet for local analysis
+- Download any file type (images, PDFs, etc.)
+
+WORKS WITH: CSV, Parquet, JSON, Excel, images, PDFs - anything!
+Files are copied as-is (raw bytes, no transformation).
+
+EXAMPLES:
+  download_file("raw_adls", "reports/daily.csv", "./data/daily.csv")
+  download_file("raw_adls", "exports/2024/data.parquet", "./data/exports.parquet")
+  download_file("raw_adls", "raw data/sales/jan.xlsx", "C:/any/folder/jan.xlsx")
+
+⚠️ Use "./" for workspace-relative, or full absolute path. AVOID bare paths like "data/file.csv".""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "connection": {
+                        "oneOf": [
+                            {"type": "string", "description": "Storage connection name"},
+                            {"type": "object", "description": "Inline storage connection spec"},
+                        ],
+                        "description": "Storage connection name or inline spec",
+                    },
+                    "source_path": {
+                        "type": "string",
+                        "description": "Path within storage (e.g., 'raw/data.csv')",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Where to save. Use './data/file.csv' (relative to workspace) or full path 'C:/Users/name/Downloads/file.csv'.",
+                    },
+                },
+                "required": ["connection", "source_path", "output_path"],
+            },
+        ),
+        # ============ DIAGNOSTIC TOOLS ============
         Tool(
             name="diagnose",
-            description="""Diagnose the MCP environment - check paths, env vars, connections, and story files.
+            description="""🔧 DIAGNOSE when tools fail. First step for troubleshooting.
 
-ALWAYS call this tool first when something fails or returns "not found".
-Returns detailed status of the environment with issues and suggestions.""",
+CALL THIS WHEN:
+- Connection errors or "not found" messages
+- Tools return unexpected errors
+- Need to verify setup before starting
+
+WHAT IT CHECKS:
+- .env file loaded and from where
+- Environment variables present (ADLS_ACCOUNT, etc.)
+- exploration.yaml path and validity
+- Connection definitions available
+
+DECISION TREE from results:
+- env_loaded=false → Create .env file or set ODIBI_CONFIG env var
+- missing env vars → Add them to .env (ADLS_ACCOUNT_NAME, ADLS_KEY, etc.)
+- no connections → Check exploration.yaml path and content
+- all good → Try map_environment again
+
+NEXT ACTION: Fix issues shown, then retry the failing tool.""",
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -1079,9 +1349,19 @@ Returns detailed status of the environment with issues and suggestions.""",
         ),
         Tool(
             name="diagnose_path",
-            description="""Diagnose a specific path - check if it exists, list contents.
+            description="""🔧 CHECK if a path exists. Debug for "path not found" errors.
 
-Use to explore the filesystem when trying to find files or understand directory structure.""",
+WHEN TO USE:
+- map_environment returns empty or errors
+- File path from suggested_sources doesn't work
+- Need to verify folder structure
+
+WHAT IT RETURNS:
+- exists: true/false
+- contents: list of files/folders if exists
+- error: what went wrong if not
+
+NEXT ACTION: Use the correct path with map_environment or profile_source.""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1420,6 +1700,30 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = to_json_serializable(res)
         elif name == "diagnose_path":
             result = diagnose_path(path=arguments["path"])
+        # ============ DOWNLOAD TOOL HANDLERS ============
+        elif name == "download_sql":
+            res = download_sql(
+                connection=arguments["connection"],
+                query=arguments["query"],
+                output_path=arguments["output_path"],
+                limit=arguments.get("limit", 10000),
+            )
+            result = to_json_serializable(res)
+        elif name == "download_table":
+            res = download_table(
+                connection=arguments["connection"],
+                table=arguments["table"],
+                output_path=arguments["output_path"],
+                limit=arguments.get("limit", 10000),
+            )
+            result = to_json_serializable(res)
+        elif name == "download_file":
+            res = download_file(
+                connection=arguments["connection"],
+                source_path=arguments["source_path"],
+                output_path=arguments["output_path"],
+            )
+            result = to_json_serializable(res)
         # Execution tools removed - use shell instead
         else:
             result = {"error": f"Unknown tool: {name}"}

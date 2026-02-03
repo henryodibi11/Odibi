@@ -13,6 +13,28 @@ These tools enable the "Lazy Bronze" workflow - point at a data source and get a
 | `generate_bronze_node` | Generate Odibi YAML for a bronze layer node from a profile result. |
 | `test_node` | Test a node definition in-memory without persisting. Validates output and suggests fixes. |
 
+### Inline Connection Specs
+
+Discovery tools now accept **either** a connection name OR an inline connection spec. This allows exploration without a config file:
+
+```python
+# Named connection (from exploration.yaml)
+map_environment("wwi")
+profile_source("wwi", "Sales.Orders")
+
+# Inline connection spec (no config needed)
+map_environment({
+    "type": "azure_sql",
+    "server": "myserver.database.windows.net",
+    "database": "MyDB",
+    "driver": "ODBC Driver 17 for SQL Server",
+    "username": "${SQL_USER}",
+    "password": "${SQL_PASSWORD}"
+})
+```
+
+**Security:** Secrets must use `${ENV_VAR}` syntax. Plaintext passwords are rejected.
+
 ### Lazy Bronze Workflow
 
 ```
@@ -161,6 +183,14 @@ Use odibi MCP list_transformers
 | `debug_env` | Debug environment setup - shows .env loading, env vars, and connection status | `{}` |
 | `diagnose` | Diagnose MCP environment - check paths, env vars, connections | `{}` |
 | `diagnose_path` | Check if a specific path exists and list contents | `{"path": "projects/data"}` |
+
+### Download Tools (3) - For AI Local Analysis
+
+| Tool | Description | Example |
+|------|-------------|---------|
+| `download_sql` | Run SQL query and save results locally (Parquet/CSV/JSON) | `{"connection": "wwi", "query": "SELECT * FROM Sales.Orders", "output_path": "./orders.parquet"}` |
+| `download_table` | Download entire table to local file | `{"connection": "wwi", "table": "Sales.Orders", "output_path": "./orders.parquet", "limit": 5000}` |
+| `download_file` | Copy ADLS/storage file to local filesystem | `{"connection": "raw_adls", "source_path": "reports/daily.csv", "output_path": "./daily.csv"}` |
 
 ### Execution - Use Shell!
 
