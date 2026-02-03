@@ -126,6 +126,44 @@ nodes:
 
 ---
 
+## Variable Substitution
+
+| Syntax | Purpose | Example |
+| :--- | :--- | :--- |
+| `${VAR}` | Environment variable | `${DB_PASSWORD}` |
+| `${env:VAR}` | Environment variable (explicit) | `${env:API_KEY}` |
+| `${vars.name}` | Custom variable from `vars:` block | `${vars.env}` |
+| `${date:expr}` | Dynamic date | `${date:today}`, `${date:-7d}` |
+| `${date:expr:fmt}` | Date with format | `${date:today:%Y%m%d}` |
+
+**Date expressions:** `today`, `yesterday`, `now`, `start_of_month`, `end_of_month`, `-7d`, `+30d`, `-1m`, `-1y`
+
+---
+
+## API Fetching
+
+```yaml
+read:
+  connection: my_api
+  format: api
+  path: /v1/data
+  options:
+    method: GET              # GET (default), POST, PUT, PATCH, DELETE
+    params:                  # URL params (GET) or merged into body (POST)
+      limit: 100
+    request_body:            # JSON body for POST/PUT/PATCH
+      filters: {...}
+    pagination:
+      type: offset_limit     # offset_limit | page_number | cursor | link_header
+      start_offset: 0        # Use 1 for 1-indexed APIs
+    response:
+      items_path: results
+      add_fields:
+        _fetched_at: "${date:now}"
+```
+
+---
+
 ## Transformer Quick Reference
 
 ### SQL Core (Column & Row Operations)

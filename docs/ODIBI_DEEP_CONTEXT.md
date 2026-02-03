@@ -1056,6 +1056,71 @@ params:
 
 ---
 
+### 6.7 API Fetching (REST APIs)
+
+Read data from REST APIs with pagination, retries, and rate limiting.
+
+#### Basic GET API
+
+```yaml
+read:
+  connection: my_api      # HTTP connection
+  format: api
+  path: /v1/records
+  options:
+    params:
+      limit: 100
+    pagination:
+      type: offset_limit
+      offset_param: skip
+      limit_param: limit
+      limit: 1000
+      max_pages: 50
+    response:
+      items_path: results
+      add_fields:
+        _fetched_at: "${date:now}"
+```
+
+#### POST API (Complex Queries)
+
+Some APIs use POST with JSON body for complex filters:
+
+```yaml
+read:
+  connection: fda_dashboard
+  format: api
+  path: /v1/recalls
+  options:
+    method: POST              # Use POST instead of GET
+    request_body:             # JSON body
+      filters:
+        Classification: ["Class I"]
+        PostedDateFrom: ["${date:-30d}"]
+      columns:
+        - RecallID
+        - FirmName
+    pagination:
+      type: offset_limit
+      offset_param: start     # Goes into JSON body for POST
+      limit_param: rows
+      limit: 1000
+      start_offset: 1         # For 1-indexed APIs
+    response:
+      items_path: result
+```
+
+| Option | Description |
+|--------|-------------|
+| `method` | HTTP method: GET (default), POST, PUT, PATCH, DELETE |
+| `params` | URL query params (GET) or merged into body (POST) |
+| `request_body` | JSON body for POST/PUT/PATCH |
+| `pagination.start_offset` | Starting offset (0 or 1 for 1-indexed APIs) |
+
+📖 **Full documentation:** [API Data Sources Guide](guides/api_data_sources.md)
+
+---
+
 ## 7. Write Configuration (Delta Lake Features)
 
 ### 7.1 Partitioning & Z-Ordering

@@ -299,6 +299,31 @@ nodes:
     cache: true                  # → cache
 ```
 
+**API Read Configuration:**
+
+```yaml
+nodes:
+  - name: fetch_api_data
+    read:
+      connection: my_api         # HTTP connection
+      format: api
+      path: /v1/records
+      options:
+        method: POST             # GET (default), POST, PUT, PATCH, DELETE
+        params:                  # URL params (GET) or merged into body (POST)
+          limit: 100
+        request_body:            # JSON body for POST/PUT/PATCH
+          filters:
+            status: ["active"]
+        pagination:
+          type: offset_limit
+          start_offset: 1        # For 1-indexed APIs
+        response:
+          items_path: results
+          add_fields:
+            _fetched_at: "${date:now}"
+```
+
 **Cross-Pipeline Dependencies (`inputs` block):**
 
 For multi-input nodes that read from other pipelines, use the `inputs` block instead of `read`:
