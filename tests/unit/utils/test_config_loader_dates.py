@@ -3,8 +3,6 @@
 import re
 from datetime import datetime, timedelta
 
-import pytest
-
 from odibi.utils.config_loader import (
     DATE_PATTERN,
     _resolve_date_expression,
