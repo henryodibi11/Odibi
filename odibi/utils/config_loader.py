@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 import yaml
@@ -12,6 +13,133 @@ ENV_PATTERN = re.compile(r"\$\{(?:env:)?([A-Za-z0-9_]+)\}")
 
 # Pattern to match ${vars.xxx}
 VARS_PATTERN = re.compile(r"\$\{vars\.([A-Za-z0-9_]+)\}")
+
+# Pattern to match ${date:expression} or ${date:expression:format}
+# Examples: ${date:today}, ${date:-7d}, ${date:now:%Y-%m-%d %H:%M:%S}
+DATE_PATTERN = re.compile(r"\$\{date:([^}:]+)(?::([^}]+))?\}")
+
+
+def _resolve_date_expression(expression: str, fmt: str | None = None) -> str:
+    """Resolve a date expression to a formatted string.
+
+    Supported expressions:
+    - now: Current datetime
+    - today: Today at midnight
+    - yesterday: Yesterday at midnight
+    - start_of_month: First day of current month
+    - end_of_month: Last day of current month
+    - start_of_year: First day of current year
+    - Relative: -7d, +30d, -1w, +2w, -1m, +3m, -1y, +1y
+
+    Args:
+        expression: The date expression (e.g., "today", "-7d", "start_of_month")
+        fmt: Optional strftime format string (default: "%Y-%m-%d")
+
+    Returns:
+        Formatted date string
+    """
+    now = datetime.now()
+    default_fmt = "%Y-%m-%d"
+
+    # Named expressions
+    named_dates = {
+        "now": now,
+        "today": now.replace(hour=0, minute=0, second=0, microsecond=0),
+        "yesterday": now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1),
+        "start_of_month": now.replace(day=1, hour=0, minute=0, second=0, microsecond=0),
+        "start_of_year": now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0),
+    }
+
+    # Handle end_of_month specially
+    if expression == "end_of_month":
+        # Get first day of next month, then subtract 1 day
+        if now.month == 12:
+            next_month = now.replace(year=now.year + 1, month=1, day=1)
+        else:
+            next_month = now.replace(month=now.month + 1, day=1)
+        result = next_month - timedelta(days=1)
+        result = result.replace(hour=0, minute=0, second=0, microsecond=0)
+        return result.strftime(fmt or default_fmt)
+
+    if expression in named_dates:
+        result = named_dates[expression]
+        # For "now", use datetime format by default
+        if expression == "now" and fmt is None:
+            return result.strftime("%Y-%m-%d %H:%M:%S")
+        return result.strftime(fmt or default_fmt)
+
+    # Relative expressions: -7d, +30d, -1w, +2w, -1m, +3m, -1y, +1y
+    relative_match = re.match(r"^([+-]?\d+)([dwmy])$", expression)
+    if relative_match:
+        amount = int(relative_match.group(1))
+        unit = relative_match.group(2)
+        base = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if unit == "d":
+            result = base + timedelta(days=amount)
+        elif unit == "w":
+            result = base + timedelta(weeks=amount)
+        elif unit == "m":
+            # Approximate month calculation
+            new_month = base.month + amount
+            new_year = base.year + (new_month - 1) // 12
+            new_month = ((new_month - 1) % 12) + 1
+            # Handle day overflow (e.g., Jan 31 + 1 month)
+            try:
+                result = base.replace(year=new_year, month=new_month)
+            except ValueError:
+                # Day doesn't exist in target month, use last day
+                if new_month == 12:
+                    next_m = base.replace(year=new_year + 1, month=1, day=1)
+                else:
+                    next_m = base.replace(year=new_year, month=new_month + 1, day=1)
+                result = next_m - timedelta(days=1)
+        elif unit == "y":
+            try:
+                result = base.replace(year=base.year + amount)
+            except ValueError:
+                # Handle Feb 29 on non-leap year
+                result = base.replace(year=base.year + amount, day=28)
+        else:
+            result = base
+
+        return result.strftime(fmt or default_fmt)
+
+    # Unknown expression, return as-is with warning
+    logger.warning("Unknown date expression", expression=expression)
+    return expression
+
+
+def _substitute_dates(data: Any) -> Any:
+    """Recursively substitute ${date:...} placeholders with resolved dates.
+
+    Args:
+        data: The data structure to process (dict, list, or scalar)
+
+    Returns:
+        Data with all ${date:...} placeholders replaced
+    """
+    if isinstance(data, dict):
+        return {k: _substitute_dates(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_substitute_dates(item) for item in data]
+    elif isinstance(data, str):
+
+        def replace_date(match):
+            expression = match.group(1)
+            fmt = match.group(2)  # May be None
+            resolved = _resolve_date_expression(expression, fmt)
+            logger.debug(
+                "Date variable substituted",
+                expression=expression,
+                format=fmt,
+                result=resolved,
+            )
+            return resolved
+
+        return DATE_PATTERN.sub(replace_date, data)
+    else:
+        return data
 
 
 def _substitute_vars(data: Any, vars_dict: Dict[str, Any]) -> Any:
@@ -391,6 +519,9 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
             vars_keys=list(vars_dict.keys()),
         )
         data = _substitute_vars(data, vars_dict)
+
+    # Apply date substitution (${date:...} syntax)
+    data = _substitute_dates(data)
 
     logger.debug(
         "Configuration loading complete",

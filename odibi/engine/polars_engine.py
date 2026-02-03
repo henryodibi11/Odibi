@@ -208,6 +208,8 @@ class PolarsEngine(Engine):
                 api_options = options.copy()
                 params = api_options.pop("params", {})
                 max_records = api_options.pop("max_records", None)
+                method = api_options.pop("method", "GET")
+                request_body = api_options.pop("request_body", None)
 
                 # Create fetcher with connection's base_url and headers
                 fetcher = create_api_fetcher(
@@ -221,6 +223,8 @@ class PolarsEngine(Engine):
                     endpoint=str(full_path),
                     params=params,
                     max_records=max_records,
+                    method=method,
+                    request_body=request_body,
                 )
 
                 ctx.info(f"API read completed: {path}", row_count=len(pdf))

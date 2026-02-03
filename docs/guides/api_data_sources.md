@@ -322,20 +322,58 @@ options:
 
 ## Date Variables {#date-variables}
 
-When adding fields to API responses, use these special variables for automatic date injection:
+Use date variables in `add_fields` OR `params` for dynamic dates at runtime. There are **three syntaxes** available:
 
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| `$now` | Current UTC timestamp (ISO 8601) | `2024-01-15T10:30:00+00:00` |
-| `$today` | Today's date | `2024-01-15` |
-| `$yesterday` | Yesterday's date | `2024-01-14` |
-| `$date` | Alias for `$today` | `2024-01-15` |
-| `$7_days_ago` | 7 days before today | `2024-01-08` |
-| `$30_days_ago` | 30 days before today | `2023-12-16` |
-| `$90_days_ago` | 90 days before today | `2023-10-17` |
-| `$start_of_week` | Monday of current week | `2024-01-15` |
-| `$start_of_month` | First of current month | `2024-01-01` |
-| `$start_of_year` | First of current year | `2024-01-01` |
+### 1. Global Syntax: `${date:expression}` (Recommended)
+
+Works **anywhere in YAML**, not just API configs:
+
+```yaml
+params:
+  start_date: ${date:-7d}              # 7 days ago
+  end_date: ${date:today}              # Today
+  compact: ${date:today:%Y%m%d}        # Custom format: 20240115
+response:
+  add_fields:
+    _fetched_at: ${date:now}
+```
+
+| Expression | Description | Example Output |
+|------------|-------------|----------------|
+| `${date:now}` | Current datetime | `2024-01-15 14:30:45` |
+| `${date:today}` | Today's date | `2024-01-15` |
+| `${date:yesterday}` | Yesterday | `2024-01-14` |
+| `${date:-7d}` | 7 days ago | `2024-01-08` |
+| `${date:-30d}` | 30 days ago | `2023-12-16` |
+| `${date:-1m}` | ~1 month ago | `2023-12-15` |
+| `${date:start_of_month}` | First of month | `2024-01-01` |
+| `${date:today:%Y%m%d}` | Custom format | `20240115` |
+
+### 2. Shortcut Syntax: `$variable` (API params/add_fields only)
+
+Quick access to common date values:
+
+| Variable | Format | Example |
+|----------|--------|---------|
+| `$now` | ISO datetime | `2024-01-15T10:30:00+00:00` |
+| `$today` | YYYY-MM-DD | `2024-01-15` |
+| `$yesterday` | YYYY-MM-DD | `2024-01-14` |
+| `$7_days_ago` | YYYY-MM-DD | `2024-01-08` |
+| `$30_days_ago` | YYYY-MM-DD | `2023-12-16` |
+| `$today_compact` | YYYYMMDD | `20240115` |
+| `$7_days_ago_compact` | YYYYMMDD | `20240108` |
+
+### 3. Expression Syntax: `{expression}` (API params/add_fields only)
+
+Flexible relative dates with optional format:
+
+```yaml
+params:
+  start: "{-30d}"              # 30 days ago
+  end: "{today:%Y%m%d}"        # Today in YYYYMMDD
+```
+
+---
 
 ### Example: Tracking Data Freshness
 
@@ -344,30 +382,48 @@ options:
   response:
     items_path: results
     add_fields:
-      _fetched_at: "$now"           # When this record was fetched
-      _load_date: "$today"          # Date-based partitioning key
-      _week_start: "$start_of_week" # For weekly aggregations
+      _fetched_at: ${date:now}              # When this record was fetched
+      _load_date: ${date:today}             # Date-based partitioning key
+      _week_start: ${date:start_of_month}   # For aggregations
 ```
 
-### Example: Audit Trail
+### Example: Dynamic Date Filtering (openFDA)
 
 ```yaml
-options:
-  response:
-    items_path: data
-    add_fields:
-      _source_system: "vendor_api"
-      _ingestion_timestamp: "$now"
-      _batch_date: "$today"
+read:
+  format: api
+  path: /food/enforcement.json
+  options:
+    params:
+      # Fetch recalls from last 30 days
+      search: "report_date:[${date:-30d:%Y%m%d}+TO+${date:today:%Y%m%d}]"
+    response:
+      items_path: results
+      add_fields:
+        _fetched_at: ${date:now}
+```
+
+### Injecting Custom Dates
+
+You can override dates via environment variables:
+
+```bash
+export REPORT_DATE=2024-01-01
+```
+
+```yaml
+params:
+  date: ${REPORT_DATE}    # Uses your injected value
 ```
 
 !!! tip "Why use date variables?"
-    Adding `_fetched_at: "$now"` to every API record lets you:
-    
     - Track when data was ingested (not just when it was created)
     - Debug stale data issues
     - Implement incremental processing based on fetch time
     - Create audit trails for compliance
+    - Build self-adjusting pipelines that always fetch "last 30 days"
+
+📖 **Full documentation:** See [Variable Substitution Guide](variable_substitution.md) for all variable types including environment variables and custom vars.
 
 ## HTTP Settings
 
@@ -774,18 +830,23 @@ read:
   format: api                  # Required for API fetching
   path: /endpoint              # API endpoint path
   options:
-    params:                    # Query parameters
+    method: GET                # HTTP method: GET (default), POST, PUT, PATCH, DELETE
+    params:                    # Query parameters (GET) or merged into body (POST)
       key: value
+    request_body:              # JSON body for POST/PUT/PATCH requests
+      filters:
+        status: ["active"]
     
     pagination:
       type: offset_limit       # offset_limit | page_number | cursor | link_header | none
       # ... pagination-specific options
       max_pages: 100           # Safety limit
+      start_offset: 0          # Starting offset (use 1 for 1-indexed APIs)
     
     response:
       items_path: results      # Dotted path to data array
       add_fields:              # Optional fields to add
-        _fetched_at: "$now"
+        _fetched_at: "${date:now}"
     
     http:
       timeout_s: 60
@@ -794,6 +855,37 @@ read:
       rate_limit:
         type: auto
 ```
+
+## POST APIs (Advanced)
+
+Some APIs use POST requests with JSON body for complex queries. Odibi supports this:
+
+```yaml
+read:
+  connection: my_api
+  format: api
+  path: /v1/search
+  options:
+    method: POST              # Use POST instead of GET
+    request_body:             # JSON body to send
+      filters:
+        Classification: ["Class I"]
+        PostedDateFrom: ["${date:-30d}"]
+      columns:
+        - RecallID
+        - FirmName
+        - ProductDescription
+    pagination:
+      type: offset_limit
+      offset_param: start     # These go into the JSON body for POST
+      limit_param: rows
+      limit: 1000
+      start_offset: 1         # Some APIs are 1-indexed
+    response:
+      items_path: result
+```
+
+For POST requests, pagination parameters are automatically added to the JSON body instead of URL query string.
 
 ## Next Steps
 

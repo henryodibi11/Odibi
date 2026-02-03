@@ -988,6 +988,74 @@ Supports: `dbfs:/`, `/dbfs/`, and mounted paths.
 
 ---
 
+### 6.6 Variable Substitution
+
+Odibi YAML supports powerful variable substitution for secrets, reusable values, and dynamic dates.
+
+#### Environment Variables: `${VAR}`
+
+Inject values from environment variables (recommended for secrets):
+
+```yaml
+connections:
+  database:
+    type: sqlserver
+    password: ${DB_PASSWORD}    # From environment
+    host: ${env:DB_HOST}        # Explicit env: prefix (same behavior)
+```
+
+#### Custom Variables: `${vars.name}`
+
+Define reusable values in a `vars:` block:
+
+```yaml
+vars:
+  env: production
+  retention_days: 90
+
+connections:
+  storage:
+    container: data-${vars.env}    # → data-production
+```
+
+#### Date Variables: `${date:expression}`
+
+Generate dynamic dates at config load time (works **anywhere in YAML**):
+
+| Expression | Description | Example Output |
+|------------|-------------|----------------|
+| `${date:today}` | Today's date | `2024-01-15` |
+| `${date:yesterday}` | Yesterday | `2024-01-14` |
+| `${date:now}` | Current datetime | `2024-01-15 14:30:45` |
+| `${date:-7d}` | 7 days ago | `2024-01-08` |
+| `${date:-1m}` | ~1 month ago | `2023-12-15` |
+| `${date:start_of_month}` | First of month | `2024-01-01` |
+| `${date:today:%Y%m%d}` | Custom format | `20240115` |
+
+**Example:**
+```yaml
+pipelines:
+  - pipeline: daily_export
+    description: "Data from ${date:-7d} to ${date:today}"
+    nodes:
+      - name: export
+        write:
+          path: exports/${date:today:%Y/%m/%d}/data.parquet
+```
+
+**Injecting custom dates via environment:**
+```bash
+export REPORT_DATE=2024-01-01
+```
+```yaml
+params:
+  date: ${REPORT_DATE}    # Uses injected value, NOT dynamic
+```
+
+📖 **Full documentation:** [Variable Substitution Guide](guides/variable_substitution.md)
+
+---
+
 ## 7. Write Configuration (Delta Lake Features)
 
 ### 7.1 Partitioning & Z-Ordering

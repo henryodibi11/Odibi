@@ -1595,22 +1595,27 @@ Response parsing configuration for API data sources.
 
 **When to Use:** Configure how to extract data from API responses.
 
-**Date Variables:** Use these in `add_fields` for automatic date injection:
+**Date Variables:** Use in `add_fields` OR `params` for dynamic dates:
 
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| `$now` | Current UTC timestamp | `2024-01-15T10:30:00+00:00` |
-| `$today` | Today's date | `2024-01-15` |
-| `$yesterday` | Yesterday's date | `2024-01-14` |
-| `$date` | Alias for `$today` | `2024-01-15` |
-| `$7_days_ago` | 7 days before today | `2024-01-08` |
-| `$30_days_ago` | 30 days before today | `2023-12-16` |
-| `$90_days_ago` | 90 days before today | `2023-10-17` |
-| `$start_of_week` | Monday of current week | `2024-01-15` |
-| `$start_of_month` | First of current month | `2024-01-01` |
-| `$start_of_year` | First of current year | `2024-01-01` |
+| Variable | Format | Example Value |
+|----------|--------|---------------|
+| `$now` | ISO timestamp | `2024-01-15T10:30:00+00:00` |
+| `$today` | YYYY-MM-DD | `2024-01-15` |
+| `$yesterday` | YYYY-MM-DD | `2024-01-14` |
+| `$date` | YYYY-MM-DD | `2024-01-15` |
+| `$7_days_ago` | YYYY-MM-DD | `2024-01-08` |
+| `$30_days_ago` | YYYY-MM-DD | `2023-12-16` |
+| `$90_days_ago` | YYYY-MM-DD | `2023-10-17` |
+| `$start_of_week` | YYYY-MM-DD | `2024-01-15` |
+| `$start_of_month` | YYYY-MM-DD | `2024-01-01` |
+| `$start_of_year` | YYYY-MM-DD | `2024-01-01` |
+| `$today_compact` | YYYYMMDD | `20240115` |
+| `$yesterday_compact` | YYYYMMDD | `20240114` |
+| `$7_days_ago_compact` | YYYYMMDD | `20240108` |
+| `$30_days_ago_compact` | YYYYMMDD | `20231216` |
+| `$90_days_ago_compact` | YYYYMMDD | `20231017` |
 
-Example:
+Example (add_fields):
 ```yaml
 read:
   format: api
@@ -1620,6 +1625,15 @@ read:
       add_fields:
         _fetched_at: "$now"
         _load_date: "$today"
+```
+
+Example (params with compact dates for openFDA):
+```yaml
+read:
+  format: api
+  options:
+    params:
+      search: "report_date:[$30_days_ago_compact+TO+$today_compact]"
 ```
 
 

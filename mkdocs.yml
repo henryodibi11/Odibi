@@ -155,6 +155,7 @@ nav:
   - Guides:
       - Decision Guide: guides/decision_guide.md
       - The Definitive Guide: guides/the_definitive_guide.md
+      - Variable Substitution: guides/variable_substitution.md
       - API Data Sources: guides/api_data_sources.md
       - Cookbook (Recipes): guides/recipes.md
       - Medallion Architecture: guides/medallion_architecture.md

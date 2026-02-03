@@ -103,6 +103,56 @@ class TestResponseExtractor:
         # $now has timezone info (ends with +00:00)
         assert "+00:00" in item["_now"] or "Z" in item["_now"]
 
+    def test_curly_brace_date_syntax(self):
+        """Test {expression:format} date variable syntax."""
+        import datetime
+
+        from odibi.connections.api_fetcher import substitute_date_variables
+
+        today = datetime.date.today()
+
+        # Basic expressions
+        assert substitute_date_variables("{today}") == today.isoformat()
+        assert substitute_date_variables("{yesterday}") == (
+            today - datetime.timedelta(days=1)
+        ).isoformat()
+
+        # Custom format
+        assert substitute_date_variables("{today:%Y%m%d}") == today.strftime("%Y%m%d")
+        assert substitute_date_variables("{today:%d/%m/%Y}") == today.strftime(
+            "%d/%m/%Y"
+        )
+
+        # Relative days
+        assert substitute_date_variables("{-7d}") == (
+            today - datetime.timedelta(days=7)
+        ).isoformat()
+        assert substitute_date_variables("{-30d:%Y%m%d}") == (
+            today - datetime.timedelta(days=30)
+        ).strftime("%Y%m%d")
+        assert substitute_date_variables("{+1d}") == (
+            today + datetime.timedelta(days=1)
+        ).isoformat()
+
+        # Period starts
+        assert substitute_date_variables("{start_of_month}") == today.replace(
+            day=1
+        ).isoformat()
+        assert substitute_date_variables("{start_of_year:%Y%m%d}") == today.replace(
+            month=1, day=1
+        ).strftime("%Y%m%d")
+
+        # Embedded in string (like openFDA)
+        result = substitute_date_variables(
+            "report_date:[{-30d:%Y%m%d}+TO+{today:%Y%m%d}]"
+        )
+        expected_start = (today - datetime.timedelta(days=30)).strftime("%Y%m%d")
+        expected_end = today.strftime("%Y%m%d")
+        assert result == f"report_date:[{expected_start}+TO+{expected_end}]"
+
+        # Unknown expressions preserved
+        assert substitute_date_variables("{unknown}") == "{unknown}"
+
 
 class TestOffsetLimitPagination:
     """Tests for OffsetLimitPagination."""
@@ -192,6 +242,63 @@ class TestOffsetLimitPagination:
             request=req2,
         )
         assert paginator.next_request(page2) is None
+
+    def test_post_request_pagination_in_body(self):
+        """Test that POST requests have pagination params in JSON body."""
+        paginator = OffsetLimitPagination(
+            offset_param="start",
+            limit_param="rows",
+            limit=100,
+            start_offset=1,  # FDA Data Dashboard is 1-indexed
+        )
+        base = ApiRequest(
+            method="POST",
+            url="https://api.test.com/data",
+            json_body={"filters": {"status": ["active"]}},
+        )
+        req = paginator.initial_request(base)
+
+        # Pagination should be in body, not params
+        assert req.json_body["start"] == 1
+        assert req.json_body["rows"] == 100
+        assert req.json_body["filters"] == {"status": ["active"]}
+        assert "start" not in req.params
+        assert "rows" not in req.params
+
+        from odibi.connections.api_fetcher import ApiPage
+
+        # Simulate full page
+        page = ApiPage(
+            items=[{"id": i} for i in range(100)],
+            raw={},
+            headers={},
+            request=req,
+        )
+
+        next_req = paginator.next_request(page)
+        assert next_req is not None
+        assert next_req.json_body["start"] == 101
+        assert next_req.json_body["rows"] == 100
+        # Original body should be preserved
+        assert next_req.json_body["filters"] == {"status": ["active"]}
+
+    def test_get_request_pagination_in_params(self):
+        """Test that GET requests have pagination params in URL params."""
+        paginator = OffsetLimitPagination(
+            offset_param="skip",
+            limit_param="limit",
+            limit=50,
+        )
+        base = ApiRequest(
+            method="GET",
+            url="https://api.test.com/data",
+        )
+        req = paginator.initial_request(base)
+
+        # Pagination should be in params
+        assert req.params["skip"] == 0
+        assert req.params["limit"] == 50
+        assert req.json_body is None
 
 
 class TestCursorPagination:

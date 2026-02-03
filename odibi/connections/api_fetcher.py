@@ -74,6 +74,152 @@ class ApiPage:
 # =============================================================================
 
 
+def get_date_variables() -> Dict[str, str]:
+    """Return date variable substitution map.
+
+    Available variables:
+    - $now: Current UTC timestamp (ISO 8601)
+    - $today, $date: Today's date (YYYY-MM-DD)
+    - $yesterday: Yesterday's date
+    - $7_days_ago, $30_days_ago, $90_days_ago: Relative dates
+    - $start_of_week: Monday of current week
+    - $start_of_month: First day of current month
+    - $start_of_year: First day of current year
+    - $today_compact, $yesterday_compact, etc.: YYYYMMDD format (for APIs like openFDA)
+    """
+    import datetime
+
+    utc_now = datetime.datetime.now(datetime.timezone.utc)
+    today = utc_now.date()
+
+    return {
+        # ISO format (YYYY-MM-DD)
+        "$now": utc_now.isoformat(),
+        "$today": today.isoformat(),
+        "$yesterday": (today - datetime.timedelta(days=1)).isoformat(),
+        "$date": today.isoformat(),
+        "$7_days_ago": (today - datetime.timedelta(days=7)).isoformat(),
+        "$30_days_ago": (today - datetime.timedelta(days=30)).isoformat(),
+        "$90_days_ago": (today - datetime.timedelta(days=90)).isoformat(),
+        "$start_of_week": (today - datetime.timedelta(days=today.weekday())).isoformat(),
+        "$start_of_month": today.replace(day=1).isoformat(),
+        "$start_of_year": today.replace(month=1, day=1).isoformat(),
+        # Compact format (YYYYMMDD) for APIs like openFDA
+        "$today_compact": today.strftime("%Y%m%d"),
+        "$yesterday_compact": (today - datetime.timedelta(days=1)).strftime("%Y%m%d"),
+        "$7_days_ago_compact": (today - datetime.timedelta(days=7)).strftime("%Y%m%d"),
+        "$30_days_ago_compact": (today - datetime.timedelta(days=30)).strftime("%Y%m%d"),
+        "$90_days_ago_compact": (today - datetime.timedelta(days=90)).strftime("%Y%m%d"),
+        "$start_of_week_compact": (
+            today - datetime.timedelta(days=today.weekday())
+        ).strftime("%Y%m%d"),
+        "$start_of_month_compact": today.replace(day=1).strftime("%Y%m%d"),
+        "$start_of_year_compact": today.replace(month=1, day=1).strftime("%Y%m%d"),
+    }
+
+
+def substitute_date_variables(value: Any) -> Any:
+    """Substitute date variables in a string value.
+
+    Supports two syntaxes:
+
+    1. **$variable** syntax (predefined):
+       - `$now`, `$today`, `$yesterday`, `$7_days_ago`, etc.
+       - `$today_compact`, `$30_days_ago_compact`, etc. (YYYYMMDD format)
+
+    2. **{expression:format}** syntax (flexible):
+       - `{today}` or `{today:%Y-%m-%d}` - today with optional format
+       - `{now}` or `{now:%Y-%m-%dT%H:%M:%S}` - current datetime
+       - `{-7d}` or `{-7d:%Y%m%d}` - 7 days ago with format
+       - `{-30d:%Y%m%d}` - 30 days ago in YYYYMMDD
+       - `{+1d}` - tomorrow
+       - `{start_of_month:%Y-%m-%d}` - first of month
+
+    Supports nested dicts and strings. Returns the value unchanged if not a string.
+    """
+    if isinstance(value, str):
+        # First, handle $variable syntax
+        date_vars = get_date_variables()
+        for var, replacement in date_vars.items():
+            if var in value:
+                value = value.replace(var, replacement)
+
+        # Then handle {expression:format} syntax
+        value = _substitute_curly_brace_dates(value)
+
+        return value
+    elif isinstance(value, dict):
+        return {k: substitute_date_variables(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [substitute_date_variables(v) for v in value]
+    return value
+
+
+def _substitute_curly_brace_dates(value: str) -> str:
+    """Handle {expression:format} date substitution.
+
+    Examples:
+        {today} -> 2024-01-15
+        {today:%Y%m%d} -> 20240115
+        {-30d} -> 2023-12-16
+        {-30d:%Y%m%d} -> 20231216
+        {now:%Y-%m-%dT%H:%M:%SZ} -> 2024-01-15T10:30:00Z
+        {start_of_month} -> 2024-01-01
+    """
+    import datetime
+    import re
+
+    utc_now = datetime.datetime.now(datetime.timezone.utc)
+    today = utc_now.date()
+
+    # Pattern: {expression} or {expression:format}
+    pattern = r"\{([^}:]+)(?::([^}]+))?\}"
+
+    def replace_match(match):
+        expr = match.group(1).strip()
+        fmt = match.group(2)  # Optional format string
+
+        # Calculate the date based on expression
+        if expr == "now":
+            dt = utc_now
+            default_fmt = "%Y-%m-%dT%H:%M:%S%z"
+        elif expr == "today" or expr == "date":
+            dt = today
+            default_fmt = "%Y-%m-%d"
+        elif expr == "yesterday":
+            dt = today - datetime.timedelta(days=1)
+            default_fmt = "%Y-%m-%d"
+        elif expr == "start_of_week":
+            dt = today - datetime.timedelta(days=today.weekday())
+            default_fmt = "%Y-%m-%d"
+        elif expr == "start_of_month":
+            dt = today.replace(day=1)
+            default_fmt = "%Y-%m-%d"
+        elif expr == "start_of_year":
+            dt = today.replace(month=1, day=1)
+            default_fmt = "%Y-%m-%d"
+        elif re.match(r"^[+-]?\d+d$", expr):
+            # Relative days: -7d, +1d, -30d
+            days = int(expr.replace("d", ""))
+            dt = today + datetime.timedelta(days=days)
+            default_fmt = "%Y-%m-%d"
+        else:
+            # Unknown expression, return as-is
+            return match.group(0)
+
+        # Use provided format or default
+        use_fmt = fmt if fmt else default_fmt
+
+        # Handle datetime vs date objects
+        if isinstance(dt, datetime.date) and not isinstance(dt, datetime.datetime):
+            # Convert date to datetime for strftime compatibility
+            dt = datetime.datetime.combine(dt, datetime.time.min)
+
+        return dt.strftime(use_fmt)
+
+    return re.sub(pattern, replace_match, value)
+
+
 class ResponseExtractor:
     """Extracts items from API responses using a dotted path."""
 
@@ -105,39 +251,9 @@ class ResponseExtractor:
 
         # Add extra fields with date variable substitution
         if self.add_fields:
-            import datetime
-
-            utc_now = datetime.datetime.now(datetime.timezone.utc)
-            today = utc_now.date()
-
-            # Date variable substitution map
-            # $now - full UTC timestamp in ISO format
-            # $today - today's date (YYYY-MM-DD)
-            # $yesterday - yesterday's date
-            # $date - alias for $today
-            # $7_days_ago, $30_days_ago, $90_days_ago - relative dates
-            # $start_of_week - Monday of current week
-            # $start_of_month - First day of current month
-            # $start_of_year - First day of current year
-            date_vars = {
-                "$now": utc_now.isoformat(),
-                "$today": today.isoformat(),
-                "$yesterday": (today - datetime.timedelta(days=1)).isoformat(),
-                "$date": today.isoformat(),
-                "$7_days_ago": (today - datetime.timedelta(days=7)).isoformat(),
-                "$30_days_ago": (today - datetime.timedelta(days=30)).isoformat(),
-                "$90_days_ago": (today - datetime.timedelta(days=90)).isoformat(),
-                "$start_of_week": (today - datetime.timedelta(days=today.weekday())).isoformat(),
-                "$start_of_month": today.replace(day=1).isoformat(),
-                "$start_of_year": today.replace(month=1, day=1).isoformat(),
-            }
-
             for item in items:
                 for k, v in self.add_fields.items():
-                    if isinstance(v, str) and v in date_vars:
-                        item[k] = date_vars[v]
-                    else:
-                        item[k] = v
+                    item[k] = substitute_date_variables(v) if isinstance(v, str) else v
 
         return items
 
@@ -160,7 +276,11 @@ class PaginationStrategy(Protocol):
 
 
 class OffsetLimitPagination:
-    """Pagination using offset/skip and limit parameters."""
+    """Pagination using offset/skip and limit parameters.
+
+    For GET requests, pagination params are added to URL query string.
+    For POST/PUT/PATCH requests, pagination params are added to JSON body.
+    """
 
     def __init__(
         self,
@@ -169,27 +289,48 @@ class OffsetLimitPagination:
         limit: int = 100,
         max_pages: int = 100,
         stop_on_empty: bool = True,
+        start_offset: int = 0,
     ):
         self.offset_param = offset_param
         self.limit_param = limit_param
         self.limit = limit
         self.max_pages = max_pages
         self.stop_on_empty = stop_on_empty
-        self._current_offset = 0
+        self.start_offset = start_offset
+        self._current_offset = start_offset
         self._page_count = 0
 
+    def _apply_pagination(
+        self, base: ApiRequest, offset: int
+    ) -> ApiRequest:
+        """Apply pagination params to either params or json_body based on method."""
+        # For POST/PUT/PATCH with a body, add pagination to body
+        if base.method in ("POST", "PUT", "PATCH") and base.json_body is not None:
+            body = dict(base.json_body)
+            body[self.offset_param] = offset
+            body[self.limit_param] = self.limit
+            return ApiRequest(
+                method=base.method,
+                url=base.url,
+                params=base.params,
+                json_body=body,
+            )
+        else:
+            # For GET or requests without body, add to URL params
+            params = dict(base.params)
+            params[self.offset_param] = offset
+            params[self.limit_param] = self.limit
+            return ApiRequest(
+                method=base.method,
+                url=base.url,
+                params=params,
+                json_body=base.json_body,
+            )
+
     def initial_request(self, base: ApiRequest) -> ApiRequest:
-        self._current_offset = 0
+        self._current_offset = self.start_offset
         self._page_count = 0
-        params = dict(base.params)
-        params[self.offset_param] = 0
-        params[self.limit_param] = self.limit
-        return ApiRequest(
-            method=base.method,
-            url=base.url,
-            params=params,
-            json_body=base.json_body,
-        )
+        return self._apply_pagination(base, self.start_offset)
 
     def next_request(self, page: ApiPage) -> Optional[ApiRequest]:
         self._page_count += 1
@@ -204,14 +345,7 @@ class OffsetLimitPagination:
             return None
 
         self._current_offset += self.limit
-        params = dict(page.request.params)
-        params[self.offset_param] = self._current_offset
-        return ApiRequest(
-            method=page.request.method,
-            url=page.request.url,
-            params=params,
-            json_body=page.request.json_body,
-        )
+        return self._apply_pagination(page.request, self._current_offset)
 
 
 class PageNumberPagination:
@@ -602,22 +736,47 @@ class ApiFetcher:
         )
 
     def fetch_iter(
-        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        method: str = "GET",
+        request_body: Optional[Dict[str, Any]] = None,
     ) -> Iterator[ApiPage]:
         """Iterate through all pages of results.
+
+        Args:
+            endpoint: API endpoint path or full URL
+            params: Query parameters (for GET) or merged into body (for POST)
+            method: HTTP method (GET, POST, PUT, PATCH, DELETE)
+            request_body: JSON body for POST/PUT/PATCH requests
 
         Yields:
             ApiPage objects for each page of results.
         """
+        # Substitute date variables in params and request_body
+        resolved_params = substitute_date_variables(params) if params else {}
+        resolved_body = substitute_date_variables(request_body) if request_body else None
+
         # If endpoint is already a full URL, use it directly
         if endpoint.startswith("http://") or endpoint.startswith("https://"):
             url = endpoint
         else:
             url = f"{self.base_url}/{endpoint.lstrip('/')}"
+
+        # For POST/PUT/PATCH, merge params into body if body exists
+        if method.upper() in ("POST", "PUT", "PATCH") and resolved_body is not None:
+            # Params become part of the JSON body, not URL query string
+            final_body = {**resolved_body, **resolved_params} if resolved_params else resolved_body
+            final_params = {}
+        else:
+            final_body = resolved_body
+            final_params = resolved_params
+
         base_request = ApiRequest(
-            method="GET",
+            method=method.upper(),
             url=url,
-            params=params or {},
+            params=final_params,
+            json_body=final_body,
         )
 
         request = self.paginator.initial_request(base_request)
@@ -625,7 +784,9 @@ class ApiFetcher:
 
         while request is not None:
             page_num += 1
-            self._ctx.info("Fetching page", page=page_num, url=request.url)
+            self._ctx.info(
+                "Fetching page", page=page_num, method=request.method, url=request.url
+            )
 
             page = self._fetch_page(request)
             yield page
@@ -640,6 +801,8 @@ class ApiFetcher:
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
         max_records: Optional[int] = None,
+        method: str = "GET",
+        request_body: Optional[Dict[str, Any]] = None,
     ) -> pd.DataFrame:
         """Fetch all pages and return as a single DataFrame.
 
@@ -647,6 +810,8 @@ class ApiFetcher:
             endpoint: API endpoint relative to base_url
             params: Query parameters
             max_records: Maximum records to return (safety limit)
+            method: HTTP method (GET, POST, PUT, PATCH, DELETE)
+            request_body: JSON body for POST/PUT/PATCH requests
 
         Returns:
             DataFrame with all results concatenated
@@ -654,7 +819,7 @@ class ApiFetcher:
         frames = []
         total_records = 0
 
-        for page in self.fetch_iter(endpoint, params):
+        for page in self.fetch_iter(endpoint, params, method, request_body):
             if not page.items:
                 continue
 
