@@ -1,6 +1,8 @@
 # odibi_mcp/context.py
 """MCP Project Context - loads odibi.yaml and provides access to connections, stories, catalog."""
 
+from __future__ import annotations
+
 import os
 import logging
 from pathlib import Path
