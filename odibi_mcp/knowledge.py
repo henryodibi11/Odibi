@@ -524,7 +524,8 @@ pm.run("pipeline_name")""",
         if name in _CONNECTION_FACTORIES:
             connection_docs = {
                 "local": "Local filesystem connection for reading/writing files.",
-                "http": "HTTP/REST API connection for fetching data.",
+                "http": "HTTP/REST API connection. Use format: api for paginated REST APIs. See docs/guides/api_data_sources.md",
+                "api": "REST API data source. Use format: api with http connection. Supports pagination, retries, rate limiting. See docs/guides/api_data_sources.md",
                 "azure_blob": "Azure Blob Storage connection.",
                 "azure_adls": "Azure Data Lake Storage Gen2 connection.",
                 "delta": "Delta Lake connection for reading/writing Delta tables.",
