@@ -110,9 +110,9 @@ def get_date_variables() -> Dict[str, str]:
         "$7_days_ago_compact": (today - datetime.timedelta(days=7)).strftime("%Y%m%d"),
         "$30_days_ago_compact": (today - datetime.timedelta(days=30)).strftime("%Y%m%d"),
         "$90_days_ago_compact": (today - datetime.timedelta(days=90)).strftime("%Y%m%d"),
-        "$start_of_week_compact": (
-            today - datetime.timedelta(days=today.weekday())
-        ).strftime("%Y%m%d"),
+        "$start_of_week_compact": (today - datetime.timedelta(days=today.weekday())).strftime(
+            "%Y%m%d"
+        ),
         "$start_of_month_compact": today.replace(day=1).strftime("%Y%m%d"),
         "$start_of_year_compact": today.replace(month=1, day=1).strftime("%Y%m%d"),
     }
@@ -300,9 +300,7 @@ class OffsetLimitPagination:
         self._current_offset = start_offset
         self._page_count = 0
 
-    def _apply_pagination(
-        self, base: ApiRequest, offset: int
-    ) -> ApiRequest:
+    def _apply_pagination(self, base: ApiRequest, offset: int) -> ApiRequest:
         """Apply pagination params to either params or json_body based on method."""
         # For POST/PUT/PATCH with a body, add pagination to body
         if base.method in ("POST", "PUT", "PATCH") and base.json_body is not None:
@@ -647,7 +645,7 @@ class ApiFetcher:
         url = request.url
         if request.params:
             sep = "&" if "?" in url else "?"
-            url = f"{url}{sep}{urlencode(request.params, doseq=True)}"
+            url = f"{url}{sep}{urlencode(request.params, doseq=True, safe='+:[]')}"
 
         data = None
         headers = dict(self.headers)
@@ -784,9 +782,7 @@ class ApiFetcher:
 
         while request is not None:
             page_num += 1
-            self._ctx.info(
-                "Fetching page", page=page_num, method=request.method, url=request.url
-            )
+            self._ctx.info("Fetching page", page=page_num, method=request.method, url=request.url)
 
             page = self._fetch_page(request)
             yield page

@@ -1,4 +1,5 @@
 """Tests for date variable substitution in config_loader."""
+
 import re
 from datetime import datetime, timedelta
 
@@ -137,9 +138,9 @@ class TestSubstituteDates:
     def test_substitutes_in_nested_dict(self):
         data = {"params": {"start": "${date:-7d}", "end": "${date:today}"}}
         result = _substitute_dates(data)
-        assert result["params"]["start"] == (
-            datetime.now() - timedelta(days=7)
-        ).strftime("%Y-%m-%d")
+        assert result["params"]["start"] == (datetime.now() - timedelta(days=7)).strftime(
+            "%Y-%m-%d"
+        )
         assert result["params"]["end"] == datetime.now().strftime("%Y-%m-%d")
 
     def test_substitutes_in_list(self):

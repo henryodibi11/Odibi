@@ -113,39 +113,34 @@ class TestResponseExtractor:
 
         # Basic expressions
         assert substitute_date_variables("{today}") == today.isoformat()
-        assert substitute_date_variables("{yesterday}") == (
-            today - datetime.timedelta(days=1)
-        ).isoformat()
+        assert (
+            substitute_date_variables("{yesterday}")
+            == (today - datetime.timedelta(days=1)).isoformat()
+        )
 
         # Custom format
         assert substitute_date_variables("{today:%Y%m%d}") == today.strftime("%Y%m%d")
-        assert substitute_date_variables("{today:%d/%m/%Y}") == today.strftime(
-            "%d/%m/%Y"
-        )
+        assert substitute_date_variables("{today:%d/%m/%Y}") == today.strftime("%d/%m/%Y")
 
         # Relative days
-        assert substitute_date_variables("{-7d}") == (
-            today - datetime.timedelta(days=7)
-        ).isoformat()
+        assert (
+            substitute_date_variables("{-7d}") == (today - datetime.timedelta(days=7)).isoformat()
+        )
         assert substitute_date_variables("{-30d:%Y%m%d}") == (
             today - datetime.timedelta(days=30)
         ).strftime("%Y%m%d")
-        assert substitute_date_variables("{+1d}") == (
-            today + datetime.timedelta(days=1)
-        ).isoformat()
+        assert (
+            substitute_date_variables("{+1d}") == (today + datetime.timedelta(days=1)).isoformat()
+        )
 
         # Period starts
-        assert substitute_date_variables("{start_of_month}") == today.replace(
-            day=1
-        ).isoformat()
+        assert substitute_date_variables("{start_of_month}") == today.replace(day=1).isoformat()
         assert substitute_date_variables("{start_of_year:%Y%m%d}") == today.replace(
             month=1, day=1
         ).strftime("%Y%m%d")
 
         # Embedded in string (like openFDA)
-        result = substitute_date_variables(
-            "report_date:[{-30d:%Y%m%d}+TO+{today:%Y%m%d}]"
-        )
+        result = substitute_date_variables("report_date:[{-30d:%Y%m%d}+TO+{today:%Y%m%d}]")
         expected_start = (today - datetime.timedelta(days=30)).strftime("%Y%m%d")
         expected_end = today.strftime("%Y%m%d")
         assert result == f"report_date:[{expected_start}+TO+{expected_end}]"
