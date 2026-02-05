@@ -194,6 +194,7 @@ class PolarsEngine(Engine):
                 # API format: delegate to Pandas (uses ApiFetcher), convert to Polars
                 from odibi.connections.api_fetcher import create_api_fetcher
                 from odibi.connections.http import HttpConnection
+                from odibi.context import get_logging_context
 
                 ctx = get_logging_context().with_context(engine="polars")
                 ctx.debug("Reading API via ApiFetcher", endpoint=str(path))
