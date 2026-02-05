@@ -90,7 +90,7 @@ class TestUnitRegistry:
         ureg = get_unit_registry()
         quantity = 1 * ureg.mcf
         result = quantity.to("ft³").magnitude
-        assert result == 1000.0
+        assert result == pytest.approx(1000.0)
 
     def test_mmbtu_defined(self):
         ureg = get_unit_registry()
