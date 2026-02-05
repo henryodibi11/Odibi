@@ -273,6 +273,28 @@ odibi explain dimension
 odibi explain azure_sql
 ```
 
+### Generate YAML Templates
+
+```bash
+# List all available template types
+odibi templates list
+
+# Show connection template with all auth options
+odibi templates show azure_blob
+
+# Show all 11 validation test types
+odibi templates show validation
+
+# Show transformer params + example YAML
+odibi templates transformer scd2
+odibi templates transformer derive_columns
+
+# Generate JSON schema for VS Code autocomplete
+odibi templates schema
+```
+
+Templates are generated directly from Pydantic models—always in sync with code.
+
 **AI Workflow Example:**
 ```bash
 # AI checks what's available
@@ -303,4 +325,5 @@ odibi validate generated_pipeline.yaml
 | `lineage` | Cross-pipeline lineage (`upstream`, `downstream`, `impact`). |
 | `list` | List available features (`transformers`, `patterns`, `connections`). |
 | `explain` | Get detailed documentation for any feature. |
+| `templates` | Generate YAML templates from Pydantic models (`list`, `show`, `transformer`, `schema`). |
 | `init-vscode` | Setup VS Code environment. |
