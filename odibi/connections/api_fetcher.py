@@ -952,27 +952,26 @@ def create_api_fetcher(
         add_fields=response_config.get("add_fields"),
     )
 
-    # HTTP settings
-    http_config = options.get("http", {})
-    timeout_s = http_config.get("timeout_s", 30.0)
-
-    # Retry policy
-    retry_config = http_config.get("retries", {})
-    backoff_config = retry_config.get("backoff", {})
+    # Retry policy (matches ApiRetryConfig schema)
+    retry_config = options.get("retry", {})
     retry_policy = RetryPolicy(
-        max_attempts=retry_config.get("max_attempts", 3),
-        base_delay_s=backoff_config.get("base_s", 1.0),
-        max_delay_s=backoff_config.get("max_s", 60.0),
-        exponential_base=backoff_config.get("exponential_base", 2.0),
-        retry_on_status=retry_config.get("retry_on_status", [429, 500, 502, 503, 504]),
+        max_attempts=retry_config.get("max_retries", 3),
+        base_delay_s=1.0,
+        max_delay_s=60.0,
+        exponential_base=retry_config.get("backoff_factor", 2.0),
+        retry_on_status=retry_config.get("retry_codes", [429, 500, 502, 503, 504]),
     )
 
-    # Rate limiter
-    rate_limit_config = http_config.get("rate_limit", {})
+    # Rate limiter (matches ApiRateLimitConfig schema)
+    rate_limit_config = options.get("rate_limit", {})
     rate_limiter = RateLimiter(
-        mode=rate_limit_config.get("type", "auto"),
+        mode="fixed" if rate_limit_config.get("requests_per_second") else "auto",
         requests_per_second=rate_limit_config.get("requests_per_second"),
     )
+
+    # HTTP timeout (optional, not in schema but useful)
+    http_config = options.get("http", {})
+    timeout_s = http_config.get("timeout_s", 30.0)
 
     return ApiFetcher(
         base_url=base_url,

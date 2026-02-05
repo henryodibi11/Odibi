@@ -714,7 +714,7 @@ class TestFetchDataframeSafe:
                         "max_pages": 10,
                     },
                     "response": {"items_path": "results"},
-                    "http": {"retries": {"max_attempts": 1}},  # Disable retries
+                    "retry": {"max_retries": 1},  # Disable retries
                 },
             )
 
