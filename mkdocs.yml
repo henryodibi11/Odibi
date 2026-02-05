@@ -164,6 +164,7 @@ nav:
       - Unit Conversion: guides/unit_conversion.md
       - Thermodynamics: guides/thermodynamics.md
       - Variable Substitution: guides/variable_substitution.md
+      - Explanation Feature: guides/explanation_feature.md
       - API Data Sources: guides/api_data_sources.md
       - Cookbook (Recipes): guides/recipes.md
       - Medallion Architecture: guides/medallion_architecture.md
