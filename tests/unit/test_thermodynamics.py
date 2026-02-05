@@ -19,7 +19,7 @@ except ImportError:
 
 pytestmark = pytest.mark.skipif(not coolprop_available, reason="CoolProp not installed")
 
-
+# ruff: noqa: E402 - imports after conditional skip marker is intentional
 from odibi.context import EngineContext, PandasContext
 from odibi.enums import EngineType
 from odibi.transformers.thermodynamics import (
