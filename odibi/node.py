@@ -2923,9 +2923,9 @@ class NodeExecutor:
             if set_in and columns_removed > 0:
                 drop_ratio = columns_removed / len(set_in)
                 if drop_ratio > 0.3:
-                    metadata[
-                        "column_drop_warning"
-                    ] = f"⚠️ {columns_removed} columns were dropped ({len(set_in)} → {len(set_out)})"
+                    metadata["column_drop_warning"] = (
+                        f"⚠️ {columns_removed} columns were dropped ({len(set_in)} → {len(set_out)})"
+                    )
 
         if df is not None and self.max_sample_rows > 0:
             metadata["sample_data"] = self._get_redacted_sample(df, config.sensitive, self.engine)
