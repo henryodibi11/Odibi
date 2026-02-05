@@ -4,39 +4,38 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 ---
 
-## Recipe 1: "Help me build a new pipeline"
+## Recipe 1: "Help me build a new pipeline" (Lazy Bronze Workflow)
 
 **When user says:** "I need to build a pipeline for...", "Create a pipeline that...", "Help me transform this data..."
 
-**Steps:**
+**Steps (Smart Discovery):**
 
-1. **Understand the data source**
+1. **Scout the data source**
    ```
-   list_files(connection="<conn>", path="<path>", pattern="*")
-   preview_source(connection="<conn>", path="<file>", max_rows=10)
-   infer_schema(connection="<conn>", path="<file>")
+   map_environment(connection="<conn>", path="<path>")
    ```
 
-2. **Suggest the right pattern**
+2. **Profile the specific file/table**
+   ```
+   profile_source(connection="<conn>", path="<file>")
+   # Returns schema, encoding, delimiter, sample data, and AI suggestions
+   ```
+
+3. **Generate bronze node YAML**
+   ```
+   generate_bronze_node(profile=<previous_result.ready_for>)
+   ```
+
+4. **Validate the generated YAML**
+   ```
+   test_node(node_yaml="<generated_yaml>")
+   # Returns fix instructions if validation fails
+   ```
+
+5. **For complex patterns, get guidance**
    ```
    suggest_pattern(use_case="<user's description>")
-   ```
-
-3. **Get the correct YAML structure**
-   ```
-   get_yaml_structure()
    get_example(pattern_name="<suggested_pattern>")
-   ```
-
-4. **Find relevant transformers**
-   ```
-   list_transformers()
-   explain(name="<transformer_name>")
-   ```
-
-5. **Generate and validate the YAML**
-   ```
-   validate_yaml(yaml_content="<generated_yaml>")
    ```
 
 **Example conversation:**
@@ -99,31 +98,34 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 **Steps:**
 
-1. **List available files**
+1. **Scout the environment (storage or SQL)**
    ```
-   list_files(connection="<conn>", path="<path>", pattern="*")
+   map_environment(connection="<conn>", path="<path>")
+   # Returns files, tables, formats, patterns detected
    ```
 
-2. **For SQL connections, list tables**
+2. **For SQL connections, get schema list first**
    ```
-   list_tables(connection="<sql_conn>", schema="dbo")
+   list_schemas(connection="<sql_conn>")
    describe_table(connection="<sql_conn>", table="<table>", schema="dbo")
    ```
 
-3. **Preview the data**
+3. **Profile a specific source**
    ```
-   preview_source(connection="<conn>", path="<file>", max_rows=10)
+   profile_source(connection="<conn>", path="<file>")
+   # Returns schema, sample data, encoding, delimiter, AI suggestions
    ```
 
 4. **For Excel files, discover sheets first**
    ```
    list_sheets(connection="<conn>", path="<file>.xlsx")
-   preview_source(connection="<conn>", path="<file>.xlsx", sheet="<sheet_name>", max_rows=10)
+   profile_source(connection="<conn>", path="<file>.xlsx")
    ```
 
-5. **Infer schema**
+5. **For folders with many files**
    ```
-   infer_schema(connection="<conn>", path="<file>")
+   profile_folder(connection="<conn>", folder_path="<folder>", pattern="*.csv")
+   # Batch profiles all files, groups by detected options
    ```
 
 ---
@@ -342,13 +344,13 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 | User Intent | Primary Tools |
 |-------------|---------------|
-| Build pipeline | `suggest_pattern`, `get_example`, `get_yaml_structure`, `list_transformers` |
+| Build pipeline | `map_environment`, `profile_source`, `generate_bronze_node`, `test_node` |
 | Debug failure | `story_read`, `node_describe`, `node_sample_in`, `node_failed_rows`, `diagnose_error` |
-| Explore data | `list_files`, `preview_source`, `infer_schema`, `list_tables` |
+| Explore data | `map_environment`, `profile_source`, `profile_folder`, `describe_table` |
 | Learn odibi | `explain`, `search_docs`, `get_deep_context`, `query_codebase` |
 | Check lineage | `lineage_graph`, `lineage_upstream`, `lineage_downstream`, `list_outputs` |
 | Monitor health | `pipeline_stats`, `node_stats`, `failure_summary`, `schema_history` |
-| Validate config | `validate_yaml`, `get_yaml_structure` |
+| Validate config | `test_node`, `validate_yaml`, `get_yaml_structure` |
 | Write code | `generate_transformer`, `get_transformer_signature`, `query_codebase` |
 
 ---
@@ -368,19 +370,18 @@ These workflows teach AI to **gather full context before taking action**. This p
 **Mandatory Steps (in order):**
 
 ```
-# Step 1: Discover what files/tables exist
-list_files(connection="<conn>", path="<path>", pattern="*")
-# or for SQL:
-list_tables(connection="<sql_conn>", schema="dbo")
+# Step 1: Scout the environment (files/tables/patterns)
+map_environment(connection="<conn>", path="<path>")
 
-# Step 2: Preview the actual data (see real values)
-preview_source(connection="<conn>", path="<file>", max_rows=20)
+# Step 2: Profile the specific source (schema, encoding, samples, suggestions)
+profile_source(connection="<conn>", path="<file>")
+# Returns: schema, sample_rows, encoding, delimiter, cardinality, AI suggestions
 
-# Step 3: Infer the schema (understand types)
-infer_schema(connection="<conn>", path="<file>")
-
-# Step 4: For SQL tables, get full structure
+# Step 3: For SQL tables, get quick structure
 describe_table(connection="<sql_conn>", table="<table>", schema="dbo")
+
+# Step 4: For folders with multiple files
+profile_folder(connection="<conn>", folder_path="<folder>", pattern="*.csv")
 ```
 
 **What AI should note:**
@@ -788,3 +789,80 @@ validate_yaml(yaml_content="<generated>")
 - Required transforms (type casts, renames, null handling)
 - Output configuration
 - Validation rules (if applicable)
+
+---
+
+## Recipe 15: "I'm Stuck / Can't Find It" (Active Recovery)
+
+**When:** Path not found, file missing, environment issues, or any error.
+
+**NEVER give up. Use these tools to self-recover:**
+
+```
+# Step 1: Diagnose the environment
+diagnose()
+# Returns: env vars, paths, connections, issues, suggestions
+
+# Step 2: Search for files
+find_path(pattern="**/*.yaml")           # Find all YAML files
+find_path(pattern="**/stories/**")       # Find story directories
+find_path(pattern="**/*bronze*")         # Find anything with 'bronze'
+
+# Step 3: Run Python to understand state
+run_python(code='''
+import os
+from pathlib import Path
+print("CWD:", os.getcwd())
+for p in Path(".").rglob("*.yaml"):
+    print("Found:", p)
+''')
+
+# Step 4: Test a fix
+run_odibi(args="doctor")                 # Check odibi health
+run_odibi(args="list transformers")      # Verify odibi works
+```
+
+**Key principle:** Use `run_python` to test hypotheses. Use `find_path` to search. Never say "I can't find it" without trying these tools first.
+
+---
+
+## Recipe 16: "Run the Pipeline" (Execute After Generate)
+
+**When user says:** "Run it", "Execute the pipeline", "Test this"
+
+**Steps:**
+
+```
+# Step 1: Dry run first (validate without writing)
+execute_pipeline(config_path="projects/bronze.yaml", dry_run=True)
+
+# Step 2: If successful, run for real
+execute_pipeline(config_path="projects/bronze.yaml")
+
+# Step 3: Check results
+story_read(pipeline="bronze")
+node_sample(pipeline="bronze", node="<node_name>", max_rows=10)
+```
+
+**Alternative using CLI:**
+```
+run_odibi(args="run projects/bronze.yaml --dry-run")
+run_odibi(args="run projects/bronze.yaml")
+run_odibi(args="story last")
+```
+
+---
+
+## Agent Behavior Summary
+
+**BE ACTIVE, not passive:**
+
+| Instead of... | Do this |
+|---------------|---------|
+| "I can't find the file" | `find_path("**/*.yaml")` |
+| "Try running this code" | `run_python(code)` |
+| "You should run this command" | `run_odibi(args)` |
+| "The pipeline should work" | `execute_pipeline(path, dry_run=True)` |
+| "I'm not sure about the path" | `diagnose()` then `find_path()` |
+
+**The tools exist to let you ACT. Use them.**

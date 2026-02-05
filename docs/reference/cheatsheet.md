@@ -6,12 +6,18 @@
 | :--- | :--- |
 | `odibi run odibi.yaml` | Run the pipeline. |
 | `odibi run odibi.yaml --dry-run` | Validate connections without moving data. |
+| `odibi validate odibi.yaml` | Validate YAML schema, pipeline logic, and transformer params. |
+| `odibi validate odibi.yaml --env prod` | Validate with environment-specific variables. |
 | `odibi doctor odibi.yaml` | Check environment and config health. |
 | `odibi stress odibi.yaml` | Run fuzz tests (random data) to find bugs. |
 | `odibi story view --latest` | Open the latest run report. |
 | `odibi secrets init odibi.yaml` | Create .env template for secrets. |
 | `odibi graph odibi.yaml` | Visualize pipeline dependencies. |
 | `odibi generate-project` | Scaffold a new project from files. |
+| `odibi templates list` | List all template types (connections, patterns, configs). |
+| `odibi templates show azure_blob` | Show YAML template with all options. |
+| `odibi templates transformer scd2` | Show transformer params and example. |
+| `odibi templates schema` | Generate JSON schema for VS Code autocomplete. |
 
 ---
 
@@ -114,6 +120,35 @@ nodes:
 - Referenced pipeline must have run first
 - Referenced node must have a `write` block
 - Cannot use both `read` and `inputs` in same node
+
+---
+
+## Node Documentation (Explanation)
+
+Document business logic for stakeholders directly in YAML:
+
+```yaml
+nodes:
+  - name: fact_sales
+    # Inline explanation (for short docs)
+    explanation: |
+      ## Sales Fact
+      Joins orders with dimension tables.
+      **Business Rule:** Orphan orders get `unknown_member_sk = -1`
+
+  - name: dim_customer
+    # External file (for longer docs, keeps YAML clean)
+    explanation_file: docs/dim_customer.md  # Relative to this YAML
+```
+
+Explanations render in **Data Story** HTML reports with full Markdown support (tables, code blocks, headers).
+
+| Field | Description |
+| :--- | :--- |
+| `explanation` | Inline Markdown documentation |
+| `explanation_file` | Path to external .md file (mutually exclusive with `explanation`) |
+
+See: [Explanation Feature Guide](../guides/explanation_feature.md)
 
 ---
 

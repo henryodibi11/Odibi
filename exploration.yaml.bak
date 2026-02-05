@@ -1,0 +1,30 @@
+# Exploration config for testing MCP smart discovery tools
+project: exploration_test
+
+connections:
+  # Azure Data Lake Storage
+  raw_adls:
+    type: azure_adls
+    account_name: globaldigitalopsteamprod
+    account_key: ${AZURE_STORAGE_ACCOUNT_KEY}
+    container: digital-manufacturing
+
+  # SQL Databases
+  wwi:
+    type: azure_sql
+    server: engineeringdatabase.database.windows.net
+    database: WideWorldImporters-Standard
+    username: ${SQL_USER}
+    password: ${SQL_PASSWORD}
+
+  wwi_dw:
+    type: azure_sql
+    server: engineeringdatabase.database.windows.net
+    database: WideWorldImportersDW-Standard
+    username: ${SQL_USER}
+    password: ${SQL_PASSWORD}
+
+  # Local filesystem for testing
+  local:
+    type: local
+    path: ./data

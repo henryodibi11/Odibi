@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-02-05T15:57:11.523392",
+  "date": "2026-02-05",
+  "layers": [
+    {
+      "name": "fetch_champions",
+      "story_path": "fetch_champions\\2026-02-05\\run_15-57-11.html",
+      "status": "success",
+      "duration": 0.5294210910797119,
+      "pipeline_layer": null
+    }
+  ],
+  "nodes": [
+    {
+      "id": "champions",
+      "type": "transform",
+      "layer": "unknown"
+    }
+  ],
+  "edges": []
+}

@@ -99,7 +99,9 @@ def diagnose() -> DiagnoseResult:
                         if "=" not in line:
                             issues.append(f".env line {i}: Missing '=' in '{line[:20]}...'")
                         elif line.startswith('"') or line.startswith("'"):
-                            issues.append(f".env line {i}: Line starts with quote (should be VAR=value)")
+                            issues.append(
+                                f".env line {i}: Line starts with quote (should be VAR=value)"
+                            )
             except Exception as e:
                 issues.append(f"Could not parse .env file: {e}")
             break

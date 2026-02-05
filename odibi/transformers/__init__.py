@@ -9,6 +9,8 @@ from odibi.transformers import (
     relational,
     scd,
     sql_core,
+    thermodynamics,
+    units,
     validation,
 )
 
@@ -115,6 +117,30 @@ def register_standard_library():
         manufacturing.detect_sequential_phases,
         "detect_sequential_phases",
         manufacturing.DetectSequentialPhasesParams,
+    )
+
+    # Thermodynamics
+    registry.register(
+        thermodynamics.fluid_properties,
+        "fluid_properties",
+        thermodynamics.FluidPropertiesParams,
+    )
+    registry.register(
+        thermodynamics.saturation_properties,
+        "saturation_properties",
+        thermodynamics.SaturationPropertiesParams,
+    )
+    registry.register(
+        thermodynamics.psychrometrics,
+        "psychrometrics",
+        thermodynamics.PsychrometricsParams,
+    )
+
+    # Units
+    registry.register(
+        units.unit_convert,
+        "unit_convert",
+        units.UnitConvertParams,
     )
 
 

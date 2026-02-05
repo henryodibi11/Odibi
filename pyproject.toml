@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odibi"
-version = "2.16.0"
+version = "2.17.0"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
     {name = "Henry Odibi", email = "odibiengineering@gmail.com"}
@@ -44,6 +44,7 @@ dependencies = [
     "duckdb>=0.9.0,<1.1.0",
     "openpyxl>=3.1.0,<4.0.0",
     "fsspec>=2023.1.0",  # Used by odibi_mcp for cloud file access
+    "pint>=0.23,<1.0.0",  # Unit conversion - core to data engineering
 ]
 
 [project.optional-dependencies]
@@ -79,6 +80,11 @@ sql = [
 ]
 polars = [
     "polars>=0.20.0,<1.37.0",  # 1.37+ dropped Python 3.9 support
+]
+thermodynamics = [
+    "CoolProp>=6.4.0",
+    "iapws>=1.5.0",       # Optional fallback for steam tables
+    "psychrolib>=2.5.0",  # Optional fallback for psychrometrics
 ]
 mcp = [
     "mcp>=1.0.0",

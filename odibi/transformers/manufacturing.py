@@ -1012,17 +1012,331 @@ def _process_single_group_pandas(
 
 
 def _detect_phases_polars(polars_df, params: DetectSequentialPhasesParams):
-    """
-    Polars implementation - converts to Pandas for processing.
+    """Native Polars implementation of sequential phase detection."""
+    import polars as pl
 
-    TODO: Native Polars implementation for better performance.
-    """
-    pdf = polars_df.to_pandas()
-    result_pdf = _detect_phases_pandas(pdf, params)
+    group_by_cols = _normalize_group_by(params.group_by)
 
-    try:
-        import polars as pl
+    df = polars_df.with_columns(
+        pl.col(params.timestamp_col).str.to_datetime().alias(params.timestamp_col)
+        if polars_df.schema[params.timestamp_col] == pl.Utf8
+        else pl.col(params.timestamp_col).cast(pl.Datetime)
+    )
+    df = df.sort(params.timestamp_col).unique()
 
-        return pl.from_pandas(result_pdf)
-    except ImportError:
-        raise ValueError("Polars is not installed")
+    summary_rows = []
+
+    for group_keys, group in df.group_by(group_by_cols, maintain_order=True):
+        group = group.sort(params.timestamp_col)
+
+        if len(group_by_cols) == 1:
+            row = {group_by_cols[0]: group_keys[0] if isinstance(group_keys, tuple) else group_keys}
+        else:
+            row = {col: val for col, val in zip(group_by_cols, group_keys)}
+
+        row.update(_get_expected_columns_polars(params))
+
+        previous_phase_end = None
+        first_phase_start = None
+
+        for phase in params.phases:
+            if isinstance(phase, PhaseConfig):
+                timer_col = phase.timer_col
+                threshold = phase.start_threshold or params.start_threshold
+            else:
+                timer_col = phase
+                threshold = params.start_threshold
+
+            if timer_col not in group.columns:
+                continue
+
+            phase_result = _detect_single_phase_polars(
+                group=group,
+                timer_col=timer_col,
+                timestamp_col=params.timestamp_col,
+                threshold=threshold,
+                previous_phase_end=previous_phase_end,
+                status_col=params.status_col,
+                status_mapping=params.status_mapping,
+                phase_metrics=params.phase_metrics,
+            )
+
+            if phase_result:
+                row.update(phase_result["columns"])
+                previous_phase_end = phase_result["end_time"]
+
+                if first_phase_start is None:
+                    first_phase_start = phase_result["start_time"]
+
+        if params.metadata and first_phase_start is not None:
+            metadata_values = _extract_metadata_polars(
+                group=group,
+                metadata_config=params.metadata,
+                timestamp_col=params.timestamp_col,
+                first_phase_start=first_phase_start,
+            )
+            row.update(metadata_values)
+
+        summary_rows.append(row)
+
+    if not summary_rows:
+        return pl.DataFrame()
+
+    result_df = pl.DataFrame(summary_rows)
+
+    first_phase_name = (
+        params.phases[0].timer_col
+        if isinstance(params.phases[0], PhaseConfig)
+        else params.phases[0]
+    )
+    start_col = f"{first_phase_name}_start"
+    if start_col in result_df.columns:
+        result_df = result_df.sort(start_col)
+
+    if params.fill_null_minutes:
+        result_df = _fill_null_numeric_columns_polars(result_df, params)
+
+    return result_df
+
+
+def _get_expected_columns_polars(params: "DetectSequentialPhasesParams") -> Dict[str, None]:
+    """Build a dict of ALL expected output columns with None values for Polars."""
+    columns = {}
+
+    phase_names = [p.timer_col if isinstance(p, PhaseConfig) else p for p in params.phases]
+    for phase in phase_names:
+        columns[f"{phase}_start"] = None
+        columns[f"{phase}_end"] = None
+        columns[f"{phase}_max_minutes"] = None
+
+        if params.status_mapping:
+            for status_name in params.status_mapping.values():
+                columns[f"{phase}_{status_name}_minutes"] = None
+
+        if params.phase_metrics:
+            for metric_col in params.phase_metrics.keys():
+                columns[f"{phase}_{metric_col}"] = None
+
+    if params.metadata:
+        for col in params.metadata.keys():
+            columns[col] = None
+
+    return columns
+
+
+def _detect_single_phase_polars(
+    group,
+    timer_col: str,
+    timestamp_col: str,
+    threshold: int,
+    previous_phase_end,
+    status_col: Optional[str],
+    status_mapping: Optional[Dict[int, str]],
+    phase_metrics: Optional[Dict[str, str]],
+) -> Optional[dict]:
+    """Detect a single phase's boundaries and calculate metrics using Polars."""
+    import polars as pl
+    from datetime import timedelta
+
+    if previous_phase_end is not None:
+        phase_data = group.filter(pl.col(timestamp_col) > previous_phase_end)
+    else:
+        phase_data = group
+
+    if phase_data.height == 0:
+        return None
+
+    non_zero = phase_data.filter(pl.col(timer_col) > 0)
+    if non_zero.height == 0:
+        return None
+
+    potential_starts = non_zero.filter(pl.col(timer_col) <= threshold).sort(timestamp_col)
+    if potential_starts.height == 0:
+        return None
+
+    first_ts = potential_starts[timestamp_col][0]
+    first_val = potential_starts[timer_col][0]
+
+    true_start = first_ts - timedelta(seconds=float(first_val))
+
+    after_start = phase_data.filter(pl.col(timestamp_col) > true_start)
+
+    unique_times = after_start.unique(subset=[timestamp_col]).sort(timestamp_col)
+
+    end_time = None
+    max_timer = 0
+
+    timer_values = unique_times[timer_col].to_list()
+    ts_values = unique_times[timestamp_col].to_list()
+
+    for i in range(1, len(timer_values)):
+        if timer_values[i] == timer_values[i - 1]:
+            end_time = ts_values[i - 1]
+            max_timer = timer_values[i]
+            break
+
+    if end_time is None and len(ts_values) > 0:
+        end_time = ts_values[-1]
+        max_timer = timer_values[-1] if timer_values else 0
+
+    if end_time is None:
+        return None
+
+    columns = {
+        f"{timer_col}_start": true_start,
+        f"{timer_col}_end": end_time,
+        f"{timer_col}_max_minutes": round(float(max_timer) / 60, 6) if max_timer else 0,
+    }
+
+    if status_col and status_mapping and status_col in group.columns:
+        status_times = _calculate_status_times_polars(
+            group=group,
+            start_time=true_start,
+            end_time=end_time,
+            timestamp_col=timestamp_col,
+            status_col=status_col,
+            status_mapping=status_mapping,
+        )
+        for status_name, duration in status_times.items():
+            columns[f"{timer_col}_{status_name}_minutes"] = round(duration, 6)
+
+    if phase_metrics:
+        phase_window = phase_data.filter(
+            (pl.col(timestamp_col) >= true_start) & (pl.col(timestamp_col) <= end_time)
+        )
+        for metric_col, agg_func in phase_metrics.items():
+            if metric_col in phase_window.columns:
+                try:
+                    if agg_func == "mean":
+                        value = phase_window[metric_col].mean()
+                    elif agg_func == "sum":
+                        value = phase_window[metric_col].sum()
+                    elif agg_func == "max":
+                        value = phase_window[metric_col].max()
+                    elif agg_func == "min":
+                        value = phase_window[metric_col].min()
+                    elif agg_func == "std":
+                        value = phase_window[metric_col].std()
+                    elif agg_func == "count":
+                        value = phase_window[metric_col].count()
+                    else:
+                        value = phase_window[metric_col].mean()
+                    columns[f"{timer_col}_{metric_col}"] = value
+                except Exception:
+                    columns[f"{timer_col}_{metric_col}"] = None
+
+    return {
+        "columns": columns,
+        "start_time": true_start,
+        "end_time": end_time,
+    }
+
+
+def _calculate_status_times_polars(
+    group,
+    start_time,
+    end_time,
+    timestamp_col: str,
+    status_col: str,
+    status_mapping: Dict[int, str],
+) -> Dict[str, float]:
+    """Calculate time spent in each status within a phase window using Polars."""
+    import polars as pl
+
+    status_times = {status_name: 0.0 for status_name in status_mapping.values()}
+
+    within_phase = group.filter(
+        (pl.col(timestamp_col) >= start_time) & (pl.col(timestamp_col) <= end_time)
+    )
+
+    if within_phase.height == 0:
+        return status_times
+
+    valid_statuses = list(status_mapping.keys())
+    valid_rows = within_phase.filter(
+        pl.col(status_col).is_not_null() & pl.col(status_col).is_in(valid_statuses)
+    )
+
+    if valid_rows.height == 0:
+        return status_times
+
+    current_status = valid_rows[status_col][0]
+    last_change_ts = valid_rows[timestamp_col][0]
+
+    ts_list = within_phase[timestamp_col].to_list()
+    status_list = within_phase[status_col].to_list()
+
+    for ts, status in zip(ts_list, status_list):
+        if status is None or status not in status_mapping:
+            continue
+
+        if status != current_status:
+            time_diff = (ts - last_change_ts).total_seconds() / 60
+            status_times[status_mapping[current_status]] += time_diff
+            last_change_ts = ts
+            current_status = status
+
+    final_diff = (end_time - last_change_ts).total_seconds() / 60
+    status_times[status_mapping[current_status]] += final_diff
+
+    return status_times
+
+
+def _extract_metadata_polars(
+    group,
+    metadata_config: Dict[str, str],
+    timestamp_col: str,
+    first_phase_start,
+) -> Dict[str, any]:
+    """Extract metadata columns with specified aggregation methods using Polars."""
+    import polars as pl
+
+    result = {}
+
+    for col, method in metadata_config.items():
+        if col not in group.columns:
+            result[col] = None
+            continue
+
+        try:
+            if method == "first":
+                result[col] = group[col][0]
+            elif method == "last":
+                result[col] = group[col][-1]
+            elif method == "first_after_start":
+                after_start = group.filter(pl.col(timestamp_col) >= first_phase_start)
+                if after_start.height > 0:
+                    valid = after_start.filter(pl.col(col).is_not_null())
+                    result[col] = valid[col][0] if valid.height > 0 else None
+                else:
+                    result[col] = None
+            elif method == "max":
+                result[col] = group[col].max()
+            elif method == "min":
+                result[col] = group[col].min()
+            elif method == "mean":
+                result[col] = group[col].mean()
+            elif method == "sum":
+                result[col] = group[col].sum()
+            else:
+                result[col] = group[col][0]
+        except Exception:
+            result[col] = None
+
+    return result
+
+
+def _fill_null_numeric_columns_polars(df, params: "DetectSequentialPhasesParams"):
+    """Fill null values in numeric columns with 0 using Polars."""
+    import polars as pl
+
+    numeric_cols = _get_numeric_columns(params)
+    fill_exprs = []
+    for col in numeric_cols:
+        if col in df.columns:
+            fill_exprs.append(pl.col(col).fill_null(0.0).alias(col))
+
+    if fill_exprs:
+        df = df.with_columns(fill_exprs)
+
+    return df

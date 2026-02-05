@@ -61,6 +61,57 @@ class TestResponseExtractor:
         assert items[0]["source"] == "test"
         assert "_fetched_at" in items[0]
 
+    def test_dict_to_list_false_returns_empty(self):
+        """Test that dict response returns empty list when dict_to_list=False."""
+        extractor = ResponseExtractor(items_path="data", dict_to_list=False)
+        response = {"data": {"Aatrox": {"id": 1}, "Ahri": {"id": 2}}}
+        items = extractor.extract_items(response)
+        assert items == []
+
+    def test_dict_to_list_true_extracts_values(self):
+        """Test that dict response extracts values as rows when dict_to_list=True."""
+        extractor = ResponseExtractor(items_path="data", dict_to_list=True)
+        response = {
+            "data": {"Aatrox": {"id": 1, "name": "Aatrox"}, "Ahri": {"id": 2, "name": "Ahri"}}
+        }
+        items = extractor.extract_items(response)
+        assert len(items) == 2
+        keys = {item["_key"] for item in items}
+        assert keys == {"Aatrox", "Ahri"}
+        for item in items:
+            assert "_key" in item
+            assert "id" in item
+            assert "name" in item
+
+    def test_dict_to_list_preserves_key_field(self):
+        """Test that dict keys are preserved as '_key' field."""
+        extractor = ResponseExtractor(items_path="", dict_to_list=True)
+        response = {"champion1": {"power": 100}, "champion2": {"power": 200}}
+        items = extractor.extract_items(response)
+        assert len(items) == 2
+        item_by_key = {item["_key"]: item for item in items}
+        assert item_by_key["champion1"]["power"] == 100
+        assert item_by_key["champion2"]["power"] == 200
+
+    def test_dict_to_list_non_dict_values(self):
+        """Test dict_to_list with non-dict values uses '_value' field."""
+        extractor = ResponseExtractor(items_path="", dict_to_list=True)
+        response = {"key1": "value1", "key2": 42}
+        items = extractor.extract_items(response)
+        assert len(items) == 2
+        item_by_key = {item["_key"]: item for item in items}
+        assert item_by_key["key1"]["_value"] == "value1"
+        assert item_by_key["key2"]["_value"] == 42
+
+    def test_dict_to_list_root_level(self):
+        """Test dict_to_list with empty items_path (root-level dict)."""
+        extractor = ResponseExtractor(items_path="", dict_to_list=True)
+        response = {"Aatrox": {"id": 1}, "Ahri": {"id": 2}}
+        items = extractor.extract_items(response)
+        assert len(items) == 2
+        keys = {item["_key"] for item in items}
+        assert keys == {"Aatrox", "Ahri"}
+
     def test_date_variables(self):
         """Test date variable substitution in add_fields."""
         import datetime

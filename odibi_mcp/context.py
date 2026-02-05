@@ -468,7 +468,7 @@ def resolve_connection(connection: str | dict) -> tuple[Any, str]:
     if isinstance(connection, str):
         if ctx is None:
             raise ValueError(
-                f"No project config loaded. Set ODIBI_CONFIG env var or provide inline connection spec."
+                "No project config loaded. Set ODIBI_CONFIG env var or provide inline connection spec."
             )
         conn = ctx.get_connection(connection)
         return conn, connection

@@ -1,0 +1,208 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "autoApprove": [
+        "create_directory",
+        "write_file",
+        "read_file",
+        "read_text_file",
+        "read_media_file",
+        "read_multiple_files",
+        "edit_file",
+        "list_directory",
+        "list_directory_with_sizes",
+        "directory_tree",
+        "move_file",
+        "search_files",
+        "get_file_info",
+        "list_allowed_directories"
+      ],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "C:/Users/henry/OneDrive/Documents/Cline/MCP/filesystem/src/filesystem/dist/index.js",
+        "C:/Users/henry",
+        "D:/odibi"
+      ]
+    },
+    "memory": {
+      "autoApprove": [
+        "create_entities",
+        "create_relations",
+        "add_observations",
+        "delete_entities",
+        "delete_observations",
+        "delete_relations",
+        "read_graph",
+        "search_nodes",
+        "open_nodes"
+      ],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "C:/Users/henry/OneDrive/Documents/Cline/MCP/filesystem/src/memory/dist/index.js"
+      ]
+    },
+    "sequential-thinking": {
+      "autoApprove": [
+        "sequentialthinking"
+      ],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "C:/Users/henry/OneDrive/Documents/Cline/MCP/filesystem/src/sequentialthinking/dist/index.js"
+      ]
+    },
+    "fetch": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "mcp_server_fetch"
+      ]
+    },
+    "git": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "mcp_server_git",
+        "--repository",
+        "D:/odibi"
+      ]
+    },
+    "time": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "mcp_server_time"
+      ]
+    },
+    "sqlite": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "C:/Users/henry/AppData/Roaming/Python/Python312/Scripts/mcp-server-sqlite.exe",
+      "args": [
+        "--db-path",
+        "D:/odibi/data/odibi.db"
+      ]
+    },
+    "duckdb": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "C:/Users/henry/AppData/Roaming/Python/Python312/Scripts/duckdb-mcp-server.exe",
+      "args": [
+        "--db-path",
+        "D:/odibi/data/odibi.duckdb"
+      ]
+    },
+    "context7": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    "github": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
+      }
+    },
+    "odibi-knowledge": {
+      "autoApprove": [
+        "list_transformers",
+        "list_patterns",
+        "list_connections",
+        "explain",
+        "get_transformer_signature",
+        "get_yaml_structure",
+        "query_codebase",
+        "reindex",
+        "get_index_stats",
+        "get_deep_context",
+        "get_doc",
+        "list_docs",
+        "search_docs",
+        "debug_env",
+        "list_projects",
+        "bootstrap_context",
+        "generate_transformer",
+        "generate_pipeline_yaml",
+        "validate_yaml",
+        "diagnose_error",
+        "get_example",
+        "suggest_pattern",
+        "get_engine_differences",
+        "get_validation_rules",
+        "story_read",
+        "story_diff",
+        "node_describe",
+        "node_sample",
+        "node_sample_in",
+        "node_failed_rows",
+        "node_stats",
+        "pipeline_stats",
+        "failure_summary",
+        "schema_history",
+        "lineage_upstream",
+        "lineage_downstream",
+        "lineage_graph",
+        "output_schema",
+        "list_outputs",
+        "describe_table",
+        "list_sheets",
+        "list_schemas",
+        "compare_schemas",
+        "map_environment",
+        "profile_source",
+        "profile_folder",
+        "generate_bronze_node",
+        "test_node",
+        "generate_sql_pipeline",
+        "validate_odibi_config",
+        "generate_project_yaml",
+        "diagnose",
+        "diagnose_path",
+        "run_python",
+        "run_odibi",
+        "find_path",
+        "execute_pipeline"
+      ],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "odibi_mcp.server"
+      ],
+      "cwd": "D:/odibi"
+    }
+  }
+}

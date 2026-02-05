@@ -41,6 +41,34 @@ Check if your YAML is valid before running it.
 odibi validate my_pipeline.yaml
 ```
 
+**With environment variables:**
+```bash
+odibi validate my_pipeline.yaml --env prod
+```
+
+**What it checks:**
+- YAML schema validity (required fields, types)
+- Pipeline logic (node dependencies, circular references)
+- Transformer parameters (valid operations, required params)
+- Connection references (all referenced connections exist)
+
+**Example output (valid config):**
+```
+[OK] Config is valid
+```
+
+**Example output (invalid config):**
+```
+[!] Pipeline 'main_etl' Errors:
+  - Node 'load_data': missing required field 'format'
+  - Node 'transform': unknown transformer 'invalid_op'
+
+[?] Pipeline 'main_etl' Warnings:
+  - Node 'save_output': 'overwrite' mode will delete existing data
+
+[X] Validation failed
+```
+
 ### 3. Visualize Dependencies
 Generate a dependency graph to understand flow.
 ```bash

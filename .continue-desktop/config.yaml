@@ -1,0 +1,55 @@
+name: Odibi Project Config
+version: 1.0.0
+schema: v1
+models:
+  - name: GPT-5.2-chat
+    provider: azure
+    model: gpt-5.2-chat
+    apiKey: ${AZURE_GPT52_API_KEY}
+    apiBase: https://henry-mkiqytxy-eastus2.cognitiveservices.azure.com
+  - name: GPT-4.1
+    provider: azure
+    model: gpt-4.1
+    apiKey: ${AZURE_GPT41_API_KEY}
+    apiBase: https://odibi-ai.cognitiveservices.azure.com
+docs:
+  - name: Odibi Doc
+    faviconUrl: ""
+    startUrl: https://henryodibi11.github.io/Odibi/
+mcpServers:
+  - name: odibi-knowledge
+    command: C:/Program Files/Python312/python.exe
+    args:
+      - "D:/odibi/run_mcp.py"
+    cwd: "D:/projects"
+    connectionTimeout: 300000
+    env:
+      PYTHONPATH: D:/odibi
+      ODIBI_CONFIG: "D:/projects/exploration.yaml"
+      ODIBI_PROJECTS_DIR: "D:/projects"
+  - name: filesystem
+    command: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "D:/odibi"
+  - name: memory
+    command: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-memory"
+  - name: fetch
+    command: C:/Program Files/Python312/python.exe
+    args:
+      - "-m"
+      - "mcp_server_fetch"
+  - name: git
+    command: C:/Program Files/Python312/python.exe
+    args:
+      - "-m"
+      - "mcp_server_git"
+  - name: sequential-thinking
+    command: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-sequential-thinking"

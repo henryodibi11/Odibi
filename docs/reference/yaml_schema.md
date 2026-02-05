@@ -52,8 +52,8 @@ alerts:
 | **version** | str | No | `1.0.0` | Project version |
 | **owner** | Optional[str] | No | - | Project owner/contact |
 | **vars** | Dict[str, Any] | No | `PydanticUndefined` | Global variables for substitution (e.g. ${vars.env}) |
-| **retry** | [RetryConfig](#retryconfig) | No | `PydanticUndefined` | - |
-| **logging** | [LoggingConfig](#loggingconfig) | No | `PydanticUndefined` | - |
+| **retry** | [RetryConfig](#retryconfig) | No | `PydanticUndefined` | Retry configuration for transient failures. Applies to all nodes unless overridden. Default: enabled with 3 attempts, exponential backoff. |
+| **logging** | [LoggingConfig](#loggingconfig) | No | `PydanticUndefined` | Logging configuration for pipeline execution. Set level (DEBUG/INFO/WARNING/ERROR), enable structured JSON logs, add metadata. |
 | **alerts** | List[[AlertConfig](#alertconfig)] | No | `PydanticUndefined` | Alert configurations |
 | **performance** | [PerformanceConfig](#performanceconfig) | No | `PydanticUndefined` | Performance tuning |
 | **environments** | Optional[Dict[str, Dict[str, Any]]] | No | - | Structure: same as ProjectConfig but with only overridden fields. Not yet validated strictly. |
@@ -383,6 +383,8 @@ These are the built-in functions you can use in two ways:
 | --- | --- | --- | --- | --- |
 | **name** | str | Yes | - | Unique node name |
 | **description** | Optional[str] | No | - | Human-readable description |
+| **explanation** | Optional[str] | No | - | Markdown-formatted explanation of the node's transformation logic. Rendered in the Data Story HTML report. Supports tables, code blocks, and rich formatting. Use to document business rules, data mappings, and transformation rationale for stakeholder communication. Mutually exclusive with 'explanation_file'. |
+| **explanation_file** | Optional[str] | No | - | Path to external Markdown file containing the explanation, relative to the YAML file. Use for longer documentation to keep YAML files clean. Mutually exclusive with 'explanation'. |
 | **runbook_url** | Optional[str] | No | - | URL to troubleshooting guide or runbook. Shown as 'Troubleshooting guide →' link on failures. |
 | **enabled** | bool | No | `True` | If False, node is skipped during execution |
 | **tags** | List[str] | No | `PydanticUndefined` | Operational tags for selective execution (e.g., 'daily', 'critical'). Use with `odibi run --tag`. |
@@ -612,7 +614,7 @@ adls_msi:
 | **validation_mode** | ValidationMode | No | `ValidationMode.LAZY` | - |
 | **account_name** | str | Yes | - | - |
 | **container** | str | Yes | - | - |
-| **auth** | AzureBlobAuthConfig | No | `PydanticUndefined` | **Options:** [AzureBlobKeyVaultAuth](#azureblobkeyvaultauth), [AzureBlobAccountKeyAuth](#azureblobaccountkeyauth), [AzureBlobSasAuth](#azureblobsasauth), [AzureBlobConnectionStringAuth](#azureblobconnectionstringauth), [AzureBlobMsiAuth](#azureblobmsiauth) |
+| **auth** | AzureBlobAuthConfig | No | `PydanticUndefined` | Authentication configuration. Choose one mode: 'account_key' (storage key), 'sas' (SAS token), 'connection_string', 'key_vault' (Azure Key Vault), or 'aad_msi' (Managed Identity, default). For production, prefer key_vault or aad_msi to avoid storing secrets in config.<br>**Options:** [AzureBlobKeyVaultAuth](#azureblobkeyvaultauth), [AzureBlobAccountKeyAuth](#azureblobaccountkeyauth), [AzureBlobSasAuth](#azureblobsasauth), [AzureBlobConnectionStringAuth](#azureblobconnectionstringauth), [AzureBlobMsiAuth](#azureblobmsiauth) |
 
 ---
 ### `SQLServerConnectionConfig`
@@ -657,7 +659,7 @@ sql_dw_login:
 | **database** | str | Yes | - | - |
 | **port** | int | No | `1433` | - |
 | **driver** | str | No | `ODBC Driver 18 for SQL Server` | - |
-| **auth** | SQLServerAuthConfig | No | `PydanticUndefined` | **Options:** [SQLLoginAuth](#sqlloginauth), [SQLAadPasswordAuth](#sqlaadpasswordauth), [SQLMsiAuth](#sqlmsiauth), [SQLConnectionStringAuth](#sqlconnectionstringauth) |
+| **auth** | SQLServerAuthConfig | No | `PydanticUndefined` | Authentication configuration. Choose one mode: 'sql_login' (username/password), 'aad_password' (Azure AD service principal), 'aad_msi' (Managed Identity, default), or 'connection_string' (full JDBC string). For Databricks/Azure, prefer aad_msi for passwordless auth.<br>**Options:** [SQLLoginAuth](#sqlloginauth), [SQLAadPasswordAuth](#sqlaadpasswordauth), [SQLMsiAuth](#sqlmsiauth), [SQLConnectionStringAuth](#sqlconnectionstringauth) |
 
 ---
 ### `HttpConnectionConfig`
@@ -682,9 +684,9 @@ api_source:
 | --- | --- | --- | --- | --- |
 | **type** | Literal['http'] | No | `ConnectionType.HTTP` | - |
 | **validation_mode** | ValidationMode | No | `ValidationMode.LAZY` | - |
-| **base_url** | str | Yes | - | - |
-| **headers** | Dict[str, str] | No | `PydanticUndefined` | - |
-| **auth** | HttpAuthConfig | No | `PydanticUndefined` | **Options:** [HttpNoAuth](#httpnoauth), [HttpBasicAuth](#httpbasicauth), [HttpBearerAuth](#httpbearerauth), [HttpApiKeyAuth](#httpapikeyauth) |
+| **base_url** | str | Yes | - | Base URL for all API requests (e.g., 'https://api.example.com/v1') |
+| **headers** | Dict[str, str] | No | `PydanticUndefined` | Default HTTP headers included in all requests. Example: {'User-Agent': 'odibi-pipeline', 'Accept': 'application/json'}. Auth headers are typically set via the 'auth' block instead. |
+| **auth** | HttpAuthConfig | No | `PydanticUndefined` | Authentication configuration. Choose one mode: 'none' (no auth), 'basic' (username/password), 'bearer' (token), or 'api_key' (custom header). Tokens can use env vars: '${API_TOKEN}'.<br>**Options:** [HttpNoAuth](#httpnoauth), [HttpBasicAuth](#httpbasicauth), [HttpBearerAuth](#httpbearerauth), [HttpApiKeyAuth](#httpapikeyauth) |
 
 ---
 ## Node Operations
@@ -1640,6 +1642,7 @@ read:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **items_path** | str | No | - | Dotted path to items array in response (e.g., 'results', 'data.items'). Empty = response is the array. |
+| **dict_to_list** | bool | No | `False` | If True and items_path resolves to a dict, extract dict values as rows with keys preserved in '_key' field. Useful for APIs like ddragon that return {'Aatrox': {...}, 'Ahri': {...}}. |
 | **add_fields** | Optional[Dict[str, Any]] | No | - | Fields to add to each record. Supports date variables: $now, $today, $yesterday, $7_days_ago, etc. |
 
 ---
@@ -2369,7 +2372,10 @@ performance:
 ### `RetryConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
-Retry configuration.
+Retry configuration for transient failures.
+
+Automatically retries failed operations (database timeouts, network issues, rate limits)
+with configurable backoff strategy.
 
 Example:
 ```yaml
@@ -2382,9 +2388,9 @@ retry:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **enabled** | bool | No | `True` | - |
-| **max_attempts** | int | No | `3` | - |
-| **backoff** | BackoffStrategy | No | `BackoffStrategy.EXPONENTIAL` | - |
+| **enabled** | bool | No | `True` | Enable automatic retry on transient failures (timeouts, connection errors) |
+| **max_attempts** | int | No | `3` | Maximum number of retry attempts before failing. Total attempts = 1 + max_attempts. |
+| **backoff** | BackoffStrategy | No | `BackoffStrategy.EXPONENTIAL` | Wait strategy between retries. 'exponential' (2^n seconds, recommended), 'linear' (n seconds), or 'constant' (fixed 1 second). |
 
 ---
 ### `StoryConfig`
@@ -2415,7 +2421,7 @@ story:
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name for story output (uses connection's path resolution) |
 | **path** | str | Yes | - | Path for stories (relative to connection base_path) |
-| **max_sample_rows** | int | No | `10` | - |
+| **max_sample_rows** | int | No | `10` | Maximum rows to include in data samples within story reports. Higher values give more debugging context but increase file size. Set to 0 to disable data sampling. |
 | **auto_generate** | bool | No | `True` | - |
 | **retention_days** | Optional[int] | No | `30` | Days to keep stories |
 | **retention_count** | Optional[int] | No | `100` | Max number of stories to keep |
@@ -4055,6 +4061,332 @@ window_calculation:
 | **function** | str | Yes | - | Window function e.g. 'sum(amount)', 'rank()' |
 | **partition_by** | List[str] | No | `PydanticUndefined` | - |
 | **order_by** | Optional[str] | No | - | - |
+
+---
+### 📂 Other Transformers
+
+#### ConversionSpec {#conversionspec}
+Specification for a single unit conversion.
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **from_unit** | str | Yes | - | Source unit (e.g., 'psig', 'degF', 'BTU/lb') |
+| **to** | str | Yes | - | Target unit (e.g., 'bar', 'degC', 'kJ/kg') |
+| **output** | Optional[str] | No | - | Output column name. If not specified, overwrites the source column. |
+
+---
+#### PropertyOutputConfig {#propertyoutputconfig}
+Configuration for a single output property.
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **property** | str | Yes | - | CoolProp property key: H (enthalpy), S (entropy), D (density), C (specific heat Cp), CVMASS (Cv), V (viscosity), L (conductivity), T (temperature), P (pressure), Q (quality) |
+| **unit** | Optional[str] | No | - | Output unit for this property. If not specified, uses SI units. |
+| **output_column** | Optional[str] | No | - | Custom output column name. Defaults to {prefix}_{property}. |
+
+---
+#### PsychrometricOutputConfig {#psychrometricoutputconfig}
+Configuration for psychrometric output property.
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **property** | str | Yes | - | Property: W (humidity ratio), B (wet bulb), D (dew point), H (enthalpy), V (specific volume), R (relative humidity) |
+| **unit** | Optional[str] | No | - | Output unit |
+| **output_column** | Optional[str] | No | - | Custom output column name |
+
+---
+#### `fluid_properties` (FluidPropertiesParams) {#fluidpropertiesparams}
+Calculate thermodynamic properties for any fluid using CoolProp.
+
+Supports 122+ fluids including Water, Ammonia, R134a, Air, CO2, etc.
+Uses IAPWS-IF97 formulation for water/steam calculations.
+
+Engine parity: Pandas, Spark (via Pandas UDF), Polars
+
+Configuration for fluid property calculations using CoolProp.
+
+Supports 122+ fluids including Water, Ammonia, R134a, Air, CO2, etc.
+See CoolProp documentation for full list: http://www.coolprop.org/fluid_properties/PurePseudoPure.html
+
+State is defined by two independent properties. Common combinations:
+- P + T (pressure + temperature) - subcooled/superheated regions
+- P + Q (pressure + quality) - two-phase region
+- P + H (pressure + enthalpy) - when enthalpy is known
+
+Scenario: Calculate steam properties from pressure and temperature
+```yaml
+fluid_properties:
+  fluid: Water
+  pressure_col: steam_pressure
+  temperature_col: steam_temp
+  pressure_unit: psig
+  temperature_unit: degF
+  gauge_offset: 14.696
+  outputs:
+    - property: H
+      unit: BTU/lb
+      output_column: steam_enthalpy
+    - property: S
+      unit: BTU/(lb·R)
+      output_column: steam_entropy
+```
+
+Scenario: Calculate saturated steam properties from pressure only
+```yaml
+fluid_properties:
+  fluid: Water
+  pressure_col: steam_pressure
+  quality: 1.0  # Saturated vapor
+  pressure_unit: psia
+  outputs:
+    - property: H
+      unit: BTU/lb
+    - property: T
+      unit: degF
+```
+
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **fluid** | str | No | `Water` | CoolProp fluid name (e.g., Water, Ammonia, R134a, Air, CO2) |
+| **pressure_col** | Optional[str] | No | - | Column containing pressure values |
+| **temperature_col** | Optional[str] | No | - | Column containing temperature values |
+| **enthalpy_col** | Optional[str] | No | - | Column containing enthalpy values |
+| **quality_col** | Optional[str] | No | - | Column containing quality values (0-1) |
+| **pressure** | Optional[float] | No | - | Fixed pressure value |
+| **temperature** | Optional[float] | No | - | Fixed temperature value |
+| **enthalpy** | Optional[float] | No | - | Fixed enthalpy value (in input unit) |
+| **quality** | Optional[float] | No | - | Fixed quality value (0=sat liquid, 1=sat vapor) |
+| **pressure_unit** | str | No | `Pa` | Pressure unit: Pa, kPa, MPa, bar, psia, psig, atm |
+| **temperature_unit** | str | No | `K` | Temperature unit: K, degC, degF, degR |
+| **enthalpy_unit** | str | No | `J/kg` | Input enthalpy unit: J/kg, kJ/kg, BTU/lb |
+| **gauge_offset** | float | No | `14.696` | Atmospheric pressure offset for psig (default 14.696 psia) |
+| **outputs** | List[[PropertyOutputConfig](#propertyoutputconfig)] | No | `PydanticUndefined` | List of properties to calculate with their units |
+| **prefix** | str | No | - | Prefix for output column names (e.g., 'steam' -> 'steam_H') |
+
+---
+#### `psychrometrics` (PsychrometricsParams) {#psychrometricsparams}
+Calculate psychrometric (humid air) properties using CoolProp HAPropsSI.
+
+Engine parity: Pandas, Spark (via Pandas UDF), Polars
+
+Psychrometric (humid air) calculations using CoolProp HAPropsSI.
+
+Calculates moist air properties from dry bulb temperature and one other
+property (typically relative humidity or humidity ratio).
+
+CoolProp property keys for humid air:
+- W: Humidity ratio (kg water / kg dry air)
+- B: Wet bulb temperature
+- D: Dew point temperature
+- H: Enthalpy (per kg dry air)
+- V: Specific volume (per kg dry air)
+- R: Relative humidity (0-1)
+- T: Dry bulb temperature
+- P: Total pressure
+
+Scenario: Calculate humidity ratio from T and RH
+```yaml
+psychrometrics:
+  dry_bulb_col: ambient_temp
+  relative_humidity_col: rh_percent
+  temperature_unit: degF
+  rh_is_percent: true
+  pressure_unit: psia
+  elevation_ft: 875
+  outputs:
+    - property: W
+      unit: lb/lb
+      output_column: humidity_ratio
+    - property: B
+      unit: degF
+      output_column: wet_bulb
+    - property: D
+      unit: degF
+      output_column: dew_point
+```
+
+Scenario: Calculate RH from temperature and humidity ratio
+```yaml
+psychrometrics:
+  dry_bulb_col: temp_f
+  humidity_ratio_col: w
+  temperature_unit: degF
+  pressure: 14.696
+  pressure_unit: psia
+  outputs:
+    - property: R
+      output_column: relative_humidity
+```
+
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **dry_bulb_col** | str | Yes | - | Column containing dry bulb temperature |
+| **relative_humidity_col** | Optional[str] | No | - | Column containing relative humidity |
+| **humidity_ratio_col** | Optional[str] | No | - | Column containing humidity ratio (kg/kg or lb/lb) |
+| **wet_bulb_col** | Optional[str] | No | - | Column containing wet bulb temperature |
+| **dew_point_col** | Optional[str] | No | - | Column containing dew point temperature |
+| **relative_humidity** | Optional[float] | No | - | Fixed relative humidity |
+| **humidity_ratio** | Optional[float] | No | - | Fixed humidity ratio |
+| **pressure_col** | Optional[str] | No | - | Column containing pressure |
+| **pressure** | Optional[float] | No | - | Fixed pressure value |
+| **elevation_ft** | Optional[float] | No | - | Elevation in feet (used to estimate pressure if not provided) |
+| **elevation_m** | Optional[float] | No | - | Elevation in meters (used to estimate pressure if not provided) |
+| **temperature_unit** | str | No | `K` | Temperature unit for all temps |
+| **pressure_unit** | str | No | `Pa` | Pressure unit |
+| **humidity_ratio_unit** | str | No | `kg/kg` | Humidity ratio unit (kg/kg, lb/lb, g/kg) |
+| **rh_is_percent** | bool | No | `False` | If True, RH input is 0-100%, otherwise 0-1 |
+| **outputs** | List[[PsychrometricOutputConfig](#psychrometricoutputconfig)] | No | `PydanticUndefined` | Properties to calculate |
+| **prefix** | str | No | - | Prefix for output columns |
+
+---
+#### `saturation_properties` (SaturationPropertiesParams) {#saturationpropertiesparams}
+Calculate saturated liquid or vapor properties.
+
+Convenience wrapper that sets Q=0 (liquid) or Q=1 (vapor) automatically.
+
+Convenience wrapper for saturated liquid (Q=0) or saturated vapor (Q=1) properties.
+
+This is a simplified interface for common saturation calculations.
+
+Scenario: Get saturated steam properties at a given pressure
+```yaml
+saturation_properties:
+  fluid: Water
+  pressure_col: steam_pressure
+  pressure_unit: psig
+  phase: vapor
+  outputs:
+    - property: H
+      unit: BTU/lb
+      output_column: hg
+    - property: T
+      unit: degF
+      output_column: sat_temp
+```
+
+Scenario: Get saturated liquid enthalpy (hf)
+```yaml
+saturation_properties:
+  pressure_col: pressure_psia
+  pressure_unit: psia
+  phase: liquid
+  outputs:
+    - property: H
+      unit: BTU/lb
+      output_column: hf
+```
+
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **fluid** | str | No | `Water` | CoolProp fluid name |
+| **pressure_col** | Optional[str] | No | - | Column containing pressure values |
+| **pressure** | Optional[float] | No | - | Fixed pressure value |
+| **temperature_col** | Optional[str] | No | - | Column containing saturation temp |
+| **temperature** | Optional[float] | No | - | Fixed saturation temperature |
+| **pressure_unit** | str | No | `Pa` | Pressure unit |
+| **temperature_unit** | str | No | `K` | Temperature unit |
+| **gauge_offset** | float | No | `14.696` | Gauge pressure offset for psig |
+| **phase** | Literal['liquid', 'vapor'] | No | `vapor` | Phase: 'liquid' (Q=0) or 'vapor' (Q=1) |
+| **outputs** | List[[PropertyOutputConfig](#propertyoutputconfig)] | No | `PydanticUndefined` | Properties to calculate |
+| **prefix** | str | No | - | Prefix for output columns |
+
+---
+#### `unit_convert` (UnitConvertParams) {#unitconvertparams}
+Convert columns from one unit to another.
+
+Uses Pint for comprehensive unit conversion support. Handles all SI units,
+imperial units, and common engineering units out of the box.
+
+Engine parity: Pandas, Spark, Polars
+
+Configuration for unit conversion transformer.
+
+Converts columns from one unit to another using Pint's comprehensive
+unit database. Supports all SI units, imperial units, and common
+engineering units.
+
+Scenario: Normalize sensor data to SI units
+```yaml
+unit_convert:
+  conversions:
+    pressure_psig:
+      from: psig
+      to: bar
+      output: pressure_bar
+    temperature_f:
+      from: degF
+      to: degC
+      output: temperature_c
+    flow_gpm:
+      from: gpm
+      to: m³/s
+      output: flow_si
+```
+
+Scenario: Convert in-place (overwrite original columns)
+```yaml
+unit_convert:
+  conversions:
+    pressure:
+      from: psia
+      to: kPa
+    temperature:
+      from: degF
+      to: K
+```
+
+Scenario: Handle gauge pressure with custom atmospheric reference
+```yaml
+unit_convert:
+  gauge_pressure_offset: 14.696 psia
+  conversions:
+    steam_pressure:
+      from: psig
+      to: psia
+      output: steam_pressure_abs
+```
+
+Scenario: Complex engineering units
+```yaml
+unit_convert:
+  conversions:
+    heat_transfer_coeff:
+      from: BTU/(hr * ft² * degF)
+      to: W/(m² * K)
+      output: htc_si
+    thermal_conductivity:
+      from: BTU/(hr * ft * degF)
+      to: W/(m * K)
+      output: k_si
+    specific_heat:
+      from: BTU/(lb * degF)
+      to: kJ/(kg * K)
+      output: cp_si
+```
+
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **conversions** | Dict[str, [ConversionSpec](#conversionspec)] | Yes | - | Mapping of source column names to conversion specifications |
+| **gauge_pressure_offset** | Optional[str] | No | `14.696 psia` | Atmospheric pressure for gauge-to-absolute conversions. Default is sea level (14.696 psia). |
+| **errors** | str | No | `null` | How to handle conversion errors: 'null' (default), 'raise', or 'ignore' |
 
 ---
 ## Semantic Layer

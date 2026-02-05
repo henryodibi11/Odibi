@@ -240,22 +240,30 @@ def _substitute_curly_brace_dates(value: str) -> str:
 class ResponseExtractor:
     """Extracts items from API responses using a dotted path."""
 
-    def __init__(self, items_path: str = "", add_fields: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        items_path: str = "",
+        add_fields: Optional[Dict[str, Any]] = None,
+        dict_to_list: bool = False,
+    ):
         """Initialize extractor.
 
         Args:
             items_path: Dotted path to items (e.g., "results", "data.items", "").
                        Empty string means response is the list itself.
             add_fields: Fields to add to each record (e.g., {"_fetched_at": "$now"})
+            dict_to_list: If True and items_path resolves to a dict, extract dict
+                         values as rows with keys preserved in '_key' field.
         """
         self.items_path = items_path
         self.add_fields = add_fields or {}
+        self.dict_to_list = dict_to_list
 
     def extract_items(self, response_json: Any) -> List[Dict[str, Any]]:
         """Extract items from response using the configured path."""
         if not self.items_path:
-            # Response itself should be a list
-            items = response_json if isinstance(response_json, list) else []
+            # Response itself should be a list or dict
+            obj = response_json
         else:
             # Navigate dotted path
             obj = response_json
@@ -264,7 +272,21 @@ class ResponseExtractor:
                     obj = obj[key]
                 else:
                     return []
-            items = obj if isinstance(obj, list) else []
+
+        # Convert result to list of items
+        if isinstance(obj, list):
+            items = obj
+        elif isinstance(obj, dict) and self.dict_to_list:
+            # Extract dict values as rows, preserving keys as '_key' field
+            items = []
+            for k, v in obj.items():
+                if isinstance(v, dict):
+                    item = {"_key": k, **v}
+                else:
+                    item = {"_key": k, "_value": v}
+                items.append(item)
+        else:
+            items = []
 
         # Add extra fields with date variable substitution
         if self.add_fields:
@@ -950,6 +972,7 @@ def create_api_fetcher(
     extractor = ResponseExtractor(
         items_path=response_config.get("items_path", ""),
         add_fields=response_config.get("add_fields"),
+        dict_to_list=response_config.get("dict_to_list", False),
     )
 
     # Retry policy (matches ApiRetryConfig schema)

@@ -678,7 +678,7 @@ def _map_sql(connection: str, conn, scanned_at: datetime) -> MapEnvironmentRespo
         if hasattr(conn, "execute_sql"):
             result = conn.execute_sql(query)
         elif hasattr(conn, "execute"):
-                        result = conn.execute(query)
+            result = conn.execute(query)
         elif hasattr(conn, "read_sql_query"):
             df = conn.read_sql_query(query)
             result = df.values.tolist()
@@ -769,7 +769,9 @@ def _map_sql(connection: str, conn, scanned_at: datetime) -> MapEnvironmentRespo
         )
 
 
-def profile_source(connection: str | dict, path: str, max_attempts: int = 5) -> ProfileSourceResponse:
+def profile_source(
+    connection: str | dict, path: str, max_attempts: int = 5
+) -> ProfileSourceResponse:
     """
     Self-correcting profiler that figures out how to read a source.
 
@@ -2540,7 +2542,7 @@ def generate_bronze_node(
         # Build complete runnable PROJECT YAML
         # Get connection config from context - USE RAW CONFIG to preserve all settings
         connection_configs = {}
-        
+
         if ctx and hasattr(ctx, "config") and ctx.config.get("connections"):
             # Use raw connection configs from config dict (preserves full YAML structure)
             raw_connections = ctx.config.get("connections", {})
@@ -2548,7 +2550,7 @@ def generate_bronze_node(
                 # Deep copy to avoid modifying original
                 connection_configs[conn_name] = dict(conn_config)
             logger.debug(f"Using raw config connections: {list(connection_configs.keys())}")
-        
+
         # If no raw config, try to reconstruct from connection objects
         if not connection_configs and ctx and hasattr(ctx, "connections") and ctx.connections:
             logger.warning("No raw config found, reconstructing connections from objects")
@@ -2578,7 +2580,9 @@ def generate_bronze_node(
                 else:
                     # Unknown type - add minimal config with warning
                     connection_configs[conn_name] = {"type": conn_type}
-                    warnings.append(f"Unknown connection type '{conn_type}' for '{conn_name}' - config may be incomplete")
+                    warnings.append(
+                        f"Unknown connection type '{conn_type}' for '{conn_name}' - config may be incomplete"
+                    )
 
         # Ensure we have a local connection for system/story
         if "local" not in connection_configs:
@@ -2589,7 +2593,7 @@ def generate_bronze_node(
 
         # Use project name from config if available, otherwise generate from node name
         project_name = ctx.project_name if ctx and ctx.project_name else f"{node_name}_project"
-        
+
         yaml_dict = {
             "project": project_name,
             "connections": connection_configs,

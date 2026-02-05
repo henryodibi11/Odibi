@@ -1775,6 +1775,64 @@ class NodeExecutor:
                 f"Check file permissions and encoding (must be UTF-8)."
             ) from e
 
+    def _resolve_explanation(self, config: NodeConfig) -> Optional[str]:
+        """Resolve explanation content from inline or external file.
+
+        Args:
+            config: Node configuration.
+
+        Returns:
+            Markdown explanation string, or None if not specified.
+        """
+        if config.explanation:
+            return config.explanation
+        if config.explanation_file:
+            return self._resolve_explanation_file(config.explanation_file)
+        return None
+
+    def _resolve_explanation_file(self, explanation_file_path: str) -> str:
+        """Load Markdown explanation content from external file.
+
+        Args:
+            explanation_file_path: Path to .md file, relative to main config file.
+
+        Returns:
+            Markdown content as string.
+
+        Raises:
+            FileNotFoundError: If the explanation file does not exist.
+            ValueError: If the file cannot be read.
+        """
+        if not self.config_file:
+            raise ValueError(
+                f"Cannot resolve explanation_file '{explanation_file_path}': "
+                f"The config_file path is not available. "
+                f"This happens when a pipeline is created programmatically without a YAML source. "
+                f"Solutions: 1) Load pipeline from YAML using load_config_from_file(), "
+                f"or 2) Use inline 'explanation:' instead of 'explanation_file:'."
+            )
+
+        config_dir = Path(self.config_file).parent
+        file_path = config_dir / explanation_file_path
+
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Explanation file not found: '{explanation_file_path}'. "
+                f"Looked in: {file_path.absolute()}. "
+                f"The path is resolved relative to the YAML config file at: {config_dir.absolute()}. "
+                f"Check: 1) The file exists at the expected location. "
+                f"2) The path is relative to your pipeline YAML, not project.yaml."
+            )
+
+        try:
+            return file_path.read_text(encoding="utf-8")
+        except Exception as e:
+            raise ValueError(
+                f"Failed to read explanation file '{explanation_file_path}' at {file_path.absolute()}. "
+                f"Error: {type(e).__name__}: {e}. "
+                f"Check file permissions and encoding (must be UTF-8)."
+            ) from e
+
     def _execute_function_step(
         self,
         function_name: str,
@@ -2854,7 +2912,7 @@ class NodeExecutor:
             "validation_warnings": self._validation_warnings.copy(),
             "config_snapshot": config_snapshot,
             "description": config.description,
-            "explanation": config.explanation,
+            "explanation": self._resolve_explanation(config),
         }
 
         if self._delta_write_info and "version" in self._delta_write_info:
@@ -2923,9 +2981,9 @@ class NodeExecutor:
             if set_in and columns_removed > 0:
                 drop_ratio = columns_removed / len(set_in)
                 if drop_ratio > 0.3:
-                    metadata["column_drop_warning"] = (
-                        f"⚠️ {columns_removed} columns were dropped ({len(set_in)} → {len(set_out)})"
-                    )
+                    metadata[
+                        "column_drop_warning"
+                    ] = f"⚠️ {columns_removed} columns were dropped ({len(set_in)} → {len(set_out)})"
 
         if df is not None and self.max_sample_rows > 0:
             metadata["sample_data"] = self._get_redacted_sample(df, config.sensitive, self.engine)

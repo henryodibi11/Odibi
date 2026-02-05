@@ -89,7 +89,7 @@ Run `tests/engine/test_parity.py` and expand coverage:
 
 ### 3.1 YAML Validation
 
-- [ ] Ensure `odibi validate config.yaml` catches ALL common mistakes
+- [x] Ensure `odibi validate config.yaml` catches ALL common mistakes ✓
 - [ ] Add validation for node name format (alphanumeric + underscore only)
 - [ ] Add validation for missing `format:` in inputs/outputs
 - [ ] Improve error messages with line numbers and suggestions

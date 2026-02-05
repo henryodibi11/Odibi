@@ -819,7 +819,10 @@ NEXT ACTIONS (pick one):
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "connection": {"type": "string", "description": "Connection name from exploration.yaml"},
+                    "connection": {
+                        "type": "string",
+                        "description": "Connection name from exploration.yaml",
+                    },
                     "path": {
                         "type": "string",
                         "default": "",
@@ -862,8 +865,14 @@ NEXT ACTION: Pass ready_for dict to generate_bronze_node() to create runnable pi
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "connection": {"type": "string", "description": "Connection name from exploration.yaml"},
-                    "path": {"type": "string", "description": "File path (e.g., 'folder/file.csv') or SQL table (e.g., 'Sales.Orders')"},
+                    "connection": {
+                        "type": "string",
+                        "description": "Connection name from exploration.yaml",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "File path (e.g., 'folder/file.csv') or SQL table (e.g., 'Sales.Orders')",
+                    },
                     "max_attempts": {
                         "type": "integer",
                         "default": 5,
@@ -1215,7 +1224,10 @@ PATH TIPS:
                     "connection": {
                         "oneOf": [
                             {"type": "string", "description": "Connection name from config"},
-                            {"type": "object", "description": "Inline connection spec with type, server, database, etc."},
+                            {
+                                "type": "object",
+                                "description": "Inline connection spec with type, server, database, etc.",
+                            },
                         ],
                         "description": "SQL connection name or inline spec",
                     },

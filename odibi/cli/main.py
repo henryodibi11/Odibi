@@ -15,6 +15,7 @@ from odibi.cli.schema import add_schema_parser, schema_command
 from odibi.cli.secrets import add_secrets_parser, secrets_command
 from odibi.cli.story import add_story_parser, story_command
 from odibi.cli.system import add_system_parser, system_command
+from odibi.cli.templates import add_templates_parser, templates_command
 from odibi.cli.test import test_command
 from odibi.cli.ui import add_ui_parser, ui_command
 from odibi.cli.validate import validate_command
@@ -49,6 +50,12 @@ Introspection (for AI tools):
   odibi list patterns                List all available patterns
   odibi list connections             List all connection types
   odibi explain <name>               Get detailed docs for any feature
+
+Template Generation:
+  odibi templates list               List all available template types
+  odibi templates show <name>        Show YAML template for any type
+  odibi templates transformer <name> Show transformer documentation
+  odibi templates schema             Generate JSON schema for VS Code
 
 Debugging:
   odibi story show <path>            View a specific story
@@ -185,6 +192,9 @@ Learn more: https://henryodibi11.github.io/Odibi/golden_path/
     # odibi explain <name>
     add_explain_parser(subparsers)
 
+    # odibi templates (list, show, transformer, schema)
+    add_templates_parser(subparsers)
+
     args = parser.parse_args()
 
     # Configure logging
@@ -235,6 +245,8 @@ Learn more: https://henryodibi11.github.io/Odibi/golden_path/
         return list_command(args)
     elif args.command == "explain":
         return explain_command(args)
+    elif args.command == "templates":
+        return templates_command(args)
     else:
         parser.print_help()
         return 1

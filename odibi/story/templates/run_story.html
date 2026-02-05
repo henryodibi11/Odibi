@@ -462,6 +462,11 @@
             color: #666; font-style: italic;
         }
 
+        /* Collapsible explanation */
+        details summary::-webkit-details-marker { display: none; }
+        details summary .collapse-icon { display: inline-block; }
+        details:not([open]) summary .collapse-icon { transform: rotate(-90deg); }
+
         /* Config Diff Viewer */
         .config-diff-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .config-diff-pane { background: var(--code-bg); border-radius: 6px; overflow: hidden; }
@@ -849,14 +854,15 @@
                     </div>
 
                     {% if node.explanation %}
-                    <div style="background: linear-gradient(135deg, #f0f7ff 0%, #e8f4f8 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #0066cc; margin-bottom: 20px;">
-                        <h4 style="margin: 0 0 12px 0; color: #0066cc; font-size: 1em; display: flex; align-items: center; gap: 8px;">
+                    <details open style="background: linear-gradient(135deg, #f0f7ff 0%, #e8f4f8 100%); padding: 0; border-radius: 8px; border-left: 4px solid #0066cc; margin-bottom: 20px;">
+                        <summary style="padding: 16px 20px; cursor: pointer; color: #0066cc; font-size: 1em; font-weight: 600; display: flex; align-items: center; gap: 8px; list-style: none;">
+                            <span class="collapse-icon" style="transition: transform 0.2s;">▼</span>
                             <span>📝</span> Transformation Explanation
-                        </h4>
-                        <div class="explanation-content" style="color: #333; line-height: 1.7; font-size: 0.95em;">
+                        </summary>
+                        <div class="explanation-content" style="color: #333; line-height: 1.7; font-size: 0.95em; padding: 0 20px 20px 20px;">
                             {{ node.explanation | markdown | safe }}
                         </div>
-                    </div>
+                    </details>
                     {% endif %}
 
                     {% if node.column_drop_warning %}

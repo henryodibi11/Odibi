@@ -63,6 +63,7 @@ nav:
   # GETTING STARTED - For new users
   # ─────────────────────────────────────────────
   - Getting Started:
+      - Installation: guides/installation.md
       - Quickstart: tutorials/getting_started.md
       - Bronze Layer: tutorials/bronze_layer.md
       - Silver Layer: tutorials/silver_layer.md
@@ -102,6 +103,9 @@ nav:
           - SCD2 Pattern: patterns/scd2.md
       - Manufacturing:
           - Phase Analysis: patterns/manufacturing.md
+      - Engineering:
+          - Unit Conversion: guides/unit_conversion.md
+          - Thermodynamics: guides/thermodynamics.md
       - Anti-Patterns: patterns/anti_patterns.md
 
   # ─────────────────────────────────────────────
@@ -155,6 +159,9 @@ nav:
   - Guides:
       - Decision Guide: guides/decision_guide.md
       - The Definitive Guide: guides/the_definitive_guide.md
+      - Installation: guides/installation.md
+      - Unit Conversion: guides/unit_conversion.md
+      - Thermodynamics: guides/thermodynamics.md
       - Variable Substitution: guides/variable_substitution.md
       - API Data Sources: guides/api_data_sources.md
       - Cookbook (Recipes): guides/recipes.md

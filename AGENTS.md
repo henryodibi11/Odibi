@@ -87,13 +87,24 @@ The docstrings in `odibi/config.py` are the source of truth for documentation.
 
 ### Introspection (AI-Friendly CLI)
 ```bash
-odibi list transformers             # List all 52+ transformers
+odibi list transformers             # List all 56 transformers
 odibi list patterns                 # List all 6 patterns
 odibi list connections              # List all connection types
 odibi explain <name>                # Get detailed docs for any feature
 odibi list transformers --format json  # JSON output for parsing
 ```
 Use these commands to discover available features before generating YAML configs.
+
+### Template Generator
+```bash
+odibi templates list                # List all template types
+odibi templates show azure_blob     # Show YAML template with all auth options
+odibi templates show sql_server     # Show connection template
+odibi templates show validation     # Show all 11 validation test types
+odibi templates transformer scd2    # Show transformer params + example YAML
+odibi templates schema              # Generate JSON schema for VS Code
+```
+Templates are generated directly from Pydantic models—always in sync with code.
 
 ### WSL/Spark Testing (Windows)
 Tests requiring Spark must run through WSL:

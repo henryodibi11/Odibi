@@ -1,4 +1,5 @@
 """Debug script to check .env loading and key format."""
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -15,7 +16,7 @@ key = os.environ.get("AZURE_STORAGE_ACCOUNT_KEY", "")
 account = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME", "")
 
 print(f"\nAZURE_STORAGE_ACCOUNT_NAME: {account or '(not set)'}")
-print(f"\nAZURE_STORAGE_ACCOUNT_KEY:")
+print("\nAZURE_STORAGE_ACCOUNT_KEY:")
 print(f"  Length: {len(key)} (should be 88)")
 print(f"  Ends with '==': {key.endswith('==')}")
 print(f"  First 10 chars: {key[:10] if key else '(empty)'}...")
@@ -28,7 +29,7 @@ print(f"  Has whitespace: {key != key.strip()}")
 if key:
     try:
         decoded = base64.b64decode(key)
-        print(f"\n✅ Base64 decoding successful! Key is valid.")
+        print("\n✅ Base64 decoding successful! Key is valid.")
     except Exception as e:
         print(f"\n❌ Base64 decoding FAILED: {e}")
         print("   This is your problem! The key is malformed.")

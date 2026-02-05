@@ -530,7 +530,13 @@ class AzureBlobConnectionConfig(BaseConnectionConfig):
     account_name: str
     container: str
     auth: AzureBlobAuthConfig = Field(
-        default_factory=lambda: AzureBlobMsiAuth(mode=AzureBlobAuthMode.AAD_MSI)
+        default_factory=lambda: AzureBlobMsiAuth(mode=AzureBlobAuthMode.AAD_MSI),
+        description=(
+            "Authentication configuration. Choose one mode: "
+            "'account_key' (storage key), 'sas' (SAS token), 'connection_string', "
+            "'key_vault' (Azure Key Vault), or 'aad_msi' (Managed Identity, default). "
+            "For production, prefer key_vault or aad_msi to avoid storing secrets in config."
+        ),
     )
 
 
@@ -654,7 +660,13 @@ class SQLServerConnectionConfig(BaseConnectionConfig):
     port: int = 1433
     driver: str = "ODBC Driver 18 for SQL Server"
     auth: SQLServerAuthConfig = Field(
-        default_factory=lambda: SQLMsiAuth(mode=SQLServerAuthMode.AAD_MSI)
+        default_factory=lambda: SQLMsiAuth(mode=SQLServerAuthMode.AAD_MSI),
+        description=(
+            "Authentication configuration. Choose one mode: "
+            "'sql_login' (username/password), 'aad_password' (Azure AD service principal), "
+            "'aad_msi' (Managed Identity, default), or 'connection_string' (full JDBC string). "
+            "For Databricks/Azure, prefer aad_msi for passwordless auth."
+        ),
     )
 
 
@@ -713,9 +725,25 @@ class HttpConnectionConfig(BaseConnectionConfig):
     """
 
     type: Literal[ConnectionType.HTTP] = ConnectionType.HTTP
-    base_url: str
-    headers: Dict[str, str] = Field(default_factory=dict)
-    auth: HttpAuthConfig = Field(default_factory=lambda: HttpNoAuth(mode=HttpAuthMode.NONE))
+    base_url: str = Field(
+        description="Base URL for all API requests (e.g., 'https://api.example.com/v1')"
+    )
+    headers: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Default HTTP headers included in all requests. "
+            "Example: {'User-Agent': 'odibi-pipeline', 'Accept': 'application/json'}. "
+            "Auth headers are typically set via the 'auth' block instead."
+        ),
+    )
+    auth: HttpAuthConfig = Field(
+        default_factory=lambda: HttpNoAuth(mode=HttpAuthMode.NONE),
+        description=(
+            "Authentication configuration. Choose one mode: "
+            "'none' (no auth), 'basic' (username/password), 'bearer' (token), "
+            "or 'api_key' (custom header). Tokens can use env vars: '${API_TOKEN}'."
+        ),
+    )
 
 
 class CustomConnectionConfig(BaseModel):
@@ -890,6 +918,10 @@ class ApiResponseConfig(BaseModel):
     items_path: str = Field(
         default="",
         description="Dotted path to items array in response (e.g., 'results', 'data.items'). Empty = response is the array.",
+    )
+    dict_to_list: bool = Field(
+        default=False,
+        description="If True and items_path resolves to a dict, extract dict values as rows with keys preserved in '_key' field. Useful for APIs like ddragon that return {'Aatrox': {...}, 'Ahri': {...}}.",
     )
     add_fields: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -3259,7 +3291,16 @@ class NodeConfig(BaseModel):
             "Markdown-formatted explanation of the node's transformation logic. "
             "Rendered in the Data Story HTML report. Supports tables, code blocks, "
             "and rich formatting. Use to document business rules, data mappings, "
-            "and transformation rationale for stakeholder communication."
+            "and transformation rationale for stakeholder communication. "
+            "Mutually exclusive with 'explanation_file'."
+        ),
+    )
+    explanation_file: Optional[str] = Field(
+        default=None,
+        description=(
+            "Path to external Markdown file containing the explanation, relative to the YAML file. "
+            "Use for longer documentation to keep YAML files clean. "
+            "Mutually exclusive with 'explanation'."
         ),
     )
     runbook_url: Optional[str] = Field(
@@ -3401,6 +3442,16 @@ class NodeConfig(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def check_explanation_exclusivity(self):
+        """Ensure explanation and explanation_file are mutually exclusive."""
+        if self.explanation and self.explanation_file:
+            raise ValueError(
+                f"Node '{self.name}': Cannot have both 'explanation' and 'explanation_file'. "
+                "Use 'explanation' for inline Markdown or 'explanation_file' for external files."
+            )
+        return self
+
 
 # ============================================
 # Pipeline Configuration
@@ -3499,7 +3550,10 @@ class BackoffStrategy(str, Enum):
 
 class RetryConfig(BaseModel):
     """
-    Retry configuration.
+    Retry configuration for transient failures.
+
+    Automatically retries failed operations (database timeouts, network issues, rate limits)
+    with configurable backoff strategy.
 
     Example:
     ```yaml
@@ -3510,9 +3564,23 @@ class RetryConfig(BaseModel):
     ```
     """
 
-    enabled: bool = True
-    max_attempts: int = Field(default=3, ge=1, le=10)
-    backoff: BackoffStrategy = Field(default=BackoffStrategy.EXPONENTIAL)
+    enabled: bool = Field(
+        default=True,
+        description="Enable automatic retry on transient failures (timeouts, connection errors)",
+    )
+    max_attempts: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum number of retry attempts before failing. Total attempts = 1 + max_attempts.",
+    )
+    backoff: BackoffStrategy = Field(
+        default=BackoffStrategy.EXPONENTIAL,
+        description=(
+            "Wait strategy between retries. 'exponential' (2^n seconds, recommended), "
+            "'linear' (n seconds), or 'constant' (fixed 1 second)."
+        ),
+    )
 
 
 class LoggingConfig(BaseModel):
@@ -3627,7 +3695,16 @@ class StoryConfig(BaseModel):
         description="Connection name for story output (uses connection's path resolution)"
     )
     path: str = Field(description="Path for stories (relative to connection base_path)")
-    max_sample_rows: int = Field(default=10, ge=0, le=100)
+    max_sample_rows: int = Field(
+        default=10,
+        ge=0,
+        le=100,
+        description=(
+            "Maximum rows to include in data samples within story reports. "
+            "Higher values give more debugging context but increase file size. "
+            "Set to 0 to disable data sampling."
+        ),
+    )
     auto_generate: bool = True
     retention_days: Optional[int] = Field(default=30, ge=1, description="Days to keep stories")
     retention_count: Optional[int] = Field(
@@ -4036,8 +4113,20 @@ class ProjectConfig(BaseModel):
     )
 
     # Global settings (optional with defaults in Pydantic)
-    retry: RetryConfig = Field(default_factory=RetryConfig)
-    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    retry: RetryConfig = Field(
+        default_factory=RetryConfig,
+        description=(
+            "Retry configuration for transient failures. "
+            "Applies to all nodes unless overridden. Default: enabled with 3 attempts, exponential backoff."
+        ),
+    )
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
+        description=(
+            "Logging configuration for pipeline execution. "
+            "Set level (DEBUG/INFO/WARNING/ERROR), enable structured JSON logs, add metadata."
+        ),
+    )
     alerts: List[AlertConfig] = Field(default_factory=list, description="Alert configurations")
     performance: PerformanceConfig = Field(
         default_factory=PerformanceConfig, description="Performance tuning"
