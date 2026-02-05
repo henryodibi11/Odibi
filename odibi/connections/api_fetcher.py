@@ -69,6 +69,23 @@ class ApiPage:
     status_code: int = 200
 
 
+@dataclass
+class FetchResult:
+    """Result of a safe fetch operation that preserves partial data on error.
+
+    Attributes:
+        df: DataFrame with all successfully fetched records (may be partial)
+        error: Exception that occurred, or None if fetch completed successfully
+        pages_fetched: Number of pages successfully fetched before error/completion
+        complete: True if all pages were fetched, False if stopped due to error
+    """
+
+    df: pd.DataFrame
+    error: Optional[Exception]
+    pages_fetched: int
+    complete: bool
+
+
 # =============================================================================
 # Response Extractor
 # =============================================================================
@@ -833,6 +850,73 @@ class ApiFetcher:
         result = pd.concat(frames, ignore_index=True)
         self._ctx.info("Fetch complete", total_records=len(result))
         return result
+
+    def fetch_dataframe_safe(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        max_records: Optional[int] = None,
+        method: str = "GET",
+        request_body: Optional[Dict[str, Any]] = None,
+    ) -> FetchResult:
+        """Fetch all pages, preserving partial data on error.
+
+        Unlike fetch_dataframe(), this method catches errors and returns
+        whatever data was successfully collected before the failure.
+
+        Args:
+            endpoint: API endpoint relative to base_url
+            params: Query parameters
+            max_records: Maximum records to return (safety limit)
+            method: HTTP method (GET, POST, PUT, PATCH, DELETE)
+            request_body: JSON body for POST/PUT/PATCH requests
+
+        Returns:
+            FetchResult with df (partial or complete), error info, and metadata
+        """
+        frames = []
+        total_records = 0
+        pages_fetched = 0
+        error: Optional[Exception] = None
+
+        try:
+            for page in self.fetch_iter(endpoint, params, method, request_body):
+                pages_fetched += 1
+
+                if not page.items:
+                    continue
+
+                df = pd.json_normalize(page.items, sep="_")
+                frames.append(df)
+                total_records += len(page.items)
+
+                if max_records and total_records >= max_records:
+                    self._ctx.info("Reached max_records limit", max_records=max_records)
+                    break
+        except Exception as e:
+            error = e
+            self._ctx.error(
+                "Fetch failed, returning partial results",
+                pages_fetched=pages_fetched,
+                records_collected=total_records,
+                error=str(e),
+            )
+
+        if not frames:
+            result_df = pd.DataFrame()
+        else:
+            result_df = pd.concat(frames, ignore_index=True)
+
+        complete = error is None
+        if complete:
+            self._ctx.info("Fetch complete", total_records=len(result_df))
+
+        return FetchResult(
+            df=result_df,
+            error=error,
+            pages_fetched=pages_fetched,
+            complete=complete,
+        )
 
 
 # =============================================================================

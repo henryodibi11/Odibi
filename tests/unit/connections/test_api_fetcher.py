@@ -8,6 +8,7 @@ import pytest
 from odibi.connections.api_fetcher import (
     ApiRequest,
     CursorPagination,
+    FetchResult,
     LinkHeaderPagination,
     NoPagination,
     OffsetLimitPagination,
@@ -534,3 +535,192 @@ class TestApiFetcherIntegration:
             df = fetcher.fetch_dataframe("/data")
             assert len(df) == 21  # 10 + 10 + 1
             assert call_count[0] == 3
+
+
+class TestFetchDataframeSafe:
+    """Tests for fetch_dataframe_safe method."""
+
+    def test_successful_fetch_returns_complete_result(self):
+        """Test that successful fetch returns complete=True."""
+        call_count = [0]
+
+        def mock_urlopen_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.headers = {}
+            data = {"results": [{"id": i} for i in range(5)]}
+            mock_response.read.return_value = json.dumps(data).encode()
+            mock_response.__enter__ = lambda s: s
+            mock_response.__exit__ = MagicMock(return_value=False)
+            return mock_response
+
+        with patch(
+            "odibi.connections.api_fetcher.urlopen",
+            side_effect=mock_urlopen_side_effect,
+        ):
+            fetcher = create_api_fetcher(
+                base_url="https://api.test.com",
+                options={
+                    "pagination": {"type": "none"},
+                    "response": {"items_path": "results"},
+                },
+            )
+
+            result = fetcher.fetch_dataframe_safe("/data")
+
+            assert isinstance(result, FetchResult)
+            assert result.complete is True
+            assert result.error is None
+            assert result.pages_fetched == 1
+            assert len(result.df) == 5
+
+    def test_error_on_second_page_returns_partial_data(self):
+        """Test that error mid-fetch preserves already collected data."""
+        call_count = [0]
+
+        def mock_urlopen_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 2:
+                raise ConnectionError("Network failure on page 2")
+
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.headers = {}
+            data = {"results": [{"id": i} for i in range(10)]}
+            mock_response.read.return_value = json.dumps(data).encode()
+            mock_response.__enter__ = lambda s: s
+            mock_response.__exit__ = MagicMock(return_value=False)
+            return mock_response
+
+        with patch(
+            "odibi.connections.api_fetcher.urlopen",
+            side_effect=mock_urlopen_side_effect,
+        ):
+            fetcher = create_api_fetcher(
+                base_url="https://api.test.com",
+                options={
+                    "pagination": {
+                        "type": "offset_limit",
+                        "limit": 10,
+                        "max_pages": 5,
+                    },
+                    "response": {"items_path": "results"},
+                },
+            )
+
+            result = fetcher.fetch_dataframe_safe("/data")
+
+            assert result.complete is False
+            assert result.error is not None
+            assert isinstance(result.error, ConnectionError)
+            assert "Network failure" in str(result.error)
+            assert result.pages_fetched == 1  # Only first page succeeded
+            assert len(result.df) == 10  # Data from first page preserved
+
+    def test_error_on_first_page_returns_empty_df(self):
+        """Test that error on first page returns empty DataFrame."""
+
+        def mock_urlopen_side_effect(*args, **kwargs):
+            raise ConnectionError("Immediate failure")
+
+        with patch(
+            "odibi.connections.api_fetcher.urlopen",
+            side_effect=mock_urlopen_side_effect,
+        ):
+            fetcher = create_api_fetcher(
+                base_url="https://api.test.com",
+                options={
+                    "pagination": {"type": "none"},
+                    "response": {"items_path": "results"},
+                },
+            )
+
+            result = fetcher.fetch_dataframe_safe("/data")
+
+            assert result.complete is False
+            assert result.error is not None
+            assert result.pages_fetched == 0
+            assert len(result.df) == 0
+
+    def test_max_records_limit_still_works(self):
+        """Test that max_records limit works with safe fetch."""
+        call_count = [0]
+
+        def mock_urlopen_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.headers = {}
+            data = {"results": [{"id": i + (call_count[0] - 1) * 10} for i in range(10)]}
+            mock_response.read.return_value = json.dumps(data).encode()
+            mock_response.__enter__ = lambda s: s
+            mock_response.__exit__ = MagicMock(return_value=False)
+            return mock_response
+
+        with patch(
+            "odibi.connections.api_fetcher.urlopen",
+            side_effect=mock_urlopen_side_effect,
+        ):
+            fetcher = create_api_fetcher(
+                base_url="https://api.test.com",
+                options={
+                    "pagination": {
+                        "type": "offset_limit",
+                        "limit": 10,
+                        "max_pages": 10,
+                    },
+                    "response": {"items_path": "results"},
+                },
+            )
+
+            result = fetcher.fetch_dataframe_safe("/data", max_records=15)
+
+            assert result.complete is True
+            assert result.error is None
+            assert result.pages_fetched == 2  # Stopped after 2 pages (20 records >= 15)
+
+    def test_error_on_third_page_preserves_two_pages(self):
+        """Test multi-page partial collection."""
+        call_count = [0]
+        page_count = [0]
+
+        def mock_urlopen_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            # Page 3 always fails (even on retries)
+            if call_count[0] >= 3:
+                raise TimeoutError("Request timeout on page 3")
+
+            page_count[0] += 1
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.headers = {}
+            data = {"results": [{"id": i + (page_count[0] - 1) * 5} for i in range(5)]}
+            mock_response.read.return_value = json.dumps(data).encode()
+            mock_response.__enter__ = lambda s: s
+            mock_response.__exit__ = MagicMock(return_value=False)
+            return mock_response
+
+        with patch(
+            "odibi.connections.api_fetcher.urlopen",
+            side_effect=mock_urlopen_side_effect,
+        ):
+            fetcher = create_api_fetcher(
+                base_url="https://api.test.com",
+                options={
+                    "pagination": {
+                        "type": "offset_limit",
+                        "limit": 5,
+                        "max_pages": 10,
+                    },
+                    "response": {"items_path": "results"},
+                    "http": {"retries": {"max_attempts": 1}},  # Disable retries
+                },
+            )
+
+            result = fetcher.fetch_dataframe_safe("/data")
+
+            assert result.complete is False
+            assert isinstance(result.error, TimeoutError)
+            assert result.pages_fetched == 2
+            assert len(result.df) == 10  # 5 + 5 from first two pages
