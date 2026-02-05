@@ -2853,6 +2853,8 @@ class NodeExecutor:
             ],
             "validation_warnings": self._validation_warnings.copy(),
             "config_snapshot": config_snapshot,
+            "description": config.description,
+            "explanation": config.explanation,
         }
 
         if self._delta_write_info and "version" in self._delta_write_info:
@@ -2915,6 +2917,15 @@ class NodeExecutor:
             metadata["columns_removed"] = list(set_in - set_out)
             if input_sample:
                 metadata["sample_data_in"] = input_sample
+
+            # Calculate column drop warning (>30% columns dropped)
+            columns_removed = len(set_in - set_out)
+            if set_in and columns_removed > 0:
+                drop_ratio = columns_removed / len(set_in)
+                if drop_ratio > 0.3:
+                    metadata[
+                        "column_drop_warning"
+                    ] = f"⚠️ {columns_removed} columns were dropped ({len(set_in)} → {len(set_out)})"
 
         if df is not None and self.max_sample_rows > 0:
             metadata["sample_data"] = self._get_redacted_sample(df, config.sensitive, self.engine)

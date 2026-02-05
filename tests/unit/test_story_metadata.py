@@ -536,3 +536,85 @@ class TestPipelineStoryMetadata:
         assert summary["success_rate"] == 100.0
         assert summary["completed_nodes"] == 2
         assert summary["failed_nodes"] == 0
+
+
+class TestNodeExplanationAndWarnings:
+    """Tests for the new explanation and column_drop_warning features."""
+
+    def test_node_with_explanation(self):
+        """Should store and serialize explanation field."""
+        explanation_text = """
+This node performs the following:
+
+1. **Filter** invalid records
+2. Derive new columns
+
+| Column | Logic |
+|--------|-------|
+| status | CASE WHEN x = 1 THEN 'A' END |
+"""
+        metadata = NodeExecutionMetadata(
+            node_name="transform_data",
+            operation="transform",
+            status="success",
+            duration=2.5,
+            explanation=explanation_text,
+        )
+
+        assert metadata.explanation == explanation_text
+
+        # Check serialization
+        d = metadata.to_dict()
+        assert d["explanation"] == explanation_text
+
+    def test_node_with_column_drop_warning(self):
+        """Should store and serialize column_drop_warning field."""
+        warning = "⚠️ 5 columns were dropped (10 → 5)"
+        metadata = NodeExecutionMetadata(
+            node_name="pivot_data",
+            operation="pivot",
+            status="success",
+            duration=1.0,
+            column_drop_warning=warning,
+        )
+
+        assert metadata.column_drop_warning == warning
+
+        # Check serialization
+        d = metadata.to_dict()
+        assert d["column_drop_warning"] == warning
+
+    def test_node_without_explanation_defaults_to_none(self):
+        """Should default explanation to None if not provided."""
+        metadata = NodeExecutionMetadata(
+            node_name="simple_node",
+            operation="read",
+            status="success",
+            duration=0.5,
+        )
+
+        assert metadata.explanation is None
+        assert metadata.column_drop_warning is None
+
+        d = metadata.to_dict()
+        assert d["explanation"] is None
+        assert d["column_drop_warning"] is None
+
+    def test_node_with_all_documentation_fields(self):
+        """Should handle all documentation fields together."""
+        metadata = NodeExecutionMetadata(
+            node_name="documented_node",
+            operation="transform",
+            status="success",
+            duration=3.0,
+            description="High-level description",
+            explanation="Detailed **markdown** explanation",
+            runbook_url="https://wiki.example.com/runbook/node",
+            column_drop_warning="⚠️ 3 columns dropped",
+        )
+
+        d = metadata.to_dict()
+        assert d["description"] == "High-level description"
+        assert d["explanation"] == "Detailed **markdown** explanation"
+        assert d["runbook_url"] == "https://wiki.example.com/runbook/node"
+        assert d["column_drop_warning"] == "⚠️ 3 columns dropped"

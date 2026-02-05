@@ -1055,6 +1055,9 @@ class StoryGenerator:
             failed_rows_truncated=meta.get("failed_rows_truncated", False),
             truncated_validations=meta.get("truncated_validations", []),
             retry_history=meta.get("retry_history", []),
+            description=meta.get("description"),
+            explanation=meta.get("explanation"),
+            column_drop_warning=meta.get("column_drop_warning"),
         )
 
         # Calculate derived metrics

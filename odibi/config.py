@@ -3253,6 +3253,15 @@ class NodeConfig(BaseModel):
 
     name: str = Field(description="Unique node name")
     description: Optional[str] = Field(default=None, description="Human-readable description")
+    explanation: Optional[str] = Field(
+        default=None,
+        description=(
+            "Markdown-formatted explanation of the node's transformation logic. "
+            "Rendered in the Data Story HTML report. Supports tables, code blocks, "
+            "and rich formatting. Use to document business rules, data mappings, "
+            "and transformation rationale for stakeholder communication."
+        ),
+    )
     runbook_url: Optional[str] = Field(
         default=None,
         description="URL to troubleshooting guide or runbook. Shown as 'Troubleshooting guide →' link on failures.",

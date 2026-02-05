@@ -84,6 +84,7 @@ class HTMLStoryRenderer:
             # Note: Template creates its own environment, so we attach to that
             template.environment.filters["to_yaml"] = self._to_yaml
             template.environment.filters["format_run_id"] = self._format_run_id
+            template.environment.filters["markdown"] = self._render_markdown
 
             # Render with metadata, theme, and version
             html = template.render(
@@ -128,6 +129,22 @@ class HTMLStoryRenderer:
             return dt.strftime("%b %d, %I:%M %p UTC").replace(" 0", " ").lstrip("0")
         except ValueError:
             return run_id
+
+    def _render_markdown(self, text: str) -> str:
+        """Render Markdown text to HTML."""
+        if not text:
+            return ""
+        try:
+            import markdown
+
+            return markdown.markdown(
+                text,
+                extensions=["tables", "fenced_code", "nl2br", "sane_lists"],
+            )
+        except ImportError:
+            import html
+
+            return f"<p>{html.escape(text)}</p>"
 
     def render_to_file(self, metadata: PipelineStoryMetadata, output_path: str) -> str:
         """

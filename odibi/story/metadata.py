@@ -120,8 +120,12 @@ class NodeExecutionMetadata:
 
     # Phase 5: Quality & Documentation
     description: Optional[str] = None  # From NodeConfig.description
+    explanation: Optional[str] = None  # Markdown explanation from NodeConfig.explanation
     runbook_url: Optional[str] = None  # From NodeConfig.runbook_url
     column_statistics: Optional[Dict[str, Dict[str, Any]]] = None  # min/max/mean/stddev per column
+
+    # Column drop warning threshold (triggered if >30% columns dropped)
+    column_drop_warning: Optional[str] = None  # Warning message if significant columns dropped
 
     def calculate_row_change(self):
         """Calculate row count change metrics."""
@@ -212,8 +216,10 @@ class NodeExecutionMetadata:
             "previous_config_snapshot": self.previous_config_snapshot,
             "duration_history": self.duration_history,
             "description": self.description,
+            "explanation": self.explanation,
             "runbook_url": self.runbook_url,
             "column_statistics": self.column_statistics,
+            "column_drop_warning": self.column_drop_warning,
         }
 
         if self.delta_info:

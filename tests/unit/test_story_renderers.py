@@ -364,3 +364,89 @@ class TestGetRenderer:
         """Should raise error for invalid format."""
         with pytest.raises(ValueError, match="Unsupported format"):
             get_renderer("invalid")
+
+
+class TestMarkdownFilter:
+    """Tests for the markdown rendering filter in HTMLStoryRenderer."""
+
+    def test_render_markdown_basic(self):
+        """Should render basic markdown to HTML."""
+        renderer = HTMLStoryRenderer()
+        result = renderer._render_markdown("**bold** and *italic*")
+        assert "<strong>bold</strong>" in result
+        assert "<em>italic</em>" in result
+
+    def test_render_markdown_list(self):
+        """Should render markdown lists."""
+        renderer = HTMLStoryRenderer()
+        result = renderer._render_markdown("1. First\n2. Second")
+        assert "<ol>" in result
+        assert "<li>" in result
+
+    def test_render_markdown_table(self):
+        """Should render markdown tables."""
+        renderer = HTMLStoryRenderer()
+        md = """
+| Column | Value |
+|--------|-------|
+| A | 1 |
+"""
+        result = renderer._render_markdown(md)
+        assert "<table>" in result
+        assert "<th>" in result
+        assert "<td>" in result
+
+    def test_render_markdown_code_block(self):
+        """Should render code blocks."""
+        renderer = HTMLStoryRenderer()
+        md = """
+```sql
+SELECT * FROM table
+```
+"""
+        result = renderer._render_markdown(md)
+        assert "<code>" in result or "<pre>" in result
+
+    def test_render_markdown_empty(self):
+        """Should handle empty input."""
+        renderer = HTMLStoryRenderer()
+        assert renderer._render_markdown("") == ""
+        assert renderer._render_markdown(None) == ""
+
+
+class TestHTMLStoryExplanationRendering:
+    """Tests for explanation rendering in HTML stories."""
+
+    def test_html_includes_explanation_section(self, sample_metadata):
+        """Should include explanation in rendered HTML when present."""
+        # Add a node with explanation
+        node_with_explanation = NodeExecutionMetadata(
+            node_name="explained_node",
+            operation="transform",
+            status="success",
+            duration=1.0,
+            explanation="This is a **test** explanation",
+        )
+        sample_metadata.add_node(node_with_explanation)
+
+        renderer = HTMLStoryRenderer()
+        html = renderer.render(sample_metadata)
+
+        assert "Transformation Explanation" in html
+        assert "explanation-content" in html
+
+    def test_html_includes_column_drop_warning(self, sample_metadata):
+        """Should include column drop warning when present."""
+        node_with_warning = NodeExecutionMetadata(
+            node_name="pivot_node",
+            operation="pivot",
+            status="success",
+            duration=1.0,
+            column_drop_warning="⚠️ 5 columns were dropped (10 → 5)",
+        )
+        sample_metadata.add_node(node_with_warning)
+
+        renderer = HTMLStoryRenderer()
+        html = renderer.render(sample_metadata)
+
+        assert "5 columns were dropped" in html
