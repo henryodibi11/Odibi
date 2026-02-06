@@ -374,6 +374,33 @@ class Pipeline:
         layers = self.graph.get_execution_layers()
         execution_order = self.graph.topological_sort()
 
+        # Filter out disabled nodes and their transitive dependents
+        disabled_nodes = {name for name in execution_order if not self.graph.nodes[name].enabled}
+        if disabled_nodes:
+            disabled_dependents = set()
+            for name in disabled_nodes:
+                disabled_dependents.update(self.graph.get_dependents(name))
+            disabled_dependents -= disabled_nodes
+            if disabled_dependents:
+                self._ctx.info(
+                    f"Disabled nodes: {sorted(disabled_nodes)} "
+                    f"(+ {len(disabled_dependents)} dependents skipped: "
+                    f"{sorted(disabled_dependents)})"
+                )
+            else:
+                self._ctx.info(f"Disabled nodes: {sorted(disabled_nodes)}")
+            all_disabled = disabled_nodes | disabled_dependents
+            for name in all_disabled:
+                reason = "disabled" if name in disabled_nodes else "dependency_disabled"
+                results.skipped.append(name)
+                results.node_results[name] = NodeResult(
+                    node_name=name,
+                    success=True,
+                    duration=0.0,
+                    metadata={"skipped": True, "reason": reason},
+                )
+            execution_order = [n for n in execution_order if n not in all_disabled]
+
         # Apply node filters (--tag, --node)
         filtered_nodes = set(execution_order)
         if tag:

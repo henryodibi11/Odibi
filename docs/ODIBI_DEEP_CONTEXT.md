@@ -219,15 +219,20 @@ error_strategy: fail_fast  # Options: fail_fast, fail_later, ignore
 
 ### 2.4 Retry Configuration
 
+Automatic retry on transient failures. Backoff strategy controls delay between attempts.
+
 ```yaml
 retry:
-  max_attempts: 3
-  delay_seconds: 10
-  backoff_multiplier: 2.0  # Exponential backoff
-  retry_on:
-    - ConnectionError
-    - TimeoutError
+  enabled: true           # Enable/disable automatic retry (default: true)
+  max_attempts: 3         # 1-10 attempts (default: 3)
+  backoff: exponential    # exponential (2^n sec), linear (n sec), constant (1 sec)
 ```
+
+| Backoff Strategy | Delay Pattern | Example (3 attempts) |
+|-----------------|---------------|----------------------|
+| `exponential` | 2^n seconds | 2s, 4s, 8s |
+| `linear` | n seconds | 1s, 2s, 3s |
+| `constant` | Fixed 1 second | 1s, 1s, 1s |
 
 ### 2.5 Context Factory
 
