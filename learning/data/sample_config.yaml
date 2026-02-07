@@ -1,0 +1,24 @@
+name: sample_pipeline
+engine: pandas
+connection:
+  name: local_dev
+  type: local
+  base_path: ./data
+
+nodes:
+  - name: employees
+    source: employees.csv
+    format: csv
+    write_mode: overwrite
+    transforms:
+      - type: rename_columns
+        params:
+          department: dept_name
+      - type: filter_rows
+        params:
+          condition: "salary > 80000"
+
+  - name: departments
+    source: departments.csv
+    format: csv
+    write_mode: overwrite
