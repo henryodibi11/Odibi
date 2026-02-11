@@ -2192,20 +2192,9 @@ class NodeExecutor:
                     ctx.debug("Applied schema harmonization")
                     self._execution_steps.append("Applied Schema Policy (Harmonization)")
 
-            ctx.info(
-                "Metadata check",
-                add_metadata=write_config.add_metadata,
-                add_metadata_type=type(write_config.add_metadata).__name__,
-                df_is_none=df is None,
-                df_is_streaming=getattr(df, "isStreaming", False) if df is not None else None,
-            )
             if write_config.add_metadata and df is not None:
                 df = self._add_write_metadata(config, df)
                 self._execution_steps.append("Added Bronze metadata columns")
-                ctx.info(
-                    "After add_write_metadata",
-                    columns=list(df.columns) if hasattr(df, "columns") else "unknown",
-                )
 
             write_options = write_config.options.copy() if write_config.options else {}
             deep_diag = write_options.pop("deep_diagnostics", False)
@@ -2643,6 +2632,10 @@ class NodeExecutor:
             if is_file_source:
                 source_path = read_config.path
 
+        # For streaming file sources, only add _source_file if merge_schema
+        # is enabled to avoid breaking existing tables without the column.
+        safe_streaming = is_streaming and getattr(write_config, "merge_schema", False)
+
         # Call engine's metadata helper
         return self.engine.add_write_metadata(
             df=df,
@@ -2651,7 +2644,7 @@ class NodeExecutor:
             source_table=source_table,
             source_path=source_path,
             is_file_source=is_file_source,
-            is_streaming=is_streaming,
+            is_streaming=safe_streaming,
         )
 
     def _check_skip_if_unchanged(
