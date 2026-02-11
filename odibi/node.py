@@ -2192,9 +2192,20 @@ class NodeExecutor:
                     ctx.debug("Applied schema harmonization")
                     self._execution_steps.append("Applied Schema Policy (Harmonization)")
 
+            ctx.info(
+                "Metadata check",
+                add_metadata=write_config.add_metadata,
+                add_metadata_type=type(write_config.add_metadata).__name__,
+                df_is_none=df is None,
+                df_is_streaming=getattr(df, "isStreaming", False) if df is not None else None,
+            )
             if write_config.add_metadata and df is not None:
                 df = self._add_write_metadata(config, df)
                 self._execution_steps.append("Added Bronze metadata columns")
+                ctx.info(
+                    "After add_write_metadata",
+                    columns=list(df.columns) if hasattr(df, "columns") else "unknown",
+                )
 
             write_options = write_config.options.copy() if write_config.options else {}
             deep_diag = write_options.pop("deep_diagnostics", False)
