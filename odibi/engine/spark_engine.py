@@ -2683,11 +2683,23 @@ class SparkEngine(Engine):
         if config.extracted_at:
             df = df.withColumn("_extracted_at", F.current_timestamp())
 
+        log = get_logging_context()
         if config.source_file and is_file_source:
             if is_streaming:
                 df = df.withColumn("_source_file", F.input_file_name())
+                log.info(
+                    "Added _source_file via input_file_name() for streaming source",
+                    columns_after=df.columns,
+                )
             elif source_path:
                 df = df.withColumn("_source_file", F.lit(source_path))
+        else:
+            log.debug(
+                "Skipped _source_file",
+                source_file_enabled=config.source_file,
+                is_file_source=is_file_source,
+                is_streaming=is_streaming,
+            )
 
         if config.source_connection and source_connection:
             df = df.withColumn("_source_connection", F.lit(source_connection))
