@@ -2685,7 +2685,7 @@ class SparkEngine(Engine):
 
         if config.source_file and is_file_source:
             if is_streaming:
-                df = df.withColumn("_source_file", F.col("_metadata.file_name"))
+                df = df.withColumn("_source_file", F.input_file_name())
             elif source_path:
                 df = df.withColumn("_source_file", F.lit(source_path))
 
