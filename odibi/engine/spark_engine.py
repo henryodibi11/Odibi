@@ -2653,6 +2653,7 @@ class SparkEngine(Engine):
         source_table: Optional[str] = None,
         source_path: Optional[str] = None,
         is_file_source: bool = False,
+        is_streaming: bool = False,
     ) -> Any:
         """Add metadata columns to DataFrame before writing (Bronze layer lineage).
 
@@ -2663,6 +2664,7 @@ class SparkEngine(Engine):
             source_table: Name of the source table (SQL sources)
             source_path: Path of the source file (file sources)
             is_file_source: True if source is a file-based read
+            is_streaming: True if source uses streaming (e.g., Auto Loader)
 
         Returns:
             DataFrame with metadata columns added
@@ -2681,8 +2683,11 @@ class SparkEngine(Engine):
         if config.extracted_at:
             df = df.withColumn("_extracted_at", F.current_timestamp())
 
-        if config.source_file and is_file_source and source_path:
-            df = df.withColumn("_source_file", F.lit(source_path))
+        if config.source_file and is_file_source:
+            if is_streaming:
+                df = df.withColumn("_source_file", F.input_file_name())
+            elif source_path:
+                df = df.withColumn("_source_file", F.lit(source_path))
 
         if config.source_connection and source_connection:
             df = df.withColumn("_source_connection", F.lit(source_connection))

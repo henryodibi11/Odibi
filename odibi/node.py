@@ -2617,13 +2617,16 @@ class NodeExecutor:
         source_path = None
         is_file_source = False
 
+        is_streaming = False
+
         if read_config:
             source_connection = read_config.connection
             source_table = read_config.table
+            is_streaming = getattr(read_config, "streaming", False)
 
             # Determine if file source based on format
             read_format = str(read_config.format).lower()
-            file_formats = {"csv", "parquet", "json", "avro", "excel"}
+            file_formats = {"csv", "parquet", "json", "avro", "excel", "cloudfiles"}
             is_file_source = read_format in file_formats
 
             if is_file_source:
@@ -2637,6 +2640,7 @@ class NodeExecutor:
             source_table=source_table,
             source_path=source_path,
             is_file_source=is_file_source,
+            is_streaming=is_streaming,
         )
 
     def _check_skip_if_unchanged(
