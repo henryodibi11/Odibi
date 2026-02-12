@@ -162,7 +162,6 @@ class TestGetPassword:
         )
 
         # Simulate import error by making the import fail
-        import sys
         import builtins
         original_import = builtins.__import__
         
@@ -716,7 +715,7 @@ class TestExecute:
         sys.modules["sqlalchemy"] = sqlalchemy_mod
 
         try:
-            result = conn.execute(
+            conn.execute(
                 "UPDATE users SET name = :name WHERE id = :id",
                 params={"name": "Alice", "id": 1},
             )
