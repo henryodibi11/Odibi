@@ -1753,7 +1753,6 @@ class PandasEngine(Engine):
         source_table: Optional[str] = None,
         source_path: Optional[str] = None,
         is_file_source: bool = False,
-        is_streaming: bool = False,
     ) -> pd.DataFrame:
         """Add metadata columns to DataFrame before writing (Bronze layer lineage).
 
@@ -1764,7 +1763,6 @@ class PandasEngine(Engine):
             source_table: Name of the source table (SQL sources)
             source_path: Path of the source file (file sources)
             is_file_source: True if source is a file-based read
-            is_streaming: True if source uses streaming (not applicable to Pandas)
 
         Returns:
             DataFrame with metadata columns added

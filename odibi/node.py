@@ -2617,24 +2617,17 @@ class NodeExecutor:
         source_path = None
         is_file_source = False
 
-        is_streaming = False
-
         if read_config:
             source_connection = read_config.connection
             source_table = read_config.table
-            is_streaming = getattr(read_config, "streaming", False)
 
             # Determine if file source based on format
             read_format = str(read_config.format).lower()
-            file_formats = {"csv", "parquet", "json", "avro", "excel", "cloudfiles"}
+            file_formats = {"csv", "parquet", "json", "avro", "excel"}
             is_file_source = read_format in file_formats
 
             if is_file_source:
                 source_path = read_config.path
-
-        # For streaming file sources, only add _source_file if merge_schema
-        # is enabled to avoid breaking existing tables without the column.
-        safe_streaming = is_streaming and getattr(write_config, "merge_schema", False)
 
         # Call engine's metadata helper
         return self.engine.add_write_metadata(
@@ -2644,7 +2637,6 @@ class NodeExecutor:
             source_table=source_table,
             source_path=source_path,
             is_file_source=is_file_source,
-            is_streaming=safe_streaming,
         )
 
     def _check_skip_if_unchanged(
