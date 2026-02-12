@@ -205,7 +205,7 @@ class MergeParams(BaseModel):
 
 
 @transform("merge", category="transformer", param_model=MergeParams)
-def merge(context, params=None, current=None, **kwargs):
+def merge(context: EngineContext, params: Optional[Union[MergeParams, Any]] = None, current: Optional[Any] = None, **kwargs: Any) -> EngineContext:
     """
     Merge transformer implementation.
     Handles Upsert, Append-Only, and Delete-Match strategies.
@@ -370,22 +370,22 @@ def merge(context, params=None, current=None, **kwargs):
 
 
 def _merge_spark(
-    context,
-    source_df,
-    target,
-    keys,
-    strategy,
-    audit_cols,
-    optimize_write,
-    vacuum_hours,
-    zorder_by,
-    cluster_by,
-    update_condition,
-    insert_condition,
-    delete_condition,
-    table_properties,
-    params,
-):
+    context: EngineContext,
+    source_df: Any,
+    target: str,
+    keys: List[str],
+    strategy: MergeStrategy,
+    audit_cols: Optional[AuditColumnsConfig],
+    optimize_write: bool,
+    vacuum_hours: Optional[int],
+    zorder_by: Optional[List[str]],
+    cluster_by: Optional[List[str]],
+    update_condition: Optional[str],
+    insert_condition: Optional[str],
+    delete_condition: Optional[str],
+    table_properties: Optional[dict],
+    params: MergeParams,
+) -> Any:
     """
     Internal helper for merge transformer on Spark engine.
 
@@ -411,14 +411,14 @@ def _merge_spark(
         if created_col and created_col not in source_df.columns:
             source_df = source_df.withColumn(created_col, current_timestamp())
 
-    def get_delta_table():
+    def get_delta_table() -> Any:
         # Heuristic: if it looks like a path, use forPath, else forName
         # Path indicators: /, \, :, or starts with .
         if "/" in target or "\\" in target or ":" in target or target.startswith("."):
             return DeltaTable.forPath(spark, target)
         return DeltaTable.forName(spark, target)
 
-    def merge_batch(batch_df, batch_id=None):
+    def merge_batch(batch_df: Any, batch_id: Optional[int] = None) -> None:
         # Check if table exists
         is_delta = False
         try:
@@ -594,7 +594,7 @@ def _merge_spark(
         return source_df
 
 
-def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params):
+def _merge_pandas(context: EngineContext, source_df: Any, target: str, keys: List[str], strategy: MergeStrategy, audit_cols: Optional[AuditColumnsConfig], params: MergeParams) -> Any:
     """
     Internal helper for merge transformer on Pandas engine.
 
