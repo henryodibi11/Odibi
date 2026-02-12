@@ -339,14 +339,16 @@ class TestPolarsValidation:
     def test_validate_schema_types_success(self, polars_engine):
         """Test validate_schema passes with correct types."""
         df = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
-        rules = {"types": {"a": "Int", "b": "String"}}  # Polars uses "String" not "Utf8"
+        # Polars string type is "String" - validation checks via substring match
+        rules = {"types": {"a": "Int", "b": "String"}}
         failures = polars_engine.validate_schema(df, rules)
         assert len(failures) == 0
 
     def test_validate_schema_types_mismatch(self, polars_engine):
         """Test validate_schema fails with type mismatch."""
         df = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
-        rules = {"types": {"a": "String"}}  # a is Int64, not String
+        # Column 'a' is Int64, expecting String type should fail validation
+        rules = {"types": {"a": "String"}}
         failures = polars_engine.validate_schema(df, rules)
         assert len(failures) == 1
         assert "has type" in failures[0]
@@ -619,68 +621,46 @@ class TestPolarsEdgeCases:
 class TestPolarsDeltaOperations:
     """Tests for Delta Lake specific operations."""
 
-    def test_vacuum_delta_import_error_handling(self, polars_engine):
+    @pytest.fixture
+    def mock_deltalake_import_error(self):
+        """Context manager to mock deltalake import failure."""
+        import sys
+
+        original_deltalake = sys.modules.get("deltalake")
+        original_import = builtins.__import__
+
+        # Remove deltalake from modules to simulate ImportError
+        if "deltalake" in sys.modules:
+            del sys.modules["deltalake"]
+
+        # Mock builtins.__import__ to raise ImportError for deltalake
+        def mock_import(name, *args, **kwargs):
+            if name == "deltalake":
+                raise ImportError("No module named 'deltalake'")
+            return original_import(name, *args, **kwargs)
+
+        builtins.__import__ = mock_import
+
+        yield
+
+        # Restore original import and deltalake module
+        builtins.__import__ = original_import
+        if original_deltalake:
+            sys.modules["deltalake"] = original_deltalake
+
+    def test_vacuum_delta_import_error_handling(self, polars_engine, mock_deltalake_import_error):
         """Test vacuum_delta raises proper error when deltalake not available."""
-        # Mock the import to fail
-        import sys
-        import importlib
+        connection = MockConnection()
+        with pytest.raises(ImportError, match="Delta Lake support requires"):
+            polars_engine.vacuum_delta(connection, path="test_path")
 
-        # Save original deltalake module if it exists
-        original_deltalake = sys.modules.get("deltalake")
-
-        try:
-            # Remove deltalake from modules to simulate ImportError
-            if "deltalake" in sys.modules:
-                del sys.modules["deltalake"]
-
-            # Mock builtins.__import__ to raise ImportError for deltalake
-            original_import = builtins.__import__
-
-            def mock_import(name, *args, **kwargs):
-                if name == "deltalake":
-                    raise ImportError("No module named 'deltalake'")
-                return original_import(name, *args, **kwargs)
-
-            builtins.__import__ = mock_import
-
-            connection = MockConnection()
-            with pytest.raises(ImportError, match="Delta Lake support requires"):
-                polars_engine.vacuum_delta(connection, path="test_path")
-
-        finally:
-            # Restore original import and deltalake module
-            builtins.__import__ = original_import
-            if original_deltalake:
-                sys.modules["deltalake"] = original_deltalake
-
-    def test_get_delta_history_import_error_handling(self, polars_engine):
+    def test_get_delta_history_import_error_handling(
+        self, polars_engine, mock_deltalake_import_error
+    ):
         """Test get_delta_history raises proper error when deltalake not available."""
-        import sys
-        import importlib
-
-        original_deltalake = sys.modules.get("deltalake")
-
-        try:
-            if "deltalake" in sys.modules:
-                del sys.modules["deltalake"]
-
-            original_import = builtins.__import__
-
-            def mock_import(name, *args, **kwargs):
-                if name == "deltalake":
-                    raise ImportError("No module named 'deltalake'")
-                return original_import(name, *args, **kwargs)
-
-            builtins.__import__ = mock_import
-
-            connection = MockConnection()
-            with pytest.raises(ImportError, match="Delta Lake support requires"):
-                polars_engine.get_delta_history(connection, path="test_path")
-
-        finally:
-            builtins.__import__ = original_import
-            if original_deltalake:
-                sys.modules["deltalake"] = original_deltalake
+        connection = MockConnection()
+        with pytest.raises(ImportError, match="Delta Lake support requires"):
+            polars_engine.get_delta_history(connection, path="test_path")
 
     def test_maintain_table_disabled(self, polars_engine):
         """Test maintain_table does nothing when config is disabled."""
