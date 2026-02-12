@@ -482,7 +482,7 @@ def generate_surrogate_key(context: EngineContext, params: SurrogateKeyParams) -
     # 1. Build the concatenation expression
     # We must cast to string and coalesce nulls
 
-    def safe_col(col, quote_char):
+    def safe_col(col: str, quote_char: str) -> str:
         # Spark/DuckDB cast syntax slightly different but standard SQL CAST(x AS STRING) usually works
         # Spark: cast(col as string) with backticks for quoting
         # DuckDB: cast(col as varchar) with double quotes for quoting
@@ -568,7 +568,7 @@ def generate_numeric_key(context: EngineContext, params: NumericKeyParams) -> En
     """
     from odibi.enums import EngineType
 
-    def safe_col(col, quote_char):
+    def safe_col(col: str, quote_char: str) -> str:
         # Normalize: TRIM whitespace, then treat empty string and NULL as equivalent
         return f"COALESCE(NULLIF(TRIM(CAST({quote_char}{col}{quote_char} AS STRING)), ''), '')"
 
