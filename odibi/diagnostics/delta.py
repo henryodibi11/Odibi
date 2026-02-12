@@ -237,7 +237,7 @@ def _get_delta_diff_spark(
         sample_added=added_rows,
         sample_removed=removed_rows,
         sample_updated=updated_rows,
-        operations_between=operations,
+        operations=operations,
     )
 
 

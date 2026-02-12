@@ -75,7 +75,8 @@ class AzureADLS(BaseConnection):
         self.client_id = client_id
         self.client_secret = client_secret
 
-        self._cached_key: Optional[str] = None
+        self._cached_storage_key: Optional[str] = None
+        self._cached_client_secret: Optional[str] = None
         self._cache_lock = threading.Lock()
 
         if validate:
@@ -230,13 +231,13 @@ class AzureADLS(BaseConnection):
 
         with self._cache_lock:
             # Return cached key if available (double-check inside lock)
-            if self._cached_key:
+            if self._cached_storage_key:
                 ctx.debug(
                     "Using cached storage key",
                     account=self.account,
                     container=self.container,
                 )
-                return self._cached_key
+                return self._cached_storage_key
 
             if self.auth_mode == "key_vault":
                 ctx.debug(
@@ -282,14 +283,14 @@ class AzureADLS(BaseConnection):
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(_fetch)
                     try:
-                        self._cached_key = future.result(timeout=timeout)
-                        logger.register_secret(self._cached_key)
+                        self._cached_storage_key = future.result(timeout=timeout)
+                        logger.register_secret(self._cached_storage_key)
                         ctx.info(
                             "Successfully fetched storage key from Key Vault",
                             account=self.account,
                             key_vault_name=self.key_vault_name,
                         )
-                        return self._cached_key
+                        return self._cached_storage_key
                     except concurrent.futures.TimeoutError:
                         ctx.error(
                             "Key Vault fetch timed out",
@@ -315,9 +316,9 @@ class AzureADLS(BaseConnection):
                 ctx.debug(
                     "Using SAS token",
                     account=self.account,
-                    from_cache=bool(self._cached_key),
+                    from_cache=bool(self._cached_storage_key),
                 )
-                return self._cached_key or self.sas_token
+                return self._cached_storage_key or self.sas_token
 
             # For other modes (SP, MI), we don't use an account key
             ctx.debug(
@@ -329,7 +330,7 @@ class AzureADLS(BaseConnection):
 
     def get_client_secret(self) -> Optional[str]:
         """Get Service Principal client secret (cached or literal)."""
-        return self._cached_key or self.client_secret
+        return self._cached_client_secret or self.client_secret
 
     def pandas_storage_options(self) -> Dict[str, Any]:
         """Get storage options for pandas/fsspec.

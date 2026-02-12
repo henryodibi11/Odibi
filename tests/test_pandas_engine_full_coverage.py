@@ -807,3 +807,582 @@ class TestPandasEngineDeltaUtilities:
         assert called["version"] == 3
         assert "p" in called["path"]
         assert called["storage_options"]["from_conn"] == "C1"
+
+
+# ========================
+# Materialize
+# ========================
+
+
+class TestMaterialize:
+    """Test materialize method for LazyDataset."""
+
+    def test_materialize_dataframe_passthrough(self, engine):
+        """Materialize on regular DataFrame returns it unchanged."""
+        df = pd.DataFrame({"x": [1, 2, 3]})
+        result = engine.materialize(df)
+        assert result is df
+
+    def test_materialize_lazy_dataset(self, engine, tmp_path):
+        """Materialize LazyDataset calls _read_file."""
+        from odibi.engine.pandas_engine import LazyDataset
+
+        # Create engine without arrow to avoid PyArrow reshape issue
+        engine_no_arrow = PandasEngine(config={"performance": {"use_arrow": False}})
+
+        csv_path = tmp_path / "data.csv"
+        pd.DataFrame({"a": [1, 2]}).to_csv(csv_path, index=False)
+
+        lazy = LazyDataset(path=str(csv_path), format="csv", options={})
+
+        result = engine_no_arrow.materialize(lazy)
+        assert isinstance(result, pd.DataFrame)
+        assert list(result.columns) == ["a"]
+        assert len(result) == 2
+
+
+# ========================
+# Anonymize
+# ========================
+
+
+class TestAnonymize:
+    """Test anonymize method for PII protection."""
+
+    def test_anonymize_hash_without_salt(self, engine):
+        """Hash method creates consistent hashes without salt."""
+        df = pd.DataFrame({"name": ["Alice", "Bob"], "age": [30, 25]})
+        result = engine.anonymize(df, columns=["name"], method="hash")
+
+        # Check that values are hashed (64 char hex)
+        assert len(result["name"][0]) == 64
+        assert len(result["name"][1]) == 64
+        assert result["name"][0] != "Alice"
+        # Age column unchanged
+        assert list(result["age"]) == [30, 25]
+
+    def test_anonymize_hash_with_salt(self, engine):
+        """Hash method with salt produces different hashes."""
+        df = pd.DataFrame({"ssn": ["123-45-6789"]})
+        result1 = engine.anonymize(df, columns=["ssn"], method="hash", salt="salt1")
+        result2 = engine.anonymize(df, columns=["ssn"], method="hash", salt="salt2")
+
+        assert result1["ssn"][0] != result2["ssn"][0]
+
+    def test_anonymize_hash_preserves_nulls(self, engine):
+        """Hash method preserves null values."""
+        df = pd.DataFrame({"email": ["user@test.com", None, "admin@test.com"]})
+        result = engine.anonymize(df, columns=["email"], method="hash")
+
+        assert pd.isna(result["email"][1])
+        assert not pd.isna(result["email"][0])
+        assert not pd.isna(result["email"][2])
+
+    def test_anonymize_mask_last_four(self, engine):
+        """Mask method exposes last 4 characters."""
+        df = pd.DataFrame({"card": ["1234567890123456", "9876543210"]})
+        result = engine.anonymize(df, columns=["card"], method="mask")
+
+        assert result["card"][0] == "************3456"
+        assert result["card"][1] == "******3210"
+
+    def test_anonymize_mask_preserves_nulls(self, engine):
+        """Mask method preserves null values."""
+        df = pd.DataFrame({"phone": ["555-1234", None]})
+        result = engine.anonymize(df, columns=["phone"], method="mask")
+
+        assert result["phone"][0] == "****1234"
+        assert pd.isna(result["phone"][1])
+
+    def test_anonymize_redact(self, engine):
+        """Redact method replaces all values."""
+        df = pd.DataFrame({"secret": ["classified", "top_secret"], "public": [1, 2]})
+        result = engine.anonymize(df, columns=["secret"], method="redact")
+
+        assert all(result["secret"] == "[REDACTED]")
+        assert list(result["public"]) == [1, 2]
+
+    def test_anonymize_missing_column_skipped(self, engine):
+        """Anonymize skips columns that don't exist."""
+        df = pd.DataFrame({"a": [1, 2]})
+        result = engine.anonymize(df, columns=["a", "nonexistent"], method="redact")
+
+        assert all(result["a"] == "[REDACTED]")
+        assert "nonexistent" not in result.columns
+
+
+# ========================
+# Harmonize Schema
+# ========================
+
+
+class TestHarmonizeSchema:
+    """Test harmonize_schema method."""
+
+    def test_harmonize_schema_evolve_add_missing(self, engine):
+        """EVOLVE mode with ADD_NULLABLE adds missing columns."""
+        from odibi.config import SchemaMode, OnMissingColumns, OnNewColumns
+
+        class Policy:
+            mode = SchemaMode.EVOLVE
+            on_missing_columns = OnMissingColumns.FILL_NULL
+            on_new_columns = OnNewColumns.ADD_NULLABLE
+
+        df = pd.DataFrame({"a": [1, 2]})
+        target_schema = {"a": "int64", "b": "int64", "c": "int64"}
+
+        result = engine.harmonize_schema(df, target_schema, Policy())
+        assert set(result.columns) == {"a", "b", "c"}
+        assert pd.isna(result["b"]).all()
+        assert pd.isna(result["c"]).all()
+
+    def test_harmonize_schema_enforce_drops_new(self, engine):
+        """ENFORCE mode drops new columns not in target."""
+        from odibi.config import SchemaMode, OnMissingColumns, OnNewColumns
+
+        class Policy:
+            mode = SchemaMode.ENFORCE
+            on_missing_columns = OnMissingColumns.FILL_NULL
+            on_new_columns = OnNewColumns.IGNORE
+
+        df = pd.DataFrame({"a": [1, 2], "b": [3, 4], "extra": [5, 6]})
+        target_schema = {"a": "int64", "b": "int64"}
+
+        result = engine.harmonize_schema(df, target_schema, Policy())
+        assert list(result.columns) == ["a", "b"]
+        assert "extra" not in result.columns
+
+    def test_harmonize_schema_fail_on_missing(self, engine):
+        """FAIL on missing columns raises ValueError."""
+        from odibi.config import SchemaMode, OnMissingColumns, OnNewColumns
+
+        class Policy:
+            mode = SchemaMode.ENFORCE
+            on_missing_columns = OnMissingColumns.FAIL
+            on_new_columns = OnNewColumns.IGNORE
+
+        df = pd.DataFrame({"a": [1, 2]})
+        target_schema = {"a": "int64", "b": "int64"}
+
+        with pytest.raises(ValueError, match="Missing columns"):
+            engine.harmonize_schema(df, target_schema, Policy())
+
+    def test_harmonize_schema_fail_on_new(self, engine):
+        """FAIL on new columns raises ValueError."""
+        from odibi.config import SchemaMode, OnMissingColumns, OnNewColumns
+
+        class Policy:
+            mode = SchemaMode.ENFORCE
+            on_missing_columns = OnMissingColumns.FILL_NULL
+            on_new_columns = OnNewColumns.FAIL
+
+        df = pd.DataFrame({"a": [1, 2], "extra": [3, 4]})
+        target_schema = {"a": "int64"}
+
+        with pytest.raises(ValueError, match="New columns"):
+            engine.harmonize_schema(df, target_schema, Policy())
+
+
+# ========================
+# Validate Data
+# ========================
+
+
+class TestValidateData:
+    """Test validate_data method."""
+
+    def test_validate_data_empty_check(self, engine):
+        """not_empty validation fails on empty DataFrame."""
+        from types import SimpleNamespace
+
+        config = SimpleNamespace(
+            not_empty=True, no_nulls=[], schema_validation=None, ranges={}, allowed_values={}
+        )
+
+        df = pd.DataFrame({"a": []})
+        failures = engine.validate_data(df, config)
+
+        assert len(failures) == 1
+        assert "empty" in failures[0].lower()
+
+    def test_validate_data_no_nulls(self, engine):
+        """no_nulls validation detects null values."""
+        from types import SimpleNamespace
+
+        config = SimpleNamespace(
+            not_empty=False,
+            no_nulls=["name", "age"],
+            schema_validation=None,
+            ranges={},
+            allowed_values={},
+        )
+
+        df = pd.DataFrame({"name": ["Alice", None], "age": [30, 25]})
+        failures = engine.validate_data(df, config)
+
+        assert len(failures) == 1
+        assert "name" in failures[0]
+        assert "null" in failures[0].lower()
+
+    def test_validate_data_ranges(self, engine):
+        """Range validation detects out-of-range values."""
+        from types import SimpleNamespace
+
+        config = SimpleNamespace(
+            not_empty=False,
+            no_nulls=[],
+            schema_validation=None,
+            ranges={"age": {"min": 18, "max": 65}},
+            allowed_values={},
+        )
+
+        df = pd.DataFrame({"age": [17, 30, 70]})
+        failures = engine.validate_data(df, config)
+
+        assert len(failures) == 2
+        assert any("< 18" in f for f in failures)
+        assert any("> 65" in f for f in failures)
+
+    def test_validate_data_allowed_values(self, engine):
+        """allowed_values validation detects invalid values."""
+        from types import SimpleNamespace
+
+        config = SimpleNamespace(
+            not_empty=False,
+            no_nulls=[],
+            schema_validation=None,
+            ranges={},
+            allowed_values={"status": ["active", "inactive"]},
+        )
+
+        df = pd.DataFrame({"status": ["active", "deleted", "inactive"]})
+        failures = engine.validate_data(df, config)
+
+        assert len(failures) == 1
+        assert "status" in failures[0]
+        assert "invalid" in failures[0].lower()
+
+    def test_validate_data_all_pass(self, engine):
+        """Valid data returns no failures."""
+        from types import SimpleNamespace
+
+        config = SimpleNamespace(
+            not_empty=True,
+            no_nulls=["name"],
+            schema_validation=None,
+            ranges={"age": {"min": 0, "max": 150}},
+            allowed_values={"role": ["admin", "user"]},
+        )
+
+        df = pd.DataFrame({"name": ["Alice", "Bob"], "age": [30, 25], "role": ["admin", "user"]})
+        failures = engine.validate_data(df, config)
+
+        assert len(failures) == 0
+
+
+# ========================
+# Get Sample
+# ========================
+
+
+class TestGetSample:
+    """Test get_sample method."""
+
+    def test_get_sample_dataframe(self, engine):
+        """get_sample returns first n rows as dict list."""
+        df = pd.DataFrame({"x": [1, 2, 3, 4, 5]})
+        result = engine.get_sample(df, n=3)
+
+        assert len(result) == 3
+        assert result[0] == {"x": 1}
+        assert result[2] == {"x": 3}
+
+    def test_get_sample_default_n(self, engine):
+        """get_sample defaults to 10 rows."""
+        df = pd.DataFrame({"x": range(100)})
+        result = engine.get_sample(df)
+
+        assert len(result) == 10
+
+    def test_get_sample_fewer_rows(self, engine):
+        """get_sample returns all rows when df has fewer than n."""
+        df = pd.DataFrame({"x": [1, 2]})
+        result = engine.get_sample(df, n=10)
+
+        assert len(result) == 2
+
+
+# ========================
+# Table Exists
+# ========================
+
+
+class TestTableExists:
+    """Test table_exists method."""
+
+    def test_table_exists_true(self, engine, tmp_path):
+        """table_exists returns True for existing path."""
+        file_path = tmp_path / "data.csv"
+        file_path.write_text("a,b\n1,2\n")
+
+        conn = FakeConnection(tmp_path)
+        result = engine.table_exists(conn, path="data.csv")
+
+        assert result is True
+
+    def test_table_exists_false(self, engine, tmp_path):
+        """table_exists returns False for non-existing path."""
+        conn = FakeConnection(tmp_path)
+        result = engine.table_exists(conn, path="nonexistent.csv")
+
+        assert result is False
+
+    def test_table_exists_no_path(self, engine, tmp_path):
+        """table_exists returns False when no path provided."""
+        conn = FakeConnection(tmp_path)
+        result = engine.table_exists(conn)
+
+        assert result is False
+
+
+# ========================
+# Profile Nulls
+# ========================
+
+
+class TestProfileNulls:
+    """Test profile_nulls method."""
+
+    def test_profile_nulls_no_nulls(self, engine):
+        """profile_nulls returns 0.0 for columns without nulls."""
+        df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        result = engine.profile_nulls(df)
+
+        assert result == {"a": 0.0, "b": 0.0}
+
+    def test_profile_nulls_some_nulls(self, engine):
+        """profile_nulls returns correct percentages."""
+        df = pd.DataFrame({"a": [1, None, 3, None], "b": [None, None, None, None]})
+        result = engine.profile_nulls(df)
+
+        assert result["a"] == 0.5
+        assert result["b"] == 1.0
+
+    def test_profile_nulls_empty_dataframe(self, engine):
+        """profile_nulls works on empty DataFrame."""
+        df = pd.DataFrame({"a": [], "b": []})
+        result = engine.profile_nulls(df)
+
+        # Empty DataFrames return NaN for mean, which should be handled
+        assert "a" in result
+        assert "b" in result
+
+
+# ========================
+# Filter Greater Than
+# ========================
+
+
+class TestFilterGreaterThan:
+    """Test filter_greater_than method."""
+
+    def test_filter_greater_than_numeric(self, engine):
+        """filter_greater_than works with numeric columns."""
+        df = pd.DataFrame({"age": [10, 20, 30, 40]})
+        result = engine.filter_greater_than(df, "age", 25)
+
+        assert len(result) == 2
+        assert list(result["age"]) == [30, 40]
+
+    def test_filter_greater_than_datetime_column(self, engine):
+        """filter_greater_than handles datetime columns."""
+        df = pd.DataFrame({"date": pd.to_datetime(["2020-01-01", "2021-01-01", "2022-01-01"])})
+        result = engine.filter_greater_than(df, "date", "2020-12-31")
+
+        assert len(result) == 2
+
+    def test_filter_greater_than_string_to_datetime(self, engine):
+        """filter_greater_than converts string columns to datetime."""
+        df = pd.DataFrame({"date_str": ["2020-01-01", "2021-01-01", "2022-01-01"]})
+        result = engine.filter_greater_than(df, "date_str", "2020-12-31")
+
+        assert len(result) == 2
+
+    def test_filter_greater_than_missing_column(self, engine):
+        """filter_greater_than raises ValueError for missing column."""
+        df = pd.DataFrame({"a": [1, 2, 3]})
+
+        with pytest.raises(ValueError, match="not found"):
+            engine.filter_greater_than(df, "nonexistent", 5)
+
+
+# ========================
+# Filter Coalesce
+# ========================
+
+
+class TestFilterCoalesce:
+    """Test filter_coalesce method."""
+
+    def test_filter_coalesce_col1_priority(self, engine):
+        """filter_coalesce uses col1 when both present."""
+        df = pd.DataFrame({"primary": [10, None, 30], "fallback": [100, 200, 300]})
+        result = engine.filter_coalesce(df, "primary", "fallback", ">=", 25)
+
+        # Row 0: 10 < 25 (excluded)
+        # Row 1: 200 >= 25 (included, fallback to col2)
+        # Row 2: 30 >= 25 (included)
+        assert len(result) == 2
+
+    def test_filter_coalesce_fallback_to_col2(self, engine):
+        """filter_coalesce uses col2 when col1 is null."""
+        df = pd.DataFrame({"col1": [None, None], "col2": [10, 20]})
+        result = engine.filter_coalesce(df, "col1", "col2", ">", 15)
+
+        assert len(result) == 1
+        assert result["col2"].iloc[0] == 20
+
+    def test_filter_coalesce_missing_col2(self, engine):
+        """filter_coalesce works when col2 doesn't exist."""
+        df = pd.DataFrame({"col1": [10, 20, 30]})
+        result = engine.filter_coalesce(df, "col1", "nonexistent", ">=", 20)
+
+        assert len(result) == 2
+
+    def test_filter_coalesce_operators(self, engine):
+        """filter_coalesce supports all operators."""
+        df = pd.DataFrame({"a": [10, 20, 30], "b": [100, 200, 300]})
+
+        # Test >=
+        result = engine.filter_coalesce(df, "a", "b", ">=", 20)
+        assert len(result) == 2
+
+        # Test >
+        result = engine.filter_coalesce(df, "a", "b", ">", 20)
+        assert len(result) == 1
+
+        # Test <=
+        result = engine.filter_coalesce(df, "a", "b", "<=", 20)
+        assert len(result) == 2
+
+        # Test <
+        result = engine.filter_coalesce(df, "a", "b", "<", 20)
+        assert len(result) == 1
+
+        # Test ==
+        result = engine.filter_coalesce(df, "a", "b", "==", 20)
+        assert len(result) == 1
+
+    def test_filter_coalesce_datetime_conversion(self, engine):
+        """filter_coalesce converts strings to datetime."""
+        df = pd.DataFrame(
+            {"date1": ["2020-01-01", "2021-01-01"], "date2": ["2019-01-01", "2022-01-01"]}
+        )
+        result = engine.filter_coalesce(df, "date1", "date2", ">=", "2020-06-01")
+
+        assert len(result) == 1
+
+    def test_filter_coalesce_missing_col1(self, engine):
+        """filter_coalesce raises ValueError when col1 missing."""
+        df = pd.DataFrame({"a": [1, 2]})
+
+        with pytest.raises(ValueError, match="not found"):
+            engine.filter_coalesce(df, "nonexistent", "a", ">=", 5)
+
+    def test_filter_coalesce_invalid_operator(self, engine):
+        """filter_coalesce raises ValueError for invalid operator."""
+        df = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
+
+        with pytest.raises(ValueError, match="Unsupported operator"):
+            engine.filter_coalesce(df, "a", "b", "!=", 5)
+
+
+# ========================
+# Add Write Metadata
+# ========================
+
+
+class TestAddWriteMetadata:
+    """Test add_write_metadata method."""
+
+    def test_add_write_metadata_all_defaults(self, engine):
+        """add_write_metadata with True adds enabled metadata."""
+        df = pd.DataFrame({"a": [1, 2]})
+        result = engine.add_write_metadata(
+            df,
+            metadata_config=True,
+            source_connection="my_conn",
+            source_table="my_table",
+            source_path="/path/to/file.csv",
+            is_file_source=True,
+        )
+
+        # Default WriteMetadataConfig enables: extracted_at, source_file
+        # but NOT source_connection or source_table
+        assert "_extracted_at" in result.columns
+        assert "_source_file" in result.columns
+        # These are False by default
+        assert "_source_connection" not in result.columns
+        assert "_source_table" not in result.columns
+        assert all(result["_source_file"] == "/path/to/file.csv")
+
+    def test_add_write_metadata_file_only_for_file_source(self, engine):
+        """add_write_metadata only adds source_file for file sources."""
+        from odibi.config import WriteMetadataConfig
+
+        df = pd.DataFrame({"a": [1]})
+        config = WriteMetadataConfig(
+            extracted_at=False, source_file=True, source_connection=False, source_table=False
+        )
+
+        # File source
+        result1 = engine.add_write_metadata(
+            df, config, source_path="/file.csv", is_file_source=True
+        )
+        assert "_source_file" in result1.columns
+
+        # SQL source
+        result2 = engine.add_write_metadata(
+            df, config, source_path="/file.csv", is_file_source=False
+        )
+        assert "_source_file" not in result2.columns
+
+    def test_add_write_metadata_selective_config(self, engine):
+        """add_write_metadata respects config selections."""
+        from odibi.config import WriteMetadataConfig
+
+        df = pd.DataFrame({"a": [1]})
+        config = WriteMetadataConfig(
+            extracted_at=True, source_file=False, source_connection=True, source_table=False
+        )
+
+        result = engine.add_write_metadata(
+            df,
+            config,
+            source_connection="conn1",
+            source_table="table1",
+            source_path="/file.csv",
+            is_file_source=True,
+        )
+
+        assert "_extracted_at" in result.columns
+        assert "_source_connection" in result.columns
+        assert "_source_file" not in result.columns
+        assert "_source_table" not in result.columns
+
+    def test_add_write_metadata_none_returns_unchanged(self, engine):
+        """add_write_metadata with None returns DataFrame unchanged."""
+        df = pd.DataFrame({"a": [1, 2]})
+        result = engine.add_write_metadata(df, metadata_config=None)
+
+        assert result.equals(df)
+        assert "_extracted_at" not in result.columns
+
+    def test_add_write_metadata_preserves_original(self, engine):
+        """add_write_metadata doesn't modify original DataFrame."""
+        df = pd.DataFrame({"a": [1, 2]})
+        original_cols = df.columns.tolist()
+
+        engine.add_write_metadata(df, metadata_config=True, is_file_source=False)
+
+        assert df.columns.tolist() == original_cols

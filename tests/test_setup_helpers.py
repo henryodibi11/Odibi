@@ -273,7 +273,7 @@ class TestConfigureConnectionsParallel:
         )
 
         assert len(errors) == 0
-        assert configured["bronze"]._cached_key == "secret-key-123"
+        assert configured["bronze"]._cached_storage_key == "secret-key-123"
 
     @patch("odibi.utils.setup_helpers.fetch_keyvault_secrets_parallel")
     def test_configuration_with_errors(self, mock_fetch):

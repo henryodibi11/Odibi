@@ -3434,7 +3434,11 @@ class SqlServerMergeWriter:
 
         elif auth_mode == "key_vault":
             # Key vault mode - try to get the resolved key
-            resolved_key = getattr(staging_connection, "_cached_key", None)
+            resolved_key = getattr(
+                staging_connection,
+                "_cached_storage_key",
+                getattr(staging_connection, "_cached_key", None),
+            )
             if resolved_key:
                 self._create_credential_with_key(credential_name, resolved_key)
             else:

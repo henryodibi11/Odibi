@@ -226,7 +226,9 @@ def configure_connections_parallel(
                 warnings.warn(error_msg, UserWarning)
         elif result.secret_value:
             conn = connections[name]
-            if hasattr(conn, "_cached_key"):
+            if hasattr(conn, "_cached_storage_key"):
+                conn._cached_storage_key = result.secret_value
+            elif hasattr(conn, "_cached_key"):
                 conn._cached_key = result.secret_value
 
     return connections, errors
