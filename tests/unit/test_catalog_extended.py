@@ -1,14 +1,12 @@
 """Extended unit tests for catalog.py - batch operations, edge cases, and error handling."""
 
 import json
-from datetime import date, datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch
+from datetime import date, datetime, timezone
 
-import pandas as pd
 import pytest
 
 from odibi.catalog import CatalogManager
-from odibi.config import NodeConfig, PipelineConfig, SystemConfig, TransformConfig
+from odibi.config import NodeConfig, SystemConfig, TransformConfig
 from odibi.engine.pandas_engine import PandasEngine
 
 

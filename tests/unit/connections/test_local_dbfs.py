@@ -133,14 +133,14 @@ class TestLocalDBFSFileOperations:
         """Should support writing and reading files."""
         conn = LocalDBFS(root=tmp_path)
         path = "dbfs:/FileStore/test_data.txt"
-        
+
         conn.ensure_dir(path)
         local_path = conn.get_path(path)
-        
+
         # Write file
         content = "test content"
         Path(local_path).write_text(content)
-        
+
         # Read file
         assert Path(local_path).read_text() == content
 
@@ -148,13 +148,13 @@ class TestLocalDBFSFileOperations:
         """Should support writing CSV files."""
         conn = LocalDBFS(root=tmp_path)
         path = "dbfs:/FileStore/bronze/data.csv"
-        
+
         conn.ensure_dir(path)
         local_path = conn.get_path(path)
-        
+
         csv_content = "id,name\n1,Alice\n2,Bob\n"
         Path(local_path).write_text(csv_content)
-        
+
         assert Path(local_path).exists()
         assert "Alice" in Path(local_path).read_text()
 
@@ -162,13 +162,13 @@ class TestLocalDBFSFileOperations:
         """Should support writing binary files."""
         conn = LocalDBFS(root=tmp_path)
         path = "dbfs:/FileStore/data.parquet"
-        
+
         conn.ensure_dir(path)
         local_path = conn.get_path(path)
-        
+
         binary_content = b"\x00\x01\x02\x03"
         Path(local_path).write_bytes(binary_content)
-        
+
         assert Path(local_path).read_bytes() == binary_content
 
 
@@ -179,9 +179,9 @@ class TestLocalDBFSEdgeCases:
         """Should not create file when just resolving path."""
         conn = LocalDBFS(root=tmp_path)
         path = "dbfs:/FileStore/nonexistent.csv"
-        
+
         local_path = conn.get_path(path)
-        
+
         # Path should be returned but file should not exist
         assert not Path(local_path).exists()
 
@@ -189,9 +189,9 @@ class TestLocalDBFSEdgeCases:
         """Should not create directories when resolving path."""
         conn = LocalDBFS(root=tmp_path)
         path = "dbfs:/FileStore/nested/deep/data.csv"
-        
+
         local_path = conn.get_path(path)
-        
+
         # Parent directory should not exist
         assert not Path(local_path).parent.exists()
 
@@ -200,9 +200,9 @@ class TestLocalDBFSEdgeCases:
         conn = LocalDBFS(root=tmp_path)
         # Note: LocalDBFS doesn't normalize backslashes, it treats them as-is
         path = r"dbfs:/FileStore\data.csv"
-        
+
         local_path = conn.get_path(path)
-        
+
         # Path should be resolved (backslash becomes part of path)
         assert "FileStore" in local_path
 
@@ -210,10 +210,10 @@ class TestLocalDBFSEdgeCases:
         """Should handle paths with spaces."""
         conn = LocalDBFS(root=tmp_path)
         path = "dbfs:/FileStore/my data/file with spaces.csv"
-        
+
         conn.ensure_dir(path)
         local_path = conn.get_path(path)
-        
+
         # Write and read to ensure it works
         Path(local_path).write_text("test")
         assert Path(local_path).read_text() == "test"
@@ -222,10 +222,10 @@ class TestLocalDBFSEdgeCases:
         """Should handle paths with Unicode characters."""
         conn = LocalDBFS(root=tmp_path)
         path = "dbfs:/FileStore/données_2024.csv"
-        
+
         conn.ensure_dir(path)
         local_path = conn.get_path(path)
-        
+
         # Write and read to ensure it works
         Path(local_path).write_text("données")
         assert Path(local_path).read_text() == "données"
@@ -235,10 +235,10 @@ class TestLocalDBFSEdgeCases:
         conn = LocalDBFS(root=tmp_path)
         # Create a very nested path
         long_path = "dbfs:/FileStore/" + "/".join([f"level{i}" for i in range(20)]) + "/data.csv"
-        
+
         conn.ensure_dir(long_path)
         local_path = conn.get_path(long_path)
-        
+
         assert Path(local_path).parent.exists()
 
 

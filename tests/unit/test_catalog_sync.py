@@ -1,8 +1,7 @@
 """Unit tests for catalog_sync.py - sync operations and edge cases."""
 
-import json
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
@@ -321,7 +320,7 @@ class TestSQLServerOperations:
         """Test that schema creation is attempted."""
         syncer = CatalogSyncer(catalog_manager, sync_config, mock_sql_connection)
 
-        with patch.object(syncer, "_ensure_sql_schema") as mock_ensure:
+        with patch.object(syncer, "_ensure_sql_schema"):
             syncer._ensure_sql_schema = Mock()
             syncer._ensure_sql_table = Mock()
             syncer._read_source_table = Mock(return_value=pd.DataFrame())
@@ -372,7 +371,7 @@ class TestDeltaSync:
         with patch.object(syncer.source, "engine") as mock_engine:
             mock_engine.write = Mock()
 
-            result = syncer._sync_to_delta("meta_runs")
+            syncer._sync_to_delta("meta_runs")
 
             # Expect failure since we're not fully mocking the delta write path
             # In real scenario, this would write to Delta Lake
@@ -479,7 +478,7 @@ class TestSyncStateManagement:
         syncer._update_sync_state = Mock()
         syncer._ensure_sql_views = Mock()
 
-        result = syncer.sync(tables=["meta_runs"])
+        syncer.sync(tables=["meta_runs"])
 
         # _update_sync_state should be called once
         syncer._update_sync_state.assert_called_once()

@@ -108,14 +108,14 @@ class TestGetPassword:
 
         import sys
         from types import ModuleType
-        
+
         # Create mock azure modules
         azure_identity = ModuleType("azure.identity")
         azure_identity.DefaultAzureCredential = mock_credential_class
         azure_keyvault = ModuleType("azure.keyvault")
         azure_keyvault_secrets = ModuleType("azure.keyvault.secrets")
         azure_keyvault_secrets.SecretClient = mock_client_class
-        
+
         sys.modules["azure.identity"] = azure_identity
         sys.modules["azure.keyvault"] = azure_keyvault
         sys.modules["azure.keyvault.secrets"] = azure_keyvault_secrets
@@ -127,8 +127,8 @@ class TestGetPassword:
                 assert password == "vault_password"
                 assert conn._cached_key == "vault_password"
                 mock_client_class.assert_called_once_with(
-                    vault_url="https://myvault.vault.azure.net", 
-                    credential=mock_credential_class.return_value
+                    vault_url="https://myvault.vault.azure.net",
+                    credential=mock_credential_class.return_value,
                 )
                 mock_client.get_secret.assert_called_once_with("mysecret")
                 mock_register.assert_called_once_with("vault_password")
@@ -147,7 +147,9 @@ class TestGetPassword:
             # Missing key_vault_name and secret_name
         )
 
-        with pytest.raises(ValueError, match="key_vault mode requires 'key_vault_name' and 'secret_name'"):
+        with pytest.raises(
+            ValueError, match="key_vault mode requires 'key_vault_name' and 'secret_name'"
+        ):
             conn.get_password()
 
     def test_get_password_key_vault_import_error(self):
@@ -163,13 +165,14 @@ class TestGetPassword:
 
         # Simulate import error by making the import fail
         import builtins
+
         original_import = builtins.__import__
-        
+
         def mock_import(name, *args, **kwargs):
             if name in ("azure.identity", "azure.keyvault.secrets"):
                 raise ImportError("No module named azure")
             return original_import(name, *args, **kwargs)
-        
+
         with patch("builtins.__import__", side_effect=mock_import):
             with pytest.raises(
                 ImportError,
@@ -339,7 +342,9 @@ class TestValidate:
             auth_mode="key_vault",
             secret_name="mysecret",
         )
-        with pytest.raises(ValueError, match="auth_mode='key_vault' requires key_vault_name and secret_name"):
+        with pytest.raises(
+            ValueError, match="auth_mode='key_vault' requires key_vault_name and secret_name"
+        ):
             conn.validate()
 
     def test_validate_fails_key_vault_without_username(self):
@@ -387,17 +392,19 @@ class TestGetEngine:
         # Mock the create_engine function at the point where it's imported in azure_sql
         import sys
         from types import ModuleType
-        
+
         # Create mock sqlalchemy module
         sqlalchemy_mod = ModuleType("sqlalchemy")
         sqlalchemy_mod.create_engine = MagicMock(return_value=mock_engine)
         sys.modules["sqlalchemy"] = sqlalchemy_mod
-        
+
         # Also need urllib.parse for quote_plus
         if "urllib" not in sys.modules:
             urllib_mod = ModuleType("urllib")
             urllib_parse = ModuleType("urllib.parse")
-            urllib_parse.quote_plus = MagicMock(side_effect=lambda x: x.replace("=", "%3D").replace(";", "%3B").replace(":", "%3A"))
+            urllib_parse.quote_plus = MagicMock(
+                side_effect=lambda x: x.replace("=", "%3D").replace(";", "%3B").replace(":", "%3A")
+            )
             urllib_mod.parse = urllib_parse
             sys.modules["urllib"] = urllib_mod
             sys.modules["urllib.parse"] = urllib_parse
@@ -427,15 +434,18 @@ class TestGetEngine:
 
         # Simulate import error by making the import fail
         import builtins
+
         original_import = builtins.__import__
-        
+
         def mock_import(name, *args, **kwargs):
             if name in ("sqlalchemy", "urllib.parse"):
                 raise ImportError("No module named sqlalchemy")
             return original_import(name, *args, **kwargs)
-        
+
         with patch("builtins.__import__", side_effect=mock_import):
-            with pytest.raises(ConnectionError, match="Required packages 'sqlalchemy' or 'pyodbc' not found"):
+            with pytest.raises(
+                ConnectionError, match="Required packages 'sqlalchemy' or 'pyodbc' not found"
+            ):
                 conn.get_engine()
 
     def test_get_engine_connection_error(self):
@@ -450,12 +460,12 @@ class TestGetEngine:
 
         import sys
         from types import ModuleType
-        
+
         # Create mock sqlalchemy module
         sqlalchemy_mod = ModuleType("sqlalchemy")
         sqlalchemy_mod.create_engine = MagicMock(return_value=mock_engine)
         sys.modules["sqlalchemy"] = sqlalchemy_mod
-        
+
         # Also need urllib.parse
         if "urllib" not in sys.modules:
             urllib_mod = ModuleType("urllib")
@@ -501,7 +511,9 @@ class TestReadSql:
 
             assert len(result) == 2
             assert list(result.columns) == ["id", "name"]
-            mock_read_sql.assert_called_once_with("SELECT * FROM users", mock_connection, params=None)
+            mock_read_sql.assert_called_once_with(
+                "SELECT * FROM users", mock_connection, params=None
+            )
 
     def test_read_sql_with_params(self):
         """Test SQL query with parameters."""
@@ -674,7 +686,7 @@ class TestExecute:
         # Mock the text function from sqlalchemy
         import sys
         from types import ModuleType
-        
+
         sqlalchemy_mod = ModuleType("sqlalchemy")
         sqlalchemy_mod.text = MagicMock(return_value="INSERT INTO users VALUES (1, 'Alice')")
         sys.modules["sqlalchemy"] = sqlalchemy_mod
@@ -709,7 +721,7 @@ class TestExecute:
 
         import sys
         from types import ModuleType
-        
+
         sqlalchemy_mod = ModuleType("sqlalchemy")
         sqlalchemy_mod.text = MagicMock(return_value="UPDATE users SET name = :name WHERE id = :id")
         sys.modules["sqlalchemy"] = sqlalchemy_mod
@@ -749,7 +761,7 @@ class TestExecute:
 
         import sys
         from types import ModuleType
-        
+
         sqlalchemy_mod = ModuleType("sqlalchemy")
         sqlalchemy_mod.text = MagicMock(return_value="SELECT * FROM users")
         sys.modules["sqlalchemy"] = sqlalchemy_mod
@@ -781,7 +793,7 @@ class TestExecute:
 
         import sys
         from types import ModuleType
-        
+
         sqlalchemy_mod = ModuleType("sqlalchemy")
         sqlalchemy_mod.text = MagicMock(return_value="INVALID SQL")
         sys.modules["sqlalchemy"] = sqlalchemy_mod

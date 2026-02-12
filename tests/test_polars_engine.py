@@ -739,7 +739,9 @@ class TestPolarsWriteSql:
                 written_data.append({"if_exists": if_exists})
 
         connection = MockSqlWriteConnection()
-        polars_engine._write_sql(df, connection=connection, table="TestTable", mode="overwrite", options={})
+        polars_engine._write_sql(
+            df, connection=connection, table="TestTable", mode="overwrite", options={}
+        )
 
         assert len(written_data) == 1
         assert written_data[0]["if_exists"] == "replace"
@@ -754,7 +756,9 @@ class TestPolarsWriteSql:
                 written_data.append({"if_exists": if_exists})
 
         connection = MockSqlWriteConnection()
-        polars_engine._write_sql(df, connection=connection, table="TestTable", mode="fail", options={})
+        polars_engine._write_sql(
+            df, connection=connection, table="TestTable", mode="fail", options={}
+        )
 
         assert len(written_data) == 1
         assert written_data[0]["if_exists"] == "fail"
@@ -769,7 +773,9 @@ class TestPolarsWriteSql:
                 written_data.append({"table": table_name, "schema": schema})
 
         connection = MockSqlWriteConnection()
-        polars_engine._write_sql(df, connection=connection, table="Sales.Orders", mode="append", options={})
+        polars_engine._write_sql(
+            df, connection=connection, table="Sales.Orders", mode="append", options={}
+        )
 
         assert len(written_data) == 1
         assert written_data[0]["schema"] == "Sales"
@@ -785,7 +791,9 @@ class TestPolarsWriteSql:
                 written_data.append({"table": table_name, "schema": schema})
 
         connection = MockSqlWriteConnection()
-        polars_engine._write_sql(df, connection=connection, table="Customers", mode="append", options={})
+        polars_engine._write_sql(
+            df, connection=connection, table="Customers", mode="append", options={}
+        )
 
         assert len(written_data) == 1
         assert written_data[0]["schema"] == "dbo"
@@ -797,7 +805,9 @@ class TestPolarsWriteSql:
         connection = MockConnection()  # No write_table method
 
         with pytest.raises(ValueError, match="does not support SQL operations"):
-            polars_engine._write_sql(df, connection=connection, table="TestTable", mode="append", options={})
+            polars_engine._write_sql(
+                df, connection=connection, table="TestTable", mode="append", options={}
+            )
 
     def test_write_sql_no_table_provided(self, polars_engine):
         """Test _write_sql raises error when no table provided."""
@@ -810,7 +820,9 @@ class TestPolarsWriteSql:
         connection = MockSqlWriteConnection()
 
         with pytest.raises(ValueError, match="table' parameter is required"):
-            polars_engine._write_sql(df, connection=connection, table=None, mode="append", options={})
+            polars_engine._write_sql(
+                df, connection=connection, table=None, mode="append", options={}
+            )
 
     def test_write_sql_with_chunksize_option(self, polars_engine):
         """Test _write_sql respects chunksize option."""
@@ -839,7 +851,9 @@ class TestPolarsWriteSql:
                 written_data.append({"rows": len(df)})
 
         connection = MockSqlWriteConnection()
-        polars_engine._write_sql(lazy_df, connection=connection, table="TestTable", mode="append", options={})
+        polars_engine._write_sql(
+            lazy_df, connection=connection, table="TestTable", mode="append", options={}
+        )
 
         assert len(written_data) == 1
         assert written_data[0]["rows"] == 3
