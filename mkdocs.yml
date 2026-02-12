@@ -142,6 +142,7 @@ nav:
           - Anti-Patterns: patterns/anti_patterns.md
       - Common Tasks:
           - Writing Transformations: guides/writing_transformations.md
+          - Custom Functions Reference: guides/custom_functions.md
           - Variable Substitution: guides/variable_substitution.md
           - Explanation Feature: guides/explanation_feature.md
           - API Data Sources: guides/api_data_sources.md
