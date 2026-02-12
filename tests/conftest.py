@@ -1,4 +1,5 @@
 import sys
+import logging
 import pytest
 
 if sys.platform == "win32":
@@ -61,3 +62,19 @@ def pytest_runtest_call(item):
         test_id = item.nodeid.lower()
         if "spark" in test_id or "delta" in test_id:
             pytest.skip("Skipping Spark/Delta tests on Windows due to missing winutils")
+
+
+@pytest.fixture(autouse=True)
+def configure_logging():
+    """Configure logging to avoid Rich Text object issues in tests."""
+    # Disable Rich handlers and use basic logging
+    root = logging.getLogger()
+    # Remove all Rich handlers
+    for handler in root.handlers[:]:
+        if hasattr(handler, "__class__") and "Rich" in handler.__class__.__name__:
+            root.removeHandler(handler)
+    # Set to WARNING level to reduce noise in tests
+    logging.basicConfig(level=logging.WARNING, format="%(message)s", force=True)
+    yield
+    # Cleanup after test
+    logging.basicConfig(level=logging.INFO, force=True)
