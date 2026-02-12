@@ -409,9 +409,10 @@ def test_drop_columns_empty_list(sample_df):
         except Exception:
             # Column doesn't exist, which is expected
             pass
-    
+
     # Better test: just verify we can drop nothing by selecting all
     from odibi.transformers.sql_core import SelectColumnsParams, select_columns
+
     params = SelectColumnsParams(columns=list(sample_df.columns))
     result_ctx = select_columns(context, params)
     result = result_ctx.df
@@ -615,7 +616,9 @@ def test_coalesce_columns_all_null():
 def test_replace_values_basic(sample_df):
     """Test replacing values in a column."""
     context = setup_context(sample_df)
-    params = ReplaceValuesParams(columns=["status"], mapping={"active": "enabled", "inactive": "disabled"})
+    params = ReplaceValuesParams(
+        columns=["status"], mapping={"active": "enabled", "inactive": "disabled"}
+    )
     result_ctx = replace_values(context, params)
     result = result_ctx.df
 
