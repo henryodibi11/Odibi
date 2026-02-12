@@ -460,7 +460,7 @@ class TestManufacturingEdgeCases:
 
     def test_timer_reset_non_monotonic(self):
         """Test handling of timer resets (non-monotonic timer values).
-        
+
         When a timer resets mid-phase, the phase detects the last plateau value.
         """
         data = {
@@ -738,7 +738,7 @@ class TestManufacturingEdgeCases:
 
     def test_mixed_timer_scales(self):
         """Test phases with vastly different timer scales (seconds vs hours).
-        
+
         When the first reading of LongPhase is above threshold, it's filtered out.
         """
         data = {
@@ -776,7 +776,7 @@ class TestManufacturingEdgeCases:
 class TestOEECalculations:
     """
     Tests for OEE-related calculations using detect_sequential_phases.
-    
+
     Note: The manufacturing module doesn't have dedicated OEE functions,
     but detect_sequential_phases provides the building blocks for OEE:
     - Availability: time_in_active_status / total_time
@@ -820,12 +820,12 @@ class TestOEECalculations:
         running_time = result_df.iloc[0]["CycleTime_running_minutes"]
         fault_time = result_df.iloc[0]["CycleTime_fault_minutes"]
         idle_time = result_df.iloc[0]["CycleTime_idle_minutes"]
-        
+
         # All status times should be present
         assert pd.notna(running_time)
         assert pd.notna(fault_time)
         assert pd.notna(idle_time)
-        
+
         total_time = running_time + fault_time + idle_time
         availability = running_time / total_time if total_time > 0 else 0
         assert 0 <= availability <= 1
