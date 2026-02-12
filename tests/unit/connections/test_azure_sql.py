@@ -124,9 +124,10 @@ class TestGetPassword:
                 "azure.keyvault.secrets": azure_keyvault_secrets,
             },
         ):
-            with patch.object(conn, "_cached_key", None), patch(
-                "odibi.connections.azure_sql.logger"
-            ) as mock_logger:
+            with (
+                patch.object(conn, "_cached_key", None),
+                patch("odibi.connections.azure_sql.logger") as mock_logger,
+            ):
                 password = conn.get_password()
 
                 assert password == "vault_password"
