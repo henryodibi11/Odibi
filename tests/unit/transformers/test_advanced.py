@@ -11,6 +11,7 @@ Tests each public transformer function with:
 import pytest
 import pandas as pd
 import json
+from pydantic import ValidationError
 
 from odibi.context import EngineContext, PandasContext
 from odibi.enums import EngineType
@@ -289,11 +290,10 @@ def test_regex_replace_basic():
     result_ctx = regex_replace(context, params)
     
     # The regex should remove all non-numeric characters
-    # But DuckDB might not fully support all regex patterns the same way
-    # Let's just verify the column was processed
     assert "phone" in result_ctx.df.columns
-    # Verify at least some dashes were removed
-    assert result_ctx.df["phone"].iloc[0] != df["phone"].iloc[0] or "-" not in str(result_ctx.df["phone"].iloc[0])
+    # Verify the phone values were modified
+    assert result_ctx.df["phone"].iloc[0] != df["phone"].iloc[0]
+    assert result_ctx.df["phone"].iloc[1] != df["phone"].iloc[1]
 
 
 def test_regex_replace_empty(empty_df):
@@ -479,10 +479,9 @@ def test_generate_numeric_key_basic(sample_df):
     )
     result_ctx = generate_numeric_key(context, params)
     
-    # Should have new column with numeric values
+    # Should have new column with integer numeric values
     assert "numeric_key" in result_ctx.df.columns
-    # Accept both signed and unsigned int types
-    assert result_ctx.df["numeric_key"].dtype in [int, "int64", "Int64", "uint64"]
+    assert pd.api.types.is_integer_dtype(result_ctx.df["numeric_key"])
 
 
 def test_generate_numeric_key_with_coalesce():
@@ -808,7 +807,7 @@ def test_split_events_by_period_day():
     result_ctx = split_events_by_period(context, params)
     
     # Should split into 2 rows (one for each day)
-    assert len(result_ctx.df) >= 1
+    assert len(result_ctx.df) == 2
 
 
 def test_split_events_by_period_hour():
@@ -827,7 +826,7 @@ def test_split_events_by_period_hour():
     result_ctx = split_events_by_period(context, params)
     
     # Should split into 3 rows (10:30-11:00, 11:00-12:00, 12:00-12:30)
-    assert len(result_ctx.df) >= 1
+    assert len(result_ctx.df) == 3
 
 
 def test_split_events_by_period_shift():
@@ -849,8 +848,8 @@ def test_split_events_by_period_shift():
     )
     result_ctx = split_events_by_period(context, params)
     
-    # Should split across shifts
-    assert len(result_ctx.df) >= 1
+    # Should split into 2 rows (one for Morning shift, one for Evening shift)
+    assert len(result_ctx.df) == 2
 
 
 def test_split_events_by_period_empty(empty_df):
@@ -875,7 +874,7 @@ def test_split_events_by_period_invalid_period():
     context = setup_context(df)
     
     # Pydantic validation will catch this before the function is called
-    with pytest.raises(Exception):  # Can be ValidationError or ValueError
+    with pytest.raises(ValidationError):
         params = SplitEventsByPeriodParams(
             start_col="start",
             end_col="end",
