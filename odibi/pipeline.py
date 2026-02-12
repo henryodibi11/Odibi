@@ -535,6 +535,17 @@ class Pipeline:
             node_ctx = self._ctx.with_context(node_id=node_name)
 
             node_config = self.graph.nodes[node_name]
+
+            # Hard guard: never execute disabled nodes regardless of scheduling
+            if not node_config.enabled:
+                node_ctx.info("Skipping disabled node", skipped=True, reason="disabled")
+                return NodeResult(
+                    node_name=node_name,
+                    success=True,
+                    duration=0.0,
+                    metadata={"skipped": True, "reason": "disabled"},
+                )
+
             deps_failed_list = [dep for dep in node_config.depends_on if dep in results.failed]
             deps_failed = len(deps_failed_list) > 0
 
@@ -843,7 +854,6 @@ class Pipeline:
 
         else:
             self._ctx.info("Starting serial execution")
-            execution_order = self.graph.topological_sort()
             for idx, node_name in enumerate(execution_order):
                 self._ctx.debug(
                     f"Executing node {idx + 1}/{len(execution_order)}",
