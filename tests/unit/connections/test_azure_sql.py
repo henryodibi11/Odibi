@@ -124,7 +124,9 @@ class TestGetPassword:
                 "azure.keyvault.secrets": azure_keyvault_secrets,
             },
         ):
-            with patch("odibi.utils.logging.logger.register_secret") as mock_register:
+            with patch.object(conn, "_cached_key", None), patch(
+                "odibi.connections.azure_sql.logger"
+            ) as mock_logger:
                 password = conn.get_password()
 
                 assert password == "vault_password"
@@ -134,7 +136,7 @@ class TestGetPassword:
                     credential=mock_credential_class.return_value,
                 )
                 mock_client.get_secret.assert_called_once_with("mysecret")
-                mock_register.assert_called_once_with("vault_password")
+                mock_logger.register_secret.assert_called_once_with("vault_password")
 
     def test_get_password_key_vault_missing_config_raises_error(self):
         """Test that key_vault mode without config raises ValueError."""
