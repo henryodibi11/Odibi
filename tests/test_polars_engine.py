@@ -236,3 +236,379 @@ class TestPolarsAzureSqlRead:
                 connection=connection,
                 format="azure_sql",
             )
+
+
+class TestPolarsUtilityMethods:
+    """Tests for utility methods in PolarsEngine."""
+
+    def test_materialize_lazyframe(self, polars_engine):
+        """Test materialize converts LazyFrame to DataFrame."""
+        lazy_df = pl.DataFrame({"a": [1, 2, 3]}).lazy()
+        result = polars_engine.materialize(lazy_df)
+        assert isinstance(result, pl.DataFrame)
+        assert result.shape == (3, 1)
+
+    def test_materialize_dataframe_passthrough(self, polars_engine):
+        """Test materialize passes through DataFrame unchanged."""
+        df = pl.DataFrame({"a": [1, 2, 3]})
+        result = polars_engine.materialize(df)
+        assert result is df
+
+    def test_get_shape_dataframe(self, polars_engine):
+        """Test get_shape returns correct shape for DataFrame."""
+        df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        shape = polars_engine.get_shape(df)
+        assert shape == (3, 2)
+
+    def test_get_shape_lazyframe(self, polars_engine):
+        """Test get_shape returns correct shape for LazyFrame."""
+        lazy_df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}).lazy()
+        shape = polars_engine.get_shape(lazy_df)
+        assert shape == (3, 2)
+
+    def test_get_shape_empty_dataframe(self, polars_engine):
+        """Test get_shape with empty DataFrame."""
+        df = pl.DataFrame({"a": [], "b": []})
+        shape = polars_engine.get_shape(df)
+        assert shape == (0, 2)
+
+    def test_count_nulls_dataframe(self, polars_engine):
+        """Test count_nulls with DataFrame."""
+        df = pl.DataFrame({"a": [1, None, 3], "b": [None, None, 6]})
+        counts = polars_engine.count_nulls(df, ["a", "b"])
+        assert counts["a"] == 1
+        assert counts["b"] == 2
+
+    def test_count_nulls_lazyframe(self, polars_engine):
+        """Test count_nulls with LazyFrame."""
+        lazy_df = pl.DataFrame({"a": [1, None, 3], "b": [None, None, 6]}).lazy()
+        counts = polars_engine.count_nulls(lazy_df, ["a", "b"])
+        assert counts["a"] == 1
+        assert counts["b"] == 2
+
+    def test_count_nulls_no_nulls(self, polars_engine):
+        """Test count_nulls when no nulls present."""
+        df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        counts = polars_engine.count_nulls(df, ["a", "b"])
+        assert counts["a"] == 0
+        assert counts["b"] == 0
+
+    def test_get_sample_dataframe(self, polars_engine):
+        """Test get_sample returns list of dicts from DataFrame."""
+        df = pl.DataFrame({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]})
+        sample = polars_engine.get_sample(df, n=3)
+        assert len(sample) == 3
+        assert sample[0] == {"a": 1, "b": 10}
+        assert sample[2] == {"a": 3, "b": 30}
+
+    def test_get_sample_lazyframe(self, polars_engine):
+        """Test get_sample returns list of dicts from LazyFrame."""
+        lazy_df = pl.DataFrame({"a": [1, 2, 3, 4, 5], "b": [10, 20, 30, 40, 50]}).lazy()
+        sample = polars_engine.get_sample(lazy_df, n=2)
+        assert len(sample) == 2
+        assert sample[0] == {"a": 1, "b": 10}
+
+    def test_get_sample_default_n(self, polars_engine):
+        """Test get_sample with default n=10."""
+        df = pl.DataFrame({"a": list(range(20))})
+        sample = polars_engine.get_sample(df)
+        assert len(sample) == 10
+
+
+class TestPolarsValidation:
+    """Tests for validation methods in PolarsEngine."""
+
+    def test_validate_schema_required_columns_success(self, polars_engine):
+        """Test validate_schema passes when all required columns present."""
+        df = pl.DataFrame({"a": [1], "b": [2], "c": [3]})
+        rules = {"required_columns": ["a", "b"]}
+        failures = polars_engine.validate_schema(df, rules)
+        assert len(failures) == 0
+
+    def test_validate_schema_required_columns_missing(self, polars_engine):
+        """Test validate_schema fails when required columns missing."""
+        df = pl.DataFrame({"a": [1], "b": [2]})
+        rules = {"required_columns": ["a", "b", "c"]}
+        failures = polars_engine.validate_schema(df, rules)
+        assert len(failures) == 1
+        assert "Missing required columns" in failures[0]
+        assert "c" in failures[0]
+
+    def test_validate_schema_types_success(self, polars_engine):
+        """Test validate_schema passes with correct types."""
+        df = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+        rules = {"types": {"a": "Int", "b": "String"}}  # Polars uses "String" not "Utf8"
+        failures = polars_engine.validate_schema(df, rules)
+        assert len(failures) == 0
+
+    def test_validate_schema_types_mismatch(self, polars_engine):
+        """Test validate_schema fails with type mismatch."""
+        df = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+        rules = {"types": {"a": "String"}}  # a is Int64, not String
+        failures = polars_engine.validate_schema(df, rules)
+        assert len(failures) == 1
+        assert "has type" in failures[0]
+        assert "expected" in failures[0]
+
+    def test_validate_schema_type_for_missing_column(self, polars_engine):
+        """Test validate_schema handles type check for missing column."""
+        df = pl.DataFrame({"a": [1]})
+        rules = {"types": {"b": "Int64"}}
+        failures = polars_engine.validate_schema(df, rules)
+        assert len(failures) == 1
+        assert "not found for type validation" in failures[0]
+
+    def test_validate_schema_with_lazyframe(self, polars_engine):
+        """Test validate_schema works with LazyFrame."""
+        lazy_df = pl.DataFrame({"a": [1], "b": [2]}).lazy()
+        rules = {"required_columns": ["a"]}
+        failures = polars_engine.validate_schema(lazy_df, rules)
+        assert len(failures) == 0
+
+    def test_validate_data_not_empty_pass(self, polars_engine):
+        """Test validate_data not_empty check passes with data."""
+        df = pl.DataFrame({"a": [1, 2]})
+
+        class Config:
+            not_empty = True
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 0
+
+    def test_validate_data_not_empty_fail(self, polars_engine):
+        """Test validate_data not_empty check fails with empty DataFrame."""
+        df = pl.DataFrame({"a": []})
+
+        class Config:
+            not_empty = True
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 1
+        assert "empty" in failures[0].lower()
+
+    def test_validate_data_no_nulls_pass(self, polars_engine):
+        """Test validate_data no_nulls check passes."""
+        df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+
+        class Config:
+            no_nulls = ["a", "b"]
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 0
+
+    def test_validate_data_no_nulls_fail(self, polars_engine):
+        """Test validate_data no_nulls check fails."""
+        df = pl.DataFrame({"a": [1, None, 3], "b": [4, 5, 6]})
+
+        class Config:
+            no_nulls = ["a"]
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 1
+        assert "null values" in failures[0]
+
+    def test_validate_data_ranges_min_pass(self, polars_engine):
+        """Test validate_data ranges min check passes."""
+        df = pl.DataFrame({"score": [10, 20, 30]})
+
+        class Config:
+            ranges = {"score": {"min": 5}}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 0
+
+    def test_validate_data_ranges_min_fail(self, polars_engine):
+        """Test validate_data ranges min check fails."""
+        df = pl.DataFrame({"score": [1, 20, 30]})
+
+        class Config:
+            ranges = {"score": {"min": 10}}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 1
+        assert "< 10" in failures[0]
+
+    def test_validate_data_ranges_max_fail(self, polars_engine):
+        """Test validate_data ranges max check fails."""
+        df = pl.DataFrame({"score": [10, 20, 150]})
+
+        class Config:
+            ranges = {"score": {"max": 100}}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 1
+        assert "> 100" in failures[0]
+
+    def test_validate_data_allowed_values_pass(self, polars_engine):
+        """Test validate_data allowed_values check passes."""
+        df = pl.DataFrame({"status": ["ACTIVE", "INACTIVE", "ACTIVE"]})
+
+        class Config:
+            allowed_values = {"status": ["ACTIVE", "INACTIVE"]}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 0
+
+    def test_validate_data_allowed_values_fail(self, polars_engine):
+        """Test validate_data allowed_values check fails."""
+        df = pl.DataFrame({"status": ["ACTIVE", "INVALID", "ACTIVE"]})
+
+        class Config:
+            allowed_values = {"status": ["ACTIVE", "INACTIVE"]}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 1
+        assert "invalid values" in failures[0]
+
+    def test_validate_data_with_lazyframe(self, polars_engine):
+        """Test validate_data works with LazyFrame."""
+        lazy_df = pl.DataFrame({"a": [1, 2, 3]}).lazy()
+
+        class Config:
+            not_empty = True
+
+        failures = polars_engine.validate_data(lazy_df, Config())
+        assert len(failures) == 0
+
+
+class TestPolarsTableManagement:
+    """Tests for table management methods in PolarsEngine."""
+
+    def test_table_exists_with_path(self, tmp_path, polars_engine):
+        """Test table_exists returns True when path exists."""
+        test_file = tmp_path / "test.parquet"
+        pl.DataFrame({"a": [1]}).write_parquet(test_file)
+
+        connection = MockConnection()
+        connection.base_path = tmp_path
+
+        class ConnWithGetPath:
+            def get_path(self, p):
+                return str(tmp_path / p)
+
+        result = polars_engine.table_exists(ConnWithGetPath(), path="test.parquet")
+        assert result is True
+
+    def test_table_exists_path_not_found(self, tmp_path, polars_engine):
+        """Test table_exists returns False when path doesn't exist."""
+
+        class ConnWithGetPath:
+            def get_path(self, p):
+                return str(tmp_path / p)
+
+        result = polars_engine.table_exists(ConnWithGetPath(), path="nonexistent.parquet")
+        assert result is False
+
+    def test_table_exists_no_path(self, polars_engine):
+        """Test table_exists returns False when no path provided."""
+        connection = MockConnection()
+        result = polars_engine.table_exists(connection)
+        assert result is False
+
+    def test_get_table_schema_parquet(self, tmp_path, polars_engine):
+        """Test get_table_schema returns schema from parquet file."""
+        test_file = tmp_path / "test.parquet"
+        pl.DataFrame({"id": [1, 2], "name": ["Alice", "Bob"]}).write_parquet(test_file)
+
+        class ConnWithGetPath:
+            def get_path(self, p):
+                return str(tmp_path / p)
+
+        schema = polars_engine.get_table_schema(
+            ConnWithGetPath(), path="test.parquet", format="parquet"
+        )
+        assert schema is not None
+        assert "id" in schema
+        assert "name" in schema
+
+    def test_get_table_schema_csv(self, tmp_path, polars_engine):
+        """Test get_table_schema returns schema from CSV file."""
+        test_file = tmp_path / "test.csv"
+        pl.DataFrame({"id": [1, 2], "value": [10.5, 20.5]}).write_csv(test_file)
+
+        class ConnWithGetPath:
+            def get_path(self, p):
+                return str(tmp_path / p)
+
+        schema = polars_engine.get_table_schema(ConnWithGetPath(), path="test.csv", format="csv")
+        assert schema is not None
+        assert "id" in schema
+        assert "value" in schema
+
+    def test_get_table_schema_nonexistent_file(self, tmp_path, polars_engine):
+        """Test get_table_schema returns None for nonexistent file."""
+
+        class ConnWithGetPath:
+            def get_path(self, p):
+                return str(tmp_path / p)
+
+        schema = polars_engine.get_table_schema(
+            ConnWithGetPath(), path="nonexistent.parquet", format="parquet"
+        )
+        assert schema is None
+
+    def test_get_source_files_dataframe(self, polars_engine):
+        """Test get_source_files returns empty list for DataFrame."""
+        df = pl.DataFrame({"a": [1, 2, 3]})
+        files = polars_engine.get_source_files(df)
+        assert files == []
+
+    def test_get_source_files_lazyframe(self, polars_engine):
+        """Test get_source_files returns empty list for LazyFrame."""
+        lazy_df = pl.DataFrame({"a": [1, 2, 3]}).lazy()
+        files = polars_engine.get_source_files(lazy_df)
+        assert files == []
+
+
+class TestPolarsEdgeCases:
+    """Tests for edge cases and error handling."""
+
+    def test_operations_on_empty_dataframe(self, polars_engine):
+        """Test operations work correctly with empty DataFrame."""
+        df = pl.DataFrame({"a": [], "b": []})
+
+        # Count rows
+        count = polars_engine.count_rows(df)
+        assert count == 0
+
+        # Get schema
+        schema = polars_engine.get_schema(df)
+        assert "a" in schema
+        assert "b" in schema
+
+        # Profile nulls
+        nulls = polars_engine.profile_nulls(df)
+        assert nulls["a"] == 0.0
+        assert nulls["b"] == 0.0
+
+    def test_all_nulls_dataframe(self, polars_engine):
+        """Test operations with DataFrame containing only nulls."""
+        df = pl.DataFrame({"a": [None, None, None], "b": [None, None, None]})
+
+        # Count nulls
+        counts = polars_engine.count_nulls(df, ["a", "b"])
+        assert counts["a"] == 3
+        assert counts["b"] == 3
+
+        # Profile nulls
+        nulls = polars_engine.profile_nulls(df)
+        assert nulls["a"] == 1.0
+        assert nulls["b"] == 1.0
+
+    def test_mixed_types_handling(self, polars_engine):
+        """Test engine handles mixed numeric types correctly."""
+        df = pl.DataFrame({"int_col": [1, 2, 3], "float_col": [1.5, 2.5, 3.5]})
+
+        schema = polars_engine.get_schema(df)
+        assert "int" in schema["int_col"].lower()
+        assert "float" in schema["float_col"].lower()
+
+        # Count rows
+        assert polars_engine.count_rows(df) == 3
+
+    def test_large_sample_request(self, polars_engine):
+        """Test get_sample handles n larger than DataFrame size."""
+        df = pl.DataFrame({"a": [1, 2, 3]})
+        sample = polars_engine.get_sample(df, n=100)
+        # Should return all 3 rows, not fail
+        assert len(sample) <= 3
