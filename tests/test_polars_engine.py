@@ -1,3 +1,5 @@
+import builtins
+
 import pytest
 
 import pandas as pd
@@ -612,3 +614,252 @@ class TestPolarsEdgeCases:
         sample = polars_engine.get_sample(df, n=100)
         # Should return all 3 rows, not fail
         assert len(sample) <= 3
+
+
+class TestPolarsDeltaOperations:
+    """Tests for Delta Lake specific operations."""
+
+    def test_vacuum_delta_import_error_handling(self, polars_engine):
+        """Test vacuum_delta raises proper error when deltalake not available."""
+        # Mock the import to fail
+        import sys
+        import importlib
+
+        # Save original deltalake module if it exists
+        original_deltalake = sys.modules.get("deltalake")
+
+        try:
+            # Remove deltalake from modules to simulate ImportError
+            if "deltalake" in sys.modules:
+                del sys.modules["deltalake"]
+
+            # Mock builtins.__import__ to raise ImportError for deltalake
+            original_import = builtins.__import__
+
+            def mock_import(name, *args, **kwargs):
+                if name == "deltalake":
+                    raise ImportError("No module named 'deltalake'")
+                return original_import(name, *args, **kwargs)
+
+            builtins.__import__ = mock_import
+
+            connection = MockConnection()
+            with pytest.raises(ImportError, match="Delta Lake support requires"):
+                polars_engine.vacuum_delta(connection, path="test_path")
+
+        finally:
+            # Restore original import and deltalake module
+            builtins.__import__ = original_import
+            if original_deltalake:
+                sys.modules["deltalake"] = original_deltalake
+
+    def test_get_delta_history_import_error_handling(self, polars_engine):
+        """Test get_delta_history raises proper error when deltalake not available."""
+        import sys
+        import importlib
+
+        original_deltalake = sys.modules.get("deltalake")
+
+        try:
+            if "deltalake" in sys.modules:
+                del sys.modules["deltalake"]
+
+            original_import = builtins.__import__
+
+            def mock_import(name, *args, **kwargs):
+                if name == "deltalake":
+                    raise ImportError("No module named 'deltalake'")
+                return original_import(name, *args, **kwargs)
+
+            builtins.__import__ = mock_import
+
+            connection = MockConnection()
+            with pytest.raises(ImportError, match="Delta Lake support requires"):
+                polars_engine.get_delta_history(connection, path="test_path")
+
+        finally:
+            builtins.__import__ = original_import
+            if original_deltalake:
+                sys.modules["deltalake"] = original_deltalake
+
+    def test_maintain_table_disabled(self, polars_engine):
+        """Test maintain_table does nothing when config is disabled."""
+
+        class FakeConfig:
+            enabled = False
+
+        connection = MockConnection()
+        # Should not raise any errors, just return silently
+        polars_engine.maintain_table(
+            connection, format="delta", path="test_path", config=FakeConfig()
+        )
+
+    def test_maintain_table_non_delta_format(self, polars_engine):
+        """Test maintain_table does nothing for non-Delta formats."""
+
+        class FakeConfig:
+            enabled = True
+
+        connection = MockConnection()
+        # Should not raise errors for non-delta formats
+        polars_engine.maintain_table(
+            connection, format="parquet", path="test_path", config=FakeConfig()
+        )
+
+    def test_maintain_table_no_path(self, polars_engine):
+        """Test maintain_table does nothing when no path provided."""
+
+        class FakeConfig:
+            enabled = True
+
+        connection = MockConnection()
+        # Should return early without error
+        polars_engine.maintain_table(connection, format="delta", config=FakeConfig())
+
+
+class TestPolarsWriteSql:
+    """Tests for SQL Server write functionality."""
+
+    def test_write_sql_basic_insert(self, polars_engine):
+        """Test _write_sql performs insert operation."""
+        df = pl.DataFrame({"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"]})
+
+        # Track what was written
+        written_data = []
+
+        class MockSqlWriteConnection:
+            def write_table(self, df, table_name, schema="dbo", if_exists="append", chunksize=1000):
+                written_data.append(
+                    {
+                        "table": table_name,
+                        "schema": schema,
+                        "if_exists": if_exists,
+                        "rows": len(df),
+                    }
+                )
+
+        connection = MockSqlWriteConnection()
+        polars_engine._write_sql(
+            df, connection=connection, table="TestTable", mode="append", options={}
+        )
+
+        assert len(written_data) == 1
+        assert written_data[0]["table"] == "TestTable"
+        assert written_data[0]["schema"] == "dbo"
+        assert written_data[0]["if_exists"] == "append"
+        assert written_data[0]["rows"] == 3
+
+    def test_write_sql_overwrite_mode(self, polars_engine):
+        """Test _write_sql with overwrite mode."""
+        df = pl.DataFrame({"id": [1]})
+        written_data = []
+
+        class MockSqlWriteConnection:
+            def write_table(self, df, table_name, schema="dbo", if_exists="append", chunksize=1000):
+                written_data.append({"if_exists": if_exists})
+
+        connection = MockSqlWriteConnection()
+        polars_engine._write_sql(df, connection=connection, table="TestTable", mode="overwrite", options={})
+
+        assert len(written_data) == 1
+        assert written_data[0]["if_exists"] == "replace"
+
+    def test_write_sql_fail_mode(self, polars_engine):
+        """Test _write_sql with fail mode."""
+        df = pl.DataFrame({"id": [1]})
+        written_data = []
+
+        class MockSqlWriteConnection:
+            def write_table(self, df, table_name, schema="dbo", if_exists="append", chunksize=1000):
+                written_data.append({"if_exists": if_exists})
+
+        connection = MockSqlWriteConnection()
+        polars_engine._write_sql(df, connection=connection, table="TestTable", mode="fail", options={})
+
+        assert len(written_data) == 1
+        assert written_data[0]["if_exists"] == "fail"
+
+    def test_write_sql_schema_table_parsing(self, polars_engine):
+        """Test _write_sql correctly parses schema.table format."""
+        df = pl.DataFrame({"id": [1]})
+        written_data = []
+
+        class MockSqlWriteConnection:
+            def write_table(self, df, table_name, schema="dbo", if_exists="append", chunksize=1000):
+                written_data.append({"table": table_name, "schema": schema})
+
+        connection = MockSqlWriteConnection()
+        polars_engine._write_sql(df, connection=connection, table="Sales.Orders", mode="append", options={})
+
+        assert len(written_data) == 1
+        assert written_data[0]["schema"] == "Sales"
+        assert written_data[0]["table"] == "Orders"
+
+    def test_write_sql_default_dbo_schema(self, polars_engine):
+        """Test _write_sql uses default dbo schema."""
+        df = pl.DataFrame({"id": [1]})
+        written_data = []
+
+        class MockSqlWriteConnection:
+            def write_table(self, df, table_name, schema="dbo", if_exists="append", chunksize=1000):
+                written_data.append({"table": table_name, "schema": schema})
+
+        connection = MockSqlWriteConnection()
+        polars_engine._write_sql(df, connection=connection, table="Customers", mode="append", options={})
+
+        assert len(written_data) == 1
+        assert written_data[0]["schema"] == "dbo"
+        assert written_data[0]["table"] == "Customers"
+
+    def test_write_sql_no_write_table_method(self, polars_engine):
+        """Test _write_sql raises error when connection doesn't support write_table."""
+        df = pl.DataFrame({"id": [1]})
+        connection = MockConnection()  # No write_table method
+
+        with pytest.raises(ValueError, match="does not support SQL operations"):
+            polars_engine._write_sql(df, connection=connection, table="TestTable", mode="append", options={})
+
+    def test_write_sql_no_table_provided(self, polars_engine):
+        """Test _write_sql raises error when no table provided."""
+        df = pl.DataFrame({"id": [1]})
+
+        class MockSqlWriteConnection:
+            def write_table(self, df, table_name, schema="dbo", if_exists="append", chunksize=1000):
+                pass
+
+        connection = MockSqlWriteConnection()
+
+        with pytest.raises(ValueError, match="table' parameter is required"):
+            polars_engine._write_sql(df, connection=connection, table=None, mode="append", options={})
+
+    def test_write_sql_with_chunksize_option(self, polars_engine):
+        """Test _write_sql respects chunksize option."""
+        df = pl.DataFrame({"id": [1, 2, 3, 4, 5]})
+        written_data = []
+
+        class MockSqlWriteConnection:
+            def write_table(self, df, table_name, schema="dbo", if_exists="append", chunksize=1000):
+                written_data.append({"chunksize": chunksize})
+
+        connection = MockSqlWriteConnection()
+        polars_engine._write_sql(
+            df, connection=connection, table="TestTable", mode="append", options={"chunksize": 500}
+        )
+
+        assert len(written_data) == 1
+        assert written_data[0]["chunksize"] == 500
+
+    def test_write_sql_materializes_lazyframe(self, polars_engine):
+        """Test _write_sql materializes LazyFrame before writing."""
+        lazy_df = pl.DataFrame({"id": [1, 2, 3]}).lazy()
+        written_data = []
+
+        class MockSqlWriteConnection:
+            def write_table(self, df, table_name, schema="dbo", if_exists="append", chunksize=1000):
+                written_data.append({"rows": len(df)})
+
+        connection = MockSqlWriteConnection()
+        polars_engine._write_sql(lazy_df, connection=connection, table="TestTable", mode="append", options={})
+
+        assert len(written_data) == 1
+        assert written_data[0]["rows"] == 3
