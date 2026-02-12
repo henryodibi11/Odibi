@@ -2,6 +2,8 @@
 
 import hashlib
 import os
+import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 try:
@@ -792,8 +794,6 @@ class PolarsEngine(Engine):
         Returns:
             DataFrame with metadata columns added
         """
-        from datetime import datetime
-
         from odibi.config import WriteMetadataConfig
 
         # Normalize config: True -> all defaults
@@ -860,8 +860,6 @@ class PolarsEngine(Engine):
                 col_expr = pl.col(column).str.to_datetime()
             # If column is datetime and value is string, parse the value
             elif col_dtype in [pl.Datetime, pl.Date] and isinstance(value, str):
-                from datetime import datetime
-
                 value = datetime.fromisoformat(value.replace("Z", "+00:00"))
 
             return df.filter(col_expr > value)
@@ -916,8 +914,6 @@ class PolarsEngine(Engine):
                 # Try to detect if we're working with datetime columns
                 col1_dtype = schema[col1]
                 if col1_dtype in [pl.Datetime, pl.Date, pl.Utf8, pl.String]:
-                    from datetime import datetime
-
                     value = datetime.fromisoformat(value.replace("Z", "+00:00"))
 
             # Apply the operator
@@ -1393,7 +1389,6 @@ class PolarsEngine(Engine):
             version: Version number to restore to
         """
         from odibi.utils.logging_context import get_logging_context
-        import time
 
         ctx = get_logging_context().with_context(engine="polars")
         start = time.time()
