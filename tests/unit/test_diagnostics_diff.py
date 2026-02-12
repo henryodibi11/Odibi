@@ -1,6 +1,5 @@
 """Unit tests for odibi.diagnostics.diff module."""
 
-
 from odibi.diagnostics.diff import (
     NodeDiffResult,
     RunDiffResult,

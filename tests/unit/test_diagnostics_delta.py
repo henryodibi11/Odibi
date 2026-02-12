@@ -102,9 +102,7 @@ class TestDetectDrift:
         mock_dt.to_pandas.return_value = pd.DataFrame({"id": [1, 2, 3]})
         mock_delta_table.return_value = mock_dt
 
-        result = detect_drift(
-            table_path="/path/to/table", current_version=2, baseline_version=1
-        )
+        result = detect_drift(table_path="/path/to/table", current_version=2, baseline_version=1)
 
         assert result is not None
         assert "Schema drift detected" in result
@@ -132,9 +130,7 @@ class TestDetectDrift:
         mock_dt.to_pandas.return_value = pd.DataFrame({"id": [1, 2, 3]})
         mock_delta_table.return_value = mock_dt
 
-        result = detect_drift(
-            table_path="/path/to/table", current_version=2, baseline_version=1
-        )
+        result = detect_drift(table_path="/path/to/table", current_version=2, baseline_version=1)
 
         assert result is not None
         assert "Schema drift detected" in result
@@ -224,9 +220,7 @@ class TestDetectDrift:
         mock_dt.to_pandas.return_value = pd.DataFrame()
         mock_delta_table.return_value = mock_dt
 
-        result = detect_drift(
-            table_path="/path/to/table", current_version=2, baseline_version=1
-        )
+        result = detect_drift(table_path="/path/to/table", current_version=2, baseline_version=1)
 
         assert result is not None
         assert "Data volume spike" in result
@@ -407,6 +401,4 @@ class TestGetDeltaDiffPandas:
         """Test that ImportError is raised when deltalake is not available."""
         with patch("builtins.__import__", side_effect=ImportError("Module not found")):
             with pytest.raises(ImportError, match="Delta Lake support requires"):
-                _get_delta_diff_pandas(
-                    table_path="/path/to/table", version_a=1, version_b=2
-                )
+                _get_delta_diff_pandas(table_path="/path/to/table", version_a=1, version_b=2)
