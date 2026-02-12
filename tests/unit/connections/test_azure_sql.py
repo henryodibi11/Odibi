@@ -88,6 +88,8 @@ class TestGetPassword:
 
     def test_get_password_fetches_from_key_vault(self):
         """Test fetching password from Azure Key Vault."""
+        from types import ModuleType
+
         conn = AzureSQL(
             server="test.database.windows.net",
             database="testdb",
@@ -106,9 +108,6 @@ class TestGetPassword:
         mock_credential_class = MagicMock()
         mock_client_class = MagicMock(return_value=mock_client)
 
-        import sys
-        from types import ModuleType
-
         # Create mock azure modules
         azure_identity = ModuleType("azure.identity")
         azure_identity.DefaultAzureCredential = mock_credential_class
@@ -116,11 +115,15 @@ class TestGetPassword:
         azure_keyvault_secrets = ModuleType("azure.keyvault.secrets")
         azure_keyvault_secrets.SecretClient = mock_client_class
 
-        sys.modules["azure.identity"] = azure_identity
-        sys.modules["azure.keyvault"] = azure_keyvault
-        sys.modules["azure.keyvault.secrets"] = azure_keyvault_secrets
-
-        try:
+        # Use patch.dict to properly mock sys.modules (handles cleanup automatically)
+        with patch.dict(
+            "sys.modules",
+            {
+                "azure.identity": azure_identity,
+                "azure.keyvault": azure_keyvault,
+                "azure.keyvault.secrets": azure_keyvault_secrets,
+            },
+        ):
             with patch("odibi.utils.logging.logger.register_secret") as mock_register:
                 password = conn.get_password()
 
@@ -132,11 +135,6 @@ class TestGetPassword:
                 )
                 mock_client.get_secret.assert_called_once_with("mysecret")
                 mock_register.assert_called_once_with("vault_password")
-        finally:
-            # Cleanup mock modules
-            del sys.modules["azure.identity"]
-            del sys.modules["azure.keyvault"]
-            del sys.modules["azure.keyvault.secrets"]
 
     def test_get_password_key_vault_missing_config_raises_error(self):
         """Test that key_vault mode without config raises ValueError."""
