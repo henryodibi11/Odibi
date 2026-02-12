@@ -1,7 +1,6 @@
 """Unit tests for LocalDBFS connection."""
 
 from pathlib import Path
-import pytest
 
 from odibi.connections.local_dbfs import LocalDBFS
 
