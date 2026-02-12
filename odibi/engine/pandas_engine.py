@@ -102,7 +102,15 @@ class PandasEngine(Engine):
                 pass
 
     def materialize(self, df: Any) -> Any:
-        """Materialize lazy dataset."""
+        """Materialize lazy dataset.
+
+        Args:
+            df: DataFrame or LazyDataset to materialize.
+
+        Returns:
+            Materialized pandas DataFrame. If input is already a DataFrame,
+            returns it unchanged.
+        """
         if isinstance(df, LazyDataset):
             # Re-invoke read but force materialization (by bypassing Lazy check)
             # We pass the resolved path directly
@@ -647,7 +655,25 @@ class PandasEngine(Engine):
         as_of_version: Optional[int] = None,
         as_of_timestamp: Optional[str] = None,
     ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
-        """Read data using Pandas (or LazyDataset)."""
+        """Read data using Pandas (or LazyDataset).
+
+        Args:
+            connection: Connection object providing base path and storage options.
+            format: Data format (csv, parquet, delta, json, excel, avro, sql).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            streaming: Whether to enable streaming mode (not supported in Pandas).
+            schema: Optional schema specification (not used in Pandas engine).
+            options: Additional read options to pass to pandas readers.
+            as_of_version: Delta Lake version for time travel queries.
+            as_of_timestamp: Delta Lake timestamp for time travel queries.
+
+        Returns:
+            DataFrame or iterator of DataFrames containing the loaded data.
+
+        Raises:
+            ValueError: If streaming is requested or neither path nor table is provided.
+        """
         ctx = get_logging_context().with_context(engine="pandas")
         start = time.time()
 
@@ -1166,7 +1192,25 @@ class PandasEngine(Engine):
         options: Optional[Dict[str, Any]] = None,
         streaming_config: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Write data using Pandas."""
+        """Write data using Pandas.
+
+        Args:
+            df: DataFrame or iterator of DataFrames to write.
+            connection: Connection object providing base path and storage options.
+            format: Output format (csv, parquet, delta, json, excel, avro, sql).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            register_table: Optional table name to register in catalog (not used).
+            mode: Write mode (overwrite, append, upsert, append_once).
+            options: Additional write options to pass to pandas writers.
+            streaming_config: Streaming configuration (not used in Pandas engine).
+
+        Returns:
+            Optional dict with write statistics for Delta writes, None otherwise.
+
+        Raises:
+            ValueError: If neither path nor table is provided.
+        """
         ctx = get_logging_context().with_context(engine="pandas")
         start = time.time()
 
@@ -2004,7 +2048,19 @@ class PandasEngine(Engine):
     def harmonize_schema(
         self, df: pd.DataFrame, target_schema: Dict[str, str], policy: Any
     ) -> pd.DataFrame:
-        """Harmonize DataFrame schema with target schema according to policy."""
+        """Harmonize DataFrame schema with target schema according to policy.
+
+        Args:
+            df: Input DataFrame to harmonize.
+            target_schema: Target schema as dict of column_name -> type_string.
+            policy: Schema policy defining how to handle missing/new columns.
+
+        Returns:
+            DataFrame with schema harmonized to match target_schema.
+
+        Raises:
+            ValueError: If policy validation fails for missing or new columns.
+        """
         # Ensure materialization
         df = self.materialize(df)
 
@@ -2038,7 +2094,17 @@ class PandasEngine(Engine):
     def anonymize(
         self, df: Any, columns: List[str], method: str, salt: Optional[str] = None
     ) -> pd.DataFrame:
-        """Anonymize specified columns."""
+        """Anonymize specified columns.
+
+        Args:
+            df: DataFrame or LazyDataset to anonymize.
+            columns: List of column names to anonymize.
+            method: Anonymization method (hash, mask, or redact).
+            salt: Optional salt string for hash method.
+
+        Returns:
+            DataFrame with specified columns anonymized.
+        """
         # Ensure materialization
         df = self.materialize(df)
 
@@ -2383,7 +2449,18 @@ class PandasEngine(Engine):
         path: Optional[str] = None,
         format: Optional[str] = None,
     ) -> Optional[Dict[str, str]]:
-        """Get schema of an existing table/file."""
+        """Get schema of an existing table/file.
+
+        Args:
+            connection: Connection object providing base path and storage options.
+            table: Table name (for SQL sources).
+            path: File path (for file sources).
+            format: Data format (delta, parquet, csv, sql, sql_server, azure_sql).
+
+        Returns:
+            Dict mapping column names to type strings, or None if schema
+            cannot be inferred.
+        """
         try:
             if table and format in ["sql", "sql_server", "azure_sql"]:
                 # SQL Server: Read empty result
@@ -2597,7 +2674,15 @@ class PandasEngine(Engine):
         path: Optional[str] = None,
         config: Optional[Any] = None,
     ) -> None:
-        """Run table maintenance operations (optimize, vacuum)."""
+        """Run table maintenance operations (optimize, vacuum).
+
+        Args:
+            connection: Connection object providing base path and storage options.
+            format: Data format (only delta is supported).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            config: Maintenance configuration specifying operations to run.
+        """
         ctx = get_logging_context().with_context(engine="pandas")
 
         if format != "delta" or not config or not config.enabled:
