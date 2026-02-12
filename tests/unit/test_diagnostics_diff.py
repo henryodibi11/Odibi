@@ -2,8 +2,6 @@
 Unit tests for odibi/diagnostics/diff.py
 """
 
-import pytest
-
 from odibi.diagnostics.diff import (
     NodeDiffResult,
     RunDiffResult,

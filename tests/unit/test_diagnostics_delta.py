@@ -2,8 +2,6 @@
 Unit tests for odibi/diagnostics/delta.py
 """
 
-import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -259,7 +257,9 @@ class TestDetectDrift:
 
     @patch("deltalake.DeltaTable")
     @patch("odibi.diagnostics.delta.get_delta_diff")
-    def test_detect_schema_drift(self, mock_get_delta_diff, mock_delta_table_class, temp_delta_table):
+    def test_detect_schema_drift(
+        self, mock_get_delta_diff, mock_delta_table_class, temp_delta_table
+    ):
         """Test that schema drift is detected."""
         # Mock diff result with schema changes
         mock_diff = MagicMock()
@@ -279,7 +279,9 @@ class TestDetectDrift:
 
     @patch("deltalake.DeltaTable")
     @patch("odibi.diagnostics.delta.get_delta_diff")
-    def test_detect_row_count_drift(self, mock_get_delta_diff, mock_delta_table_class, temp_delta_table):
+    def test_detect_row_count_drift(
+        self, mock_get_delta_diff, mock_delta_table_class, temp_delta_table
+    ):
         """Test that row count drift is detected."""
         # Mock diff result with no schema changes but row changes
         mock_diff = MagicMock()
@@ -331,7 +333,9 @@ class TestDetectDrift:
 
     @patch("deltalake.DeltaTable")
     @patch("odibi.diagnostics.delta.get_delta_diff")
-    def test_drift_from_zero_baseline(self, mock_get_delta_diff, mock_delta_table_class, temp_delta_table):
+    def test_drift_from_zero_baseline(
+        self, mock_get_delta_diff, mock_delta_table_class, temp_delta_table
+    ):
         """Test drift detection when baseline has zero rows."""
         # Mock diff result
         mock_diff = MagicMock()
@@ -388,6 +392,6 @@ class TestGetDeltaDiff:
         mock_result = MagicMock()
         mock_pandas_impl.return_value = mock_result
 
-        result = get_delta_diff(temp_delta_table, 1, 2, deep=True, keys=["id"])
+        get_delta_diff(temp_delta_table, 1, 2, deep=True, keys=["id"])
 
         mock_pandas_impl.assert_called_once_with(temp_delta_table, 1, 2, True, ["id"])
