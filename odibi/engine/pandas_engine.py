@@ -1882,9 +1882,6 @@ class PandasEngine(Engine):
             for name in context.list_names():
                 dataset_obj = context.get(name)
 
-                # Debug check
-                # print(f"DEBUG: Registering {name} type={type(dataset_obj)} LazyDataset={LazyDataset}")
-
                 # Handle LazyDataset (DuckDB optimization)
                 # if isinstance(dataset_obj, LazyDataset):
                 #     self._register_lazy_view(conn, name, dataset_obj)
