@@ -186,17 +186,47 @@ def create_delta_connection(name: str, config: Dict[str, Any]) -> Any:
     from odibi.connections.base import BaseConnection
 
     class DeltaCatalogConnection(BaseConnection):
+        """Connection to Delta Lake tables via catalog (Spark only).
+
+        This connection type is used for catalog-based Delta Lake table access
+        in Spark/Databricks environments. It generates fully qualified table names
+        in the format: catalog.schema.table.
+        """
+
         def __init__(self, catalog, schema):
+            """Initialize catalog-based Delta connection.
+
+            Args:
+                catalog: Catalog name (e.g., 'main', 'hive_metastore')
+                schema: Schema/database name (e.g., 'silver', 'gold')
+            """
             self.catalog = catalog
             self.schema = schema
 
         def get_path(self, table):
+            """Get fully qualified table name.
+
+            Args:
+                table: Table name
+
+            Returns:
+                Fully qualified table name in format: catalog.schema.table
+            """
             return f"{self.catalog}.{self.schema}.{table}"
 
         def validate(self):
+            """Validate connection configuration.
+
+            No-op for catalog connections as validation occurs in Spark engine.
+            """
             pass
 
         def pandas_storage_options(self):
+            """Get storage options for Pandas.
+
+            Returns:
+                Empty dict. Catalog-based connections don't use storage options.
+            """
             return {}
 
     catalog = config.get("catalog")
