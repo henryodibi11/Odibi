@@ -188,7 +188,7 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
     return result
 
 
-def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
+def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> EngineContext:
     """
     Internal helper for SCD2 logic on Spark engine.
 
@@ -367,7 +367,7 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     return context.with_df(final_df)
 
 
-def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
+def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> EngineContext:
     """
     Internal helper for SCD2 logic on Pandas engine.
 
@@ -537,7 +537,7 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
     updates = merged[merged["_merge"] == "both"].copy()
 
     # Detect Changes
-    def has_changed(row):
+    def has_changed(row: Any) -> bool:
         for col in track:
             s = row.get(col)
             t = row.get(col + "_tgt")
