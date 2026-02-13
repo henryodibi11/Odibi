@@ -48,6 +48,18 @@ class DateDimensionPattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate date dimension pattern configuration parameters.
+
+        Ensures that all required parameters are present and valid. Checks that:
+        - start_date is provided in YYYY-MM-DD format
+        - end_date is provided in YYYY-MM-DD format
+        - start_date is before or equal to end_date
+        - fiscal_year_start_month is an integer between 1-12 if provided
+
+        Raises:
+            ValueError: If required dates are missing, dates are invalid/unparseable,
+                start_date is after end_date, or fiscal_year_start_month is invalid.
+        """
         ctx = get_logging_context()
         ctx.debug(
             "DateDimensionPattern validation starting",
@@ -127,6 +139,27 @@ class DateDimensionPattern(Pattern):
         return datetime.strptime(date_str, "%Y-%m-%d").date()
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the date dimension pattern to generate a date dimension table.
+
+        Generates a complete date dimension table with pre-calculated date attributes for
+        the specified date range. The execution flow:
+        1. Parse start_date and end_date parameters
+        2. Generate one row per date in the range
+        3. Calculate all date attributes (day_of_week, quarter, fiscal_year, etc.)
+        4. Add unknown member row (date_sk=0) if configured
+
+        Generated columns include date_sk (surrogate key), full_date, day/week/month/quarter/year
+        attributes, fiscal year/quarter, and boolean flags for period boundaries.
+
+        Args:
+            context: Engine context for DataFrame creation and execution environment.
+
+        Returns:
+            DataFrame containing one row per date with all calculated date attributes.
+
+        Raises:
+            Exception: If date parsing fails or DataFrame generation encounters errors.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 

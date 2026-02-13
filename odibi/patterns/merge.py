@@ -18,6 +18,15 @@ class MergePattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate merge pattern configuration parameters.
+
+        Ensures that all required parameters are present for merge operations. Checks that:
+        - target (or path) is provided (destination table/path for merge)
+        - keys are provided (columns to match source and target rows)
+
+        Raises:
+            ValueError: If target/path is missing or keys are missing.
+        """
         ctx = get_logging_context()
 
         # Support both 'target' and 'path' for compatibility with merge transformer
@@ -67,6 +76,26 @@ class MergePattern(Pattern):
         )
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the merge pattern to upsert data into the target table.
+
+        Performs a merge/upsert operation by delegating to the merge transformer. The merge
+        strategy determines the behavior:
+        - 'upsert': Insert new rows, update matching rows
+        - 'append_only': Insert new rows only, never update
+        - 'delete_match': Delete rows matching the keys
+
+        The merge transformer handles loading the target table, comparing keys, and applying
+        the specified merge strategy.
+
+        Args:
+            context: Engine context containing the source DataFrame and execution environment.
+
+        Returns:
+            Source DataFrame (unchanged, as merge writes to target directly).
+
+        Raises:
+            Exception: If merge operation fails, target loading fails, or parameters are invalid.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 

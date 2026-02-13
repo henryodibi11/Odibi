@@ -48,6 +48,16 @@ class AggregationPattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate aggregation pattern configuration parameters.
+
+        Ensures that all required parameters are present and valid. Checks that:
+        - grain is specified (list of GROUP BY columns)
+        - measures are provided with correct structure (list of dicts with 'name' and 'expr')
+        - incremental config is valid if provided (requires 'timestamp_column' and valid merge_strategy)
+
+        Raises:
+            ValueError: If grain is missing, measures are missing/invalid, or incremental config is invalid.
+        """
         ctx = get_logging_context()
         grain = self.params.get("grain")
         measures = self.params.get("measures", [])
@@ -147,6 +157,24 @@ class AggregationPattern(Pattern):
         )
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the aggregation pattern on the input data.
+
+        Performs aggregation operations on the source DataFrame, optionally applying incremental
+        merge with existing target data. The execution flow:
+        1. Aggregate source data by grain columns with specified measures
+        2. Apply HAVING clause filtering if configured
+        3. Merge with existing target data if incremental mode is enabled
+        4. Add audit columns (load_timestamp, source_system) if configured
+
+        Args:
+            context: Engine context containing the source DataFrame and execution environment.
+
+        Returns:
+            Aggregated DataFrame with measures computed at the specified grain level.
+
+        Raises:
+            Exception: If aggregation fails, incremental merge fails, or target loading fails.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 
