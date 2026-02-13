@@ -1215,3 +1215,66 @@ class PolarsEngine(Engine):
         )
 
         return history
+
+    def filter_greater_than(self, df: Any, column: str, value: Any) -> Any:
+        """Filter DataFrame where column > value.
+
+        Automatically casts string columns to datetime for proper comparison.
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            column: Column name to filter on
+            value: Threshold value to compare against
+
+        Returns:
+            Filtered DataFrame or LazyFrame
+
+        Raises:
+            ValueError: If column not found or filtering fails
+        """
+        # Materialize to check schema
+        if isinstance(df, pl.LazyFrame):
+            schema = df.collect_schema()
+        else:
+            schema = df.schema
+
+        if column not in schema:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+
+        try:
+            col_dtype = schema[column]
+
+            # If column is string type, try to parse as datetime
+            if col_dtype == pl.String or col_dtype == pl.Utf8:
+                df = df.with_columns(
+                    pl.col(column).str.to_datetime(time_unit="us", strict=False).alias(column)
+                )
+                # If value is string, parse it to datetime
+                if isinstance(value, str):
+                    import datetime
+                    value = pl.datetime(
+                        year=int(value[:4]),
+                        month=int(value[5:7]) if len(value) >= 7 else 1,
+                        day=int(value[8:10]) if len(value) >= 10 else 1
+                    )
+
+            # If column is datetime and value is string, parse value
+            elif col_dtype in (pl.Datetime, pl.Date) and isinstance(value, str):
+                import datetime
+                # Parse the string value to datetime
+                if "T" in value:
+                    value = datetime.datetime.fromisoformat(value)
+                else:
+                    # Parse date string like "2020-12-31"
+                    parts = value.split("-")
+                    if len(parts) == 3:
+                        value = datetime.datetime(int(parts[0]), int(parts[1]), int(parts[2]))
+                    else:
+                        # Fall back to parsing
+                        value = datetime.datetime.fromisoformat(value)
+
+            # Apply filter
+            return df.filter(pl.col(column) > value)
+
+        except Exception as e:
+            raise ValueError(f"Failed to filter {column} > {value}: {e}")

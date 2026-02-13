@@ -857,3 +857,59 @@ class TestPolarsWriteSql:
 
         assert len(written_data) == 1
         assert written_data[0]["rows"] == 3
+
+
+class TestPolarsFilterGreaterThan:
+    """Tests for filter_greater_than method."""
+
+    def test_filter_greater_than_numeric(self, polars_engine):
+        """filter_greater_than works with numeric columns."""
+        df = pl.DataFrame({"age": [10, 20, 30, 40]})
+        result = polars_engine.filter_greater_than(df, "age", 25)
+
+        result_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+        assert len(result_collected) == 2
+        assert result_collected["age"].to_list() == [30, 40]
+
+    def test_filter_greater_than_datetime_column(self, polars_engine):
+        """filter_greater_than handles datetime columns with string threshold."""
+        df = pl.DataFrame({
+            "date": pl.Series(["2020-01-01", "2021-01-01", "2022-01-01"]).str.to_datetime()
+        })
+        result = polars_engine.filter_greater_than(df, "date", "2020-12-31")
+
+        result_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+        assert len(result_collected) == 2
+
+    def test_filter_greater_than_string_to_datetime(self, polars_engine):
+        """filter_greater_than converts string columns to datetime."""
+        df = pl.DataFrame({"date_str": ["2020-01-01", "2021-01-01", "2022-01-01"]})
+        result = polars_engine.filter_greater_than(df, "date_str", "2020-12-31")
+
+        result_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+        assert len(result_collected) == 2
+
+    def test_filter_greater_than_empty_result(self, polars_engine):
+        """filter_greater_than returns empty DataFrame when no rows match."""
+        df = pl.DataFrame({"value": [1, 2, 3]})
+        result = polars_engine.filter_greater_than(df, "value", 100)
+
+        result_collected = result.collect() if isinstance(result, pl.LazyFrame) else result
+        assert len(result_collected) == 0
+
+    def test_filter_greater_than_missing_column(self, polars_engine):
+        """filter_greater_than raises ValueError for missing column."""
+        df = pl.DataFrame({"a": [1, 2, 3]})
+
+        with pytest.raises(ValueError, match="not found"):
+            polars_engine.filter_greater_than(df, "nonexistent", 5)
+
+    def test_filter_greater_than_lazy_frame(self, polars_engine):
+        """filter_greater_than works with LazyFrame."""
+        df = pl.DataFrame({"value": [10, 20, 30, 40]}).lazy()
+        result = polars_engine.filter_greater_than(df, "value", 25)
+
+        assert isinstance(result, pl.LazyFrame)
+        result_collected = result.collect()
+        assert len(result_collected) == 2
+        assert result_collected["value"].to_list() == [30, 40]
