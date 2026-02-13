@@ -862,19 +862,23 @@ class PolarsEngine(Engine):
 
         Automatically casts string columns to datetime for proper comparison.
         """
-        if col1 not in df.columns:
+        # Get schema efficiently (works for both DataFrame and LazyFrame)
+        schema = df.collect_schema() if hasattr(df, "collect_schema") else df.schema
+        columns = schema.names()
+
+        if col1 not in columns:
             raise ValueError(f"Column '{col1}' not found")
 
         def _to_datetime_if_string(col_name: str) -> pl.Expr:
             """Convert string column to datetime if needed."""
             col_expr = pl.col(col_name)
             # Check if the column is string type
-            if df.schema[col_name] == pl.Utf8:
+            if schema[col_name] == pl.Utf8:
                 return col_expr.str.strptime(pl.Datetime, "%Y-%m-%d", strict=False)
             return col_expr
 
         # Build the coalesce expression
-        if col2 not in df.columns:
+        if col2 not in columns:
             coalesced = _to_datetime_if_string(col1)
         else:
             coalesced = pl.coalesce([_to_datetime_if_string(col1), _to_datetime_if_string(col2)])
