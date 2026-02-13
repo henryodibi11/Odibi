@@ -857,6 +857,54 @@ class PolarsEngine(Engine):
 
         return df
 
+    def filter_coalesce(self, df: Any, col1: str, col2: str, op: str, value: Any) -> Any:
+        """Filter using COALESCE(col1, col2) op value.
+
+        Automatically casts string columns to datetime for proper comparison.
+        """
+        if col1 not in df.columns:
+            raise ValueError(f"Column '{col1}' not found")
+
+        def _to_datetime_if_string(col_name: str) -> pl.Expr:
+            """Convert string column to datetime if needed."""
+            col_expr = pl.col(col_name)
+            # Check if the column is string type
+            if df.schema[col_name] == pl.Utf8:
+                return col_expr.str.strptime(pl.Datetime, "%Y-%m-%d", strict=False)
+            return col_expr
+
+        # Build the coalesce expression
+        if col2 not in df.columns:
+            coalesced = _to_datetime_if_string(col1)
+        else:
+            coalesced = pl.coalesce([_to_datetime_if_string(col1), _to_datetime_if_string(col2)])
+
+        # Convert value to datetime if needed
+        if isinstance(value, str):
+            try:
+                import datetime
+
+                value = datetime.datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                pass  # Keep as string if parsing fails
+
+        # Apply the filter operation
+        try:
+            if op == ">=":
+                return df.filter(coalesced >= value)
+            elif op == ">":
+                return df.filter(coalesced > value)
+            elif op == "<=":
+                return df.filter(coalesced <= value)
+            elif op == "<":
+                return df.filter(coalesced < value)
+            elif op == "==" or op == "=":
+                return df.filter(coalesced == value)
+            else:
+                raise ValueError(f"Unsupported operator: {op}")
+        except Exception as e:
+            raise ValueError(f"Failed to filter COALESCE({col1}, {col2}) {op} {value}: {e}")
+
     def anonymize(
         self, df: Any, columns: List[str], method: str, salt: Optional[str] = None
     ) -> Any:

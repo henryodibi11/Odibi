@@ -857,3 +857,79 @@ class TestPolarsWriteSql:
 
         assert len(written_data) == 1
         assert written_data[0]["rows"] == 3
+
+
+class TestFilterCoalesce:
+    """Test filter_coalesce method."""
+
+    def test_filter_coalesce_col1_priority(self, polars_engine):
+        """filter_coalesce uses col1 when both present."""
+        df = pl.DataFrame({"primary": [10, None, 30], "fallback": [100, 200, 300]})
+        result = polars_engine.filter_coalesce(df, "primary", "fallback", ">=", 25)
+
+        # Row 0: 10 < 25 (excluded)
+        # Row 1: 200 >= 25 (included, fallback to col2)
+        # Row 2: 30 >= 25 (included)
+        assert len(result) == 2
+
+    def test_filter_coalesce_fallback_to_col2(self, polars_engine):
+        """filter_coalesce uses col2 when col1 is null."""
+        df = pl.DataFrame({"col1": [None, None], "col2": [10, 20]})
+        result = polars_engine.filter_coalesce(df, "col1", "col2", ">", 15)
+
+        assert len(result) == 1
+        assert result["col2"][0] == 20
+
+    def test_filter_coalesce_missing_col2(self, polars_engine):
+        """filter_coalesce works when col2 doesn't exist."""
+        df = pl.DataFrame({"col1": [10, 20, 30]})
+        result = polars_engine.filter_coalesce(df, "col1", "nonexistent", ">=", 20)
+
+        assert len(result) == 2
+
+    def test_filter_coalesce_operators(self, polars_engine):
+        """filter_coalesce supports all operators."""
+        df = pl.DataFrame({"a": [10, 20, 30], "b": [100, 200, 300]})
+
+        # Test >=
+        result = polars_engine.filter_coalesce(df, "a", "b", ">=", 20)
+        assert len(result) == 2
+
+        # Test >
+        result = polars_engine.filter_coalesce(df, "a", "b", ">", 20)
+        assert len(result) == 1
+
+        # Test <=
+        result = polars_engine.filter_coalesce(df, "a", "b", "<=", 20)
+        assert len(result) == 2
+
+        # Test <
+        result = polars_engine.filter_coalesce(df, "a", "b", "<", 20)
+        assert len(result) == 1
+
+        # Test ==
+        result = polars_engine.filter_coalesce(df, "a", "b", "==", 20)
+        assert len(result) == 1
+
+    def test_filter_coalesce_datetime_conversion(self, polars_engine):
+        """filter_coalesce converts strings to datetime."""
+        df = pl.DataFrame(
+            {"date1": ["2020-01-01", "2021-01-01"], "date2": ["2019-01-01", "2022-01-01"]}
+        )
+        result = polars_engine.filter_coalesce(df, "date1", "date2", ">=", "2020-06-01")
+
+        assert len(result) == 1
+
+    def test_filter_coalesce_missing_col1(self, polars_engine):
+        """filter_coalesce raises ValueError when col1 missing."""
+        df = pl.DataFrame({"a": [1, 2]})
+
+        with pytest.raises(ValueError, match="not found"):
+            polars_engine.filter_coalesce(df, "nonexistent", "a", ">=", 5)
+
+    def test_filter_coalesce_invalid_operator(self, polars_engine):
+        """filter_coalesce raises ValueError for invalid operator."""
+        df = pl.DataFrame({"a": [1, 2], "b": [3, 4]})
+
+        with pytest.raises(ValueError, match="Unsupported operator"):
+            polars_engine.filter_coalesce(df, "a", "b", "!=", 5)
