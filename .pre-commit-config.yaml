@@ -66,6 +66,21 @@ repos:
         name: Check for merge conflicts
         description: Detects <<<<<<< markers in files
 
+      # Detects leftover debugging code (pdb, breakpoint, print statements)
+      # Why: Prevents debug code from being committed to production
+      # Note: Only applies to odibi/ source code, excluding CLI (which uses print for output)
+      - id: debug-statements
+        name: Check for debug statements
+        description: Detects pdb, breakpoint, and debugging imports
+        files: ^odibi/
+        exclude: ^odibi/cli/
+
+      # Detects private keys and secrets in code
+      # Why: Prevents accidental commits of credentials and API keys
+      - id: detect-private-key
+        name: Detect private keys
+        description: Scans for private keys and secrets
+
   # ============================================================================
   # PYTHON LINTING AND FORMATTING
   # Ruff - Extremely fast Python linter and formatter (replaces flake8, pylint, isort, black)
