@@ -437,6 +437,16 @@ class LocalConnectionConfig(BaseConnectionConfig):
 
 
 class AzureBlobAuthMode(str, Enum):
+    """Authentication modes for Azure Blob Storage / ADLS Gen2.
+    
+    Values:
+    * `account_key` - Authenticate using storage account key directly
+    * `sas` - Authenticate using Shared Access Signature token
+    * `connection_string` - Authenticate using connection string
+    * `key_vault` - Retrieve account key from Azure Key Vault
+    * `aad_msi` - Authenticate using Azure Active Directory Managed Service Identity
+    """
+    
     ACCOUNT_KEY = "account_key"
     SAS = "sas"
     CONNECTION_STRING = "connection_string"
@@ -445,27 +455,73 @@ class AzureBlobAuthMode(str, Enum):
 
 
 class AzureBlobKeyVaultAuth(BaseModel):
+    """Authentication using Azure Key Vault to retrieve storage account key.
+    
+    **When to Use:** Production environments where secrets are managed in Key Vault.
+    
+    Attributes:
+        mode: Set to "key_vault"
+        key_vault: Name of the Azure Key Vault
+        secret: Name of the secret containing the storage account key
+    """
+    
     mode: Literal[AzureBlobAuthMode.KEY_VAULT] = AzureBlobAuthMode.KEY_VAULT
     key_vault: str
     secret: str
 
 
 class AzureBlobAccountKeyAuth(BaseModel):
+    """Authentication using storage account key directly.
+    
+    **When to Use:** Development/testing or when Key Vault is not available.
+    
+    Attributes:
+        mode: Set to "account_key"
+        account_key: Storage account access key (typically from environment variable)
+    """
+    
     mode: Literal[AzureBlobAuthMode.ACCOUNT_KEY] = AzureBlobAuthMode.ACCOUNT_KEY
     account_key: str
 
 
 class AzureBlobSasAuth(BaseModel):
+    """Authentication using Shared Access Signature (SAS) token.
+    
+    **When to Use:** Temporary, limited-scope access or sharing data with external parties.
+    
+    Attributes:
+        mode: Set to "sas"
+        sas_token: Shared Access Signature token string
+    """
+    
     mode: Literal[AzureBlobAuthMode.SAS] = AzureBlobAuthMode.SAS
     sas_token: str
 
 
 class AzureBlobConnectionStringAuth(BaseModel):
+    """Authentication using Azure Storage connection string.
+    
+    **When to Use:** Simple local development or when a connection string is provided.
+    
+    Attributes:
+        mode: Set to "connection_string"
+        connection_string: Full Azure Storage connection string
+    """
+    
     mode: Literal[AzureBlobAuthMode.CONNECTION_STRING] = AzureBlobAuthMode.CONNECTION_STRING
     connection_string: str
 
 
 class AzureBlobMsiAuth(BaseModel):
+    """Authentication using Azure Active Directory Managed Service Identity.
+    
+    **When to Use:** Running in Azure (VM, App Service, Databricks) with managed identity enabled.
+    
+    Attributes:
+        mode: Set to "aad_msi"
+        client_id: Optional client ID for user-assigned managed identity
+    """
+    
     mode: Literal[AzureBlobAuthMode.AAD_MSI] = AzureBlobAuthMode.AAD_MSI
     client_id: Optional[str] = None
 
@@ -586,6 +642,15 @@ class DeltaConnectionConfig(BaseConnectionConfig):
 
 
 class SQLServerAuthMode(str, Enum):
+    """Authentication modes for SQL Server / Azure SQL Database.
+    
+    Values:
+    * `aad_msi` - Azure Active Directory Managed Service Identity
+    * `aad_password` - Azure Active Directory service principal with password
+    * `sql_login` - Traditional SQL Server username/password authentication
+    * `connection_string` - Full connection string with embedded authentication
+    """
+    
     AAD_MSI = "aad_msi"
     AAD_PASSWORD = "aad_password"
     SQL_LOGIN = "sql_login"
@@ -593,12 +658,33 @@ class SQLServerAuthMode(str, Enum):
 
 
 class SQLLoginAuth(BaseModel):
+    """SQL Server authentication using username and password.
+    
+    **When to Use:** Traditional SQL Server authentication with database-level credentials.
+    
+    Attributes:
+        mode: Set to "sql_login"
+        username: SQL Server login username
+        password: SQL Server login password (typically from environment variable)
+    """
+    
     mode: Literal[SQLServerAuthMode.SQL_LOGIN] = SQLServerAuthMode.SQL_LOGIN
     username: str
     password: str
 
 
 class SQLAadPasswordAuth(BaseModel):
+    """Azure Active Directory service principal authentication.
+    
+    **When to Use:** Azure SQL Database with service principal credentials.
+    
+    Attributes:
+        mode: Set to "aad_password"
+        tenant_id: Azure AD tenant ID
+        client_id: Service principal (application) ID
+        client_secret: Service principal password
+    """
+    
     mode: Literal[SQLServerAuthMode.AAD_PASSWORD] = SQLServerAuthMode.AAD_PASSWORD
     tenant_id: str
     client_id: str
@@ -606,11 +692,29 @@ class SQLAadPasswordAuth(BaseModel):
 
 
 class SQLMsiAuth(BaseModel):
+    """Azure SQL authentication using Managed Service Identity.
+    
+    **When to Use:** Running in Azure with managed identity enabled (recommended for production).
+    
+    Attributes:
+        mode: Set to "aad_msi"
+        client_id: Optional client ID for user-assigned managed identity
+    """
+    
     mode: Literal[SQLServerAuthMode.AAD_MSI] = SQLServerAuthMode.AAD_MSI
     client_id: Optional[str] = None
 
 
 class SQLConnectionStringAuth(BaseModel):
+    """SQL Server authentication using a full connection string.
+    
+    **When to Use:** When you have a pre-constructed connection string with embedded credentials.
+    
+    Attributes:
+        mode: Set to "connection_string"
+        connection_string: Full ADO.NET or ODBC connection string
+    """
+    
     mode: Literal[SQLServerAuthMode.CONNECTION_STRING] = SQLServerAuthMode.CONNECTION_STRING
     connection_string: str
 
@@ -674,6 +778,15 @@ class SQLServerConnectionConfig(BaseConnectionConfig):
 
 
 class HttpAuthMode(str, Enum):
+    """Authentication modes for HTTP connections.
+    
+    Values:
+    * `none` - No authentication required
+    * `basic` - HTTP Basic authentication (username:password in Base64)
+    * `bearer` - Bearer token authentication (OAuth 2.0 style)
+    * `api_key` - Custom API key in header
+    """
+    
     NONE = "none"
     BASIC = "basic"
     BEARER = "bearer"
@@ -681,23 +794,60 @@ class HttpAuthMode(str, Enum):
 
 
 class HttpBasicAuth(BaseModel):
+    """HTTP Basic authentication with username and password.
+    
+    **When to Use:** APIs requiring HTTP Basic Auth (RFC 7617).
+    
+    Attributes:
+        mode: Set to "basic"
+        username: Username for Basic authentication
+        password: Password for Basic authentication
+    """
+    
     mode: Literal[HttpAuthMode.BASIC] = HttpAuthMode.BASIC
     username: str
     password: str
 
 
 class HttpBearerAuth(BaseModel):
+    """Bearer token authentication (OAuth 2.0 style).
+    
+    **When to Use:** APIs using OAuth 2.0 or similar bearer token schemes.
+    
+    Attributes:
+        mode: Set to "bearer"
+        token: Bearer token string (typically from environment variable)
+    """
+    
     mode: Literal[HttpAuthMode.BEARER] = HttpAuthMode.BEARER
     token: str
 
 
 class HttpApiKeyAuth(BaseModel):
+    """Custom API key authentication with configurable header.
+    
+    **When to Use:** APIs requiring custom header-based authentication (e.g., X-API-Key).
+    
+    Attributes:
+        mode: Set to "api_key"
+        header_name: Name of the header (default: "Authorization")
+        value_template: Template for header value with {token} placeholder (default: "Bearer {token}")
+    """
+    
     mode: Literal[HttpAuthMode.API_KEY] = HttpAuthMode.API_KEY
     header_name: str = "Authorization"
     value_template: str = "Bearer {token}"
 
 
 class HttpNoAuth(BaseModel):
+    """No authentication required for HTTP connection.
+    
+    **When to Use:** Public APIs or endpoints that don't require authentication.
+    
+    Attributes:
+        mode: Set to "none"
+    """
+    
     mode: Literal[HttpAuthMode.NONE] = HttpAuthMode.NONE
 
 
@@ -775,6 +925,17 @@ ConnectionConfig = Union[
 
 
 class ReadFormat(str, Enum):
+    """Supported data source formats for read operations.
+    
+    Values:
+    * `csv` - Comma-separated values text files
+    * `parquet` - Apache Parquet columnar format
+    * `delta` - Delta Lake format (ACID transactions, time travel)
+    * `json` - JSON format (newline-delimited or array)
+    * `sql` - SQL query against database connection
+    * `api` - REST API endpoint
+    """
+    
     CSV = "csv"
     PARQUET = "parquet"
     DELTA = "delta"
@@ -1540,16 +1701,46 @@ class TransformConfig(BaseModel):
 
 
 class ValidationAction(str, Enum):
+    """Actions to take when validation tests fail.
+    
+    Values:
+    * `fail` - Stop pipeline execution and raise error
+    * `warn` - Log warning but continue pipeline execution
+    """
+    
     FAIL = "fail"
     WARN = "warn"
 
 
 class OnFailAction(str, Enum):
+    """Actions to take on pipeline node failure.
+    
+    Values:
+    * `alert` - Notify and stop pipeline execution
+    * `ignore` - Log error but allow pipeline to continue
+    """
+    
     ALERT = "alert"
     IGNORE = "ignore"
 
 
 class TestType(str, Enum):
+    """Supported data quality test types.
+    
+    Values:
+    * `not_null` - Column must not contain NULL values
+    * `unique` - Column values must be unique
+    * `accepted_values` - Column values must be in allowed list
+    * `row_count` - Table must have minimum/maximum row count
+    * `custom_sql` - Custom SQL assertion query
+    * `range` - Numeric column must be within min/max range
+    * `regex_match` - String column must match regex pattern
+    * `volume_drop` - Detect significant drops in row count vs history
+    * `schema` - Validate schema matches expectations
+    * `distribution` - Check value distribution statistics
+    * `freshness` - Data must be recent (not stale)
+    """
+    
     __test__ = False  # Prevent pytest collection
 
     NOT_NULL = "not_null"
@@ -1566,12 +1757,30 @@ class TestType(str, Enum):
 
 
 class ContractSeverity(str, Enum):
+    """Severity levels for data contract violations.
+    
+    Values:
+    * `warn` - Log warning but allow data to pass through
+    * `fail` - Stop pipeline execution and raise error
+    * `quarantine` - Move violating rows to quarantine table, allow clean rows to pass
+    """
+    
     WARN = "warn"
     FAIL = "fail"
     QUARANTINE = "quarantine"
 
 
 class BaseTestConfig(BaseModel):
+    """Base configuration for data quality tests.
+    
+    All test configurations inherit from this class and specify their test type.
+    
+    Attributes:
+        type: Type of data quality test to perform
+        name: Optional descriptive name for the test
+        on_fail: Action to take when test fails (warn, fail, or quarantine)
+    """
+    
     type: TestType
     name: Optional[str] = Field(default=None, description="Optional name for the check")
     on_fail: ContractSeverity = Field(
@@ -2891,17 +3100,39 @@ class ColumnMetadata(BaseModel):
 
 
 class SchemaMode(str, Enum):
+    """Schema handling modes for data operations.
+    
+    Values:
+    * `enforce` - Strict schema validation, fail on any schema mismatch
+    * `evolve` - Allow schema to evolve with configurable handling of new/missing columns
+    """
+    
     ENFORCE = "enforce"
     EVOLVE = "evolve"
 
 
 class OnNewColumns(str, Enum):
+    """Actions to take when new columns appear in source data.
+    
+    Values:
+    * `ignore` - Drop new columns silently
+    * `fail` - Raise error and stop pipeline
+    * `add_nullable` - Add new columns to schema as nullable
+    """
+    
     IGNORE = "ignore"
     FAIL = "fail"
     ADD_NULLABLE = "add_nullable"
 
 
 class OnMissingColumns(str, Enum):
+    """Actions to take when expected columns are missing from source data.
+    
+    Values:
+    * `fail` - Raise error and stop pipeline
+    * `fill_null` - Create missing columns with NULL values
+    """
+    
     FAIL = "fail"
     FILL_NULL = "fill_null"
 
