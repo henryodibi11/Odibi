@@ -2,6 +2,8 @@
 
 import hashlib
 import os
+import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 try:
@@ -1333,3 +1335,191 @@ class PolarsEngine(Engine):
         )
 
         return history
+
+    def add_write_metadata(
+        self,
+        df: "pl.DataFrame",
+        metadata_config: Any,
+        source_connection: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_path: Optional[str] = None,
+        is_file_source: bool = False,
+    ) -> "pl.DataFrame":
+        """Add metadata columns to DataFrame before writing (Bronze layer lineage).
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            metadata_config: WriteMetadataConfig or True (for all defaults)
+            source_connection: Name of the source connection
+            source_table: Name of the source table (SQL sources)
+            source_path: Path of the source file (file sources)
+            is_file_source: True if source is a file-based read
+
+        Returns:
+            DataFrame with metadata columns added
+        """
+        from odibi.config import WriteMetadataConfig
+
+        if metadata_config is True:
+            config = WriteMetadataConfig()
+        elif isinstance(metadata_config, WriteMetadataConfig):
+            config = metadata_config
+        else:
+            return df
+
+        is_lazy = isinstance(df, pl.LazyFrame)
+        if is_lazy:
+            df = df.collect()
+
+        columns = []
+        if config.extracted_at:
+            columns.append(pl.lit(datetime.now()).alias("_extracted_at"))
+        if config.source_file and is_file_source and source_path:
+            columns.append(pl.lit(source_path).alias("_source_file"))
+        if config.source_connection and source_connection:
+            columns.append(pl.lit(source_connection).alias("_source_connection"))
+        if config.source_table and source_table:
+            columns.append(pl.lit(source_table).alias("_source_table"))
+
+        if columns:
+            df = df.with_columns(columns)
+
+        return df.lazy() if is_lazy else df
+
+    def restore_delta(self, connection: Any, path: str, version: int) -> None:
+        """Restore Delta table to a specific version.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            version: Version number to restore to
+        """
+        from odibi.utils.logging_context import get_logging_context
+
+        ctx = get_logging_context().with_context(engine="polars")
+        start = time.time()
+
+        ctx.info("Starting Delta table restore", path=path, target_version=version)
+
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            ctx.error("Delta Lake library not installed", path=path)
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[polars]' "
+                "or 'pip install deltalake'. See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path) if connection else path
+
+        storage_opts = {}
+        if hasattr(connection, "pandas_storage_options"):
+            storage_opts = connection.pandas_storage_options()
+
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        dt.restore(version)
+
+        elapsed = (time.time() - start) * 1000
+        ctx.info(
+            "Delta table restored",
+            path=str(full_path),
+            restored_to_version=version,
+            elapsed_ms=round(elapsed, 2),
+        )
+
+    def filter_greater_than(self, df: "pl.DataFrame", column: str, value: Any) -> "pl.DataFrame":
+        """Filter DataFrame where column > value.
+
+        Automatically casts string columns to datetime for proper comparison.
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            column: Column name to filter on
+            value: Value to compare against
+
+        Returns:
+            Filtered DataFrame
+        """
+        is_lazy = isinstance(df, pl.LazyFrame)
+        if is_lazy:
+            df = df.collect()
+
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+
+        try:
+            col_dtype = df[column].dtype
+
+            if col_dtype == pl.Utf8:
+                df = df.with_columns(pl.col(column).str.to_datetime(time_unit="us", strict=False))
+                value = datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T"))
+            elif col_dtype in (pl.Datetime, pl.Date) and isinstance(value, str):
+                value = datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T"))
+
+            result = df.filter(pl.col(column) > value)
+            return result.lazy() if is_lazy else result
+        except Exception as e:
+            raise ValueError(f"Failed to filter {column} > {value}: {e}")
+
+    def filter_coalesce(
+        self,
+        df: "pl.DataFrame",
+        col1: str,
+        col2: str,
+        op: str,
+        value: Any,
+    ) -> "pl.DataFrame":
+        """Filter using COALESCE(col1, col2) op value.
+
+        Automatically casts string columns to datetime for proper comparison.
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            col1: Primary column name
+            col2: Fallback column name
+            op: Comparison operator (>=, >, <=, <, ==, =)
+            value: Value to compare against
+
+        Returns:
+            Filtered DataFrame
+        """
+        is_lazy = isinstance(df, pl.LazyFrame)
+        if is_lazy:
+            df = df.collect()
+
+        if col1 not in df.columns:
+            raise ValueError(f"Column '{col1}' not found")
+
+        def _cast_if_string(col_name: str) -> pl.Expr:
+            if df[col_name].dtype == pl.Utf8:
+                return pl.col(col_name).str.to_datetime(strict=False)
+            return pl.col(col_name)
+
+        expr1 = _cast_if_string(col1)
+        if col2 in df.columns:
+            expr2 = _cast_if_string(col2)
+            coalesced = pl.coalesce(expr1, expr2)
+        else:
+            coalesced = expr1
+
+        try:
+            coalesced_series = df.select(coalesced.alias("_coalesced"))["_coalesced"]
+            if coalesced_series.dtype in (pl.Datetime, pl.Date) and isinstance(value, str):
+                value = datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T"))
+
+            ops = {
+                ">=": coalesced >= value,
+                ">": coalesced > value,
+                "<=": coalesced <= value,
+                "<": coalesced < value,
+                "==": coalesced == value,
+                "=": coalesced == value,
+            }
+
+            if op not in ops:
+                raise ValueError(f"Unsupported operator: {op}")
+
+            result = df.filter(ops[op])
+            return result.lazy() if is_lazy else result
+        except Exception as e:
+            raise ValueError(f"Failed to filter COALESCE({col1}, {col2}) {op} {value}: {e}")
