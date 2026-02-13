@@ -974,7 +974,7 @@ class TestPolarsAddWriteMetadata:
 
         # Result should still be lazy
         assert isinstance(result, pl.LazyFrame)
-        
+
         # Collect and verify
         materialized = result.collect()
         assert "_extracted_at" in materialized.columns
