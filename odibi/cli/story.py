@@ -5,6 +5,7 @@ Story CLI Commands
 Commands for generating and managing pipeline documentation stories.
 """
 
+import argparse
 from pathlib import Path
 
 import yaml
@@ -13,7 +14,7 @@ from odibi.config import ProjectConfig
 from odibi.story import DocStoryGenerator
 
 
-def story_command(args):
+def story_command(args) -> int:
     """
     Handle story subcommands.
 
@@ -38,7 +39,7 @@ def story_command(args):
         return 1
 
 
-def generate_command(args):
+def generate_command(args) -> int:
     """
     Generate documentation story from pipeline config.
 
@@ -124,7 +125,7 @@ def generate_command(args):
         return 1
 
 
-def diff_command(args):
+def diff_command(args) -> int:
     """
     Compare two pipeline run stories.
 
@@ -243,7 +244,7 @@ def diff_command(args):
         return 1
 
 
-def list_command(args):
+def list_command(args) -> int:
     """
     List available story files.
 
@@ -308,7 +309,7 @@ def list_command(args):
         return 1
 
 
-def last_command(args):
+def last_command(args) -> int:
     """
     Show the most recent story file.
 
@@ -401,7 +402,7 @@ def last_command(args):
     return 0
 
 
-def show_command(args):
+def show_command(args) -> int:
     """
     Show a specific story file.
 
@@ -446,7 +447,7 @@ def show_command(args):
     return 0
 
 
-def add_story_parser(subparsers):
+def add_story_parser(subparsers) -> argparse.ArgumentParser:
     """
     Add story subcommand parser.
 

@@ -1,5 +1,6 @@
 """Catalog CLI command for querying the System Catalog."""
 
+import argparse
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -9,7 +10,7 @@ from odibi.utils.extensions import load_extensions
 from odibi.utils.logging import logger
 
 
-def add_catalog_parser(subparsers):
+def add_catalog_parser(subparsers) -> argparse.ArgumentParser:
     """Add catalog subcommand parser."""
     catalog_parser = subparsers.add_parser(
         "catalog",
@@ -187,7 +188,7 @@ def add_catalog_parser(subparsers):
     return catalog_parser
 
 
-def catalog_command(args):
+def catalog_command(args) -> int:
     """Execute catalog command."""
     if not hasattr(args, "catalog_command") or args.catalog_command is None:
         print("Usage: odibi catalog <command>")
@@ -613,7 +614,7 @@ def _stats_command(args) -> int:
         return 1
 
 
-def _sync_command(args):
+def _sync_command(args) -> int:
     """Execute catalog sync command."""
     from odibi.catalog_sync import CatalogSyncer, ALL_SYNC_TABLES, DEFAULT_SYNC_TABLES
     from odibi.config import load_config_from_file
@@ -710,7 +711,7 @@ def _sync_command(args):
         return 1
 
 
-def _sync_status_command(args):
+def _sync_status_command(args) -> int:
     """Show sync status for configured destinations."""
     from odibi.config import load_config_from_file
 
@@ -765,7 +766,7 @@ def _sync_status_command(args):
         return 1
 
 
-def _sync_purge_command(args):
+def _sync_purge_command(args) -> int:
     """Purge old records from SQL Server sync tables."""
     from odibi.catalog_sync import CatalogSyncer
     from odibi.config import load_config_from_file
