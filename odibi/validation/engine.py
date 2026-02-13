@@ -599,7 +599,11 @@ class Validator:
                         try:
                             s = pd.to_datetime(df[col])
                             max_ts = s.max()
-                        except Exception:
+                        except Exception as e:
+                            logger = get_logging_context()
+                            logger.debug(
+                                f"Failed to convert column '{col}' to datetime for max_age check: {type(e).__name__}: {e}"
+                            )
                             max_ts = None
                     else:
                         max_ts = df[col].max()

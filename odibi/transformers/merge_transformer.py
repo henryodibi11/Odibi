@@ -434,9 +434,17 @@ def _merge_spark(
                 try:
                     DeltaTable.forName(spark, target)
                     is_delta = True
-                except Exception:
+                except Exception as e:
+                    logger = get_logging_context()
+                    logger.debug(
+                        f"Target '{target}' not found as Delta table by name: {type(e).__name__}: {e}"
+                    )
                     is_delta = False
-        except Exception:
+        except Exception as e:
+            logger = get_logging_context()
+            logger.debug(
+                f"Failed to check if target '{target}' is a Delta table: {type(e).__name__}: {e}"
+            )
             is_delta = False
 
         if is_delta:

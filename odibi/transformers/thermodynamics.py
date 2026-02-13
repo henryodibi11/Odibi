@@ -402,7 +402,9 @@ def _compute_fluid_properties_row(
 
             result[col_name] = raw_value
 
-    except Exception:
+    except Exception as e:
+        logger = get_logging_context()
+        logger.debug(f"Failed to calculate fluid properties for row: {type(e).__name__}: {e}")
         # Return nulls for all outputs on error
         for out_cfg in params.outputs:
             if out_cfg.output_column:
@@ -918,7 +920,11 @@ def _compute_psychrometrics_row(
 
             result[col_name] = raw_value
 
-    except Exception:
+    except Exception as e:
+        logger = get_logging_context()
+        logger.debug(
+            f"Failed to calculate psychrometric properties for row: {type(e).__name__}: {e}"
+        )
         for out_cfg in params.outputs:
             col_name = out_cfg.output_column or (
                 f"{params.prefix}_{out_cfg.property}" if params.prefix else out_cfg.property
