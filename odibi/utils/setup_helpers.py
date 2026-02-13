@@ -1,9 +1,12 @@
 """Setup helpers for ODIBI - Phase 2C performance utilities."""
 
 import concurrent.futures
+import logging
 import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -141,11 +144,11 @@ def fetch_keyvault_secrets_parallel(
 
     if not kv_connections:
         if verbose:
-            print("- No Key Vault connections to fetch")
+            logger.info("- No Key Vault connections to fetch")
         return results
 
     if verbose:
-        print(f"⚡ Fetching {len(kv_connections)} Key Vault secrets in parallel...")
+        logger.info(f"⚡ Fetching {len(kv_connections)} Key Vault secrets in parallel...")
 
     start_time = time.time()
 
@@ -168,15 +171,15 @@ def fetch_keyvault_secrets_parallel(
 
             if verbose:
                 if result.success:
-                    print(f"  - {name}: {result.duration_ms:.0f}ms")
+                    logger.info(f"  - {name}: {result.duration_ms:.0f}ms")
                 else:
-                    print(f"  [X] {name}: {type(result.error).__name__}")
+                    logger.info(f"  [X] {name}: {type(result.error).__name__}")
 
     total_duration = (time.time() - start_time) * 1000
 
     if verbose:
         success_count = sum(1 for r in results.values() if r.success)
-        print(
+        logger.info(
             f"- Completed in {total_duration:.0f}ms ({success_count}/{len(kv_connections)} successful)"
         )
 
