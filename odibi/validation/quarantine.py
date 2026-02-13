@@ -103,7 +103,10 @@ def _evaluate_test_mask(
         elif test.type == TestType.CUSTOM_SQL:
             try:
                 return F.expr(test.condition)
-            except Exception:
+            except Exception as e:
+                logger.debug(
+                    f"Failed to parse custom SQL condition for Spark: {type(e).__name__}: {e}"
+                )
                 return F.lit(True)
 
         return F.lit(True)
@@ -194,7 +197,10 @@ def _evaluate_test_mask(
                 valid = df.query(test.condition)
                 mask = df.index.isin(valid.index)
                 return pd.Series(mask, index=df.index)
-            except Exception:
+            except Exception as e:
+                logger.debug(
+                    f"Failed to execute custom SQL query for Pandas: {type(e).__name__}: {e}"
+                )
                 return pd.Series([True] * len(df), index=df.index)
 
         return pd.Series([True] * len(df), index=df.index)

@@ -204,11 +204,18 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
     try:
         # Try reading as table first
         target_df = spark.table(params.target)
-    except Exception:
+    except Exception as e:
+        logger = get_logging_context()
+        logger.debug(
+            f"Target table '{params.target}' not found as registered table: {type(e).__name__}: {e}"
+        )
         try:
             # Try reading as Delta path
             target_df = spark.read.format("delta").load(params.target)
-        except Exception:
+        except Exception as e2:
+            logger.debug(
+                f"Target '{params.target}' not found as Delta path - assuming first run: {type(e2).__name__}: {e2}"
+            )
             # Target doesn't exist yet - First Run
             pass
 
