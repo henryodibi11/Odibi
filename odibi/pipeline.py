@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -275,7 +275,7 @@ class Pipeline:
                     self._ctx.warning(f"Failed to close connection {name}: {e}", exc_info=True)
 
     @classmethod
-    def from_yaml(cls, yaml_path: str) -> "PipelineManager":
+    def from_yaml(cls: Type["Pipeline"], yaml_path: str) -> "PipelineManager":
         """Create PipelineManager from YAML file (recommended).
 
         This method now returns a PipelineManager that can run all or specific pipelines.
@@ -1208,7 +1208,7 @@ class Pipeline:
                     if field in project_dump and project_dump[field]:
                         config_dump[field] = project_dump[field]
 
-            def generate_story():
+            def generate_story() -> Optional[str]:
                 try:
                     # Get graph data for interactive DAG visualization
                     graph_data_dict = self.graph.to_dict() if self.graph else None
@@ -1877,7 +1877,9 @@ class PipelineManager:
         }
 
     @classmethod
-    def from_yaml(cls, yaml_path: str, env: str = None) -> "PipelineManager":
+    def from_yaml(
+        cls: Type["PipelineManager"], yaml_path: str, env: str = None
+    ) -> "PipelineManager":
         """Create PipelineManager from YAML file.
 
         Args:
@@ -1913,7 +1915,7 @@ class PipelineManager:
             except ImportError:
                 logger.warning("python-dotenv not installed, skipping .env file")
 
-        def load_transforms_module(path):
+        def load_transforms_module(path: str) -> None:
             if os.path.exists(path):
                 try:
                     spec = importlib.util.spec_from_file_location("transforms_autodiscovered", path)
