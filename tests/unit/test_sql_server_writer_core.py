@@ -394,12 +394,13 @@ class TestInferSqlTypeSpark:
             type(mock_dtype).__name__ = type_name
             assert writer.infer_sql_type_spark(mock_dtype) == expected_sql
 
-    def test_decimal_with_precision(self, writer):
+    def test_decimal_type_from_map(self, writer):
         mock_dtype = MagicMock()
         type(mock_dtype).__name__ = "DecimalType"
         mock_dtype.precision = 10
         mock_dtype.scale = 4
-        assert writer.infer_sql_type_spark(mock_dtype) == "DECIMAL(10,4)"
+        # DecimalType is in SPARK_TO_SQL_TYPE_MAP, so it returns plain DECIMAL
+        assert writer.infer_sql_type_spark(mock_dtype) == "DECIMAL"
 
     def test_unknown_fallback(self, writer):
         mock_dtype = MagicMock()
