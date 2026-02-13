@@ -395,15 +395,15 @@ class TestDoctorCommand:
                 raise Exception("Import error")
             return real_import(name, *args, **kwargs)
 
-        with patch("builtins.__import__", side_effect=mock_import):
-            with patch("odibi.cli.doctor.check_dependencies", return_value=True):
-                with patch("odibi.cli.doctor.check_config", return_value=mock_manager):
-                    with patch("odibi.cli.doctor.check_connections", return_value=True):
+        with patch("odibi.cli.doctor.check_dependencies", return_value=True):
+            with patch("odibi.cli.doctor.check_config", return_value=mock_manager):
+                with patch("odibi.cli.doctor.check_connections", return_value=True):
+                    with patch("builtins.__import__", side_effect=mock_import):
                         args = Mock()
                         doctor_command(args)
 
-                        captured = capsys.readouterr()
-                        assert "Odibi Doctor (vunknown)" in captured.out
+                    captured = capsys.readouterr()
+                    assert "Odibi Doctor (vunknown)" in captured.out
 
     def test_doctor_command_separator_line(self, capsys):
         """Should display separator line."""

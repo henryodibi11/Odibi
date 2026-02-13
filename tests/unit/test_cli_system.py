@@ -684,30 +684,48 @@ class TestCountRecordsSpark:
 
     def test_count_spark_success(self):
         """Should count records using Spark."""
-        mock_functions = Mock()
-        mock_pyspark_sql = Mock()
-        mock_pyspark_sql.functions = mock_functions
+        import sys
 
-        with patch.dict(
-            "sys.modules",
-            {"pyspark": Mock(), "pyspark.sql": mock_pyspark_sql},
-        ):
-            mock_catalog = Mock()
-            mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
+        mock_catalog = Mock()
+        mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
 
-            mock_filtered = Mock()
-            mock_filtered.count.return_value = 75
+        mock_filtered = Mock()
+        mock_filtered.count.return_value = 75
 
-            mock_df = Mock()
-            mock_df.filter.return_value = mock_filtered
+        mock_df = Mock()
+        mock_df.filter.return_value = mock_filtered
 
-            mock_catalog.spark.read.format.return_value.load.return_value = mock_df
+        mock_catalog.spark.read.format.return_value.load.return_value = mock_df
 
-            cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
+        cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
 
-            result = _count_records_spark(mock_catalog, cutoffs)
+        # The function does `from pyspark.sql import functions as F`.
+        # In CI with real PySpark installed, F.col/F.lit create real Column
+        # objects that may fail without JVM. We must ensure our mock is used.
+        # Remove cached real pyspark modules temporarily so patch.dict works.
+        saved = {}
+        keys_to_remove = [k for k in sys.modules if k.startswith("pyspark")]
+        for k in keys_to_remove:
+            saved[k] = sys.modules.pop(k)
 
-            assert result == {"meta_daily_stats": 75}
+        mock_F = Mock()
+        mock_sql = Mock()
+        mock_sql.functions = mock_F
+        try:
+            with patch.dict(
+                "sys.modules",
+                {
+                    "pyspark": Mock(),
+                    "pyspark.sql": mock_sql,
+                    "pyspark.sql.functions": mock_F,
+                },
+            ):
+                result = _count_records_spark(mock_catalog, cutoffs)
+        finally:
+            # Restore real pyspark modules
+            sys.modules.update(saved)
+
+        assert result == {"meta_daily_stats": 75}
 
     def test_count_spark_exception_handling(self, caplog):
         """Should handle exceptions gracefully."""
