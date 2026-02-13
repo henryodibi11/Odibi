@@ -504,10 +504,8 @@ def test_pivot_count():
 
 def test_pivot_avg():
     """Test pivot with average aggregation.
-
-    Note: The current implementation passes agg_func directly to pandas,
-    which expects 'mean' not 'avg'. This test uses 'sum' instead.
-    TODO: The transformer should map 'avg' -> 'mean' for pandas compatibility.
+    
+    This test verifies that 'avg' is correctly mapped to 'mean' for pandas compatibility.
     """
     df = pd.DataFrame(
         {
@@ -518,17 +516,60 @@ def test_pivot_avg():
     )
 
     context = create_context(df)
-    # Use sum since avg->mean mapping isn't implemented
     params = PivotParams(
         group_by=["product"],
         pivot_col="month",
         agg_col="sales",
-        agg_func="sum",
+        agg_func="avg",
     )
     result_ctx = pivot(context, params)
     result = result_ctx.df
 
     assert len(result) == 2
+    # Check that average values are correctly calculated
+    # Product A: Jan=100, Feb=150
+    # Product B: Jan=200, Feb=250
+    assert result[result["product"] == "A"]["Jan"].values[0] == 100
+    assert result[result["product"] == "A"]["Feb"].values[0] == 150
+    assert result[result["product"] == "B"]["Jan"].values[0] == 200
+    assert result[result["product"] == "B"]["Feb"].values[0] == 250
+
+
+def test_pivot_avg_mean_equivalence():
+    """Test that 'avg' and 'mean' produce identical results.
+    
+    This verifies that the mapping from 'avg' to 'mean' works correctly.
+    """
+    df = pd.DataFrame(
+        {
+            "product": ["A", "A", "A", "B", "B", "B"],
+            "month": ["Jan", "Jan", "Feb", "Jan", "Jan", "Feb"],
+            "sales": [100, 120, 150, 200, 220, 250],
+        }
+    )
+
+    context = create_context(df)
+    
+    # Test with 'avg'
+    params_avg = PivotParams(
+        group_by=["product"],
+        pivot_col="month",
+        agg_col="sales",
+        agg_func="avg",
+    )
+    result_avg_ctx = pivot(context, params_avg)
+    result_avg = result_avg_ctx.df
+    
+    # Note: 'mean' is not currently in the Literal type for agg_func,
+    # but we can test by directly calling pandas to verify our expectation
+    # Instead, we'll verify avg produces mathematically correct means
+    
+    # Product A: Jan=(100+120)/2=110, Feb=150
+    # Product B: Jan=(200+220)/2=210, Feb=250
+    assert result_avg[result_avg["product"] == "A"]["Jan"].values[0] == 110
+    assert result_avg[result_avg["product"] == "A"]["Feb"].values[0] == 150
+    assert result_avg[result_avg["product"] == "B"]["Jan"].values[0] == 210
+    assert result_avg[result_avg["product"] == "B"]["Feb"].values[0] == 250
 
 
 def test_pivot_max():
