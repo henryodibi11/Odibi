@@ -363,8 +363,10 @@ class TestSetupTelemetry:
                 captured = capsys.readouterr()
                 assert "Warning: Failed to initialize OpenTelemetry" not in captured.err
 
-    def test_setup_with_endpoint_generic_exception(self, monkeypatch, capsys):
+    def test_setup_with_endpoint_generic_exception(self, monkeypatch, caplog):
         """Test setup_telemetry handles generic exceptions without crashing."""
+        import logging
+
         import odibi.utils.telemetry as telemetry_module
 
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
@@ -395,12 +397,12 @@ class TestSetupTelemetry:
                     },
                 ):
                     # Should not raise
-                    setup_telemetry()
+                    with caplog.at_level(logging.WARNING, logger="odibi.utils.telemetry"):
+                        setup_telemetry()
 
-                    # Should print warning for non-ImportError exceptions
-                    captured = capsys.readouterr()
-                    assert "Warning: Failed to initialize OpenTelemetry" in captured.err
-                    assert "Setup failed" in captured.err
+                    # Should log warning for non-ImportError exceptions
+                    assert "Failed to initialize OpenTelemetry" in caplog.text
+                    assert "Setup failed" in caplog.text
             finally:
                 if old_trace is not None:
                     telemetry_module.trace = old_trace
