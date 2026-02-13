@@ -1215,3 +1215,45 @@ class PolarsEngine(Engine):
         )
 
         return history
+
+    def restore_delta(self, connection: Any, path: str, version: int) -> None:
+        """Restore Delta table to a specific version.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            version: Version number to restore to
+        """
+        from odibi.utils.logging_context import get_logging_context
+        import time
+
+        ctx = get_logging_context().with_context(engine="polars")
+        start = time.time()
+
+        ctx.info("Starting Delta table restore", path=path, target_version=version)
+
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            ctx.error("Delta Lake library not installed", path=path)
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[polars]' "
+                "or 'pip install deltalake'. See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path) if connection else path
+
+        storage_opts = {}
+        if hasattr(connection, "pandas_storage_options"):
+            storage_opts = connection.pandas_storage_options()
+
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        dt.restore(version)
+
+        elapsed = (time.time() - start) * 1000
+        ctx.info(
+            "Delta table restored",
+            path=str(full_path),
+            restored_to_version=version,
+            elapsed_ms=round(elapsed, 2),
+        )

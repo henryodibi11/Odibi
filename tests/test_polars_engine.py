@@ -662,6 +662,47 @@ class TestPolarsDeltaOperations:
         with pytest.raises(ImportError, match="Delta Lake support requires"):
             polars_engine.get_delta_history(connection, path="test_path")
 
+    def test_restore_delta_import_error_handling(self, polars_engine, mock_deltalake_import_error):
+        """Test restore_delta raises proper error when deltalake not available."""
+        connection = MockConnection()
+        with pytest.raises(ImportError, match="Delta Lake support requires"):
+            polars_engine.restore_delta(connection, path="test_path", version=1)
+
+    def test_restore_delta_success(self, polars_engine, monkeypatch):
+        """Test restore_delta successfully restores a Delta table to a version."""
+        import sys
+        import types
+
+        called = {}
+
+        class FakeDeltaTable:
+            def __init__(self, path, storage_options=None):
+                called["path"] = path
+                called["storage_options"] = storage_options
+
+            def restore(self, version):
+                called["version"] = version
+
+        # Mock the deltalake module
+        monkeypatch.setitem(
+            sys.modules, "deltalake", types.SimpleNamespace(DeltaTable=FakeDeltaTable)
+        )
+
+        # Create a mock connection with storage options
+        class MockConnWithStorage:
+            def get_path(self, path):
+                return f"/full/{path}"
+
+            def pandas_storage_options(self):
+                return {"test_option": "test_value"}
+
+        connection = MockConnWithStorage()
+        polars_engine.restore_delta(connection, "test_path", version=3)
+
+        assert called["version"] == 3
+        assert "test_path" in called["path"]
+        assert called["storage_options"]["test_option"] == "test_value"
+
     def test_maintain_table_disabled(self, polars_engine):
         """Test maintain_table does nothing when config is disabled."""
 
