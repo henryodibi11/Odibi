@@ -1,5 +1,6 @@
 """Polars engine implementation."""
 
+import datetime
 import hashlib
 import os
 from typing import Any, Dict, List, Optional
@@ -1245,33 +1246,19 @@ class PolarsEngine(Engine):
             col_dtype = schema[column]
 
             # If column is string type, try to parse as datetime
-            if col_dtype == pl.String or col_dtype == pl.Utf8:
+            if col_dtype in (pl.String, pl.Utf8):
                 df = df.with_columns(
                     pl.col(column).str.to_datetime(time_unit="us", strict=False).alias(column)
                 )
                 # If value is string, parse it to datetime
                 if isinstance(value, str):
-                    import datetime
-                    value = pl.datetime(
-                        year=int(value[:4]),
-                        month=int(value[5:7]) if len(value) >= 7 else 1,
-                        day=int(value[8:10]) if len(value) >= 10 else 1
-                    )
+                    value = datetime.datetime.fromisoformat(value.replace(" ", "T"))
 
             # If column is datetime and value is string, parse value
             elif col_dtype in (pl.Datetime, pl.Date) and isinstance(value, str):
-                import datetime
-                # Parse the string value to datetime
-                if "T" in value:
-                    value = datetime.datetime.fromisoformat(value)
-                else:
-                    # Parse date string like "2020-12-31"
-                    parts = value.split("-")
-                    if len(parts) == 3:
-                        value = datetime.datetime(int(parts[0]), int(parts[1]), int(parts[2]))
-                    else:
-                        # Fall back to parsing
-                        value = datetime.datetime.fromisoformat(value)
+                # Parse the string value to datetime using fromisoformat
+                # Handle both ISO format and simple date strings
+                value = datetime.datetime.fromisoformat(value.replace(" ", "T"))
 
             # Apply filter
             return df.filter(pl.col(column) > value)
