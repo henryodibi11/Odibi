@@ -488,7 +488,7 @@ class SparkContext(Context):
             try:
                 self.spark.catalog.dropTempView(name)
             except Exception as e:
-                logger.debug(f"Failed to drop temp view '{name}' during cleanup: {e}")
+                logger.debug(f"Failed to drop temp view '{name}' during cleanup: {type(e).__name__}: {e}")
 
     def unregister(self, name: str) -> None:
         """Unregister a temp view from Spark.
@@ -503,7 +503,7 @@ class SparkContext(Context):
         try:
             self.spark.catalog.dropTempView(name)
         except Exception as e:
-            logger.debug(f"Failed to drop temp view '{name}': {e}")
+            logger.debug(f"Failed to drop temp view '{name}': {type(e).__name__}: {e}")
 
 
 def create_context(engine: str, spark_session: Optional[Any] = None) -> Context:
