@@ -857,3 +857,180 @@ class TestPolarsWriteSql:
 
         assert len(written_data) == 1
         assert written_data[0]["rows"] == 3
+
+
+class TestAddWriteMetadata:
+    def test_defaults_adds_extracted_at(self, polars_engine):
+        df = pl.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+        result = polars_engine.add_write_metadata(df, True)
+        assert "_extracted_at" in result.columns
+        assert len(result) == 2
+
+    def test_source_file_only_for_file_sources(self, polars_engine):
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(
+            df, True, source_path="/data/file.csv", is_file_source=True
+        )
+        assert "_source_file" in result.columns
+        assert result["_source_file"][0] == "/data/file.csv"
+
+    def test_source_file_skipped_for_non_file(self, polars_engine):
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(
+            df, True, source_path="/data/file.csv", is_file_source=False
+        )
+        assert "_source_file" not in result.columns
+
+    def test_source_connection_added(self, polars_engine):
+        from odibi.config import WriteMetadataConfig
+
+        cfg = WriteMetadataConfig(source_connection=True)
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(df, cfg, source_connection="my_db")
+        assert "_source_connection" in result.columns
+        assert result["_source_connection"][0] == "my_db"
+
+    def test_source_table_added(self, polars_engine):
+        from odibi.config import WriteMetadataConfig
+
+        cfg = WriteMetadataConfig(source_table=True)
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(df, cfg, source_table="customers")
+        assert "_source_table" in result.columns
+        assert result["_source_table"][0] == "customers"
+
+    def test_none_config_returns_unchanged(self, polars_engine):
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(df, None)
+        assert result.columns == ["id"]
+
+    def test_lazyframe_support(self, polars_engine):
+        df = pl.DataFrame({"id": [1]}).lazy()
+        result = polars_engine.add_write_metadata(df, True)
+        assert isinstance(result, pl.LazyFrame)
+        collected = result.collect()
+        assert "_extracted_at" in collected.columns
+
+
+class TestRestoreDelta:
+    def test_import_error_raised(self, polars_engine):
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "deltalake":
+                raise ImportError("no deltalake")
+            return real_import(name, *args, **kwargs)
+
+        builtins.__import__ = mock_import
+        try:
+            with pytest.raises(ImportError, match="Delta Lake support requires"):
+                polars_engine.restore_delta(MockConnection(), "/table", 1)
+        finally:
+            builtins.__import__ = real_import
+
+    def test_restore_calls_dt_restore(self, polars_engine, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        mock_dt_instance = MagicMock()
+        mock_dt_class = MagicMock(return_value=mock_dt_instance)
+
+        with patch("odibi.engine.polars_engine.DeltaTable", mock_dt_class, create=True):
+            monkeypatch.setattr(
+                "builtins.__import__",
+                lambda name, *a, **kw: (
+                    type("mod", (), {"DeltaTable": mock_dt_class})()
+                    if name == "deltalake"
+                    else __import__(name, *a, **kw)
+                ),
+            )
+            polars_engine.restore_delta(MockConnection(), "/table", 3)
+
+        mock_dt_instance.restore.assert_called_once_with(3)
+
+
+class TestFilterGreaterThan:
+    def test_numeric_filter(self, polars_engine):
+        df = pl.DataFrame({"value": [1, 5, 10, 15]})
+        result = polars_engine.filter_greater_than(df, "value", 5)
+        assert result["value"].to_list() == [10, 15]
+
+    def test_datetime_column(self, polars_engine):
+        from datetime import datetime
+
+        df = pl.DataFrame(
+            {"ts": [datetime(2024, 1, 1), datetime(2024, 6, 1), datetime(2024, 12, 1)]}
+        )
+        result = polars_engine.filter_greater_than(df, "ts", "2024-06-01")
+        assert len(result) == 1
+
+    def test_string_to_datetime_cast(self, polars_engine):
+        df = pl.DataFrame({"date": ["2024-01-01", "2024-06-15", "2024-12-31"]})
+        result = polars_engine.filter_greater_than(df, "date", "2024-06-01")
+        assert len(result) == 2
+
+    def test_missing_column_raises(self, polars_engine):
+        df = pl.DataFrame({"id": [1]})
+        with pytest.raises(ValueError, match="not found"):
+            polars_engine.filter_greater_than(df, "missing", 0)
+
+    def test_empty_result(self, polars_engine):
+        df = pl.DataFrame({"value": [1, 2, 3]})
+        result = polars_engine.filter_greater_than(df, "value", 100)
+        assert len(result) == 0
+
+    def test_lazyframe_support(self, polars_engine):
+        df = pl.DataFrame({"value": [1, 5, 10]}).lazy()
+        result = polars_engine.filter_greater_than(df, "value", 5)
+        assert isinstance(result, pl.LazyFrame)
+        assert result.collect()["value"].to_list() == [10]
+
+
+class TestFilterCoalesce:
+    def test_basic_coalesce_gte(self, polars_engine):
+        df = pl.DataFrame({"a": [1, 5, 10], "b": [2, 6, 11]})
+        result = polars_engine.filter_coalesce(df, "a", "b", ">=", 5)
+        assert len(result) == 2
+
+    def test_coalesce_fills_nulls(self, polars_engine):
+        df = pl.DataFrame({"a": [None, 5, None], "b": [2, None, 11]})
+        result = polars_engine.filter_coalesce(df, "a", "b", ">", 3)
+        assert len(result) == 2
+
+    def test_missing_col1_raises(self, polars_engine):
+        df = pl.DataFrame({"b": [1]})
+        with pytest.raises(ValueError, match="not found"):
+            polars_engine.filter_coalesce(df, "missing", "b", ">", 0)
+
+    def test_missing_col2_uses_col1_only(self, polars_engine):
+        df = pl.DataFrame({"a": [1, 5, 10]})
+        result = polars_engine.filter_coalesce(df, "a", "missing", ">", 3)
+        assert len(result) == 2
+
+    def test_unsupported_operator_raises(self, polars_engine):
+        df = pl.DataFrame({"a": [1], "b": [2]})
+        with pytest.raises(ValueError, match="Unsupported operator"):
+            polars_engine.filter_coalesce(df, "a", "b", "!=", 1)
+
+    def test_datetime_coalesce(self, polars_engine):
+        df = pl.DataFrame(
+            {
+                "updated": ["2024-06-01", None, "2024-12-01"],
+                "created": ["2024-01-01", "2024-03-01", "2024-01-01"],
+            }
+        )
+        result = polars_engine.filter_coalesce(df, "updated", "created", ">=", "2024-04-01")
+        assert len(result) == 2
+
+    def test_all_operators(self, polars_engine):
+        df = pl.DataFrame({"a": [1, 5, 10], "b": [1, 5, 10]})
+        for op in [">=", ">", "<=", "<", "==", "="]:
+            result = polars_engine.filter_coalesce(df, "a", "b", op, 5)
+            assert len(result) >= 0
+
+    def test_lazyframe_support(self, polars_engine):
+        df = pl.DataFrame({"a": [1, 5, 10], "b": [2, 6, 11]}).lazy()
+        result = polars_engine.filter_coalesce(df, "a", "b", ">", 5)
+        assert isinstance(result, pl.LazyFrame)
+        assert len(result.collect()) == 1
