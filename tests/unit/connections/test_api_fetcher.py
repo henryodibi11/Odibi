@@ -115,87 +115,157 @@ class TestResponseExtractor:
     def test_date_variables(self):
         """Test date variable substitution in add_fields."""
         import datetime
+        import sys
 
-        extractor = ResponseExtractor(
-            items_path="",
-            add_fields={
-                "_now": "$now",
-                "_today": "$today",
-                "_yesterday": "$yesterday",
-                "_date": "$date",
-                "_7_days": "$7_days_ago",
-                "_30_days": "$30_days_ago",
-                "_90_days": "$90_days_ago",
-                "_week_start": "$start_of_week",
-                "_month_start": "$start_of_month",
-                "_year_start": "$start_of_year",
-                "_static": "constant_value",
-            },
-        )
-        response = [{"id": 1}]
-        items = extractor.extract_items(response)
+        # Fix timezone flake: use a fixed datetime for testing
+        # Save references to original datetime components before creating mocks
+        original_datetime_class = datetime.datetime
+        original_timedelta = datetime.timedelta
+        original_timezone = datetime.timezone
+        original_date = datetime.date
+        original_time = datetime.time
 
-        today = datetime.date.today()
-        item = items[0]
+        fixed_dt = original_datetime_class(2024, 3, 15, 14, 30, 0, tzinfo=original_timezone.utc)
+        today = fixed_dt.date()
 
-        # Static value preserved
-        assert item["_static"] == "constant_value"
+        # Create a custom datetime class that overrides now()
+        class FixedDatetime(original_datetime_class):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_dt
 
-        # Date values are ISO format strings
-        assert item["_today"] == today.isoformat()
-        assert item["_date"] == today.isoformat()  # Alias
-        assert item["_yesterday"] == (today - datetime.timedelta(days=1)).isoformat()
-        assert item["_7_days"] == (today - datetime.timedelta(days=7)).isoformat()
-        assert item["_30_days"] == (today - datetime.timedelta(days=30)).isoformat()
-        assert item["_90_days"] == (today - datetime.timedelta(days=90)).isoformat()
-        assert item["_week_start"] == (today - datetime.timedelta(days=today.weekday())).isoformat()
-        assert item["_month_start"] == today.replace(day=1).isoformat()
-        assert item["_year_start"] == today.replace(month=1, day=1).isoformat()
+        # Create a mock datetime module
+        class MockDatetimeModule:
+            datetime = FixedDatetime
+            timedelta = original_timedelta
+            timezone = original_timezone
+            date = original_date
+            time = original_time
 
-        # $now has timezone info (ends with +00:00)
-        assert "+00:00" in item["_now"] or "Z" in item["_now"]
+        # Replace datetime in sys.modules temporarily
+        original_datetime_module = sys.modules["datetime"]
+        sys.modules["datetime"] = MockDatetimeModule()
+
+        try:
+            extractor = ResponseExtractor(
+                items_path="",
+                add_fields={
+                    "_now": "$now",
+                    "_today": "$today",
+                    "_yesterday": "$yesterday",
+                    "_date": "$date",
+                    "_7_days": "$7_days_ago",
+                    "_30_days": "$30_days_ago",
+                    "_90_days": "$90_days_ago",
+                    "_week_start": "$start_of_week",
+                    "_month_start": "$start_of_month",
+                    "_year_start": "$start_of_year",
+                    "_static": "constant_value",
+                },
+            )
+            response = [{"id": 1}]
+            items = extractor.extract_items(response)
+
+            item = items[0]
+
+            # Static value preserved
+            assert item["_static"] == "constant_value"
+
+            # Date values are ISO format strings
+            assert item["_today"] == today.isoformat()
+            assert item["_date"] == today.isoformat()  # Alias
+            assert item["_yesterday"] == (today - original_timedelta(days=1)).isoformat()
+            assert item["_7_days"] == (today - original_timedelta(days=7)).isoformat()
+            assert item["_30_days"] == (today - original_timedelta(days=30)).isoformat()
+            assert item["_90_days"] == (today - original_timedelta(days=90)).isoformat()
+            assert (
+                item["_week_start"]
+                == (today - original_timedelta(days=today.weekday())).isoformat()
+            )
+            assert item["_month_start"] == today.replace(day=1).isoformat()
+            assert item["_year_start"] == today.replace(month=1, day=1).isoformat()
+
+            # $now has timezone info (ends with +00:00)
+            assert "+00:00" in item["_now"] or "Z" in item["_now"]
+        finally:
+            # Restore original datetime module
+            sys.modules["datetime"] = original_datetime_module
 
     def test_curly_brace_date_syntax(self):
         """Test {expression:format} date variable syntax."""
         import datetime
+        import sys
 
         from odibi.connections.api_fetcher import substitute_date_variables
 
-        today = datetime.date.today()
+        # Fix timezone flake: use a fixed datetime for testing
+        # Save references to original datetime components before creating mocks
+        original_datetime_class = datetime.datetime
+        original_timedelta = datetime.timedelta
+        original_timezone = datetime.timezone
+        original_date = datetime.date
+        original_time = datetime.time
 
-        # Basic expressions
-        assert substitute_date_variables("{today}") == today.isoformat()
-        assert (
-            substitute_date_variables("{yesterday}")
-            == (today - datetime.timedelta(days=1)).isoformat()
-        )
+        fixed_dt = original_datetime_class(2024, 3, 15, 14, 30, 0, tzinfo=original_timezone.utc)
+        today = fixed_dt.date()
 
-        # Custom format
-        assert substitute_date_variables("{today:%Y%m%d}") == today.strftime("%Y%m%d")
-        assert substitute_date_variables("{today:%d/%m/%Y}") == today.strftime("%d/%m/%Y")
+        # Create a custom datetime class that overrides now()
+        class FixedDatetime(original_datetime_class):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_dt
 
-        # Relative days
-        assert (
-            substitute_date_variables("{-7d}") == (today - datetime.timedelta(days=7)).isoformat()
-        )
-        assert substitute_date_variables("{-30d:%Y%m%d}") == (
-            today - datetime.timedelta(days=30)
-        ).strftime("%Y%m%d")
-        assert (
-            substitute_date_variables("{+1d}") == (today + datetime.timedelta(days=1)).isoformat()
-        )
+        # Create a mock datetime module
+        class MockDatetimeModule:
+            datetime = FixedDatetime
+            timedelta = original_timedelta
+            timezone = original_timezone
+            date = original_date
+            time = original_time
 
-        # Period starts
-        assert substitute_date_variables("{start_of_month}") == today.replace(day=1).isoformat()
-        assert substitute_date_variables("{start_of_year:%Y%m%d}") == today.replace(
-            month=1, day=1
-        ).strftime("%Y%m%d")
+        # Replace datetime in sys.modules temporarily
+        original_datetime_module = sys.modules["datetime"]
+        sys.modules["datetime"] = MockDatetimeModule()
 
-        # Embedded in string (like openFDA)
-        result = substitute_date_variables("report_date:[{-30d:%Y%m%d}+TO+{today:%Y%m%d}]")
-        expected_start = (today - datetime.timedelta(days=30)).strftime("%Y%m%d")
-        expected_end = today.strftime("%Y%m%d")
-        assert result == f"report_date:[{expected_start}+TO+{expected_end}]"
+        try:
+            # Basic expressions
+            assert substitute_date_variables("{today}") == today.isoformat()
+            assert (
+                substitute_date_variables("{yesterday}")
+                == (today - original_timedelta(days=1)).isoformat()
+            )
+
+            # Custom format
+            assert substitute_date_variables("{today:%Y%m%d}") == today.strftime("%Y%m%d")
+            assert substitute_date_variables("{today:%d/%m/%Y}") == today.strftime("%d/%m/%Y")
+
+            # Relative days
+            assert (
+                substitute_date_variables("{-7d}")
+                == (today - original_timedelta(days=7)).isoformat()
+            )
+            assert substitute_date_variables("{-30d:%Y%m%d}") == (
+                today - original_timedelta(days=30)
+            ).strftime("%Y%m%d")
+            assert (
+                substitute_date_variables("{+1d}")
+                == (today + original_timedelta(days=1)).isoformat()
+            )
+
+            # Period starts
+            assert substitute_date_variables("{start_of_month}") == today.replace(day=1).isoformat()
+            assert substitute_date_variables("{start_of_year:%Y%m%d}") == today.replace(
+                month=1, day=1
+            ).strftime("%Y%m%d")
+
+            # Embedded in string (like openFDA)
+            result = substitute_date_variables("report_date:[{-30d:%Y%m%d}+TO+{today:%Y%m%d}]")
+            expected_start = (today - original_timedelta(days=30)).strftime("%Y%m%d")
+            expected_end = today.strftime("%Y%m%d")
+            assert result == f"report_date:[{expected_start}+TO+{expected_end}]"
+        finally:
+            # Restore original datetime module
+            sys.modules["datetime"] = original_datetime_module
 
         # Unknown expressions preserved
         assert substitute_date_variables("{unknown}") == "{unknown}"
