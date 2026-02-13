@@ -293,15 +293,15 @@ def validate_databricks_environment(verbose: bool = True) -> Dict[str, Any]:
         results["errors"].append(f"dbutils check failed: {e}")
 
     if verbose:
-        print(f"  Databricks Runtime: {'[X]' if results['is_databricks'] else '[ ]'}")
+        logger.info(f"  Databricks Runtime: {'[X]' if results['is_databricks'] else '[ ]'}")
         if results["runtime_version"]:
-            print(f"  Runtime Version: {results['runtime_version']}")
-        print(f"  Spark Available: {'[X]' if results['spark_available'] else '[ ]'}")
-        print(f"  dbutils Available: {'[X]' if results['dbutils_available'] else '[ ]'}")
+            logger.info(f"  Runtime Version: {results['runtime_version']}")
+        logger.info(f"  Spark Available: {'[X]' if results['spark_available'] else '[ ]'}")
+        logger.info(f"  dbutils Available: {'[X]' if results['dbutils_available'] else '[ ]'}")
 
         if results["errors"]:
-            print("\n  Errors:")
+            logger.info("\n  Errors:")
             for error in results["errors"]:
-                print(f"    - {error}")
+                logger.info(f"    - {error}")
 
     return results
