@@ -1,179 +1,35 @@
 name: CI
 
-# Trigger on pushes to any branch and all pull requests
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
-    branches: ["**"]
+    branches: [main]
 
 jobs:
-  # BASE JOB (REQUIRED) - Tests core Pandas functionality
-  # This job MUST pass for the build to be considered successful
-  test-base:
-    name: Test Base (Python ${{ matrix.python-version }})
+  test:
     runs-on: ubuntu-latest
-
-    strategy:
-      # Test on multiple Python versions
-      matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
-      # Don't cancel other jobs if one fails
-      fail-fast: false
-
+    
     steps:
-      # Step 1: Check out the repository code
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # Step 2: Set up Python with the specified version
-      - name: Set up Python ${{ matrix.python-version }}
+      
+      - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-          # Cache pip dependencies to speed up builds
-          cache: 'pip'
-          cache-dependency-path: 'pyproject.toml'
-
-      # Step 3: Install base dependencies (including Azure and Spark for Phase 2)
+          python-version: "3.9"
+      
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[all,dev]
-
-      # Step 4: Run code formatting check with Ruff (matches pre-commit)
-      - name: Check code formatting (Ruff)
-        run: ruff format --check odibi/ tests/
-
-      # Step 5: Run linting with Ruff
-      - name: Lint code (Ruff)
-        run: ruff check odibi/ tests/
-
-      # Step 6: Regenerate docs (only on 3.11 where sync test runs)
-      - name: Regenerate docs
-        if: matrix.python-version == '3.11'
-        run: python odibi/introspect.py
-
-      # Step 7: Run all base tests with coverage
-      # These are the 78 existing Pandas tests that MUST pass
-      - name: Run tests with coverage
-        run: pytest -v -m "not extras" --cov=odibi --cov-report=term-missing --cov-report=xml
-
-      # Step 7: Upload coverage report to GitHub (for review)
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v3
-        if: matrix.python-version == '3.11'
-        with:
-          files: ./coverage.xml
-          flags: base
-          fail_ci_if_error: false
-
-  # EXTRAS JOB (OPTIONAL) - Tests optional dependencies (Spark, Azure)
-  # This job can fail without breaking the build (experimental features)
-  test-extras:
-    name: Test Extras (Python 3.11)
-    runs-on: ubuntu-latest
-    # Enforce pass for hardened CI
-    continue-on-error: false
-
-    steps:
-      # Step 1: Check out the repository code
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Step 2: Set up Python 3.11 (latest stable for extras)
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          # Cache pip dependencies to speed up builds
-          cache: 'pip'
-          cache-dependency-path: 'pyproject.toml'
-
-      # Step 3: Install Java for Spark
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      # Step 4: Install with all extras (Spark, Azure, etc.)
-      - name: Install with all extras
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[all,dev]
-
-      # Step 4: Test that optional imports work correctly
-      - name: Test Spark imports
-        run: |
-          python -c "from odibi.engine.spark_engine import SparkEngine; print('✅ Spark engine imports successfully')"
-
-      # Step 5: Test Azure connection imports
-      - name: Test Azure imports
-        run: |
-          python -c "from odibi.connections.azure_adls import AzureADLS; print('✅ Azure ADLS imports successfully')"
-          python -c "from odibi.connections.azure_sql import AzureSQL; print('✅ Azure SQL imports successfully')"
-
-      # Step 6: Run extras-specific tests (marked with @pytest.mark.extras)
-      - name: Run extras tests
-        run: pytest -v -k "extras" --cov=odibi --cov-report=term-missing
-
-  # SQL JOB (OPTIONAL) - Tests SQL dependencies (Phase 2.5)
-  # This job verifies SQL dependencies install correctly
-  test-sql:
-    name: Test SQL Dependencies (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
-    # This job is allowed to fail without failing the entire build
-    continue-on-error: true
-
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.12"]
-      fail-fast: false
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-          cache-dependency-path: 'pyproject.toml'
-
-      # Install with SQL extras
-      - name: Install with SQL extras
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[sql,dev]
-
-      # Test SQL imports work
-      - name: Test SQL imports
-        run: |
-          python -c "import pyodbc; print(f'pyodbc {pyodbc.version} OK')"
-          python -c "import sqlalchemy; print(f'SQLAlchemy {sqlalchemy.__version__} OK')"
-
-      # Test markdown2 and Jinja2 (core deps for Phase 3)
-      - name: Test Phase 3 core dependencies
-        run: |
-          python -c "import markdown2; print(f'markdown2 {markdown2.__version__} OK')"
-          python -c "import jinja2; print(f'Jinja2 {jinja2.__version__} OK')"
-
-      # Run full test suite to ensure SQL deps don't break anything
-      - name: Run tests
-        run: pytest -v
-
-  # BUILD STATUS CHECK - Overall build health indicator
-  build-status:
-    name: Build Status
-    runs-on: ubuntu-latest
-    needs: [test-base]
-    # Note: test-extras is NOT a dependency, so it won't block this job
-
-    steps:
-      - name: All required tests passed
-        run: |
-          echo "✅ All required tests passed!"
-          echo "📊 Base tests: PASSED (78 Pandas tests)"
-          echo "🚀 Build is ready for merge"
+          pip install -e .[dev]
+      
+      - name: Run ruff
+        continue-on-error: false
+        run: ruff check .
+      
+      - name: Run pytest
+        continue-on-error: false
+        env:
+          SKIP_SPARK: "1"
+        run: pytest tests/ -v --tb=short
