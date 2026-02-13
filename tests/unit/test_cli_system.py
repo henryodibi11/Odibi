@@ -684,38 +684,30 @@ class TestCountRecordsSpark:
 
     def test_count_spark_success(self):
         """Should count records using Spark."""
-        # Mock pyspark functions
         mock_functions = Mock()
-        mock_col_obj = Mock()
-        mock_lit_obj = Mock()
-        mock_condition = Mock()  # The result of col < lit
+        mock_pyspark_sql = Mock()
+        mock_pyspark_sql.functions = mock_functions
 
-        # Set up the comparison to return a mock condition
-        mock_col_obj.__lt__ = Mock(return_value=mock_condition)
+        with patch.dict(
+            "sys.modules",
+            {"pyspark": Mock(), "pyspark.sql": mock_pyspark_sql},
+        ):
+            mock_catalog = Mock()
+            mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
 
-        mock_functions.col.return_value = mock_col_obj
-        mock_functions.lit.return_value = mock_lit_obj
+            mock_filtered = Mock()
+            mock_filtered.count.return_value = 75
 
-        with patch.dict("sys.modules", {"pyspark": Mock(), "pyspark.sql": Mock()}):
-            with patch("pyspark.sql.functions", mock_functions):
-                mock_catalog = Mock()
-                mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
+            mock_df = Mock()
+            mock_df.filter.return_value = mock_filtered
 
-                mock_df = Mock()
-                mock_df.count.return_value = 150
+            mock_catalog.spark.read.format.return_value.load.return_value = mock_df
 
-                mock_filtered = Mock()
-                mock_filtered.count.return_value = 75
+            cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
 
-                mock_df.filter.return_value = mock_filtered
+            result = _count_records_spark(mock_catalog, cutoffs)
 
-                mock_catalog.spark.read.format.return_value.load.return_value = mock_df
-
-                cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
-
-                result = _count_records_spark(mock_catalog, cutoffs)
-
-                assert result == {"meta_daily_stats": 75}
+            assert result == {"meta_daily_stats": 75}
 
     def test_count_spark_exception_handling(self, caplog):
         """Should handle exceptions gracefully."""

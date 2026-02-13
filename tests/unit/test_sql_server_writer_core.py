@@ -3,8 +3,12 @@
 from unittest.mock import MagicMock
 
 import pandas as pd
-import polars as pl
 import pytest
+
+try:
+    import polars as pl
+except ImportError:
+    pl = None  # type: ignore[assignment]
 
 from odibi.config import (
     SqlServerMergeValidationConfig,
@@ -207,6 +211,7 @@ class TestComputeHashPandas:
         assert result["_computed_hash"].notna().all()
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestComputeHashPolars:
     def test_deterministic(self, writer):
         df = pl.DataFrame({"a": [1, 2], "b": ["x", "y"]})
@@ -257,6 +262,7 @@ class TestFilterChangedRowsPandas:
         assert len(result) == 0
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestFilterChangedRowsPolars:
     def test_empty_target(self, writer):
         src = pl.DataFrame({"id": [1, 2], "hash": ["a", "b"]})
@@ -315,6 +321,7 @@ class TestValidateKeysPandas:
         assert r.is_valid is True
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidateKeysPolars:
     def test_valid(self, writer):
         df = pl.DataFrame({"k": [1, 2, 3]})
@@ -364,6 +371,7 @@ class TestInferSqlTypePandas:
         assert writer.infer_sql_type_pandas("unknown_type_xyz") == "NVARCHAR(MAX)"
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestInferSqlTypePolars:
     def test_int64(self, writer):
         assert writer.infer_sql_type_polars("Int64") == "BIGINT"
@@ -430,6 +438,7 @@ class TestCreateTableFromPandas:
         assert "[myschema].[tbl]" in sql_arg
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestCreateTableFromPolars:
     def test_ddl_generated(self, writer, mock_conn):
         df = pl.DataFrame({"id": [1], "val": ["hello"]})
@@ -484,6 +493,7 @@ class TestHandleSchemaEvolutionPandas:
         assert cols == ["a"]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestHandleSchemaEvolutionPolars:
     def test_none_config_returns_all_cols(self, writer):
         df = pl.DataFrame({"a": [1], "b": [2]})

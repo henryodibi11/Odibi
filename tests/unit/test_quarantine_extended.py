@@ -3,8 +3,12 @@
 from unittest.mock import MagicMock
 
 import pandas as pd
-import polars as pl
 import pytest
+
+try:
+    import polars as pl
+except ImportError:
+    pl = None  # type: ignore[assignment]
 
 from odibi.config import (
     AcceptedValuesTest,
@@ -48,6 +52,8 @@ def pandas_df():
 
 @pytest.fixture()
 def polars_df():
+    if pl is None:
+        pytest.skip("polars not installed")
     return pl.DataFrame(
         {
             "id": [1, 2, 3, 4, 5],
@@ -182,6 +188,7 @@ class TestEvaluateTestMaskPandas:
 # ===========================================================================
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestEvaluateTestMaskPolars:
     """Tests for _evaluate_test_mask with Polars DataFrames."""
 
@@ -499,11 +506,13 @@ class TestApplySampling:
 
     # -- Polars --
 
+    @pytest.mark.skipif(pl is None, reason="polars not installed")
     def test_polars_no_sampling(self, polars_df):
         config = self._make_config()
         result = _apply_sampling(polars_df, config, is_spark=False, is_polars=True)
         assert len(result) == len(polars_df)
 
+    @pytest.mark.skipif(pl is None, reason="polars not installed")
     def test_polars_sample_fraction(self):
         df = pl.DataFrame({"a": range(100)})
         config = self._make_config(sample_fraction=0.1)
@@ -511,11 +520,13 @@ class TestApplySampling:
         assert len(result) <= 100
         assert len(result) > 0
 
+    @pytest.mark.skipif(pl is None, reason="polars not installed")
     def test_polars_max_rows(self, polars_df):
         config = self._make_config(max_rows=2)
         result = _apply_sampling(polars_df, config, is_spark=False, is_polars=True)
         assert len(result) == 2
 
+    @pytest.mark.skipif(pl is None, reason="polars not installed")
     def test_polars_both_fraction_and_max(self):
         df = pl.DataFrame({"a": range(100)})
         config = self._make_config(sample_fraction=0.5, max_rows=3)

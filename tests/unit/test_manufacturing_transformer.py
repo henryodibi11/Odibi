@@ -3,10 +3,17 @@
 from datetime import datetime, timedelta
 
 import pandas as pd
-import polars as pl
 import pytest
 
-from odibi.context import EngineContext, PandasContext, PolarsContext
+try:
+    import polars as pl
+except ImportError:
+    pl = None  # type: ignore[assignment]
+
+from odibi.context import EngineContext, PandasContext
+
+if pl is not None:
+    from odibi.context import PolarsContext
 from odibi.enums import EngineType
 from odibi.transformers.manufacturing import (
     DetectSequentialPhasesParams,
@@ -34,7 +41,7 @@ def _make_pandas_context(df: pd.DataFrame) -> EngineContext:
     return EngineContext(context=ctx, df=df, engine_type=EngineType.PANDAS)
 
 
-def _make_polars_context(df: pl.DataFrame) -> EngineContext:
+def _make_polars_context(df: "pl.DataFrame") -> EngineContext:
     ctx = PolarsContext()
     return EngineContext(context=ctx, df=df, engine_type=EngineType.POLARS)
 
@@ -188,7 +195,7 @@ def _two_phase_pandas_df(batch_id: str = "B1") -> pd.DataFrame:
     return pd.DataFrame(_two_phase_rows(batch_id))
 
 
-def _two_phase_polars_df(batch_id: str = "B1") -> pl.DataFrame:
+def _two_phase_polars_df(batch_id: str = "B1") -> "pl.DataFrame":
     rows = _two_phase_rows(batch_id)
     return pl.DataFrame(rows).with_columns(pl.col("ts").cast(pl.Datetime))
 
@@ -380,6 +387,7 @@ class TestDetectSequentialPhasesPandas:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestDetectSequentialPhasesPolars:
     @pytest.fixture()
     def base_params(self):
@@ -592,6 +600,7 @@ class TestDetectSequentialPhasesPolars:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestPhaseConfigThreshold:
     def test_per_phase_threshold_pandas(self):
         """A tight threshold on LoadTime should still detect the phase
@@ -639,6 +648,7 @@ class TestPhaseConfigThreshold:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestMultiColumnGroupBy:
     def _build_df(self, engine: str):
         rows = []

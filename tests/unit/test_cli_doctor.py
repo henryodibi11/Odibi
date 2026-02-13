@@ -369,10 +369,9 @@ class TestDoctorCommand:
         mock_manager = Mock()
         mock_manager.catalog_manager = None
 
-        mock_odibi = Mock()
-        mock_odibi.__version__ = "1.2.3"
+        import odibi
 
-        with patch("builtins.__import__", return_value=mock_odibi):
+        with patch.object(odibi, "__version__", "1.2.3"):
             with patch("odibi.cli.doctor.check_dependencies", return_value=True):
                 with patch("odibi.cli.doctor.check_config", return_value=mock_manager):
                     with patch("odibi.cli.doctor.check_connections", return_value=True):
@@ -387,7 +386,16 @@ class TestDoctorCommand:
         mock_manager = Mock()
         mock_manager.catalog_manager = None
 
-        with patch("builtins.__import__", side_effect=Exception("Import error")):
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "odibi":
+                raise Exception("Import error")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
             with patch("odibi.cli.doctor.check_dependencies", return_value=True):
                 with patch("odibi.cli.doctor.check_config", return_value=mock_manager):
                     with patch("odibi.cli.doctor.check_connections", return_value=True):

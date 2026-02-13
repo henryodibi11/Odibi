@@ -12,8 +12,12 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pandas as pd
-import polars as pl
 import pytest
+
+try:
+    import polars as pl
+except ImportError:
+    pl = None  # type: ignore[assignment]
 
 from odibi.config import (
     AcceptedValuesTest,
@@ -252,6 +256,8 @@ class TestValidatePandasSchema:
 
 def _polars_df():
     """Build a simple Polars eager DataFrame."""
+    if pl is None:
+        pytest.skip("polars not installed")
     return pl.DataFrame(
         {
             "id": [1, 2, 3, 4],
@@ -266,12 +272,15 @@ def _polars_df():
 @pytest.fixture(params=["eager", "lazy"], ids=["eager", "lazy"])
 def polars_df(request):
     """Yield both eager and lazy Polars DataFrames."""
+    if pl is None:
+        pytest.skip("polars not installed")
     df = _polars_df()
     if request.param == "lazy":
         return df.lazy()
     return df
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsSchema:
     def test_strict_match(self, validator, polars_df):
         config = ValidationConfig(tests=[SchemaContract(strict=True)])
@@ -302,6 +311,7 @@ class TestValidatePolarsSchema:
         assert "Missing columns" in failures[0]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsRowCount:
     def test_min_pass(self, validator, polars_df):
         config = ValidationConfig(tests=[RowCountTest(min=1)])
@@ -326,6 +336,7 @@ class TestValidatePolarsRowCount:
         assert "> max" in failures[0]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsNotNull:
     def test_no_nulls(self, validator, polars_df):
         config = ValidationConfig(tests=[NotNullTest(columns=["id"])])
@@ -339,6 +350,7 @@ class TestValidatePolarsNotNull:
         assert "NULLs" in failures[0]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsUnique:
     def test_unique_pass(self, validator, polars_df):
         config = ValidationConfig(tests=[UniqueTest(columns=["id"])])
@@ -360,6 +372,7 @@ class TestValidatePolarsUnique:
         assert "not unique" in failures[0]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsAcceptedValues:
     def test_accepted_pass(self, validator, polars_df):
         config = ValidationConfig(
@@ -387,6 +400,7 @@ class TestValidatePolarsAcceptedValues:
         assert "invalid values" in failures[0]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsRange:
     def test_range_pass(self, validator, polars_df):
         config = ValidationConfig(tests=[RangeTest(column="age", min=0, max=200)])
@@ -400,6 +414,7 @@ class TestValidatePolarsRange:
         assert "out of range" in failures[0]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsRegex:
     def test_regex_pass(self, validator):
         df = pl.DataFrame({"code": ["AB-1", "CD-2"]})
@@ -428,6 +443,7 @@ class TestValidatePolarsRegex:
         assert "not found" in failures[0]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsFreshness:
     def test_freshness_eager_fresh(self, validator):
         now = datetime.now(timezone.utc)
@@ -466,6 +482,7 @@ class TestValidatePolarsFreshness:
         assert "not found" in failures[0]
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsFailFast:
     def test_fail_fast_exits_early(self, validator, polars_df):
         config = ValidationConfig(
@@ -490,6 +507,7 @@ class TestValidatePolarsFailFast:
         assert len(failures) == 2
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestValidatePolarsNotNullFailFast:
     def test_fail_fast_on_not_null(self, validator):
         df = pl.DataFrame({"a": [None, None], "b": [None, None]})

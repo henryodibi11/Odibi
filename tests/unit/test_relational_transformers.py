@@ -1,5 +1,7 @@
 """Unit tests for odibi/transformers/relational.py — Pandas paths."""
 
+from typing import Optional
+
 import pandas as pd
 import pytest
 from pydantic import ValidationError
@@ -27,7 +29,7 @@ from odibi.transformers.relational import (
 # ---------------------------------------------------------------------------
 
 
-def _make_context(df: pd.DataFrame, extras: dict | None = None) -> EngineContext:
+def _make_context(df: pd.DataFrame, extras: Optional[dict] = None) -> EngineContext:
     """Build a real EngineContext backed by PandasContext + DuckDB sql_executor."""
     ctx = PandasContext()
     ctx.register("df", df)

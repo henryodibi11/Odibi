@@ -4,8 +4,12 @@ overwrite strategies, merge_pandas, merge_polars, and read_target_hashes."""
 from unittest.mock import MagicMock
 
 import pandas as pd
-import polars as pl
 import pytest
+
+try:
+    import polars as pl
+except ImportError:
+    pl = None  # type: ignore[assignment]
 
 from odibi.config import (
     SqlServerAuditColsConfig,
@@ -379,6 +383,7 @@ class TestOverwritePandas:
 # ===========================================================================
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestOverwritePolars:
     """Tests for overwrite_polars method."""
 
@@ -491,6 +496,7 @@ class TestMergePandas:
 # ===========================================================================
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestMergePolars:
     """Tests for merge_polars with mock connection."""
 

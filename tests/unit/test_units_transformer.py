@@ -2,11 +2,18 @@
 
 import numpy as np
 import pandas as pd
-import polars as pl
 import pint
 import pytest
 
-from odibi.context import EngineContext, PandasContext, PolarsContext
+try:
+    import polars as pl
+except ImportError:
+    pl = None  # type: ignore[assignment]
+
+from odibi.context import EngineContext, PandasContext
+
+if pl is not None:
+    from odibi.context import PolarsContext
 from odibi.enums import EngineType
 from odibi.transformers.units import (
     ConversionSpec,
@@ -31,7 +38,7 @@ def _make_pandas_context(df: pd.DataFrame) -> EngineContext:
     return EngineContext(context=ctx, df=df, engine_type=EngineType.PANDAS)
 
 
-def _make_polars_context(df: pl.DataFrame) -> EngineContext:
+def _make_polars_context(df: "pl.DataFrame") -> EngineContext:
     ctx = PolarsContext()
     return EngineContext(context=ctx, df=df, engine_type=EngineType.POLARS)
 
@@ -175,6 +182,7 @@ class TestConvertColumnPandas:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestConvertColumnPolars:
     def test_temperature_conversion(self):
         df = pl.DataFrame({"temp": [32.0, 212.0, -40.0]})
@@ -254,6 +262,7 @@ class TestUnitConvertPandas:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(pl is None, reason="polars not installed")
 class TestUnitConvertPolars:
     def test_multiple_conversions(self):
         df = pl.DataFrame({"temp": [212.0], "pressure": [0.0]})
