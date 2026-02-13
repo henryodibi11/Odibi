@@ -857,3 +857,125 @@ class TestPolarsWriteSql:
 
         assert len(written_data) == 1
         assert written_data[0]["rows"] == 3
+
+
+class TestPolarsAddWriteMetadata:
+    """Test add_write_metadata method for PolarsEngine."""
+
+    def test_add_write_metadata_all_defaults(self, polars_engine):
+        """add_write_metadata with True adds enabled metadata."""
+        df = pl.DataFrame({"a": [1, 2]})
+        result = polars_engine.add_write_metadata(
+            df,
+            metadata_config=True,
+            source_connection="my_conn",
+            source_table="my_table",
+            source_path="/path/to/file.csv",
+            is_file_source=True,
+        )
+
+        # Default WriteMetadataConfig enables: extracted_at, source_file
+        # but NOT source_connection or source_table
+        assert "_extracted_at" in result.columns
+        assert "_source_file" in result.columns
+        # These are False by default
+        assert "_source_connection" not in result.columns
+        assert "_source_table" not in result.columns
+        assert all(result["_source_file"] == "/path/to/file.csv")
+
+    def test_add_write_metadata_file_only_for_file_source(self, polars_engine):
+        """add_write_metadata only adds source_file for file sources."""
+        from odibi.config import WriteMetadataConfig
+
+        df = pl.DataFrame({"a": [1]})
+        config = WriteMetadataConfig(
+            extracted_at=False, source_file=True, source_connection=False, source_table=False
+        )
+
+        # File source
+        result1 = polars_engine.add_write_metadata(
+            df, config, source_path="/file.csv", is_file_source=True
+        )
+        assert "_source_file" in result1.columns
+
+        # SQL source
+        result2 = polars_engine.add_write_metadata(
+            df, config, source_path="/file.csv", is_file_source=False
+        )
+        assert "_source_file" not in result2.columns
+
+    def test_add_write_metadata_selective_config(self, polars_engine):
+        """add_write_metadata respects config selections."""
+        from odibi.config import WriteMetadataConfig
+
+        df = pl.DataFrame({"a": [1]})
+        config = WriteMetadataConfig(
+            extracted_at=True, source_file=False, source_connection=True, source_table=False
+        )
+
+        result = polars_engine.add_write_metadata(
+            df,
+            config,
+            source_connection="conn1",
+            source_table="table1",
+            source_path="/file.csv",
+            is_file_source=True,
+        )
+
+        assert "_extracted_at" in result.columns
+        assert "_source_connection" in result.columns
+        assert "_source_file" not in result.columns
+        assert "_source_table" not in result.columns
+
+    def test_add_write_metadata_none_returns_unchanged(self, polars_engine):
+        """add_write_metadata with None returns DataFrame unchanged."""
+        df = pl.DataFrame({"a": [1, 2]})
+        result = polars_engine.add_write_metadata(df, metadata_config=None)
+
+        # Check that columns are the same
+        assert result.columns == df.columns
+        assert "_extracted_at" not in result.columns
+
+    def test_add_write_metadata_all_metadata_types(self, polars_engine):
+        """add_write_metadata can add all metadata types."""
+        from odibi.config import WriteMetadataConfig
+
+        df = pl.DataFrame({"a": [1]})
+        config = WriteMetadataConfig(
+            extracted_at=True, source_file=True, source_connection=True, source_table=True
+        )
+
+        result = polars_engine.add_write_metadata(
+            df,
+            config,
+            source_connection="conn1",
+            source_table="table1",
+            source_path="/file.csv",
+            is_file_source=True,
+        )
+
+        assert "_extracted_at" in result.columns
+        assert "_source_file" in result.columns
+        assert "_source_connection" in result.columns
+        assert "_source_table" in result.columns
+        assert all(result["_source_file"] == "/file.csv")
+        assert all(result["_source_connection"] == "conn1")
+        assert all(result["_source_table"] == "table1")
+
+    def test_add_write_metadata_with_lazyframe(self, polars_engine):
+        """add_write_metadata works with LazyFrame."""
+        df = pl.DataFrame({"a": [1, 2, 3]}).lazy()
+        result = polars_engine.add_write_metadata(
+            df,
+            metadata_config=True,
+            source_path="/path/to/file.csv",
+            is_file_source=True,
+        )
+
+        # Result should still be lazy
+        assert isinstance(result, pl.LazyFrame)
+        
+        # Collect and verify
+        materialized = result.collect()
+        assert "_extracted_at" in materialized.columns
+        assert "_source_file" in materialized.columns

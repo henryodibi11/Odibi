@@ -324,6 +324,58 @@ class PolarsEngine(Engine):
 
         return None
 
+    def add_write_metadata(
+        self,
+        df: Any,
+        metadata_config: Any,
+        source_connection: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_path: Optional[str] = None,
+        is_file_source: bool = False,
+    ) -> Any:
+        """Add metadata columns to DataFrame before writing (Bronze layer lineage).
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            metadata_config: WriteMetadataConfig or True (for all defaults)
+            source_connection: Name of the source connection
+            source_table: Name of the source table (SQL sources)
+            source_path: Path of the source file (file sources)
+            is_file_source: True if source is a file-based read
+
+        Returns:
+            DataFrame with metadata columns added
+        """
+        from datetime import datetime
+
+        from odibi.config import WriteMetadataConfig
+
+        # Normalize config: True -> all defaults
+        if metadata_config is True:
+            config = WriteMetadataConfig()
+        elif isinstance(metadata_config, WriteMetadataConfig):
+            config = metadata_config
+        else:
+            return df  # None or invalid -> no metadata
+
+        # _extracted_at: always applicable
+        if config.extracted_at:
+            df = df.with_columns(pl.lit(datetime.now()).alias("_extracted_at"))
+
+        # _source_file: only for file sources
+        if config.source_file and is_file_source and source_path:
+            df = df.with_columns(pl.lit(source_path).alias("_source_file"))
+
+        # _source_connection: all sources
+        if config.source_connection and source_connection:
+            df = df.with_columns(pl.lit(source_connection).alias("_source_connection"))
+
+        # _source_table: SQL sources only
+        if config.source_table and source_table:
+            df = df.with_columns(pl.lit(source_table).alias("_source_table"))
+
+        return df
+
     def _write_sql(
         self,
         df: Any,
