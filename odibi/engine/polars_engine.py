@@ -68,6 +68,16 @@ class PolarsEngine(Engine):
     ) -> Any:
         """Read data using Polars (Lazy by default).
 
+        Args:
+            connection: Connection object providing base path and storage options.
+            format: Data format (csv, parquet, delta, json, sql, sql_server, azure_sql).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            streaming: Whether to enable streaming mode (uses scan methods when possible).
+            schema: Optional schema specification for SQL queries.
+            options: Additional read options to pass to Polars readers.
+            **kwargs: Additional keyword arguments.
+
         Returns:
             pl.LazyFrame or pl.DataFrame
         """
@@ -254,7 +264,21 @@ class PolarsEngine(Engine):
         options: Optional[Dict[str, Any]] = None,
         streaming_config: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Write data using Polars."""
+        """Write data using Polars.
+
+        Args:
+            df: DataFrame or LazyFrame to write.
+            connection: Connection object providing base path and storage options.
+            format: Output format (csv, parquet, delta, json, sql, sql_server, azure_sql).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            mode: Write mode (overwrite, append, upsert, append_once).
+            options: Additional write options to pass to Polars writers.
+            streaming_config: Streaming configuration (not used in Polars engine).
+
+        Returns:
+            Optional dict with write statistics for Delta writes, None otherwise.
+        """
         options = options or {}
 
         if format in ["sql", "sql_server", "azure_sql"]:
@@ -481,7 +505,16 @@ class PolarsEngine(Engine):
         return ctx.execute(sql, eager=False)
 
     def execute_operation(self, operation: str, params: Dict[str, Any], df: Any) -> Any:
-        """Execute built-in operation."""
+        """Execute built-in operation.
+
+        Args:
+            operation: Name of the operation to execute (e.g., 'pivot', 'unpivot', 'explode').
+            params: Dictionary of parameters specific to the operation.
+            df: DataFrame or LazyFrame to operate on.
+
+        Returns:
+            Transformed DataFrame or LazyFrame.
+        """
         # Ensure LazyFrame for consistency if possible, but operations work on both usually.
         # If DataFrame, some operations might need different methods.
 
@@ -604,14 +637,28 @@ class PolarsEngine(Engine):
         return df
 
     def get_schema(self, df: Any) -> Any:
-        """Get DataFrame schema."""
+        """Get DataFrame schema.
+
+        Args:
+            df: DataFrame or LazyFrame to get schema from.
+
+        Returns:
+            Dictionary mapping column names to data type strings.
+        """
         # Polars schema is a dict {name: DataType}
         # We can return a dict of strings for compatibility
         schema = df.collect_schema() if isinstance(df, pl.LazyFrame) else df.schema
         return {name: str(dtype) for name, dtype in schema.items()}
 
     def get_shape(self, df: Any) -> tuple:
-        """Get DataFrame shape."""
+        """Get DataFrame shape.
+
+        Args:
+            df: DataFrame or LazyFrame to get shape from.
+
+        Returns:
+            Tuple of (rows, columns) as integers.
+        """
         if isinstance(df, pl.LazyFrame):
             # Expensive to count rows in LazyFrame without scan
             # But usually shape implies (rows, cols)
@@ -624,13 +671,28 @@ class PolarsEngine(Engine):
         return df.shape
 
     def count_rows(self, df: Any) -> int:
-        """Count rows in DataFrame."""
+        """Count rows in DataFrame.
+
+        Args:
+            df: DataFrame or LazyFrame to count rows from.
+
+        Returns:
+            Number of rows as integer.
+        """
         if isinstance(df, pl.LazyFrame):
             return df.select(pl.len()).collect().item()
         return len(df)
 
     def count_nulls(self, df: Any, columns: List[str]) -> Dict[str, int]:
-        """Count nulls in specified columns."""
+        """Count nulls in specified columns.
+
+        Args:
+            df: DataFrame or LazyFrame to analyze.
+            columns: List of column names to count nulls for.
+
+        Returns:
+            Dictionary mapping column names to null counts.
+        """
         if isinstance(df, pl.LazyFrame):
             # efficient null count
             return df.select([pl.col(c).null_count() for c in columns]).collect().to_dicts()[0]
@@ -638,7 +700,16 @@ class PolarsEngine(Engine):
         return df.select([pl.col(c).null_count() for c in columns]).to_dicts()[0]
 
     def validate_schema(self, df: Any, schema_rules: Dict[str, Any]) -> List[str]:
-        """Validate DataFrame schema."""
+        """Validate DataFrame schema.
+
+        Args:
+            df: DataFrame or LazyFrame to validate.
+            schema_rules: Dictionary containing schema validation rules
+                (e.g., required_columns, expected_types, disallowed_columns).
+
+        Returns:
+            List of validation failure messages (empty if all validations pass).
+        """
         failures = []
 
         # Schema is dict-like in Polars
@@ -745,13 +816,28 @@ class PolarsEngine(Engine):
         return failures
 
     def get_sample(self, df: Any, n: int = 10) -> List[Dict[str, Any]]:
-        """Get sample rows as list of dictionaries."""
+        """Get sample rows as list of dictionaries.
+
+        Args:
+            df: DataFrame or LazyFrame to sample from.
+            n: Number of rows to sample (default: 10).
+
+        Returns:
+            List of dictionaries, each representing a row.
+        """
         if isinstance(df, pl.LazyFrame):
             return df.limit(n).collect().to_dicts()
         return df.head(n).to_dicts()
 
     def profile_nulls(self, df: Any) -> Dict[str, float]:
-        """Calculate null percentage for each column."""
+        """Calculate null percentage for each column.
+
+        Args:
+            df: DataFrame or LazyFrame to profile.
+
+        Returns:
+            Dictionary mapping column names to null percentages (0.0 to 1.0).
+        """
         if isinstance(df, pl.LazyFrame):
             # null_count() / count()
             # We can do this in one expression
@@ -773,14 +859,33 @@ class PolarsEngine(Engine):
     def table_exists(
         self, connection: Any, table: Optional[str] = None, path: Optional[str] = None
     ) -> bool:
-        """Check if table or location exists."""
+        """Check if table or location exists.
+
+        Args:
+            connection: Connection object to resolve paths.
+            table: Table name to check (mutually exclusive with path).
+            path: File path to check (mutually exclusive with table).
+
+        Returns:
+            True if the table or path exists, False otherwise.
+        """
         if path:
             full_path = connection.get_path(path)
             return os.path.exists(full_path)
         return False
 
     def harmonize_schema(self, df: Any, target_schema: Dict[str, str], policy: Any) -> Any:
-        """Harmonize DataFrame schema."""
+        """Harmonize DataFrame schema.
+
+        Args:
+            df: DataFrame or LazyFrame to harmonize.
+            target_schema: Dictionary mapping column names to target data types.
+            policy: SchemaPolicyConfig object defining harmonization behavior
+                (mode, on_missing_columns, on_new_columns).
+
+        Returns:
+            DataFrame or LazyFrame with harmonized schema.
+        """
         # policy: SchemaPolicyConfig
         from odibi.config import OnMissingColumns, OnNewColumns, SchemaMode
 
@@ -860,7 +965,17 @@ class PolarsEngine(Engine):
     def anonymize(
         self, df: Any, columns: List[str], method: str, salt: Optional[str] = None
     ) -> Any:
-        """Anonymize specified columns."""
+        """Anonymize specified columns.
+
+        Args:
+            df: DataFrame or LazyFrame to anonymize.
+            columns: List of column names to anonymize.
+            method: Anonymization method ('mask', 'hash', 'redact').
+            salt: Optional salt string for hash-based anonymization.
+
+        Returns:
+            DataFrame or LazyFrame with anonymized columns.
+        """
         if method == "mask":
             # Mask all but last 4 characters: '******1234'
             # Regex look-around not supported in some envs.
@@ -1016,6 +1131,9 @@ class PolarsEngine(Engine):
             table: Table name
             path: Table path
             config: AutoOptimizeConfig object
+
+        Returns:
+            None
         """
         from odibi.utils.logging_context import get_logging_context
 
