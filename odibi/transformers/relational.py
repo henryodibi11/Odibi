@@ -436,13 +436,16 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
     elif context.engine_type == EngineType.PANDAS:
         import pandas as pd
 
+        # Map 'avg' to 'mean' for pandas compatibility
+        agg_func_mapped = "mean" if params.agg_func == "avg" else params.agg_func
+
         # pivot_table is robust
         res = pd.pivot_table(
             context.df,
             index=params.group_by,
             columns=params.pivot_col,
             values=params.agg_col,
-            aggfunc=params.agg_func,
+            aggfunc=agg_func_mapped,
         ).reset_index()
 
         rows_after = res.shape[0] if hasattr(res, "shape") else None
