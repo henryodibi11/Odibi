@@ -171,41 +171,49 @@ class TestResponseExtractor:
 
         from odibi.connections.api_fetcher import substitute_date_variables
 
-        today = datetime.date.today()
+        # Fix timezone flake: use a fixed datetime for testing
+        fixed_dt = datetime.datetime(2024, 3, 15, 14, 30, 0, tzinfo=datetime.timezone.utc)
+        today = fixed_dt.date()
 
-        # Basic expressions
-        assert substitute_date_variables("{today}") == today.isoformat()
-        assert (
-            substitute_date_variables("{yesterday}")
-            == (today - datetime.timedelta(days=1)).isoformat()
-        )
+        with patch("odibi.connections.api_fetcher.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = fixed_dt
+            mock_datetime.timedelta = datetime.timedelta
 
-        # Custom format
-        assert substitute_date_variables("{today:%Y%m%d}") == today.strftime("%Y%m%d")
-        assert substitute_date_variables("{today:%d/%m/%Y}") == today.strftime("%d/%m/%Y")
+            # Basic expressions
+            assert substitute_date_variables("{today}") == today.isoformat()
+            assert (
+                substitute_date_variables("{yesterday}")
+                == (today - datetime.timedelta(days=1)).isoformat()
+            )
 
-        # Relative days
-        assert (
-            substitute_date_variables("{-7d}") == (today - datetime.timedelta(days=7)).isoformat()
-        )
-        assert substitute_date_variables("{-30d:%Y%m%d}") == (
-            today - datetime.timedelta(days=30)
-        ).strftime("%Y%m%d")
-        assert (
-            substitute_date_variables("{+1d}") == (today + datetime.timedelta(days=1)).isoformat()
-        )
+            # Custom format
+            assert substitute_date_variables("{today:%Y%m%d}") == today.strftime("%Y%m%d")
+            assert substitute_date_variables("{today:%d/%m/%Y}") == today.strftime("%d/%m/%Y")
 
-        # Period starts
-        assert substitute_date_variables("{start_of_month}") == today.replace(day=1).isoformat()
-        assert substitute_date_variables("{start_of_year:%Y%m%d}") == today.replace(
-            month=1, day=1
-        ).strftime("%Y%m%d")
+            # Relative days
+            assert (
+                substitute_date_variables("{-7d}")
+                == (today - datetime.timedelta(days=7)).isoformat()
+            )
+            assert substitute_date_variables("{-30d:%Y%m%d}") == (
+                today - datetime.timedelta(days=30)
+            ).strftime("%Y%m%d")
+            assert (
+                substitute_date_variables("{+1d}")
+                == (today + datetime.timedelta(days=1)).isoformat()
+            )
 
-        # Embedded in string (like openFDA)
-        result = substitute_date_variables("report_date:[{-30d:%Y%m%d}+TO+{today:%Y%m%d}]")
-        expected_start = (today - datetime.timedelta(days=30)).strftime("%Y%m%d")
-        expected_end = today.strftime("%Y%m%d")
-        assert result == f"report_date:[{expected_start}+TO+{expected_end}]"
+            # Period starts
+            assert substitute_date_variables("{start_of_month}") == today.replace(day=1).isoformat()
+            assert substitute_date_variables("{start_of_year:%Y%m%d}") == today.replace(
+                month=1, day=1
+            ).strftime("%Y%m%d")
+
+            # Embedded in string (like openFDA)
+            result = substitute_date_variables("report_date:[{-30d:%Y%m%d}+TO+{today:%Y%m%d}]")
+            expected_start = (today - datetime.timedelta(days=30)).strftime("%Y%m%d")
+            expected_end = today.strftime("%Y%m%d")
+            assert result == f"report_date:[{expected_start}+TO+{expected_end}]"
 
         # Unknown expressions preserved
         assert substitute_date_variables("{unknown}") == "{unknown}"
