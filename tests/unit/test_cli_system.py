@@ -684,7 +684,9 @@ class TestCountRecordsSpark:
 
     def test_count_spark_success(self):
         """Should count records using Spark."""
+        import importlib
         import sys
+        import types
 
         mock_catalog = Mock()
         mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
@@ -699,30 +701,43 @@ class TestCountRecordsSpark:
 
         cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
 
-        # The function does `from pyspark.sql import functions as F`.
-        # In CI with real PySpark installed, F.col/F.lit create real Column
-        # objects that may fail without JVM. We must ensure our mock is used.
-        # Remove cached real pyspark modules temporarily so patch.dict works.
+        # The function does `from pyspark.sql import functions as F` locally.
+        # In CI, real pyspark is installed but has no JVM, so F.col/F.lit
+        # create real Column objects that fail. We must completely replace
+        # pyspark.sql.functions in sys.modules so the local import resolves
+        # to our mock. We evict ALL pyspark modules and install fake ones.
+        # Also, F.col("date") < F.lit(...) uses __lt__, which Mock doesn't
+        # support by default. We make col() return an object with __lt__.
+        mock_column = Mock()
+        mock_column.__lt__ = Mock(return_value=Mock(name="filter_expr"))
+
+        mock_F = types.ModuleType("pyspark.sql.functions")
+        mock_F.col = Mock(return_value=mock_column)
+        mock_F.lit = Mock()
+
+        mock_pyspark = types.ModuleType("pyspark")
+        mock_pyspark_sql = types.ModuleType("pyspark.sql")
+        mock_pyspark_sql.functions = mock_F
+        mock_pyspark.sql = mock_pyspark_sql
+
         saved = {}
-        keys_to_remove = [k for k in sys.modules if k.startswith("pyspark")]
+        keys_to_remove = [k for k in list(sys.modules) if k.startswith("pyspark")]
         for k in keys_to_remove:
             saved[k] = sys.modules.pop(k)
 
-        mock_F = Mock()
-        mock_sql = Mock()
-        mock_sql.functions = mock_F
+        sys.modules["pyspark"] = mock_pyspark
+        sys.modules["pyspark.sql"] = mock_pyspark_sql
+        sys.modules["pyspark.sql.functions"] = mock_F
+        importlib.invalidate_caches()
+
         try:
-            with patch.dict(
-                "sys.modules",
-                {
-                    "pyspark": Mock(),
-                    "pyspark.sql": mock_sql,
-                    "pyspark.sql.functions": mock_F,
-                },
-            ):
-                result = _count_records_spark(mock_catalog, cutoffs)
+            result = _count_records_spark(mock_catalog, cutoffs)
         finally:
-            # Restore real pyspark modules
+            # Remove fakes
+            for k in list(sys.modules):
+                if k.startswith("pyspark"):
+                    del sys.modules[k]
+            # Restore originals
             sys.modules.update(saved)
 
         assert result == {"meta_daily_stats": 75}
