@@ -193,12 +193,33 @@ def test_join_right(left_df, right_df):
 
 def test_join_full(left_df, right_df):
     """Test full outer join.
-
-    Note: Current pandas implementation doesn't map 'full' to 'outer'.
-    Pandas requires 'outer' join type. This is skipped for now.
-    TODO: Transformer should map 'full' -> 'outer' for pandas compatibility.
+    
+    Verifies that 'full' join type correctly maps to 'outer' for pandas compatibility.
+    Full outer join should include all rows from both datasets.
     """
-    pytest.skip("Transformer doesn't map 'full' to 'outer' for pandas - known issue")
+    context = create_context(left_df, {"customers": right_df})
+    params = JoinParams(right_dataset="customers", on="customer_id", how="full")
+    result_ctx = join(context, params)
+    result = result_ctx.df
+    
+    # Full outer join should include all rows from both datasets
+    # Left has: 1, 2, 3, 4
+    # Right has: 2, 3, 4, 5
+    # Result should have: 1, 2, 3, 4, 5
+    assert len(result) == 5
+    assert sorted(result["customer_id"].tolist()) == [1, 2, 3, 4, 5]
+    
+    # Check that row 1 (left only) has null region
+    assert pd.isna(result.loc[result["customer_id"] == 1, "region"].iloc[0])
+    
+    # Check that row 5 (right only) has null name
+    assert pd.isna(result.loc[result["customer_id"] == 5, "name"].iloc[0])
+    
+    # Check that rows 2, 3, 4 (both sides) have both name and region
+    for cid in [2, 3, 4]:
+        row = result.loc[result["customer_id"] == cid].iloc[0]
+        assert pd.notna(row["name"])
+        assert pd.notna(row["region"])
 
 
 def test_join_with_prefix(left_df, right_df):
