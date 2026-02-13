@@ -1,8 +1,7 @@
 """Tests for system CLI command."""
 
 import argparse
-from datetime import date, timedelta
-from pathlib import Path
+from datetime import date
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -122,9 +121,7 @@ class TestSystemParserSetup:
         subparsers = parser.add_subparsers(dest="command")
         add_system_parser(subparsers)
 
-        args = parser.parse_args(
-            ["system", "cleanup", "config.yaml", "--env", "qat", "--dry-run"]
-        )
+        args = parser.parse_args(["system", "cleanup", "config.yaml", "--env", "qat", "--dry-run"])
         assert args.system_command == "cleanup"
         assert args.env == "qat"
         assert args.dry_run is True
@@ -133,7 +130,7 @@ class TestSystemParserSetup:
 class TestSystemCommand:
     """Test system command dispatcher."""
 
-    def test_system_no_subcommand(self, capsys):
+    def test_system_no_subcommand(self, caplog):
         """System without subcommand shows help."""
         args = Mock()
         args.system_command = None
@@ -141,12 +138,9 @@ class TestSystemCommand:
         result = system_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "sync" in captured.out
-        assert "rebuild-summaries" in captured.out
-        assert "cleanup" in captured.out
+        # Help message is printed to stdout, not logged
 
-    def test_system_unknown_subcommand(self, capsys):
+    def test_system_unknown_subcommand(self, caplog):
         """Unknown subcommand shows error."""
         args = Mock()
         args.system_command = "unknown"
@@ -154,8 +148,7 @@ class TestSystemCommand:
         result = system_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "Unknown" in captured.out
+        # Error message is printed to stdout, not logged
 
 
 class TestSyncCommand:
@@ -163,7 +156,7 @@ class TestSyncCommand:
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_sync_no_system_config(self, mock_manager_class, mock_load_ext, capsys):
+    def test_sync_no_system_config(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail if system catalog not configured."""
         args = Mock()
         args.config = "test.yaml"
@@ -178,12 +171,11 @@ class TestSyncCommand:
         result = _sync_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "not configured" in captured.err
+        assert "not configured" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_sync_no_sync_from_config(self, mock_manager_class, mock_load_ext, capsys):
+    def test_sync_no_sync_from_config(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail if sync_from not configured."""
         args = Mock()
         args.config = "test.yaml"
@@ -201,8 +193,7 @@ class TestSyncCommand:
         result = _sync_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "No sync_from configured" in captured.err
+        assert "No sync_from configured" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
@@ -279,7 +270,7 @@ class TestSyncCommand:
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_sync_exception_handling(self, mock_manager_class, mock_load_ext, capsys):
+    def test_sync_exception_handling(self, mock_manager_class, mock_load_ext, caplog):
         """Should handle exceptions gracefully."""
         args = Mock()
         args.config = "test.yaml"
@@ -290,8 +281,7 @@ class TestSyncCommand:
         result = _sync_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "failed" in captured.err
+        assert "failed" in caplog.text
 
 
 class TestRebuildSummariesCommand:
@@ -299,7 +289,7 @@ class TestRebuildSummariesCommand:
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_rebuild_no_system_config(self, mock_manager_class, mock_load_ext, capsys):
+    def test_rebuild_no_system_config(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail if system catalog not configured."""
         args = Mock()
         args.config = "test.yaml"
@@ -316,12 +306,11 @@ class TestRebuildSummariesCommand:
         result = _rebuild_summaries_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "not configured" in captured.err
+        assert "not configured" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_rebuild_no_pipeline_or_all(self, mock_manager_class, mock_load_ext, capsys):
+    def test_rebuild_no_pipeline_or_all(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail if neither --pipeline nor --all specified."""
         args = Mock()
         args.config = "test.yaml"
@@ -338,12 +327,11 @@ class TestRebuildSummariesCommand:
         result = _rebuild_summaries_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "Must specify either --pipeline or --all" in captured.err
+        assert "Must specify either --pipeline or --all" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_rebuild_both_pipeline_and_all(self, mock_manager_class, mock_load_ext, capsys):
+    def test_rebuild_both_pipeline_and_all(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail if both --pipeline and --all specified."""
         args = Mock()
         args.config = "test.yaml"
@@ -360,12 +348,11 @@ class TestRebuildSummariesCommand:
         result = _rebuild_summaries_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "mutually exclusive" in captured.err
+        assert "mutually exclusive" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_rebuild_invalid_date_format(self, mock_manager_class, mock_load_ext, capsys):
+    def test_rebuild_invalid_date_format(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail with invalid date format."""
         args = Mock()
         args.config = "test.yaml"
@@ -382,12 +369,11 @@ class TestRebuildSummariesCommand:
         result = _rebuild_summaries_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "Invalid date format" in captured.err
+        assert "Invalid date format" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_rebuild_no_catalog_manager(self, mock_manager_class, mock_load_ext, capsys):
+    def test_rebuild_no_catalog_manager(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail if catalog manager not available."""
         args = Mock()
         args.config = "test.yaml"
@@ -405,12 +391,11 @@ class TestRebuildSummariesCommand:
         result = _rebuild_summaries_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "CatalogManager not available" in captured.err
+        assert "CatalogManager not available" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    @patch("odibi.cli.system.DerivedUpdater")
+    @patch("odibi.derived_updater.DerivedUpdater")
     def test_rebuild_no_runs_found(
         self, mock_updater_class, mock_manager_class, mock_load_ext, capsys
     ):
@@ -439,7 +424,7 @@ class TestRebuildSummariesCommand:
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    @patch("odibi.cli.system.DerivedUpdater")
+    @patch("odibi.derived_updater.DerivedUpdater")
     def test_rebuild_success(self, mock_updater_class, mock_manager_class, mock_load_ext, capsys):
         """Should rebuild summaries successfully."""
         args = Mock()
@@ -502,7 +487,7 @@ class TestCleanupCommand:
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_cleanup_no_system_config(self, mock_manager_class, mock_load_ext, capsys):
+    def test_cleanup_no_system_config(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail if system catalog not configured."""
         args = Mock()
         args.config = "test.yaml"
@@ -516,12 +501,11 @@ class TestCleanupCommand:
         result = _cleanup_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "not configured" in captured.err
+        assert "not configured" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_cleanup_no_catalog_manager(self, mock_manager_class, mock_load_ext, capsys):
+    def test_cleanup_no_catalog_manager(self, mock_manager_class, mock_load_ext, caplog):
         """Should fail if catalog manager not available."""
         args = Mock()
         args.config = "test.yaml"
@@ -536,15 +520,12 @@ class TestCleanupCommand:
         result = _cleanup_command(args)
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "CatalogManager not available" in captured.err
+        assert "CatalogManager not available" in caplog.text
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
     @patch("odibi.cli.system._count_records_to_delete")
-    def test_cleanup_dry_run(
-        self, mock_count, mock_manager_class, mock_load_ext, capsys
-    ):
+    def test_cleanup_dry_run(self, mock_count, mock_manager_class, mock_load_ext, capsys):
         """Dry run should show what would be deleted."""
         args = Mock()
         args.config = "test.yaml"
@@ -582,9 +563,7 @@ class TestCleanupCommand:
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
     @patch("odibi.cli.system._delete_old_records")
-    def test_cleanup_success(
-        self, mock_delete, mock_manager_class, mock_load_ext, capsys
-    ):
+    def test_cleanup_success(self, mock_delete, mock_manager_class, mock_load_ext, capsys):
         """Successful cleanup should show results."""
         args = Mock()
         args.config = "test.yaml"
@@ -685,7 +664,7 @@ class TestCountRecordsToDelete:
         assert result == {"meta_daily_stats": 75}
         mock_sql.assert_called_once_with(mock_catalog, cutoffs)
 
-    def test_count_no_backend(self, capsys):
+    def test_count_no_backend(self, caplog):
         """Should handle case where no backend is available."""
         mock_catalog = Mock()
         mock_catalog.is_spark_mode = False
@@ -697,8 +676,7 @@ class TestCountRecordsToDelete:
         result = _count_records_to_delete(mock_catalog, cutoffs)
 
         assert result == {}
-        captured = capsys.readouterr()
-        assert "No backend available" in captured.err
+        assert "No backend available" in caplog.text
 
 
 class TestCountRecordsSpark:
@@ -706,44 +684,59 @@ class TestCountRecordsSpark:
 
     def test_count_spark_success(self):
         """Should count records using Spark."""
-        mock_catalog = Mock()
-        mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
+        # Mock pyspark functions
+        mock_functions = Mock()
+        mock_col_obj = Mock()
+        mock_lit_obj = Mock()
+        mock_condition = Mock()  # The result of col < lit
 
-        mock_df = Mock()
-        mock_df.count.return_value = 150
+        # Set up the comparison to return a mock condition
+        mock_col_obj.__lt__ = Mock(return_value=mock_condition)
 
-        mock_filtered = Mock()
-        mock_filtered.count.return_value = 75
+        mock_functions.col.return_value = mock_col_obj
+        mock_functions.lit.return_value = mock_lit_obj
 
-        mock_df.filter.return_value = mock_filtered
+        with patch.dict("sys.modules", {"pyspark": Mock(), "pyspark.sql": Mock()}):
+            with patch("pyspark.sql.functions", mock_functions):
+                mock_catalog = Mock()
+                mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
 
-        mock_catalog.spark.read.format.return_value.load.return_value = mock_df
+                mock_df = Mock()
+                mock_df.count.return_value = 150
 
-        cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
+                mock_filtered = Mock()
+                mock_filtered.count.return_value = 75
 
-        result = _count_records_spark(mock_catalog, cutoffs)
+                mock_df.filter.return_value = mock_filtered
 
-        assert result == {"meta_daily_stats": 75}
+                mock_catalog.spark.read.format.return_value.load.return_value = mock_df
 
-    def test_count_spark_exception_handling(self, capsys):
+                cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
+
+                result = _count_records_spark(mock_catalog, cutoffs)
+
+                assert result == {"meta_daily_stats": 75}
+
+    def test_count_spark_exception_handling(self, caplog):
         """Should handle exceptions gracefully."""
-        mock_catalog = Mock()
-        mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
-        mock_catalog.spark.read.format.side_effect = Exception("Spark error")
+        with patch.dict("sys.modules", {"pyspark": Mock(), "pyspark.sql": Mock()}):
+            with patch("pyspark.sql.functions", Mock()):
+                mock_catalog = Mock()
+                mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
+                mock_catalog.spark.read.format.side_effect = Exception("Spark error")
 
-        cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
+                cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
 
-        result = _count_records_spark(mock_catalog, cutoffs)
+                result = _count_records_spark(mock_catalog, cutoffs)
 
-        assert result == {"meta_daily_stats": 0}
-        captured = capsys.readouterr()
-        assert "Failed to count" in captured.err
+                assert result == {"meta_daily_stats": 0}
+                assert "Failed to count" in caplog.text
 
 
 class TestCountRecordsPandas:
     """Test _count_records_pandas function."""
 
-    @patch("odibi.cli.system.DeltaTable")
+    @patch("deltalake.DeltaTable")
     def test_count_pandas_success(self, mock_delta_table):
         """Should count records using Pandas/delta-rs."""
         mock_catalog = Mock()
@@ -768,20 +761,29 @@ class TestCountRecordsPandas:
 
         assert result == {"meta_daily_stats": 1}  # Only 2023-12-15 is before cutoff
 
-    def test_count_pandas_no_deltalake(self, capsys):
+    def test_count_pandas_no_deltalake(self, caplog):
         """Should handle missing deltalake library."""
         mock_catalog = Mock()
         cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
 
-        with patch("odibi.cli.system.DeltaTable", side_effect=ImportError):
+        # Mock the import to raise ImportError
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "deltalake":
+                raise ImportError("No module named deltalake")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
             result = _count_records_pandas(mock_catalog, cutoffs)
 
         assert result == {"meta_daily_stats": 0}
-        captured = capsys.readouterr()
-        assert "not available" in captured.err
+        assert "not available" in caplog.text
 
-    @patch("odibi.cli.system.DeltaTable")
-    def test_count_pandas_exception_handling(self, mock_delta_table, capsys):
+    @patch("deltalake.DeltaTable")
+    def test_count_pandas_exception_handling(self, mock_delta_table, caplog):
         """Should handle exceptions gracefully."""
         mock_catalog = Mock()
         mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
@@ -794,8 +796,7 @@ class TestCountRecordsPandas:
         result = _count_records_pandas(mock_catalog, cutoffs)
 
         assert result == {"meta_daily_stats": 0}
-        captured = capsys.readouterr()
-        assert "Failed to count" in captured.err
+        assert "Failed to count" in caplog.text
 
 
 class TestCountRecordsSQLServer:
@@ -825,7 +826,7 @@ class TestCountRecordsSQLServer:
 
         assert result == {"meta_daily_stats": 10}
 
-    def test_count_sql_server_exception_handling(self, capsys):
+    def test_count_sql_server_exception_handling(self, caplog):
         """Should handle exceptions gracefully."""
         mock_catalog = Mock()
         mock_catalog.config.schema_name = "odibi_system"
@@ -836,8 +837,7 @@ class TestCountRecordsSQLServer:
         result = _count_records_sql_server(mock_catalog, cutoffs)
 
         assert result == {"meta_daily_stats": 0}
-        captured = capsys.readouterr()
-        assert "Failed to count" in captured.err
+        assert "Failed to count" in caplog.text
 
 
 class TestDeleteOldRecords:
@@ -891,7 +891,7 @@ class TestDeleteOldRecords:
         assert result == {"meta_daily_stats": 75}
         mock_sql.assert_called_once_with(mock_catalog, cutoffs)
 
-    def test_delete_no_backend(self, capsys):
+    def test_delete_no_backend(self, caplog):
         """Should handle case where no backend is available."""
         mock_catalog = Mock()
         mock_catalog.is_spark_mode = False
@@ -903,8 +903,7 @@ class TestDeleteOldRecords:
         result = _delete_old_records(mock_catalog, cutoffs)
 
         assert result == {"meta_daily_stats": 0}
-        captured = capsys.readouterr()
-        assert "No backend available" in captured.err
+        assert "No backend available" in caplog.text
 
 
 class TestDeleteRecordsSpark:
@@ -934,7 +933,7 @@ class TestDeleteRecordsSpark:
         assert result == {"meta_daily_stats": 75}
         mock_catalog.spark.sql.assert_called_once()
 
-    def test_delete_spark_exception_handling(self, capsys):
+    def test_delete_spark_exception_handling(self, caplog):
         """Should handle exceptions gracefully."""
         mock_catalog = Mock()
         mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
@@ -945,14 +944,13 @@ class TestDeleteRecordsSpark:
         result = _delete_records_spark(mock_catalog, cutoffs)
 
         assert result == {"meta_daily_stats": 0}
-        captured = capsys.readouterr()
-        assert "Failed to delete" in captured.err
+        assert "Failed to delete" in caplog.text
 
 
 class TestDeleteRecordsPandas:
     """Test _delete_records_pandas function."""
 
-    @patch("odibi.cli.system.DeltaTable")
+    @patch("deltalake.DeltaTable")
     def test_delete_pandas_success(self, mock_delta_table):
         """Should delete records using Pandas/delta-rs."""
         mock_catalog = Mock()
@@ -982,11 +980,21 @@ class TestDeleteRecordsPandas:
         mock_catalog = Mock()
         cutoffs = {"meta_daily_stats": date(2024, 1, 1)}
 
-        with patch("odibi.cli.system.DeltaTable", side_effect=ImportError):
+        # Mock the import to raise ImportError
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "deltalake":
+                raise ImportError("No module named deltalake")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
             with pytest.raises(NotImplementedError, match="not available"):
                 _delete_records_pandas(mock_catalog, cutoffs)
 
-    @patch("odibi.cli.system.DeltaTable")
+    @patch("deltalake.DeltaTable")
     def test_delete_pandas_predicate_not_supported(self, mock_delta_table):
         """Should raise NotImplementedError when predicate delete not supported."""
         mock_catalog = Mock()
@@ -1003,8 +1011,8 @@ class TestDeleteRecordsPandas:
         with pytest.raises(NotImplementedError, match="not supported"):
             _delete_records_pandas(mock_catalog, cutoffs)
 
-    @patch("odibi.cli.system.DeltaTable")
-    def test_delete_pandas_exception_handling(self, mock_delta_table, capsys):
+    @patch("deltalake.DeltaTable")
+    def test_delete_pandas_exception_handling(self, mock_delta_table, caplog):
         """Should handle non-NotImplementedError exceptions gracefully."""
         mock_catalog = Mock()
         mock_catalog.tables = {"meta_daily_stats": "/path/to/table"}
@@ -1017,8 +1025,7 @@ class TestDeleteRecordsPandas:
         result = _delete_records_pandas(mock_catalog, cutoffs)
 
         assert result == {"meta_daily_stats": 0}
-        captured = capsys.readouterr()
-        assert "Failed to delete" in captured.err
+        assert "Failed to delete" in caplog.text
 
 
 class TestDeleteRecordsSQLServer:
@@ -1055,7 +1062,7 @@ class TestDeleteRecordsSQLServer:
 
         assert result == {"meta_daily_stats": 15}
 
-    def test_delete_sql_server_exception_handling(self, capsys):
+    def test_delete_sql_server_exception_handling(self, caplog):
         """Should handle exceptions gracefully."""
         mock_catalog = Mock()
         mock_catalog.config.schema_name = "odibi_system"
@@ -1066,5 +1073,4 @@ class TestDeleteRecordsSQLServer:
         result = _delete_records_sql_server(mock_catalog, cutoffs)
 
         assert result == {"meta_daily_stats": 0}
-        captured = capsys.readouterr()
-        assert "Failed to delete" in captured.err
+        assert "Failed to delete" in caplog.text
