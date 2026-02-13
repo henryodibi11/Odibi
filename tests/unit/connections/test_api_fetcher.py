@@ -116,44 +116,54 @@ class TestResponseExtractor:
         """Test date variable substitution in add_fields."""
         import datetime
 
-        extractor = ResponseExtractor(
-            items_path="",
-            add_fields={
-                "_now": "$now",
-                "_today": "$today",
-                "_yesterday": "$yesterday",
-                "_date": "$date",
-                "_7_days": "$7_days_ago",
-                "_30_days": "$30_days_ago",
-                "_90_days": "$90_days_ago",
-                "_week_start": "$start_of_week",
-                "_month_start": "$start_of_month",
-                "_year_start": "$start_of_year",
-                "_static": "constant_value",
-            },
-        )
-        response = [{"id": 1}]
-        items = extractor.extract_items(response)
+        # Fix timezone flake: use a fixed datetime for testing
+        fixed_dt = datetime.datetime(2024, 3, 15, 14, 30, 0, tzinfo=datetime.timezone.utc)
+        today = fixed_dt.date()
 
-        today = datetime.date.today()
-        item = items[0]
+        with patch("odibi.connections.api_fetcher.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = fixed_dt
+            mock_datetime.timedelta = datetime.timedelta
 
-        # Static value preserved
-        assert item["_static"] == "constant_value"
+            extractor = ResponseExtractor(
+                items_path="",
+                add_fields={
+                    "_now": "$now",
+                    "_today": "$today",
+                    "_yesterday": "$yesterday",
+                    "_date": "$date",
+                    "_7_days": "$7_days_ago",
+                    "_30_days": "$30_days_ago",
+                    "_90_days": "$90_days_ago",
+                    "_week_start": "$start_of_week",
+                    "_month_start": "$start_of_month",
+                    "_year_start": "$start_of_year",
+                    "_static": "constant_value",
+                },
+            )
+            response = [{"id": 1}]
+            items = extractor.extract_items(response)
 
-        # Date values are ISO format strings
-        assert item["_today"] == today.isoformat()
-        assert item["_date"] == today.isoformat()  # Alias
-        assert item["_yesterday"] == (today - datetime.timedelta(days=1)).isoformat()
-        assert item["_7_days"] == (today - datetime.timedelta(days=7)).isoformat()
-        assert item["_30_days"] == (today - datetime.timedelta(days=30)).isoformat()
-        assert item["_90_days"] == (today - datetime.timedelta(days=90)).isoformat()
-        assert item["_week_start"] == (today - datetime.timedelta(days=today.weekday())).isoformat()
-        assert item["_month_start"] == today.replace(day=1).isoformat()
-        assert item["_year_start"] == today.replace(month=1, day=1).isoformat()
+            item = items[0]
 
-        # $now has timezone info (ends with +00:00)
-        assert "+00:00" in item["_now"] or "Z" in item["_now"]
+            # Static value preserved
+            assert item["_static"] == "constant_value"
+
+            # Date values are ISO format strings
+            assert item["_today"] == today.isoformat()
+            assert item["_date"] == today.isoformat()  # Alias
+            assert item["_yesterday"] == (today - datetime.timedelta(days=1)).isoformat()
+            assert item["_7_days"] == (today - datetime.timedelta(days=7)).isoformat()
+            assert item["_30_days"] == (today - datetime.timedelta(days=30)).isoformat()
+            assert item["_90_days"] == (today - datetime.timedelta(days=90)).isoformat()
+            assert (
+                item["_week_start"]
+                == (today - datetime.timedelta(days=today.weekday())).isoformat()
+            )
+            assert item["_month_start"] == today.replace(day=1).isoformat()
+            assert item["_year_start"] == today.replace(month=1, day=1).isoformat()
+
+            # $now has timezone info (ends with +00:00)
+            assert "+00:00" in item["_now"] or "Z" in item["_now"]
 
     def test_curly_brace_date_syntax(self):
         """Test {expression:format} date variable syntax."""
