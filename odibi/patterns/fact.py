@@ -85,6 +85,18 @@ class FactPattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate fact pattern configuration parameters.
+
+        Ensures that all required parameters are present and valid. Checks that:
+        - keys are provided when deduplicate is True
+        - orphan_handling is valid ('unknown', 'reject', or 'quarantine')
+        - quarantine config is complete when orphan_handling='quarantine'
+        - all dimension lookups have required fields (source_column, dimension_table, etc.)
+
+        Raises:
+            ValueError: If keys are missing for deduplication, orphan_handling is invalid,
+                quarantine config is incomplete, or dimension configs are missing required fields.
+        """
         ctx = get_logging_context()
         deduplicate = self.params.get("deduplicate")
         keys = self.params.get("keys")
@@ -183,6 +195,29 @@ class FactPattern(Pattern):
         )
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the fact pattern to build a fact table with surrogate key lookups.
+
+        Builds a fact table with automatic surrogate key lookups from dimension tables.
+        The execution flow:
+        1. Deduplicate source data if configured
+        2. Perform dimension lookups to replace natural keys with surrogate keys
+        3. Handle orphan records (unknown SK=0, reject with error, or quarantine)
+        4. Apply measure calculations and transformations if configured
+        5. Validate grain (check for duplicates) if grain is specified
+        6. Add audit columns (load_timestamp, source_system) if configured
+
+        Args:
+            context: Engine context containing the source DataFrame, dimension tables,
+                and execution environment.
+
+        Returns:
+            Fact DataFrame with surrogate keys from dimension lookups and all transformations applied.
+
+        Raises:
+            ValueError: If orphan records are found and orphan_handling='reject', if grain
+                validation fails (duplicates found), or if dimension lookup fails.
+            Exception: If quarantine write fails or measure calculations fail.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 

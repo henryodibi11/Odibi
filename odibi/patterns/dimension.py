@@ -58,6 +58,19 @@ class DimensionPattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate dimension pattern configuration parameters.
+
+        Ensures that all required parameters are present and valid. Checks that:
+        - natural_key is provided (business key column(s))
+        - surrogate_key is provided (auto-generated primary key column name)
+        - scd_type is valid (0, 1, or 2)
+        - target is provided for SCD Type 2 (required for history comparison)
+        - track_cols is provided for SCD Type 1 and 2 (columns to monitor for changes)
+
+        Raises:
+            ValueError: If natural_key or surrogate_key is missing, scd_type is invalid,
+                target is missing for SCD2, or track_cols is missing for SCD1/2.
+        """
         ctx = get_logging_context()
         ctx.debug(
             "DimensionPattern validation starting",
@@ -137,6 +150,27 @@ class DimensionPattern(Pattern):
         )
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the dimension pattern to build a dimension table with surrogate keys.
+
+        Builds a complete dimension table with auto-generated surrogate keys and optional
+        slowly changing dimension (SCD) support. The execution flow varies by SCD type:
+        - SCD Type 0: Insert new records only, never update existing
+        - SCD Type 1: Update existing records in-place, insert new records
+        - SCD Type 2: Track full history with valid_from/valid_to dates and is_current flag
+
+        All modes generate surrogate keys starting from MAX(existing_sk) + 1 for new records.
+        Optionally adds audit columns and ensures unknown member row (SK=0) exists.
+
+        Args:
+            context: Engine context containing the source DataFrame and execution environment.
+
+        Returns:
+            DataFrame with surrogate keys assigned and SCD logic applied as configured.
+
+        Raises:
+            Exception: If target loading fails, SCD processing fails, or surrogate key
+                generation encounters errors.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 
