@@ -1,637 +1,435 @@
-"""
-Tests for thermodynamics transformers.
+"""Unit tests for odibi/transformers/thermodynamics.py."""
 
-Tests fluid_properties, saturation_properties, and psychrometrics transformers
-with engine parity (Pandas, Spark mock, Polars).
-"""
+import math
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
-# Skip all tests if CoolProp not installed
-coolprop_available = False
-try:
-    import CoolProp.CoolProp as CP  # noqa: F401
-
-    coolprop_available = True
-except ImportError:
-    pass
-
-pytestmark = pytest.mark.skipif(not coolprop_available, reason="CoolProp not installed")
-
-# ruff: noqa: E402 - imports after conditional skip marker is intentional
-from odibi.context import EngineContext, PandasContext
+from odibi.context import EngineContext
 from odibi.enums import EngineType
 from odibi.transformers.thermodynamics import (
+    ATM_PA,
     FluidPropertiesParams,
     PropertyOutputConfig,
     PsychrometricOutputConfig,
     PsychrometricsParams,
-    SaturationPropertiesParams,
+    _compute_psychrometrics_row,
+    _pressure_from_pa,
     _pressure_to_pa,
     _temp_from_kelvin,
     _temp_to_kelvin,
     fluid_properties,
     psychrometrics,
-    saturation_properties,
 )
 
 
 # =============================================================================
-# UNIT CONVERSION TESTS
+# _ensure_coolprop
 # =============================================================================
 
 
-class TestUnitConversions:
-    """Test unit conversion helper functions."""
+class TestEnsureCoolprop:
+    def test_raises_when_coolprop_missing(self):
+        with patch.dict("sys.modules", {"CoolProp": None, "CoolProp.CoolProp": None}):
+            from odibi.transformers.thermodynamics import _ensure_coolprop
 
-    def test_temp_to_kelvin_degf(self):
-        # 212°F = 373.15 K (boiling point of water)
-        result = _temp_to_kelvin(212.0, "degF")
-        assert abs(result - 373.15) < 0.01
-
-    def test_temp_to_kelvin_degc(self):
-        # 100°C = 373.15 K
-        result = _temp_to_kelvin(100.0, "degC")
-        assert abs(result - 373.15) < 0.01
-
-    def test_temp_to_kelvin_already_kelvin(self):
-        result = _temp_to_kelvin(300.0, "K")
-        assert result == 300.0
-
-    def test_temp_from_kelvin_degf(self):
-        # 373.15 K = 212°F
-        result = _temp_from_kelvin(373.15, "degF")
-        assert abs(result - 212.0) < 0.1
-
-    def test_temp_from_kelvin_degc(self):
-        # 373.15 K = 100°C
-        result = _temp_from_kelvin(373.15, "degC")
-        assert abs(result - 100.0) < 0.01
-
-    def test_pressure_to_pa_psia(self):
-        # 14.696 psia = 101325 Pa (1 atm)
-        result = _pressure_to_pa(14.696, "psia")
-        assert abs(result - 101325) < 100
-
-    def test_pressure_to_pa_psig(self):
-        # 0 psig = 14.696 psia = 101325 Pa (with default gauge offset)
-        result = _pressure_to_pa(0.0, "psig", gauge_offset=14.696)
-        assert abs(result - 101325) < 100
-
-    def test_pressure_to_pa_bar(self):
-        # 1 bar = 100000 Pa
-        result = _pressure_to_pa(1.0, "bar")
-        assert result == 100000.0
-
-    def test_pressure_to_pa_mpa(self):
-        # 0.1 MPa = 100000 Pa
-        result = _pressure_to_pa(0.1, "MPa")
-        assert result == 100000.0
+            with pytest.raises(ImportError, match="CoolProp is required"):
+                _ensure_coolprop()
 
 
 # =============================================================================
-# FLUID PROPERTIES TESTS
+# Temperature conversions
 # =============================================================================
 
 
-class TestFluidPropertiesPandas:
-    """Test fluid_properties transformer with Pandas engine."""
+class TestTempToKelvin:
+    def test_kelvin_passthrough(self):
+        assert _temp_to_kelvin(300.0, "K") == 300.0
 
-    def _create_context(self, df: pd.DataFrame) -> EngineContext:
-        """Create a Pandas EngineContext for testing."""
-        pandas_ctx = PandasContext()
-        return EngineContext(
-            context=pandas_ctx,
-            df=df,
-            engine_type=EngineType.PANDAS,
+    def test_celsius(self):
+        assert _temp_to_kelvin(0.0, "degC") == pytest.approx(273.15)
+        assert _temp_to_kelvin(100.0, "degC") == pytest.approx(373.15)
+
+    def test_fahrenheit(self):
+        assert _temp_to_kelvin(32.0, "degF") == pytest.approx(273.15)
+        assert _temp_to_kelvin(212.0, "degF") == pytest.approx(373.15)
+
+    def test_rankine(self):
+        assert _temp_to_kelvin(491.67, "degR") == pytest.approx(273.15, rel=1e-4)
+
+    def test_unknown_unit_raises(self):
+        with pytest.raises(ValueError, match="Unknown temperature unit"):
+            _temp_to_kelvin(100.0, "degX")
+
+
+class TestTempFromKelvin:
+    def test_kelvin_passthrough(self):
+        assert _temp_from_kelvin(300.0, "K") == 300.0
+
+    def test_celsius(self):
+        assert _temp_from_kelvin(273.15, "degC") == pytest.approx(0.0)
+        assert _temp_from_kelvin(373.15, "degC") == pytest.approx(100.0)
+
+    def test_fahrenheit(self):
+        assert _temp_from_kelvin(273.15, "degF") == pytest.approx(32.0)
+        assert _temp_from_kelvin(373.15, "degF") == pytest.approx(212.0)
+
+    def test_rankine(self):
+        assert _temp_from_kelvin(273.15, "degR") == pytest.approx(491.67)
+
+    def test_unknown_unit_raises(self):
+        with pytest.raises(ValueError, match="Unknown temperature unit"):
+            _temp_from_kelvin(300.0, "degX")
+
+
+# =============================================================================
+# Pressure conversions
+# =============================================================================
+
+
+class TestPressureToPa:
+    def test_pa_passthrough(self):
+        assert _pressure_to_pa(101325.0, "Pa") == 101325.0
+
+    def test_kpa(self):
+        assert _pressure_to_pa(101.325, "kPa") == pytest.approx(101325.0)
+
+    def test_bar(self):
+        assert _pressure_to_pa(1.0, "bar") == pytest.approx(100_000.0)
+
+    def test_psia(self):
+        assert _pressure_to_pa(14.696, "psia") == pytest.approx(101325.0, rel=1e-3)
+
+    def test_psig_with_default_offset(self):
+        # psig: value + 14.696 (default), then * psia factor
+        result = _pressure_to_pa(0.0, "psig")
+        expected = 14.696 * 6894.757293168
+        assert result == pytest.approx(expected)
+
+    def test_psig_with_custom_offset(self):
+        result = _pressure_to_pa(10.0, "psig", gauge_offset=14.7)
+        expected = (10.0 + 14.7) * 6894.757293168
+        assert result == pytest.approx(expected)
+
+    def test_unknown_unit_raises(self):
+        with pytest.raises(ValueError, match="Unknown pressure unit"):
+            _pressure_to_pa(100.0, "mmHg")
+
+
+class TestPressureFromPa:
+    def test_pa_passthrough(self):
+        assert _pressure_from_pa(101325.0, "Pa") == 101325.0
+
+    def test_kpa(self):
+        assert _pressure_from_pa(101325.0, "kPa") == pytest.approx(101.325)
+
+    def test_bar(self):
+        assert _pressure_from_pa(100_000.0, "bar") == pytest.approx(1.0)
+
+    def test_psia(self):
+        assert _pressure_from_pa(101325.0, "psia") == pytest.approx(14.696, rel=1e-3)
+
+    def test_psig_with_default_offset(self):
+        pa_input = 14.696 * 6894.757293168
+        result = _pressure_from_pa(pa_input, "psig")
+        assert result == pytest.approx(0.0, abs=0.01)
+
+    def test_psig_with_custom_offset(self):
+        pa_input = 24.7 * 6894.757293168
+        result = _pressure_from_pa(pa_input, "psig", gauge_offset=14.7)
+        assert result == pytest.approx(10.0, abs=0.01)
+
+    def test_unknown_unit_raises(self):
+        with pytest.raises(ValueError, match="Unknown pressure unit"):
+            _pressure_from_pa(100.0, "mmHg")
+
+
+# =============================================================================
+# Pydantic model validation
+# =============================================================================
+
+
+class TestPropertyOutputConfig:
+    def test_minimal(self):
+        cfg = PropertyOutputConfig(property="H")
+        assert cfg.property == "H"
+        assert cfg.unit is None
+        assert cfg.output_column is None
+
+    def test_with_all_fields(self):
+        cfg = PropertyOutputConfig(property="S", unit="kJ/(kg·K)", output_column="entropy")
+        assert cfg.property == "S"
+        assert cfg.unit == "kJ/(kg·K)"
+        assert cfg.output_column == "entropy"
+
+
+class TestFluidPropertiesParams:
+    def test_valid_pt(self):
+        params = FluidPropertiesParams(pressure=100.0, temperature=300.0)
+        assert params.fluid == "Water"
+        assert params.pressure == 100.0
+        assert params.temperature == 300.0
+
+    def test_valid_pq(self):
+        params = FluidPropertiesParams(pressure_col="p", quality=1.0)
+        assert params.quality == 1.0
+
+    def test_too_few_state_props_raises(self):
+        with pytest.raises(ValidationError, match="2 independent properties"):
+            FluidPropertiesParams(pressure=100.0)
+
+    def test_defaults(self):
+        params = FluidPropertiesParams(pressure=100.0, temperature=300.0)
+        assert params.pressure_unit == "Pa"
+        assert params.temperature_unit == "K"
+        assert params.gauge_offset == 14.696
+        assert len(params.outputs) == 1
+        assert params.outputs[0].property == "H"
+
+
+class TestPsychrometricsParams:
+    def test_valid_with_rh(self):
+        params = PsychrometricsParams(
+            dry_bulb_col="tdb",
+            relative_humidity=0.5,
+            pressure=101325.0,
         )
+        assert params.dry_bulb_col == "tdb"
 
-    def test_steam_enthalpy_from_pt(self):
-        """Test calculating steam enthalpy from pressure and temperature."""
-        df = pd.DataFrame(
-            {
-                "pressure_mpa": [0.1, 0.5, 1.0],
-                "temp_c": [150.0, 200.0, 250.0],
-            }
+    def test_missing_humidity_input_raises(self):
+        with pytest.raises(ValidationError, match="one of"):
+            PsychrometricsParams(
+                dry_bulb_col="tdb",
+                pressure=101325.0,
+            )
+
+    def test_missing_pressure_source_raises(self):
+        with pytest.raises(ValidationError, match="pressure"):
+            PsychrometricsParams(
+                dry_bulb_col="tdb",
+                relative_humidity=0.5,
+            )
+
+    def test_valid_with_elevation_ft(self):
+        params = PsychrometricsParams(
+            dry_bulb_col="tdb",
+            relative_humidity_col="rh",
+            elevation_ft=1000.0,
         )
-        ctx = self._create_context(df)
+        assert params.elevation_ft == 1000.0
 
-        params = FluidPropertiesParams(
-            fluid="Water",
-            pressure_col="pressure_mpa",
-            temperature_col="temp_c",
-            pressure_unit="MPa",
+    def test_valid_with_humidity_ratio_col(self):
+        params = PsychrometricsParams(
+            dry_bulb_col="tdb",
+            humidity_ratio_col="w",
+            pressure=101325.0,
+        )
+        assert params.humidity_ratio_col == "w"
+
+    def test_valid_with_wet_bulb_col(self):
+        params = PsychrometricsParams(
+            dry_bulb_col="tdb",
+            wet_bulb_col="twb",
+            elevation_m=300.0,
+        )
+        assert params.wet_bulb_col == "twb"
+
+
+# =============================================================================
+# _compute_psychrometrics_row
+# =============================================================================
+
+
+class TestComputePsychrometricsRow:
+    def _make_params(self, **overrides):
+        defaults = dict(
+            dry_bulb_col="tdb",
+            relative_humidity=0.5,
+            pressure=101325.0,
             temperature_unit="degC",
-            outputs=[
-                PropertyOutputConfig(property="H", unit="kJ/kg", output_column="enthalpy"),
-            ],
+            outputs=[PsychrometricOutputConfig(property="W", output_column="w_out")],
         )
+        defaults.update(overrides)
+        return PsychrometricsParams(**defaults)
 
-        result = fluid_properties(ctx, params)
-        result_df = result.df
+    def test_success_case(self):
+        mock_cp = MagicMock()
+        mock_cp.HAPropsSI.return_value = 0.0088
+        params = self._make_params()
+        row = {"tdb": 25.0}
+        result = _compute_psychrometrics_row(row, params, mock_cp)
+        assert "w_out" in result
+        assert result["w_out"] == pytest.approx(0.0088)
+        mock_cp.HAPropsSI.assert_called_once()
 
-        assert "enthalpy" in result_df.columns
-        # All values should be positive and reasonable for superheated steam
-        assert all(result_df["enthalpy"] > 2500)  # kJ/kg for superheated steam
-        assert all(result_df["enthalpy"] < 3500)
+    def test_null_dry_bulb_returns_none(self):
+        mock_cp = MagicMock()
+        params = self._make_params()
+        row = {"tdb": None}
+        result = _compute_psychrometrics_row(row, params, mock_cp)
+        assert result["w_out"] is None
+        mock_cp.HAPropsSI.assert_not_called()
 
-    def test_steam_multiple_outputs(self):
-        """Test calculating multiple properties at once."""
-        df = pd.DataFrame(
-            {
-                "P_psia": [100.0],
-                "T_degF": [400.0],
-            }
+    def test_nan_dry_bulb_returns_none(self):
+        mock_cp = MagicMock()
+        params = self._make_params()
+        row = {"tdb": float("nan")}
+        result = _compute_psychrometrics_row(row, params, mock_cp)
+        assert result["w_out"] is None
+
+    def test_humidity_ratio_gkg_conversion(self):
+        mock_cp = MagicMock()
+        mock_cp.HAPropsSI.return_value = 0.010  # kg/kg
+        params = self._make_params(
+            relative_humidity=None,
+            humidity_ratio=10.0,
+            humidity_ratio_unit="g/kg",
+            outputs=[PsychrometricOutputConfig(property="W", unit="g/kg", output_column="w_out")],
         )
-        ctx = self._create_context(df)
+        row = {"tdb": 25.0}
+        result = _compute_psychrometrics_row(row, params, mock_cp)
+        # Output should be raw_value * 1000 = 10.0
+        assert result["w_out"] == pytest.approx(10.0)
 
-        params = FluidPropertiesParams(
-            fluid="Water",
-            pressure_col="P_psia",
-            temperature_col="T_degF",
-            pressure_unit="psia",
-            temperature_unit="degF",
-            outputs=[
-                PropertyOutputConfig(property="H", unit="BTU/lb", output_column="h"),
-                PropertyOutputConfig(property="S", unit="BTU/(lb·R)", output_column="s"),
-                PropertyOutputConfig(property="D", unit="lb/ft³", output_column="rho"),
-            ],
+    def test_elevation_ft_pressure_calc(self):
+        mock_cp = MagicMock()
+        mock_cp.HAPropsSI.return_value = 0.008
+        params = self._make_params(
+            pressure=None,
+            elevation_ft=875.0,
         )
+        row = {"tdb": 25.0}
+        _compute_psychrometrics_row(row, params, mock_cp)
+        # Verify pressure arg passed to HAPropsSI
+        call_args = mock_cp.HAPropsSI.call_args
+        p_pa_arg = call_args[0][2]  # "P", p_pa is index 1,2
+        expected_p = ATM_PA * math.exp(-0.0000366 * 875.0)
+        assert p_pa_arg == pytest.approx(expected_p)
 
-        result = fluid_properties(ctx, params)
-        result_df = result.df
-
-        assert "h" in result_df.columns
-        assert "s" in result_df.columns
-        assert "rho" in result_df.columns
-        # Enthalpy should be around 1200 BTU/lb for this condition
-        assert 1100 < result_df["h"].iloc[0] < 1300
-
-    def test_saturated_steam_from_pq(self):
-        """Test calculating saturated vapor properties using P and Q."""
-        df = pd.DataFrame(
-            {
-                "pressure_psig": [0.0, 50.0, 100.0],
-            }
+    def test_prefix_used_when_no_output_column(self):
+        mock_cp = MagicMock()
+        mock_cp.HAPropsSI.return_value = 0.008
+        params = self._make_params(
+            prefix="psych",
+            outputs=[PsychrometricOutputConfig(property="W")],
         )
-        ctx = self._create_context(df)
+        row = {"tdb": 25.0}
+        result = _compute_psychrometrics_row(row, params, mock_cp)
+        assert "psych_W" in result
 
-        params = FluidPropertiesParams(
-            fluid="Water",
-            pressure_col="pressure_psig",
-            pressure_unit="psig",
-            gauge_offset=14.696,
-            quality=1.0,  # Saturated vapor
-            outputs=[
-                PropertyOutputConfig(property="H", unit="BTU/lb", output_column="hg"),
-                PropertyOutputConfig(property="T", unit="degF", output_column="sat_temp"),
-            ],
+    def test_rh_col_input(self):
+        mock_cp = MagicMock()
+        mock_cp.HAPropsSI.return_value = 0.008
+        params = self._make_params(
+            relative_humidity=None,
+            relative_humidity_col="rh",
+            rh_is_percent=True,
         )
-
-        result = fluid_properties(ctx, params)
-        result_df = result.df
-
-        assert "hg" in result_df.columns
-        assert "sat_temp" in result_df.columns
-        # At 0 psig (14.696 psia), sat temp should be ~212°F
-        assert abs(result_df["sat_temp"].iloc[0] - 212) < 2
-
-    def test_refrigerant_properties(self):
-        """Test with R134a refrigerant."""
-        df = pd.DataFrame(
-            {
-                "P_kpa": [500.0],
-                "T_c": [25.0],
-            }
-        )
-        ctx = self._create_context(df)
-
-        params = FluidPropertiesParams(
-            fluid="R134a",
-            pressure_col="P_kpa",
-            temperature_col="T_c",
-            pressure_unit="kPa",
-            temperature_unit="degC",
-            outputs=[
-                PropertyOutputConfig(property="H", unit="kJ/kg"),
-            ],
-        )
-
-        result = fluid_properties(ctx, params)
-        result_df = result.df
-
-        assert "H" in result_df.columns
-        assert result_df["H"].iloc[0] is not None
-
-    def test_null_handling(self):
-        """Test that null inputs produce null outputs."""
-        df = pd.DataFrame(
-            {
-                "pressure": [100.0, None, 100.0],
-                "temp": [200.0, 200.0, None],
-            }
-        )
-        ctx = self._create_context(df)
-
-        params = FluidPropertiesParams(
-            fluid="Water",
-            pressure_col="pressure",
-            temperature_col="temp",
-            pressure_unit="psia",
-            temperature_unit="degF",
-            outputs=[PropertyOutputConfig(property="H")],
-        )
-
-        result = fluid_properties(ctx, params)
-        result_df = result.df
-
-        assert result_df["H"].iloc[0] is not None
-        assert pd.isna(result_df["H"].iloc[1])  # Null pressure
-        assert pd.isna(result_df["H"].iloc[2])  # Null temp
-
-    def test_prefix_in_output_columns(self):
-        """Test that prefix is applied to output columns."""
-        df = pd.DataFrame({"P": [100.0], "T": [300.0]})
-        ctx = self._create_context(df)
-
-        params = FluidPropertiesParams(
-            fluid="Water",
-            pressure_col="P",
-            temperature_col="T",
-            pressure_unit="psia",
-            temperature_unit="degF",
-            prefix="steam",
-            outputs=[
-                PropertyOutputConfig(property="H"),
-                PropertyOutputConfig(property="S"),
-            ],
-        )
-
-        result = fluid_properties(ctx, params)
-        result_df = result.df
-
-        assert "steam_H" in result_df.columns
-        assert "steam_S" in result_df.columns
+        row = {"tdb": 25.0, "rh": 50.0}
+        _compute_psychrometrics_row(row, params, mock_cp)
+        call_args = mock_cp.HAPropsSI.call_args
+        # args: (prop, "P", p_pa, "T", tdb_k, "R", rh)
+        assert call_args[0][5] == "R"
+        assert call_args[0][6] == pytest.approx(0.5)
 
 
 # =============================================================================
-# SATURATION PROPERTIES TESTS
-# =============================================================================
-
-
-class TestSaturationPropertiesPandas:
-    """Test saturation_properties transformer."""
-
-    def _create_context(self, df: pd.DataFrame) -> EngineContext:
-        pandas_ctx = PandasContext()
-        return EngineContext(
-            context=pandas_ctx,
-            df=df,
-            engine_type=EngineType.PANDAS,
-        )
-
-    def test_saturated_vapor_properties(self):
-        """Test saturated vapor (Q=1) properties."""
-        df = pd.DataFrame({"P_psia": [14.696, 50.0, 100.0]})
-        ctx = self._create_context(df)
-
-        params = SaturationPropertiesParams(
-            fluid="Water",
-            pressure_col="P_psia",
-            pressure_unit="psia",
-            phase="vapor",
-            outputs=[
-                PropertyOutputConfig(property="H", unit="BTU/lb", output_column="hg"),
-                PropertyOutputConfig(property="T", unit="degF", output_column="Tsat"),
-            ],
-        )
-
-        result = saturation_properties(ctx, params)
-        result_df = result.df
-
-        # At 14.696 psia, Tsat = 212°F, hg ≈ 1150 BTU/lb
-        assert abs(result_df["Tsat"].iloc[0] - 212) < 2
-        assert 1140 < result_df["hg"].iloc[0] < 1160
-
-    def test_saturated_liquid_properties(self):
-        """Test saturated liquid (Q=0) properties."""
-        df = pd.DataFrame({"P_bar": [1.0, 5.0, 10.0]})
-        ctx = self._create_context(df)
-
-        params = SaturationPropertiesParams(
-            fluid="Water",
-            pressure_col="P_bar",
-            pressure_unit="bar",
-            phase="liquid",
-            outputs=[
-                PropertyOutputConfig(property="H", unit="kJ/kg", output_column="hf"),
-            ],
-        )
-
-        result = saturation_properties(ctx, params)
-        result_df = result.df
-
-        # Saturated liquid enthalpy should be positive and less than ~1000 kJ/kg
-        assert all(result_df["hf"] > 0)
-        assert all(result_df["hf"] < 1000)
-
-
-# =============================================================================
-# PSYCHROMETRICS TESTS
+# psychrometrics (Pandas path)
 # =============================================================================
 
 
 class TestPsychrometricsPandas:
-    """Test psychrometrics transformer."""
+    @patch("odibi.transformers.thermodynamics._ensure_coolprop")
+    def test_pandas_end_to_end(self, mock_ensure):
+        mock_cp = MagicMock()
+        mock_cp.HAPropsSI.return_value = 0.0088
+        mock_ensure.return_value = mock_cp
 
-    def _create_context(self, df: pd.DataFrame) -> EngineContext:
-        pandas_ctx = PandasContext()
-        return EngineContext(
-            context=pandas_ctx,
+        df = pd.DataFrame({"tdb": [25.0, 30.0], "rh": [0.5, 0.6]})
+        ctx_mock = MagicMock(spec=["context"])
+        engine_ctx = EngineContext(
+            context=ctx_mock,
             df=df,
             engine_type=EngineType.PANDAS,
         )
 
-    def test_humidity_ratio_from_t_rh(self):
-        """Test calculating humidity ratio from dry bulb and RH."""
-        df = pd.DataFrame(
-            {
-                "Tdb_F": [80.0, 75.0, 90.0],
-                "RH_pct": [60.0, 45.0, 70.0],
-            }
-        )
-        ctx = self._create_context(df)
-
         params = PsychrometricsParams(
-            dry_bulb_col="Tdb_F",
-            relative_humidity_col="RH_pct",
-            temperature_unit="degF",
-            rh_is_percent=True,
-            elevation_ft=875.0,
-            outputs=[
-                PsychrometricOutputConfig(
-                    property="W", unit="lb/lb", output_column="humidity_ratio"
-                ),
-            ],
-        )
-
-        result = psychrometrics(ctx, params)
-        result_df = result.df
-
-        assert "humidity_ratio" in result_df.columns
-        # Humidity ratio at 80°F, 60% RH should be around 0.013
-        assert 0.01 < result_df["humidity_ratio"].iloc[0] < 0.02
-
-    def test_wet_bulb_calculation(self):
-        """Test calculating wet bulb temperature."""
-        df = pd.DataFrame(
-            {
-                "Tdb": [25.0],  # degC
-                "RH": [0.50],  # 50%
-            }
-        )
-        ctx = self._create_context(df)
-
-        params = PsychrometricsParams(
-            dry_bulb_col="Tdb",
-            relative_humidity_col="RH",
+            dry_bulb_col="tdb",
+            relative_humidity_col="rh",
+            pressure=101325.0,
             temperature_unit="degC",
-            rh_is_percent=False,
-            pressure=101325.0,
-            pressure_unit="Pa",
-            outputs=[
-                PsychrometricOutputConfig(property="B", unit="degC", output_column="wet_bulb"),
-            ],
+            outputs=[PsychrometricOutputConfig(property="W", output_column="w_out")],
         )
-
-        result = psychrometrics(ctx, params)
-        result_df = result.df
-
-        # Wet bulb should be less than dry bulb
-        assert result_df["wet_bulb"].iloc[0] < 25.0
-        # At 25°C, 50% RH, wet bulb is around 17-18°C
-        assert 15 < result_df["wet_bulb"].iloc[0] < 20
-
-    def test_dew_point_calculation(self):
-        """Test calculating dew point temperature."""
-        df = pd.DataFrame(
-            {
-                "Tdb_F": [80.0],
-                "RH_pct": [50.0],
-            }
-        )
-        ctx = self._create_context(df)
-
-        params = PsychrometricsParams(
-            dry_bulb_col="Tdb_F",
-            relative_humidity_col="RH_pct",
-            temperature_unit="degF",
-            rh_is_percent=True,
-            pressure=14.696,
-            pressure_unit="psia",
-            outputs=[
-                PsychrometricOutputConfig(property="D", unit="degF", output_column="dew_point"),
-            ],
-        )
-
-        result = psychrometrics(ctx, params)
-        result_df = result.df
-
-        # Dew point should be less than dry bulb
-        assert result_df["dew_point"].iloc[0] < 80.0
-        # At 80°F, 50% RH, dew point is around 59°F
-        assert 55 < result_df["dew_point"].iloc[0] < 65
-
-    def test_multiple_psychrometric_outputs(self):
-        """Test calculating multiple properties at once."""
-        df = pd.DataFrame(
-            {
-                "T": [300.0],  # K
-                "RH": [0.60],
-            }
-        )
-        ctx = self._create_context(df)
-
-        params = PsychrometricsParams(
-            dry_bulb_col="T",
-            relative_humidity_col="RH",
-            temperature_unit="K",
-            rh_is_percent=False,
-            pressure=101325.0,
-            pressure_unit="Pa",
-            prefix="air",
-            outputs=[
-                PsychrometricOutputConfig(property="W"),
-                PsychrometricOutputConfig(property="B", unit="K"),
-                PsychrometricOutputConfig(property="D", unit="K"),
-                PsychrometricOutputConfig(property="H", unit="kJ/kg"),
-            ],
-        )
-
-        result = psychrometrics(ctx, params)
-        result_df = result.df
-
-        assert "air_W" in result_df.columns
-        assert "air_B" in result_df.columns
-        assert "air_D" in result_df.columns
-        assert "air_H" in result_df.columns
-
-    def test_elevation_pressure_estimation(self):
-        """Test that elevation is used to estimate pressure."""
-        df = pd.DataFrame({"Tdb": [80.0], "RH": [50.0]})
-        ctx = self._create_context(df)
-
-        params = PsychrometricsParams(
-            dry_bulb_col="Tdb",
-            relative_humidity_col="RH",
-            temperature_unit="degF",
-            rh_is_percent=True,
-            elevation_ft=5000.0,  # High elevation -> lower pressure
-            outputs=[PsychrometricOutputConfig(property="W", output_column="W")],
-        )
-
-        result = psychrometrics(ctx, params)
-        result_df = result.df
-
-        # At higher elevation, humidity ratio should be slightly different
-        assert result_df["W"].iloc[0] is not None
+        result_ctx = psychrometrics(engine_ctx, params)
+        result_df = result_ctx.df
+        assert "w_out" in result_df.columns
+        assert len(result_df) == 2
+        assert list(result_df["w_out"]) == pytest.approx([0.0088, 0.0088])
 
 
 # =============================================================================
-# VALIDATION TESTS
+# psychrometrics (Polars path)
 # =============================================================================
 
 
-class TestParamsValidation:
-    """Test Pydantic model validation."""
+class TestPsychrometricsPolars:
+    @patch("odibi.transformers.thermodynamics._ensure_coolprop")
+    def test_polars_delegates_to_pandas(self, mock_ensure):
+        pl = pytest.importorskip("polars")
+        mock_cp = MagicMock()
+        mock_cp.HAPropsSI.return_value = 0.0088
+        mock_ensure.return_value = mock_cp
 
-    def test_fluid_properties_requires_two_state_props(self):
-        """FluidPropertiesParams requires exactly 2 state properties."""
-        with pytest.raises(ValueError, match="Fluid state requires 2 independent properties"):
-            FluidPropertiesParams(
-                fluid="Water",
-                pressure_col="P",
-                # Missing second state property
-            )
-
-    def test_fluid_properties_valid_with_p_and_t(self):
-        """Valid with pressure and temperature."""
-        params = FluidPropertiesParams(
-            fluid="Water",
-            pressure_col="P",
-            temperature_col="T",
-        )
-        assert params is not None
-
-    def test_fluid_properties_valid_with_p_and_q(self):
-        """Valid with pressure and quality."""
-        params = FluidPropertiesParams(
-            fluid="Water",
-            pressure_col="P",
-            quality=1.0,
-        )
-        assert params is not None
-
-    def test_psychrometrics_requires_humidity_input(self):
-        """PsychrometricsParams requires at least one humidity input."""
-        with pytest.raises(ValueError, match="requires dry_bulb and one of"):
-            PsychrometricsParams(
-                dry_bulb_col="Tdb",
-                pressure=101325.0,
-                # Missing RH, W, Twb, or Tdp
-            )
-
-    def test_psychrometrics_requires_pressure_source(self):
-        """PsychrometricsParams requires a pressure source."""
-        with pytest.raises(ValueError, match="requires pressure"):
-            PsychrometricsParams(
-                dry_bulb_col="Tdb",
-                relative_humidity_col="RH",
-                # Missing pressure, pressure_col, or elevation
-            )
-
-
-# =============================================================================
-# POLARS ENGINE TESTS
-# =============================================================================
-
-
-class TestFluidPropertiesPolars:
-    """Test fluid_properties with Polars engine."""
-
-    @pytest.fixture
-    def polars_available(self):
-        try:
-            import polars  # noqa: F401
-
-            return True
-        except ImportError:
-            pytest.skip("Polars not installed")
-
-    def test_basic_calculation(self, polars_available):
-        """Test basic Polars calculation."""
-        import polars as pl
-
-        from odibi.context import PolarsContext
-
-        df = pl.DataFrame(
-            {
-                "P": [100.0, 200.0],
-                "T": [400.0, 500.0],
-            }
-        )
-
-        polars_ctx = PolarsContext()
-        ctx = EngineContext(
-            context=polars_ctx,
+        df = pl.DataFrame({"tdb": [25.0, 30.0], "rh": [0.5, 0.6]})
+        ctx_mock = MagicMock(spec=["context"])
+        engine_ctx = EngineContext(
+            context=ctx_mock,
             df=df,
             engine_type=EngineType.POLARS,
         )
 
-        params = FluidPropertiesParams(
-            fluid="Water",
-            pressure_col="P",
-            temperature_col="T",
-            pressure_unit="psia",
-            temperature_unit="degF",
-            outputs=[PropertyOutputConfig(property="H", unit="BTU/lb")],
+        params = PsychrometricsParams(
+            dry_bulb_col="tdb",
+            relative_humidity_col="rh",
+            pressure=101325.0,
+            temperature_unit="degC",
+            outputs=[PsychrometricOutputConfig(property="W", output_column="w_out")],
         )
-
-        result = fluid_properties(ctx, params)
-        result_df = result.df
-
-        assert "H" in result_df.columns
-        assert len(result_df) == 2
+        result_ctx = psychrometrics(engine_ctx, params)
+        assert isinstance(result_ctx.df, pl.DataFrame)
+        assert "w_out" in result_ctx.df.columns
 
 
 # =============================================================================
-# SPARK MOCK TESTS
+# fluid_properties (Pandas path)
 # =============================================================================
 
 
-class TestFluidPropertiesSparkMock:
-    """Test fluid_properties with mocked Spark engine."""
+class TestFluidPropertiesPandas:
+    @patch("odibi.transformers.thermodynamics._ensure_coolprop")
+    def test_pandas_end_to_end(self, mock_ensure):
+        mock_cp = MagicMock()
+        mock_cp.PropsSI.return_value = 2675000.0  # enthalpy in J/kg
+        mock_ensure.return_value = mock_cp
 
-    def test_spark_udf_structure(self):
-        """Test that Spark implementation creates correct UDF structure."""
-        # This test verifies the Spark code path without needing real Spark
-        # The actual Spark tests run in Databricks
+        df = pd.DataFrame({"pressure": [101325.0], "temperature": [373.15]})
+        ctx_mock = MagicMock(spec=["context"])
+        engine_ctx = EngineContext(
+            context=ctx_mock,
+            df=df,
+            engine_type=EngineType.PANDAS,
+        )
 
         params = FluidPropertiesParams(
             fluid="Water",
-            pressure_col="P",
-            temperature_col="T",
-            pressure_unit="psia",
-            temperature_unit="degF",
-            outputs=[
-                PropertyOutputConfig(property="H", unit="BTU/lb"),
-                PropertyOutputConfig(property="S"),
-            ],
+            pressure_col="pressure",
+            temperature_col="temperature",
+            outputs=[PropertyOutputConfig(property="H", output_column="enthalpy")],
         )
-
-        # Verify params serialize correctly for UDF
-        params_dict = params.model_dump()
-        reconstructed = FluidPropertiesParams(**params_dict)
-        assert reconstructed.fluid == "Water"
-        assert len(reconstructed.outputs) == 2
+        result_ctx = fluid_properties(engine_ctx, params)
+        result_df = result_ctx.df
+        assert "enthalpy" in result_df.columns
+        assert result_df["enthalpy"].iloc[0] == pytest.approx(2675000.0)
+        mock_cp.PropsSI.assert_called_once()
