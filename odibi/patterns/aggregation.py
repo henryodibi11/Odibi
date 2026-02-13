@@ -63,9 +63,10 @@ class AggregationPattern(Pattern):
             ctx.error(
                 "AggregationPattern validation failed: 'grain' is required",
                 pattern="AggregationPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "AggregationPattern: 'grain' parameter is required. "
+                f"AggregationPattern (node '{self.config.name}'): 'grain' parameter is required. "
                 "Grain defines the grouping columns for aggregation (e.g., ['date', 'region']). "
                 "Provide a list of column names to group by."
             )
@@ -74,9 +75,10 @@ class AggregationPattern(Pattern):
             ctx.error(
                 "AggregationPattern validation failed: 'measures' is required",
                 pattern="AggregationPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "AggregationPattern: 'measures' parameter is required. "
+                f"AggregationPattern (node '{self.config.name}'): 'measures' parameter is required. "
                 "Measures define the aggregations to compute (e.g., [{'name': 'total_sales', 'expr': 'sum(amount)'}]). "
                 "Provide a list of dicts, each with 'name' and 'expr' keys."
             )
@@ -86,9 +88,10 @@ class AggregationPattern(Pattern):
                 ctx.error(
                     f"AggregationPattern validation failed: measure[{i}] must be a dict",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"AggregationPattern: measure[{i}] must be a dict with 'name' and 'expr'. "
+                    f"AggregationPattern (node '{self.config.name}'): measure[{i}] must be a dict with 'name' and 'expr'. "
                     f"Got {type(measure).__name__}: {measure!r}. "
                     "Example: {'name': 'total_sales', 'expr': 'sum(amount)'}"
                 )
@@ -96,18 +99,20 @@ class AggregationPattern(Pattern):
                 ctx.error(
                     f"AggregationPattern validation failed: measure[{i}] missing 'name'",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"AggregationPattern: measure[{i}] missing 'name'. "
+                    f"AggregationPattern (node '{self.config.name}'): measure[{i}] missing 'name'. "
                     f"Got: {measure!r}. Add a 'name' key for the output column name."
                 )
             if "expr" not in measure:
                 ctx.error(
                     f"AggregationPattern validation failed: measure[{i}] missing 'expr'",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"AggregationPattern: measure[{i}] missing 'expr'. "
+                    f"AggregationPattern (node '{self.config.name}'): measure[{i}] missing 'expr'. "
                     f"Got: {measure!r}. Add an 'expr' key with the aggregation expression (e.g., 'sum(amount)')."
                 )
 
@@ -117,9 +122,10 @@ class AggregationPattern(Pattern):
                 ctx.error(
                     "AggregationPattern validation failed: incremental missing 'timestamp_column'",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    "AggregationPattern: incremental config requires 'timestamp_column'. "
+                    f"AggregationPattern (node '{self.config.name}'): incremental config requires 'timestamp_column'. "
                     f"Got: {incremental!r}. "
                     "Add 'timestamp_column' to specify which column tracks record timestamps."
                 )
@@ -128,9 +134,10 @@ class AggregationPattern(Pattern):
                 ctx.error(
                     f"AggregationPattern validation failed: invalid merge_strategy '{merge_strategy}'",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"AggregationPattern: 'merge_strategy' must be 'replace', 'sum', 'min', or 'max'. "
+                    f"AggregationPattern (node '{self.config.name}'): 'merge_strategy' must be 'replace', 'sum', 'min', or 'max'. "
                     f"Got: {merge_strategy}"
                 )
 
@@ -195,6 +202,7 @@ class AggregationPattern(Pattern):
             ctx.error(
                 f"AggregationPattern failed: {e}",
                 pattern="AggregationPattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )

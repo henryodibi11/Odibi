@@ -105,9 +105,10 @@ class FactPattern(Pattern):
             ctx.error(
                 "FactPattern validation failed: 'keys' required when 'deduplicate' is True",
                 pattern="FactPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "FactPattern: 'keys' required when 'deduplicate' is True. "
+                f"FactPattern (node '{self.config.name}'): 'keys' required when 'deduplicate' is True. "
                 "Keys define which columns uniquely identify a fact row for deduplication. "
                 "Provide keys=['col1', 'col2'] to specify the deduplication columns."
             )
@@ -116,9 +117,10 @@ class FactPattern(Pattern):
             ctx.error(
                 f"FactPattern validation failed: invalid orphan_handling '{orphan_handling}'",
                 pattern="FactPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                f"FactPattern: 'orphan_handling' must be 'unknown', 'reject', or 'quarantine'. "
+                f"FactPattern (node '{self.config.name}'): 'orphan_handling' must be 'unknown', 'reject', or 'quarantine'. "
                 f"Got: {orphan_handling}"
             )
 
@@ -129,18 +131,20 @@ class FactPattern(Pattern):
                     "FactPattern validation failed: 'quarantine' config required "
                     "when orphan_handling='quarantine'",
                     pattern="FactPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    "FactPattern: 'quarantine' configuration is required when "
+                    f"FactPattern (node '{self.config.name}'): 'quarantine' configuration is required when "
                     "orphan_handling='quarantine'."
                 )
             if not quarantine_config.get("connection"):
                 ctx.error(
                     "FactPattern validation failed: quarantine.connection is required",
                     pattern="FactPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    "FactPattern: 'quarantine.connection' is required. "
+                    f"FactPattern (node '{self.config.name}'): 'quarantine.connection' is required. "
                     "The connection specifies where to write quarantined orphan records "
                     "(e.g., a Spark session or database connection). "
                     "Add 'connection' to your quarantine config."
@@ -149,9 +153,10 @@ class FactPattern(Pattern):
                 ctx.error(
                     "FactPattern validation failed: quarantine requires 'path' or 'table'",
                     pattern="FactPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"FactPattern: 'quarantine' requires either 'path' or 'table'. "
+                    f"FactPattern (node '{self.config.name}'): 'quarantine' requires either 'path' or 'table'. "
                     f"Got config: {quarantine_config}. "
                     "Add 'path' for file storage or 'table' for database storage."
                 )
@@ -163,9 +168,10 @@ class FactPattern(Pattern):
                     ctx.error(
                         f"FactPattern validation failed: dimension[{i}] missing '{key}'",
                         pattern="FactPattern",
+                        node=self.config.name,
                     )
                     raise ValueError(
-                        f"FactPattern: dimension[{i}] missing required key '{key}'. "
+                        f"FactPattern (node '{self.config.name}'): dimension[{i}] missing required key '{key}'. "
                         f"Required keys: {required_keys}. "
                         f"Got: {dim}. "
                         f"Ensure all required keys are provided in the dimension config."
@@ -257,6 +263,7 @@ class FactPattern(Pattern):
             ctx.error(
                 f"FactPattern failed: {e}",
                 pattern="FactPattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )
@@ -305,7 +312,8 @@ class FactPattern(Pattern):
             dim_df = self._get_dimension_df(context, dim_table, is_scd2)
             if dim_df is None:
                 raise ValueError(
-                    f"FactPattern: Dimension table '{dim_table}' not found in context."
+                    f"FactPattern (node '{self.config.name}'): Dimension table '{dim_table}' not found in context. "
+                    f"Expected dimension: '{dim_table}'. Available context: {list(context.dataframes.keys()) if hasattr(context, 'dataframes') else 'N/A'}."
                 )
 
             df, orphan_count, quarantined = self._join_dimension(
@@ -485,8 +493,9 @@ class FactPattern(Pattern):
 
         if orphan_handling == "reject" and orphan_count > 0:
             raise ValueError(
-                f"FactPattern: {orphan_count} orphan records found for dimension "
-                f"lookup on '{source_col}'. Orphan handling is set to 'reject'."
+                f"FactPattern (node '{self.config.name}'): {orphan_count} orphan records found for dimension "
+                f"lookup on '{source_col}' -> '{dim_table}'. Orphan handling is set to 'reject'. "
+                f"Fix: Either update orphan_handling to 'unknown' or 'quarantine', or ensure all '{source_col}' values exist in '{dim_table}.{dim_key}'."
             )
 
         if orphan_handling == "unknown":
@@ -569,14 +578,16 @@ class FactPattern(Pattern):
             ctx.error(
                 f"FactPattern grain validation failed: {duplicate_count} duplicate rows",
                 pattern="FactPattern",
+                node=self.config.name,
                 grain=grain,
                 total_rows=total_count,
                 distinct_rows=distinct_count,
             )
             raise ValueError(
-                f"FactPattern: Grain validation failed. Found {duplicate_count} duplicate "
+                f"FactPattern (node '{self.config.name}'): Grain validation failed. Found {duplicate_count} duplicate "
                 f"rows at grain level {grain}. Total rows: {total_count}, "
-                f"Distinct rows: {distinct_count}."
+                f"Distinct rows: {distinct_count}. "
+                f"Fix: Check for duplicate data in source or add deduplication before grain validation."
             )
 
         ctx.debug(

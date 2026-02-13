@@ -69,9 +69,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 "DimensionPattern validation failed: 'natural_key' is required",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DimensionPattern: 'natural_key' parameter is required. "
+                f"DimensionPattern (node '{self.config.name}'): 'natural_key' parameter is required. "
                 "The natural_key identifies the business key column(s) that uniquely identify "
                 "each dimension record in the source system. "
                 "Provide natural_key as a string (single column) or list of strings (composite key)."
@@ -81,9 +82,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 "DimensionPattern validation failed: 'surrogate_key' is required",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DimensionPattern: 'surrogate_key' parameter is required. "
+                f"DimensionPattern (node '{self.config.name}'): 'surrogate_key' parameter is required. "
                 "The surrogate_key is the auto-generated primary key column for the dimension table, "
                 "used to join with fact tables instead of the natural key. "
                 "Provide surrogate_key as a string specifying the column name (e.g., 'customer_sk')."
@@ -94,9 +96,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 f"DimensionPattern validation failed: invalid scd_type {scd_type}",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                f"DimensionPattern: 'scd_type' must be 0, 1, or 2. Got: {scd_type}. "
+                f"DimensionPattern (node '{self.config.name}'): 'scd_type' must be 0, 1, or 2. Got: {scd_type}. "
                 "SCD Type 0: No changes tracked (static dimension). "
                 "SCD Type 1: Overwrite changes (no history). "
                 "SCD Type 2: Track full history with valid_from/valid_to dates."
@@ -106,9 +109,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 "DimensionPattern validation failed: 'target' required for SCD2",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DimensionPattern: 'target' parameter is required for scd_type=2. "
+                f"DimensionPattern (node '{self.config.name}'): 'target' parameter is required for scd_type=2. "
                 "SCD Type 2 compares incoming data against existing records to detect changes, "
                 "so a target DataFrame containing current dimension data must be provided. "
                 "Pass the existing dimension table as the 'target' parameter."
@@ -118,9 +122,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 "DimensionPattern validation failed: 'track_cols' required for SCD1/2",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DimensionPattern: 'track_cols' parameter is required for scd_type 1 or 2. "
+                f"DimensionPattern (node '{self.config.name}'): 'track_cols' parameter is required for scd_type 1 or 2. "
                 "The track_cols specifies which columns to monitor for changes. "
                 "When these columns change, SCD1 overwrites values or SCD2 creates new history records. "
                 "Provide track_cols as a list of column names (e.g., ['address', 'phone', 'email'])."
@@ -195,6 +200,7 @@ class DimensionPattern(Pattern):
             ctx.error(
                 f"DimensionPattern failed: {e}",
                 pattern="DimensionPattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )
