@@ -787,7 +787,11 @@ def _detect_phases_spark_native(spark_df: Any, params: DetectSequentialPhasesPar
 
 
 def _compute_status_durations_spark(
-    df: Any, phase_bounds: Any, params: DetectSequentialPhasesParams, timer_col: str, group_by_cols: List[str]
+    df: Any,
+    phase_bounds: Any,
+    params: DetectSequentialPhasesParams,
+    timer_col: str,
+    group_by_cols: List[str],
 ) -> Any:
     """Compute time spent in each status within a phase window using Spark."""
     from pyspark.sql import functions as F
@@ -857,7 +861,11 @@ def _compute_status_durations_spark(
 
 
 def _compute_phase_metrics_spark(
-    df: Any, phase_bounds: Any, params: DetectSequentialPhasesParams, timer_col: str, group_by_cols: List[str]
+    df: Any,
+    phase_bounds: Any,
+    params: DetectSequentialPhasesParams,
+    timer_col: str,
+    group_by_cols: List[str],
 ) -> Any:
     """Compute aggregated metrics within a phase window using Spark."""
     from pyspark.sql import functions as F

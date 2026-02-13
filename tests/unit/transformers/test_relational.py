@@ -193,7 +193,7 @@ def test_join_right(left_df, right_df):
 
 def test_join_full(left_df, right_df):
     """Test full outer join.
-    
+
     Verifies that 'full' join type correctly maps to 'outer' for pandas compatibility.
     Full outer join should include all rows from both datasets.
     """
@@ -201,20 +201,20 @@ def test_join_full(left_df, right_df):
     params = JoinParams(right_dataset="customers", on="customer_id", how="full")
     result_ctx = join(context, params)
     result = result_ctx.df
-    
+
     # Full outer join should include all rows from both datasets
     # Left has: 1, 2, 3, 4
     # Right has: 2, 3, 4, 5
     # Result should have: 1, 2, 3, 4, 5
     assert len(result) == 5
     assert sorted(result["customer_id"].tolist()) == [1, 2, 3, 4, 5]
-    
+
     # Check that row 1 (left only) has null region
     assert pd.isna(result.loc[result["customer_id"] == 1, "region"].iloc[0])
-    
+
     # Check that row 5 (right only) has null name
     assert pd.isna(result.loc[result["customer_id"] == 5, "name"].iloc[0])
-    
+
     # Check that rows 2, 3, 4 (both sides) have both name and region
     for cid in [2, 3, 4]:
         row = result.loc[result["customer_id"] == cid].iloc[0]
@@ -504,7 +504,7 @@ def test_pivot_count():
 
 def test_pivot_avg():
     """Test pivot with average aggregation.
-    
+
     This test verifies that 'avg' is correctly mapped to 'mean' for pandas compatibility.
     """
     df = pd.DataFrame(
@@ -537,7 +537,7 @@ def test_pivot_avg():
 
 def test_pivot_avg_mean_equivalence():
     """Test that 'avg' and 'mean' produce identical results.
-    
+
     This verifies that the mapping from 'avg' to 'mean' works correctly.
     """
     df = pd.DataFrame(
@@ -549,7 +549,7 @@ def test_pivot_avg_mean_equivalence():
     )
 
     context = create_context(df)
-    
+
     # Test with 'avg'
     params_avg = PivotParams(
         group_by=["product"],
@@ -559,11 +559,11 @@ def test_pivot_avg_mean_equivalence():
     )
     result_avg_ctx = pivot(context, params_avg)
     result_avg = result_avg_ctx.df
-    
+
     # Note: 'mean' is not currently in the Literal type for agg_func,
     # but we can test by directly calling pandas to verify our expectation
     # Instead, we'll verify avg produces mathematically correct means
-    
+
     # Product A: Jan=(100+120)/2=110, Feb=150
     # Product B: Jan=(200+220)/2=210, Feb=250
     assert result_avg[result_avg["product"] == "A"]["Jan"].values[0] == 110

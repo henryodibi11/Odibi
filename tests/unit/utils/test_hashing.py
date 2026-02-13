@@ -223,12 +223,12 @@ class TestCalculateConfigHash:
         """Test that exclude=None uses defaults, exclude=set() uses no exclusions."""
         data = {"name": "test", "description": "text", "tags": ["a"]}
         model = MockPydanticModel(data)
-        
+
         # With exclude=None (default), should exclude DEFAULT_EXCLUDE_FIELDS
         hash1 = calculate_config_hash(model, exclude=None)
         expected1 = compute_expected_hash({"name": "test"})
         assert hash1 == expected1
-        
+
         # With exclude=set(), should not exclude anything
         hash2 = calculate_config_hash(model, exclude=set())
         expected2 = compute_expected_hash(data)
@@ -308,13 +308,13 @@ class TestCalculatePipelineHash:
             "log_level": "INFO",
         }
         model = MockPydanticModel(data)
-        
+
         # Pipeline hash includes everything
         pipeline_hash = calculate_pipeline_hash(model)
-        
+
         # Config hash excludes description, tags, log_level
         config_hash = calculate_config_hash(model)
-        
+
         # They should be different
         assert pipeline_hash != config_hash
 

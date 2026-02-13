@@ -5,8 +5,6 @@ Tests NodeDiffResult, RunDiffResult dataclasses,
 diff_nodes, and diff_runs functions.
 """
 
-
-
 from odibi.diagnostics.diff import NodeDiffResult, RunDiffResult, diff_nodes, diff_runs
 from odibi.story.metadata import DeltaWriteInfo, NodeExecutionMetadata, PipelineStoryMetadata
 
@@ -16,9 +14,7 @@ class TestNodeDiffResult:
 
     def test_nodediffresult_basic_fields(self):
         """Test NodeDiffResult instantiation with basic fields."""
-        result = NodeDiffResult(
-            node_name="test_node", rows_out_a=100, rows_out_b=150, rows_diff=50
-        )
+        result = NodeDiffResult(node_name="test_node", rows_out_a=100, rows_out_b=150, rows_diff=50)
 
         assert result.node_name == "test_node"
         assert result.rows_out_a == 100

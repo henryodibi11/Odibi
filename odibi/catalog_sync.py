@@ -954,7 +954,9 @@ class CatalogSyncer:
             try:
                 return self.spark.read.format("delta").load(path).toPandas()
             except Exception as e:
-                logger.debug(f"Failed to read Delta table from '{path}' using Spark: {type(e).__name__}: {e}")
+                logger.debug(
+                    f"Failed to read Delta table from '{path}' using Spark: {type(e).__name__}: {e}"
+                )
 
         if self.source.engine:
             return self.source._read_local_table(path)
@@ -1002,7 +1004,9 @@ class CatalogSyncer:
             if value:
                 return datetime.fromisoformat(value)
         except Exception as e:
-            logger.debug(f"Failed to get last sync timestamp for table '{table}': {type(e).__name__}: {e}")
+            logger.debug(
+                f"Failed to get last sync timestamp for table '{table}': {type(e).__name__}: {e}"
+            )
         return None
 
     def _update_sync_state(self, results: Dict[str, Any]) -> None:

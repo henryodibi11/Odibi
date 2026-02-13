@@ -121,7 +121,7 @@ class CustomPlugin:
                 del sys.modules["transforms"]
 
             extensions.load_extensions(tmp_path)
-            
+
             # Should have added 'transforms' to sys.modules
             assert "transforms" in sys.modules
         finally:
@@ -139,7 +139,10 @@ class CustomPlugin:
             # Should log a warning about failed load
             mock_logger.warning.assert_called()
             warning_calls = mock_logger.warning.call_args_list
-            assert any("Failed to load" in str(call) and "transforms.py" in str(call) for call in warning_calls)
+            assert any(
+                "Failed to load" in str(call) and "transforms.py" in str(call)
+                for call in warning_calls
+            )
 
     def test_load_extensions_with_empty_file(self, tmp_path):
         """Test loading empty Python file."""

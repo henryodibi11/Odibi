@@ -65,8 +65,8 @@ class TestIsNotebookEnvironment:
         mock_shell = MagicMock()
         mock_shell.__class__.__name__ = "ZMQInteractiveShell"
         mock_get_ipython = MagicMock(return_value=mock_shell)
-        
-        with patch.dict('sys.modules', {'IPython': MagicMock(get_ipython=mock_get_ipython)}):
+
+        with patch.dict("sys.modules", {"IPython": MagicMock(get_ipython=mock_get_ipython)}):
             result = console._is_notebook_environment()
             assert result is True
 
@@ -75,8 +75,8 @@ class TestIsNotebookEnvironment:
         mock_shell = MagicMock()
         mock_shell.__class__.__name__ = "DatabricksShell"
         mock_get_ipython = MagicMock(return_value=mock_shell)
-        
-        with patch.dict('sys.modules', {'IPython': MagicMock(get_ipython=mock_get_ipython)}):
+
+        with patch.dict("sys.modules", {"IPython": MagicMock(get_ipython=mock_get_ipython)}):
             result = console._is_notebook_environment()
             assert result is True
 
@@ -85,16 +85,16 @@ class TestIsNotebookEnvironment:
         mock_shell = MagicMock()
         mock_shell.__class__.__name__ = "Shell"
         mock_get_ipython = MagicMock(return_value=mock_shell)
-        
-        with patch.dict('sys.modules', {'IPython': MagicMock(get_ipython=mock_get_ipython)}):
+
+        with patch.dict("sys.modules", {"IPython": MagicMock(get_ipython=mock_get_ipython)}):
             result = console._is_notebook_environment()
             assert result is True
 
     def test_is_notebook_environment_none_shell(self):
         """Test when get_ipython returns None."""
         mock_get_ipython = MagicMock(return_value=None)
-        
-        with patch.dict('sys.modules', {'IPython': MagicMock(get_ipython=mock_get_ipython)}):
+
+        with patch.dict("sys.modules", {"IPython": MagicMock(get_ipython=mock_get_ipython)}):
             result = console._is_notebook_environment()
             assert result is False
 
@@ -110,8 +110,8 @@ class TestIsNotebookEnvironment:
         mock_shell = MagicMock()
         mock_shell.__class__.__name__ = "TerminalInteractiveShell"
         mock_get_ipython = MagicMock(return_value=mock_shell)
-        
-        with patch.dict('sys.modules', {'IPython': MagicMock(get_ipython=mock_get_ipython)}):
+
+        with patch.dict("sys.modules", {"IPython": MagicMock(get_ipython=mock_get_ipython)}):
             result = console._is_notebook_environment()
             assert result is False
 

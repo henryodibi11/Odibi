@@ -224,7 +224,9 @@ class TestValidate:
             secret_name="mysecret",
             validate=False,
         )
-        with pytest.raises(ValueError, match="key_vault mode requires 'key_vault_name' and 'secret_name'"):
+        with pytest.raises(
+            ValueError, match="key_vault mode requires 'key_vault_name' and 'secret_name'"
+        ):
             conn.validate()
 
     def test_validate_fails_key_vault_without_secret_name(self):
@@ -236,7 +238,9 @@ class TestValidate:
             key_vault_name="myvault",
             validate=False,
         )
-        with pytest.raises(ValueError, match="key_vault mode requires 'key_vault_name' and 'secret_name'"):
+        with pytest.raises(
+            ValueError, match="key_vault mode requires 'key_vault_name' and 'secret_name'"
+        ):
             conn.validate()
 
     def test_validate_fails_direct_key_without_account_key(self):
@@ -318,7 +322,9 @@ class TestValidate:
     def test_validate_warns_direct_key_in_production(self):
         """Test that direct_key mode warns in production."""
         with patch.dict("os.environ", {"ODIBI_ENV": "production"}):
-            with pytest.warns(UserWarning, match="Using direct_key in production is not recommended"):
+            with pytest.warns(
+                UserWarning, match="Using direct_key in production is not recommended"
+            ):
                 AzureADLS(
                     account="mystorageacct",
                     container="mycontainer",
@@ -514,10 +520,10 @@ class TestGetStorageKey:
         ):
             # Mock the executor to raise TimeoutError when result() is called
             import concurrent.futures
-            
+
             mock_future = Mock()
             mock_future.result.side_effect = concurrent.futures.TimeoutError()
-            
+
             with patch("concurrent.futures.ThreadPoolExecutor") as mock_executor_class:
                 mock_executor_instance = Mock()
                 mock_executor_instance.submit.return_value = mock_future
@@ -767,8 +773,13 @@ class TestConfigureSpark:
             keys_set["fs.azure.sas.token.provider.type.mystorageacct.dfs.core.windows.net"]
             == "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider"
         )
-        assert keys_set["fs.azure.sas.fixed.token.mystorageacct.dfs.core.windows.net"] == "sv=2020-08-04&ss=b"
-        assert keys_set["fs.azure.account.hns.enabled.mystorageacct.dfs.core.windows.net"] == "false"
+        assert (
+            keys_set["fs.azure.sas.fixed.token.mystorageacct.dfs.core.windows.net"]
+            == "sv=2020-08-04&ss=b"
+        )
+        assert (
+            keys_set["fs.azure.account.hns.enabled.mystorageacct.dfs.core.windows.net"] == "false"
+        )
         assert keys_set["fs.azure.skip.user.group.metadata.during.initialization"] == "true"
 
     def test_configure_spark_service_principal_mode(self):
@@ -793,8 +804,14 @@ class TestConfigureSpark:
             keys_set["fs.azure.account.oauth.provider.type.mystorageacct.dfs.core.windows.net"]
             == "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider"
         )
-        assert keys_set["fs.azure.account.oauth2.client.id.mystorageacct.dfs.core.windows.net"] == "client123"
-        assert keys_set["fs.azure.account.oauth2.client.secret.mystorageacct.dfs.core.windows.net"] == "secret123"
+        assert (
+            keys_set["fs.azure.account.oauth2.client.id.mystorageacct.dfs.core.windows.net"]
+            == "client123"
+        )
+        assert (
+            keys_set["fs.azure.account.oauth2.client.secret.mystorageacct.dfs.core.windows.net"]
+            == "secret123"
+        )
         assert (
             keys_set["fs.azure.account.oauth2.client.endpoint.mystorageacct.dfs.core.windows.net"]
             == "https://login.microsoftonline.com/tenant123/oauth2/token"
@@ -849,7 +866,10 @@ class TestUri:
 
         uri = conn.uri("folder/file.csv")
 
-        assert uri == "abfss://mycontainer@mystorageacct.dfs.core.windows.net/bronze/raw/folder/file.csv"
+        assert (
+            uri
+            == "abfss://mycontainer@mystorageacct.dfs.core.windows.net/bronze/raw/folder/file.csv"
+        )
 
     def test_uri_strips_leading_slash_from_path(self):
         """Test that leading slash is stripped from path."""
@@ -875,7 +895,10 @@ class TestUri:
 
         uri = conn.uri("bronze/customers/2024/01/data.parquet")
 
-        assert uri == "abfss://mycontainer@mystorageacct.dfs.core.windows.net/bronze/customers/2024/01/data.parquet"
+        assert (
+            uri
+            == "abfss://mycontainer@mystorageacct.dfs.core.windows.net/bronze/customers/2024/01/data.parquet"
+        )
 
 
 class TestGetPath:

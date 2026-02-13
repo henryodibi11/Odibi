@@ -205,7 +205,12 @@ class MergeParams(BaseModel):
 
 
 @transform("merge", category="transformer", param_model=MergeParams)
-def merge(context: EngineContext, params: Optional[Union[MergeParams, Any]] = None, current: Optional[Any] = None, **kwargs: Any) -> EngineContext:
+def merge(
+    context: EngineContext,
+    params: Optional[Union[MergeParams, Any]] = None,
+    current: Optional[Any] = None,
+    **kwargs: Any,
+) -> EngineContext:
     """
     Merge transformer implementation.
     Handles Upsert, Append-Only, and Delete-Match strategies.
@@ -594,7 +599,15 @@ def _merge_spark(
         return source_df
 
 
-def _merge_pandas(context: EngineContext, source_df: Any, target: str, keys: List[str], strategy: MergeStrategy, audit_cols: Optional[AuditColumnsConfig], params: MergeParams) -> Any:
+def _merge_pandas(
+    context: EngineContext,
+    source_df: Any,
+    target: str,
+    keys: List[str],
+    strategy: MergeStrategy,
+    audit_cols: Optional[AuditColumnsConfig],
+    params: MergeParams,
+) -> Any:
     """
     Internal helper for merge transformer on Pandas engine.
 
