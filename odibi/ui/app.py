@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -7,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from odibi.state import StateManager
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Odibi UI")
 
@@ -38,7 +41,8 @@ async def dashboard(request: Request):
             backend = create_state_backend(config, project_root=os.path.dirname(config_path))
             state_mgr = StateManager(backend=backend)
             state = state_mgr.backend.load_state()
-        except Exception:
+        except Exception as e:
+            logger.debug(f"[state backend load]: {type(e).__name__}: {e}")
             state = {}
     else:
         state = {}
@@ -177,8 +181,8 @@ if config_path_env and os.path.exists(config_path_env):
                 if not os.path.isabs(base):
                     base = os.path.join(abs_config_path.parent, base)
                 static_stories_dir = Path(base) / s_path
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[story path resolution]: {type(e).__name__}: {e}")
 
 if static_stories_dir.exists():
     app.mount(
