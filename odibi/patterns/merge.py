@@ -35,10 +35,11 @@ class MergePattern(Pattern):
             ctx.error(
                 "MergePattern validation failed: 'target' or 'path' is required",
                 pattern="MergePattern",
+                node=self.config.name,
             )
             provided_params = {k: v for k, v in self.params.items() if v is not None}
             raise ValueError(
-                f"MergePattern: 'target' or 'path' is required. "
+                f"MergePattern (node '{self.config.name}'): 'target' or 'path' is required. "
                 f"Expected: A target table path string. "
                 f"Provided params: {list(provided_params.keys())}. "
                 f"Fix: Add 'target' or 'path' to your pattern configuration."
@@ -47,10 +48,11 @@ class MergePattern(Pattern):
             ctx.error(
                 "MergePattern validation failed: 'keys' is required",
                 pattern="MergePattern",
+                node=self.config.name,
             )
             source_columns = list(self.source.columns) if hasattr(self.source, "columns") else []
             raise ValueError(
-                f"MergePattern: 'keys' is required. "
+                f"MergePattern (node '{self.config.name}'): 'keys' is required. "
                 f"Expected: A list of column names to match source and target rows for merge. "
                 f"Available source columns: {source_columns}. "
                 f"Fix: Add 'keys' with columns that uniquely identify rows (e.g., keys=['id'])."
@@ -105,6 +107,7 @@ class MergePattern(Pattern):
             ctx.error(
                 f"Merge pattern execution failed: {e}",
                 pattern="MergePattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
                 target=target,

@@ -59,9 +59,10 @@ class DateDimensionPattern(Pattern):
             ctx.error(
                 "DateDimensionPattern validation failed: 'start_date' is required",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DateDimensionPattern: 'start_date' parameter is required. "
+                f"DateDimensionPattern (node '{self.config.name}'): 'start_date' parameter is required. "
                 "Expected format: 'YYYY-MM-DD' (e.g., '2024-01-01'). "
                 "Provide a valid start_date in params."
             )
@@ -70,9 +71,10 @@ class DateDimensionPattern(Pattern):
             ctx.error(
                 "DateDimensionPattern validation failed: 'end_date' is required",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DateDimensionPattern: 'end_date' parameter is required. "
+                f"DateDimensionPattern (node '{self.config.name}'): 'end_date' parameter is required. "
                 "Expected format: 'YYYY-MM-DD' (e.g., '2024-12-31'). "
                 "Provide a valid end_date in params."
             )
@@ -82,18 +84,19 @@ class DateDimensionPattern(Pattern):
             end = self._parse_date(self.params["end_date"])
             if start > end:
                 raise ValueError(
-                    f"start_date must be before or equal to end_date. "
+                    f"DateDimensionPattern (node '{self.config.name}'): start_date must be before or equal to end_date. "
                     f"Provided: start_date='{self.params['start_date']}', "
                     f"end_date='{self.params['end_date']}'. "
-                    f"Swap the values or adjust the date range."
+                    f"Fix: Swap the values or adjust the date range."
                 )
         except Exception as e:
             ctx.error(
                 f"DateDimensionPattern validation failed: {e}",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                f"DateDimensionPattern: Invalid date parameters. {e} "
+                f"DateDimensionPattern (node '{self.config.name}'): Invalid date parameters. {e} "
                 f"Provided: start_date='{self.params.get('start_date')}', "
                 f"end_date='{self.params.get('end_date')}'. "
                 f"Expected format: 'YYYY-MM-DD'."
@@ -104,9 +107,10 @@ class DateDimensionPattern(Pattern):
             ctx.error(
                 "DateDimensionPattern validation failed: invalid fiscal_year_start_month",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                f"DateDimensionPattern: 'fiscal_year_start_month' must be an integer 1-12. "
+                f"DateDimensionPattern (node '{self.config.name}'): 'fiscal_year_start_month' must be an integer 1-12. "
                 f"Provided: {fiscal_month!r} (type: {type(fiscal_month).__name__}). "
                 f"Use an integer like 1 for January or 7 for July."
             )
@@ -169,6 +173,7 @@ class DateDimensionPattern(Pattern):
             ctx.error(
                 f"DateDimensionPattern failed: {e}",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )

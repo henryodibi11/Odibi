@@ -34,9 +34,10 @@ class SCD2Pattern(Pattern):
             ctx.error(
                 "SCD2Pattern validation failed: 'keys' parameter is required",
                 pattern="SCD2Pattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "SCD2Pattern: 'keys' parameter is required. "
+                f"SCD2Pattern (node '{self.config.name}'): 'keys' parameter is required. "
                 f"Expected a list of business key column names, but got: {self.params.get('keys')!r}. "
                 f"Available params: {list(self.params.keys())}. "
                 "Fix: Provide 'keys' as a list, e.g., keys=['customer_id']."
@@ -45,9 +46,10 @@ class SCD2Pattern(Pattern):
             ctx.error(
                 "SCD2Pattern validation failed: 'target' parameter is required",
                 pattern="SCD2Pattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "SCD2Pattern: 'target' parameter is required. "
+                f"SCD2Pattern (node '{self.config.name}'): 'target' parameter is required. "
                 f"Expected a table name or path string, but got: {self.params.get('target')!r}. "
                 "Fix: Provide 'target' as a string, e.g., target='dim_customer'."
             )
@@ -100,11 +102,12 @@ class SCD2Pattern(Pattern):
             ctx.error(
                 f"SCD2 invalid parameters: {e}",
                 pattern="SCD2Pattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 params=filtered_params,
             )
             raise ValueError(
-                f"Invalid SCD2 parameters: {e}. "
+                f"Invalid SCD2 parameters in node '{self.config.name}': {e}. "
                 f"Provided params: {filtered_params}. "
                 f"Valid param names: {list(valid_keys)}."
             )
@@ -116,6 +119,7 @@ class SCD2Pattern(Pattern):
             ctx.error(
                 f"SCD2 pattern execution failed: {e}",
                 pattern="SCD2Pattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )
