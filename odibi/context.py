@@ -1,3 +1,4 @@
+import logging
 import re
 import threading
 from abc import ABC, abstractmethod
@@ -6,12 +7,14 @@ from typing import Any, Dict, Optional, Union
 
 import pandas as pd
 
+from odibi.enums import EngineType
+
+logger = logging.getLogger(__name__)
+
 try:
     import polars as pl
 except ImportError:
     pl = None
-
-from odibi.enums import EngineType
 
 # Thread-local storage for unique temp view names
 _thread_local = threading.local()
@@ -484,8 +487,8 @@ class SparkContext(Context):
         for name in views_to_drop:
             try:
                 self.spark.catalog.dropTempView(name)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to drop temp view '{name}' during cleanup: {type(e).__name__}: {e}")
 
     def unregister(self, name: str) -> None:
         """Unregister a temp view from Spark.
@@ -499,8 +502,8 @@ class SparkContext(Context):
 
         try:
             self.spark.catalog.dropTempView(name)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to drop temp view '{name}': {type(e).__name__}: {e}")
 
 
 def create_context(engine: str, spark_session: Optional[Any] = None) -> Context:
