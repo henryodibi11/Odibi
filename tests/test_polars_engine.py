@@ -935,6 +935,7 @@ class TestRestoreDelta:
 
         mock_dt_instance = MagicMock()
         mock_dt_class = MagicMock(return_value=mock_dt_instance)
+        real_import = builtins.__import__
 
         with patch("odibi.engine.polars_engine.DeltaTable", mock_dt_class, create=True):
             monkeypatch.setattr(
@@ -942,7 +943,7 @@ class TestRestoreDelta:
                 lambda name, *a, **kw: (
                     type("mod", (), {"DeltaTable": mock_dt_class})()
                     if name == "deltalake"
-                    else __import__(name, *a, **kw)
+                    else real_import(name, *a, **kw)
                 ),
             )
             polars_engine.restore_delta(MockConnection(), "/table", 3)
