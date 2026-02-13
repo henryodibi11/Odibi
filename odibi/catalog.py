@@ -23,33 +23,114 @@ except ImportError:
     SparkSession = Any
 
     class DataType:
+        """Base class for all Odibi data types.
+
+        This is the parent class for all type definitions used in Odibi schemas.
+        It serves as a fallback when PySpark is not available in the environment.
+        Use specific subclasses (StringType, LongType, etc.) to define column types.
+        """
+
         pass
 
     class StringType(DataType):
+        """String/text data type.
+
+        Represents textual data of variable length. Use this for names, descriptions,
+        identifiers, and any other character-based data. Maps to VARCHAR/TEXT in SQL
+        and string in Pandas/PyArrow.
+        """
+
         pass
 
     class LongType(DataType):
+        """64-bit integer data type.
+
+        Represents whole numbers (integers) without decimals. Use this for counts,
+        IDs, row numbers, and other numeric data that doesn't require decimal precision.
+        Maps to BIGINT in SQL and int64 in Pandas/PyArrow.
+        """
+
         pass
 
     class DoubleType(DataType):
+        """Double-precision floating point data type.
+
+        Represents decimal numbers with high precision. Use this for measurements,
+        percentages, monetary values, and other numeric data requiring decimal places.
+        Maps to DOUBLE/FLOAT in SQL and float64 in Pandas/PyArrow.
+        """
+
         pass
 
     class DateType(DataType):
+        """Calendar date data type (year-month-day).
+
+        Represents a calendar date without time information. Use this for birth dates,
+        effective dates, or any date that doesn't require time-of-day precision.
+        Maps to DATE in SQL and date32 in PyArrow.
+        """
+
         pass
 
     class TimestampType(DataType):
+        """Timestamp data type with date and time.
+
+        Represents a specific point in time with microsecond precision. Use this for
+        event timestamps, audit trails, created_at/updated_at fields, and any data
+        requiring precise time tracking. Maps to TIMESTAMP in SQL and timestamp(us, UTC)
+        in PyArrow.
+        """
+
         pass
 
     class ArrayType(DataType):
+        """Array/list data type for collections.
+
+        Represents a collection of elements of the same type. Use this for storing
+        lists, tags, or multiple values in a single field. All elements must be of
+        the type specified in elementType.
+
+        Args:
+            elementType: The data type of elements in the array (e.g., StringType()).
+        """
+
         def __init__(self, elementType):
             self.elementType = elementType
 
     class StructField:
+        """Schema field definition for a single column.
+
+        Defines a single column in a table schema, including its name, data type,
+        and whether it can contain null values. Use this when defining custom schemas
+        for catalog tables or data structures.
+
+        Args:
+            name: Column name (e.g., "customer_id", "order_date").
+            dtype: Data type of the column (e.g., StringType(), LongType()).
+            nullable: Whether the column can contain null values (default: True).
+        """
+
         def __init__(self, name, dtype, nullable=True):
             self.name = name
             self.dataType = dtype
 
     class StructType:
+        """Schema structure definition for a table.
+
+        Defines the complete schema of a table as a collection of StructField objects.
+        Use this when defining schemas for catalog tables or custom data structures.
+
+        Args:
+            fields: List of StructField objects defining each column in the schema.
+
+        Example:
+            schema = StructType([
+                StructField("id", LongType()),
+                StructField("name", StringType()),
+                StructField("created_at", TimestampType())
+            ])
+        """
+
         def __init__(self, fields):
             self.fields = fields
 
@@ -357,6 +438,18 @@ class CatalogManager:
                     from deltalake import write_deltalake
 
                     def map_to_arrow_type(dtype):
+                        """Convert Odibi/Spark data type to PyArrow type.
+
+                        Maps Odibi's internal type system to PyArrow types for Delta Lake
+                        table creation. Handles all standard types and recursively converts
+                        ArrayType elements.
+
+                        Args:
+                            dtype: Odibi data type object (StringType, LongType, etc.).
+
+                        Returns:
+                            PyArrow type object (pa.string(), pa.int64(), etc.).
+                        """
                         s_type = str(dtype)
                         if isinstance(dtype, StringType) or "StringType" in s_type:
                             return pa.string()
@@ -403,6 +496,18 @@ class CatalogManager:
                     data = {}
 
                     def get_pd_type(dtype):
+                        """Convert Odibi/Spark data type to Pandas dtype string.
+
+                        Maps Odibi's internal type system to Pandas dtype strings for
+                        DataFrame creation. Used as a fallback when Delta Lake/PyArrow
+                        is not available.
+
+                        Args:
+                            dtype: Odibi data type object (StringType, LongType, etc.).
+
+                        Returns:
+                            Pandas dtype string (e.g., "string", "int64", "float64").
+                        """
                         if isinstance(dtype, StringType) or "StringType" in str(type(dtype)):
                             return "string"
                         if isinstance(dtype, LongType) or "LongType" in str(type(dtype)):
@@ -1065,6 +1170,11 @@ class CatalogManager:
                 df = pd.DataFrame(data)
 
                 def do_write():
+                    """Write pipeline metadata to Delta Lake meta_pipelines table.
+
+                    Performs an upsert operation to store or update pipeline definitions
+                    in the system catalog. Uses pipeline_name as the key for deduplication.
+                    """
                     self.engine.write(
                         df,
                         connection=self.connection,
@@ -1155,6 +1265,12 @@ class CatalogManager:
                 df = pd.DataFrame(data)
 
                 def do_write():
+                    """Write node metadata to Delta Lake meta_nodes table.
+
+                    Performs an upsert operation to store or update node configurations
+                    in the system catalog. Uses (pipeline_name, node_name) as composite
+                    key for deduplication.
+                    """
                     self.engine.write(
                         df,
                         connection=self.connection,
@@ -1267,6 +1383,12 @@ class CatalogManager:
                 df = pd.DataFrame(data)
 
                 def do_write():
+                    """Write output metadata to Delta Lake meta_outputs table.
+
+                    Performs an upsert operation to store or update output table information
+                    in the system catalog. Uses (pipeline_name, node_name) as composite
+                    key for deduplication.
+                    """
                     self.engine.write(
                         df,
                         connection=self.connection,
