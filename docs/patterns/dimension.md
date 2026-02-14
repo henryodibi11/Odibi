@@ -333,9 +333,18 @@ result_df = pattern.execute(context)
 
 ---
 
+## Data Quality and Quarantine
+
+Dimension patterns do not directly support quarantine functionality. However, dimensions can be validated using standard [validation tests](../validation/tests.md) with `on_fail: quarantine` to route invalid source records to quarantine tables before dimension processing.
+
+For **orphan handling** in fact tables (when dimension lookups fail), use the fact pattern's [quarantine configuration](./fact.md#quarantine-configuration) with `orphan_handling: quarantine`.
+
+---
+
 ## See Also
 
 - [Date Dimension Pattern](./date_dimension.md) - Generate date dimensions
 - [Fact Pattern](./fact.md) - Build fact tables with SK lookups
 - [Aggregation Pattern](./aggregation.md) - Build aggregate tables
+- [Quarantine Feature](../features/quarantine.md) - Route invalid data to quarantine tables
 - [YAML Schema Reference](../reference/yaml_schema.md) - Full configuration reference
