@@ -329,7 +329,15 @@ class AzureADLS(BaseConnection):
             return None
 
     def get_client_secret(self) -> Optional[str]:
-        """Get Service Principal client secret (cached or literal)."""
+        """Get Service Principal client secret (cached or literal).
+
+        Returns the cached secret if available (loaded from Azure Key Vault or
+        environment variable during initialization), otherwise returns the literal
+        client_secret value from the configuration.
+
+        Returns:
+            Client secret string, or None if not using Service Principal authentication
+        """
         return self._cached_client_secret or self.client_secret
 
     def pandas_storage_options(self) -> Dict[str, Any]:

@@ -22,7 +22,15 @@ logger = logging.getLogger(__name__)
 
 
 class DeleteThresholdExceeded(Exception):
-    """Raised when delete percentage exceeds configured threshold."""
+    """Raised when delete percentage exceeds configured threshold.
+
+    This exception is raised during delete detection when the percentage of
+    deleted records exceeds the configured safety threshold, preventing
+    accidental mass deletions due to data source issues.
+
+    See DeleteDetectionConfig.threshold and threshold_breach_action for
+    configuration options.
+    """
 
     pass
 

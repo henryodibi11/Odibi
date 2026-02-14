@@ -216,7 +216,17 @@ class AzureSQL(BaseConnection):
         return dsn
 
     def get_path(self, relative_path: str) -> str:
-        """Get table reference for relative path."""
+        """Get table reference for relative path.
+
+        In Azure SQL, the relative path is the table reference itself
+        (e.g., "schema.table" or "table"), so this method returns it as-is.
+
+        Args:
+            relative_path: Table reference (e.g., "dbo.users", "customers")
+
+        Returns:
+            Same table reference unchanged
+        """
         return relative_path
 
     def validate(self) -> None:
@@ -627,7 +637,12 @@ class AzureSQL(BaseConnection):
             )
 
     def close(self):
-        """Close database connection and dispose of engine."""
+        """Close database connection and dispose of engine.
+
+        Cleanly closes the SQLAlchemy connection pool and disposes of the engine.
+        Safe to call multiple times (subsequent calls are no-ops).
+        Should be called when done with the connection to free database resources.
+        """
         ctx = get_logging_context()
         ctx.debug(
             "Closing AzureSQL connection",
