@@ -1,5 +1,4 @@
 import time
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from odibi.context import EngineContext
@@ -609,28 +608,3 @@ class AggregationPattern(Pattern):
                     result[col] = merged[n_col]
 
             return result
-
-    def _add_audit_columns(self, context: EngineContext, df, audit_config: Dict):
-        """Add audit columns (load_timestamp, source_system)."""
-        load_timestamp = audit_config.get("load_timestamp", False)
-        source_system = audit_config.get("source_system")
-
-        if context.engine_type == EngineType.SPARK:
-            from pyspark.sql import functions as F
-
-            if load_timestamp:
-                df = df.withColumn("load_timestamp", F.current_timestamp())
-            if source_system:
-                df = df.withColumn("source_system", F.lit(source_system))
-        else:
-            if load_timestamp or source_system:
-                df = df.copy()
-            if load_timestamp:
-                # Use timezone-aware timestamp for Delta Lake compatibility
-                from datetime import timezone
-
-                df["load_timestamp"] = datetime.now(timezone.utc)
-            if source_system:
-                df["source_system"] = source_system
-
-        return df
