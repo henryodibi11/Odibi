@@ -272,6 +272,7 @@ class ResponseExtractor:
         extractor = ResponseExtractor(items_path="metrics", dict_to_list=True)
         items = extractor.extract({"metrics": {"cpu": 80, "mem": 60}})
         # Returns: [{"_key": "cpu", "value": 80}, {"_key": "mem", "value": 60}]
+        # Dictionary keys become "_key" field, values become "value" field
         ```
     """
 

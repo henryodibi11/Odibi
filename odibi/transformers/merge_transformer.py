@@ -21,7 +21,8 @@ class MergeStrategy(str, Enum):
     Attributes:
         UPSERT: Insert new records and update existing ones based on keys
         APPEND_ONLY: Only insert new records, never update existing ones
-        DELETE_MATCH: Remove records from target that match source keys (GDPR/compliance)
+        DELETE_MATCH: Remove records from target that match source keys
+            (useful for GDPR deletion requests and compliance scenarios)
     """
 
     UPSERT = "upsert"

@@ -204,7 +204,7 @@ def cast_columns(context: EngineContext, params: CastColumnsParams) -> EngineCon
         New context with columns cast to specified types
 
     Example:
-        Cast multiple columns with simple and complex types:
+        Cast columns using both simple type aliases and complex SQL types:
         ```yaml
         cast_columns:
           casts:
