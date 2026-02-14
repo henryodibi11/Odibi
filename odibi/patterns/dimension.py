@@ -181,6 +181,9 @@ class DimensionPattern(Pattern):
         target = self.params.get("target")
         unknown_member = self.params.get("unknown_member", False)
         audit_config = self.params.get("audit", {})
+        # DimensionPattern defaults load_timestamp to True for backward compatibility
+        if "load_timestamp" not in audit_config:
+            audit_config = {**audit_config, "load_timestamp": True}
 
         ctx.debug(
             "DimensionPattern starting",
@@ -630,30 +633,6 @@ class DimensionPattern(Pattern):
                     result_df = pd.concat([result_df[~null_mask], null_df], ignore_index=True)
 
         return result_df
-
-    def _add_audit_columns(self, context: EngineContext, df, audit_config: dict):
-        """Add audit columns (load_timestamp, source_system) to the dataframe."""
-        load_timestamp = audit_config.get("load_timestamp", True)
-        source_system = audit_config.get("source_system")
-
-        if context.engine_type == EngineType.SPARK:
-            from pyspark.sql import functions as F
-
-            if load_timestamp:
-                df = df.withColumn("load_timestamp", F.current_timestamp())
-            if source_system:
-                df = df.withColumn("source_system", F.lit(source_system))
-        else:
-            df = df.copy()
-            if load_timestamp:
-                # Use timezone-aware timestamp for Delta Lake compatibility
-                from datetime import timezone
-
-                df["load_timestamp"] = datetime.now(timezone.utc)
-            if source_system:
-                df["source_system"] = source_system
-
-        return df
 
     def _ensure_unknown_member(
         self,

@@ -1,6 +1,7 @@
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 from odibi.config import NodeConfig
 from odibi.context import EngineContext
@@ -103,3 +104,40 @@ class Pattern(ABC):
                 return len(df)
         except Exception:
             return None
+
+    def _add_audit_columns(self, context: EngineContext, df, audit_config: Dict):
+        """
+        Add audit columns (load_timestamp, source_system) to the dataframe.
+
+        Args:
+            context: EngineContext containing current DataFrame and helpers.
+            df: DataFrame to add audit columns to.
+            audit_config: Dictionary with audit configuration.
+                - load_timestamp (bool): If True, add load_timestamp column. Default: False.
+                - source_system (str): Source system name for source_system column.
+
+        Returns:
+            DataFrame with audit columns added.
+        """
+        load_timestamp = audit_config.get("load_timestamp", False)
+        source_system = audit_config.get("source_system")
+
+        if context.engine_type == EngineType.SPARK:
+            from pyspark.sql import functions as F
+
+            if load_timestamp:
+                df = df.withColumn("load_timestamp", F.current_timestamp())
+            if source_system:
+                df = df.withColumn("source_system", F.lit(source_system))
+        else:
+            if load_timestamp or source_system:
+                df = df.copy()
+            if load_timestamp:
+                # Use timezone-aware timestamp for Delta Lake compatibility
+                from datetime import timezone
+
+                df["load_timestamp"] = datetime.now(timezone.utc)
+            if source_system:
+                df["source_system"] = source_system
+
+        return df
