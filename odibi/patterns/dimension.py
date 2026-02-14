@@ -683,7 +683,9 @@ class DimensionPattern(Pattern):
                 elif col == natural_key:
                     unknown_values.append("-1")
                 elif col == valid_from_col:
-                    unknown_values.append(datetime(1900, 1, 1))
+                    from datetime import timezone
+
+                    unknown_values.append(datetime(1900, 1, 1, tzinfo=timezone.utc))
                 elif col == valid_to_col:
                     unknown_values.append(None)
                 elif col == is_current_col:
@@ -713,7 +715,9 @@ class DimensionPattern(Pattern):
                 elif col == natural_key:
                     unknown_row[col] = "-1"
                 elif col == valid_from_col:
-                    unknown_row[col] = datetime(1900, 1, 1)
+                    from datetime import timezone
+
+                    unknown_row[col] = datetime(1900, 1, 1, tzinfo=timezone.utc)
                 elif col == valid_to_col:
                     unknown_row[col] = None
                 elif col == is_current_col:
