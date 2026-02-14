@@ -91,16 +91,15 @@ class TestValidatePandasFreshness:
         assert "Data too old" in failures[0]
 
     def test_freshness_string_col_auto_convert_tz_naive(self, validator):
-        """String col auto-converts to tz-naive Timestamp; subtraction with
-        tz-aware now() raises TypeError which is uncaught, so no freshness
-        failure is produced (max_ts stays as NaT-equivalent path)."""
+        """String col auto-converts to tz-naive Timestamp; freshness check
+        should handle this gracefully by using naive now() for comparison."""
         old = datetime.now(timezone.utc) - timedelta(days=5)
         ts_str = old.strftime("%Y-%m-%d %H:%M:%S")
         df = pd.DataFrame({"updated_at": [ts_str]})
         config = ValidationConfig(tests=[FreshnessContract(column="updated_at", max_age="24h")])
-        # tz-naive Timestamp vs tz-aware now() → TypeError bubbles up
-        with pytest.raises(TypeError, match="tz-naive and tz-aware"):
-            validator.validate(df, config)
+        failures = validator.validate(df, config)
+        assert len(failures) == 1
+        assert "Data too old" in failures[0]
 
     def test_freshness_missing_column(self, validator):
         df = pd.DataFrame({"other_col": [1, 2, 3]})
