@@ -65,6 +65,21 @@ class TestSCD2Pandas:
         assert result_df["is_current"].all()  # All should be true
         assert result_df["valid_to"].isna().all()  # All open-ended
 
+    def test_end_col_dtype_is_datetime(self, context, source_df, params):
+        """Test that end_col is created with datetime64 dtype, not object."""
+        ctx = context.with_df(source_df)
+
+        # Mock target loading to return empty DF
+        with patch("os.path.exists", return_value=False):
+            result_ctx = scd2(ctx, params)
+            result_df = result_ctx.df
+
+        # Verify end_col exists and has datetime64 dtype
+        assert "valid_to" in result_df.columns
+        assert pd.api.types.is_datetime64_any_dtype(result_df["valid_to"])
+        # Also verify it's not object dtype (the bug we're fixing)
+        assert result_df["valid_to"].dtype != "object"
+
     def test_no_changes(self, context, source_df, params):
         """Test SCD2 when source matches target exactly."""
         # Create target that matches source exactly (but with SCD metadata)
