@@ -343,7 +343,7 @@ nodes:
       path: "initial_load.csv"
       # CSV has: id, name, email, phone
       # phone column is all null!
-    
+
     write:
       format: delta
       mode: overwrite
@@ -354,14 +354,14 @@ nodes:
   - name: "create_customer_table"
     read:
       path: "initial_load.csv"
-    
+
     transform:
       steps:
         - function: "cast_columns"
           params:
             columns:
               phone: "string"  # ✅ Explicit type for null column
-    
+
     write:
       format: delta
       mode: overwrite
@@ -816,7 +816,7 @@ You're trying to use a column that doesn't exist in your DataFrame. The column n
    # BEFORE (broken)
    params:
      keys: ["customer_id"]  # ❌ Wrong case
-   
+
    # AFTER (fixed)
    params:
      keys: ["CustomerID"]   # ✅ Matches actual column
@@ -875,7 +875,7 @@ A column you referenced in your config doesn't exist in the DataFrame at that po
            params:
              columns:
                EffectiveDate: "effective_date"  # Now it's lowercase
-   
+
    # Node 2: Use the NEW name
    - name: "process_data"
      depends_on: ["clean_data"]
@@ -892,7 +892,7 @@ nodes:
       steps:
         - function: "rename_columns"
           params: { columns: { OldName: "new_name" } }
-  
+
   - name: "process"
     depends_on: ["prep"]
     params:
@@ -905,7 +905,7 @@ nodes:
       steps:
         - function: "rename_columns"
           params: { columns: { OldName: "new_name" } }
-  
+
   - name: "process"
     depends_on: ["prep"]
     params:
@@ -938,7 +938,7 @@ You're trying to combine (union) two DataFrames that have different schemas—ei
    ```python
    source_df = spark.read.format("delta").load("source/path")
    target_df = spark.read.format("delta").load("target/path")
-   
+
    print("Source columns:", source_df.dtypes)
    print("Target columns:", target_df.dtypes)
    ```
@@ -970,7 +970,7 @@ nodes:
     read:
       connection: landing
       path: new_customers.csv  # customer_id is STRING in CSV
-    
+
     write:
       connection: silver
       table: dim_customers  # customer_id is INTEGER in target
@@ -982,14 +982,14 @@ nodes:
     read:
       connection: landing
       path: new_customers.csv
-    
+
     transform:
       steps:
         - function: "cast_columns"
           params:
             columns:
               customer_id: "integer"  # ✅ Match target type
-    
+
     write:
       connection: silver
       table: dim_customers
@@ -1106,7 +1106,7 @@ Your pipeline references a connection name that isn't defined in your project co
      - name: "load_data"
        write:
          connection: gold  # ❌ Not defined in connections!
-   
+
    # AFTER (fixed)
    nodes:
      - name: "load_data"
@@ -1318,7 +1318,7 @@ ValueError: Cannot union DataFrames with different columns
    ```python
    # Check target schema
    target_df.printSchema()
-   
+
    # Check what SCD2 expects to add
    # is_current, effective_from, effective_to, row_hash
    ```
@@ -1378,11 +1378,11 @@ KeyError: 'Customer Name'
    ```python
    # Pandas
    df.columns = df.columns.str.replace(' ', '_')
-   
+
    # Spark
    for col in df.columns:
        df = df.withColumnRenamed(col, col.replace(' ', '_'))
-   
+
    # Polars
    df = df.rename({col: col.replace(' ', '_') for col in df.columns})
    ```
@@ -1575,7 +1575,7 @@ ConcurrentAppendException: Files were added by a concurrent update
    ```python
    # Instead of overwrite (can conflict)
    df.write.format("delta").mode("overwrite").save(path)
-   
+
    # Use merge (handles concurrency better)
    delta_table.alias("target").merge(
        df.alias("source"),
@@ -1586,7 +1586,7 @@ ConcurrentAppendException: Files were added by a concurrent update
 3. **Add retry logic:**
    ```python
    from tenacity import retry, stop_after_attempt, wait_exponential
-   
+
    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1))
    def safe_write(df, path):
        df.write.format("delta").mode("append").save(path)
