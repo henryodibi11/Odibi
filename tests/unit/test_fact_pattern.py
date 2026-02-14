@@ -657,3 +657,25 @@ class TestFactPatternIntegration:
         result = pattern.execute(context)
 
         assert len(result) == 2
+
+
+class TestFactPatternIsExpression:
+    """Test _is_expression edge cases."""
+
+    def test_column_name_with_hyphen_is_expression(self, mock_engine, mock_config):
+        """Column names with hyphens are detected as expressions (known limitation)."""
+        mock_config.params = {}
+        pattern = FactPattern(mock_engine, mock_config)
+        assert pattern._is_expression("total-cost") is True
+
+    def test_simple_column_name_not_expression(self, mock_engine, mock_config):
+        """Simple column names are not expressions."""
+        mock_config.params = {}
+        pattern = FactPattern(mock_engine, mock_config)
+        assert pattern._is_expression("total_cost") is False
+
+    def test_arithmetic_is_expression(self, mock_engine, mock_config):
+        """Arithmetic expressions are detected."""
+        mock_config.params = {}
+        pattern = FactPattern(mock_engine, mock_config)
+        assert pattern._is_expression("quantity * price") is True

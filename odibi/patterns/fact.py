@@ -462,9 +462,12 @@ class FactPattern(Pattern):
     ):
         from pyspark.sql import functions as F
 
+        # Use a unique alias for the SK column to avoid ambiguity if sk_col
+        # already exists in fact_df (e.g., from a previous dimension lookup)
+        sk_alias = f"_dim_{sk_col}"
         dim_subset = dim_df.select(
             F.col(dim_key).alias(f"_dim_{dim_key}"),
-            F.col(sk_col).alias(sk_col),
+            F.col(sk_col).alias(sk_alias),
         )
 
         joined = fact_df.join(
@@ -472,6 +475,11 @@ class FactPattern(Pattern):
             fact_df[source_col] == dim_subset[f"_dim_{dim_key}"],
             "left",
         )
+
+        # If sk_col already existed in fact_df, drop the old one and rename the new one
+        if sk_col in fact_df.columns:
+            joined = joined.drop(fact_df[sk_col])
+        joined = joined.withColumnRenamed(sk_alias, sk_col)
 
         orphan_mask = F.col(sk_col).isNull()
         orphan_count = joined.filter(orphan_mask).count()

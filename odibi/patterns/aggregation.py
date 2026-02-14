@@ -374,11 +374,18 @@ class AggregationPattern(Pattern):
         if not os.path.exists(path):
             return None
 
+        path_lower = str(path).lower()
         try:
-            if str(path).endswith(".parquet") or os.path.isdir(path):
+            if path_lower.endswith(".parquet") or os.path.isdir(path):
                 return pd.read_parquet(path)
-            elif str(path).endswith(".csv"):
+            elif path_lower.endswith(".csv"):
                 return pd.read_csv(path)
+            elif path_lower.endswith(".json"):
+                return pd.read_json(path)
+            elif path_lower.endswith(".xlsx") or path_lower.endswith(".xls"):
+                return pd.read_excel(path)
+            elif path_lower.endswith(".feather") or path_lower.endswith(".arrow"):
+                return pd.read_feather(path)
         except Exception:
             return None
 
