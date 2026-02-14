@@ -148,9 +148,9 @@ params:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `target` | string | One of target/connection+path | - | Target table name or full path |
-| `connection` | string | One of target/connection+path | - | Connection name to resolve path |
-| `path` | string | One of target/connection+path | - | Relative path within connection |
+| `target` | string | Conditional¹ | - | Target table name or full path |
+| `connection` | string | Conditional¹ | - | Connection name to resolve path |
+| `path` | string | Conditional¹ | - | Relative path within connection |
 | `keys` | list[string] | Yes | - | Natural keys to identify unique entities |
 | `track_cols` | list[string] | Yes | - | Columns to monitor for changes |
 | `effective_time_col` | string | Yes | - | Source column indicating when change occurred |
@@ -158,10 +158,12 @@ params:
 | `current_flag_col` | string | No | "is_current" | Name of the current record flag column |
 | `delete_col` | string | No | None | Column indicating soft deletion (boolean) |
 
-**Validation Rules:**
-- Must provide **either** `target` **OR** both `connection` + `path`
-  - Providing both will raise a validation error
-  - Providing neither will also raise a validation error
+**Notes:**
+1. **Target specification**: Must provide **either** `target` **OR** both `connection` + `path`
+   - Providing both will raise a validation error
+   - Providing neither will also raise a validation error
+
+**Additional Validation Rules:**
 - `keys` and `track_cols` must exist in source data
 - `effective_time_col` must exist in source data
 
@@ -359,7 +361,7 @@ For each natural key, **only one record** can have `is_current=true` at any time
 | 1 | 101 | CA | 2024-01-01 | 2024-02-01 | **false** |
 | 2 | 101 | NY | 2024-02-01 | NULL | **true** |
 
-_Note: Only one record per customer_id has is_current=true._
+_Note: Only one record per `customer_id` has `is_current=true`._
 
 **INVALID State (Duplicate Grain):**
 
@@ -368,7 +370,7 @@ _Note: Only one record per customer_id has is_current=true._
 | 1 | 101 | CA | 2024-01-01 | NULL | **true** |
 | 2 | 101 | NY | 2024-02-01 | NULL | **true** |
 
-_Problem: Two records for customer_id=101 both have is_current=true (grain violation)._
+_Problem: Two records for `customer_id=101` both have `is_current=true` (grain violation)._
 
 ### How Odibi Prevents This
 
@@ -427,12 +429,13 @@ The `scd2` transformer is **NOT** an incremental merge pattern. It is designed f
 | Feature | SCD2 Transformer | Merge Pattern |
 |---------|------------------|---------------|
 | **Purpose** | Track dimension history | Incrementally merge raw → silver |
-| **Write Mode** | `overwrite` (returns full history)* | `append` or `merge` |
+| **Write Mode** | `overwrite` (returns full history)¹ | `append` or `merge` |
 | **Use Case** | Dimension tables with history | Fact tables, raw data ingestion |
 | **Output** | Complete historical dataset | New/changed records only |
 | **Idempotency** | Re-runs rebuild full history | Merge by key prevents duplicates |
 
-_* Note: `overwrite` mode is the typical pattern. The SCD2 transformer returns the complete history (all versions), which you then write back to replace the target. Advanced users can implement incremental SCD2 using Delta merge operations, but this is not the default behavior of the `scd2` transformer._
+**Notes:**
+1. `overwrite` mode is the typical pattern. The SCD2 transformer returns the complete history (all versions), which you then write back to replace the target. Advanced users can implement incremental SCD2 using Delta merge operations, but this is not the default behavior of the `scd2` transformer.
 
 ### When to Use Each
 
