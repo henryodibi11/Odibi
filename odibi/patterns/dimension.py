@@ -241,7 +241,15 @@ class DimensionPattern(Pattern):
             raise
 
     def _load_existing_target(self, context: EngineContext, target: str):
-        """Load existing target table if it exists."""
+        """Load existing target table if it exists.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            target: The name or path of the target table to load.
+
+        Returns:
+            DataFrame containing the existing target data, or None if not found.
+        """
         if context.engine_type == EngineType.SPARK:
             return self._load_existing_spark(context, target)
         else:
@@ -632,7 +640,17 @@ class DimensionPattern(Pattern):
         return result_df
 
     def _add_audit_columns(self, context: EngineContext, df, audit_config: dict):
-        """Add audit columns (load_timestamp, source_system) to the dataframe."""
+        """Add audit columns (load_timestamp, source_system) to the DataFrame.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The DataFrame to add audit columns to.
+            audit_config: Configuration dictionary specifying which audit columns to add.
+                Keys: 'load_timestamp' (bool), 'source_system' (str).
+
+        Returns:
+            DataFrame with audit columns added as configured.
+        """
         load_timestamp = audit_config.get("load_timestamp", True)
         source_system = audit_config.get("source_system")
 
@@ -663,7 +681,22 @@ class DimensionPattern(Pattern):
         surrogate_key: str,
         audit_config: dict,
     ):
-        """Ensure unknown member row exists with SK=0."""
+        """Ensure unknown member row exists with SK=0.
+
+        The unknown member is a special dimension row used to handle orphan facts
+        where the dimension lookup fails. It has a surrogate key of 0 and
+        standard 'Unknown' placeholder values.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The dimension DataFrame to ensure unknown member in.
+            natural_key: The natural key column name.
+            surrogate_key: The surrogate key column name.
+            audit_config: Audit configuration for source_system value.
+
+        Returns:
+            DataFrame with unknown member row added if not already present.
+        """
         valid_from_col = self.params.get("valid_from_col", "valid_from")
         valid_to_col = self.params.get("valid_to_col", "valid_to")
         is_current_col = self.params.get("is_current_col", "is_current")

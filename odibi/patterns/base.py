@@ -13,6 +13,12 @@ class Pattern(ABC):
     """Base class for Execution Patterns."""
 
     def __init__(self, engine: Engine, config: NodeConfig):
+        """Initialize a pattern instance.
+
+        Args:
+            engine: The execution engine (Spark, Pandas, or Polars).
+            config: Node configuration containing pattern parameters and metadata.
+        """
         self.engine = engine
         self.config = config
         self.params = config.params

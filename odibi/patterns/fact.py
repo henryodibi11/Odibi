@@ -583,7 +583,17 @@ class FactPattern(Pattern):
         return any(op in expr for op in spaced_operators)
 
     def _add_calculated_measure(self, context: EngineContext, df, name: str, expr: str):
-        """Add a calculated measure column."""
+        """Add a calculated measure column using an expression.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The DataFrame to add the calculated measure to.
+            name: The name of the new calculated measure column.
+            expr: The expression to evaluate for the calculated measure.
+
+        Returns:
+            DataFrame with the new calculated measure column added.
+        """
         if context.engine_type == EngineType.SPARK:
             from pyspark.sql import functions as F
 
@@ -594,7 +604,17 @@ class FactPattern(Pattern):
             return df
 
     def _rename_column(self, context: EngineContext, df, old_name: str, new_name: str):
-        """Rename a column."""
+        """Rename a column in the DataFrame.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The DataFrame containing the column to rename.
+            old_name: The current name of the column.
+            new_name: The new name for the column.
+
+        Returns:
+            DataFrame with the column renamed.
+        """
         if context.engine_type == EngineType.SPARK:
             return df.withColumnRenamed(old_name, new_name)
         else:
@@ -640,7 +660,17 @@ class FactPattern(Pattern):
         )
 
     def _add_audit_columns(self, context: EngineContext, df, audit_config: Dict):
-        """Add audit columns (load_timestamp, source_system)."""
+        """Add audit columns (load_timestamp, source_system) to the DataFrame.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The DataFrame to add audit columns to.
+            audit_config: Configuration dictionary specifying which audit columns to add.
+                Keys: 'load_timestamp' (bool), 'source_system' (str).
+
+        Returns:
+            DataFrame with audit columns added as configured.
+        """
         load_timestamp = audit_config.get("load_timestamp", False)
         source_system = audit_config.get("source_system")
 
@@ -671,7 +701,18 @@ class FactPattern(Pattern):
         source_col: str,
         quarantine_config: Dict,
     ):
-        """Add metadata columns to quarantined Spark DataFrame."""
+        """Add metadata columns to quarantined Spark DataFrame.
+
+        Args:
+            df: The Spark DataFrame containing quarantined records.
+            dim_table: Name of the dimension table that caused the orphan rejection.
+            source_col: Name of the source column that failed the dimension lookup.
+            quarantine_config: Configuration dictionary with 'add_columns' specifying
+                which metadata columns to add (_rejection_reason, _rejected_at, _source_dimension).
+
+        Returns:
+            Spark DataFrame with quarantine metadata columns added.
+        """
         from pyspark.sql import functions as F
 
         add_columns = quarantine_config.get("add_columns", {})
@@ -695,7 +736,18 @@ class FactPattern(Pattern):
         source_col: str,
         quarantine_config: Dict,
     ):
-        """Add metadata columns to quarantined Pandas DataFrame."""
+        """Add metadata columns to quarantined Pandas DataFrame.
+
+        Args:
+            df: The Pandas DataFrame containing quarantined records.
+            dim_table: Name of the dimension table that caused the orphan rejection.
+            source_col: Name of the source column that failed the dimension lookup.
+            quarantine_config: Configuration dictionary with 'add_columns' specifying
+                which metadata columns to add (_rejection_reason, _rejected_at, _source_dimension).
+
+        Returns:
+            Pandas DataFrame with quarantine metadata columns added.
+        """
         add_columns = quarantine_config.get("add_columns", {})
 
         if add_columns.get("_rejection_reason", False):
@@ -719,7 +771,14 @@ class FactPattern(Pattern):
         quarantined_df,
         quarantine_config: Dict,
     ):
-        """Write quarantined records to the configured destination."""
+        """Write quarantined records to the configured destination.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            quarantined_df: DataFrame containing the quarantined orphan records.
+            quarantine_config: Configuration dictionary specifying destination with keys:
+                'connection', 'path', and/or 'table'.
+        """
         ctx = get_logging_context()
         connection = quarantine_config.get("connection")
         path = quarantine_config.get("path")
@@ -745,7 +804,15 @@ class FactPattern(Pattern):
         path: Optional[str],
         table: Optional[str],
     ):
-        """Write quarantine data using Spark."""
+        """Write quarantine data using Spark to Delta Lake format.
+
+        Args:
+            context: Engine context with engine instance for connection resolution.
+            df: Spark DataFrame containing quarantined records.
+            connection: Connection name for resolving paths.
+            path: Optional file path for quarantine storage.
+            table: Optional table name for quarantine storage.
+        """
         if table:
             full_table = f"{connection}.{table}" if connection else table
             df.write.format("delta").mode("append").saveAsTable(full_table)
@@ -767,7 +834,15 @@ class FactPattern(Pattern):
         path: Optional[str],
         table: Optional[str],
     ):
-        """Write quarantine data using Pandas."""
+        """Write quarantine data using Pandas to Delta Lake or SQL Server.
+
+        Args:
+            context: Engine context with engine instance for connection resolution.
+            df: Pandas DataFrame containing quarantined records.
+            connection: Connection name for resolving paths or database connections.
+            path: Optional file path for quarantine storage (Delta Lake).
+            table: Optional table name for quarantine storage (SQL Server).
+        """
         import os
 
         destination = path or table
