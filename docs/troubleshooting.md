@@ -150,6 +150,27 @@ If `log_run` fails with schema errors:
 2. Use exact column types that match the run log schema
 3. Serialize complex types (like lists) to JSON strings
 
+#### Timezone Mismatch Errors
+
+```
+TypeError: can't subtract offset-naive and offset-aware datetimes
+```
+
+**Cause:** Mixing timezone-naive (`datetime.now()`) and timezone-aware (`datetime.now(timezone.utc)`) timestamps in the same DataFrame or comparison.
+
+**Common scenarios:**
+- Freshness validation comparing data timestamps against `datetime.now()`
+- Unknown member rows with `datetime(1900, 1, 1)` alongside tz-aware `load_timestamp`
+- Delta Lake reads returning UTC timestamps compared against naive Python datetimes
+
+**Fix:** Always use timezone-aware timestamps:
+```python
+from datetime import datetime, timezone
+now = datetime.now(timezone.utc)  # Not datetime.now()
+```
+
+**Prevention:** Odibi uses `timezone.utc` throughout. If you write custom transformers, always use `datetime.now(timezone.utc)`.
+
 ---
 
 ### Validation Errors

@@ -189,3 +189,6 @@ IPS_S_Curve/
 
 # MCP reference servers (external clone, not a submodule)
 servers/
+
+# MkDocs build output
+site/
