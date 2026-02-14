@@ -314,8 +314,7 @@ SELECT
     customer_id,
     _rejection_reason,
     _source_dimension,
-    _rejected_at,
-    _source_batch_id
+    _rejected_at
 FROM quarantine.fact_orders_orphans
 WHERE _rejected_at >= current_date() - INTERVAL 7 DAYS
 ORDER BY _rejected_at DESC;
