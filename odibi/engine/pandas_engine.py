@@ -8,7 +8,7 @@ import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Union
 from urllib.parse import urlparse
@@ -1613,7 +1613,7 @@ class PandasEngine(Engine):
 
         return {
             "version": dt.version(),
-            "timestamp": datetime.fromtimestamp(latest.get("timestamp", 0) / 1000),
+            "timestamp": datetime.fromtimestamp(latest.get("timestamp", 0) / 1000, tz=timezone.utc),
             "operation": latest.get("operation"),
             "operation_metrics": latest.get("operationMetrics", {}),
             "read_version": latest.get("readVersion"),
