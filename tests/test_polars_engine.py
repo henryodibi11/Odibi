@@ -866,6 +866,15 @@ class TestAddWriteMetadata:
         assert "_extracted_at" in result.columns
         assert len(result) == 2
 
+    def test_extracted_at_is_timezone_aware(self, polars_engine):
+        """Verify _extracted_at column has timezone information (UTC)."""
+        df = pl.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+        result = polars_engine.add_write_metadata(df, True)
+
+        # Polars datetime values should have timezone if created with timezone.utc
+        # The dtype should be Datetime with time_zone="UTC"
+        assert result["_extracted_at"].dtype == pl.Datetime(time_unit="us", time_zone="UTC")
+
     def test_source_file_only_for_file_sources(self, polars_engine):
         df = pl.DataFrame({"id": [1]})
         result = polars_engine.add_write_metadata(
