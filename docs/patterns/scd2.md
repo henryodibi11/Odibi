@@ -355,14 +355,18 @@ For each natural key, **only one record** can have `is_current=true` at any time
 | customer_sk | customer_id | address | valid_from | valid_to | is_current |
 |-------------|-------------|---------|------------|----------|------------|
 | 1 | 101 | CA | 2024-01-01 | 2024-02-01 | **false** |
-| 2 | 101 | NY | 2024-02-01 | NULL | **true** ← Only one current |
+| 2 | 101 | NY | 2024-02-01 | NULL | **true** |
+
+_Note: Only one record per customer_id has is_current=true._
 
 **INVALID State (Duplicate Grain):**
 
 | customer_sk | customer_id | address | valid_from | valid_to | is_current |
 |-------------|-------------|---------|------------|----------|------------|
-| 1 | 101 | CA | 2024-01-01 | NULL | **true** ← Duplicate! |
-| 2 | 101 | NY | 2024-02-01 | NULL | **true** ← Duplicate! |
+| 1 | 101 | CA | 2024-01-01 | NULL | **true** |
+| 2 | 101 | NY | 2024-02-01 | NULL | **true** |
+
+_Problem: Two records for customer_id=101 both have is_current=true (grain violation)._
 
 ### How Odibi Prevents This
 
