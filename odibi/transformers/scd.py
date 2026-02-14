@@ -515,7 +515,7 @@ def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> 
 
     # Prepare Source
     source_df = source_df.copy()
-    source_df[end_col] = None
+    source_df[end_col] = pd.NaT
     source_df[flag_col] = True
 
     if target_df.empty:
