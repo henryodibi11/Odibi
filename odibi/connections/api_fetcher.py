@@ -50,7 +50,14 @@ from odibi.utils.logging_context import get_logging_context
 
 @dataclass
 class ApiRequest:
-    """Represents an API request to be made."""
+    """Represents an API request to be made.
+
+    Attributes:
+        method: HTTP method (GET, POST, etc.)
+        url: Full URL for the request
+        params: Query parameters as key-value pairs
+        json_body: Optional JSON body for POST/PUT requests
+    """
 
     method: str
     url: str
@@ -60,7 +67,15 @@ class ApiRequest:
 
 @dataclass
 class ApiPage:
-    """Represents a single page of API response."""
+    """Represents a single page of API response.
+
+    Attributes:
+        items: List of data items extracted from the response
+        raw: Full raw response body as dictionary
+        headers: HTTP response headers
+        request: The original request that generated this response
+        status_code: HTTP status code (default 200)
+    """
 
     items: List[Dict[str, Any]]
     raw: Dict[str, Any]
@@ -240,7 +255,25 @@ def _substitute_curly_brace_dates(value: str) -> str:
 
 
 class ResponseExtractor:
-    """Extracts items from API responses using a dotted path."""
+    """Extracts items from API responses using a dotted path.
+
+    Supports flexible response structures with nested data extraction,
+    field addition, and dictionary-to-list conversion for key-value APIs.
+
+    Example:
+        Extract items from nested response:
+        ```python
+        extractor = ResponseExtractor(items_path="data.results")
+        items = extractor.extract(response_dict)
+        ```
+
+        Handle dict-based responses:
+        ```python
+        extractor = ResponseExtractor(items_path="metrics", dict_to_list=True)
+        items = extractor.extract({"metrics": {"cpu": 80, "mem": 60}})
+        # Returns: [{"_key": "cpu", "value": 80}, {"_key": "mem", "value": 60}]
+        ```
+    """
 
     def __init__(
         self,
