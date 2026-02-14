@@ -115,21 +115,574 @@ df.pivot(on="column", ...)  # Not columns="column"
 
 ### Delta Lake Issues
 
-#### Schema Mismatch Errors
+Delta Lake is a powerful format, but it has specific requirements and error modes. This section covers the most common issues you'll encounter.
 
+---
+
+#### 1. Schema Evolution Failures
+
+📋 **Error Message:**
+```
+DeltaAnalysisException: A schema mismatch detected when writing to the Delta table
+```
+or
 ```
 Schema of data does not match table schema
 ```
-
-**Cause:** DataFrame columns don't match the Delta table schema.
-
-**Fix:** Ensure column types match exactly:
-```python
-# Check schemas before writing
-print(df.dtypes)
-# Cast columns if needed
-df['column'] = df['column'].astype('string')
+or
 ```
+AnalysisException: Cannot write incompatible data to table
+```
+
+💡 **What It Means:**
+You're trying to write data with a schema (columns and/or types) that doesn't match the existing Delta table. Delta Lake enforces schema consistency to prevent data corruption.
+
+🔍 **When It Happens:**
+- Adding new columns to an existing table
+- Changing column data types (e.g., from integer to string)
+- Renaming columns that Delta interprets as removals + additions
+- Source data schema evolved without updating the target configuration
+
+✅ **Step-by-Step Fix:**
+
+**Option 1: Enable schema evolution (recommended for most cases):**
+```yaml
+# In your YAML config
+write:
+  format: delta
+  mode: append
+  delta_options:
+    schema_mode: "merge"  # Automatically adds new columns
+```
+
+**Option 2: Overwrite schema completely (destructive - use with caution):**
+```yaml
+write:
+  format: delta
+  mode: overwrite
+  delta_options:
+    overwrite_schema: true  # Replaces entire table schema
+```
+
+**Option 3: Pre-validate and cast columns before writing:**
+```python
+# Pandas example
+existing_schema = pd.read_parquet("path/to/delta")
+for col in df.columns:
+    if col in existing_schema.columns:
+        df[col] = df[col].astype(existing_schema[col].dtype)
+```
+
+🛡️ **How to Prevent It:**
+
+1. **Use Delta table contracts (recommended):**
+```python
+# When creating the table initially
+from deltalake import DeltaTable, write_deltalake
+
+write_deltalake(
+    "path/to/table",
+    df,
+    mode="overwrite",
+    configuration={
+        "delta.constraints.column_name.notNull": "true",
+        "delta.minReaderVersion": "2",
+        "delta.minWriterVersion": "5"
+    }
+)
+```
+
+2. **Set `schema_mode: "merge"` as default in project config:**
+```yaml
+# In project-level config
+engine:
+  pandas:
+    performance:
+      delta_defaults:
+        schema_mode: "merge"
+```
+
+3. **Add schema validation step before writes:**
+```yaml
+transform:
+  steps:
+    - function: "validate_schema"
+      params:
+        expected_columns: ["id", "name", "created_at"]
+        allow_extra: true  # Allow new columns (will merge)
+```
+
+📝 **YAML Before/After:**
+```yaml
+# BEFORE (broken) - Rigid schema
+nodes:
+  - name: "write_customers"
+    write:
+      format: delta
+      mode: append
+      # Missing schema_mode - fails when source adds columns!
+
+# AFTER (fixed) - Schema evolution enabled
+nodes:
+  - name: "write_customers"
+    write:
+      format: delta
+      mode: append
+      delta_options:
+        schema_mode: "merge"  # ✅ Safely handles new columns
+```
+
+**⚠️ Important Notes:**
+- `schema_mode: "merge"` requires the Rust engine (delta-rs). The PyArrow engine doesn't support it.
+- Odibi uses `engine="rust"` by default for Delta writes (see `odibi/engine/pandas_engine.py:1603`)
+- `overwrite_schema: true` replaces the entire table - use only for full rebuilds
+
+---
+
+#### 2. Null Column Type Errors
+
+📋 **Error Message:**
+```
+ArrowInvalid: Could not convert <NA> with type NoneType
+```
+or
+```
+ArrowInvalid: Could not convert NULL with type NoneType: did not recognize Python value type when inferring an Arrow data type
+```
+or
+```
+pyarrow.lib.ArrowTypeError: Expected schema field ... to be not-null
+```
+
+💡 **What It Means:**
+You're trying to write a column where **all values are NULL** on the first write. Arrow and Delta Lake can't infer the data type from NULL-only columns, causing the write to fail.
+
+🔍 **When It Happens:**
+- First write to a new Delta table with columns that have no data yet
+- Optional columns that are completely empty in the initial batch
+- Late-binding columns (added to source but not yet populated)
+- Columns that will be filled by later transformations
+
+✅ **Step-by-Step Fix:**
+
+**Option 1: Odibi handles this automatically (Pandas engine only):**
+```python
+# The framework already does this for you (odibi/engine/pandas_engine.py:1518-1522)
+# All-null columns are automatically cast to string type
+for col in df.columns:
+    if df[col].isna().all():
+        df[col] = df[col].astype("string")
+```
+
+**Option 2: Explicitly cast columns in your YAML:**
+```yaml
+transform:
+  steps:
+    - function: "cast_columns"
+      params:
+        columns:
+          optional_column: "string"
+          future_column: "string"
+          nullable_field: "int64"  # Use int64, not int (supports nulls)
+```
+
+**Option 3: Declare schema upfront with `columns:` config:**
+```yaml
+write:
+  format: delta
+  columns:
+    - name: "customer_id"
+      type: "int64"
+    - name: "optional_field"
+      type: "string"  # ✅ Explicit type even if all nulls
+    - name: "future_column"
+      type: "string"
+```
+
+**Option 4: Provide default non-null values temporarily:**
+```python
+# Pandas example
+df['optional_column'] = df['optional_column'].fillna("UNKNOWN")
+```
+
+🛡️ **How to Prevent It:**
+
+1. **Always bootstrap tables with representative data (preferred):**
+```yaml
+# Use a sample dataset that has at least one non-null value per column
+bootstrap:
+  source: "sample_data.csv"  # Include all columns with example values
+```
+
+2. **Use typed schemas in your data contracts:**
+```yaml
+# Define schema explicitly at table creation
+schema:
+  columns:
+    - name: "id"
+      type: "int64"
+      nullable: false
+    - name: "optional_field"
+      type: "string"
+      nullable: true  # ✅ Declared as nullable with known type
+```
+
+3. **Avoid writing empty DataFrames on first run:**
+```python
+if not df.empty and df[optional_cols].notna().any().any():
+    # Safe to write
+    write_deltalake(...)
+```
+
+📝 **YAML Before/After:**
+```yaml
+# BEFORE (broken) - All-null column fails on first write
+nodes:
+  - name: "create_customer_table"
+    read:
+      path: "initial_load.csv"
+      # CSV has: id, name, email, phone
+      # phone column is all null!
+    
+    write:
+      format: delta
+      mode: overwrite
+      # ❌ Fails: Can't infer type from NULL-only column
+
+# AFTER (fixed) - Explicit type casting
+nodes:
+  - name: "create_customer_table"
+    read:
+      path: "initial_load.csv"
+    
+    transform:
+      steps:
+        - function: "cast_columns"
+          params:
+            columns:
+              phone: "string"  # ✅ Explicit type for null column
+    
+    write:
+      format: delta
+      mode: overwrite
+```
+
+**💡 Pro Tip:**
+The Pandas engine (`odibi/engine/pandas_engine.py`) automatically handles this issue by casting all-null columns to string type before writing. However, if you're using Spark or need specific types (not string), use explicit casting.
+
+---
+
+#### 3. Concurrent Write Conflicts
+
+📋 **Error Message:**
+```
+ConcurrentAppendException: Files were added to the root of the table by a concurrent update
+```
+or
+```
+ConcurrentDeleteReadException: This transaction attempted to read files that were deleted by a concurrent commit
+```
+or
+```
+ConcurrentDeleteDeleteException: Multiple commits deleted the same files
+```
+or
+```
+DeltaError: Transaction commit failed - conflict with concurrent operation
+```
+
+💡 **What It Means:**
+Two or more processes tried to write to the same Delta table at the same time, and their operations conflicted. Delta Lake uses optimistic concurrency control and detects conflicts at commit time.
+
+🔍 **When It Happens:**
+- Parallel pipeline runs writing to the same table simultaneously
+- Two users running the same notebook/script at once
+- Overlapping scheduled jobs (e.g., hourly job starts before previous run completes)
+- Streaming and batch jobs writing to the same table
+- Using `overwrite` mode while another process is appending
+
+✅ **Step-by-Step Fix:**
+
+**Option 1: Odibi handles this automatically with retries:**
+```python
+# The framework already does this (odibi/engine/pandas_engine.py:157-169)
+# All Delta operations retry up to 5 times with exponential backoff
+def _retry_delta_operation(self, func, max_retries=5, base_delay=0.2):
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            if "conflict" in str(e).lower() or "concurrent" in str(e).lower():
+                # Wait and retry with exponential backoff
+                delay = base_delay * (2**attempt) + random.uniform(0, 0.1)
+                time.sleep(delay)
+```
+
+**Option 2: Use merge instead of append (idempotent):**
+```yaml
+# Merge is safer for concurrent operations than append
+transformer: "merge"
+params:
+  target: "silver.customers"
+  keys: ["customer_id"]
+  strategy: "upsert"
+```
+
+**Option 3: Configure isolation level for your use case:**
+```python
+# For Spark users
+spark.conf.set("spark.databricks.delta.properties.defaults.isolationLevel", "WriteSerializable")
+
+# For high-concurrency scenarios
+spark.conf.set("spark.databricks.delta.properties.defaults.isolationLevel", "Serializable")
+```
+
+**Option 4: Partition writes by date or other dimension:**
+```yaml
+write:
+  format: delta
+  delta_options:
+    partition_by: ["process_date"]  # Different partitions = no conflict
+```
+
+🛡️ **How to Prevent It:**
+
+1. **Configure orchestrator to prevent overlaps:**
+```yaml
+# Airflow example
+dag = DAG(
+    'customer_pipeline',
+    max_active_runs=1,  # ✅ Only one run at a time
+    catchup=False
+)
+
+# Databricks Workflows example
+{
+  "max_concurrent_runs": 1  # ✅ Serial execution only
+}
+```
+
+2. **Use idempotent patterns (merge, upsert) instead of append:**
+```yaml
+# SAFER: Merge-based patterns handle concurrency better
+pattern: "merge"
+params:
+  target: "silver.orders"
+  keys: ["order_id"]
+  # Retrying a merge is safe - produces same result
+```
+
+3. **Partition by run ID or timestamp:**
+```yaml
+# Write to unique paths per run
+write:
+  path: "bronze/orders/${run_id}"  # Each run gets its own path
+  format: delta
+```
+
+4. **Use Delta Lake's Change Data Feed for streaming:**
+```yaml
+read:
+  format: delta
+  delta_options:
+    readChangeFeed: true
+    startingVersion: 0
+```
+
+📝 **YAML Before/After:**
+```yaml
+# BEFORE (problematic) - Append mode with concurrent runs
+schedule:
+  interval: "*/5 * * * *"  # Every 5 minutes
+  max_concurrent: 5  # ❌ Allows overlaps!
+
+nodes:
+  - name: "load_orders"
+    write:
+      format: delta
+      mode: append  # ❌ Conflicts if runs overlap
+
+# AFTER (fixed) - Serial execution + idempotent merge
+schedule:
+  interval: "*/5 * * * *"
+  max_concurrent: 1  # ✅ One run at a time
+
+nodes:
+  - name: "load_orders"
+    transformer: "merge"  # ✅ Safer than append
+    params:
+      target: "bronze.orders"
+      keys: ["order_id", "timestamp"]
+      strategy: "upsert"
+```
+
+**⚠️ Important Notes:**
+- Concurrent **reads** are always safe - conflicts only happen with writes
+- `overwrite` mode is especially prone to conflicts - prefer merge/upsert
+- Retries are automatic in Odibi (Pandas engine) - just ensure retries are enabled
+- For very high concurrency, consider using Delta Lake's optimistic transaction log on a distributed file system (not local disk)
+
+---
+
+#### 4. Deletion Vector Errors
+
+📋 **Error Message:**
+```
+DeltaError: Deletion vectors are not supported by the currently used reader/writer
+```
+or
+```
+Generic error: Table uses deletion vectors which are not supported by this reader
+```
+or
+```
+ReaderFeatureNotSupported: deletion vectors
+```
+
+💡 **What It Means:**
+The Delta table uses **deletion vectors** (a performance optimization in Delta Lake 2.0+), but your delta-rs version or reader doesn't support this feature yet.
+
+🔍 **When It Happens:**
+- Reading a table written by Databricks with deletion vectors enabled (default in DBR 11.3+)
+- Using an older version of delta-rs (< 0.15.0) that predates deletion vector support
+- Reading a table that had `DELETE` or `MERGE` operations run with deletion vectors
+- Using `delta-rs` readers with tables written by `delta-spark` 2.3.0+
+
+✅ **Step-by-Step Fix:**
+
+**Option 1: Update delta-rs (recommended):**
+```bash
+# Update to the latest version that supports deletion vectors
+pip install --upgrade deltalake
+
+# Verify version (need >= 0.15.0 for deletion vector support)
+python -c "import deltalake; print(deltalake.__version__)"
+```
+
+**Option 2: Disable deletion vectors on the table (if you control it):**
+```python
+# For Spark users (run once on the table)
+spark.sql("""
+    ALTER TABLE catalog.schema.table_name
+    SET TBLPROPERTIES ('delta.enableDeletionVectors' = 'false')
+""")
+```
+
+```python
+# For Databricks SQL
+ALTER TABLE silver.customers
+SET TBLPROPERTIES ('delta.enableDeletionVectors' = 'false');
+```
+
+**Option 3: Rewrite table without deletion vectors:**
+```python
+from deltalake import DeltaTable
+
+# Read the table
+dt = DeltaTable("path/to/table")
+df = dt.to_pandas()
+
+# Overwrite without deletion vectors
+from deltalake import write_deltalake
+write_deltalake(
+    "path/to/table",
+    df,
+    mode="overwrite",
+    overwrite_schema=False,
+    configuration={
+        "delta.enableDeletionVectors": "false"
+    }
+)
+```
+
+**Option 4: Use a compatibility shim while upgrading:**
+```python
+# Temporary workaround: read via Spark then pass to Pandas
+spark_df = spark.read.format("delta").load("path/to/table")
+pandas_df = spark_df.toPandas()
+# Now work with pandas_df in your pipeline
+```
+
+🛡️ **How to Prevent It:**
+
+1. **Set project-wide deletion vector policy:**
+```yaml
+# In your project config for new tables
+engine:
+  pandas:
+    performance:
+      delta_defaults:
+        configuration:
+          delta.enableDeletionVectors: "false"  # Disable for compatibility
+```
+
+2. **Pin compatible delta-rs version in requirements:**
+```txt
+# requirements.txt
+deltalake>=0.15.0  # ✅ Supports deletion vectors
+```
+
+3. **Check table properties before reading:**
+```python
+from deltalake import DeltaTable
+
+dt = DeltaTable("path/to/table")
+props = dt.metadata().configuration
+
+if props.get("delta.enableDeletionVectors") == "true":
+    print("⚠️  Table uses deletion vectors - ensure delta-rs >= 0.15.0")
+```
+
+4. **For cross-platform compatibility, disable deletion vectors:**
+```python
+# When creating tables that will be read by multiple tools
+write_deltalake(
+    "path/to/table",
+    df,
+    mode="overwrite",
+    configuration={
+        "delta.enableDeletionVectors": "false",  # Max compatibility
+        "delta.minReaderVersion": "1",
+        "delta.minWriterVersion": "2"
+    }
+)
+```
+
+📝 **YAML Before/After:**
+```yaml
+# BEFORE (broken) - Incompatible reader version
+dependencies:
+  - deltalake==0.10.0  # ❌ Too old for deletion vectors
+
+read:
+  connection: databricks_prod
+  table: "silver.customers"  # Uses deletion vectors
+  format: delta
+  # ❌ Fails with "deletion vectors not supported"
+
+# AFTER (fixed) - Updated dependency
+dependencies:
+  - deltalake>=0.15.0  # ✅ Supports deletion vectors
+
+read:
+  connection: databricks_prod
+  table: "silver.customers"
+  format: delta
+  # ✅ Works with deletion vector tables
+```
+
+**💡 Pro Tips:**
+- Deletion vectors are a **performance optimization**, not a requirement - disabling them is safe
+- If you control the table, disabling is easiest (run `ALTER TABLE` once)
+- If you don't control the table, upgrade delta-rs
+- Databricks enables deletion vectors by default for better `DELETE`/`MERGE` performance
+- Check your delta-rs version with: `pip show deltalake`
+
+**📚 Reference:**
+- [Delta Lake Deletion Vectors Docs](https://docs.delta.io/latest/delta-deletion-vectors.html)
+- [delta-rs Changelog](https://github.com/delta-io/delta-rs/blob/main/CHANGELOG.md)
+
+---
 
 #### PyArrow Engine Limitations
 
@@ -139,9 +692,7 @@ schema_mode 'merge' is not supported in pyarrow engine. Use engine=rust
 
 **Cause:** The PyArrow engine doesn't support schema evolution with `schema_mode='merge'`.
 
-**Fix:** Either:
-1. Use the Rust engine: `engine='rust'`
-2. Remove `schema_mode='merge'` for append-only operations (schema is fixed at bootstrap)
+**Fix:** Odibi automatically uses `engine="rust"` for Delta writes (see `odibi/engine/pandas_engine.py:1603`). This error should not occur in normal usage. If you see it, verify you're using the Pandas engine's Delta writer, not a custom implementation.
 
 #### Catalog log_run Failures
 
