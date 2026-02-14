@@ -88,7 +88,7 @@ params:
 params:
   incremental:
     timestamp_column: order_date  # Column to identify new data
-    merge_strategy: replace       # "replace" or "sum"
+    merge_strategy: replace       # "replace", "sum", "min", or "max" (default: "replace")
   target: warehouse.agg_daily_sales
 ```
 
@@ -129,9 +129,18 @@ params:
 
 ## Incremental Merge Strategies
 
-### Replace Strategy
+The `AggregationPattern` supports four incremental merge strategies that control how new aggregates are combined with existing data. Each strategy serves different use cases based on your data characteristics and business requirements.
 
-New aggregates overwrite existing for matching grain keys:
+### 1. Replace Strategy
+
+**Behavior:** New aggregates completely overwrite existing rows for matching grain keys. Rows with grain keys that only exist in the target are preserved unchanged.
+
+**When to use:**
+- Full recalculation of affected grains (idempotent, handles late-arriving data)
+- You want to replace outdated aggregates with fresh calculations
+- Default strategy when you need simplicity and correctness
+
+**Example:**
 
 ```yaml
 nodes:
@@ -139,6 +148,7 @@ nodes:
     read:
       connection: warehouse
       path: fact_orders
+      format: delta
     pattern:
       type: aggregation
       params:
@@ -146,32 +156,185 @@ nodes:
         measures:
           - name: total_revenue
             expr: "SUM(line_total)"
+          - name: order_count
+            expr: "COUNT(*)"
         incremental:
           timestamp_column: order_date
-          merge_strategy: replace
+          merge_strategy: replace  # Default strategy
         target: warehouse.agg_daily_sales
     write:
       connection: warehouse
       path: agg_daily_sales
+      format: delta
       mode: overwrite
 ```
 
-**Use case:** Full recalculation of affected grains (idempotent, handles late data)
+**What happens:**
 
-### Sum Strategy
+| Existing (Target) | New Aggregate | Result |
+|-------------------|---------------|---------|
+| date=2024-01-01, product=A, revenue=100 | date=2024-01-01, product=A, revenue=150 | date=2024-01-01, product=A, revenue=**150** (replaced) |
+| date=2024-01-02, product=B, revenue=200 | *(not in new)* | date=2024-01-02, product=B, revenue=200 (unchanged) |
+| *(not in existing)* | date=2024-01-03, product=C, revenue=300 | date=2024-01-03, product=C, revenue=300 (inserted) |
 
-Add new measure values to existing aggregates:
+---
+
+### 2. Sum Strategy
+
+**Behavior:** Adds new measure values to existing measures for matching grain keys. Performs a FULL OUTER JOIN and sums matching rows.
+
+**When to use:**
+- Purely additive metrics (counts, sums) where data is append-only
+- You want to accumulate values over time without recalculating from source
+- Performance optimization when you can add deltas rather than recompute
+
+**⚠️ Warning:** Do NOT use for AVG, DISTINCT counts, ratios, or any non-additive metric. Results will be incorrect.
+
+**Example:**
 
 ```yaml
-params:
-  incremental:
-    timestamp_column: order_date
-    merge_strategy: sum
+nodes:
+  - name: agg_daily_sales
+    read:
+      connection: warehouse
+      path: fact_orders_incremental  # Only new/updated orders
+      format: delta
+    pattern:
+      type: aggregation
+      params:
+        grain: [date_sk, product_sk]
+        measures:
+          - name: total_revenue
+            expr: "SUM(line_total)"
+          - name: order_count
+            expr: "COUNT(*)"
+        incremental:
+          timestamp_column: order_date
+          merge_strategy: sum  # Accumulate values
+        target: warehouse.agg_daily_sales
+    write:
+      connection: warehouse
+      path: agg_daily_sales
+      format: delta
+      mode: overwrite
 ```
 
-**Use case:** Additive metrics only (counts, sums) where data is append-only
+**What happens:**
 
-**Warning:** Don't use for AVG, DISTINCT counts, or ratios.
+| Existing (Target) | New Aggregate | Result |
+|-------------------|---------------|---------|
+| date=2024-01-01, product=A, revenue=100, count=5 | date=2024-01-01, product=A, revenue=50, count=2 | date=2024-01-01, product=A, revenue=**150**, count=**7** (summed) |
+| date=2024-01-02, product=B, revenue=200, count=10 | *(not in new)* | date=2024-01-02, product=B, revenue=200, count=10 (unchanged) |
+| *(not in existing)* | date=2024-01-03, product=C, revenue=300, count=15 | date=2024-01-03, product=C, revenue=300, count=15 (inserted) |
+
+---
+
+### 3. Min Strategy
+
+**Behavior:** Keeps the minimum value for each measure across existing and new rows. Performs a FULL OUTER JOIN and computes MIN for each measure.
+
+**When to use:**
+- Tracking minimum values over time (lowest price, shortest duration, earliest timestamp)
+- You want to preserve historical minimums even when new data arrives
+- Monitoring metrics where you care about the floor value
+
+**Example:**
+
+```yaml
+nodes:
+  - name: agg_product_min_price
+    read:
+      connection: warehouse
+      path: fact_orders
+      format: delta
+    pattern:
+      type: aggregation
+      params:
+        grain: [date_sk, product_sk]
+        measures:
+          - name: min_unit_price
+            expr: "MIN(unit_price)"
+          - name: min_discount_pct
+            expr: "MIN(discount_pct)"
+        incremental:
+          timestamp_column: order_date
+          merge_strategy: min  # Keep minimum values
+        target: warehouse.agg_product_min_price
+    write:
+      connection: warehouse
+      path: agg_product_min_price
+      format: delta
+      mode: overwrite
+```
+
+**What happens:**
+
+| Existing (Target) | New Aggregate | Result |
+|-------------------|---------------|---------|
+| date=2024-01-01, product=A, min_price=10.00 | date=2024-01-01, product=A, min_price=8.50 | date=2024-01-01, product=A, min_price=**8.50** (lower value kept) |
+| date=2024-01-02, product=B, min_price=5.00 | date=2024-01-02, product=B, min_price=7.00 | date=2024-01-02, product=B, min_price=**5.00** (existing lower) |
+| *(not in existing)* | date=2024-01-03, product=C, min_price=12.00 | date=2024-01-03, product=C, min_price=12.00 (inserted) |
+
+---
+
+### 4. Max Strategy
+
+**Behavior:** Keeps the maximum value for each measure across existing and new rows. Performs a FULL OUTER JOIN and computes MAX for each measure.
+
+**When to use:**
+- Tracking maximum values over time (highest price, longest duration, latest timestamp)
+- You want to preserve historical maximums even when new data arrives
+- Monitoring metrics where you care about the ceiling value
+
+**Example:**
+
+```yaml
+nodes:
+  - name: agg_product_max_price
+    read:
+      connection: warehouse
+      path: fact_orders
+      format: delta
+    pattern:
+      type: aggregation
+      params:
+        grain: [date_sk, product_sk]
+        measures:
+          - name: max_unit_price
+            expr: "MAX(unit_price)"
+          - name: max_discount_pct
+            expr: "MAX(discount_pct)"
+        incremental:
+          timestamp_column: order_date
+          merge_strategy: max  # Keep maximum values
+        target: warehouse.agg_product_max_price
+    write:
+      connection: warehouse
+      path: agg_product_max_price
+      format: delta
+      mode: overwrite
+```
+
+**What happens:**
+
+| Existing (Target) | New Aggregate | Result |
+|-------------------|---------------|---------|
+| date=2024-01-01, product=A, max_price=20.00 | date=2024-01-01, product=A, max_price=25.00 | date=2024-01-01, product=A, max_price=**25.00** (higher value kept) |
+| date=2024-01-02, product=B, max_price=30.00 | date=2024-01-02, product=B, max_price=28.00 | date=2024-01-02, product=B, max_price=**30.00** (existing higher) |
+| *(not in existing)* | date=2024-01-03, product=C, max_price=35.00 | date=2024-01-03, product=C, max_price=35.00 (inserted) |
+
+---
+
+### Strategy Comparison
+
+| Strategy | Use Case | Pros | Cons |
+|----------|----------|------|------|
+| **replace** | Full recalculation, late data | Accurate, idempotent, simple | Requires reading source data for affected grains |
+| **sum** | Append-only additive metrics | Fast, incremental processing | Only works for SUM/COUNT, not AVG/DISTINCT |
+| **min** | Tracking minimum values | Preserves historical lows | Not applicable to most business metrics |
+| **max** | Tracking maximum values | Preserves historical highs | Not applicable to most business metrics |
+
+**Recommendation:** Use `replace` (default) unless you have a specific reason to use another strategy.
 
 ---
 
