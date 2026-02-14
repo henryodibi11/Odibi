@@ -299,9 +299,18 @@ pipelines:
 
 ---
 
+## Data Quality and Quarantine
+
+Aggregation patterns do not directly support quarantine for failed aggregations. However, you can use standard [validation tests](../validation/tests.md) on the source data with `on_fail: quarantine` to route invalid records to quarantine tables before aggregation.
+
+For a complete guide to quarantine functionality, see the [Quarantine Feature Guide](../features/quarantine.md).
+
+---
+
 ## See Also
 
 - [Fact Pattern](./fact.md) - Build fact tables
 - [Semantic Layer](../semantics/index.md) - Define metrics for ad-hoc queries
 - [Materializing Metrics](../semantics/materialize.md) - Schedule metric materialization
+- [Quarantine Feature](../features/quarantine.md) - Route invalid data to quarantine tables
 - [YAML Schema Reference](../reference/yaml_schema.md) - Full configuration reference

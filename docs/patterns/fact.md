@@ -159,6 +159,177 @@ Route orphans to quarantine table:
 orphan_handling: quarantine
 ```
 
+When using `orphan_handling: quarantine`, you must provide a full quarantine configuration (see [Quarantine Configuration](#quarantine-configuration) below).
+
+---
+
+## Quarantine Configuration
+
+When `orphan_handling: quarantine` is set, fact table rows that fail dimension lookups (orphans) are routed to a quarantine table with rejection metadata. This allows the pipeline to continue processing valid rows while preserving problematic records for debugging and reprocessing.
+
+### Full Configuration Example
+
+```yaml
+pattern:
+  type: fact
+  params:
+    dimensions:
+      - source_column: customer_id
+        dimension_table: dim_customer
+        dimension_key: customer_id
+        surrogate_key: customer_sk
+    orphan_handling: quarantine
+    quarantine:
+      connection: silver
+      path: fact_orders_orphans
+      add_columns:
+        _rejection_reason: true
+        _rejected_at: true
+        _source_dimension: true
+```
+
+### Quarantine Config Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `connection` | string | Yes | - | Connection for quarantine writes |
+| `path` | string | No* | - | Path for quarantine data |
+| `table` | string | No* | - | Table name for quarantine |
+| `add_columns` | dict | No | {} | Metadata columns to add (see below) |
+
+*Either `path` or `table` is required.
+
+### Metadata Columns
+
+The `add_columns` configuration controls which metadata columns are added to quarantined rows:
+
+```yaml
+quarantine:
+  connection: silver
+  path: fact_orders_orphans
+  add_columns:
+    _rejection_reason: true     # Why the row was quarantined
+    _rejected_at: true          # UTC timestamp of quarantine
+    _source_dimension: true     # Which dimension lookup failed
+```
+
+**Available columns for fact pattern orphan quarantine:**
+- `_rejection_reason` - Description of the orphan (e.g., "Orphan record: no match in dimension 'dim_customer' on column 'customer_id'")
+- `_rejected_at` - UTC timestamp when the row was quarantined
+- `_source_dimension` - Name of the dimension table that had no matching record
+
+**Note:** This is orphan-specific quarantine for fact tables. For general validation quarantine (with additional metadata like `_failed_tests` and `_source_batch_id`), see the [Quarantine Feature Guide](../features/quarantine.md).
+
+### How Quarantine Works for Fact Tables
+
+1. **Dimension Lookup**: Each dimension lookup is attempted using the `source_column` and `dimension_key`
+2. **Orphan Detection**: Rows with no matching dimension record are flagged as orphans
+3. **Metadata Addition**: Orphan rows receive metadata columns (rejection reason, timestamp, etc.)
+4. **Quarantine Write**: Orphan rows are written to the quarantine table
+5. **Pipeline Continues**: Valid rows with successful dimension lookups proceed to the fact table
+
+```
+┌─────────────────┐
+│   Fact Source   │
+│   (100 rows)    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Dimension Lookup│
+│  (customer_sk)  │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+┌───────┐  ┌──────────┐
+│ Valid │  │ Orphans  │
+│ (95)  │  │   (5)    │
+└───┬───┘  └─────┬────┘
+    │            │
+    ▼            ▼
+┌────────┐  ┌───────────────────┐
+│  Fact  │  │ Quarantine Table  │
+│ Table  │  │ fact_orders_orphans│
+└────────┘  └───────────────────┘
+```
+
+### Example: Complete Fact Pattern with Quarantine
+
+```yaml
+nodes:
+  - name: fact_orders
+    depends_on: [dim_customer, dim_product]
+    read:
+      connection: staging
+      path: orders
+      format: delta
+    
+    pattern:
+      type: fact
+      params:
+        grain: [order_id, line_item_id]
+        dimensions:
+          - source_column: customer_id
+            dimension_table: dim_customer
+            dimension_key: customer_id
+            surrogate_key: customer_sk
+            scd2: true
+          - source_column: product_id
+            dimension_table: dim_product
+            dimension_key: product_id
+            surrogate_key: product_sk
+        orphan_handling: quarantine
+        quarantine:
+          connection: silver
+          path: quarantine/fact_orders_orphans
+          add_columns:
+            _rejection_reason: true
+            _rejected_at: true
+            _source_dimension: true
+        measures:
+          - quantity
+          - unit_price
+          - line_total: "quantity * unit_price"
+        audit:
+          load_timestamp: true
+          source_system: "pos"
+    
+    write:
+      connection: warehouse
+      path: fact_orders
+      format: delta
+      mode: overwrite
+```
+
+### Querying Quarantined Orphans
+
+After running the pipeline, analyze quarantined orphans:
+
+```sql
+-- View recent orphan records
+SELECT
+    order_id,
+    customer_id,
+    _rejection_reason,
+    _source_dimension,
+    _rejected_at
+FROM quarantine.fact_orders_orphans
+WHERE _rejected_at >= current_date() - INTERVAL 7 DAYS
+ORDER BY _rejected_at DESC;
+
+-- Count orphans by dimension
+SELECT
+    _source_dimension,
+    COUNT(*) as orphan_count
+FROM quarantine.fact_orders_orphans
+GROUP BY _source_dimension
+ORDER BY orphan_count DESC;
+```
+
+**See Also:** [Quarantine Feature Guide](../features/quarantine.md) for complete details on quarantine behavior, validation integration, and best practices.
+
 ---
 
 ## Grain Validation
