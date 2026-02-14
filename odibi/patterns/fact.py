@@ -782,6 +782,11 @@ class FactPattern(Pattern):
 
         path_lower = str(full_path).lower()
 
+        # Create parent directories if needed
+        dir_name = os.path.dirname(full_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+
         if path_lower.endswith(".csv"):
             if os.path.exists(full_path):
                 df.to_csv(full_path, mode="a", header=False, index=False)

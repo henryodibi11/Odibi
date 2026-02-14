@@ -691,3 +691,128 @@ class TestFactPatternIsExpression:
         mock_config.params = {}
         pattern = FactPattern(mock_engine, mock_config)
         assert pattern._is_expression("total_revenue") is False
+
+
+class TestFactPatternQuarantineParentDirectories:
+    """Test that quarantine writer creates parent directories."""
+
+    def test_write_quarantine_pandas_creates_parent_dirs_csv(self, mock_engine, mock_config, tmp_path):
+        """Test that _write_quarantine_pandas creates parent directories for CSV files."""
+
+        mock_config.params = {}
+        pattern = FactPattern(mock_engine, mock_config)
+
+        # Create a DataFrame to write
+        df = pd.DataFrame(
+            {
+                "order_id": [1, 2],
+                "customer_id": ["C999", "C998"],
+                "_rejection_reason": ["Missing dimension", "Missing dimension"],
+            }
+        )
+
+        # Use a nested path that doesn't exist
+        nested_path = tmp_path / "data" / "quarantine" / "nested" / "orphans.csv"
+        assert not nested_path.parent.exists(), "Parent directory should not exist before test"
+
+        # Mock context without connections
+        mock_context = MagicMock()
+        mock_context.engine = None
+
+        # Call the quarantine writer
+        pattern._write_quarantine_pandas(
+            context=mock_context,
+            df=df,
+            connection="",
+            path=str(nested_path),
+            table=None,
+        )
+
+        # Verify directory was created and file exists
+        assert nested_path.parent.exists(), "Parent directories should be created"
+        assert nested_path.exists(), "Quarantine file should be created"
+        
+        # Verify data was written correctly
+        result_df = pd.read_csv(nested_path)
+        assert len(result_df) == 2
+        assert "order_id" in result_df.columns
+
+    def test_write_quarantine_pandas_creates_parent_dirs_parquet(self, mock_engine, mock_config, tmp_path):
+        """Test that _write_quarantine_pandas creates parent directories for Parquet files."""
+
+        mock_config.params = {}
+        pattern = FactPattern(mock_engine, mock_config)
+
+        # Create a DataFrame to write
+        df = pd.DataFrame(
+            {
+                "order_id": [1, 2],
+                "customer_id": ["C999", "C998"],
+                "_rejection_reason": ["Missing dimension", "Missing dimension"],
+            }
+        )
+
+        # Use a nested path that doesn't exist
+        nested_path = tmp_path / "data" / "quarantine" / "nested" / "orphans.parquet"
+        assert not nested_path.parent.exists(), "Parent directory should not exist before test"
+
+        # Mock context without connections
+        mock_context = MagicMock()
+        mock_context.engine = None
+
+        # Call the quarantine writer
+        pattern._write_quarantine_pandas(
+            context=mock_context,
+            df=df,
+            connection="",
+            path=str(nested_path),
+            table=None,
+        )
+
+        # Verify directory was created and file exists
+        assert nested_path.parent.exists(), "Parent directories should be created"
+        assert nested_path.exists(), "Quarantine file should be created"
+        
+        # Verify data was written correctly
+        result_df = pd.read_parquet(nested_path)
+        assert len(result_df) == 2
+        assert "order_id" in result_df.columns
+
+    def test_write_quarantine_pandas_bare_filename_no_crash(self, mock_engine, mock_config, tmp_path):
+        """Test that _write_quarantine_pandas handles bare filenames without crashing."""
+        import os
+
+        # Change to tmp_path so bare filename is written there
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+
+            mock_config.params = {}
+            pattern = FactPattern(mock_engine, mock_config)
+
+            # Create a DataFrame to write
+            df = pd.DataFrame(
+                {
+                    "order_id": [1],
+                    "_rejection_reason": ["Missing dimension"],
+                }
+            )
+
+            # Mock context without connections
+            mock_context = MagicMock()
+            mock_context.engine = None
+
+            # Call with bare filename (no directory path)
+            # This should NOT crash even though dirname returns empty string
+            pattern._write_quarantine_pandas(
+                context=mock_context,
+                df=df,
+                connection="",
+                path="orphans.csv",
+                table=None,
+            )
+
+            # Verify file was created in current directory
+            assert (tmp_path / "orphans.csv").exists()
+        finally:
+            os.chdir(original_cwd)
