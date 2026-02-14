@@ -240,15 +240,6 @@ class DimensionPattern(Pattern):
             )
             raise
 
-    def _get_row_count(self, df, engine_type) -> Optional[int]:
-        try:
-            if engine_type == EngineType.SPARK:
-                return df.count()
-            else:
-                return len(df)
-        except Exception:
-            return None
-
     def _load_existing_target(self, context: EngineContext, target: str):
         """Load existing target table if it exists."""
         if context.engine_type == EngineType.SPARK:

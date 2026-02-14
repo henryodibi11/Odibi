@@ -236,15 +236,6 @@ class AggregationPattern(Pattern):
             )
             raise
 
-    def _get_row_count(self, df, engine_type) -> Optional[int]:
-        try:
-            if engine_type == EngineType.SPARK:
-                return df.count()
-            else:
-                return len(df)
-        except Exception:
-            return None
-
     def _aggregate(
         self,
         context: EngineContext,

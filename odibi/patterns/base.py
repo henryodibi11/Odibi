@@ -1,10 +1,11 @@
 import time
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 from odibi.config import NodeConfig
 from odibi.context import EngineContext
 from odibi.engine.base import Engine
+from odibi.enums import EngineType
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -92,3 +93,13 @@ class Pattern(ABC):
             error_type=type(error).__name__,
             **kwargs,
         )
+
+    def _get_row_count(self, df, engine_type) -> Optional[int]:
+        """Get row count from a DataFrame, handling both Spark and Pandas."""
+        try:
+            if engine_type == EngineType.SPARK:
+                return df.count()
+            else:
+                return len(df)
+        except Exception:
+            return None

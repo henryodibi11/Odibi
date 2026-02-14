@@ -304,15 +304,6 @@ class FactPattern(Pattern):
             )
             raise
 
-    def _get_row_count(self, df, engine_type) -> Optional[int]:
-        try:
-            if engine_type == EngineType.SPARK:
-                return df.count()
-            else:
-                return len(df)
-        except Exception:
-            return None
-
     def _deduplicate(self, context: EngineContext, df, keys: List[str]):
         """Remove duplicates based on keys."""
         if context.engine_type == EngineType.SPARK:
@@ -579,9 +570,17 @@ class FactPattern(Pattern):
         return df
 
     def _is_expression(self, expr: str) -> bool:
-        """Check if string is a calculation expression."""
-        operators = ["+", "-", "*", "/", "(", ")"]
-        return any(op in expr for op in operators)
+        """Check if string is a calculation expression vs a column name.
+
+        Operators like + - * / must be surrounded by spaces to count as
+        expression operators. Parentheses always indicate an expression.
+        This avoids treating column names with hyphens (e.g. 'total-cost')
+        as expressions.
+        """
+        if "(" in expr or ")" in expr:
+            return True
+        spaced_operators = [" + ", " - ", " * ", " / "]
+        return any(op in expr for op in spaced_operators)
 
     def _add_calculated_measure(self, context: EngineContext, df, name: str, expr: str):
         """Add a calculated measure column."""
