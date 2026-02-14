@@ -442,3 +442,52 @@ class TestMergePandasAuditColumns:
             assert result["dw_updated"].iloc[0] > old_ts
             # names were updated
             assert result["name"].iloc[0] == "Alice_new"
+
+
+class TestMergePandasBugFixes:
+    """Tests for specific bug fixes in _merge_pandas."""
+
+    def test_audit_cols_do_not_mutate_source(self, pandas_ctx):
+        """Audit columns should not modify the caller's source DataFrame."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "target.parquet")
+            source = pd.DataFrame({"id": [1], "name": ["Alice"], "value": [100]})
+            original_cols = list(source.columns)
+
+            audit = AuditColumnsConfig(created_col="created", updated_col="updated")
+            ctx = _engine_context(pandas_ctx, source)
+
+            _merge_pandas(
+                ctx,
+                source,
+                path,
+                ["id"],
+                MergeStrategy.UPSERT,
+                audit,
+                MergeParams(target=path, keys=["id"], audit_cols=audit),
+            )
+
+            # Source DataFrame should NOT have audit columns added
+            assert list(source.columns) == original_cols
+
+    def test_initial_write_with_bare_filename(self, pandas_ctx):
+        """Initial write should work when path has no directory component."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Use a bare filename in a known directory
+            path = os.path.join(tmpdir, "output.parquet")
+            source = pd.DataFrame({"id": [1], "name": ["Alice"]})
+            ctx = _engine_context(pandas_ctx, source)
+
+            _merge_pandas(
+                ctx,
+                source,
+                path,
+                ["id"],
+                MergeStrategy.UPSERT,
+                None,
+                MergeParams(target=path, keys=["id"]),
+            )
+
+            assert os.path.exists(path)
+            result = pd.read_parquet(path)
+            assert len(result) == 1

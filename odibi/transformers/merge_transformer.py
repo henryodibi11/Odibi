@@ -656,9 +656,10 @@ def _merge_pandas(
         # For MVP, assuming it's a path or resolved by user.
         pass
 
-    # Audit columns
+    # Audit columns — copy to avoid mutating caller's DataFrame
     now = pd.Timestamp.now()
     if audit_cols:
+        source_df = source_df.copy()
         created_col = audit_cols.created_col
         updated_col = audit_cols.updated_col
 
@@ -686,7 +687,9 @@ def _merge_pandas(
                     return source_df  # Nothing to delete from
 
                 # Initial Write
-                os.makedirs(os.path.dirname(path), exist_ok=True)
+                dir_name = os.path.dirname(path)
+                if dir_name:
+                    os.makedirs(dir_name, exist_ok=True)
                 con.execute(f"COPY (SELECT * FROM source_df) TO '{path}' (FORMAT PARQUET)")
                 return source_df
 
@@ -777,7 +780,9 @@ def _merge_pandas(
             return source_df
 
         # Write source as initial
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        dir_name = os.path.dirname(path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         source_df.to_parquet(path, index=False)
         return source_df
 
