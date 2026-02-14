@@ -159,7 +159,9 @@ params:
 | `delete_col` | string | No | None | Column indicating soft deletion (boolean) |
 
 **Validation Rules:**
-- Must provide **either** `target` **OR** both `connection` + `path` (not both)
+- Must provide **either** `target` **OR** both `connection` + `path`
+  - Providing both will raise a validation error
+  - Providing neither will also raise a validation error
 - `keys` and `track_cols` must exist in source data
 - `effective_time_col` must exist in source data
 
@@ -425,10 +427,12 @@ The `scd2` transformer is **NOT** an incremental merge pattern. It is designed f
 | Feature | SCD2 Transformer | Merge Pattern |
 |---------|------------------|---------------|
 | **Purpose** | Track dimension history | Incrementally merge raw → silver |
-| **Write Mode** | `overwrite` (returns full history) | `append` or `merge` |
+| **Write Mode** | `overwrite` (returns full history)* | `append` or `merge` |
 | **Use Case** | Dimension tables with history | Fact tables, raw data ingestion |
 | **Output** | Complete historical dataset | New/changed records only |
 | **Idempotency** | Re-runs rebuild full history | Merge by key prevents duplicates |
+
+_* Note: `overwrite` mode is the typical pattern. The SCD2 transformer returns the complete history (all versions), which you then write back to replace the target. Advanced users can implement incremental SCD2 using Delta merge operations, but this is not the default behavior of the `scd2` transformer._
 
 ### When to Use Each
 
