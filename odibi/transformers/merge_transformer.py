@@ -16,12 +16,37 @@ except ImportError:
 
 
 class MergeStrategy(str, Enum):
+    """Merge operation strategies for combining source and target data.
+
+    Attributes:
+        UPSERT: Insert new records and update existing ones based on keys
+        APPEND_ONLY: Only insert new records, never update existing ones
+        DELETE_MATCH: Remove records from target that match source keys
+            (useful for GDPR deletion requests and compliance scenarios)
+    """
+
     UPSERT = "upsert"
     APPEND_ONLY = "append_only"
     DELETE_MATCH = "delete_match"
 
 
 class AuditColumnsConfig(BaseModel):
+    """Configuration for automatic audit timestamp columns during merge operations.
+
+    Attributes:
+        created_col: Column to set only on first insert (e.g., "created_at")
+        updated_col: Column to update on every merge operation (e.g., "updated_at")
+
+    At least one of created_col or updated_col must be specified.
+
+    Example:
+        ```yaml
+        audit_cols:
+          created_col: "created_at"
+          updated_col: "updated_at"
+        ```
+    """
+
     created_col: Optional[str] = Field(
         default=None, description="Column to set only on first insert"
     )

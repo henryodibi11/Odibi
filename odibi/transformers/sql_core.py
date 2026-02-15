@@ -149,6 +149,13 @@ def derive_columns(context: EngineContext, params: DeriveColumnsParams) -> Engin
 
 
 class SimpleType(str, Enum):
+    """Simple type aliases for common SQL types.
+
+    Provides user-friendly type names that are normalized to standard SQL types.
+    Supports both short forms (int, str, float, bool) and SQL standard forms
+    (integer, string, double, boolean).
+    """
+
     INT = "int"
     INTEGER = "integer"
     STR = "str"
@@ -185,6 +192,26 @@ class CastColumnsParams(BaseModel):
 def cast_columns(context: EngineContext, params: CastColumnsParams) -> EngineContext:
     """
     Casts specific columns to new types while keeping others intact.
+
+    Normalizes common type aliases (int->INTEGER, str->STRING, float->DOUBLE)
+    and passes through complex SQL types as-is (e.g., ARRAY<STRING>).
+
+    Args:
+        context: Current execution context with dataframe
+        params: Cast configuration with column-to-type mapping
+
+    Returns:
+        New context with columns cast to specified types
+
+    Example:
+        Cast columns using simple type aliases and complex SQL types:
+        ```yaml
+        cast_columns:
+          casts:
+            age: "int"
+            salary: "double"
+            tags: "ARRAY<STRING>"
+        ```
     """
     current_cols = context.columns
     projection = []
@@ -1191,7 +1218,25 @@ def normalize_column_names(
 ) -> EngineContext:
     """
     Normalizes column names to a consistent style.
-    Useful for cleaning up messy source data with spaces, mixed case, or special characters.
+
+    Useful for cleaning up messy source data with spaces, mixed case, or special
+    characters. Converts names like "First Name" or "firstName" to "first_name".
+
+    Args:
+        context: Current execution context with dataframe
+        params: Normalization configuration (style, lowercase, special char handling)
+
+    Returns:
+        New context with standardized column names
+
+    Example:
+        Convert all columns to lowercase snake_case:
+        ```yaml
+        normalize_column_names:
+          style: "snake_case"
+          lowercase: true
+          remove_special: true
+        ```
     """
     import re
 
@@ -1262,7 +1307,25 @@ class CoalesceColumnsParams(BaseModel):
 def coalesce_columns(context: EngineContext, params: CoalesceColumnsParams) -> EngineContext:
     """
     Returns the first non-null value from a list of columns.
-    Useful for fallback/priority scenarios.
+
+    Useful for fallback/priority scenarios where you want to use the first available
+    value from multiple columns (e.g., primary phone, backup phone, home phone).
+
+    Args:
+        context: Current execution context with dataframe
+        params: Coalesce configuration (columns list, output name, drop source option)
+
+    Returns:
+        New context with coalesced column added
+
+    Example:
+        Create a primary phone column from multiple fallback options:
+        ```yaml
+        coalesce_columns:
+          columns: ["mobile_phone", "work_phone", "home_phone"]
+          output_col: "primary_phone"
+          drop_source: true
+        ```
     """
     from odibi.enums import EngineType
 
@@ -1319,7 +1382,27 @@ class ReplaceValuesParams(BaseModel):
 def replace_values(context: EngineContext, params: ReplaceValuesParams) -> EngineContext:
     """
     Replaces values in specified columns according to the mapping.
-    Supports replacing to NULL.
+
+    Supports replacing specific values with new values or NULL. Useful for data
+    standardization (e.g., "N/A" -> NULL, "Unknown" -> NULL).
+
+    Args:
+        context: Current execution context with dataframe
+        params: Replacement configuration (columns and value mapping)
+
+    Returns:
+        New context with replaced values
+
+    Example:
+        Standardize missing value indicators:
+        ```yaml
+        replace_values:
+          columns: ["status", "category"]
+          mapping:
+            "N/A": null
+            "Unknown": null
+            "PENDING": "pending"
+        ```
     """
     current_cols = context.columns
     select_parts = []
@@ -1397,6 +1480,29 @@ class TrimWhitespaceParams(BaseModel):
 def trim_whitespace(context: EngineContext, params: TrimWhitespaceParams) -> EngineContext:
     """
     Trims leading and trailing whitespace from string columns.
+
+    If no columns are specified, applies to all columns (SQL TRIM handles
+    non-strings gracefully). Useful for cleaning up data from sources with
+    inconsistent spacing.
+
+    Args:
+        context: Current execution context with dataframe
+        params: Trim configuration (optional column list)
+
+    Returns:
+        New context with trimmed string columns
+
+    Example:
+        Trim specific columns:
+        ```yaml
+        trim_whitespace:
+          columns: ["name", "address", "city"]
+        ```
+
+        Trim all string columns:
+        ```yaml
+        trim_whitespace: {}
+        ```
     """
     current_cols = context.columns
     target_cols = params.columns
