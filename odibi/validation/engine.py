@@ -192,7 +192,12 @@ class Validator:
                             delta = timedelta(minutes=int(duration_str[:-1]))
 
                         if delta:
-                            if datetime.now(timezone.utc) - max_ts > delta:
+                            # Handle timezone-naive timestamps by using naive now()
+                            if hasattr(max_ts, "tzinfo") and max_ts.tzinfo is not None:
+                                now = datetime.now(timezone.utc)
+                            else:
+                                now = datetime.now()
+                            if now - max_ts > delta:
                                 msg = (
                                     f"Data too old. Max timestamp {max_ts} "
                                     f"is older than {test.max_age}"
