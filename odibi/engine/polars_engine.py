@@ -3,7 +3,7 @@
 import hashlib
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 try:
@@ -1373,7 +1373,7 @@ class PolarsEngine(Engine):
 
         columns = []
         if config.extracted_at:
-            columns.append(pl.lit(datetime.now()).alias("_extracted_at"))
+            columns.append(pl.lit(datetime.now(timezone.utc)).alias("_extracted_at"))
         if config.source_file and is_file_source and source_path:
             columns.append(pl.lit(source_path).alias("_source_file"))
         if config.source_connection and source_connection:
