@@ -38,7 +38,18 @@ Each record has an "effective window" (`effective_time` to `end_time`) and a fla
 
 ## Configuration
 
-Use the `scd2` transformer in your pipeline node.
+### Two Ways to Build SCD2 Dimensions
+
+**Option A: Raw `scd2` Transformer** (shown below)
+- Lower-level transformer for SCD2 logic only
+- You manage surrogate keys, audit columns, unknown members separately
+
+**Option B: [Dimension Pattern](./dimension.md)** (recommended)
+- Higher-level pattern that includes SCD2 + surrogate keys + audit + unknown member
+- More comprehensive for building production dimensions
+- See the sections on [Audit Columns](#audit-columns), [Unknown Member](#unknown-member-row-sk0), and [Grain Validation](#grain-validation) in this doc
+
+This section covers the **raw `scd2` transformer** configuration.
 
 ### Option 1: Using Table Name
 
@@ -101,10 +112,60 @@ params:
   # Source column for start date
   effective_time_col: "updated_at"
 
-  # Target columns to manage (optional defaults shown)
-  end_time_col: "valid_to"
-  current_flag_col: "is_current"
+  # Target columns to manage (optional - customize names if needed)
+  end_time_col: "valid_to"             # Default: valid_to
+  current_flag_col: "is_current"       # Default: is_current
+  
+  # Optional: soft delete support
+  delete_col: "is_deleted"             # If source has soft delete flag
 ```
+
+### Customizing Column Names
+
+If your organization uses different naming conventions, you can customize the SCD2 metadata column names:
+
+```yaml
+# Example: Using company-specific naming standards
+transformer: "scd2"
+params:
+  target: "silver.dim_customers"
+  keys: ["customer_id"]
+  track_cols: ["address", "tier"]
+  effective_time_col: "last_modified_date"
+  
+  # Custom column names
+  end_time_col: "effective_end_date"      # Instead of valid_to
+  current_flag_col: "active_flag"         # Instead of is_current
+```
+
+**Result columns:**
+- `effective_end_date` instead of `valid_to`
+- `active_flag` instead of `is_current`
+
+---
+
+## Complete Parameter Reference
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `target` | string | Conditional¹ | - | Target table name or full path |
+| `connection` | string | Conditional¹ | - | Connection name to resolve path |
+| `path` | string | Conditional¹ | - | Relative path within connection |
+| `keys` | list[string] | Yes | - | Natural keys to identify unique entities |
+| `track_cols` | list[string] | Yes | - | Columns to monitor for changes |
+| `effective_time_col` | string | Yes | - | Source column indicating when change occurred |
+| `end_time_col` | string | No | "valid_to" | Name of the end timestamp column |
+| `current_flag_col` | string | No | "is_current" | Name of the current record flag column |
+| `delete_col` | string | No | None | Column indicating soft deletion (boolean) |
+
+**Notes:**
+1. **Target specification**: Must provide **either** `target` **OR** both `connection` + `path`
+   - Providing both will raise a validation error
+   - Providing neither will also raise a validation error
+
+**Additional Validation Rules:**
+- `keys` and `track_cols` must exist in source data
+- `effective_time_col` must exist in source data
 
 ---
 
@@ -133,6 +194,309 @@ The `scd2` transformer performs a complex set of operations automatically:
 
 *   **Fact Tables**: Events (Transactions, Logs) are immutable; they don't change state, they just occur. Use `append` instead.
 *   **Rapidly Changing Data**: If a record changes 100 times a day, SCD2 will explode your storage size. Use a snapshot or aggregate approach instead.
+
+---
+
+## Audit Columns
+
+SCD2 dimensions work seamlessly with audit columns to track data lineage and load metadata. When building SCD2 dimensions via the [Dimension Pattern](./dimension.md), you can automatically add:
+
+- **`load_timestamp`**: When the record was loaded into the data warehouse
+- **`source_system`**: Source system identifier (e.g., "crm", "erp", "pos")
+
+### Configuration
+
+Use the `audit` parameter in the **Dimension Pattern** (not the raw `scd2` transformer):
+
+```yaml
+nodes:
+  - name: "dim_customers"
+    read:
+      connection: staging
+      path: customers
+
+    pattern:
+      type: dimension
+      params:
+        natural_key: customer_id
+        surrogate_key: customer_sk
+        scd_type: 2
+        track_cols: ["address", "tier", "email"]
+        target: "warehouse.dim_customers"
+        audit:
+          load_timestamp: true       # Adds load_timestamp column
+          source_system: "crm"       # Adds source_system='crm' column
+
+    write:
+      connection: warehouse
+      path: dim_customers
+      format: delta
+      mode: overwrite
+```
+
+### Result
+
+Your SCD2 dimension will include these columns:
+
+| customer_sk | customer_id | address | tier | valid_from | valid_to | is_current | load_timestamp | source_system |
+|-------------|-------------|---------|------|------------|----------|------------|----------------|---------------|
+| 1 | 101 | CA | Gold | 2024-01-01 | 2024-02-01 | false | 2024-01-01 10:00 | crm |
+| 2 | 101 | NY | Gold | 2024-02-01 | NULL | true | 2024-02-01 14:30 | crm |
+
+**Use Cases:**
+- **Data lineage**: Track when each version was loaded
+- **Source identification**: Know which system the data came from
+- **Audit trails**: Reconstruct the history of data loading operations
+
+---
+
+## Unknown Member Row (SK=0)
+
+When building star schema fact tables, you often need to handle **orphan records** — fact records that reference dimensions that don't exist yet (or never will).
+
+### The Problem
+
+```yaml
+# Fact table has customer_id=999, but dim_customers doesn't have it yet
+fact_orders:
+  order_id: 12345
+  customer_id: 999  # ← Orphan! Not in dim_customers
+  amount: 100.00
+```
+
+### The Solution
+
+Add an **unknown member row** to your dimension with surrogate key = 0. When fact tables encounter orphans, they can safely reference SK=0 instead of failing or creating NULL foreign keys.
+
+### Configuration
+
+Enable `unknown_member: true` in the **Dimension Pattern**:
+
+```yaml
+nodes:
+  - name: "dim_customers"
+    pattern:
+      type: dimension
+      params:
+        natural_key: customer_id
+        surrogate_key: customer_sk
+        scd_type: 2
+        track_cols: ["address", "tier"]
+        target: "warehouse.dim_customers"
+        unknown_member: true        # ← Adds SK=0 row
+        audit:
+          load_timestamp: true
+          source_system: "crm"
+
+    write:
+      connection: warehouse
+      path: dim_customers
+      format: delta
+      mode: overwrite
+```
+
+### Result
+
+The dimension automatically includes an unknown member row:
+
+| customer_sk | customer_id | address | tier | valid_from | valid_to | is_current | load_timestamp | source_system |
+|-------------|-------------|---------|------|------------|----------|------------|----------------|---------------|
+| **0** | **-1** | **Unknown** | **Unknown** | **1900-01-01** | **NULL** | **true** | *current_time* | **crm** |
+| 1 | 101 | CA | Gold | 2024-01-01 | 2024-02-01 | false | 2024-01-01 10:00 | crm |
+| 2 | 101 | NY | Gold | 2024-02-01 | NULL | true | 2024-02-01 14:30 | crm |
+
+**Facts can now safely reference SK=0** when the dimension doesn't exist:
+
+```yaml
+fact_orders:
+  order_id: 12345
+  customer_sk: 0      # ← Maps to unknown member
+  amount: 100.00
+```
+
+### Integration with Fact Pattern
+
+The [Fact Pattern](./fact.md) supports three **orphan handling strategies**:
+
+1. **`unknown`** (default): Map orphans to SK=0
+2. **`reject`**: Fail the pipeline if orphans exist
+3. **`quarantine`**: Write orphans to a quarantine table for investigation
+
+```yaml
+nodes:
+  - name: "fact_orders"
+    depends_on: [dim_customers, dim_products]
+    
+    pattern:
+      type: fact
+      params:
+        grain: [order_id]
+        dimensions:
+          - source_column: customer_id
+            dimension_table: dim_customers
+            dimension_key: customer_id
+            surrogate_key: customer_sk
+            scd2: true                    # Filter to is_current=true
+        orphan_handling: unknown          # ← Uses SK=0 for orphans
+```
+
+**See [Fact Pattern - Orphan Handling](./fact.md#orphan-handling) for complete details.**
+
+---
+
+## Grain Validation
+
+SCD2 dimensions have a specific **grain** (level of uniqueness) that you must maintain:
+
+**Grain Definition:** `(natural_key, is_current=true)` must be unique.
+
+### What This Means
+
+For each natural key, **only one record** can have `is_current=true` at any time. Historical records (closed versions) have `is_current=false`.
+
+**Valid SCD2 State:**
+
+| customer_sk | customer_id | address | valid_from | valid_to | is_current |
+|-------------|-------------|---------|------------|----------|------------|
+| 1 | 101 | CA | 2024-01-01 | 2024-02-01 | **false** |
+| 2 | 101 | NY | 2024-02-01 | NULL | **true** |
+
+_Note: Only one record per `customer_id` has `is_current=true`._
+
+**INVALID State (Duplicate Grain):**
+
+| customer_sk | customer_id | address | valid_from | valid_to | is_current |
+|-------------|-------------|---------|------------|----------|------------|
+| 1 | 101 | CA | 2024-01-01 | NULL | **true** |
+| 2 | 101 | NY | 2024-02-01 | NULL | **true** |
+
+_Problem: Two records for `customer_id=101` both have `is_current=true` (grain violation)._
+
+### How Odibi Prevents This
+
+The `scd2` transformer **automatically maintains grain uniqueness** by:
+1. Identifying changed records (comparing `track_cols`)
+2. Closing old versions (setting `is_current=false`, `valid_to=<new_effective_time>`)
+3. Opening new versions (setting `is_current=true`, `valid_to=NULL`)
+
+### Validating Grain in Fact Tables
+
+When using the [Fact Pattern](./fact.md), define the **fact table grain** to detect duplicates:
+
+```yaml
+nodes:
+  - name: "fact_orders"
+    pattern:
+      type: fact
+      params:
+        grain: [order_id, line_item_id]  # ← Validates uniqueness
+        dimensions:
+          - source_column: customer_id
+            dimension_table: dim_customers
+            dimension_key: customer_id
+            surrogate_key: customer_sk
+            scd2: true
+```
+
+**The Fact Pattern will raise an error if duplicates exist at the grain level.**
+
+### Manual Validation Query
+
+If you need to check for grain violations in an existing SCD2 dimension:
+
+```sql
+-- Find natural keys with multiple current records (grain violation)
+SELECT 
+  customer_id,
+  COUNT(*) as current_count
+FROM dim_customers
+WHERE is_current = true
+GROUP BY customer_id
+HAVING COUNT(*) > 1
+ORDER BY current_count DESC;
+```
+
+**Expected result:** 0 rows (no violations).
+
+---
+
+## Incremental Loading and Merge Pattern
+
+The `scd2` transformer is **NOT** an incremental merge pattern. It is designed for building complete dimension history from source data.
+
+### Key Differences
+
+| Feature | SCD2 Transformer | Merge Pattern |
+|---------|------------------|---------------|
+| **Purpose** | Track dimension history | Incrementally merge raw → silver |
+| **Write Mode** | `overwrite` (returns full history)¹ | `append` or `merge` |
+| **Use Case** | Dimension tables with history | Fact tables, raw data ingestion |
+| **Output** | Complete historical dataset | New/changed records only |
+| **Idempotency** | Re-runs rebuild full history | Merge by key prevents duplicates |
+
+**Notes:**
+1. `overwrite` mode is the typical pattern. The SCD2 transformer returns the complete history (all versions), which you then write back to replace the target. Advanced users can implement incremental SCD2 using Delta merge operations, but this is not the default behavior of the `scd2` transformer.
+
+### When to Use Each
+
+**Use SCD2 Transformer:**
+- Dimension tables where you need full history
+- Customer, product, employee dimensions
+- Tracking attribute changes over time
+
+**Use Merge Pattern:**
+- Incremental fact table loading
+- Deduplicating raw data into silver
+- Stateless transformations (no history tracking)
+
+**Example: Building dimensions with SCD2, facts with merge:**
+
+```yaml
+pipelines:
+  # 1. Build SCD2 dimension
+  - pipeline: build_dimensions
+    nodes:
+      - name: dim_customers
+        read:
+          connection: staging
+          path: customers
+        
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols: [name, address, tier]
+            target: warehouse.dim_customers
+            unknown_member: true
+        
+        write:
+          connection: warehouse
+          path: dim_customers
+          mode: overwrite          # ← Full history
+
+  # 2. Merge fact table incrementally
+  - pipeline: build_facts
+    nodes:
+      - name: fact_orders
+        read:
+          connection: raw
+          path: orders_incremental  # Only new/changed orders
+        
+        transformer: merge
+        params:
+          target: warehouse.fact_orders
+          keys: [order_id]
+          mode: insert              # Or upsert
+        
+        write:
+          connection: warehouse
+          path: fact_orders
+          mode: append              # ← Incremental
+```
+
+**See [Merge/Upsert Pattern](./merge_upsert.md) for complete details on incremental loading strategies.**
 
 ---
 
@@ -412,6 +776,15 @@ def validate_scd2_input(df, config):
 
 ## Next Steps
 
-- [Anti-Patterns Guide](./anti_patterns.md) - What NOT to do with SCD2
-- [Dimension Pattern](./dimension.md) - Full dimension table management
-- [Troubleshooting Guide](../troubleshooting.md) - General debugging
+### Related Documentation
+- **[Dimension Pattern](./dimension.md)** - Complete dimension table management with surrogate keys, audit columns, and unknown members
+- **[Fact Pattern](./fact.md)** - Build fact tables with automatic SK lookups and orphan handling
+- **[Merge/Upsert Pattern](./merge_upsert.md)** - Incremental loading strategies for raw → silver
+- **[Anti-Patterns Guide](./anti_patterns.md)** - What NOT to do with SCD2
+- **[Troubleshooting Guide](../troubleshooting.md)** - General debugging
+
+### Key Concepts Covered
+- ✅ **Audit Columns**: Track load timestamps and source systems
+- ✅ **Unknown Members**: Handle orphan FK references with SK=0
+- ✅ **Grain Validation**: Ensure uniqueness at (natural_key, is_current) level
+- ✅ **Incremental Strategies**: Use merge pattern for facts, SCD2 for dimensions
