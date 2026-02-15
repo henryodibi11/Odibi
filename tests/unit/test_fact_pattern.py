@@ -696,7 +696,9 @@ class TestFactPatternIsExpression:
 class TestFactPatternQuarantineParentDirectories:
     """Test that quarantine writer creates parent directories."""
 
-    def test_write_quarantine_pandas_creates_parent_dirs_csv(self, mock_engine, mock_config, tmp_path):
+    def test_write_quarantine_pandas_creates_parent_dirs_csv(
+        self, mock_engine, mock_config, tmp_path
+    ):
         """Test that _write_quarantine_pandas creates parent directories for CSV files."""
 
         mock_config.params = {}
@@ -731,13 +733,15 @@ class TestFactPatternQuarantineParentDirectories:
         # Verify directory was created and file exists
         assert nested_path.parent.exists(), "Parent directories should be created"
         assert nested_path.exists(), "Quarantine file should be created"
-        
+
         # Verify data was written correctly
         result_df = pd.read_csv(nested_path)
         assert len(result_df) == 2
         assert "order_id" in result_df.columns
 
-    def test_write_quarantine_pandas_creates_parent_dirs_parquet(self, mock_engine, mock_config, tmp_path):
+    def test_write_quarantine_pandas_creates_parent_dirs_parquet(
+        self, mock_engine, mock_config, tmp_path
+    ):
         """Test that _write_quarantine_pandas creates parent directories for Parquet files."""
 
         mock_config.params = {}
@@ -772,13 +776,15 @@ class TestFactPatternQuarantineParentDirectories:
         # Verify directory was created and file exists
         assert nested_path.parent.exists(), "Parent directories should be created"
         assert nested_path.exists(), "Quarantine file should be created"
-        
+
         # Verify data was written correctly
         result_df = pd.read_parquet(nested_path)
         assert len(result_df) == 2
         assert "order_id" in result_df.columns
 
-    def test_write_quarantine_pandas_bare_filename_no_crash(self, mock_engine, mock_config, tmp_path):
+    def test_write_quarantine_pandas_bare_filename_no_crash(
+        self, mock_engine, mock_config, tmp_path
+    ):
         """Test that _write_quarantine_pandas handles bare filenames without crashing."""
         import os
 

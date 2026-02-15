@@ -3,6 +3,7 @@
 import os
 import tempfile
 import warnings
+from datetime import timezone
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -488,3 +489,35 @@ class TestWriteAndRead:
             engine.write(df=df2, format="csv", path=path, connection=None, mode="append")
             result = engine.read(format="csv", path=path, connection=None)
             assert len(result) == 2
+
+
+class TestWriteTimestampTzAware:
+    """Test that _write_delta returns timezone-aware timestamps (issue #182)."""
+
+    def test_write_returns_tz_aware_timestamp(self):
+        """Returned commit info timestamp must be timezone-aware (UTC)."""
+        mock_dt_instance = Mock()
+        mock_dt_instance.version.return_value = 1
+        mock_dt_instance.history.return_value = [
+            {"timestamp": 1700000000000, "operation": "WRITE", "operationMetrics": {}}
+        ]
+
+        mock_delta_table = Mock(return_value=mock_dt_instance)
+        mock_write = Mock()
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "deltalake": Mock(
+                    DeltaTable=mock_delta_table,
+                    write_deltalake=mock_write,
+                ),
+            },
+        ):
+            engine = PandasEngine()
+            df = pd.DataFrame({"a": [1, 2]})
+            result = engine._write_delta(df, "/fake/path", "overwrite", {})
+
+        ts = result["timestamp"]
+        assert ts.tzinfo is not None
+        assert ts.tzinfo == timezone.utc

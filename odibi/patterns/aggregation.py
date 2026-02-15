@@ -1,5 +1,4 @@
 import time
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from odibi.context import EngineContext
@@ -339,60 +338,6 @@ class AggregationPattern(Pattern):
         else:  # max
             return self._merge_max(context, existing_df, new_agg_df, grain, measures)
 
-    def _load_existing_target(self, context: EngineContext, target: str):
-        """Load existing target table if it exists."""
-        if context.engine_type == EngineType.SPARK:
-            return self._load_existing_spark(context, target)
-        else:
-            return self._load_existing_pandas(context, target)
-
-    def _load_existing_spark(self, context: EngineContext, target: str):
-        spark = context.spark
-        try:
-            return spark.table(target)
-        except Exception:
-            try:
-                return spark.read.format("delta").load(target)
-            except Exception:
-                return None
-
-    def _load_existing_pandas(self, context: EngineContext, target: str):
-        import os
-
-        import pandas as pd
-
-        path = target
-        if hasattr(context, "engine") and context.engine:
-            if "." in path:
-                parts = path.split(".", 1)
-                conn_name = parts[0]
-                rel_path = parts[1]
-                if conn_name in context.engine.connections:
-                    try:
-                        path = context.engine.connections[conn_name].get_path(rel_path)
-                    except Exception:
-                        pass
-
-        if not os.path.exists(path):
-            return None
-
-        path_lower = str(path).lower()
-        try:
-            if path_lower.endswith(".parquet") or os.path.isdir(path):
-                return pd.read_parquet(path)
-            elif path_lower.endswith(".csv"):
-                return pd.read_csv(path)
-            elif path_lower.endswith(".json"):
-                return pd.read_json(path)
-            elif path_lower.endswith(".xlsx") or path_lower.endswith(".xls"):
-                return pd.read_excel(path)
-            elif path_lower.endswith(".feather") or path_lower.endswith(".arrow"):
-                return pd.read_feather(path)
-        except Exception:
-            return None
-
-        return None
-
     def _merge_replace(self, context: EngineContext, existing_df, new_df, grain: List[str]):
         """
         Replace strategy: New aggregates overwrite existing for matching grain keys.
@@ -620,38 +565,3 @@ class AggregationPattern(Pattern):
                     result[col] = merged[n_col]
 
             return result
-
-    def _add_audit_columns(self, context: EngineContext, df, audit_config: Dict):
-        """Add audit columns (load_timestamp, source_system) to the DataFrame.
-
-        Args:
-            context: Engine context containing engine type and configuration.
-            df: The DataFrame to add audit columns to.
-            audit_config: Configuration dictionary specifying which audit columns to add.
-                Keys: 'load_timestamp' (bool), 'source_system' (str).
-
-        Returns:
-            DataFrame with audit columns added as configured.
-        """
-        load_timestamp = audit_config.get("load_timestamp", False)
-        source_system = audit_config.get("source_system")
-
-        if context.engine_type == EngineType.SPARK:
-            from pyspark.sql import functions as F
-
-            if load_timestamp:
-                df = df.withColumn("load_timestamp", F.current_timestamp())
-            if source_system:
-                df = df.withColumn("source_system", F.lit(source_system))
-        else:
-            if load_timestamp or source_system:
-                df = df.copy()
-            if load_timestamp:
-                # Use timezone-aware timestamp for Delta Lake compatibility
-                from datetime import timezone
-
-                df["load_timestamp"] = datetime.now(timezone.utc)
-            if source_system:
-                df["source_system"] = source_system
-
-        return df

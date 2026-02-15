@@ -424,7 +424,7 @@ def _apply_soft_delete(
             df[soft_delete_col] = pd.Series([False] * len(df), dtype="bool")
 
             # Get full deleted rows from target
-            deleted_rows = prev_df.merge(deleted_keys, on=keys, how="inner")
+            deleted_rows = prev_df.merge(deleted_keys, on=keys, how="inner").copy()
             deleted_rows[soft_delete_col] = True
 
             # Align columns to match source schema

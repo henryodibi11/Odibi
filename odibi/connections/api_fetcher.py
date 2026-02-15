@@ -256,6 +256,9 @@ class ResponseExtractor:
             add_fields: Fields to add to each record (e.g., {"_fetched_at": "$now"})
             dict_to_list: If True and items_path resolves to a dict, extract dict
                          values as rows with keys preserved in '_key' field.
+                         Dict values become '_value' for scalars, or are merged for dicts.
+                         Example: {"cpu": 80, "mem": 60} becomes
+                         [{"_key": "cpu", "_value": 80}, {"_key": "mem", "_value": 60}]
 
         """
         self.items_path = items_path
