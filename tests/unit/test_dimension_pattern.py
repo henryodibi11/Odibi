@@ -390,6 +390,49 @@ class TestDimensionPatternUnknownMember:
         unknown_count = (result["customer_sk"] == 0).sum()
         assert unknown_count == 1
 
+    def test_unknown_member_timezone_consistency(self, mock_engine, mock_config, tmp_path):
+        """Test that unknown member has timezone-aware datetimes consistent with load_timestamp."""
+        from datetime import timezone
+
+        target_path = tmp_path / "dim_customer.parquet"
+
+        mock_config.params = {
+            "natural_key": "customer_id",
+            "surrogate_key": "customer_sk",
+            "scd_type": 2,  # Use SCD2 to include valid_from/valid_to columns
+            "target": str(target_path),
+            "unknown_member": True,
+            "audit": {"load_timestamp": True},  # Enable load_timestamp
+        }
+
+        source_df = pd.DataFrame({"customer_id": ["A", "B"], "name": ["Alice", "Bob"]})
+
+        context = create_pandas_context(source_df, mock_engine)
+
+        pattern = DimensionPattern(mock_engine, mock_config)
+        result = pattern.execute(context)
+
+        # Get the unknown member row
+        unknown = result[result["customer_sk"] == 0]
+        assert len(unknown) == 1
+
+        # Check that valid_from is timezone-aware
+        valid_from = unknown.iloc[0]["valid_from"]
+        assert valid_from.tzinfo is not None, "valid_from should be timezone-aware"
+        assert valid_from.tzinfo == timezone.utc, "valid_from should use UTC timezone"
+
+        # Check that load_timestamp is timezone-aware
+        load_timestamp = unknown.iloc[0]["load_timestamp"]
+        assert load_timestamp.tzinfo is not None, "load_timestamp should be timezone-aware"
+        assert load_timestamp.tzinfo == timezone.utc, "load_timestamp should use UTC timezone"
+
+        # Verify both datetimes are comparable (no naive/aware mismatch)
+        # This would raise TypeError if one is naive and one is aware
+        try:
+            _ = load_timestamp > valid_from
+        except TypeError as e:
+            pytest.fail(f"Cannot compare datetimes due to timezone mismatch: {e}")
+
 
 class TestDimensionPatternIntegration:
     """Integration tests for full dimension pattern workflows."""
