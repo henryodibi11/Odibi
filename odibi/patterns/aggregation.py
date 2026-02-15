@@ -244,7 +244,18 @@ class AggregationPattern(Pattern):
         measures: List[Dict],
         having: Optional[str],
     ):
-        """Perform the aggregation using SQL."""
+        """Perform the aggregation using SQL.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The source DataFrame to aggregate.
+            grain: List of column names to group by.
+            measures: List of measure definitions with aggregation functions.
+            having: Optional SQL HAVING clause filter for post-aggregation filtering.
+
+        Returns:
+            Aggregated DataFrame with grain columns and calculated measures.
+        """
         if context.engine_type == EngineType.SPARK:
             return self._aggregate_spark(context, df, grain, measures, having)
         else:
@@ -611,7 +622,17 @@ class AggregationPattern(Pattern):
             return result
 
     def _add_audit_columns(self, context: EngineContext, df, audit_config: Dict):
-        """Add audit columns (load_timestamp, source_system)."""
+        """Add audit columns (load_timestamp, source_system) to the DataFrame.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The DataFrame to add audit columns to.
+            audit_config: Configuration dictionary specifying which audit columns to add.
+                Keys: 'load_timestamp' (bool), 'source_system' (str).
+
+        Returns:
+            DataFrame with audit columns added as configured.
+        """
         load_timestamp = audit_config.get("load_timestamp", False)
         source_system = audit_config.get("source_system")
 
