@@ -853,9 +853,9 @@ def test_duckdb_upsert_preserves_created_col(tmp_path):
 
     # Row for key=1 should have original created_at (Jan 1), not source's (Feb 1)
     row1 = result[result["id"] == 1].iloc[0]
-    assert row1["created_at"] == datetime(
-        2024, 1, 1
-    ), f"created_at should be preserved: got {row1['created_at']}"
+    assert row1["created_at"] == datetime(2024, 1, 1), (
+        f"created_at should be preserved: got {row1['created_at']}"
+    )
     assert row1["value"] == "new_a"  # value should be updated
 
     # Row for key=2 should be unchanged

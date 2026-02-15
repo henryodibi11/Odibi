@@ -86,7 +86,7 @@ repos:
   # Ruff - Extremely fast Python linter and formatter (replaces flake8, pylint, isort, black)
   # ============================================================================
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.2.0  # Use latest stable Ruff version
+    rev: v0.14.6  # Match local ruff version
     hooks:
       # Lints Python code for errors, style issues, and best practices
       # Why: Catches bugs, enforces PEP 8, detects unused imports/variables

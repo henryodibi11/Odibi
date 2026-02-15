@@ -1375,9 +1375,9 @@ class Pipeline:
 
                     # Enrich with run health summary from story metadata
                     if self.story_generator._last_metadata:
-                        context[
-                            "run_health"
-                        ] = self.story_generator._last_metadata.get_run_health_summary()
+                        context["run_health"] = (
+                            self.story_generator._last_metadata.get_run_health_summary()
+                        )
 
                         # Enrich with data quality summary
                         quality = self.story_generator._last_metadata.get_data_quality_summary()
