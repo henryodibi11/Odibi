@@ -433,6 +433,34 @@ class TestDimensionPatternUnknownMember:
         except TypeError as e:
             pytest.fail(f"Cannot compare datetimes due to timezone mismatch: {e}")
 
+    def test_ensure_unknown_member_incompatible_dtypes(self, mock_engine, mock_config):
+        """Bug #183: astype must not crash on datetime/incompatible columns."""
+        mock_config.params = {
+            "natural_key": "nk",
+            "surrogate_key": "sk",
+            "scd_type": 2,
+            "track_cols": ["amount"],
+            "target": "test.parquet",
+            "unknown_member": True,
+            "audit": {"load_timestamp": False},
+        }
+
+        source_df = pd.DataFrame(
+            {
+                "nk": ["A"],
+                "amount": [100.0],
+                "event_ts": pd.to_datetime(["2024-01-01"], utc=True),
+            }
+        )
+
+        context = create_pandas_context(source_df, mock_engine)
+
+        pattern = DimensionPattern(mock_engine, mock_config)
+        result = pattern.execute(context)
+
+        assert len(result) >= 2
+        assert (result["sk"] == 0).any()
+
 
 class TestDimensionPatternIntegration:
     """Integration tests for full dimension pattern workflows."""

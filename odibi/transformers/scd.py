@@ -437,13 +437,14 @@ def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> 
 
             src_cols = [c for c in source_df.columns if c not in [end_col, flag_col]]
             cols_select = ", ".join([f"s.{c}" for c in src_cols])
+            null_check = " AND ".join([f"t.{k} IS NULL" for k in keys])
 
             sql_new_inserts = f"""
                 SELECT {cols_select}, NULL::TIMESTAMP as {end_col}, True as {flag_col}
                 FROM source_df s
                 LEFT JOIN (SELECT * FROM read_parquet('{path}') WHERE {flag_col} = True) t
                 ON {join_cond}
-                WHERE t.{keys[0]} IS NULL
+                WHERE {null_check}
             """
 
             sql_changed_inserts = f"""
@@ -577,6 +578,9 @@ def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> 
 
         # Prepare DataFrame of keys to close + new end date
         keys_to_close = changed_records[keys + [eff_col]].rename(columns={eff_col: "__new_end"})
+        keys_to_close = keys_to_close.sort_values("__new_end").drop_duplicates(
+            subset=keys, keep="last"
+        )
 
         # Merge original target with closing info
         # We use left merge to preserve all target rows

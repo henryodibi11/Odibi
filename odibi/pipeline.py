@@ -1345,14 +1345,54 @@ class Pipeline:
                     "event_type": event,
                 }
 
+                # Enrich with per-node details from results
+                node_details = []
+                for name, nr in results.node_results.items():
+                    node_details.append(
+                        {
+                            "node": name,
+                            "success": nr.success,
+                            "duration": round(nr.duration, 2),
+                            "rows_processed": nr.rows_processed,
+                            "error": str(nr.error) if nr.error else None,
+                            "error_type": type(nr.error).__name__ if nr.error else None,
+                        }
+                    )
+                context["node_details"] = node_details
+
+                # Add scoreboard counts
+                context["nodes_passed"] = len(results.completed)
+                context["nodes_failed"] = len(results.failed)
+                context["nodes_skipped"] = len(results.skipped)
+                context["nodes_total"] = (
+                    len(results.completed) + len(results.failed) + len(results.skipped)
+                )
+
                 # Enrich with story summary (row counts, story URL)
                 if event != "on_start" and self.generate_story:
                     story_summary = self.story_generator.get_alert_summary()
                     context.update(story_summary)
 
+                    # Enrich with run health summary from story metadata
+                    if self.story_generator._last_metadata:
+                        context[
+                            "run_health"
+                        ] = self.story_generator._last_metadata.get_run_health_summary()
+
+                        # Enrich with data quality summary
+                        quality = self.story_generator._last_metadata.get_data_quality_summary()
+                        if quality.get("has_quality_issues"):
+                            context["data_quality"] = quality
+
+                total = len(results.completed) + len(results.failed) + len(results.skipped)
                 msg = f"Pipeline '{self.config.pipeline}' {status}"
                 if results.failed:
-                    msg += f". Failed nodes: {', '.join(results.failed)}"
+                    msg += (
+                        f" ({len(results.completed)}/{total} nodes passed)."
+                        f" Failed: {', '.join(results.failed)}"
+                    )
+                elif total > 0:
+                    msg += f" ({total}/{total} nodes passed)"
 
                 send_alert(alert_config, msg, context)
 

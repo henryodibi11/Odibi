@@ -222,6 +222,49 @@ class TestLoadExistingPandas:
         result = pattern._load_existing_pandas(context, "/nonexistent/path.parquet")
         assert result is None
 
+    def test_load_existing_pandas_unrecognized_format_tries_parquet(
+        self, mock_engine, mock_config, tmp_path
+    ):
+        """Bug #193: unrecognized format should attempt parquet read."""
+        pattern = ConcretePattern(mock_engine, mock_config)
+
+        df = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        path = tmp_path / "data.dat"
+        df.to_parquet(path, index=False)
+
+        pandas_context = PandasContext()
+        context = EngineContext(
+            context=pandas_context,
+            df=pd.DataFrame(),
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+        result = pattern._load_existing_pandas(context, str(path))
+        assert result is not None
+        assert len(result) == 2
+        assert list(result.columns) == ["id", "val"]
+
+    def test_load_existing_pandas_unrecognized_format_unreadable_returns_none(
+        self, mock_engine, mock_config, tmp_path
+    ):
+        """Bug #193: truly unreadable file with unrecognized extension returns None."""
+        pattern = ConcretePattern(mock_engine, mock_config)
+
+        path = tmp_path / "data.dat"
+        path.write_text("not valid parquet data")
+
+        pandas_context = PandasContext()
+        context = EngineContext(
+            context=pandas_context,
+            df=pd.DataFrame(),
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+        result = pattern._load_existing_pandas(context, str(path))
+        assert result is None
+
 
 class TestPatternExecution:
     """Test Pattern execution behavior."""

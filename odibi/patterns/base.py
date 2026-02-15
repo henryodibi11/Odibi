@@ -211,11 +211,14 @@ class Pattern(ABC):
                 ctx.warning(
                     f"Unrecognized file format for target '{target}'. "
                     "Supported formats: parquet, csv, json, xlsx, xls, feather, arrow, pickle. "
-                    "Treating as initial load.",
+                    "Attempting to read as parquet.",
                     pattern=pattern_name,
                     target=target,
                 )
-                return None
+                try:
+                    return pd.read_parquet(path)
+                except Exception:
+                    return None
         except Exception as e:
             ctx.warning(
                 f"Could not load existing target '{target}': {e}. Treating as initial load.",

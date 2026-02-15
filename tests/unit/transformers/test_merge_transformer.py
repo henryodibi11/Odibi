@@ -14,6 +14,7 @@ from odibi.transformers.merge_transformer import (
     AuditColumnsConfig,
     MergeParams,
     MergeStrategy,
+    _merge_pandas,
     merge,
 )
 
@@ -773,3 +774,90 @@ class TestMergeLogging:
             # Verify connection resolution was logged
             debug_calls = [call[0][0] for call in mock_ctx.debug.call_args_list]
             assert any("Resolved merge target path" in str(call) for call in debug_calls)
+
+
+class TestMergeReturnValue:
+    """Test that merge returns the merged result, not the source (Bug #187)."""
+
+    def test_upsert_returns_merged_result_pandas_path(self, pandas_context):
+        """Verify _merge_pandas returns the merged DataFrame, not the source."""
+        source_df = pd.DataFrame({"id": [1, 2], "value": [10, 20]})
+        target_df = pd.DataFrame({"id": [2, 3], "value": [200, 300]})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "target.parquet")
+            target_df.to_parquet(path, index=False)
+
+            # Block duckdb import so we exercise the Pandas fallback path
+            with patch.dict("sys.modules", {"duckdb": None}):
+                result = _merge_pandas(
+                    context=EngineContext(pandas_context, source_df, EngineType.PANDAS),
+                    source_df=source_df,
+                    target=path,
+                    keys=["id"],
+                    strategy=MergeStrategy.UPSERT,
+                    audit_cols=None,
+                    params=MergeParams(target=path, keys=["id"]),
+                )
+
+            result_ids = sorted(result["id"].tolist())
+            assert result_ids == [1, 2, 3], f"Expected merged keys [1,2,3] but got {result_ids}"
+            # id=2 should have source value (upsert updates matched rows)
+            assert result.loc[result["id"] == 2, "value"].iloc[0] == 20
+
+
+def test_duckdb_upsert_preserves_created_col(tmp_path):
+    """Bug #197: DuckDB UPSERT must preserve target's created_col for updates."""
+    from datetime import datetime
+    from unittest.mock import MagicMock
+
+    # Target: key=1, created_at=Jan 1
+    target = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "value": ["old_a", "old_b"],
+            "created_at": [datetime(2024, 1, 1), datetime(2024, 1, 1)],
+            "updated_at": [datetime(2024, 1, 1), datetime(2024, 1, 1)],
+        }
+    )
+    path = str(tmp_path / "target.parquet")
+    target.to_parquet(path, index=False)
+
+    # Source: update key=1 with new value, created_at=Feb 1 (wrong, should be preserved)
+    source = pd.DataFrame(
+        {
+            "id": [1],
+            "value": ["new_a"],
+            "created_at": [datetime(2024, 2, 1)],
+            "updated_at": [datetime(2024, 2, 1)],
+        }
+    )
+
+    audit = MagicMock()
+    audit.created_col = "created_at"
+    audit.updated_col = "updated_at"
+
+    context = MagicMock()
+    context.engine = None
+    params = MergeParams(target=path, keys=["id"])
+
+    result = _merge_pandas(
+        context=context,
+        source_df=source,
+        target=path,
+        keys=["id"],
+        strategy=MergeStrategy.UPSERT,
+        audit_cols=audit,
+        params=params,
+    )
+
+    # Row for key=1 should have original created_at (Jan 1), not source's (Feb 1)
+    row1 = result[result["id"] == 1].iloc[0]
+    assert row1["created_at"] == datetime(
+        2024, 1, 1
+    ), f"created_at should be preserved: got {row1['created_at']}"
+    assert row1["value"] == "new_a"  # value should be updated
+
+    # Row for key=2 should be unchanged
+    row2 = result[result["id"] == 2].iloc[0]
+    assert row2["value"] == "old_b"

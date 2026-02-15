@@ -728,27 +728,35 @@ def _merge_pandas(
 
             query = ""
             if strategy == MergeStrategy.UPSERT:
-                # Logic: (Source) UNION ALL (Target WHERE NOT EXISTS in Source)
-                # Note: This replaces the whole row with Source version (Update)
-                # Special handling for created_col: If updating, preserve target's created_col?
-
-                # If created_col exists, we want to use Target's created_col for updates?
-                # But "Source" row has new created_col (current time) which is wrong for update.
-                # Ideally: SELECT s.* EXCEPT (created_col), t.created_col ...
-                # But 'EXCEPT' is post-projection.
-                # Simpler: Just overwrite. If user wants to preserve, they shouldn't overwrite it in source.
-                # BUT audit logic above set created_col in source.
-                # If we are strictly upserting, maybe we should handle it.
-                # For performance, let's stick to standard Upsert (Source wins).
-
-                query = f"""
-                    SELECT * FROM source_df
-                    UNION ALL
-                    SELECT * FROM read_parquet('{path}') t
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM source_df s WHERE {join_cond}
+                if audit_cols and audit_cols.created_col:
+                    created = audit_cols.created_col
+                    # For updates: use target's created_col; for inserts: use source's
+                    src_cols = ", ".join(
+                        f'COALESCE(t."{created}", s."{created}") AS "{created}"'
+                        if c == created
+                        else f's."{c}"'
+                        for c in source_df.columns
                     )
-                """
+                    query = f"""
+                        SELECT {src_cols}
+                        FROM source_df s
+                        LEFT JOIN read_parquet('{path}') t
+                        ON {join_cond}
+                        UNION ALL
+                        SELECT * FROM read_parquet('{path}') t
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM source_df s WHERE {join_cond}
+                        )
+                    """
+                else:
+                    query = f"""
+                        SELECT * FROM source_df
+                        UNION ALL
+                        SELECT * FROM read_parquet('{path}') t
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM source_df s WHERE {join_cond}
+                        )
+                    """
 
             elif strategy == MergeStrategy.APPEND_ONLY:
                 # Logic: (Source WHERE NOT EXISTS in Target) UNION ALL (Target)
@@ -784,7 +792,8 @@ def _merge_pandas(
                     os.remove(path)
                 os.rename(temp_path, path)
 
-            return source_df
+            final_df = pd.read_parquet(path)
+            return final_df
 
         except Exception as e:
             # Fallback to Pandas if DuckDB fails (e.g. complex types, memory)
@@ -859,4 +868,4 @@ def _merge_pandas(
     # Write back
     final_df.to_parquet(path, index=False)
 
-    return source_df
+    return final_df

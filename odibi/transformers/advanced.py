@@ -1282,7 +1282,7 @@ def _split_by_hour(context: EngineContext, params: SplitEventsByPeriodParams) ->
             WHERE _event_hours > 1
         ),
         multi_hour_adjusted AS (
-            SELECT * EXCEPT(_exploded_hour, _event_hours, _ts_start, _ts_end),
+            SELECT * EXCEPT(_exploded_hour, _event_hours, _ts_start, _ts_end, {start_col}, {end_col}),
                 CASE
                     WHEN date_trunc('hour', _ts_start) = _exploded_hour THEN _ts_start
                     ELSE _exploded_hour
@@ -1294,13 +1294,13 @@ def _split_by_hour(context: EngineContext, params: SplitEventsByPeriodParams) ->
             FROM multi_hour
         ),
         single_hour AS (
-            SELECT * EXCEPT(_event_hours, _ts_start, _ts_end){duration_expr}
+            SELECT * EXCEPT(_event_hours, _ts_start, _ts_end)
             FROM events_with_hours
             WHERE _event_hours = 1
         )
         SELECT *{duration_expr} FROM multi_hour_adjusted
         UNION ALL
-        SELECT * FROM single_hour
+        SELECT *{duration_expr} FROM single_hour
         """
         return context.sql(sql)
 
