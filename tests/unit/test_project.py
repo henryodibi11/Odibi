@@ -983,7 +983,7 @@ class TestProjectReadPolars:
 
     def test_read_csv_polars(self, tmp_path):
         """Reads .csv files via polars."""
-        import polars as pl
+        pl = pytest.importorskip("polars")
 
         csv_path = tmp_path / "data.csv"
         pd.DataFrame({"a": [1, 2], "b": [3, 4]}).to_csv(csv_path, index=False)
@@ -1030,7 +1030,7 @@ class TestProjectReadPolars:
 
     def test_read_parquet_polars(self, tmp_path):
         """Reads .parquet files via polars."""
-        import polars as pl
+        pl = pytest.importorskip("polars")
 
         pq_path = tmp_path / "data.parquet"
         pd.DataFrame({"x": [10, 20]}).to_parquet(pq_path, index=False)

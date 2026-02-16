@@ -49,6 +49,23 @@ def test_load_plugins_runs_without_error():
     load_plugins()
 
 
+def _mock_entry_points(eps):
+    """Create a mock entry_points callable that works on all Python versions."""
+    from unittest.mock import MagicMock
+
+    def mock_entry_points(**kwargs):
+        if kwargs:
+            # Python 3.10+ path: entry_points(group=...)
+            return eps
+        # Python 3.9 path: entry_points() returns object with .select()/.get()
+        result = MagicMock()
+        result.select.return_value = eps
+        result.get.return_value = eps
+        return result
+
+    return mock_entry_points
+
+
 def test_load_plugins_registers_entry_point(monkeypatch):
     import logging
     from unittest.mock import MagicMock
@@ -61,7 +78,7 @@ def test_load_plugins_registers_entry_point(monkeypatch):
 
     import odibi.plugins as plugins_mod
 
-    monkeypatch.setattr(plugins_mod, "entry_points", lambda **kwargs: [mock_ep])
+    monkeypatch.setattr(plugins_mod, "entry_points", _mock_entry_points([mock_ep]))
     load_plugins()
     assert get_connection_factory("test_conn") is _dummy_factory
 
@@ -80,7 +97,7 @@ def test_load_plugins_handles_failing_entry_point(monkeypatch):
 
     import odibi.plugins as plugins_mod
 
-    monkeypatch.setattr(plugins_mod, "entry_points", lambda **kwargs: [mock_ep])
+    monkeypatch.setattr(plugins_mod, "entry_points", _mock_entry_points([mock_ep]))
     load_plugins()
     assert get_connection_factory("bad_conn") is None
 

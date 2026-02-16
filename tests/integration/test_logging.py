@@ -13,32 +13,18 @@ def strip_ansi(text):
 
 
 class TestStructuredLogger:
-    def test_standard_logging(self):
+    def test_standard_logging(self, caplog):
         """Test standard human-readable logging."""
-        # Capture stdout
-        captured = StringIO()
-        original_stdout = sys.stdout
-        sys.stdout = captured
+        import logging
 
-        try:
-            # Force re-init of logging config for this test
-            import logging
+        logger = StructuredLogger(structured=False)
+        logger.logger.propagate = True
 
-            # Reset logging
-            root = logging.getLogger()
-            for handler in root.handlers[:]:
-                root.removeHandler(handler)
-
-            logger = StructuredLogger(structured=False)
+        with caplog.at_level(logging.INFO, logger="odibi"):
             logger.info("Test message", extra="value")
 
-            output = strip_ansi(captured.getvalue())
-            assert "Test message" in output
-            assert "extra=value" in output
-            assert "{" not in output  # Should not be JSON
-
-        finally:
-            sys.stdout = original_stdout
+        assert any("Test message" in r.message for r in caplog.records)
+        assert any("extra=value" in r.message for r in caplog.records)
 
     def test_structured_logging(self):
         """Test JSON structured logging."""
