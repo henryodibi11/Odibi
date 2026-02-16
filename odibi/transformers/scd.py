@@ -100,6 +100,11 @@ class SCD2Params(BaseModel):
         description="Use Delta Lake MERGE for Spark engine (faster for large tables). "
         "Falls back to full overwrite if target is not Delta format.",
     )
+    register_table: Optional[str] = Field(
+        default=None,
+        description="Register as Unity Catalog/metastore table after write "
+        "(e.g., 'silver.dim_customers'). Spark only.",
+    )
 
     @model_validator(mode="after")
     def check_target_or_connection(self):
@@ -195,6 +200,32 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
             f"Supported engines: SPARK, PANDAS. "
             f"Check your engine configuration or use a different transformer."
         )
+
+    # Register table in metastore if requested (Spark only)
+    if params.register_table and context.engine_type == EngineType.SPARK:
+        try:
+            spark = context.spark
+            if spark:
+                ctx.debug(
+                    "Registering table in metastore",
+                    table_name=params.register_table,
+                    location=target,
+                )
+                spark.sql(
+                    f"CREATE TABLE IF NOT EXISTS {params.register_table} "
+                    f"USING DELTA LOCATION '{target}'"
+                )
+                ctx.info(
+                    "Table registered successfully",
+                    table_name=params.register_table,
+                    location=target,
+                )
+        except Exception as e:
+            ctx.warning(
+                f"Failed to register table: {e}",
+                table_name=params.register_table,
+                error=str(e),
+            )
 
     rows_after = None
     try:

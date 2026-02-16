@@ -487,3 +487,63 @@ class TestSCD2PandasConnectionPathResolution:
 
         conn.get_path.assert_called_once_with("table")
         assert result.df.shape[0] == 1
+
+
+# ---------------------------------------------------------------------------
+# register_table
+# ---------------------------------------------------------------------------
+class TestSCD2RegisterTable:
+    """Tests for register_table parameter."""
+
+    def test_register_table_param_accepted(self):
+        """register_table should be accepted as a valid parameter."""
+        params = _base_params(register_table="silver.dim_customers")
+        assert params.register_table == "silver.dim_customers"
+
+    def test_register_table_default_is_none(self):
+        """register_table should default to None."""
+        params = _base_params()
+        assert params.register_table is None
+
+    def test_register_table_calls_spark_sql(self):
+        """On Spark, register_table should issue CREATE TABLE IF NOT EXISTS."""
+        mock_spark = MagicMock()
+        mock_context = MagicMock()
+        mock_context.spark = mock_spark
+        ctx = EngineContext(
+            context=mock_context,
+            df=MagicMock(),
+            engine_type=EngineType.SPARK,
+        )
+
+        params = SCD2Params(
+            target="dbfs:/mnt/silver/dim_customers",
+            keys=["id"],
+            track_cols=["status"],
+            effective_time_col="updated_at",
+            register_table="silver.dim_customers",
+        )
+
+        with patch("odibi.transformers.scd._scd2_spark") as mock_impl:
+            mock_impl.return_value = ctx
+            scd2(ctx, params)
+
+        mock_spark.sql.assert_called_once()
+        call_sql = mock_spark.sql.call_args[0][0]
+        assert "CREATE TABLE IF NOT EXISTS silver.dim_customers" in call_sql
+        assert "USING DELTA" in call_sql
+
+    def test_register_table_ignored_on_pandas(self):
+        """On Pandas, register_table should be silently ignored."""
+        src = pd.DataFrame(
+            {
+                "id": [1],
+                "status": ["a"],
+                "updated_at": [datetime(2024, 1, 1)],
+            }
+        )
+        ctx = _make_context(src)
+        params = _base_params(register_table="silver.dim_customers")
+        with patch("os.path.exists", return_value=False):
+            result = scd2(ctx, params)
+        assert result.df.shape[0] == 1

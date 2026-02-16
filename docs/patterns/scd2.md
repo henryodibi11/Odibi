@@ -90,6 +90,7 @@ nodes:
       keys: ["customer_id"]
       track_cols: ["address", "tier"]
       effective_time_col: "txn_date"
+      register_table: "silver.dim_customers"  # Optional: register in Unity Catalog
 ```
 
 ### Option 3: Legacy Full Overwrite (opt-out of Delta MERGE)
@@ -135,6 +136,10 @@ params:
   # Uses Delta MERGE on Spark — only updates changed rows
   # Falls back to full overwrite if target is not Delta
   use_delta_merge: true
+
+  # Optional: register as table in Unity Catalog/metastore (Spark only)
+  # Useful with connection + path to make data queryable via SQL
+  register_table: "silver.dim_customers"
 ```
 
 ### Customizing Column Names
@@ -176,6 +181,7 @@ params:
 | `current_flag_col` | string | No | "is_current" | Name of the current record flag column |
 | `delete_col` | string | No | None | Column indicating soft deletion (boolean) |
 | `use_delta_merge` | bool | No | true | Use Delta MERGE on Spark (falls back to full overwrite if not Delta) |
+| `register_table` | string | No | None | Register as Unity Catalog/metastore table after write (Spark only) |
 
 **Notes:**
 1. **Target specification**: Must provide **either** `target` **OR** both `connection` + `path`
