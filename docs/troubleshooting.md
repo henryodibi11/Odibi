@@ -921,7 +921,7 @@ config:
   effective_time_col: transaction_date  # Matches actual column name
 ```
 
-**Common gotcha:** The `effective_time_col` must exist in your **source** DataFrame. It gets used to set `effective_from` dates and may be dropped after processing.
+**Common gotcha:** The `effective_time_col` must exist in your **source** DataFrame. It gets renamed to `start_time_col` (default: `valid_from`) in the target.
 
 **How to prevent it next time:**
 - Print `df.columns` right before the SCD2 pattern runs

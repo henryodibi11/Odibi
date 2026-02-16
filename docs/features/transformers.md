@@ -496,7 +496,8 @@ params:
   target: "silver.dim_customers"  # Registered table name
   keys: ["customer_id"]           # Entity keys
   track_cols: ["address", "tier"] # Columns to monitor for changes
-  effective_time_col: "txn_date"  # When change occurred
+  effective_time_col: "txn_date"  # Source column (when change occurred)
+  start_time_col: "valid_from"    # Renamed from effective_time_col in target
   end_time_col: "valid_to"        # End timestamp column
   current_flag_col: "is_current"  # Current record flag
 ```
@@ -516,10 +517,10 @@ params:
 **How SCD2 Works:**
 1. **Match**: Finds existing records using `keys`
 2. **Compare**: Checks `track_cols` to detect changes
-3. **Close**: Updates old record's `end_time_col` if changed
-4. **Insert**: Adds new record with open-ended validity
+3. **Close**: Updates old record's `valid_to` if changed
+4. **Insert**: Adds new record with `valid_from` (renamed from `effective_time_col`), `valid_to = NULL`
 
-**Note:** SCD2 returns a DataFrame. You must add a `write:` block with `mode: overwrite`.
+**Note:** SCD2 is self-contained — it writes directly to the target table on all engines. No `write:` block is needed.
 
 ### Merge Transformer
 

@@ -114,59 +114,61 @@ The `AGENTS.md` file in the odibi root provides framework guidance.
 | **fetch** | Fetch web pages | npx (auto-downloads) |
 | **context7** | Up-to-date library docs | npx (auto-downloads) |
 
-### odibi-knowledge Tools (21 total)
+### odibi-knowledge Tools (15 total)
 
-**Core Tools:**
+**Bootstrap Tool:**
+| Tool | Description |
+|------|-------------|
+| `bootstrap_context` | **CALL FIRST** - Auto-gather full project context |
+
+**Discovery Tools:**
+| Tool | Description |
+|------|-------------|
+| `map_environment` | Scout a connection to understand what exists |
+| `profile_source` | Self-correcting profiler for files/tables |
+| `profile_folder` | Batch profile all files in a folder |
+
+**Knowledge Tools:**
 | Tool | Description |
 |------|-------------|
 | `list_transformers` | List all 52+ transformers |
 | `list_patterns` | List all 6 DWH patterns |
 | `list_connections` | List all connection types |
 | `explain(name)` | Get detailed docs for any feature |
-
-**Code Generation Tools:**
-| Tool | Description |
-|------|-------------|
-| `get_transformer_signature` | Get exact function signature for custom transformers |
-| `get_yaml_structure` | Get exact YAML pipeline structure |
-| `generate_transformer` | Generate complete transformer Python code |
-| `generate_pipeline_yaml` | Generate complete pipeline YAML config |
-| `validate_yaml` | Validate YAML before saving |
-
-**Decision Support Tools:**
-| Tool | Description |
-|------|-------------|
-| `suggest_pattern` | Recommend the right pattern for your use case |
-| `get_engine_differences` | Spark vs Pandas vs Polars SQL differences |
 | `get_validation_rules` | All validation rule types with examples |
 
-**Documentation Tools:**
+**Validation & Debug Tools:**
 | Tool | Description |
 |------|-------------|
-| `get_deep_context` | Get full ODIBI_DEEP_CONTEXT.md (2,300+ lines) |
-| `get_doc(path)` | Get specific doc file |
-| `list_docs(category)` | List available documentation |
-| `search_docs(query)` | Search all documentation |
-| `get_example(name)` | Get working example for any pattern/transformer |
-
-**Debugging Tools:**
-| Tool | Description |
-|------|-------------|
+| `validate_yaml` | Validate YAML before saving |
 | `diagnose_error` | Diagnose odibi errors and get fix suggestions |
-| `query_codebase(question)` | Semantic search (requires `mcp-rag`) |
-| `reindex` | Rebuild the semantic search index |
-| `get_index_stats` | Check index status |
+
+**Story/Sample Tools:**
+| Tool | Description |
+|------|-------------|
+| `story_read` | Get pipeline run status |
+| `node_sample` | Get node output sample |
+| `node_failed_rows` | Get validation failures |
+
+**Lineage Tools:**
+| Tool | Description |
+|------|-------------|
+| `lineage_graph` | Full pipeline lineage graph |
+
+> **Note:** For YAML structure reference, see `docs/reference/yaml_schema.md`. For codebase questions, use grep on the `docs/` folder.
 
 ## Usage Tips
 
 ### Prompt Examples
 
 ```
-# Get transformer signature before writing custom transformer
-"Show me the exact signature for creating a custom odibi transformer"
+# Explore data before building pipelines
+"Use map_environment to see what's in my connection"
+"Profile the customers.csv file"
 
-# Get YAML structure before writing config
-"What's the exact YAML structure for an odibi pipeline?"
+# Get pattern/transformer info before writing YAML
+"What patterns are available for tracking historical changes?"
+"Explain the scd2 pattern"
 
 # Use context7 for library docs
 "How do I use PySpark window functions? use context7"
@@ -181,7 +183,8 @@ Add to your AI assistant's rules to auto-use odibi-knowledge:
 
 ```
 When working with odibi code or YAML configs, always use the odibi-knowledge
-MCP tools first: get_transformer_signature, get_yaml_structure, list_transformers.
+MCP tools first: list_transformers, list_patterns, explain, validate_yaml.
+Reference docs/reference/yaml_schema.md for YAML structure.
 ```
 
 ## Troubleshooting

@@ -589,3 +589,192 @@ def test_window_calculation(pandas_context):
     it_rows = result[result["dept"] == "IT"].sort_values("age", ascending=False)
     assert it_rows.iloc[0]["age_rank"] == 1  # David
     assert it_rows.iloc[1]["age_rank"] == 2  # Bob
+
+
+# -------------------------------------------------------------------------
+# New Coverage Tests
+# -------------------------------------------------------------------------
+
+
+def test_regex_replace(pandas_context):
+    df = pandas_context.df.copy()
+    df["phone"] = ["123-4567890", "555x1234", "0001112222", "9998887777", "111y2223333"]
+    pandas_context.df = df
+
+    params = advanced.RegexReplaceParams(column="phone", pattern="[^0-9]", replacement="")
+    result = advanced.regex_replace(pandas_context, params).df
+
+    assert result.iloc[0]["phone"] == "1234567890"
+    assert result.iloc[2]["phone"] == "0001112222"
+    assert result.iloc[3]["phone"] == "9998887777"
+
+
+def test_unpack_struct(pandas_context):
+    df = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "info": [{"x": 10, "y": 20}, {"x": 30, "y": 40}, {"x": 50, "y": 60}],
+        }
+    )
+    pandas_context.df = df
+
+    params = advanced.UnpackStructParams(column="info")
+    result = advanced.unpack_struct(pandas_context, params).df
+
+    assert "x" in result.columns
+    assert "y" in result.columns
+    assert result.iloc[0]["x"] == 10
+    assert result.iloc[2]["y"] == 60
+
+
+def test_normalize_json(pandas_context):
+    df = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "data": [{"a": 1, "b": {"c": 2}}, {"a": 3, "b": {"c": 4}}],
+        }
+    )
+    pandas_context.df = df
+
+    params = advanced.NormalizeJsonParams(column="data", sep="_")
+    result = advanced.normalize_json(pandas_context, params).df
+
+    assert "a" in result.columns
+    assert "b_c" in result.columns
+    assert result.iloc[0]["a"] == 1
+    assert result.iloc[1]["b_c"] == 4
+
+
+def test_sessionize(pandas_context):
+    df = pd.DataFrame(
+        {
+            "user_id": ["u1", "u1", "u1", "u2", "u2"],
+            "event_time": pd.to_datetime(
+                [
+                    "2024-01-01 10:00:00",
+                    "2024-01-01 10:05:00",
+                    "2024-01-01 11:00:00",
+                    "2024-01-01 10:00:00",
+                    "2024-01-01 10:10:00",
+                ]
+            ),
+        }
+    )
+    pandas_context.df = df
+
+    params = advanced.SessionizeParams(
+        timestamp_col="event_time",
+        user_col="user_id",
+        threshold_seconds=600,
+        session_col="session_id",
+    )
+    result = advanced.sessionize(pandas_context, params).df
+
+    u1 = result[result["user_id"] == "u1"].sort_values("event_time")
+    assert u1.iloc[0]["session_id"] == u1.iloc[1]["session_id"]
+    assert u1.iloc[2]["session_id"] != u1.iloc[0]["session_id"]
+
+    u2 = result[result["user_id"] == "u2"].sort_values("event_time")
+    assert u2.iloc[0]["session_id"] == u2.iloc[1]["session_id"]
+
+
+def test_split_events_by_period_day(pandas_context):
+    df = pd.DataFrame(
+        {
+            "event": ["A"],
+            "start": [pd.Timestamp("2024-01-01 10:00:00")],
+            "end": [pd.Timestamp("2024-01-03 14:00:00")],
+        }
+    )
+    pandas_context.df = df
+
+    params = advanced.SplitEventsByPeriodParams(
+        start_col="start", end_col="end", period="day", duration_col="dur_min"
+    )
+    result = advanced.split_events_by_period(pandas_context, params).df
+
+    assert len(result) == 3
+    assert "dur_min" in result.columns
+
+
+def test_split_events_by_period_hour(pandas_context):
+    df = pd.DataFrame(
+        {
+            "event": ["B"],
+            "start": [pd.Timestamp("2024-01-01 10:30:00")],
+            "end": [pd.Timestamp("2024-01-01 12:45:00")],
+        }
+    )
+    pandas_context.df = df
+
+    params = advanced.SplitEventsByPeriodParams(
+        start_col="start", end_col="end", period="hour", duration_col="dur_min"
+    )
+    result = advanced.split_events_by_period(pandas_context, params).df
+
+    assert len(result) == 3
+    assert "dur_min" in result.columns
+
+
+def test_split_events_by_period_shift(pandas_context):
+    df = pd.DataFrame(
+        {
+            "event": ["C"],
+            "start": [pd.Timestamp("2024-01-01 07:00:00")],
+            "end": [pd.Timestamp("2024-01-01 15:00:00")],
+        }
+    )
+    pandas_context.df = df
+
+    shifts = [
+        advanced.ShiftDefinition(name="Morning", start="06:00", end="14:00"),
+        advanced.ShiftDefinition(name="Afternoon", start="14:00", end="22:00"),
+    ]
+    params = advanced.SplitEventsByPeriodParams(
+        start_col="start",
+        end_col="end",
+        period="shift",
+        duration_col="dur_min",
+        shifts=shifts,
+    )
+    result = advanced.split_events_by_period(pandas_context, params).df
+
+    assert len(result) == 2
+    assert set(result["shift_name"]) == {"Morning", "Afternoon"}
+    assert "dur_min" in result.columns
+
+
+def test_geocode_stub(pandas_context):
+    params = advanced.GeocodeParams(address_col="name", output_col="coords")
+    result = advanced.geocode(pandas_context, params)
+
+    assert result.df.equals(pandas_context.df)
+
+
+def test_dict_mapping_with_default(pandas_context):
+    mapping = {"HR": "Human Resources"}
+    params = advanced.DictMappingParams(
+        column="dept", mapping=mapping, output_column="dept_full", default="Other"
+    )
+    result = advanced.dict_based_mapping(pandas_context, params).df
+
+    assert result.iloc[0]["dept_full"] == "Human Resources"
+    assert result.iloc[1]["dept_full"] == "Other"
+
+
+def test_explode_outer(pandas_context):
+    params = advanced.ExplodeParams(column="tags", outer=True)
+    result = advanced.explode_list_column(pandas_context, params).df
+
+    assert len(result) == 8
+    has_none = result["tags"].isna().any()
+    assert has_none
+
+
+def test_hash_columns_sha256(pandas_context):
+    params = advanced.HashParams(columns=["name"], algorithm="sha256")
+    result = advanced.hash_columns(pandas_context, params).df
+
+    val = result.iloc[0]["name"]
+    assert len(val) == 64
+    assert val != " Alice "

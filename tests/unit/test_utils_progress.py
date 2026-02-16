@@ -149,3 +149,185 @@ def test_print_phase_timing_report_no_aggregate(pipeline_progress_plain, capsys)
     final_out = capsys.readouterr().out
     # Since no phase timings exist, there should be no change.
     assert final_out == ""
+
+
+@pytest.fixture
+def pipeline_progress_plain_with_layers(monkeypatch):
+    monkeypatch.setattr("odibi.utils.progress.is_rich_available", lambda: False)
+    monkeypatch.setattr("odibi.utils.progress._is_notebook_environment", lambda: False)
+    return PipelineProgress(
+        "layered_pipeline",
+        ["node1", "node2", "node3"],
+        engine="pandas",
+        layers=[["node1"], ["node2", "node3"]],
+    )
+
+
+class TestFormatDuration:
+    def test_none(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_duration(None) == "-"
+
+    def test_sub_second(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_duration(0.5) == "500ms"
+
+    def test_seconds(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_duration(2.345) == "2.35s"
+
+    def test_exactly_one(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_duration(1.0) == "1.00s"
+
+
+class TestFormatRows:
+    def test_none(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_rows(None) == "-"
+
+    def test_small(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_rows(50) == "50"
+
+    def test_thousands(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_rows(5000) == "5.0K"
+
+    def test_millions(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_rows(2000000) == "2.0M"
+
+
+class TestFormatStatusPlain:
+    def test_pending(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status_plain(NodeStatus.PENDING) == "○ pending"
+
+    def test_running(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status_plain(NodeStatus.RUNNING) == "◉ running"
+
+    def test_success(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status_plain(NodeStatus.SUCCESS) == "✓ success"
+
+    def test_failed(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status_plain(NodeStatus.FAILED) == "✗ failed"
+
+    def test_skipped(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status_plain(NodeStatus.SKIPPED) == "⏭ skipped"
+
+    def test_unknown(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status_plain("unknown") == "unknown"
+
+
+class TestFormatStatus:
+    def test_pending(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status(NodeStatus.PENDING) == "[dim]○ pending[/dim]"
+
+    def test_running(self, pipeline_progress_plain):
+        assert (
+            pipeline_progress_plain._format_status(NodeStatus.RUNNING)
+            == "[yellow]◉ running[/yellow]"
+        )
+
+    def test_success(self, pipeline_progress_plain):
+        assert (
+            pipeline_progress_plain._format_status(NodeStatus.SUCCESS) == "[green]✓ success[/green]"
+        )
+
+    def test_failed(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status(NodeStatus.FAILED) == "[red]✗ failed[/red]"
+
+    def test_skipped(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status(NodeStatus.SKIPPED) == "[dim]⏭ skipped[/dim]"
+
+    def test_unknown(self, pipeline_progress_plain):
+        assert pipeline_progress_plain._format_status("unknown") == "unknown"
+
+
+class TestLayersInit:
+    def test_node_to_layer_mapping(self, pipeline_progress_plain_with_layers):
+        pp = pipeline_progress_plain_with_layers
+        assert pp._node_to_layer == {"node1": 0, "node2": 1, "node3": 1}
+
+    def test_layers_stored(self, pipeline_progress_plain_with_layers):
+        pp = pipeline_progress_plain_with_layers
+        assert pp.layers == [["node1"], ["node2", "node3"]]
+
+
+class TestUpdatePlainWithLayers:
+    def test_wave_header_prints(self, pipeline_progress_plain_with_layers, capsys):
+        pp = pipeline_progress_plain_with_layers
+        pp.start()
+        capsys.readouterr()
+
+        pp.update_node("node1", NodeStatus.SUCCESS, duration=1.0, rows=100)
+        out1 = capsys.readouterr().out
+        assert "Wave 1" in out1
+        assert "(parallel)" not in out1
+
+        pp.update_node("node2", NodeStatus.SUCCESS, duration=0.5, rows=200)
+        out2 = capsys.readouterr().out
+        assert "Wave 2" in out2
+        assert "(parallel)" in out2
+
+        pp.update_node("node3", NodeStatus.RUNNING, duration=0.3, rows=50)
+        out3 = capsys.readouterr().out
+        assert "Wave" not in out3
+
+
+class TestFinishPlain:
+    def test_success_output(self, pipeline_progress_plain, capsys):
+        pipeline_progress_plain.start()
+        capsys.readouterr()
+        pipeline_progress_plain._finish_plain(completed=2, failed=0, skipped=0, duration=3.14)
+        out = capsys.readouterr().out
+        assert "SUCCESS" in out
+        assert "3.14s" in out
+        assert "Completed: 2" in out
+        assert "Failed: 0" in out
+
+    def test_failure_output(self, pipeline_progress_plain, capsys):
+        pipeline_progress_plain.start()
+        capsys.readouterr()
+        pipeline_progress_plain._finish_plain(completed=1, failed=1, skipped=0, duration=2.0)
+        out = capsys.readouterr().out
+        assert "FAILED" in out
+
+
+class TestPrintPhaseTimingPlain:
+    def test_full_output(self, pipeline_progress_plain, capsys):
+        aggregate = {"load": 1500.0, "transform": 800.0, "validate": 200.0}
+        total_ms = 2500.0
+        pipeline_progress_plain._print_phase_timing_plain(aggregate, total_ms)
+        out = capsys.readouterr().out
+        assert "Phase Bottlenecks" in out
+        assert "load: 1.50s (60.0% of pipeline)" in out
+        assert "transform: 800ms (32.0% of pipeline)" in out
+        assert "validate: 200ms (8.0% of pipeline)" in out
+
+    def test_zero_total(self, pipeline_progress_plain, capsys):
+        aggregate = {"load": 0.0}
+        pipeline_progress_plain._print_phase_timing_plain(aggregate, 0.0)
+        out = capsys.readouterr().out
+        assert "0.0%" in out
+
+
+class TestPrintPhaseTimingReportFallback:
+    def test_fallback_to_sum(self, monkeypatch, capsys):
+        monkeypatch.setattr("odibi.utils.progress.is_rich_available", lambda: False)
+        monkeypatch.setattr("odibi.utils.progress._is_notebook_environment", lambda: False)
+        pp = PipelineProgress("test", ["n1"], engine="pandas")
+        pp.update_node(
+            "n1", NodeStatus.SUCCESS, duration=1.0, rows=10, phase_timings={"a": 300.0, "b": 200.0}
+        )
+        pp.print_phase_timing_report()
+        out = capsys.readouterr().out
+        assert "a: 300ms (60.0% of pipeline)" in out
+        assert "b: 200ms (40.0% of pipeline)" in out
+
+
+class TestFinishStopsLive:
+    def test_live_stopped(self, monkeypatch, pipeline_progress_rich):
+        stopped = []
+
+        class FakeLive:
+            def stop(self):
+                stopped.append(True)
+
+        pipeline_progress_rich._live = FakeLive()
+        monkeypatch.setattr(pipeline_progress_rich, "_finish_rich", lambda *a: None)
+        pipeline_progress_rich.finish(completed=2, failed=0, skipped=0)
+        assert len(stopped) == 1
+        assert pipeline_progress_rich._live is None

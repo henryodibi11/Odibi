@@ -33,7 +33,7 @@ When you call `https://api.fda.gov/food/enforcement.json?limit=2`, you get:
     },
     {
       "recall_number": "F-0865-2017",
-      "status": "Terminated",
+      "status": "Terminated", 
       "city": "Millbrae",
       "state": "CA",
       "classification": "Class II"
@@ -94,14 +94,14 @@ pipelines:
           options:
             params:                      # Query parameters to send
               limit: 1000
-
+            
             pagination:                  # How to get all pages
               type: offset_limit
               offset_param: skip
               limit_param: limit
               limit: 1000
               max_pages: 10
-
+            
             response:                    # Where to find the data in JSON
               items_path: results
 
@@ -201,7 +201,8 @@ options:
     limit_param: limit        # Parameter name for limit (default: "limit")
     limit: 1000               # Records per page
     max_pages: 100            # Safety limit
-    stop_on_empty: true       # Stop when no more results
+    stop_on_empty: true       # Stop when no more results (default: true)
+    start_offset: 0           # Starting offset value (default: 0, use 1 for 1-indexed APIs)
 ```
 
 ### 2. Page Number
@@ -427,26 +428,31 @@ params:
 
 ## HTTP Settings
 
-Configure retries and rate limiting:
+Configure timeouts, retries, and rate limiting:
 
 ```yaml
 options:
-  retry:
-    max_retries: 5                # Maximum retry attempts
-    backoff_factor: 2.0           # Exponential backoff multiplier
-    retry_codes:                  # HTTP codes to retry
-      - 429                       # Too Many Requests
-      - 500                       # Server Error
-      - 502                       # Bad Gateway
-      - 503                       # Service Unavailable
-      - 504                       # Gateway Timeout
-
-  rate_limit:
-    requests_per_second: 2        # Max requests per second (optional)
-
-  # Optional HTTP settings
   http:
-    timeout_s: 60                 # Request timeout in seconds
+    timeout_s: 60                 # Request timeout in seconds (default: 30)
+    
+    retries:
+      max_attempts: 5             # Total attempts including first (default: 3)
+      backoff:
+        base_s: 1.0               # Initial wait between retries (default: 1.0)
+        max_s: 60.0               # Maximum wait time (default: 60.0)
+        exponential_base: 2.0     # Backoff multiplier (default: 2.0) - delay = base_s * (exponential_base ^ attempt)
+      retry_on_status:            # HTTP codes to retry (defaults shown below)
+        - 429                     # Too Many Requests
+        - 500                     # Server Error
+        - 502                     # Bad Gateway
+        - 503                     # Service Unavailable
+        - 504                     # Gateway Timeout
+    
+    rate_limit:
+      type: auto                  # Respects Retry-After headers (default)
+      # OR fixed rate:
+      # type: fixed
+      # requests_per_second: 2
 ```
 
 ## Query Parameters
@@ -797,8 +803,10 @@ When working with a new API, you need to find:
 - The API is rate limiting you
 - Add rate limiting config:
   ```yaml
-  rate_limit:
-    requests_per_second: 1
+  http:
+    rate_limit:
+      type: fixed
+      requests_per_second: 1
   ```
 
 ### No data returned
@@ -812,9 +820,8 @@ When working with a new API, you need to find:
 ### "Connection timed out"
 - Increase timeout:
   ```yaml
-  options:
-    http:
-      timeout_s: 120
+  http:
+    timeout_s: 120
   ```
 
 ## Quick Reference
@@ -831,27 +838,30 @@ read:
     request_body:              # JSON body for POST/PUT/PATCH requests
       filters:
         status: ["active"]
-
+    
     pagination:
       type: offset_limit       # offset_limit | page_number | cursor | link_header | none
       # ... pagination-specific options
       max_pages: 100           # Safety limit
       start_offset: 0          # Starting offset (use 1 for 1-indexed APIs)
-
+    
     response:
       items_path: results      # Dotted path to data array
       add_fields:              # Optional fields to add
         _fetched_at: "${date:now}"
-
-    retry:
-      max_retries: 5           # Maximum retry attempts
-      backoff_factor: 2.0      # Exponential backoff multiplier
-
-    rate_limit:
-      requests_per_second: 2   # Optional rate limiting
-
+    
     http:
-      timeout_s: 60            # Request timeout
+      timeout_s: 60            # Request timeout (default: 30)
+      retries:
+        max_attempts: 5        # Total attempts (default: 3)
+        backoff:
+          base_s: 1.0          # Initial delay (default: 1.0)
+          max_s: 60.0          # Max delay (default: 60.0)
+          exponential_base: 2.0  # Backoff multiplier (default: 2.0)
+        retry_on_status: [429, 500, 502, 503, 504]  # HTTP codes to retry
+      rate_limit:
+        type: auto             # auto (default) | fixed
+        # requests_per_second: 2  # For type: fixed
 ```
 
 ## POST APIs (Advanced)

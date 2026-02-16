@@ -165,7 +165,7 @@ These patterns are built on the **Odibi Architecture Manifesto**:
 | High Water Mark | Source + Timestamp | Raw | `append` | Yes (filtered by timestamp) |
 | Smart Read | Source + Timestamp | Raw | `append` | Yes (auto-managed) |
 | Merge/Upsert | Raw (micro-batch) | Silver | `merge` | Yes (by key) |
-| SCD Type 2 | Raw (micro-batch) | Silver/Gold | `overwrite` | Yes (full history) |
+| SCD Type 2 | Raw (micro-batch) | Silver/Gold | N/A (self-contained) | Yes (full history) |
 | Windowed Reprocess | Silver (window) | Gold | `overwrite` (partition) | Yes (recalculated) |
 | Skip If Unchanged | Snapshot Source | Raw | `append` (conditional) | Yes (hash-based) |
 | **Dimension** | Staging | Gold (dim_*) | `overwrite` | Yes (SK-based) |

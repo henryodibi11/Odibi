@@ -61,12 +61,7 @@ pipelines:
               - tier
               - city
             unknown_member: true  # Creates SK=0 for orphan handling
-        
-        write:
-          connection: silver
-          format: delta
-          path: dim_customer
-          mode: overwrite  # Required for SCD2
+        # No write: block needed — SCD2 writes directly to the target table
 ```
 
 ---

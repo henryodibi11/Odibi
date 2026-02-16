@@ -8,7 +8,7 @@ The **SCD Type 2** pattern allows you to track the full history of changes for a
 "I need to know what the customer's address was *last month*, not just where they live now."
 
 **The Solution:**
-Each record has an "effective window" (`effective_time` to `end_time`) and a flag (`is_current`) indicating if it is the latest version.
+Each record has an "effective window" (`valid_from` to `valid_to`) and a flag (`is_current`) indicating if it is the latest version.
 
 ### Visual Example
 
@@ -22,17 +22,19 @@ Each record has an "effective window" (`effective_time` to `end_time`) and a fla
 **Target Table (Before):**
 *Customer 101 lived in CA since Jan 1st.*
 
-| customer_id | address | tier | txn_date   | valid_to | is_active |
-|-------------|---------|------|------------|----------|-----------|
-| 101         | CA      | Gold | 2024-01-01 | NULL     | true      |
+| customer_id | address | tier | valid_from | valid_to | is_current |
+|-------------|---------|------|------------|----------|------------|
+| 101         | CA      | Gold | 2024-01-01 | NULL     | true       |
 
 **Target Table (After SCD2):**
-*Old record CLOSED (valid_to set). New record OPEN (is_active=true).*
+*Old record CLOSED (valid_to set). New record OPEN (is_current=true).*
 
-| customer_id | address | tier | txn_date   | valid_to   | is_active |
-|-------------|---------|------|------------|------------|-----------|
-| 101         | CA      | Gold | 2024-01-01 | 2024-02-01 | false     |
-| 101         | NY      | Gold | 2024-02-01 | NULL       | true      |
+| customer_id | address | tier | valid_from | valid_to   | is_current |
+|-------------|---------|------|------------|------------|------------|
+| 101         | CA      | Gold | 2024-01-01 | 2024-02-01 | false      |
+| 101         | NY      | Gold | 2024-02-01 | NULL       | true       |
+
+> **Note:** The source column `txn_date` is automatically renamed to `valid_from` in the target, giving each version a complete time window `[valid_from, valid_to)`.
 
 ---
 
@@ -40,7 +42,11 @@ Each record has an "effective window" (`effective_time` to `end_time`) and a fla
 
 Use the `scd2` transformer in your pipeline node.
 
-### Option 1: Using Table Name
+### Option 1: Spark + Delta (Recommended — uses Delta MERGE)
+
+On Spark with Delta tables, SCD2 uses an **optimized Delta MERGE** by default.
+The MERGE only touches changed rows instead of rewriting the entire table,
+making it dramatically faster for large tables with small change sets.
 
 ```yaml
 nodes:
@@ -49,16 +55,15 @@ nodes:
 
     transformer: "scd2"
     params:
-      target: "silver.dim_customers"   # Registered table name
+      target: "silver.dim_customers"   # Delta table name
       keys: ["customer_id"]            # Unique ID
       track_cols: ["address", "tier"]  # Changes here trigger a new version
       effective_time_col: "txn_date"   # When the change happened
-
-    write:
-      table: "silver.dim_customers"
-      format: "delta"
-      mode: "overwrite"                # Important: SCD2 returns FULL history
+      # use_delta_merge: true          # Default — no write block needed!
 ```
+
+> **No `write:` block needed!** SCD2 writes directly to the target table on all engines.
+> This includes first run — the transformer creates the table automatically.
 
 ### Option 2: Using Connection + Path (ADLS)
 
@@ -74,20 +79,26 @@ nodes:
       keys: ["customer_id"]
       track_cols: ["address", "tier"]
       effective_time_col: "txn_date"
-
-    write:
-      connection: adls_prod            # WRITE result back (same location)
-      path: sales/silver/dim_customers
-      format: "delta"
-      mode: "overwrite"
 ```
 
-> **Why specify the path twice?**
-> - `params.connection/path` → Where to **read** existing history (to detect changes)
-> - `write.connection/path` → Where to **write** the full result
->
-> They should typically match. SCD2 returns a DataFrame (doesn't write directly),
-> so the write phase handles persistence separately.
+### Option 3: Legacy Full Overwrite (opt-out of Delta MERGE)
+
+Set `use_delta_merge: false` to use the legacy full-overwrite approach on Spark.
+Still self-contained — no `write:` block needed.
+
+```yaml
+nodes:
+  - name: "dim_customers"
+    # ... (read from source) ...
+
+    transformer: "scd2"
+    params:
+      target: "silver.dim_customers"
+      keys: ["customer_id"]
+      track_cols: ["address", "tier"]
+      effective_time_col: "txn_date"
+      use_delta_merge: false           # Uses full read-join-overwrite instead
+```
 
 ### Full Configuration
 
@@ -98,12 +109,18 @@ params:
   keys: ["customer_id"]
   track_cols: ["address", "tier", "email"]
 
-  # Source column for start date
+  # Source column indicating when the change happened
   effective_time_col: "updated_at"
 
-  # Target columns to manage (optional defaults shown)
+  # Target columns (optional — defaults shown)
+  start_time_col: "valid_from"         # effective_time_col renamed to this
   end_time_col: "valid_to"
   current_flag_col: "is_current"
+
+  # Performance optimization (default: true)
+  # Uses Delta MERGE on Spark — only updates changed rows
+  # Falls back to full overwrite if target is not Delta
+  use_delta_merge: true
 ```
 
 ---
@@ -114,15 +131,31 @@ The `scd2` transformer performs a complex set of operations automatically:
 
 1.  **Match**: Finds existing records in the `target` table using `keys`.
 2.  **Compare**: Checks `track_cols` to see if any data has changed.
-3.  **Close**: If a record changed, it updates the *old* record's `end_time_col` to equal the new record's `effective_time_col`, and sets `is_current = false`.
-4.  **Insert**: It adds the *new* record with `effective_time_col` as the start date, `NULL` as the end date, and `is_current = true`.
+3.  **Close**: If a record changed, it updates the *old* record's `valid_to` to the new record's effective time, and sets `is_current = false`.
+4.  **Insert**: It adds the *new* record with `valid_from` (renamed from `effective_time_col`), `valid_to = NULL`, and `is_current = true`.
 5.  **Preserve**: It keeps all unchanged history records as they are.
+
+### Delta MERGE Optimization (Spark)
+
+When `use_delta_merge: true` (default) and the target is a Delta table, SCD2 uses
+`DeltaTable.merge()` instead of the full read-join-overwrite approach:
+
+- **`whenMatchedUpdate`**: Only updates `end_time_col` and `current_flag_col` on
+  changed current records (partial column update, not full row rewrite)
+- **`whenNotMatchedInsert`**: Inserts new records with SCD metadata
+
+This means only the Parquet files containing affected rows are rewritten by Delta,
+rather than the entire table. For a 10M row table with 1K changes, this is orders
+of magnitude faster.
+
+If the target is not a Delta table, or if `delta-spark` is not available, the
+transformer automatically falls back to the legacy full-overwrite approach.
 
 ## Important Notes
 
-*   **Write Mode**: You must use `mode: overwrite` for the write operation following this transformer. The transformer constructs the *complete* new state of the history table (including old closed records and new open records).
-*   **Target Existence**: If the target table doesn't exist (first run), the transformer simply prepares the source data (adds valid_to/is_current columns) and returns it.
-*   **Engine Support**: Works on both Spark (Delta Lake) and Pandas (Parquet/CSV).
+*   **Self-contained**: SCD2 writes directly to the target on **all engines and code paths** — no `write:` block is needed.
+*   **First Run**: If the target table doesn't exist, the transformer creates it automatically with the initial data.
+*   **Engine Support**: Works on Spark (Delta MERGE or full overwrite) and Pandas (Parquet/CSV with DuckDB optimization or pure Pandas fallback).
 
 ## When to Use
 
@@ -250,18 +283,7 @@ Your target table (from a previous run) has a different schema than the new data
 
 **Step-by-Step Fix:**
 
-**Option 1: Allow Schema Merging**
-```yaml
-write:
-  connection: silver
-  table: dim_customers
-  format: delta
-  mode: overwrite
-  delta_options:
-    mergeSchema: true  # ✅ Allows new columns
-```
-
-**Option 2: Handle in Transform**
+**Option 1: Handle in Transform**
 ```yaml
 # Add missing columns with defaults before SCD2
 transform:
@@ -272,7 +294,7 @@ transform:
           phone: "COALESCE(phone, 'unknown')"
 ```
 
-**Option 3: Full Schema Reset (Nuclear Option)**
+**Option 2: Full Schema Reset (Nuclear Option)**
 ```python
 # Delete target table and rerun from scratch
 # WARNING: Loses all history!
@@ -356,7 +378,8 @@ Before running your SCD2 pipeline, verify these items:
 #     - If duplicates exist, deduplicate BEFORE SCD2
 
 # [ ] 5. Write Mode Check
-#     - Using mode: overwrite (required for SCD2)
+#     - SCD2 is self-contained — no write: block needed on any engine
+#     - If you have a legacy write: block, remove it to avoid double-writes
 ```
 
 **Python Debugging Script:**

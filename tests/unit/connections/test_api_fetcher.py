@@ -135,7 +135,7 @@ class TestResponseExtractor:
         response = [{"id": 1}]
         items = extractor.extract_items(response)
 
-        today = datetime.date.today()
+        today = datetime.datetime.now(datetime.timezone.utc).date()
         item = items[0]
 
         # Static value preserved
@@ -161,7 +161,7 @@ class TestResponseExtractor:
 
         from odibi.connections.api_fetcher import substitute_date_variables
 
-        today = datetime.date.today()
+        today = datetime.datetime.now(datetime.timezone.utc).date()
 
         # Basic expressions
         assert substitute_date_variables("{today}") == today.isoformat()

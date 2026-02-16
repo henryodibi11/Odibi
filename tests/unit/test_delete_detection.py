@@ -676,3 +676,218 @@ class TestWriteMetadata:
         )
 
         assert list(df.columns) == original_columns
+
+
+# ============================================================
+# Section 4: Helper Functions & Edge Cases
+# ============================================================
+
+
+class TestDeleteDetectionHelpers:
+    """Test internal helper functions for delete detection."""
+
+    def test_unknown_mode_raises_error(self):
+        """Unknown mode raises validation error at the detect_deletes entry point."""
+        df = pd.DataFrame({"id": [1, 2]})
+        ctx = EngineContext(context=PandasContext(), df=df, engine_type=EngineType.PANDAS)
+        with pytest.raises(Exception, match="none.*snapshot_diff.*sql_compare"):
+            detect_deletes(ctx, mode="invalid_mode", keys=["id"])
+
+    def test_build_source_keys_query_with_table(self):
+        """_build_source_keys_query returns SELECT DISTINCT from source_table."""
+        from odibi.transformers.delete_detection import _build_source_keys_query
+
+        config = DeleteDetectionConfig(
+            mode=DeleteDetectionMode.SQL_COMPARE,
+            keys=["id", "region"],
+            source_connection="conn",
+            source_table="dbo.Customers",
+        )
+        query = _build_source_keys_query(config)
+        assert "SELECT DISTINCT id, region FROM dbo.Customers" == query
+
+    def test_build_source_keys_query_with_custom_query(self):
+        """_build_source_keys_query returns source_query when provided."""
+        from odibi.transformers.delete_detection import _build_source_keys_query
+
+        config = DeleteDetectionConfig(
+            mode=DeleteDetectionMode.SQL_COMPARE,
+            keys=["id"],
+            source_connection="conn",
+            source_query="SELECT id FROM dbo.Active WHERE status=1",
+        )
+        query = _build_source_keys_query(config)
+        assert query == "SELECT id FROM dbo.Active WHERE status=1"
+
+    def test_get_row_count_pandas(self):
+        """_get_row_count works for Pandas DataFrames."""
+        from odibi.transformers.delete_detection import _get_row_count
+
+        df = pd.DataFrame({"id": [1, 2, 3]})
+        assert _get_row_count(df, EngineType.PANDAS) == 3
+
+    def test_get_target_path_from_write_path(self):
+        """_get_target_path resolves from _current_write_path."""
+        from odibi.transformers.delete_detection import _get_target_path
+
+        ctx = EngineContext(
+            context=PandasContext(), df=pd.DataFrame(), engine_type=EngineType.PANDAS
+        )
+        mock_engine = MagicMock()
+        mock_engine._current_write_path = "/data/silver/table"
+        ctx.engine = mock_engine
+        assert _get_target_path(ctx) == "/data/silver/table"
+
+    def test_get_target_path_from_input_path(self):
+        """_get_target_path resolves from _current_input_path."""
+        from odibi.transformers.delete_detection import _get_target_path
+
+        ctx = EngineContext(
+            context=PandasContext(), df=pd.DataFrame(), engine_type=EngineType.PANDAS
+        )
+        mock_engine = MagicMock()
+        mock_engine._current_write_path = None
+        mock_engine._current_input_path = "/data/input/table"
+        ctx.engine = mock_engine
+        assert _get_target_path(ctx) == "/data/input/table"
+
+    def test_get_target_path_from_inner_context(self):
+        """_get_target_path falls back to inner context._current_table_path."""
+        from odibi.transformers.delete_detection import _get_target_path
+
+        ctx = EngineContext(
+            context=PandasContext(), df=pd.DataFrame(), engine_type=EngineType.PANDAS
+        )
+        ctx.engine = None
+        ctx.context._current_table_path = "/fallback/path"
+        assert _get_target_path(ctx) == "/fallback/path"
+
+    def test_get_target_path_returns_none(self):
+        """_get_target_path returns None when no path available."""
+        from odibi.transformers.delete_detection import _get_target_path
+
+        ctx = EngineContext(
+            context=PandasContext(), df=pd.DataFrame(), engine_type=EngineType.PANDAS
+        )
+        ctx.engine = None
+        assert _get_target_path(ctx) is None
+
+    def test_get_connection_found(self):
+        """_get_connection returns connection from engine."""
+        from odibi.transformers.delete_detection import _get_connection
+
+        ctx = EngineContext(
+            context=PandasContext(), df=pd.DataFrame(), engine_type=EngineType.PANDAS
+        )
+        mock_conn = MagicMock()
+        mock_engine = MagicMock()
+        mock_engine.connections = {"my_conn": mock_conn}
+        ctx.engine = mock_engine
+        assert _get_connection(ctx, "my_conn") is mock_conn
+
+    def test_get_connection_not_found(self):
+        """_get_connection returns None when connection not found."""
+        from odibi.transformers.delete_detection import _get_connection
+
+        ctx = EngineContext(
+            context=PandasContext(), df=pd.DataFrame(), engine_type=EngineType.PANDAS
+        )
+        mock_engine = MagicMock()
+        mock_engine.connections = {}
+        ctx.engine = mock_engine
+        assert _get_connection(ctx, "missing") is None
+
+    def test_get_connection_no_engine(self):
+        """_get_connection returns None when no engine."""
+        from odibi.transformers.delete_detection import _get_connection
+
+        ctx = EngineContext(
+            context=PandasContext(), df=pd.DataFrame(), engine_type=EngineType.PANDAS
+        )
+        ctx.engine = None
+        assert _get_connection(ctx, "any") is None
+
+    def test_get_sqlalchemy_engine_from_engine_attr(self):
+        """_get_sqlalchemy_engine returns conn.engine."""
+        from odibi.transformers.delete_detection import _get_sqlalchemy_engine
+
+        mock_conn = MagicMock()
+        mock_conn.engine = "fake_engine"
+        assert _get_sqlalchemy_engine(mock_conn) == "fake_engine"
+
+    def test_get_sqlalchemy_engine_from_get_engine(self):
+        """_get_sqlalchemy_engine calls conn.get_engine()."""
+        from odibi.transformers.delete_detection import _get_sqlalchemy_engine
+
+        mock_conn = MagicMock(spec=["get_engine"])
+        mock_conn.get_engine.return_value = "engine_from_method"
+        assert _get_sqlalchemy_engine(mock_conn) == "engine_from_method"
+
+    def test_get_sqlalchemy_engine_raises_on_missing(self):
+        """_get_sqlalchemy_engine raises ValueError if no way to create engine."""
+        from odibi.transformers.delete_detection import _get_sqlalchemy_engine
+
+        mock_conn = MagicMock(spec=[])
+        with pytest.raises(ValueError, match="Cannot create SQLAlchemy engine"):
+            _get_sqlalchemy_engine(mock_conn)
+
+    def test_ensure_delete_column_no_soft_col(self):
+        """_ensure_delete_column returns unchanged if no soft_delete_col."""
+        from odibi.transformers.delete_detection import _ensure_delete_column
+
+        df = pd.DataFrame({"id": [1, 2]})
+        ctx = EngineContext(context=PandasContext(), df=df, engine_type=EngineType.PANDAS)
+        config = DeleteDetectionConfig(mode=DeleteDetectionMode.NONE, soft_delete_col=None)
+        result = _ensure_delete_column(ctx, config)
+        assert "_is_deleted" not in result.df.columns
+
+    def test_ensure_delete_column_adds_column(self):
+        """_ensure_delete_column adds soft_delete_col with False."""
+        from odibi.transformers.delete_detection import _ensure_delete_column
+
+        df = pd.DataFrame({"id": [1, 2]})
+        ctx = EngineContext(context=PandasContext(), df=df, engine_type=EngineType.PANDAS)
+        config = DeleteDetectionConfig(mode=DeleteDetectionMode.NONE, soft_delete_col="_is_deleted")
+        result = _ensure_delete_column(ctx, config)
+        assert "_is_deleted" in result.df.columns
+        assert all(result.df["_is_deleted"] == False)  # noqa: E712
+
+    def test_ensure_delete_column_already_exists(self):
+        """_ensure_delete_column returns unchanged if column already exists."""
+        from odibi.transformers.delete_detection import _ensure_delete_column
+
+        df = pd.DataFrame({"id": [1], "_is_deleted": [True]})
+        ctx = EngineContext(context=PandasContext(), df=df, engine_type=EngineType.PANDAS)
+        config = DeleteDetectionConfig(mode=DeleteDetectionMode.NONE, soft_delete_col="_is_deleted")
+        result = _ensure_delete_column(ctx, config)
+        assert bool(result.df["_is_deleted"].iloc[0]) is True
+
+    def test_snapshot_diff_no_target_path_skips(self):
+        """snapshot_diff skips when target path cannot be determined."""
+        df = pd.DataFrame({"id": [1, 2]})
+        ctx = EngineContext(context=PandasContext(), df=df, engine_type=EngineType.PANDAS)
+        ctx.engine = None
+
+        with patch.dict("sys.modules", {"deltalake": MagicMock()}):
+            result = detect_deletes(ctx, mode="snapshot_diff", keys=["id"])
+
+        assert "_is_deleted" in result.df.columns
+        assert all(result.df["_is_deleted"] == False)  # noqa: E712
+
+    @patch("odibi.transformers.delete_detection._get_sqlalchemy_engine")
+    @patch("odibi.transformers.delete_detection._get_connection")
+    def test_sql_compare_connection_not_found(self, mock_get_conn, mock_get_engine):
+        """sql_compare raises ValueError when connection not found."""
+        mock_get_conn.return_value = None
+
+        df = pd.DataFrame({"id": [1, 2]})
+        ctx = EngineContext(context=PandasContext(), df=df, engine_type=EngineType.PANDAS)
+
+        with pytest.raises(ValueError, match="not found"):
+            detect_deletes(
+                ctx,
+                mode="sql_compare",
+                keys=["id"],
+                source_connection="missing_conn",
+                source_table="tbl",
+            )
