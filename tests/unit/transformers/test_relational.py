@@ -259,8 +259,7 @@ class TestPivotPandas:
         assert result.df.shape[0] == 2
         cols = [str(c) for c in result.df.columns]
         assert "Jan" in cols or ("month", "Jan") in [
-            (str(c[0]), str(c[1])) for c in result.df.columns
-            if isinstance(c, tuple)
+            (str(c[0]), str(c[1])) for c in result.df.columns if isinstance(c, tuple)
         ]
 
     def test_unsupported_engine_raises(self):
@@ -284,35 +283,25 @@ class TestPivotPandas:
 
 class TestAggregatePandas:
     def test_sum_aggregation(self):
-        df = pd.DataFrame(
-            {"dept": ["A", "A", "B", "B"], "salary": [100, 200, 300, 400]}
-        )
+        df = pd.DataFrame({"dept": ["A", "A", "B", "B"], "salary": [100, 200, 300, 400]})
         ctx = make_pandas_context(df, sql_executor=pandas_sql_executor)
-        params = AggregateParams(
-            group_by=["dept"], aggregations={"salary": AggFunc.SUM}
-        )
+        params = AggregateParams(group_by=["dept"], aggregations={"salary": AggFunc.SUM})
         result = aggregate(ctx, params)
         result_df = result.df.sort_values("dept").reset_index(drop=True)
         assert result_df.loc[0, "salary"] == 300
         assert result_df.loc[1, "salary"] == 700
 
     def test_count_aggregation(self):
-        df = pd.DataFrame(
-            {"dept": ["A", "A", "B"], "emp_id": [1, 2, 3]}
-        )
+        df = pd.DataFrame({"dept": ["A", "A", "B"], "emp_id": [1, 2, 3]})
         ctx = make_pandas_context(df, sql_executor=pandas_sql_executor)
-        params = AggregateParams(
-            group_by=["dept"], aggregations={"emp_id": AggFunc.COUNT}
-        )
+        params = AggregateParams(group_by=["dept"], aggregations={"emp_id": AggFunc.COUNT})
         result = aggregate(ctx, params)
         result_df = result.df.sort_values("dept").reset_index(drop=True)
         assert result_df.loc[0, "emp_id"] == 2
         assert result_df.loc[1, "emp_id"] == 1
 
     def test_multiple_aggregations(self):
-        df = pd.DataFrame(
-            {"dept": ["A", "A", "B"], "salary": [10, 20, 30], "age": [25, 35, 45]}
-        )
+        df = pd.DataFrame({"dept": ["A", "A", "B"], "salary": [10, 20, 30], "age": [25, 35, 45]})
         ctx = make_pandas_context(df, sql_executor=pandas_sql_executor)
         params = AggregateParams(
             group_by=["dept"],

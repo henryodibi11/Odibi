@@ -123,9 +123,7 @@ class AdfProfiler:
 
     def _post(self, suffix: str, body: dict) -> dict:
         self._refresh_token()
-        resp = requests.post(
-            self._url(suffix), headers=self._headers, json=body
-        )
+        resp = requests.post(self._url(suffix), headers=self._headers, json=body)
         resp.raise_for_status()
         return resp.json()
 
@@ -169,31 +167,31 @@ class AdfProfiler:
         for p in raw:
             props = p.get("properties", {})
             activities = props.get("activities", [])
-            results.append({
-                "name": p["name"],
-                "folder": props.get("folder", {}).get("name"),
-                "description": props.get("description"),
-                "concurrency": props.get("concurrency"),
-                "parameters": {
-                    k: {
-                        "type": v.get("type", "String"),
-                        "default": v.get("defaultValue"),
-                    }
-                    for k, v in props.get("parameters", {}).items()
-                },
-                "variables": {
-                    k: {
-                        "type": v.get("type", "String"),
-                        "default": v.get("defaultValue"),
-                    }
-                    for k, v in props.get("variables", {}).items()
-                },
-                "activity_count": len(activities),
-                "activities": [
-                    self._parse_activity(a) for a in activities
-                ],
-                "annotations": props.get("annotations", []),
-            })
+            results.append(
+                {
+                    "name": p["name"],
+                    "folder": props.get("folder", {}).get("name"),
+                    "description": props.get("description"),
+                    "concurrency": props.get("concurrency"),
+                    "parameters": {
+                        k: {
+                            "type": v.get("type", "String"),
+                            "default": v.get("defaultValue"),
+                        }
+                        for k, v in props.get("parameters", {}).items()
+                    },
+                    "variables": {
+                        k: {
+                            "type": v.get("type", "String"),
+                            "default": v.get("defaultValue"),
+                        }
+                        for k, v in props.get("variables", {}).items()
+                    },
+                    "activity_count": len(activities),
+                    "activities": [self._parse_activity(a) for a in activities],
+                    "annotations": props.get("annotations", []),
+                }
+            )
         return results
 
     def _parse_activity(self, activity: dict) -> dict:
@@ -250,8 +248,13 @@ class AdfProfiler:
 
     def _count_nested_activities(self, type_props: dict) -> int:
         count = 0
-        for key in ("ifTrueActivities", "ifFalseActivities", "activities",
-                     "cases", "defaultActivities"):
+        for key in (
+            "ifTrueActivities",
+            "ifFalseActivities",
+            "activities",
+            "cases",
+            "defaultActivities",
+        ):
             val = type_props.get(key, [])
             if isinstance(val, list):
                 for item in val:
@@ -275,21 +278,23 @@ class AdfProfiler:
             props = d.get("properties", {})
             type_props = props.get("typeProperties", {})
             ls_ref = props.get("linkedServiceName", {})
-            results.append({
-                "name": d["name"],
-                "type": props.get("type"),
-                "folder": props.get("folder", {}).get("name"),
-                "linked_service": ls_ref.get("referenceName"),
-                "description": props.get("description"),
-                "parameters": {
-                    k: {"type": v.get("type", "String"), "default": v.get("defaultValue")}
-                    for k, v in props.get("parameters", {}).items()
-                },
-                "schema": props.get("schema", []),
-                "structure": props.get("structure", []),
-                "annotations": props.get("annotations", []),
-                "location": self._extract_location(type_props),
-            })
+            results.append(
+                {
+                    "name": d["name"],
+                    "type": props.get("type"),
+                    "folder": props.get("folder", {}).get("name"),
+                    "linked_service": ls_ref.get("referenceName"),
+                    "description": props.get("description"),
+                    "parameters": {
+                        k: {"type": v.get("type", "String"), "default": v.get("defaultValue")}
+                        for k, v in props.get("parameters", {}).items()
+                    },
+                    "schema": props.get("schema", []),
+                    "structure": props.get("structure", []),
+                    "annotations": props.get("annotations", []),
+                    "location": self._extract_location(type_props),
+                }
+            )
         return results
 
     def _extract_location(self, type_props: dict) -> dict:
@@ -302,8 +307,16 @@ class AdfProfiler:
                 "file_name": loc.get("fileName"),
             }
         result = {}
-        for key in ("tableName", "table", "schema", "fileName", "folderPath",
-                     "relativeUrl", "container", "fileSystem"):
+        for key in (
+            "tableName",
+            "table",
+            "schema",
+            "fileName",
+            "folderPath",
+            "relativeUrl",
+            "container",
+            "fileSystem",
+        ):
             if key in type_props:
                 result[key] = type_props[key]
         return result
@@ -321,30 +334,45 @@ class AdfProfiler:
         for ls in raw:
             props = ls.get("properties", {})
             type_props = props.get("typeProperties", {})
-            results.append({
-                "name": ls["name"],
-                "type": props.get("type"),
-                "description": props.get("description"),
-                "annotations": props.get("annotations", []),
-                "connect_via": props.get("connectVia", {}).get("referenceName"),
-                "connection_details": self._safe_connection_info(type_props),
-            })
+            results.append(
+                {
+                    "name": ls["name"],
+                    "type": props.get("type"),
+                    "description": props.get("description"),
+                    "annotations": props.get("annotations", []),
+                    "connect_via": props.get("connectVia", {}).get("referenceName"),
+                    "connection_details": self._safe_connection_info(type_props),
+                }
+            )
         return results
 
     def _safe_connection_info(self, type_props: dict) -> dict:
         safe = {}
         safe_keys = [
-            "url", "baseUrl", "connectionString", "accountName",
-            "server", "database", "servicePrincipalId", "tenant",
-            "functionAppUrl", "encryptedCredential", "authenticationType",
-            "userName", "host", "port", "databaseName",
+            "url",
+            "baseUrl",
+            "connectionString",
+            "accountName",
+            "server",
+            "database",
+            "servicePrincipalId",
+            "tenant",
+            "functionAppUrl",
+            "encryptedCredential",
+            "authenticationType",
+            "userName",
+            "host",
+            "port",
+            "databaseName",
         ]
         for key in safe_keys:
             val = type_props.get(key)
             if val is not None:
                 if isinstance(val, dict) and "value" in val:
                     safe[key] = val["value"]
-                elif isinstance(val, str) and ("secret" in key.lower() or "password" in key.lower()):
+                elif isinstance(val, str) and (
+                    "secret" in key.lower() or "password" in key.lower()
+                ):
                     safe[key] = "***REDACTED***"
                 else:
                     safe[key] = val
@@ -413,10 +441,12 @@ class AdfProfiler:
                     ]
                 elif isinstance(pipelines, dict):
                     ref = pipelines.get("pipelineReference", pipelines)
-                    result["associated_pipelines"] = [{
-                        "pipeline": ref.get("referenceName"),
-                        "parameters": pipelines.get("parameters", {}),
-                    }]
+                    result["associated_pipelines"] = [
+                        {
+                            "pipeline": ref.get("referenceName"),
+                            "parameters": pipelines.get("parameters", {}),
+                        }
+                    ]
 
             results.append(result)
         return results
@@ -434,34 +464,36 @@ class AdfProfiler:
         for df in raw:
             props = df.get("properties", {})
             type_props = props.get("typeProperties", {})
-            results.append({
-                "name": df["name"],
-                "type": props.get("type"),
-                "folder": props.get("folder", {}).get("name"),
-                "description": props.get("description"),
-                "sources": [
-                    {
-                        "name": s.get("name"),
-                        "dataset": s.get("dataset", {}).get("referenceName"),
-                        "linked_service": s.get("linkedService", {}).get("referenceName"),
-                    }
-                    for s in type_props.get("sources", [])
-                ],
-                "sinks": [
-                    {
-                        "name": s.get("name"),
-                        "dataset": s.get("dataset", {}).get("referenceName"),
-                        "linked_service": s.get("linkedService", {}).get("referenceName"),
-                    }
-                    for s in type_props.get("sinks", [])
-                ],
-                "transformations": [
-                    {"name": t.get("name"), "description": t.get("description")}
-                    for t in type_props.get("transformations", [])
-                ],
-                "script": type_props.get("script"),
-                "script_lines": type_props.get("scriptLines"),
-            })
+            results.append(
+                {
+                    "name": df["name"],
+                    "type": props.get("type"),
+                    "folder": props.get("folder", {}).get("name"),
+                    "description": props.get("description"),
+                    "sources": [
+                        {
+                            "name": s.get("name"),
+                            "dataset": s.get("dataset", {}).get("referenceName"),
+                            "linked_service": s.get("linkedService", {}).get("referenceName"),
+                        }
+                        for s in type_props.get("sources", [])
+                    ],
+                    "sinks": [
+                        {
+                            "name": s.get("name"),
+                            "dataset": s.get("dataset", {}).get("referenceName"),
+                            "linked_service": s.get("linkedService", {}).get("referenceName"),
+                        }
+                        for s in type_props.get("sinks", [])
+                    ],
+                    "transformations": [
+                        {"name": t.get("name"), "description": t.get("description")}
+                        for t in type_props.get("transformations", [])
+                    ],
+                    "script": type_props.get("script"),
+                    "script_lines": type_props.get("scriptLines"),
+                }
+            )
         return results
 
     # ------------------------------------------------------------------ #
@@ -530,17 +562,21 @@ class AdfProfiler:
         }
         filters = []
         if pipeline_name:
-            filters.append({
-                "operand": "PipelineName",
-                "operator": "Equals",
-                "values": [pipeline_name],
-            })
+            filters.append(
+                {
+                    "operand": "PipelineName",
+                    "operator": "Equals",
+                    "values": [pipeline_name],
+                }
+            )
         if status:
-            filters.append({
-                "operand": "Status",
-                "operator": "Equals",
-                "values": [status],
-            })
+            filters.append(
+                {
+                    "operand": "Status",
+                    "operator": "Equals",
+                    "values": [status],
+                }
+            )
         if filters:
             body["filters"] = filters
 
@@ -549,19 +585,21 @@ class AdfProfiler:
         data = self._post("queryPipelineRuns", body)
         runs = []
         for r in data.get("value", []):
-            runs.append({
-                "run_id": r.get("runId"),
-                "pipeline_name": r.get("pipelineName"),
-                "status": r.get("status"),
-                "run_start": r.get("runStart"),
-                "run_end": r.get("runEnd"),
-                "duration_ms": r.get("durationInMs"),
-                "triggered_by": r.get("invokedBy", {}).get("name"),
-                "trigger_type": r.get("invokedBy", {}).get("invokedByType"),
-                "parameters": r.get("parameters", {}),
-                "message": r.get("message"),
-                "run_group_id": r.get("runGroupId"),
-            })
+            runs.append(
+                {
+                    "run_id": r.get("runId"),
+                    "pipeline_name": r.get("pipelineName"),
+                    "status": r.get("status"),
+                    "run_start": r.get("runStart"),
+                    "run_end": r.get("runEnd"),
+                    "duration_ms": r.get("durationInMs"),
+                    "triggered_by": r.get("invokedBy", {}).get("name"),
+                    "trigger_type": r.get("invokedBy", {}).get("invokedByType"),
+                    "parameters": r.get("parameters", {}),
+                    "message": r.get("message"),
+                    "run_group_id": r.get("runGroupId"),
+                }
+            )
         return runs
 
     def get_activity_runs(self, run_id: str, pipeline_name: str) -> list[dict]:
@@ -570,45 +608,38 @@ class AdfProfiler:
             "lastUpdatedAfter": (now - timedelta(days=90)).isoformat(),
             "lastUpdatedBefore": now.isoformat(),
         }
-        data = self._post(
-            f"pipelineRuns/{run_id}/queryActivityruns", body
-        )
+        data = self._post(f"pipelineRuns/{run_id}/queryActivityruns", body)
         runs = []
         for a in data.get("value", []):
-            runs.append({
-                "activity_name": a.get("activityName"),
-                "activity_type": a.get("activityType"),
-                "status": a.get("status"),
-                "start": a.get("activityRunStart"),
-                "end": a.get("activityRunEnd"),
-                "duration_ms": a.get("durationInMs"),
-                "error": a.get("error"),
-                "input": a.get("input"),
-                "output": a.get("output"),
-            })
+            runs.append(
+                {
+                    "activity_name": a.get("activityName"),
+                    "activity_type": a.get("activityType"),
+                    "status": a.get("status"),
+                    "start": a.get("activityRunStart"),
+                    "end": a.get("activityRunEnd"),
+                    "duration_ms": a.get("durationInMs"),
+                    "error": a.get("error"),
+                    "input": a.get("input"),
+                    "output": a.get("output"),
+                }
+            )
         return runs
 
     def get_last_run(self, pipeline_name: str) -> Optional[dict]:
         runs = self.get_pipeline_runs(days_back=1095, pipeline_name=pipeline_name)
         return runs[0] if runs else None
 
-    def get_pipeline_run_stats(
-        self, pipeline_name: str, days_back: int = 30
-    ) -> dict:
+    def get_pipeline_run_stats(self, pipeline_name: str, days_back: int = 30) -> dict:
         runs = self.get_pipeline_runs(days_back=days_back, pipeline_name=pipeline_name)
         if not runs:
             return {"total_runs": 0}
         status_counts = Counter(r["status"] for r in runs)
-        durations = [
-            r["duration_ms"] for r in runs
-            if r.get("duration_ms") is not None
-        ]
+        durations = [r["duration_ms"] for r in runs if r.get("duration_ms") is not None]
         return {
             "total_runs": len(runs),
             "status_breakdown": dict(status_counts),
-            "success_rate": round(
-                status_counts.get("Succeeded", 0) / len(runs) * 100, 1
-            ),
+            "success_rate": round(status_counts.get("Succeeded", 0) / len(runs) * 100, 1),
             "avg_duration_sec": round(statistics.mean(durations) / 1000, 1) if durations else None,
             "min_duration_sec": round(min(durations) / 1000, 1) if durations else None,
             "max_duration_sec": round(max(durations) / 1000, 1) if durations else None,
@@ -641,25 +672,29 @@ class AdfProfiler:
                 ds = datasets.get(ds_name, {})
                 ls_name = ds.get("linked_service")
                 ls = linked_services.get(ls_name, {})
-                entry["sources"].append({
-                    "dataset": ds_name,
-                    "dataset_type": ds.get("type"),
-                    "linked_service": ls_name,
-                    "connector_type": ls.get("type"),
-                    "location": ds.get("location", {}),
-                })
+                entry["sources"].append(
+                    {
+                        "dataset": ds_name,
+                        "dataset_type": ds.get("type"),
+                        "linked_service": ls_name,
+                        "connector_type": ls.get("type"),
+                        "location": ds.get("location", {}),
+                    }
+                )
             for out in act.get("outputs", []):
                 ds_name = out.get("dataset")
                 ds = datasets.get(ds_name, {})
                 ls_name = ds.get("linked_service")
                 ls = linked_services.get(ls_name, {})
-                entry["sinks"].append({
-                    "dataset": ds_name,
-                    "dataset_type": ds.get("type"),
-                    "linked_service": ls_name,
-                    "connector_type": ls.get("type"),
-                    "location": ds.get("location", {}),
-                })
+                entry["sinks"].append(
+                    {
+                        "dataset": ds_name,
+                        "dataset_type": ds.get("type"),
+                        "linked_service": ls_name,
+                        "connector_type": ls.get("type"),
+                        "location": ds.get("location", {}),
+                    }
+                )
             if entry["sources"] or entry["sinks"]:
                 lineage_entries.append(entry)
 
@@ -672,13 +707,15 @@ class AdfProfiler:
     #  Full Profile                                                        #
     # ------------------------------------------------------------------ #
 
-    def full_profile(
-        self, include_runs: bool = True, days_back: int = 30
-    ) -> dict:
+    def full_profile(self, include_runs: bool = True, days_back: int = 30) -> dict:
         start = time.time()
         steps = [
-            "Factory info", "Pipelines", "Datasets",
-            "Linked Services", "Triggers", "Data Flows",
+            "Factory info",
+            "Pipelines",
+            "Datasets",
+            "Linked Services",
+            "Triggers",
+            "Data Flows",
             "Integration Runtimes",
         ]
         total_steps = len(steps) + (1 if include_runs else 0)
@@ -716,12 +753,9 @@ class AdfProfiler:
                 "integration_runtime_count": len(integration_runtimes),
                 "connector_types": list({ls["type"] for ls in linked_services if ls.get("type")}),
                 "dataset_types": list({ds["type"] for ds in datasets if ds.get("type")}),
-                "activity_types": list({
-                    a["type"]
-                    for p in pipelines
-                    for a in p.get("activities", [])
-                    if a.get("type")
-                }),
+                "activity_types": list(
+                    {a["type"] for p in pipelines for a in p.get("activities", []) if a.get("type")}
+                ),
             },
             "pipelines": pipelines,
             "datasets": datasets,
@@ -733,22 +767,18 @@ class AdfProfiler:
 
         if include_runs:
             self._progress(
-                f"Run statistics ({len(pipelines)} pipelines, "
-                f"{self.max_workers} threads)",
-                8, total_steps,
+                f"Run statistics ({len(pipelines)} pipelines, {self.max_workers} threads)",
+                8,
+                total_steps,
             )
-            profile["run_statistics"] = self._parallel_run_stats(
-                pipelines, days_back
-            )
+            profile["run_statistics"] = self._parallel_run_stats(pipelines, days_back)
 
         elapsed = round(time.time() - start, 1)
         self._progress(f"Done in {elapsed}s", total_steps, total_steps)
         profile["profile_duration_sec"] = elapsed
         return profile
 
-    def _parallel_run_stats(
-        self, pipelines: list[dict], days_back: int
-    ) -> dict[str, dict]:
+    def _parallel_run_stats(self, pipelines: list[dict], days_back: int) -> dict[str, dict]:
         pipe_names = [p["name"] for p in pipelines]
         run_stats: dict[str, dict] = {}
         total = len(pipe_names)
@@ -769,7 +799,8 @@ class AdfProfiler:
                 if completed % 10 == 0 or completed == total:
                     self._progress(
                         f"  Pipeline runs: {completed}/{total}",
-                        completed, total,
+                        completed,
+                        total,
                     )
 
         return run_stats
@@ -838,7 +869,9 @@ class AdfProfiler:
         lines.append(f"| Integration Runtimes | {summary['integration_runtime_count']} |")
         lines.append("")
 
-        lines.append(f"**Connector Types:** {', '.join(sorted(summary.get('connector_types', [])))}")
+        lines.append(
+            f"**Connector Types:** {', '.join(sorted(summary.get('connector_types', [])))}"
+        )
         lines.append(f"**Dataset Types:** {', '.join(sorted(summary.get('dataset_types', [])))}")
         lines.append(f"**Activity Types:** {', '.join(sorted(summary.get('activity_types', [])))}")
         lines.append("")
@@ -888,9 +921,7 @@ class AdfProfiler:
             lines.append("| Name | Type | Depends On |")
             lines.append("|------|------|------------|")
             for a in p.get("activities", []):
-                deps = ", ".join(
-                    d.get("activity", "") for d in a.get("depends_on", [])
-                )
+                deps = ", ".join(d.get("activity", "") for d in a.get("depends_on", []))
                 lines.append(f"| {a['name']} | {a['type']} | {deps} |")
             lines.append("")
 
@@ -899,14 +930,8 @@ class AdfProfiler:
         lines.append("| Name | Type | State | Associated Pipelines |")
         lines.append("|------|------|-------|---------------------|")
         for t in profile["triggers"]:
-            pipes = ", ".join(
-                p.get("pipeline", "")
-                for p in t.get("associated_pipelines", [])
-            )
-            lines.append(
-                f"| {t['name']} | {t.get('type')} "
-                f"| {t.get('runtime_state')} | {pipes} |"
-            )
+            pipes = ", ".join(p.get("pipeline", "") for p in t.get("associated_pipelines", []))
+            lines.append(f"| {t['name']} | {t.get('type')} | {t.get('runtime_state')} | {pipes} |")
         lines.append("")
 
         # Data Flows
@@ -915,19 +940,26 @@ class AdfProfiler:
             for df in profile["data_flows"]:
                 lines.append(f"### {df['name']}")
                 if df.get("sources"):
-                    lines.append("**Sources:** " + ", ".join(
-                        f"{s['name']} ({s.get('dataset', s.get('linked_service', 'inline'))})"
-                        for s in df["sources"]
-                    ))
+                    lines.append(
+                        "**Sources:** "
+                        + ", ".join(
+                            f"{s['name']} ({s.get('dataset', s.get('linked_service', 'inline'))})"
+                            for s in df["sources"]
+                        )
+                    )
                 if df.get("sinks"):
-                    lines.append("**Sinks:** " + ", ".join(
-                        f"{s['name']} ({s.get('dataset', s.get('linked_service', 'inline'))})"
-                        for s in df["sinks"]
-                    ))
+                    lines.append(
+                        "**Sinks:** "
+                        + ", ".join(
+                            f"{s['name']} ({s.get('dataset', s.get('linked_service', 'inline'))})"
+                            for s in df["sinks"]
+                        )
+                    )
                 if df.get("transformations"):
-                    lines.append("**Transformations:** " + ", ".join(
-                        t["name"] for t in df["transformations"]
-                    ))
+                    lines.append(
+                        "**Transformations:** "
+                        + ", ".join(t["name"] for t in df["transformations"])
+                    )
                 lines.append("")
 
         # Integration Runtimes
@@ -944,9 +976,7 @@ class AdfProfiler:
             lines.append(
                 "| Pipeline | Runs | Success Rate | Avg Duration | Last Status | Last Run |"
             )
-            lines.append(
-                "|----------|------|-------------|-------------|-------------|----------|"
-            )
+            lines.append("|----------|------|-------------|-------------|-------------|----------|")
             for pipe_name, stats in profile["run_statistics"].items():
                 if "error" in stats:
                     lines.append(f"| {pipe_name} | Error | - | - | - | {stats['error']} |")
@@ -970,20 +1000,20 @@ class AdfProfiler:
         profile = self.full_profile(include_runs=False)
         summary = profile["summary"]
         factory = profile["factory"]
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  ADF Profile: {factory['name']}")
         print(f"  Location: {factory.get('location')}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"  Pipelines:           {summary['pipeline_count']}")
         print(f"  Datasets:            {summary['dataset_count']}")
         print(f"  Linked Services:     {summary['linked_service_count']}")
         print(f"  Triggers:            {summary['trigger_count']}")
         print(f"  Data Flows:          {summary['data_flow_count']}")
         print(f"  Integration Runtimes:{summary['integration_runtime_count']}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"  Connectors: {', '.join(sorted(summary.get('connector_types', [])))}")
         print(f"  Dataset Types: {', '.join(sorted(summary.get('dataset_types', [])))}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
     def to_json(
         self,
@@ -1026,28 +1056,47 @@ class AdfProfiler:
                 {"Property": "", "Value": ""},
                 {"Property": "Pipelines", "Value": profile["summary"]["pipeline_count"]},
                 {"Property": "Datasets", "Value": profile["summary"]["dataset_count"]},
-                {"Property": "Linked Services", "Value": profile["summary"]["linked_service_count"]},
+                {
+                    "Property": "Linked Services",
+                    "Value": profile["summary"]["linked_service_count"],
+                },
                 {"Property": "Triggers", "Value": profile["summary"]["trigger_count"]},
                 {"Property": "Data Flows", "Value": profile["summary"]["data_flow_count"]},
-                {"Property": "Integration Runtimes", "Value": profile["summary"]["integration_runtime_count"]},
+                {
+                    "Property": "Integration Runtimes",
+                    "Value": profile["summary"]["integration_runtime_count"],
+                },
                 {"Property": "", "Value": ""},
-                {"Property": "Connector Types", "Value": ", ".join(sorted(profile["summary"].get("connector_types", [])))},
-                {"Property": "Dataset Types", "Value": ", ".join(sorted(profile["summary"].get("dataset_types", [])))},
-                {"Property": "Activity Types", "Value": ", ".join(sorted(profile["summary"].get("activity_types", [])))},
+                {
+                    "Property": "Connector Types",
+                    "Value": ", ".join(sorted(profile["summary"].get("connector_types", []))),
+                },
+                {
+                    "Property": "Dataset Types",
+                    "Value": ", ".join(sorted(profile["summary"].get("dataset_types", []))),
+                },
+                {
+                    "Property": "Activity Types",
+                    "Value": ", ".join(sorted(profile["summary"].get("activity_types", []))),
+                },
             ]
             repo = factory.get("repo_configuration")
             if repo:
-                summary_rows.extend([
-                    {"Property": "", "Value": ""},
-                    {"Property": "Repo Type", "Value": repo.get("type")},
-                    {"Property": "Repo Name", "Value": repo.get("repositoryName")},
-                    {"Property": "Branch", "Value": repo.get("collaborationBranch")},
-                ])
+                summary_rows.extend(
+                    [
+                        {"Property": "", "Value": ""},
+                        {"Property": "Repo Type", "Value": repo.get("type")},
+                        {"Property": "Repo Name", "Value": repo.get("repositoryName")},
+                        {"Property": "Branch", "Value": repo.get("collaborationBranch")},
+                    ]
+                )
             for k, v in factory.get("global_parameters", {}).items():
-                summary_rows.append({
-                    "Property": f"Global Param: {k}",
-                    "Value": f"{v.get('value')} ({v.get('type')})",
-                })
+                summary_rows.append(
+                    {
+                        "Property": f"Global Param: {k}",
+                        "Value": f"{v.get('value')} ({v.get('type')})",
+                    }
+                )
             pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
 
             # -- Sheet 2: Pipelines --
@@ -1059,15 +1108,17 @@ class AdfProfiler:
                 variables = ", ".join(
                     f"{k} ({v.get('type', '')})" for k, v in p.get("variables", {}).items()
                 )
-                pipe_rows.append({
-                    "Pipeline": p["name"],
-                    "Folder": p.get("folder", ""),
-                    "Description": p.get("description", ""),
-                    "Activity Count": p.get("activity_count", 0),
-                    "Concurrency": p.get("concurrency", ""),
-                    "Parameters": params,
-                    "Variables": variables,
-                })
+                pipe_rows.append(
+                    {
+                        "Pipeline": p["name"],
+                        "Folder": p.get("folder", ""),
+                        "Description": p.get("description", ""),
+                        "Activity Count": p.get("activity_count", 0),
+                        "Concurrency": p.get("concurrency", ""),
+                        "Parameters": params,
+                        "Variables": variables,
+                    }
+                )
             pd.DataFrame(pipe_rows).to_excel(writer, sheet_name="Pipelines", index=False)
 
             # -- Sheet 3: Activities --
@@ -1077,18 +1128,20 @@ class AdfProfiler:
                     deps = ", ".join(d.get("activity", "") for d in a.get("depends_on", []))
                     inputs = ", ".join(i.get("dataset", "") for i in a.get("inputs", []))
                     outputs = ", ".join(o.get("dataset", "") for o in a.get("outputs", []))
-                    act_rows.append({
-                        "Pipeline": p["name"],
-                        "Activity": a["name"],
-                        "Type": a["type"],
-                        "Depends On": deps,
-                        "Input Datasets": inputs,
-                        "Output Datasets": outputs,
-                        "Source Type": a.get("source_type", ""),
-                        "Sink Type": a.get("sink_type", ""),
-                        "Called Pipeline": a.get("called_pipeline", ""),
-                        "Data Flow": a.get("data_flow", ""),
-                    })
+                    act_rows.append(
+                        {
+                            "Pipeline": p["name"],
+                            "Activity": a["name"],
+                            "Type": a["type"],
+                            "Depends On": deps,
+                            "Input Datasets": inputs,
+                            "Output Datasets": outputs,
+                            "Source Type": a.get("source_type", ""),
+                            "Sink Type": a.get("sink_type", ""),
+                            "Called Pipeline": a.get("called_pipeline", ""),
+                            "Data Flow": a.get("data_flow", ""),
+                        }
+                    )
             pd.DataFrame(act_rows).to_excel(writer, sheet_name="Activities", index=False)
 
             # -- Sheet 4: Datasets --
@@ -1102,15 +1155,17 @@ class AdfProfiler:
                 params = ", ".join(
                     f"{k} ({v.get('type', '')})" for k, v in ds.get("parameters", {}).items()
                 )
-                ds_rows.append({
-                    "Dataset": ds["name"],
-                    "Type": ds.get("type", ""),
-                    "Linked Service": ds.get("linked_service", ""),
-                    "Folder": ds.get("folder", ""),
-                    "Location": loc_str,
-                    "Parameters": params,
-                    "Description": ds.get("description", ""),
-                })
+                ds_rows.append(
+                    {
+                        "Dataset": ds["name"],
+                        "Type": ds.get("type", ""),
+                        "Linked Service": ds.get("linked_service", ""),
+                        "Folder": ds.get("folder", ""),
+                        "Location": loc_str,
+                        "Parameters": params,
+                        "Description": ds.get("description", ""),
+                    }
+                )
             pd.DataFrame(ds_rows).to_excel(writer, sheet_name="Datasets", index=False)
 
             # -- Sheet 5: Linked Services --
@@ -1118,22 +1173,22 @@ class AdfProfiler:
             for ls in profile["linked_services"]:
                 conn = ls.get("connection_details", {})
                 conn_str = ", ".join(f"{k}={v}" for k, v in conn.items() if v)
-                ls_rows.append({
-                    "Linked Service": ls["name"],
-                    "Type": ls.get("type", ""),
-                    "Integration Runtime": ls.get("connect_via", "AutoResolve"),
-                    "Auth Type": conn.get("authenticationType", ""),
-                    "Connection Details": conn_str,
-                    "Description": ls.get("description", ""),
-                })
+                ls_rows.append(
+                    {
+                        "Linked Service": ls["name"],
+                        "Type": ls.get("type", ""),
+                        "Integration Runtime": ls.get("connect_via", "AutoResolve"),
+                        "Auth Type": conn.get("authenticationType", ""),
+                        "Connection Details": conn_str,
+                        "Description": ls.get("description", ""),
+                    }
+                )
             pd.DataFrame(ls_rows).to_excel(writer, sheet_name="Linked Services", index=False)
 
             # -- Sheet 6: Triggers --
             trig_rows = []
             for t in profile["triggers"]:
-                pipes = ", ".join(
-                    p.get("pipeline", "") for p in t.get("associated_pipelines", [])
-                )
+                pipes = ", ".join(p.get("pipeline", "") for p in t.get("associated_pipelines", []))
                 schedule_str = ""
                 if t.get("schedule"):
                     s = t["schedule"]
@@ -1146,14 +1201,16 @@ class AdfProfiler:
                 elif t.get("blob_events"):
                     be = t["blob_events"]
                     schedule_str = f"Events: {', '.join(be.get('events', []))}"
-                trig_rows.append({
-                    "Trigger": t["name"],
-                    "Type": t.get("type", ""),
-                    "State": t.get("runtime_state", ""),
-                    "Schedule": schedule_str,
-                    "Associated Pipelines": pipes,
-                    "Description": t.get("description", ""),
-                })
+                trig_rows.append(
+                    {
+                        "Trigger": t["name"],
+                        "Type": t.get("type", ""),
+                        "State": t.get("runtime_state", ""),
+                        "Schedule": schedule_str,
+                        "Associated Pipelines": pipes,
+                        "Description": t.get("description", ""),
+                    }
+                )
             pd.DataFrame(trig_rows).to_excel(writer, sheet_name="Triggers", index=False)
 
             # -- Sheet 7: Data Flows --
@@ -1168,34 +1225,36 @@ class AdfProfiler:
                         f"{s['name']} ({s.get('dataset') or s.get('linked_service') or 'inline'})"
                         for s in df.get("sinks", [])
                     )
-                    transforms = ", ".join(
-                        t["name"] for t in df.get("transformations", [])
+                    transforms = ", ".join(t["name"] for t in df.get("transformations", []))
+                    df_rows.append(
+                        {
+                            "Data Flow": df["name"],
+                            "Type": df.get("type", ""),
+                            "Folder": df.get("folder", ""),
+                            "Sources": sources,
+                            "Sinks": sinks,
+                            "Transformations": transforms,
+                            "Description": df.get("description", ""),
+                        }
                     )
-                    df_rows.append({
-                        "Data Flow": df["name"],
-                        "Type": df.get("type", ""),
-                        "Folder": df.get("folder", ""),
-                        "Sources": sources,
-                        "Sinks": sinks,
-                        "Transformations": transforms,
-                        "Description": df.get("description", ""),
-                    })
                 pd.DataFrame(df_rows).to_excel(writer, sheet_name="Data Flows", index=False)
 
             # -- Sheet 8: Integration Runtimes --
             ir_rows = []
             for ir in profile["integration_runtimes"]:
                 compute = ir.get("compute", {})
-                ir_rows.append({
-                    "Integration Runtime": ir["name"],
-                    "Type": ir.get("type", ""),
-                    "State": ir.get("state", ""),
-                    "Location": compute.get("location", ""),
-                    "Core Count": compute.get("core_count", ""),
-                    "Compute Type": compute.get("compute_type", ""),
-                    "Self Hosted": ir.get("self_hosted", False),
-                    "Description": ir.get("description", ""),
-                })
+                ir_rows.append(
+                    {
+                        "Integration Runtime": ir["name"],
+                        "Type": ir.get("type", ""),
+                        "State": ir.get("state", ""),
+                        "Location": compute.get("location", ""),
+                        "Core Count": compute.get("core_count", ""),
+                        "Compute Type": compute.get("compute_type", ""),
+                        "Self Hosted": ir.get("self_hosted", False),
+                        "Description": ir.get("description", ""),
+                    }
+                )
             pd.DataFrame(ir_rows).to_excel(writer, sheet_name="Integration Runtimes", index=False)
 
             # -- Sheet 9: Run Statistics --
@@ -1203,34 +1262,38 @@ class AdfProfiler:
                 run_rows = []
                 for pipe_name, stats in profile["run_statistics"].items():
                     if "error" in stats:
-                        run_rows.append({
-                            "Pipeline": pipe_name,
-                            "Total Runs": "Error",
-                            "Success Rate (%)": "",
-                            "Avg Duration (sec)": "",
-                            "Min Duration (sec)": "",
-                            "Max Duration (sec)": "",
-                            "Last Status": "",
-                            "Last Run Start": "",
-                            "Last Run End": "",
-                            "Last Triggered By": "",
-                            "Error": stats["error"],
-                        })
+                        run_rows.append(
+                            {
+                                "Pipeline": pipe_name,
+                                "Total Runs": "Error",
+                                "Success Rate (%)": "",
+                                "Avg Duration (sec)": "",
+                                "Min Duration (sec)": "",
+                                "Max Duration (sec)": "",
+                                "Last Status": "",
+                                "Last Run Start": "",
+                                "Last Run End": "",
+                                "Last Triggered By": "",
+                                "Error": stats["error"],
+                            }
+                        )
                         continue
                     last = stats.get("last_run", {})
-                    run_rows.append({
-                        "Pipeline": pipe_name,
-                        "Total Runs": stats.get("total_runs", 0),
-                        "Success Rate (%)": stats.get("success_rate"),
-                        "Avg Duration (sec)": stats.get("avg_duration_sec"),
-                        "Min Duration (sec)": stats.get("min_duration_sec"),
-                        "Max Duration (sec)": stats.get("max_duration_sec"),
-                        "Last Status": last.get("status", ""),
-                        "Last Run Start": last.get("run_start", ""),
-                        "Last Run End": last.get("run_end", ""),
-                        "Last Triggered By": last.get("triggered_by", ""),
-                        "Error": "",
-                    })
+                    run_rows.append(
+                        {
+                            "Pipeline": pipe_name,
+                            "Total Runs": stats.get("total_runs", 0),
+                            "Success Rate (%)": stats.get("success_rate"),
+                            "Avg Duration (sec)": stats.get("avg_duration_sec"),
+                            "Min Duration (sec)": stats.get("min_duration_sec"),
+                            "Max Duration (sec)": stats.get("max_duration_sec"),
+                            "Last Status": last.get("status", ""),
+                            "Last Run Start": last.get("run_start", ""),
+                            "Last Run End": last.get("run_end", ""),
+                            "Last Triggered By": last.get("triggered_by", ""),
+                            "Error": "",
+                        }
+                    )
                 pd.DataFrame(run_rows).to_excel(writer, sheet_name="Run Statistics", index=False)
 
             # -- Sheet 10: Lineage --
@@ -1244,29 +1307,33 @@ class AdfProfiler:
                         ds = datasets_map.get(ds_name, {})
                         ls_name = ds.get("linked_service", "")
                         ls = ls_map.get(ls_name, {})
-                        lineage_rows.append({
-                            "Pipeline": p["name"],
-                            "Activity": a["name"],
-                            "Direction": "Source",
-                            "Dataset": ds_name,
-                            "Dataset Type": ds.get("type", ""),
-                            "Linked Service": ls_name,
-                            "Connector Type": ls.get("type", ""),
-                        })
+                        lineage_rows.append(
+                            {
+                                "Pipeline": p["name"],
+                                "Activity": a["name"],
+                                "Direction": "Source",
+                                "Dataset": ds_name,
+                                "Dataset Type": ds.get("type", ""),
+                                "Linked Service": ls_name,
+                                "Connector Type": ls.get("type", ""),
+                            }
+                        )
                     for out in a.get("outputs", []):
                         ds_name = out.get("dataset", "")
                         ds = datasets_map.get(ds_name, {})
                         ls_name = ds.get("linked_service", "")
                         ls = ls_map.get(ls_name, {})
-                        lineage_rows.append({
-                            "Pipeline": p["name"],
-                            "Activity": a["name"],
-                            "Direction": "Sink",
-                            "Dataset": ds_name,
-                            "Dataset Type": ds.get("type", ""),
-                            "Linked Service": ls_name,
-                            "Connector Type": ls.get("type", ""),
-                        })
+                        lineage_rows.append(
+                            {
+                                "Pipeline": p["name"],
+                                "Activity": a["name"],
+                                "Direction": "Sink",
+                                "Dataset": ds_name,
+                                "Dataset Type": ds.get("type", ""),
+                                "Linked Service": ls_name,
+                                "Connector Type": ls.get("type", ""),
+                            }
+                        )
             if lineage_rows:
                 pd.DataFrame(lineage_rows).to_excel(writer, sheet_name="Lineage", index=False)
 

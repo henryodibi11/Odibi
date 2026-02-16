@@ -11,6 +11,7 @@ from odibi.transformers.validation import cross_check, CrossCheckParams
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _make_context(datasets: dict, row_counts: dict = None, schemas: dict = None):
     """Build a mock EngineContext with the given datasets, row counts, and schemas."""
     ctx_mock = MagicMock()
@@ -49,6 +50,7 @@ PATCH_LOG = patch("odibi.transformers.validation.get_logging_context")
 # CrossCheckParams validation
 # ---------------------------------------------------------------------------
 
+
 class TestCrossCheckParams:
     def test_valid_params(self):
         params = CrossCheckParams(
@@ -77,6 +79,7 @@ class TestCrossCheckParams:
 # row_count_diff
 # ---------------------------------------------------------------------------
 
+
 class TestRowCountDiff:
     @PATCH_LOG
     def test_matching_counts_pass(self, _mock_log, df_a, df_b):
@@ -84,9 +87,7 @@ class TestRowCountDiff:
             {"node_a": df_a, "node_b": df_b},
             row_counts={df_a: 100, df_b: 100},
         )
-        params = CrossCheckParams(
-            type="row_count_diff", inputs=["node_a", "node_b"], threshold=0.0
-        )
+        params = CrossCheckParams(type="row_count_diff", inputs=["node_a", "node_b"], threshold=0.0)
         result = cross_check(ctx, params)
         assert result is None
 
@@ -134,9 +135,7 @@ class TestRowCountDiff:
             {"node_a": df_a, "node_b": df_b},
             row_counts={df_a: 0, df_b: 10},
         )
-        params = CrossCheckParams(
-            type="row_count_diff", inputs=["node_a", "node_b"], threshold=0.5
-        )
+        params = CrossCheckParams(type="row_count_diff", inputs=["node_a", "node_b"], threshold=0.5)
         with pytest.raises(ValidationError):
             cross_check(ctx, params)
 
@@ -146,9 +145,7 @@ class TestRowCountDiff:
             {"node_a": df_a, "node_b": df_b},
             row_counts={df_a: 0, df_b: 0},
         )
-        params = CrossCheckParams(
-            type="row_count_diff", inputs=["node_a", "node_b"], threshold=0.0
-        )
+        params = CrossCheckParams(type="row_count_diff", inputs=["node_a", "node_b"], threshold=0.0)
         result = cross_check(ctx, params)
         assert result is None
 
@@ -158,9 +155,7 @@ class TestRowCountDiff:
             {"a": df_a, "b": df_b, "c": df_c},
             row_counts={df_a: 100, df_b: 100, df_c: 100},
         )
-        params = CrossCheckParams(
-            type="row_count_diff", inputs=["a", "b", "c"], threshold=0.0
-        )
+        params = CrossCheckParams(type="row_count_diff", inputs=["a", "b", "c"], threshold=0.0)
         result = cross_check(ctx, params)
         assert result is None
 
@@ -170,9 +165,7 @@ class TestRowCountDiff:
             {"a": df_a, "b": df_b, "c": df_c},
             row_counts={df_a: 100, df_b: 100, df_c: 200},
         )
-        params = CrossCheckParams(
-            type="row_count_diff", inputs=["a", "b", "c"], threshold=0.05
-        )
+        params = CrossCheckParams(type="row_count_diff", inputs=["a", "b", "c"], threshold=0.05)
         with pytest.raises(ValidationError) as exc_info:
             cross_check(ctx, params)
         assert "c" in str(exc_info.value)
@@ -182,6 +175,7 @@ class TestRowCountDiff:
 # schema_match
 # ---------------------------------------------------------------------------
 
+
 class TestSchemaMatch:
     @PATCH_LOG
     def test_matching_schemas_pass(self, _mock_log, df_a, df_b):
@@ -190,9 +184,7 @@ class TestSchemaMatch:
             {"node_a": df_a, "node_b": df_b},
             schemas={df_a: schema, df_b: schema},
         )
-        params = CrossCheckParams(
-            type="schema_match", inputs=["node_a", "node_b"]
-        )
+        params = CrossCheckParams(type="schema_match", inputs=["node_a", "node_b"])
         result = cross_check(ctx, params)
         assert result is None
 
@@ -205,9 +197,7 @@ class TestSchemaMatch:
                 df_b: {"id": "int64", "value": "float64"},
             },
         )
-        params = CrossCheckParams(
-            type="schema_match", inputs=["node_a", "node_b"]
-        )
+        params = CrossCheckParams(type="schema_match", inputs=["node_a", "node_b"])
         with pytest.raises(ValidationError) as exc_info:
             cross_check(ctx, params)
         err_msg = str(exc_info.value)
@@ -271,22 +261,19 @@ class TestSchemaMatch:
 # Edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     @PATCH_LOG
     def test_fewer_than_two_inputs_raises(self, _mock_log):
         ctx = _make_context({})
-        params = CrossCheckParams(
-            type="row_count_diff", inputs=["only_one"], threshold=0.0
-        )
+        params = CrossCheckParams(type="row_count_diff", inputs=["only_one"], threshold=0.0)
         with pytest.raises(ValueError, match="at least 2 inputs"):
             cross_check(ctx, params)
 
     @PATCH_LOG
     def test_empty_inputs_raises(self, _mock_log):
         ctx = _make_context({})
-        params = CrossCheckParams(
-            type="row_count_diff", inputs=[], threshold=0.0
-        )
+        params = CrossCheckParams(type="row_count_diff", inputs=[], threshold=0.0)
         with pytest.raises(ValueError, match="at least 2 inputs"):
             cross_check(ctx, params)
 
@@ -302,8 +289,6 @@ class TestEdgeCases:
     @PATCH_LOG
     def test_unknown_check_type_returns_none(self, _mock_log, df_a, df_b):
         ctx = _make_context({"a": df_a, "b": df_b})
-        params = CrossCheckParams(
-            type="unknown_type", inputs=["a", "b"], threshold=0.0
-        )
+        params = CrossCheckParams(type="unknown_type", inputs=["a", "b"], threshold=0.0)
         result = cross_check(ctx, params)
         assert result is None

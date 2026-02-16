@@ -89,9 +89,7 @@ class TestReadSampleBytes:
         with patch.dict("sys.modules", {"fsspec": mock_fsspec}):
             result = _read_sample_bytes(conn, "abfss://container/file.csv", 1024)
         assert result == b"remote data"
-        mock_fsspec.open.assert_called_once_with(
-            "abfss://container/file.csv", "rb", key="val"
-        )
+        mock_fsspec.open.assert_called_once_with("abfss://container/file.csv", "rb", key="val")
 
     def test_fsspec_exception_falls_through(self, tmp_path):
         f = tmp_path / "fallback.txt"
@@ -115,9 +113,7 @@ class TestReadSampleBytes:
     def test_nonexistent_local_file_returns_none(self, tmp_path):
         conn = MagicMock()
         with patch.dict("sys.modules", {"fsspec": None}):
-            result = _read_sample_bytes(
-                conn, str(tmp_path / "nonexistent.txt"), 1024
-            )
+            result = _read_sample_bytes(conn, str(tmp_path / "nonexistent.txt"), 1024)
         assert result is None
 
     def test_no_storage_options_method(self, tmp_path):
@@ -167,9 +163,7 @@ class TestDetectEncoding:
         raw = b"hello \xff\xfe world"
         f.write_bytes(raw)
         conn = self._make_connection(str(f))
-        result = detect_encoding(
-            conn, "latin1_only.csv", candidates=["utf-8", "latin1"]
-        )
+        result = detect_encoding(conn, "latin1_only.csv", candidates=["utf-8", "latin1"])
         assert result == "latin1"
 
     def test_empty_file_returns_none(self, tmp_path):
