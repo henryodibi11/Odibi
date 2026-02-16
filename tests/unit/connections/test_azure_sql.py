@@ -953,3 +953,233 @@ class TestReadSqlQuery:
 
             assert len(result) == 1
             mock_read_sql.assert_called_once_with("SELECT * FROM users", {"id": 1})
+
+
+class TestTrustServerCertificate:
+    """Tests for trust_server_certificate parameter."""
+
+    def test_default_trust_server_certificate_is_true(self):
+        """Test that trust_server_certificate defaults to True."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+        assert conn.trust_server_certificate is True
+
+    def test_trust_server_certificate_false(self):
+        """Test setting trust_server_certificate to False."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+            trust_server_certificate=False,
+        )
+        assert conn.trust_server_certificate is False
+
+    def test_odbc_dsn_trust_true(self):
+        """Test ODBC DSN includes TrustServerCertificate=yes when True."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+            trust_server_certificate=True,
+        )
+        dsn = conn.odbc_dsn()
+        assert "TrustServerCertificate=yes" in dsn
+
+    def test_odbc_dsn_trust_false(self):
+        """Test ODBC DSN includes TrustServerCertificate=no when False."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+            trust_server_certificate=False,
+        )
+        dsn = conn.odbc_dsn()
+        assert "TrustServerCertificate=no" in dsn
+
+    def test_spark_options_trust_true(self):
+        """Test Spark JDBC URL includes trustServerCertificate=true when True."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+            trust_server_certificate=True,
+        )
+        options = conn.get_spark_options()
+        assert "trustServerCertificate=true" in options["url"]
+
+    def test_spark_options_trust_false(self):
+        """Test Spark JDBC URL includes trustServerCertificate=false when False."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+            trust_server_certificate=False,
+        )
+        options = conn.get_spark_options()
+        assert "trustServerCertificate=false" in options["url"]
+
+
+class TestSanitizeError:
+    """Tests for _sanitize_error method."""
+
+    def test_sanitize_pwd(self):
+        """Test that PWD is redacted from error messages."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+        msg = "Connection failed: PWD=secret123;Server=test"
+        result = conn._sanitize_error(msg)
+        assert "secret123" not in result
+        assert "PWD=***" in result
+        assert "Server=test" in result
+
+    def test_sanitize_uid(self):
+        """Test that UID is redacted from error messages."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+        msg = "Error: UID=admin;PWD=pass123;Database=testdb"
+        result = conn._sanitize_error(msg)
+        assert "admin" not in result
+        assert "pass123" not in result
+        assert "UID=***" in result
+        assert "PWD=***" in result
+        assert "Database=testdb" in result
+
+    def test_sanitize_password_case_insensitive(self):
+        """Test that password is redacted case-insensitively."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+        msg = "Error: Password=MySecret;host=server"
+        result = conn._sanitize_error(msg)
+        assert "MySecret" not in result
+        assert "password=***" in result
+
+    def test_sanitize_user_case_insensitive(self):
+        """Test that user is redacted case-insensitively."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+        msg = "Error: User=admin;host=server"
+        result = conn._sanitize_error(msg)
+        assert "admin" not in result
+        assert "user=***" in result
+
+    def test_sanitize_no_credentials(self):
+        """Test that messages without credentials are unchanged."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+        msg = "Connection timeout after 30 seconds"
+        result = conn._sanitize_error(msg)
+        assert result == msg
+
+    def test_sanitize_error_used_in_get_engine(self):
+        """Test that get_engine sanitizes credentials in error messages."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+            username="testuser",
+            password="testpass",
+            auth_mode="sql",
+        )
+
+        mock_engine = Mock()
+        mock_engine.connect.side_effect = Exception(
+            "Login failed: UID=testuser;PWD=testpass;Server=test"
+        )
+
+        import sys
+        from types import ModuleType
+
+        sqlalchemy_mod = ModuleType("sqlalchemy")
+        sqlalchemy_mod.create_engine = MagicMock(return_value=mock_engine)
+        sys.modules["sqlalchemy"] = sqlalchemy_mod
+
+        try:
+            with pytest.raises(ConnectionError) as exc_info:
+                conn.get_engine()
+            assert "testpass" not in str(exc_info.value)
+            assert "testuser" not in str(exc_info.value)
+            assert "PWD=***" in str(exc_info.value)
+            assert "UID=***" in str(exc_info.value)
+        finally:
+            if "sqlalchemy" in sys.modules:
+                del sys.modules["sqlalchemy"]
+
+    def test_sanitize_error_used_in_read_sql(self):
+        """Test that read_sql sanitizes credentials in error messages."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+
+        mock_engine = Mock()
+        mock_connection = Mock()
+        mock_connection.__enter__ = Mock(return_value=mock_connection)
+        mock_connection.__exit__ = Mock(return_value=False)
+        mock_engine.connect.return_value = mock_connection
+        conn._engine = mock_engine
+
+        with patch("pandas.read_sql") as mock_read_sql:
+            mock_read_sql.side_effect = Exception("Query failed: PWD=secret;UID=admin")
+
+            with pytest.raises(ConnectionError) as exc_info:
+                conn.read_sql("SELECT 1")
+            assert "secret" not in str(exc_info.value)
+            assert "admin" not in str(exc_info.value)
+            assert "PWD=***" in str(exc_info.value)
+            assert "UID=***" in str(exc_info.value)
+
+    def test_sanitize_error_used_in_write_table(self):
+        """Test that write_table sanitizes credentials in error messages."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+
+        df = pd.DataFrame({"id": [1]})
+        mock_engine = Mock()
+        conn._engine = mock_engine
+
+        with patch.object(
+            df, "to_sql", side_effect=Exception("Write failed: PWD=secret;UID=admin")
+        ):
+            with pytest.raises(ConnectionError) as exc_info:
+                conn.write_table(df, "users")
+            assert "secret" not in str(exc_info.value)
+            assert "admin" not in str(exc_info.value)
+
+    def test_sanitize_error_used_in_execute(self):
+        """Test that execute sanitizes credentials in error messages."""
+        conn = AzureSQL(
+            server="test.database.windows.net",
+            database="testdb",
+        )
+
+        mock_engine = Mock()
+        mock_connection = Mock()
+        mock_connection.execute.side_effect = Exception("Exec failed: PWD=secret;UID=admin")
+        mock_connection.__enter__ = Mock(return_value=mock_connection)
+        mock_connection.__exit__ = Mock(return_value=False)
+        mock_engine.begin.return_value = mock_connection
+        conn._engine = mock_engine
+
+        import sys
+        from types import ModuleType
+
+        sqlalchemy_mod = ModuleType("sqlalchemy")
+        sqlalchemy_mod.text = MagicMock(return_value="DELETE FROM users")
+        sys.modules["sqlalchemy"] = sqlalchemy_mod
+
+        try:
+            with pytest.raises(ConnectionError) as exc_info:
+                conn.execute("DELETE FROM users")
+            assert "secret" not in str(exc_info.value)
+            assert "admin" not in str(exc_info.value)
+        finally:
+            if "sqlalchemy" in sys.modules:
+                del sys.modules["sqlalchemy"]

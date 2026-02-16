@@ -302,7 +302,8 @@ class TestPandasEngineWrite:
 
         monkeypatch.setattr(pd.DataFrame, method_name, stub)
         engine.write(df, tmp_conn, fmt, path=f"out.{fmt}", options={"x": 1})
-        assert "out." in called["path"]
+        # Atomic writes use a temp file; verify it targets the right directory
+        assert called["path"].endswith(f".{fmt}.tmp") or "out." in called["path"]
         assert called["kwargs"]["x"] == 1
 
     def test_write_csv_modes(self, engine, tmp_conn, monkeypatch):

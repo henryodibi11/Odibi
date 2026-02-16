@@ -2145,6 +2145,11 @@ class NodeExecutor:
         if not config.write:
             return
 
+        if df is None:
+            ctx.warning("Skipping write phase: no data to write")
+            self._execution_steps.append("Skipped write: no data (result_df is None)")
+            return
+
         write_config = config.write
         connection = self.connections.get(write_config.connection)
 
@@ -3733,6 +3738,22 @@ class Node:
                 }
                 result_for_log.metadata["_run_record"] = run_record
 
+    def _calculate_backoff(self, attempt: int) -> float:
+        """Calculate backoff sleep time based on retry config.
+
+        Args:
+            attempt: Current attempt number (1-based).
+
+        Returns:
+            Sleep time in seconds.
+        """
+        if self.retry_config.backoff == "exponential":
+            return float(2 ** (attempt - 1))
+        elif self.retry_config.backoff == "linear":
+            return float(attempt)
+        else:  # constant
+            return 1.0
+
     def _execute_with_retries(self) -> NodeResult:
         """Execute with internal retry logic."""
         ctx = create_logging_context(
@@ -3813,6 +3834,8 @@ class Node:
                                 )
                             except Exception as e:
                                 result.metadata["hwm_error"] = str(e)
+                                result.success = False
+                                result.error = e
                                 ctx.warning(f"Failed to update HWM state: {e}")
 
                     return result
@@ -3830,6 +3853,15 @@ class Node:
                     }
                 )
 
+                if attempts < max_attempts:
+                    sleep_time = self._calculate_backoff(attempts)
+                    ctx.warning(
+                        f"Attempt {attempts} failed (graceful), retrying in {sleep_time}s",
+                        error_type=type(last_error).__name__ if last_error else "GracefulFailure",
+                        backoff_seconds=sleep_time,
+                    )
+                    time.sleep(sleep_time)
+
             except Exception as e:
                 attempt_duration = time.time() - attempt_start
                 last_error = e
@@ -3845,14 +3877,7 @@ class Node:
                 )
 
                 if attempts < max_attempts:
-                    sleep_time = 1
-                    if self.retry_config.backoff == "exponential":
-                        sleep_time = 2 ** (attempts - 1)
-                    elif self.retry_config.backoff == "linear":
-                        sleep_time = attempts
-                    elif self.retry_config.backoff == "constant":
-                        sleep_time = 1
-
+                    sleep_time = self._calculate_backoff(attempts)
                     ctx.warning(
                         f"Attempt {attempts} failed, retrying in {sleep_time}s",
                         error_type=type(e).__name__,

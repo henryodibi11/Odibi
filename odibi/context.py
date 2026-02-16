@@ -115,7 +115,7 @@ class EngineContext:
             try:
                 # Replace 'df' references with our unique view name in the query
                 # Use word boundary matching to avoid replacing 'df' inside column names
-                safe_query = re.sub(r"\bdf\b", view_name, query)
+                safe_query = re.sub(r'(?<!["\'\[])(\bdf\b)(?!["\'\]])', view_name, query)
                 res = self.sql_executor(safe_query, self.context)
                 return self.with_df(res)
             finally:

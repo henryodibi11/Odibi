@@ -521,3 +521,130 @@ class TestWriteTimestampTzAware:
         ts = result["timestamp"]
         assert ts.tzinfo is not None
         assert ts.tzinfo == timezone.utc
+
+
+class TestAtomicWrite:
+    """Test atomic write behavior in _write_file (issue #211)."""
+
+    def test_overwrite_writes_correct_data(self):
+        """Normal overwrite produces the expected file content."""
+        engine = PandasEngine()
+        df = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "out.parquet")
+            engine._write_file(df, path, "parquet", "overwrite", {})
+            result = pd.read_parquet(path)
+            assert list(result["id"]) == [1, 2]
+
+    def test_overwrite_preserves_original_on_write_failure(self):
+        """If the write raises, the original file must remain intact."""
+        engine = PandasEngine()
+        original = pd.DataFrame({"id": [1], "val": ["orig"]})
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "data.parquet")
+            original.to_parquet(path, index=False)
+
+            with patch.object(
+                engine,
+                "_write_to_target",
+                side_effect=IOError("disk full"),
+            ):
+                with pytest.raises(IOError, match="disk full"):
+                    engine._write_file(
+                        pd.DataFrame({"id": [99]}),
+                        path,
+                        "parquet",
+                        "overwrite",
+                        {},
+                    )
+
+            preserved = pd.read_parquet(path)
+            assert list(preserved["id"]) == [1]
+            assert list(preserved["val"]) == ["orig"]
+
+    def test_overwrite_cleans_up_temp_file_on_failure(self):
+        """Temp file must be removed when writing fails."""
+        engine = PandasEngine()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "data.csv")
+            with patch.object(
+                engine,
+                "_write_to_target",
+                side_effect=ValueError("bad data"),
+            ):
+                with pytest.raises(ValueError, match="bad data"):
+                    engine._write_file(
+                        pd.DataFrame({"a": [1]}),
+                        path,
+                        "csv",
+                        "overwrite",
+                        {},
+                    )
+
+            remaining = os.listdir(tmpdir)
+            assert not any(f.endswith(".tmp") for f in remaining)
+
+    def test_append_mode_skips_atomic_write(self):
+        """Append mode should write directly, not via temp file."""
+        engine = PandasEngine()
+        df = pd.DataFrame({"a": [1]})
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "out.csv")
+            with patch("odibi.engine.pandas_engine.tempfile") as mock_tempfile:
+                engine._write_file(df, path, "csv", "append", {})
+                mock_tempfile.mkstemp.assert_not_called()
+
+            result = pd.read_csv(path)
+            assert list(result["a"]) == [1]
+
+    def test_csv_overwrite_atomic(self):
+        """CSV overwrite uses atomic pattern and produces correct file."""
+        engine = PandasEngine()
+        df = pd.DataFrame({"x": [10, 20]})
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "out.csv")
+            engine._write_file(df, path, "csv", "overwrite", {})
+            result = pd.read_csv(path)
+            assert list(result["x"]) == [10, 20]
+
+    def test_upsert_overwrite_is_atomic(self):
+        """End-to-end: upsert resolves to overwrite which uses atomic write."""
+        engine = PandasEngine()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "data.parquet")
+            existing = pd.DataFrame({"id": [1, 2], "val": [10, 20]})
+            existing.to_parquet(path, index=False)
+
+            new_data = pd.DataFrame({"id": [2, 3], "val": [200, 300]})
+            merged_df, mode = engine._handle_generic_upsert(
+                new_data, path, "parquet", "upsert", {"keys": ["id"]}
+            )
+            assert mode == "overwrite"
+
+            engine._write_file(merged_df, path, "parquet", "overwrite", {})
+            result = pd.read_parquet(path)
+            assert set(result["id"]) == {1, 2, 3}
+
+
+class TestIsLocalPath:
+    """Test _is_local_path helper."""
+
+    def test_local_relative_path(self):
+        engine = PandasEngine()
+        assert engine._is_local_path("data/file.csv") is True
+
+    def test_local_absolute_path(self):
+        engine = PandasEngine()
+        assert engine._is_local_path("/tmp/file.parquet") is True
+
+    def test_windows_drive_path(self):
+        engine = PandasEngine()
+        assert engine._is_local_path("D:\\data\\file.csv") is True
+
+    def test_remote_abfss_path(self):
+        engine = PandasEngine()
+        assert engine._is_local_path("abfss://container@account.dfs.core.windows.net/f") is False
+
+    def test_remote_s3_path(self):
+        engine = PandasEngine()
+        assert engine._is_local_path("s3://bucket/key") is False

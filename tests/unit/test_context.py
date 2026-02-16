@@ -1,7 +1,10 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 import pandas as pd
 
-from odibi.context import Context, PandasContext
+from odibi.context import Context, EngineContext, PandasContext
+from odibi.enums import EngineType
 
 # Polars is optional - only import if available
 try:
@@ -179,3 +182,74 @@ def test_polars_context_metadata_handling(polars_context_instance):
         assert polars_context_instance.metadata.get("p_meta") == "test_polars"
     else:
         pytest.skip("PolarsContext does not implement a metadata property")
+
+
+# Tests for EngineContext.sql() regex (GitHub #213)
+
+
+@pytest.fixture
+def engine_context_with_sql():
+    """Create an EngineContext with a mock sql_executor that captures the query."""
+    mock_context = MagicMock()
+    mock_df = pd.DataFrame({"a": [1, 2, 3]})
+    captured = {}
+
+    def fake_executor(query, ctx):
+        captured["query"] = query
+        return mock_df
+
+    ctx = EngineContext(
+        context=mock_context,
+        df=mock_df,
+        engine_type=EngineType.PANDAS,
+        sql_executor=fake_executor,
+    )
+    return ctx, captured
+
+
+@patch("odibi.context._get_unique_view_name", return_value="_df_test_1")
+def test_sql_replaces_bare_df(mock_view, engine_context_with_sql):
+    """Bare 'df' references should be replaced with the temp view name."""
+    ctx, captured = engine_context_with_sql
+    ctx.sql("SELECT * FROM df")
+    assert captured["query"] == "SELECT * FROM _df_test_1"
+
+
+@patch("odibi.context._get_unique_view_name", return_value="_df_test_1")
+def test_sql_preserves_double_quoted_df(mock_view, engine_context_with_sql):
+    """'df' inside double quotes should NOT be replaced."""
+    ctx, captured = engine_context_with_sql
+    ctx.sql('SELECT "df" FROM df')
+    assert captured["query"] == 'SELECT "df" FROM _df_test_1'
+
+
+@patch("odibi.context._get_unique_view_name", return_value="_df_test_1")
+def test_sql_preserves_bracket_quoted_df(mock_view, engine_context_with_sql):
+    """'df' inside SQL Server bracket quotes should NOT be replaced."""
+    ctx, captured = engine_context_with_sql
+    ctx.sql("SELECT [df] FROM df")
+    assert captured["query"] == "SELECT [df] FROM _df_test_1"
+
+
+@patch("odibi.context._get_unique_view_name", return_value="_df_test_1")
+def test_sql_preserves_single_quoted_df(mock_view, engine_context_with_sql):
+    """'df' directly wrapped in single quotes should NOT be replaced."""
+    ctx, captured = engine_context_with_sql
+    ctx.sql("SELECT 'df' FROM df")
+    assert captured["query"] == "SELECT 'df' FROM _df_test_1"
+
+
+@patch("odibi.context._get_unique_view_name", return_value="_df_test_1")
+def test_sql_replaces_df_with_dot_access(mock_view, engine_context_with_sql):
+    """'df.col' should replace 'df' (dot is a word boundary)."""
+    ctx, captured = engine_context_with_sql
+    ctx.sql("SELECT df.col1 FROM df")
+    assert captured["query"] == "SELECT _df_test_1.col1 FROM _df_test_1"
+
+
+@patch("odibi.context._get_unique_view_name", return_value="_df_test_1")
+def test_sql_does_not_replace_df_substring(mock_view, engine_context_with_sql):
+    """'df' as part of a longer word (e.g., 'pdf') should NOT be replaced."""
+    ctx, captured = engine_context_with_sql
+    ctx.sql("SELECT pdf_count FROM df")
+    assert captured["query"] == "SELECT pdf_count FROM _df_test_1"
