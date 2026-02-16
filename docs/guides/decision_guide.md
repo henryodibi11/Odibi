@@ -128,7 +128,7 @@ Has reliable timestamp column?
 | First load / full refresh | `overwrite` | Clean slate |
 | Incremental updates | `merge` | Preserve existing, update keys |
 | Append-only events | `append` | Immutable, no updates |
-| SCD2 result | `overwrite` | Transformer returns full history |
+| SCD2 result | N/A (self-contained) | Transformer writes directly to target — no `write:` block needed |
 | Aggregations | `overwrite` | Idempotent recalculation |
 
 **Rule:** When in doubt, use `overwrite` for transforms and `append` for raw.

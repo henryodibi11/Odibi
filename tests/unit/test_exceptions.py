@@ -15,6 +15,114 @@ from odibi.exceptions import (
 )
 
 
+class TestCleanPy4JError:
+    @pytest.fixture
+    def error_instance(self):
+        ctx = ExecutionContext(node_name="n")
+        return NodeExecutionError("msg", ctx)
+
+    def test_regular_exception_passthrough(self, error_instance):
+        err = ValueError("plain error")
+        clean_msg, clean_type = error_instance._clean_spark_error(err)
+        assert clean_msg == "plain error"
+        assert clean_type == "ValueError"
+
+    def test_analysis_exception_pattern(self, error_instance):
+        class Py4JJavaError(Exception):
+            pass
+
+        err = Py4JJavaError(
+            "An error occurred while calling o46.save.\n"
+            ": org.apache.spark.sql.AnalysisException: Column 'x' does not exist"
+        )
+        clean_msg, clean_type = error_instance._clean_spark_error(err)
+        assert "Column 'x' does not exist" in clean_msg
+        assert clean_type == "AnalysisException"
+
+    def test_parse_exception_pattern(self, error_instance):
+        class Py4JJavaError(Exception):
+            pass
+
+        err = Py4JJavaError(
+            "An error occurred\n: org.apache.spark.sql.catalyst.parser.ParseException: syntax error"
+        )
+        clean_msg, clean_type = error_instance._clean_spark_error(err)
+        assert "syntax error" in clean_msg
+        assert clean_type == "ParseException"
+
+    def test_file_not_found_pattern(self, error_instance):
+        class Py4JJavaError(Exception):
+            pass
+
+        err = Py4JJavaError("An error occurred\n: java.io.FileNotFoundException: /data/missing.csv")
+        clean_msg, clean_type = error_instance._clean_spark_error(err)
+        assert "/data/missing.csv" in clean_msg
+        assert clean_type == "FileNotFoundException"
+
+    def test_generic_exception_pattern(self, error_instance):
+        class Py4JJavaError(Exception):
+            pass
+
+        err = Py4JJavaError("SomeException: bad stuff happened")
+        clean_msg, clean_type = error_instance._clean_spark_error(err)
+        assert "bad stuff happened" in clean_msg
+        assert clean_type == "SomeException"
+
+    def test_py4j_no_matching_pattern_uses_java_line_fallback(self, error_instance):
+        class Py4JJavaError(Exception):
+            pass
+
+        err = Py4JJavaError(
+            "An error occurred while calling o46.save.\n"
+            ": java.lang.NullPointerException: some detail\n"
+            "  at org.apache.hadoop.Something"
+        )
+        clean_msg, clean_type = error_instance._clean_spark_error(err)
+        assert clean_type == "NullPointerException"
+
+    def test_py4j_completely_unparseable(self, error_instance):
+        class Py4JJavaError(Exception):
+            pass
+
+        err = Py4JJavaError("totally unparseable garbage with no patterns at all")
+        clean_msg, clean_type = error_instance._clean_spark_error(err)
+        assert clean_type == "Py4JJavaError"
+        assert "unparseable" in clean_msg
+
+    def test_java_fallback_pattern(self, error_instance):
+        class Py4JJavaError(Exception):
+            pass
+
+        err = Py4JJavaError(
+            "An error occurred while calling o46.save.\n"
+            ": java.lang.IllegalArgumentException: Path must not be null\n"
+            "  at org.apache.hadoop..."
+        )
+        clean_msg, clean_type = error_instance._clean_spark_error(err)
+        assert "Path must not be null" in clean_msg
+
+    def test_cleaned_error_used_in_format(self):
+        class Py4JJavaError(Exception):
+            pass
+
+        original = Py4JJavaError(
+            "An error occurred\n: org.apache.spark.sql.AnalysisException: Table not found"
+        )
+        ctx = ExecutionContext(node_name="n")
+        err = NodeExecutionError("fallback msg", ctx, original_error=original)
+        msg = str(err)
+        assert "Table not found" in msg
+        assert "AnalysisException" in msg
+
+    def test_uncleaned_error_falls_back_to_message(self):
+        original = ValueError("short")
+        ctx = ExecutionContext(node_name="n")
+        err = NodeExecutionError("fallback msg", ctx, original_error=original)
+        msg = str(err)
+        assert "Error: fallback msg" in msg
+        assert "Type: ValueError" in msg
+
+
 class TestOdibiException:
     """Test base OdibiException class."""
 

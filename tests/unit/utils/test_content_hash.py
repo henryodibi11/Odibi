@@ -42,6 +42,13 @@ class TestComputeDataframeHash:
         h_sub = compute_dataframe_hash(df, columns=["a", "b"])
         assert h_all != h_sub
 
+    def test_column_subset_only_selected_columns_affect_hash(self):
+        df1 = pd.DataFrame({"id": [1, 2], "value": ["a", "b"], "extra": [10, 20]})
+        df2 = pd.DataFrame({"id": [1, 2], "value": ["a", "b"], "extra": [99, 99]})
+        h1 = compute_dataframe_hash(df1, columns=["id", "value"])
+        h2 = compute_dataframe_hash(df2, columns=["id", "value"])
+        assert h1 == h2
+
     def test_missing_columns_raises(self):
         df = pd.DataFrame({"a": [1]})
         with pytest.raises(ValueError, match="Hash columns not found"):
@@ -56,6 +63,13 @@ class TestComputeDataframeHash:
         df1 = pd.DataFrame({"x": [1, 2]})
         df2 = pd.DataFrame({"x": [3, 4]})
         assert compute_dataframe_hash(df1) != compute_dataframe_hash(df2)
+
+    def test_sort_columns_same_data_different_order(self):
+        df1 = pd.DataFrame({"id": [1, 2, 3], "value": ["a", "b", "c"]})
+        df2 = pd.DataFrame({"id": [3, 1, 2], "value": ["c", "a", "b"]})
+        h1 = compute_dataframe_hash(df1, sort_columns=["id"])
+        h2 = compute_dataframe_hash(df2, sort_columns=["id"])
+        assert h1 == h2
 
 
 # ---------- has_content_changed (via get/set round-trip) ----------

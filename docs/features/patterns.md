@@ -53,6 +53,7 @@ Tracks history by creating new rows for updates. When a tracked column changes, 
 | `keys` | list | Yes | - | Natural keys to identify unique entities |
 | `track_cols` | list | Yes | - | Columns to monitor for changes |
 | `effective_time_col` | string | Yes | - | Source column indicating when the change occurred |
+| `start_time_col` | string | No | `valid_from` | Name of the start timestamp column in target. Renamed from effective_time_col. |
 | `end_time_col` | string | No | `valid_to` | Name of the end timestamp column |
 | `current_flag_col` | string | No | `is_current` | Name of the current record flag column |
 | `delete_col` | string | No | `null` | Column indicating soft deletion (boolean) |

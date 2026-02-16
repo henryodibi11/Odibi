@@ -741,7 +741,7 @@ FunctionRegistry.register({name}, "{name}", {params_class})
 connections:
   local_data:
     type: local
-    path: ./data
+    base_path: ./data
 
 story:
   connection: local_data
@@ -752,19 +752,18 @@ system:
   path: _system
 
 pipelines:
-  - name: main_pipeline
+  - pipeline: main_pipeline
+    pattern: dimension
     nodes:
       - name: process_data
-        inputs:
-          input_1:
-            connection: local_data
-            path: {input_path}
-            format: {input_format}{transform_block}
-        outputs:
-          output_1:
-            connection: local_data
-            path: {output_path}
-            format: {output_format}
+        read:
+          connection: local_data
+          path: {input_path}
+          format: {input_format}{transform_block}
+        write:
+          connection: local_data
+          path: {output_path}
+          format: {output_format}
 """
 
     def validate_yaml(self, yaml_content: str) -> dict[str, Any]:

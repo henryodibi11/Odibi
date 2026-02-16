@@ -166,7 +166,7 @@ class TestSCD2PandasExistingTarget:
             {
                 "id": [1, 2],
                 "status": ["active", "gold"],
-                "updated_at": [datetime(2023, 6, 1), datetime(2023, 6, 1)],
+                "valid_from": [datetime(2023, 6, 1), datetime(2023, 6, 1)],
                 "valid_to": [None, None],
                 "is_current": [True, True],
             }
@@ -184,9 +184,10 @@ class TestSCD2PandasExistingTarget:
         ctx = _make_context(src)
         with (
             patch("os.path.exists", return_value=True),
-            patch("pandas.read_parquet", return_value=target_df),
+            patch("pandas.read_csv", return_value=target_df),
+            patch("pandas.DataFrame.to_csv"),
         ):
-            result = _scd2_pandas(ctx, src.copy(), _base_params())
+            result = _scd2_pandas(ctx, src.copy(), _base_params(target="target.csv"))
         df = result.df
         assert 3 in df["id"].values
         row3 = df[df["id"] == 3].iloc[0]
@@ -205,9 +206,10 @@ class TestSCD2PandasExistingTarget:
         ctx = _make_context(src)
         with (
             patch("os.path.exists", return_value=True),
-            patch("pandas.read_parquet", return_value=target_df),
+            patch("pandas.read_csv", return_value=target_df),
+            patch("pandas.DataFrame.to_csv"),
         ):
-            result = _scd2_pandas(ctx, src.copy(), _base_params())
+            result = _scd2_pandas(ctx, src.copy(), _base_params(target="target.csv"))
         df = result.df
         # id=1 appears once (unchanged), id=2 also once (from target)
         assert len(df[df["id"] == 1]) == 1
@@ -225,11 +227,12 @@ class TestSCD2PandasExistingTarget:
         ctx = _make_context(src)
         with (
             patch("os.path.exists", return_value=True),
-            patch("pandas.read_parquet", return_value=target_df),
+            patch("pandas.read_csv", return_value=target_df),
+            patch("pandas.DataFrame.to_csv"),
         ):
-            result = _scd2_pandas(ctx, src.copy(), _base_params())
+            result = _scd2_pandas(ctx, src.copy(), _base_params(target="target.csv"))
         df = result.df
-        rows_id1 = df[df["id"] == 1].sort_values("updated_at")
+        rows_id1 = df[df["id"] == 1].sort_values("valid_from")
         assert len(rows_id1) == 2
 
         old = rows_id1.iloc[0]
@@ -314,9 +317,10 @@ class TestSCD2PandasCSVTarget:
 class TestSCD2ConnectionResolution:
     """Tests for connection + path resolution via the scd2 entry point."""
 
-    def test_connection_found_resolves_path(self):
+    def test_connection_found_resolves_path(self, tmp_path):
         conn = MagicMock()
-        conn.get_path.return_value = "/resolved/dim.parquet"
+        resolved = str(tmp_path / "dim.parquet")
+        conn.get_path.return_value = resolved
         engine = MagicMock()
         engine.connections = {"adls_prod": conn}
 

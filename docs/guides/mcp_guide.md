@@ -1,17 +1,18 @@
 # Odibi MCP Server Guide
 
-The **odibi-knowledge** MCP (Model Context Protocol) server exposes 53 knowledge tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines. Execution is done via shell commands.
+The **odibi-knowledge** MCP (Model Context Protocol) server exposes 15 knowledge tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines. Execution is done via shell commands.
 
-## Smart Discovery Tools (New!)
+## Smart Discovery Tools
 
-These tools enable the "Lazy Bronze" workflow - point at a data source and get a working bronze layer:
+These tools help you explore data sources and understand what exists:
 
 | Tool | Description |
 |------|-------------|
 | `map_environment` | Scout a connection (storage or SQL) to understand what exists. Returns folder structure, file patterns, table counts, and recommendations. |
 | `profile_source` | Self-correcting profiler that figures out how to read a file or table. Detects encoding, delimiter, skip rows, schema. Iterates until data looks right. |
-| `generate_bronze_node` | Generate Odibi YAML for a bronze layer node from a profile result. |
-| `test_node` | Test a node definition in-memory without persisting. Validates output and suggests fixes. |
+| `profile_folder` | Batch profiler - profile all files in a folder, group by options. |
+
+> **Note:** For generating bronze layer YAML, write YAML manually following [docs/reference/yaml_schema.md](../reference/yaml_schema.md).
 
 ### Inline Connection Specs
 
@@ -35,15 +36,14 @@ map_environment({
 
 **Security:** Secrets must use `${ENV_VAR}` syntax. Plaintext passwords are rejected.
 
-### Lazy Bronze Workflow
+### Discovery Workflow
 
 ```
 1. map_environment(connection)          → What's here?
 2. profile_source(connection, path)     → How do I read it?
-3. generate_bronze_node(profile)        → Give me the YAML
-4. test_node(yaml)                      → Verify it works
-5. [iterate if needed]                  → Fix issues
-6. Save to project                      → Done!
+3. Write YAML manually                  → Follow docs/reference/yaml_schema.md
+4. validate_yaml(yaml_content)          → Verify syntax
+5. Run pipeline via shell               → python -m odibi run X.yaml
 ```
 
 ## Quick Start
@@ -91,7 +91,7 @@ Use odibi MCP list_transformers
 
 ---
 
-## Available Tools (53 Total)
+## Available Tools (15 Total)
 
 ### 🚀 Start Here: Bootstrap Tool
 
@@ -99,7 +99,15 @@ Use odibi MCP list_transformers
 |------|-------------|---------|
 | `bootstrap_context` | **CALL FIRST** - Auto-gather full project context (connections, pipelines, outputs, patterns, YAML rules) | `{}` |
 
-### Knowledge Tools (21)
+### Discovery Tools (3)
+
+| Tool | Description | Example |
+|------|-------------|---------|
+| `map_environment` | **Scout connection** - understand what exists, detect patterns. Call FIRST | `{"connection": "my_adls", "path": "raw/"}` |
+| `profile_source` | **Self-correcting profiler** - figures out encoding, delimiter, skip rows | `{"connection": "my_adls", "path": "raw/data.csv"}` |
+| `profile_folder` | **Batch profiler** - profile all files in a folder, group by options | `{"connection": "my_adls", "folder_path": "raw/", "pattern": "*.csv"}` |
+
+### Knowledge Tools (5)
 
 | Tool | Description | Example |
 |------|-------------|---------|
@@ -107,90 +115,35 @@ Use odibi MCP list_transformers
 | `list_patterns` | List all 6 DWH patterns | `{}` |
 | `list_connections` | List connection types | `{}` |
 | `explain` | Get detailed docs for any feature | `{"name": "scd2"}` |
-| `get_transformer_signature` | Correct transformer signature | `{}` |
-| `get_yaml_structure` | Correct YAML structure | `{}` |
-| `get_deep_context` | Full 69K char framework docs | `{}` |
-| `get_index_stats` | Codebase index statistics | `{}` |
-| `list_docs` | List documentation files | `{"category": "patterns"}` |
-| `search_docs` | Search documentation | `{"query": "SCD2"}` |
-| `get_doc` | Get specific doc file | `{"doc_path": "docs/patterns/scd2.md"}` |
+| `get_validation_rules` | Available validation rules | `{}` |
+
+> **Note:** For YAML structure reference, see [docs/reference/yaml_schema.md](../reference/yaml_schema.md). For codebase questions, use grep on the `docs/` folder.
+
+### Validation & Debug Tools (2)
+
+| Tool | Description | Example |
+|------|-------------|---------|
 | `validate_yaml` | Validate pipeline YAML | `{"yaml_content": "..."}` |
 | `diagnose_error` | Get fix suggestions for errors | `{"error_message": "KeyError: 'col'"}` |
-| `get_example` | Get pattern example YAML | `{"pattern_name": "dimension"}` |
-| `suggest_pattern` | Suggest pattern for use case | `{"use_case": "track changes"}` |
-| `get_engine_differences` | Spark/Pandas/Polars differences | `{}` |
-| `get_validation_rules` | Available validation rules | `{}` |
-| `generate_transformer` | Generate transformer code | `{"name": "my_func", ...}` |
-| `generate_pipeline_yaml` | Generate pipeline YAML | `{"project_name": "test", ...}` |
-| `query_codebase` | Search odibi source code | `{"question": "how does SCD2 work?"}` |
-| `reindex` | Rebuild codebase index | `{"force": true}` |
 
-### Story/Run Tools (4)
+### Story/Run Tools (1)
 
 | Tool | Description | Example |
 |------|-------------|---------|
 | `story_read` | Get pipeline run status | `{"pipeline": "bronze"}` |
-| `story_diff` | Compare two runs | `{"pipeline": "bronze", "run_a": "...", "run_b": "..."}` |
-| `node_describe` | Get node execution details | `{"pipeline": "bronze", "node": "my_node"}` |
 
-### Sample Data Tools (3)
+### Sample Data Tools (2)
 
 | Tool | Description | Example |
 |------|-------------|---------|
 | `node_sample` | Get node output sample | `{"pipeline": "bronze", "node": "my_node", "max_rows": 10}` |
-| `node_sample_in` | Get node input sample | `{"pipeline": "bronze", "node": "my_node"}` |
 | `node_failed_rows` | Get validation failures | `{"pipeline": "bronze", "node": "my_node"}` |
 
-### Catalog/Stats Tools (4)
+### Lineage Tools (1)
 
 | Tool | Description | Example |
 |------|-------------|---------|
-| `node_stats` | Node execution statistics | `{"pipeline": "bronze", "node": "my_node"}` |
-| `pipeline_stats` | Pipeline-level statistics | `{"pipeline": "bronze"}` |
-| `failure_summary` | Recent failures across pipelines | `{"max_failures": 100}` |
-| `schema_history` | Schema changes over time | `{"pipeline": "bronze", "node": "my_node"}` |
-
-> **Note:** Catalog tools require `skip_catalog_writes: false` in your config. They return empty results when disabled.
-
-### Lineage Tools (3)
-
-| Tool | Description | Example |
-|------|-------------|---------|
-| `lineage_upstream` | Find upstream dependencies | `{"pipeline": "bronze", "node": "my_node", "depth": 3}` |
-| `lineage_downstream` | Find downstream dependents | `{"pipeline": "bronze", "node": "my_node", "depth": 3}` |
 | `lineage_graph` | Full pipeline lineage graph | `{"pipeline": "bronze", "include_external": true}` |
-
-### Schema Tools (3)
-
-| Tool | Description | Example |
-|------|-------------|---------|
-| `list_outputs` | List pipeline outputs | `{"pipeline": "bronze"}` |
-| `output_schema` | Get output column schema | `{"pipeline": "bronze", "output_name": "my_node"}` |
-| `compare_schemas` | Compare schemas between two sources | `{"source_connection": "raw", "source_path": "data.csv", "target_connection": "bronze", "target_path": "output.parquet"}` |
-
-### Discovery Tools (12)
-
-| Tool | Description | Example |
-|------|-------------|---------|
-| `map_environment` | **Scout connection** - understand what exists, detect patterns. Call FIRST | `{"connection": "my_adls", "path": "raw/"}` |
-| `profile_source` | **Self-correcting profiler** - figures out encoding, delimiter, skip rows | `{"connection": "my_adls", "path": "raw/data.csv"}` |
-| `profile_folder` | **Batch profiler** - profile all files in a folder, group by options | `{"connection": "my_adls", "folder_path": "raw/", "pattern": "*.csv"}` |
-| `generate_bronze_node` | **Generate bronze YAML** from profile result | `{"profile": {...}, "output_connection": "bronze"}` |
-| `test_node` | **Test node in-memory** - validate before saving | `{"node_yaml": "...", "max_rows": 100}` |
-| `list_schemas` | List schemas in SQL database with table counts | `{"connection": "my_sql"}` |
-| `describe_table` | Describe SQL table (quick metadata) | `{"connection": "my_sql", "table": "my_table"}` |
-| `list_sheets` | List sheet names in Excel file | `{"connection": "my_conn", "path": "data.xlsx"}` |
-| `debug_env` | Debug environment setup - shows .env loading, env vars, and connection status | `{}` |
-| `diagnose` | Diagnose MCP environment - check paths, env vars, connections | `{}` |
-| `diagnose_path` | Check if a specific path exists and list contents | `{"path": "projects/data"}` |
-
-### Download Tools (3) - For AI Local Analysis
-
-| Tool | Description | Example |
-|------|-------------|---------|
-| `download_sql` | Run SQL query and save results locally (Parquet/CSV/JSON) | `{"connection": "wwi", "query": "SELECT * FROM Sales.Orders", "output_path": "./orders.parquet"}` |
-| `download_table` | Download entire table to local file | `{"connection": "wwi", "table": "Sales.Orders", "output_path": "./orders.parquet", "limit": 5000}` |
-| `download_file` | Copy ADLS/storage file to local filesystem | `{"connection": "raw_adls", "source_path": "reports/daily.csv", "output_path": "./daily.csv"}` |
 
 ### Execution - Use Shell!
 
@@ -210,9 +163,7 @@ Get-ChildItem -Recurse -Filter "*.yaml"  # Find files
 
 ## Common Workflows
 
-### 1. Lazy Bronze (Recommended!)
-
-Point at a data source and get a working bronze layer:
+### 1. Explore Available Data
 
 ```
 Use odibi MCP map_environment with connection="raw_adls", path="/"
@@ -220,50 +171,54 @@ Use odibi MCP map_environment with connection="raw_adls", path="/"
 
 Use odibi MCP profile_source with connection="raw_adls", path="Reliability_Report/IP24.csv"
 → {encoding: "windows-1252", delimiter: "\t", skipRows: 5, schema: [...], confidence: 0.94}
-
-Use odibi MCP generate_bronze_node with profile={...from above...}
-→ YAML node definition ready to use
-
-Use odibi MCP test_node with node_yaml="..."
-→ {status: "success", rows_read: 1234, ready_to_save: true}
 ```
 
-### 2. Explore Available Data
+### 2. Build a New Pipeline
 
 ```
-Use odibi MCP map_environment with connection="my_adls", path="raw/"
-→ Shows all files, tables, patterns detected
+Use odibi MCP list_patterns
+→ Review available patterns (Dimension, Fact, SCD2, Merge, Aggregation, Date Dimension)
 
-Use odibi MCP profile_source with connection="my_adls", path="raw/customers.csv"
-→ Returns full schema, sample data, encoding, delimiter, AI suggestions
-```
+Use odibi MCP explain with name="scd2"
+→ Get detailed documentation on the pattern
 
-### 3. Build a New Pipeline
-
-```
-Use odibi MCP get_yaml_structure
-Use odibi MCP suggest_pattern with use_case="build customer dimension with history"
-Use odibi MCP get_example with pattern_name="dimension"
 Use odibi MCP list_transformers
+→ Find transformers you need
+
+# Write YAML manually following docs/reference/yaml_schema.md
+# Then validate:
+Use odibi MCP validate_yaml with yaml_content="..."
 ```
 
-### 4. Debug a Failed Run
+### 3. Debug a Failed Run
 
 ```
 Use odibi MCP story_read with pipeline="bronze"
-Use odibi MCP node_describe with pipeline="bronze", node="failed_node"
-Use odibi MCP node_sample_in with pipeline="bronze", node="failed_node"
+→ See which node failed
+
+Use odibi MCP node_sample with pipeline="bronze", node="failed_node"
+→ Check output data
+
 Use odibi MCP node_failed_rows with pipeline="bronze", node="failed_node"
+→ See validation failures
+
 Use odibi MCP diagnose_error with error_message="<the error message>"
+→ Get fix suggestions
 ```
 
-### 5. Understand the Framework
+### 4. Understand the Framework
 
 ```
-Use odibi MCP get_deep_context
 Use odibi MCP explain with name="scd2"
-Use odibi MCP search_docs with query="validation"
-Use odibi MCP query_codebase with question="how does merge pattern work?"
+→ Detailed docs for any feature
+
+Use odibi MCP list_transformers
+→ See all available transformers
+
+Use odibi MCP get_validation_rules
+→ See available validation rules
+
+# For deeper questions, use grep on docs/ folder
 ```
 
 ---
@@ -303,17 +258,13 @@ connections:
 | `map_environment` | ✅ | Scout any connection (files, tables, patterns) |
 | `profile_source` | ✅ | Profile any file/table with full schema |
 | `profile_folder` | ✅ | Batch profile all files in a folder |
-| `describe_table` | ✅ | Get column info from SQL |
-| `list_schemas` | ✅ | List SQL schemas with table counts |
-| `list_sheets` | ✅ | Excel sheet names |
-| `generate_bronze_node` | ✅ | Generate YAML from profile |
-| `test_node` | ✅ | Test generated YAML |
-| `list_projects` | ✅ | List all projects in ODIBI_PROJECTS_DIR |
 | `story_read` | ✅* | Auto-discovers from ODIBI_PROJECTS_DIR |
 | `node_sample` | ✅* | Auto-discovers from ODIBI_PROJECTS_DIR |
-| `lineage_*` | ✅* | Auto-discovers from ODIBI_PROJECTS_DIR |
+| `lineage_graph` | ✅* | Auto-discovers from ODIBI_PROJECTS_DIR |
 
 *These tools auto-discover projects from `ODIBI_PROJECTS_DIR` by pipeline name.
+
+> **Note:** For generating bronze layer YAML, write YAML manually following [docs/reference/yaml_schema.md](../reference/yaml_schema.md).
 
 ### Example Workflow
 
@@ -325,7 +276,8 @@ connections:
    ```
    Use odibi MCP map_environment with connection="my_sql"
    Use odibi MCP profile_source with connection="my_sql", path="dbo.customers"
-   Use odibi MCP generate_bronze_node → saves to projects/ folder
+   # Write YAML manually following docs/reference/yaml_schema.md
+   Use odibi MCP validate_yaml with yaml_content="..."
    ```
 4. **Run pipeline**: `python -m odibi run projects/my_project.yaml`
 5. **Ask AI to sample**: `Use odibi MCP node_sample with pipeline="my_pipeline", node="my_node"`
@@ -351,10 +303,6 @@ The MCP server reads your `odibi.yaml` to access:
 | `MCP_CONFIG` | Path to MCP-specific config (optional) |
 | `ODIBI_USE_TFIDF_EMBEDDINGS` | Set to `1` on Windows to use keyword search fallback |
 
-### Windows Notes
-
-On Windows, the `query_codebase` and `reindex` tools use a keyword-based fallback instead of semantic embeddings due to PyTorch DLL issues. This is automatic when using `run_mcp.py`.
-
 ---
 
 ## Troubleshooting
@@ -363,20 +311,13 @@ On Windows, the `query_codebase` and `reindex` tools use a keyword-based fallbac
 
 Make sure `ODIBI_CONFIG` points to a valid odibi.yaml file.
 
-### Empty results from catalog tools
+### Empty results from story/sample tools
 
-Check your config has `skip_catalog_writes: false`. Catalog tools need the system catalog to be populated.
+Ensure pipelines have been run at least once and story files exist.
 
-### "No outputs found" for list_outputs
+### YAML validation fails
 
-Ensure your pipeline nodes have `write:` blocks defined with `connection`, `path`, and `format`.
-
-### query_codebase crashes on Windows
-
-This is handled automatically by the keyword fallback. If you still have issues, set:
-```bash
-set ODIBI_USE_TFIDF_EMBEDDINGS=1
-```
+Check your YAML against [docs/reference/yaml_schema.md](../reference/yaml_schema.md) for the correct structure.
 
 ---
 

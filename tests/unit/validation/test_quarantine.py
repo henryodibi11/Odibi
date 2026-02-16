@@ -15,6 +15,7 @@ import pytest
 from odibi.config import (
     AcceptedValuesTest,
     ContractSeverity,
+    CustomSQLTest,
     NotNullTest,
     QuarantineColumnsConfig,
     QuarantineConfig,
@@ -936,3 +937,231 @@ class TestWriteQuarantinePolars:
         result = write_quarantine(empty_df, config, MockWriteEngine(), connections)
 
         assert result["rows_quarantined"] == 0
+
+
+class TestEvaluateTestMaskPandasExtended:
+    """Additional Pandas-path tests for _evaluate_test_mask to cover remaining branches."""
+
+    def test_unique_test_returns_all_true(self):
+        """UNIQUE test type returns all-True mask (checked at aggregate level)."""
+        df = pd.DataFrame({"id": [1, 2, 2, 3]})
+        test = UniqueTest(
+            type=TestType.UNIQUE,
+            columns=["id"],
+            on_fail=ContractSeverity.QUARANTINE,
+        )
+        mask = _evaluate_test_mask(df, test, is_spark=False, is_polars=False)
+        assert mask.all()
+        assert len(mask) == 4
+
+    def test_custom_sql_valid_condition(self):
+        """CUSTOM_SQL mask filters rows using df.query()."""
+        df = pd.DataFrame({"amount": [10, -5, 20, 0, 15]})
+        test = CustomSQLTest(
+            type=TestType.CUSTOM_SQL,
+            condition="amount > 0",
+            on_fail=ContractSeverity.QUARANTINE,
+        )
+        mask = _evaluate_test_mask(df, test, is_spark=False, is_polars=False)
+        assert mask.sum() == 3
+        assert not mask.iloc[1]
+        assert not mask.iloc[3]
+
+    def test_custom_sql_invalid_condition_returns_all_true(self):
+        """CUSTOM_SQL with bad condition falls back to all-True mask."""
+        df = pd.DataFrame({"amount": [10, 20, 30]})
+        test = CustomSQLTest(
+            type=TestType.CUSTOM_SQL,
+            condition="INVALID SYNTAX !!!",
+            on_fail=ContractSeverity.QUARANTINE,
+        )
+        mask = _evaluate_test_mask(df, test, is_spark=False, is_polars=False)
+        assert mask.all()
+
+    def test_regex_match_missing_column_returns_all_true(self):
+        """REGEX_MATCH with missing column returns all-True mask."""
+        df = pd.DataFrame({"other_col": ["a", "b", "c"]})
+        test = RegexMatchTest(
+            type=TestType.REGEX_MATCH,
+            column="nonexistent",
+            pattern=r".*",
+            on_fail=ContractSeverity.QUARANTINE,
+        )
+        mask = _evaluate_test_mask(df, test, is_spark=False, is_polars=False)
+        assert mask.all()
+
+    def test_accepted_values_missing_column_returns_all_true(self):
+        """ACCEPTED_VALUES with missing column returns all-True mask."""
+        df = pd.DataFrame({"other_col": ["a", "b", "c"]})
+        test = AcceptedValuesTest(
+            type=TestType.ACCEPTED_VALUES,
+            column="nonexistent",
+            values=["x", "y"],
+            on_fail=ContractSeverity.QUARANTINE,
+        )
+        mask = _evaluate_test_mask(df, test, is_spark=False, is_polars=False)
+        assert mask.all()
+
+    def test_not_null_all_columns_missing(self):
+        """NOT_NULL with all columns missing returns all-True mask."""
+        df = pd.DataFrame({"other_col": [1, 2, 3]})
+        test = NotNullTest(
+            type=TestType.NOT_NULL,
+            columns=["missing_a", "missing_b"],
+            on_fail=ContractSeverity.QUARANTINE,
+        )
+        mask = _evaluate_test_mask(df, test, is_spark=False, is_polars=False)
+        assert mask.all()
+        assert len(mask) == 3
+
+
+class TestSplitValidInvalidExtended:
+    """Additional split_valid_invalid tests for uncovered Pandas branches."""
+
+    @pytest.fixture
+    def mock_engine(self):
+        return MockEngine()
+
+    def test_duplicate_test_names_are_deduplicated(self, mock_engine):
+        """Tests with the same name get a suffix to avoid key collision."""
+        df = pd.DataFrame({"id": [1, None, 3], "value": [10, 20, None]})
+        tests = [
+            NotNullTest(
+                type=TestType.NOT_NULL,
+                columns=["id"],
+                on_fail=ContractSeverity.QUARANTINE,
+                name="null_check",
+            ),
+            NotNullTest(
+                type=TestType.NOT_NULL,
+                columns=["value"],
+                on_fail=ContractSeverity.QUARANTINE,
+                name="null_check",
+            ),
+        ]
+        result = split_valid_invalid(df, tests, mock_engine)
+        assert result.rows_quarantined == 2
+        assert result.rows_valid == 1
+        test_names = list(result.test_results.keys())
+        assert len(test_names) == 2
+        assert test_names[0] != test_names[1]
+
+    def test_test_results_populated_with_counts(self, mock_engine):
+        """test_results dict contains pass_count and fail_count per test."""
+        df = pd.DataFrame({"id": [1, None, 3, None, 5]})
+        tests = [
+            NotNullTest(
+                type=TestType.NOT_NULL,
+                columns=["id"],
+                on_fail=ContractSeverity.QUARANTINE,
+                name="id_not_null",
+            )
+        ]
+        result = split_valid_invalid(df, tests, mock_engine)
+        assert "id_not_null" in result.test_results
+        assert result.test_results["id_not_null"]["pass_count"] == 3
+        assert result.test_results["id_not_null"]["fail_count"] == 2
+
+    def test_mixed_quarantine_and_non_quarantine_tests(self, mock_engine):
+        """Only QUARANTINE-severity tests affect the split."""
+        df = pd.DataFrame({"id": [1, None, 3], "value": [None, 20, 30]})
+        tests = [
+            NotNullTest(
+                type=TestType.NOT_NULL,
+                columns=["id"],
+                on_fail=ContractSeverity.QUARANTINE,
+            ),
+            NotNullTest(
+                type=TestType.NOT_NULL,
+                columns=["value"],
+                on_fail=ContractSeverity.FAIL,
+            ),
+        ]
+        result = split_valid_invalid(df, tests, mock_engine)
+        assert result.rows_quarantined == 1
+        assert result.rows_valid == 2
+
+    def test_custom_sql_quarantine_integration(self, mock_engine):
+        """CUSTOM_SQL test works end-to-end through split_valid_invalid."""
+        df = pd.DataFrame({"price": [10, -5, 20, -1, 15]})
+        tests = [
+            CustomSQLTest(
+                type=TestType.CUSTOM_SQL,
+                condition="price > 0",
+                on_fail=ContractSeverity.QUARANTINE,
+                name="positive_price",
+            )
+        ]
+        result = split_valid_invalid(df, tests, mock_engine)
+        assert result.rows_quarantined == 2
+        assert result.rows_valid == 3
+        assert all(result.invalid_df["price"] <= 0)
+
+
+class TestAddQuarantineMetadataExtended:
+    """Additional add_quarantine_metadata tests for Pandas path."""
+
+    @pytest.fixture
+    def mock_engine(self):
+        return MockEngine()
+
+    def test_metadata_with_unnamed_tests(self, mock_engine):
+        """Tests without names use type value as fallback."""
+        invalid_df = pd.DataFrame({"id": [None]})
+        tests = [
+            NotNullTest(
+                type=TestType.NOT_NULL,
+                columns=["id"],
+                on_fail=ContractSeverity.QUARANTINE,
+            )
+        ]
+        config = QuarantineColumnsConfig(
+            rejection_reason=True,
+            rejected_at=False,
+            source_batch_id=False,
+            failed_tests=True,
+            original_node=False,
+        )
+        result = add_quarantine_metadata(
+            invalid_df,
+            test_results={},
+            config=config,
+            engine=mock_engine,
+            node_name="node",
+            run_id="run-1",
+            tests=tests,
+        )
+        assert "not_null" in result["_failed_tests"].iloc[0]
+
+    def test_metadata_only_original_node(self, mock_engine):
+        """Only original_node column is added when others are disabled."""
+        invalid_df = pd.DataFrame({"id": [None]})
+        tests = [
+            NotNullTest(
+                type=TestType.NOT_NULL,
+                columns=["id"],
+                on_fail=ContractSeverity.QUARANTINE,
+            )
+        ]
+        config = QuarantineColumnsConfig(
+            rejection_reason=False,
+            rejected_at=False,
+            source_batch_id=False,
+            failed_tests=False,
+            original_node=True,
+        )
+        result = add_quarantine_metadata(
+            invalid_df,
+            test_results={},
+            config=config,
+            engine=mock_engine,
+            node_name="my_node",
+            run_id="run-1",
+            tests=tests,
+        )
+        assert "_original_node" in result.columns
+        assert result["_original_node"].iloc[0] == "my_node"
+        assert "_rejection_reason" not in result.columns
+        assert "_rejected_at" not in result.columns
+        assert "_source_batch_id" not in result.columns
+        assert "_failed_tests" not in result.columns

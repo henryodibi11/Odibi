@@ -5,16 +5,15 @@ from odibi.utils.logging import StructuredLogger
 
 def test_secret_redaction(caplog):
     """Test that registered secrets are redacted from logs."""
-    caplog.set_level(logging.INFO)
     logger = StructuredLogger(structured=False)
+    logger.logger.propagate = True
 
     secret = "super_secret_password"
     logger.register_secret(secret)
 
-    # Test direct message redaction
-    logger.info(f"Connecting with password: {secret}")
+    with caplog.at_level(logging.INFO, logger="odibi"):
+        logger.info(f"Connecting with password: {secret}")
 
-    # Check log records
     assert len(caplog.records) > 0
     assert "password: [REDACTED]" in caplog.text
     assert secret not in caplog.text
@@ -23,13 +22,14 @@ def test_secret_redaction(caplog):
 def test_kwargs_redaction(caplog):
     """Test that kwargs values are redacted."""
     caplog.clear()
-    caplog.set_level(logging.INFO)
     logger = StructuredLogger(structured=False)
+    logger.logger.propagate = True
 
     key = "my_api_key"
     logger.register_secret(key)
 
-    logger.info("Authenticating", api_key=key)
+    with caplog.at_level(logging.INFO, logger="odibi"):
+        logger.info("Authenticating", api_key=key)
 
     assert len(caplog.records) > 0
     assert "api_key=[REDACTED]" in caplog.text

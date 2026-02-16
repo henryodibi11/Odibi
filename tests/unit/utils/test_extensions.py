@@ -1,15 +1,76 @@
-"""Unit tests for odibi/utils/extensions.py."""
+"""Tests for extension loading utilities."""
 
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 
 from odibi.utils import extensions
+from odibi.utils.extensions import load_extensions
 
 
+@pytest.fixture(autouse=True)
+def _cleanup_sys(tmp_path):
+    """Remove test artifacts from sys.path and sys.modules after each test."""
+    original_path = sys.path.copy()
+    original_modules = set(sys.modules.keys())
+    yield
+    sys.path[:] = original_path
+    for key in list(sys.modules.keys()):
+        if key not in original_modules:
+            del sys.modules[key]
+
+
+@patch("odibi.utils.extensions.logger")
 class TestLoadExtensions:
-    """Tests for load_extensions function."""
+    def test_loads_transforms(self, mock_logger, tmp_path):
+        (tmp_path / "transforms.py").write_text("LOADED = True\n")
+        load_extensions(tmp_path)
+        assert "transforms" in sys.modules
+        assert sys.modules["transforms"].LOADED is True
+        mock_logger.info.assert_called_once()
+
+    def test_loads_plugins(self, mock_logger, tmp_path):
+        (tmp_path / "plugins.py").write_text("PLUGIN_LOADED = True\n")
+        load_extensions(tmp_path)
+        assert "plugins" in sys.modules
+        assert sys.modules["plugins"].PLUGIN_LOADED is True
+
+    def test_loads_both(self, mock_logger, tmp_path):
+        (tmp_path / "transforms.py").write_text("T = 1\n")
+        (tmp_path / "plugins.py").write_text("P = 2\n")
+        load_extensions(tmp_path)
+        assert sys.modules["transforms"].T == 1
+        assert sys.modules["plugins"].P == 2
+        assert mock_logger.info.call_count == 2
+
+    def test_no_files_no_error(self, mock_logger, tmp_path):
+        load_extensions(tmp_path)
+        assert "transforms" not in sys.modules
+        assert "plugins" not in sys.modules
+        mock_logger.info.assert_not_called()
+        mock_logger.warning.assert_not_called()
+
+    def test_import_error_logged_not_raised(self, mock_logger, tmp_path):
+        (tmp_path / "transforms.py").write_text("def bad(\n")
+        load_extensions(tmp_path)
+        mock_logger.warning.assert_called_once()
+        args = mock_logger.warning.call_args
+        assert "Failed to load transforms.py" in args[0][0]
+
+    def test_adds_path_to_sys_path(self, mock_logger, tmp_path):
+        load_extensions(tmp_path)
+        assert str(tmp_path) in sys.path
+
+    def test_no_duplicate_sys_path(self, mock_logger, tmp_path):
+        load_extensions(tmp_path)
+        load_extensions(tmp_path)
+        assert sys.path.count(str(tmp_path)) == 1
+
+
+class TestLoadExtensionsEdgeCases:
+    """Comprehensive edge case tests for load_extensions function."""
 
     def test_load_extensions_with_valid_transforms_py(self, tmp_path):
         """Test loading valid transforms.py file."""
@@ -85,49 +146,30 @@ class CustomPlugin:
 
     def test_load_extensions_adds_path_to_sys_path(self, tmp_path):
         """Test that the path is added to sys.path."""
-        original_sys_path = sys.path.copy()
-        try:
-            extensions.load_extensions(tmp_path)
-            assert str(tmp_path) in sys.path
-        finally:
-            # Restore original sys.path
-            sys.path = original_sys_path
+        extensions.load_extensions(tmp_path)
+        assert str(tmp_path) in sys.path
 
     def test_load_extensions_does_not_duplicate_path(self, tmp_path):
         """Test that the same path is not added to sys.path multiple times."""
-        original_sys_path = sys.path.copy()
-        try:
-            # Add the path first
-            sys.path.append(str(tmp_path))
-            initial_count = sys.path.count(str(tmp_path))
+        # Add the path first
+        sys.path.append(str(tmp_path))
+        initial_count = sys.path.count(str(tmp_path))
 
-            extensions.load_extensions(tmp_path)
-            final_count = sys.path.count(str(tmp_path))
+        extensions.load_extensions(tmp_path)
+        final_count = sys.path.count(str(tmp_path))
 
-            # Should not increase the count
-            assert final_count == initial_count
-        finally:
-            # Restore original sys.path
-            sys.path = original_sys_path
+        # Should not increase the count
+        assert final_count == initial_count
 
     def test_load_extensions_module_added_to_sys_modules(self, tmp_path):
         """Test that loaded modules are added to sys.modules."""
         transforms_file = tmp_path / "transforms.py"
         transforms_file.write_text("# simple module")
 
-        try:
-            # Remove 'transforms' from sys.modules if it exists before the test
-            if "transforms" in sys.modules:
-                del sys.modules["transforms"]
+        extensions.load_extensions(tmp_path)
 
-            extensions.load_extensions(tmp_path)
-
-            # Should have added 'transforms' to sys.modules
-            assert "transforms" in sys.modules
-        finally:
-            # Clean up sys.modules
-            if "transforms" in sys.modules:
-                del sys.modules["transforms"]
+        # Should have added 'transforms' to sys.modules
+        assert "transforms" in sys.modules
 
     def test_load_extensions_with_runtime_error(self, tmp_path):
         """Test loading file that raises error during execution."""
@@ -184,32 +226,21 @@ class DataTransformer:
 """
         )
 
-        original_modules = set(sys.modules.keys())
-        try:
-            with patch("odibi.utils.extensions.logger") as mock_logger:
-                extensions.load_extensions(tmp_path)
-                mock_logger.info.assert_called()
+        with patch("odibi.utils.extensions.logger") as mock_logger:
+            extensions.load_extensions(tmp_path)
+            mock_logger.info.assert_called()
 
-                # Verify the module was loaded and is accessible
-                assert "transforms" in sys.modules
-        finally:
-            # Clean up
-            for mod in list(sys.modules.keys()):
-                if mod not in original_modules:
-                    del sys.modules[mod]
+            # Verify the module was loaded and is accessible
+            assert "transforms" in sys.modules
 
     def test_load_extensions_preserves_original_sys_path_order(self, tmp_path):
         """Test that load_extensions appends to sys.path, not prepends."""
-        original_sys_path = sys.path.copy()
         original_length = len(sys.path)
 
-        try:
-            extensions.load_extensions(tmp_path)
-            # Path should be added at the end
-            if str(tmp_path) not in original_sys_path:
-                assert sys.path.index(str(tmp_path)) >= original_length
-        finally:
-            sys.path = original_sys_path
+        extensions.load_extensions(tmp_path)
+        # Path should be added at the end
+        if str(tmp_path) not in sys.path[:original_length]:
+            assert sys.path.index(str(tmp_path)) >= original_length
 
     def test_load_extensions_logs_with_exc_info(self, tmp_path):
         """Test that warnings include exception info."""

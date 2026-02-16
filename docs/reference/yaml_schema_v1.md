@@ -3145,11 +3145,10 @@ params:
 **How it works:**
 1. **Match**: Finds existing records using `keys`.
 2. **Compare**: Checks `track_cols` to see if data changed.
-3. **Close**: If changed, updates the old record's `end_time_col` to the new `effective_time_col`.
-4. **Insert**: Adds a new record with `effective_time_col` as start and open-ended end date.
+3. **Close**: If changed, updates the old record's `valid_to` to the new effective time.
+4. **Insert**: Adds a new record with `valid_from` (renamed from `effective_time_col`), `valid_to = NULL`, and `is_current = true`.
 
-**Note:** SCD2 returns a DataFrame containing the full history. You must use a `write:` block
-to persist the result (typically with `mode: overwrite` to the same location as `target`).
+**Note:** SCD2 is self-contained — it writes directly to the target table on all engines. No `write:` block is needed.
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3160,6 +3159,7 @@ to persist the result (typically with `mode: overwrite` to the same location as 
 | **keys** | List[str] | Yes | - | Natural keys to identify unique entities |
 | **track_cols** | List[str] | Yes | - | Columns to monitor for changes |
 | **effective_time_col** | str | Yes | - | Source column indicating when the change occurred. |
+| **start_time_col** | str | No | `valid_from` | Name of the start timestamp column in target. The effective_time_col is renamed to this. |
 | **end_time_col** | str | No | `valid_to` | Name of the end timestamp column |
 | **current_flag_col** | str | No | `is_current` | Name of the current record flag column |
 | **delete_col** | Optional[str] | No | - | Column indicating soft deletion (boolean) |

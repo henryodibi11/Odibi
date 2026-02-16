@@ -381,6 +381,7 @@ pattern:
 | `keys` | list | Yes | Natural key columns |
 | `track_cols` | list | Yes | Columns to monitor for changes |
 | `effective_time_col` | str | Yes | Source column with change timestamp |
+| `start_time_col` | str | No | Default: `valid_from`. Renamed from effective_time_col in target. |
 | `end_time_col` | str | No | Default: `valid_to` |
 | `current_flag_col` | str | No | Default: `is_current` |
 | `delete_col` | str | No | Column indicating soft deletion |
@@ -411,17 +412,10 @@ params:
 **How It Works:**
 1. **Match**: Find existing records using `keys`
 2. **Compare**: Check `track_cols` for changes (uses `IS DISTINCT FROM` for null-safe comparison)
-3. **Close**: Update old record's `end_time_col` to `effective_time_col`, set `is_current=False`
-4. **Insert**: Add new record with `is_current=True`, open-ended `end_time_col`
+3. **Close**: Update old record's `valid_to` to the effective time, set `is_current=False`
+4. **Insert**: Add new record with `valid_from` (renamed from `effective_time_col`), `valid_to=NULL`, `is_current=True`
 
-**CRITICAL:** SCD2 returns the FULL history dataset. You MUST use `mode: overwrite`:
-```yaml
-write:
-  connection: silver
-  path: dim_customers
-  format: delta
-  mode: overwrite  # NOT append!
-```
+**Note:** SCD2 is self-contained — it writes directly to the target table on all engines. No `write:` block is needed.
 
 ---
 
@@ -1772,12 +1766,8 @@ nodes:
           keys: [customer_id]
           track_cols: [name, email, address, tier]
           effective_time_col: updated_at
-    write:
-      connection: adls_prod
-      path: silver/dim_customers
-      format: delta
-      mode: overwrite  # SCD2 returns full history!
 ```
+SCD2 is self-contained — it writes directly to the target table. No `write:` block is needed.
 
 **Step 3: Verify**
 ```python
@@ -1992,26 +1982,18 @@ nodes:
 
 **Error Message:** *"Invalid node name 'X' for Spark engine. Names must contain only alphanumeric characters and underscores"*
 
-### 18.2 SCD2 Mode Must Be Overwrite
+### 18.2 SCD2 Is Self-Contained (No Write Block Needed)
 
-❌ **Wrong:**
-```yaml
-transformer: scd2
-params:
-  target: dim_customers
-  ...
-write:
-  mode: append  # WRONG - duplicates history!
-```
+SCD2 writes directly to the target table on all engines. Do **not** add a `write:` block for SCD2 nodes — the transformer handles persistence internally.
 
 ✅ **Correct:**
 ```yaml
 transformer: scd2
 params:
   target: dim_customers
-  ...
-write:
-  mode: overwrite  # SCD2 returns FULL history
+  keys: [customer_id]
+  track_cols: [name, email]
+  # No write: block needed
 ```
 
 ### 18.3 Missing depends_on for Joins

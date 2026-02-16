@@ -69,8 +69,10 @@ class DummySparkDFLegacy:
     def isEmpty(self):
         return False
 
+    def select(self, columns):
+        return DummySparkDFLegacy(self._pandas_df[columns])
+
     def orderBy(self, sort_columns):
-        # Simulate ordering; in reality, this would sort the DataFrame.
         return self
 
     def toPandas(self):
@@ -192,5 +194,40 @@ def test_set_content_hash_in_state_with_none_backend():
     """test_set_content_hash_in_state_with_none_backend:
     If the state backend is None, the function should not raise an error.
     """
-    # Should not raise any exception when backend is None
     set_content_hash_in_state(None, "node1", "tableA", "hash_value")
+
+
+def test_compute_dummy_df_hash_with_columns_selects_subset():
+    df = pd.DataFrame({"x": [1, 2], "y": [3, 4], "z": [5, 6]})
+    dummy = DummySparkDFLegacy(df)
+    subset_df = df[["x", "y"]]
+    csv_bytes = subset_df.to_csv(index=False).encode("utf-8")
+    expected = hashlib.sha256(csv_bytes).hexdigest()
+    result = compute_spark_dataframe_hash(dummy, columns=["x", "y"], distributed=False)
+    assert result == expected
+
+
+def test_compute_dummy_df_hash_legacy_no_sort_columns():
+    df = pd.DataFrame({"a": [10, 20], "b": ["x", "y"]})
+    dummy = DummySparkDFLegacy(df)
+    csv_bytes = df.to_csv(index=False).encode("utf-8")
+    expected = hashlib.sha256(csv_bytes).hexdigest()
+    result = compute_spark_dataframe_hash(dummy, distributed=False)
+    assert result == expected
+
+
+def test_compute_dataframe_hash_sort_columns_no_column_filter():
+    df = pd.DataFrame({"id": [2, 1], "val": ["b", "a"]})
+    sorted_df = df.sort_values(["id"]).reset_index(drop=True)
+    csv_bytes = sorted_df.to_csv(index=False).encode("utf-8")
+    expected = hashlib.sha256(csv_bytes).hexdigest()
+    result = compute_dataframe_hash(df, sort_columns=["id"])
+    assert result == expected
+
+
+def test_compute_dataframe_hash_no_columns_no_sort():
+    df = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+    csv_bytes = df.to_csv(index=False).encode("utf-8")
+    expected = hashlib.sha256(csv_bytes).hexdigest()
+    result = compute_dataframe_hash(df)
+    assert result == expected

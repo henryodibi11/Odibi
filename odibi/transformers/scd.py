@@ -48,10 +48,21 @@ class SCD2Params(BaseModel):
     1. **Match**: Finds existing records using `keys`.
     2. **Compare**: Checks `track_cols` to see if data changed.
     3. **Close**: If changed, updates the old record's `end_time_col` to the new `effective_time_col`.
-    4. **Insert**: Adds a new record with `effective_time_col` as start and open-ended end date.
+    4. **Insert**: Adds a new record with `start_time_col` (renamed from `effective_time_col`)
+       as the version start, open-ended `end_time_col`, and `is_current = true`.
 
-    **Note:** SCD2 returns a DataFrame containing the full history. You must use a `write:` block
-    to persist the result (typically with `mode: overwrite` to the same location as `target`).
+    The ``effective_time_col`` (source column) is automatically renamed to ``start_time_col``
+    (default: ``valid_from``) in the target, giving each version a complete time window:
+    ``[valid_from, valid_to)``.
+
+    **Note:** SCD2 is self-contained — it writes directly to the target table on all
+    engines. No separate ``write:`` block is needed in your pipeline YAML.
+
+    On Spark with Delta targets, uses an optimized Delta MERGE by default
+    (``use_delta_merge: true``). Set ``use_delta_merge: false`` to use the legacy
+    full-overwrite approach (still self-contained, just slower for large tables).
+
+    On Pandas, writes directly to the target file (parquet or CSV).
     """
 
     target: Optional[str] = Field(
@@ -72,12 +83,22 @@ class SCD2Params(BaseModel):
         ...,
         description="Source column indicating when the change occurred.",
     )
+    start_time_col: str = Field(
+        default="valid_from",
+        description="Name of the start timestamp column in the target. "
+        "The effective_time_col value is renamed to this column.",
+    )
     end_time_col: str = Field(default="valid_to", description="Name of the end timestamp column")
     current_flag_col: str = Field(
         default="is_current", description="Name of the current record flag column"
     )
     delete_col: Optional[str] = Field(
         default=None, description="Column indicating soft deletion (boolean)"
+    )
+    use_delta_merge: bool = Field(
+        default=True,
+        description="Use Delta Lake MERGE for Spark engine (faster for large tables). "
+        "Falls back to full overwrite if target is not Delta format.",
     )
 
     @model_validator(mode="after")
@@ -94,7 +115,14 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
     """
     Implements SCD Type 2 Logic.
 
-    Returns the FULL history dataset (to be written via Overwrite).
+    SCD2 is self-contained: it writes directly to the target table on all
+    engines and code paths. No separate write: block is needed.
+
+    On Spark with use_delta_merge=True (default), uses an optimized Delta
+    MERGE that only touches changed rows. The legacy path reads the full
+    target, computes the union, and overwrites. Both write directly.
+
+    On Pandas, writes directly to the target file (parquet or CSV).
     """
     ctx = get_logging_context()
     start_time = time.time()
@@ -194,11 +222,42 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
 
     Compares source and target DataFrames, detects changes, closes old records, and inserts new versions
     according to SCD Type 2 rules. Handles both table and Delta path targets.
+
+    All code paths write directly to the target (self-contained).
+    When use_delta_merge is enabled, attempts the optimized Delta MERGE path first.
+    Falls back to the legacy full-overwrite approach if Delta MERGE is unavailable.
     """
     from pyspark.sql import functions as F
 
     spark = context.spark
 
+    # Define Columns
+    eff_col = params.effective_time_col
+    start_col = params.start_time_col
+    end_col = params.end_time_col
+    flag_col = params.current_flag_col
+
+    # Validate effective_time_col exists in source
+    source_cols = source_df.columns
+    if eff_col not in source_cols:
+        raise ValueError(
+            f"SCD2: effective_time_col '{eff_col}' not found in source DataFrame. "
+            f"Available columns: {source_cols}"
+        )
+
+    # Try optimized Delta MERGE path (avoids reading entire target)
+    if params.use_delta_merge:
+        try:
+            result = _scd2_spark_delta_merge(context, source_df, params)
+            if result is not None:
+                return result
+        except Exception as e:
+            get_logging_context().warning(
+                f"Delta MERGE path unavailable, using full overwrite: {e}",
+                target=params.target,
+            )
+
+    # Legacy path: read entire target, join in memory, return full history
     # 1. Check if target exists
     target_df = None
     try:
@@ -219,19 +278,6 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
             # Target doesn't exist yet - First Run
             pass
 
-    # Define Columns
-    eff_col = params.effective_time_col
-    end_col = params.end_time_col
-    flag_col = params.current_flag_col
-
-    # Validate effective_time_col exists in source
-    source_cols = source_df.columns
-    if eff_col not in source_cols:
-        raise ValueError(
-            f"SCD2: effective_time_col '{eff_col}' not found in source DataFrame. "
-            f"Available columns: {source_cols}"
-        )
-
     # Prepare Source: Add SCD metadata columns
     # New records start as Current
     new_records = source_df.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
@@ -239,10 +285,27 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
     )
 
     if target_df is None:
-        # First Run: Return Source prepared
-        # Drop effective_time_col as it's only used for SCD logic, not stored in target
+        # First Run: write directly to target
         if eff_col in new_records.columns:
-            new_records = new_records.drop(eff_col)
+            new_records = new_records.withColumnRenamed(eff_col, start_col)
+
+        is_path = (
+            "/" in params.target
+            or "\\" in params.target
+            or ":" in params.target
+            or params.target.startswith(".")
+        )
+        writer = new_records.write.format("delta").mode("overwrite")
+        if is_path:
+            writer.save(params.target)
+        else:
+            writer.saveAsTable(params.target)
+
+        get_logging_context().info(
+            "SCD2 legacy first run: wrote initial data directly to target",
+            target=params.target,
+        )
+
         return context.with_df(new_records)
 
     # 2. Logic: Compare Source vs Target (Current Records Only)
@@ -303,10 +366,9 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
         flag_col, F.lit(True)
     )
 
-    # Drop the effective_time_col (txn_date) from inserts since it's not part of target schema
-    # Target schema = source columns (minus eff_col) + end_col + flag_col
+    # Rename effective_time_col to start_time_col (e.g., txn_date → valid_from)
     if eff_col in rows_to_insert.columns:
-        rows_to_insert = rows_to_insert.drop(eff_col)
+        rows_to_insert = rows_to_insert.withColumnRenamed(eff_col, start_col)
 
     # B) Close Old Records
     # We need to update target_df.
@@ -363,18 +425,164 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
     )
 
     # 3. Union: Updated History + New Inserts
-    # Drop effective_time_col from final_target if it exists (legacy data migration)
-    # This ensures schema consistency with rows_to_insert which also drops eff_col
+    # Rename effective_time_col in final_target if it exists (legacy data migration)
     if eff_col in final_target.columns:
-        final_target = final_target.drop(eff_col)
+        final_target = final_target.withColumnRenamed(eff_col, start_col)
 
     # UnionByName handles column order differences
     final_df = final_target.unionByName(rows_to_insert)
 
+    # Write directly to target (self-contained, no external write: block needed)
+    is_path = (
+        "/" in params.target
+        or "\\" in params.target
+        or ":" in params.target
+        or params.target.startswith(".")
+    )
+    writer = final_df.write.format("delta").mode("overwrite")
+    if is_path:
+        writer.save(params.target)
+    else:
+        writer.saveAsTable(params.target)
+
+    get_logging_context().info(
+        "SCD2 legacy overwrite: wrote full history directly to target",
+        target=params.target,
+    )
+
     return context.with_df(final_df)
 
 
-def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> EngineContext:
+def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Params):
+    """
+    Optimized SCD2 using Delta Lake MERGE.
+
+    Instead of reading the entire target, joining in memory, and overwriting,
+    this uses Delta MERGE to only update affected rows. Much faster for large
+    tables with small change sets.
+
+    Returns None if target is not a Delta table (caller should fall back to
+    the legacy full-overwrite path).
+    """
+    from pyspark.sql import functions as F
+
+    try:
+        from delta.tables import DeltaTable
+    except ImportError:
+        return None
+
+    spark = context.spark
+    target = params.target
+    keys = params.keys
+    eff_col = params.effective_time_col
+    start_col = params.start_time_col
+    end_col = params.end_time_col
+    flag_col = params.current_flag_col
+    ctx = get_logging_context()
+
+    # Check if target is a Delta table
+    is_delta = False
+    delta_table = None
+    try:
+        delta_table = DeltaTable.forName(spark, target)
+        is_delta = True
+    except Exception:
+        try:
+            if DeltaTable.isDeltaTable(spark, target):
+                delta_table = DeltaTable.forPath(spark, target)
+                is_delta = True
+        except Exception:
+            pass
+
+    if not is_delta:
+        # Target doesn't exist yet or is not Delta — check for first run
+        target_exists = False
+        try:
+            spark.table(target)
+            target_exists = True
+        except Exception:
+            try:
+                spark.read.format("delta").load(target)
+                target_exists = True
+            except Exception:
+                pass
+
+        if not target_exists:
+            # First run: write directly to target (same pattern as merge transformer)
+            new_records = source_df.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
+                flag_col, F.lit(True)
+            )
+            if eff_col in new_records.columns:
+                new_records = new_records.withColumnRenamed(eff_col, start_col)
+
+            is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
+            writer = new_records.write.format("delta").mode("overwrite")
+            if is_path:
+                writer.save(target)
+            else:
+                writer.saveAsTable(target)
+
+            ctx.info(
+                "SCD2 first run: wrote initial data directly to target",
+                target=target,
+            )
+
+            return context.with_df(new_records)
+
+        # Target exists but not Delta — can't use MERGE
+        return None
+
+    ctx.info(
+        "Using Delta MERGE for SCD2 (optimized path)",
+        target=target,
+        keys=keys,
+        track_cols=params.track_cols,
+    )
+
+    # Prepare merge source: rename eff_col to start_col, add SCD metadata
+    # Also keep eff_col temporarily as __eff_col for the update_set reference
+    merge_source = (
+        source_df.withColumn(start_col, F.col(f"`{eff_col}`"))
+        .withColumn(end_col, F.lit(None).cast("timestamp"))
+        .withColumn(flag_col, F.lit(True))
+    )
+
+    # Build MERGE condition: match on keys AND only current records in target
+    key_conditions = [f"target.`{k}` = source.`{k}`" for k in keys]
+    match_condition = " AND ".join(key_conditions) + f" AND target.`{flag_col}` = true"
+
+    # Build change detection condition for whenMatchedUpdate
+    change_conds = [f"NOT (target.`{col}` <=> source.`{col}`)" for col in params.track_cols]
+    change_condition = " OR ".join(change_conds) if change_conds else "true"
+
+    # Partial update: only close the old record (use eff_col from source for end date)
+    update_set = {
+        f"`{end_col}`": f"source.`{eff_col}`",
+        f"`{flag_col}`": "false",
+    }
+
+    # Build explicit insert map: include start_col, exclude original eff_col
+    insert_cols = [c for c in merge_source.columns if c != eff_col]
+    insert_values = {f"`{col}`": f"source.`{col}`" for col in insert_cols}
+
+    # Execute MERGE
+    merger = (
+        delta_table.alias("target")
+        .merge(merge_source.alias("source"), match_condition)
+        .whenMatchedUpdate(condition=change_condition, set=update_set)
+        .whenNotMatchedInsert(values=insert_values)
+    )
+    merger.execute()
+
+    # Return the source records with start_col (MERGE already wrote to target)
+    result_df = merge_source.drop(eff_col) if eff_col in merge_source.columns else merge_source
+
+    ctx.info("Delta MERGE SCD2 completed", target=target)
+
+    return context.with_df(result_df)
+
+
+def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
     """
     Internal helper for SCD2 logic on Pandas engine.
 
@@ -416,6 +624,7 @@ def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> 
     # Define Cols
     keys = params.keys
     eff_col = params.effective_time_col
+    start_col = params.start_time_col
     end_col = params.end_time_col
     flag_col = params.current_flag_col
     track = params.track_cols
@@ -436,7 +645,10 @@ def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> 
             join_cond = " AND ".join([f"s.{k} = t.{k}" for k in keys])
 
             src_cols = [c for c in source_df.columns if c not in [end_col, flag_col]]
-            cols_select = ", ".join([f"s.{c}" for c in src_cols])
+            # Rename eff_col to start_col in SELECT
+            cols_select = ", ".join(
+                [f"s.{c} as {start_col}" if c == eff_col else f"s.{c}" for c in src_cols]
+            )
             null_check = " AND ".join([f"t.{k} IS NULL" for k in keys])
 
             sql_new_inserts = f"""
@@ -514,12 +726,24 @@ def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> 
         except Exception as e:
             get_logging_context().debug(f"Could not read target file: {type(e).__name__}")
 
-    # Prepare Source
+    # Prepare Source: rename eff_col to start_col, add SCD metadata
     source_df = source_df.copy()
+    source_df = source_df.rename(columns={eff_col: start_col})
     source_df[end_col] = pd.NaT
     source_df[flag_col] = True
 
     if target_df.empty:
+        # First run: write directly to target
+        if str(path).endswith(".parquet") or os.path.isdir(path) or not os.path.exists(path):
+            source_df.to_parquet(path, index=False)
+        elif str(path).endswith(".csv"):
+            source_df.to_csv(path, index=False)
+
+        get_logging_context().info(
+            "SCD2 Pandas first run: wrote initial data directly to target",
+            target=path,
+        )
+
         return context.with_df(source_df)
 
     # Ensure types match for merge
@@ -577,7 +801,7 @@ def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> 
         # Note: This assumes keys are unique in current_target (valid for SCD2)
 
         # Prepare DataFrame of keys to close + new end date
-        keys_to_close = changed_records[keys + [eff_col]].rename(columns={eff_col: "__new_end"})
+        keys_to_close = changed_records[keys + [start_col]].rename(columns={start_col: "__new_end"})
         keys_to_close = keys_to_close.sort_values("__new_end").drop_duplicates(
             subset=keys, keep="last"
         )
@@ -600,5 +824,16 @@ def _scd2_pandas(context: EngineContext, source_df: Any, params: SCD2Params) -> 
 
     # 3. Combine
     result = pd.concat([final_target, all_inserts], ignore_index=True)
+
+    # Write directly to target (self-contained, no external write: block needed)
+    if str(path).endswith(".parquet") or os.path.isdir(path):
+        result.to_parquet(path, index=False)
+    elif str(path).endswith(".csv"):
+        result.to_csv(path, index=False)
+
+    get_logging_context().info(
+        "SCD2 Pandas overwrite: wrote full history directly to target",
+        target=path,
+    )
 
     return context.with_df(result)

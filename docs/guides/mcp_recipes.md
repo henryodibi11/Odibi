@@ -4,48 +4,44 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 ---
 
-## Recipe 1: "Help me build a new pipeline" (Lazy Bronze Workflow)
+## Recipe 1: "Help me build a new pipeline"
 
 **When user says:** "I need to build a pipeline for...", "Create a pipeline that...", "Help me transform this data..."
 
-**Steps (Smart Discovery):**
+**Steps:**
 
-1. **Scout the data source**
+1. **Understand the data source**
    ```
    map_environment(connection="<conn>", path="<path>")
-   ```
-
-2. **Profile the specific file/table**
-   ```
    profile_source(connection="<conn>", path="<file>")
-   # Returns schema, encoding, delimiter, sample data, and AI suggestions
    ```
 
-3. **Generate bronze node YAML**
+2. **Check available patterns**
    ```
-   generate_bronze_node(profile=<previous_result.ready_for>)
-   ```
-
-4. **Validate the generated YAML**
-   ```
-   test_node(node_yaml="<generated_yaml>")
-   # Returns fix instructions if validation fails
+   list_patterns()
+   explain(name="<pattern_name>")
    ```
 
-5. **For complex patterns, get guidance**
+3. **Find relevant transformers**
    ```
-   suggest_pattern(use_case="<user's description>")
-   get_example(pattern_name="<suggested_pattern>")
+   list_transformers()
+   explain(name="<transformer_name>")
+   ```
+
+4. **Write and validate the YAML**
+   ```
+   # Write YAML manually following docs/reference/yaml_schema.md
+   validate_yaml(yaml_content="<generated_yaml>")
    ```
 
 **Example conversation:**
 > User: "I need to build a pipeline to track customer changes over time"
 >
 > AI: Let me help you build that. First, I'll check what pattern fits best...
-> [calls suggest_pattern with use_case="track customer changes over time"]
+> [calls list_patterns to see available options]
+> [calls explain with name="scd2" to get details]
 >
-> The SCD2 pattern is perfect for this. Let me get you an example...
-> [calls get_example with pattern_name="scd2"]
+> The SCD2 pattern is perfect for this. See docs/reference/yaml_schema.md for the structure...
 
 ---
 
@@ -60,22 +56,17 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
    story_read(pipeline="<pipeline_name>")
    ```
 
-2. **Get details on the failed node**
+2. **Check node output data**
    ```
-   node_describe(pipeline="<pipeline>", node="<failed_node>")
-   ```
-
-3. **Examine the input data**
-   ```
-   node_sample_in(pipeline="<pipeline>", node="<node>", max_rows=10)
+   node_sample(pipeline="<pipeline>", node="<failed_node>", max_rows=10)
    ```
 
-4. **Check for validation failures**
+3. **Check for validation failures**
    ```
    node_failed_rows(pipeline="<pipeline>", node="<node>")
    ```
 
-5. **Get diagnosis and fix suggestions**
+4. **Get diagnosis and fix suggestions**
    ```
    diagnose_error(error_message="<the_error>")
    ```
@@ -85,7 +76,7 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 >
 > AI: Let me investigate...
 > [calls story_read to see which node failed]
-> [calls node_sample_in to see the actual input data]
+> [calls node_sample to see output data]
 >
 > I see the issue - the source column is named 'CustomerID' not 'customer_id'.
 > You need to rename it in your transform steps.
@@ -98,34 +89,19 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 **Steps:**
 
-1. **Scout the environment (storage or SQL)**
+1. **Scout the connection**
    ```
    map_environment(connection="<conn>", path="<path>")
-   # Returns files, tables, formats, patterns detected
    ```
 
-2. **For SQL connections, get schema list first**
-   ```
-   list_schemas(connection="<sql_conn>")
-   describe_table(connection="<sql_conn>", table="<table>", schema="dbo")
-   ```
-
-3. **Profile a specific source**
+2. **Profile specific files/tables**
    ```
    profile_source(connection="<conn>", path="<file>")
-   # Returns schema, sample data, encoding, delimiter, AI suggestions
    ```
 
-4. **For Excel files, discover sheets first**
+3. **For batch profiling**
    ```
-   list_sheets(connection="<conn>", path="<file>.xlsx")
-   profile_source(connection="<conn>", path="<file>.xlsx")
-   ```
-
-5. **For folders with many files**
-   ```
-   profile_folder(connection="<conn>", folder_path="<folder>", pattern="*.csv")
-   # Batch profiles all files, groups by detected options
+   profile_folder(connection="<conn>", folder_path="<path>", pattern="*.csv")
    ```
 
 ---
@@ -141,20 +117,17 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
    explain(name="<feature_name>")
    ```
 
-2. **Search documentation**
+2. **List available options**
    ```
-   search_docs(query="<topic>")
-   get_doc(doc_path="<relevant_doc>")
-   ```
-
-3. **For deep questions, search the codebase**
-   ```
-   query_codebase(question="<question>")
+   list_transformers()
+   list_patterns()
+   list_connections()
+   get_validation_rules()
    ```
 
-4. **For comprehensive understanding**
+3. **For deeper questions**
    ```
-   get_deep_context()
+   # Use grep on the docs/ folder to search documentation
    ```
 
 **Example conversation:**
@@ -174,26 +147,19 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 **Steps:**
 
-1. **List pipeline outputs**
-   ```
-   list_outputs(pipeline="<pipeline>")
-   ```
-
-2. **Get the lineage graph**
+1. **Get the lineage graph**
    ```
    lineage_graph(pipeline="<pipeline>", include_external=true)
    ```
 
-3. **For specific nodes, get details**
-   ```
-   node_describe(pipeline="<pipeline>", node="<node>")
-   output_schema(pipeline="<pipeline>", output_name="<node>")
-   ```
-
-4. **Check recent execution**
+2. **Check recent execution**
    ```
    story_read(pipeline="<pipeline>")
-   pipeline_stats(pipeline="<pipeline>")
+   ```
+
+3. **Sample node output**
+   ```
+   node_sample(pipeline="<pipeline>", node="<node>", max_rows=10)
    ```
 
 ---
@@ -204,24 +170,19 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 **Steps:**
 
-1. **Check overall failure summary**
+1. **Check recent run status**
    ```
-   failure_summary(max_failures=20)
-   ```
-
-2. **Check specific pipeline stats**
-   ```
-   pipeline_stats(pipeline="<pipeline>")
+   story_read(pipeline="<pipeline>")
    ```
 
-3. **Check node-level stats**
+2. **Check for failed rows**
    ```
-   node_stats(pipeline="<pipeline>", node="<node>")
+   node_failed_rows(pipeline="<pipeline>", node="<node>")
    ```
 
-4. **Check for schema drift**
+3. **View lineage for impact analysis**
    ```
-   schema_history(pipeline="<pipeline>", node="<node>")
+   lineage_graph(pipeline="<pipeline>")
    ```
 
 ---
@@ -232,25 +193,21 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 **Steps:**
 
-1. **Get the correct signature**
-   ```
-   get_transformer_signature()
-   ```
-
-2. **Check if similar transformer exists**
+1. **Check if similar transformer exists**
    ```
    list_transformers()
    explain(name="<similar_transformer>")
    ```
 
-3. **Search for implementation examples**
+2. **Review existing transformer implementations**
    ```
-   query_codebase(question="how to implement <transformer_type>")
+   # Use grep on odibi/transformers/ folder to find examples
    ```
 
-4. **Generate the transformer**
+3. **Write transformer following the pattern**
    ```
-   generate_transformer(name="<name>", params=[...], description="...")
+   # See docs/reference/yaml_schema.md for transformer structure
+   # Use @register_function decorator
    ```
 
 ---
@@ -266,20 +223,14 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
    story_read(pipeline="<pipeline>")
    ```
 
-2. **Compare the runs**
+2. **Sample data from runs**
    ```
-   story_diff(pipeline="<pipeline>", run_a="<run_id_1>", run_b="<run_id_2>")
-   ```
-
-3. **Check schema changes**
-   ```
-   schema_history(pipeline="<pipeline>", node="<node>")
+   node_sample(pipeline="<pipeline>", node="<node>", max_rows=20)
    ```
 
-4. **Sample data from both runs**
+3. **Check failed rows**
    ```
-   node_sample(pipeline="<pipeline>", node="<node>", run_id="<run_1>")
-   node_sample(pipeline="<pipeline>", node="<node>", run_id="<run_2>")
+   node_failed_rows(pipeline="<pipeline>", node="<node>")
    ```
 
 ---
@@ -297,7 +248,7 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 2. **Compare against correct structure**
    ```
-   get_yaml_structure()
+   # See docs/reference/yaml_schema.md for the complete schema
    ```
 
 3. **Check transformer usage**
@@ -313,9 +264,9 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 **Steps:**
 
-1. **Provide comprehensive context**
+1. **Bootstrap context**
    ```
-   get_deep_context()
+   bootstrap_context()
    ```
 
 2. **Show available patterns**
@@ -328,14 +279,14 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
    list_connections()
    ```
 
-4. **Get the YAML structure**
+4. **Review YAML structure**
    ```
-   get_yaml_structure()
+   # See docs/reference/yaml_schema.md for complete schema
    ```
 
-5. **Show a simple example**
+5. **Explain a pattern**
    ```
-   get_example(pattern_name="dimension")
+   explain(name="dimension")
    ```
 
 ---
@@ -344,14 +295,14 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 
 | User Intent | Primary Tools |
 |-------------|---------------|
-| Build pipeline | `map_environment`, `profile_source`, `generate_bronze_node`, `test_node` |
-| Debug failure | `story_read`, `node_describe`, `node_sample_in`, `node_failed_rows`, `diagnose_error` |
-| Explore data | `map_environment`, `profile_source`, `profile_folder`, `describe_table` |
-| Learn odibi | `explain`, `search_docs`, `get_deep_context`, `query_codebase` |
-| Check lineage | `lineage_graph`, `lineage_upstream`, `lineage_downstream`, `list_outputs` |
-| Monitor health | `pipeline_stats`, `node_stats`, `failure_summary`, `schema_history` |
-| Validate config | `test_node`, `validate_yaml`, `get_yaml_structure` |
-| Write code | `generate_transformer`, `get_transformer_signature`, `query_codebase` |
+| Build pipeline | `list_patterns`, `explain`, `list_transformers`, `validate_yaml` |
+| Debug failure | `story_read`, `node_sample`, `node_failed_rows`, `diagnose_error` |
+| Explore data | `map_environment`, `profile_source`, `profile_folder` |
+| Learn odibi | `explain`, `list_transformers`, `list_patterns`, `get_validation_rules` |
+| Check lineage | `lineage_graph` |
+| Monitor health | `story_read`, `node_failed_rows` |
+| Validate config | `validate_yaml` + docs/reference/yaml_schema.md |
+| Write code | `list_transformers`, `explain` + grep odibi/transformers/ |
 
 ---
 
@@ -370,18 +321,14 @@ These workflows teach AI to **gather full context before taking action**. This p
 **Mandatory Steps (in order):**
 
 ```
-# Step 1: Scout the environment (files/tables/patterns)
+# Step 1: Scout what files/tables exist
 map_environment(connection="<conn>", path="<path>")
 
-# Step 2: Profile the specific source (schema, encoding, samples, suggestions)
+# Step 2: Profile the source (get schema, encoding, delimiter, sample data)
 profile_source(connection="<conn>", path="<file>")
-# Returns: schema, sample_rows, encoding, delimiter, cardinality, AI suggestions
 
-# Step 3: For SQL tables, get quick structure
-describe_table(connection="<sql_conn>", table="<table>", schema="dbo")
-
-# Step 4: For folders with multiple files
-profile_folder(connection="<conn>", folder_path="<folder>", pattern="*.csv")
+# Step 3: For batch profiling
+profile_folder(connection="<conn>", folder_path="<path>", pattern="*.csv")
 ```
 
 **What AI should note:**
@@ -402,31 +349,22 @@ profile_folder(connection="<conn>", folder_path="<folder>", pattern="*.csv")
 **Mandatory Steps:**
 
 ```
-# Step 1: What outputs does this pipeline produce?
-list_outputs(pipeline="<pipeline>")
-
-# Step 2: What's the schema of each output?
-output_schema(pipeline="<pipeline>", output_name="<output>")
-# Repeat for each output
-
-# Step 3: Understand the full lineage
+# Step 1: Understand the full lineage
 lineage_graph(pipeline="<pipeline>", include_external=true)
 
-# Step 4: For specific nodes of interest:
-node_describe(pipeline="<pipeline>", node="<node>")
+# Step 2: Check execution history
+story_read(pipeline="<pipeline>")
 
-# Step 5: See actual data flowing through
-node_sample_in(pipeline="<pipeline>", node="<node>", max_rows=10)
+# Step 3: See actual data flowing through
 node_sample(pipeline="<pipeline>", node="<node>", max_rows=10)
 
-# Step 6: Check execution history
-story_read(pipeline="<pipeline>")
+# Step 4: Check for failed rows
+node_failed_rows(pipeline="<pipeline>", node="<node>")
 ```
 
 **What AI should understand before acting:**
 - The flow of data through all nodes
 - What transformations are applied at each step
-- The expected input/output schemas
 - Recent run success/failure history
 - Any validation or quality rules in place
 
@@ -440,28 +378,25 @@ story_read(pipeline="<pipeline>")
 
 ```
 # Step 1: If suggesting a pattern, verify understanding
+list_patterns()
 explain(name="<pattern_name>")
-get_example(pattern_name="<pattern_name>")
 
 # Step 2: If using transformers, verify each one
+list_transformers()
 explain(name="<transformer_name>")
 # Check parameters, expected inputs, edge cases
 
-# Step 3: For complex questions, get full context
-get_deep_context()
+# Step 3: For validation rules
+get_validation_rules()
 
-# Step 4: For implementation details, search docs
-search_docs(query="<topic>")
-get_doc(doc_path="<relevant_doc>")
-
-# Step 5: For code-level understanding
-query_codebase(question="how does <feature> work internally")
+# Step 4: For deeper understanding
+# Use grep on docs/ folder to search documentation
 ```
 
 **AI should NEVER:**
 - Guess transformer parameters - always use `explain` first
-- Assume YAML structure - always reference `get_yaml_structure`
-- Invent column names - always derive from actual `preview_source` or `infer_schema`
+- Assume YAML structure - always reference docs/reference/yaml_schema.md
+- Invent column names - always derive from actual `profile_source`
 
 ---
 
@@ -475,21 +410,17 @@ query_codebase(question="how does <feature> work internally")
 # Step 1: Get the error context
 story_read(pipeline="<pipeline>")  # See which node failed
 
-# Step 2: Understand what the node expects
-node_describe(pipeline="<pipeline>", node="<failed_node>")
+# Step 2: See what data came out
+node_sample(pipeline="<pipeline>", node="<failed_node>", max_rows=20)
 
-# Step 3: See what data actually arrived
-node_sample_in(pipeline="<pipeline>", node="<failed_node>", max_rows=20)
-
-# Step 4: Check for validation failures
+# Step 3: Check for validation failures
 node_failed_rows(pipeline="<pipeline>", node="<failed_node>")
 
-# Step 5: Get AI diagnosis of the error
+# Step 4: Get AI diagnosis of the error
 diagnose_error(error_message="<exact_error>")
 
-# Step 6: Trace back to source if needed
-lineage_upstream(pipeline="<pipeline>", node="<failed_node>")
-# Then check those upstream nodes too
+# Step 5: Trace lineage if needed
+lineage_graph(pipeline="<pipeline>")
 ```
 
 **Fix suggestions should include:**
@@ -508,19 +439,16 @@ lineage_upstream(pipeline="<pipeline>", node="<failed_node>")
 validate_yaml(yaml_content="<full_yaml>")
 
 # Step 2: Verify source data is accessible
-list_files(connection="<source_conn>", path="<source_path>")
-preview_source(connection="<source_conn>", path="<source_file>", max_rows=5)
+map_environment(connection="<source_conn>", path="<source_path>")
+profile_source(connection="<source_conn>", path="<source_file>")
 
 # Step 3: For each transformer used, verify parameters
 explain(name="<transformer_1>")
 explain(name="<transformer_2>")
 # ...for each transformer in the pipeline
 
-# Step 4: Check the expected output schema
-get_yaml_structure()  # Verify output config is valid
-
-# Step 5: If extending existing pipeline, check compatibility
-output_schema(pipeline="<existing>", output_name="<output>")
+# Step 4: Reference YAML structure
+# See docs/reference/yaml_schema.md for complete schema
 ```
 
 ---
@@ -532,8 +460,8 @@ output_schema(pipeline="<existing>", output_name="<output>")
 **Full Context Acquisition:**
 
 ```
-# Step 1: Framework understanding
-get_deep_context()
+# Step 1: Bootstrap context (recommended first step)
+bootstrap_context()
 
 # Step 2: Available patterns and their purposes
 list_patterns()
@@ -545,16 +473,15 @@ list_connections()
 list_transformers()
 
 # Step 5: For each pipeline in scope:
-list_outputs(pipeline="<pipeline_1>")
 lineage_graph(pipeline="<pipeline_1>")
 story_read(pipeline="<pipeline_1>")
 
 # Step 6: Explore actual source data
-list_files(connection="<primary_source>", path="/")
-preview_source(connection="<primary_source>", path="<key_file>")
+map_environment(connection="<primary_source>", path="/")
+profile_source(connection="<primary_source>", path="<key_file>")
 
-# Step 7: Check documentation for project-specific patterns
-search_docs(query="<project_name>")
+# Step 7: For deeper questions
+# Use grep on docs/ folder to search documentation
 ```
 
 **AI should build a mental model of:**
@@ -570,12 +497,12 @@ search_docs(query="<project_name>")
 
 | ❌ Don't | ✅ Do Instead |
 |----------|--------------|
-| Guess column names | Use `preview_source` or `infer_schema` to see actual names |
+| Guess column names | Use `profile_source` to see actual names |
 | Assume transformer parameters | Use `explain` to verify exact parameter names and types |
 | Generate YAML without validation | Always run `validate_yaml` before presenting to user |
-| Suggest fixes without evidence | Use `node_sample_in` and `node_failed_rows` to see actual data |
+| Suggest fixes without evidence | Use `node_sample` and `node_failed_rows` to see actual data |
 | Skip lineage understanding | Use `lineage_graph` before modifying downstream nodes |
-| Assume schema | Use `output_schema` to see actual column types |
+| Assume YAML structure | Reference docs/reference/yaml_schema.md |
 
 ---
 
@@ -583,8 +510,8 @@ search_docs(query="<project_name>")
 
 Before suggesting ANY pipeline changes, verify:
 
-- [ ] I have seen the actual source data (`preview_source`)
-- [ ] I know the exact column names and types (`infer_schema`)
+- [ ] I have seen the actual source data (`profile_source`)
+- [ ] I know the exact column names and types (`profile_source`)
 - [ ] I understand the pattern being used (`explain`)
 - [ ] I have validated my YAML (`validate_yaml`)
 - [ ] I have checked lineage impact (`lineage_graph`)
@@ -594,12 +521,12 @@ Before suggesting ANY pipeline changes, verify:
 
 ## Best Practices for AI Assistants
 
-1. **Always start with context** - Use `story_read` or `list_outputs` to understand the current state
-2. **Show real data** - Use `preview_source` and `node_sample` to ground responses in actual data
+1. **Always start with context** - Use `bootstrap_context` or `story_read` to understand the current state
+2. **Show real data** - Use `profile_source` and `node_sample` to ground responses in actual data
 3. **Validate before suggesting** - Use `validate_yaml` before presenting YAML to users
-4. **Chain tools logically** - Debug flows: status → details → samples → diagnosis
+4. **Chain tools logically** - Debug flows: status → samples → diagnosis
 5. **Use explain liberally** - Always clarify transformers/patterns before using them
-6. **Prefer specific tools** - Use `explain` over `get_deep_context` for focused questions
+6. **Reference yaml_schema.md** - For YAML structure, see docs/reference/yaml_schema.md
 7. **Never guess - always verify** - If unsure about column names, types, or parameters, use the tools to check
 8. **Build complete mental models** - Use the Context-First Workflows before taking action
 
@@ -611,40 +538,19 @@ Before suggesting ANY pipeline changes, verify:
 
 **Two-Step Pattern:** Structure first, samples second.
 
-**For Storage Connections:**
+**For Any Connection:**
 
 ```
-# Step 1: Discover structure (shallow, no samples by default)
-discover_storage(connection="<conn>", path="")
-# Returns: file names, formats, schemas - lightweight response
+# Step 1: Scout the connection (files, tables, patterns)
+map_environment(connection="<conn>", path="")
+# Returns: structure overview, file patterns, table counts
 
-# Step 2: For interesting files, get samples
-preview_source(connection="<conn>", path="<file>", max_rows=20)
+# Step 2: Profile specific files/tables
+profile_source(connection="<conn>", path="<file>")
+# Returns: full schema, encoding, delimiter, sample data
 
-# Step 3: For Excel files, discover sheets first
-list_sheets(connection="<conn>", path="<file>.xlsx")
-preview_source(connection="<conn>", path="<file>.xlsx", sheet="<sheet_name>")
-
-# Optional: Deep scan if needed
-discover_storage(connection="<conn>", path="", recursive=true, max_files=50)
-```
-
-**For Database Connections:**
-
-```
-# Step 0: List available schemas FIRST
-list_schemas(connection="<sql_conn>")
-# Returns: schema names with table counts - know what exists before diving in
-
-# Step 1: Discover structure (shallow, no samples by default)
-discover_database(connection="<sql_conn>", schema="dbo")
-# Returns: table names, columns, row counts - lightweight response
-
-# Step 2: For interesting tables, get samples
-preview_source(connection="<sql_conn>", path="<table>", max_rows=20)
-
-# Optional: Include samples if context budget allows
-discover_database(connection="<sql_conn>", schema="dbo", sample_rows=3)
+# Step 3: For batch profiling
+profile_folder(connection="<conn>", folder_path="<path>", pattern="*.csv")
 ```
 
 **AI should summarize:**
@@ -663,15 +569,11 @@ discover_database(connection="<sql_conn>", schema="dbo", sample_rows=3)
 **Steps:**
 
 ```
-# Direct comparison with one call
-compare_schemas(
-    source_connection="<source_conn>",
-    source_path="<source_path>",
-    target_connection="<target_conn>",
-    target_path="<target_path>",
-    source_sheet="<optional_sheet>",  # For Excel
-    target_sheet="<optional_sheet>"
-)
+# Profile both source and target
+profile_source(connection="<source_conn>", path="<source_path>")
+profile_source(connection="<target_conn>", path="<target_path>")
+
+# Compare the schemas manually from profile results
 ```
 
 **Response should include:**
@@ -679,22 +581,7 @@ compare_schemas(
 - Added columns (in target, not in source)
 - Removed columns (in source, missing in target - BREAKING)
 - Type mismatches (BREAKING)
-- Nullability changes
 - Suggestions for handling differences
-
-**Example conversation:**
-> User: "Is my staging table compatible with the production target?"
->
-> AI: Let me compare the schemas...
-> [calls compare_schemas with source and target]
->
-> The schemas have 2 breaking differences:
-> - Column `customer_id` type changed: `string` → `int` (BREAKING)
-> - Column `created_date` is missing in target (BREAKING)
->
-> You'll need to either:
-> 1. Add a type cast in your transform: `CAST(customer_id AS INT)`
-> 2. Add the missing column to the target table
 
 ---
 
@@ -705,51 +592,23 @@ compare_schemas(
 **Steps:**
 
 ```
-# Step 0: List available schemas
-list_schemas(connection="<sql_conn>")
+# Step 1: Scout the connection
+map_environment(connection="<sql_conn>")
 
-# Step 1: Discover all tables in each schema
-discover_database(connection="<sql_conn>", schema="dbo", max_tables=100, sample_rows=3)
+# Step 2: Profile key tables
+profile_source(connection="<sql_conn>", path="<table1>")
+profile_source(connection="<sql_conn>", path="<table2>")
 
-# Step 2: For each important table, AI analyzes:
-# - Column names and types
-# - Sample values
-# - Potential keys (columns ending in _id, unique values)
-# - Table purpose (dim_, fact_, stg_, etc.)
-# - Relationships (FK patterns)
-
-# Step 3: Output structured catalog
+# Step 3: For batch profiling
+profile_folder(connection="<sql_conn>", folder_path="<schema>", pattern="*")
 ```
 
-**AI Output Format:**
-
-```yaml
-catalog:
-  connection: <connection_name>
-  schema: dbo
-  tables:
-    - name: dim_customer
-      purpose: Customer master data (dimension table)
-      row_count: 15000
-      primary_key: customer_id
-      columns:
-        - name: customer_id
-          type: int
-          role: primary_key
-        - name: customer_name
-          type: varchar
-          role: business_name
-      relationships:
-        - references: fact_orders.customer_id
-
-    - name: fact_orders
-      purpose: Sales transactions (fact table)
-      row_count: 1500000
-      primary_key: order_id
-      foreign_keys:
-        - customer_id → dim_customer.customer_id
-        - product_id → dim_product.product_id
-```
+**AI should analyze:**
+- Column names and types
+- Sample values
+- Potential keys (columns ending in _id, unique values)
+- Table purpose (dim_, fact_, stg_, etc.)
+- Relationships (FK patterns)
 
 ---
 
@@ -762,24 +621,21 @@ catalog:
 **Steps:**
 
 ```
-# Step 1: Confirm understanding
-preview_source(connection="<conn>", path="<file>")
-infer_schema(connection="<conn>", path="<file>")
+# Step 1: Confirm understanding with profile
+profile_source(connection="<conn>", path="<file>")
 
-# Step 2: Recommend pattern based on data shape
-suggest_pattern(use_case="<inferred from data>")
+# Step 2: Check available patterns
+list_patterns()
+explain(name="<suggested_pattern>")
 
-# Step 3: Get pattern example
-get_example(pattern_name="<suggested_pattern>")
-
-# Step 4: Find relevant transformers
+# Step 3: Find relevant transformers
 list_transformers()
 explain(name="<transformer_name>")
 
-# Step 5: Generate YAML
-generate_pipeline_yaml(...)  # Or manually construct
+# Step 4: Write YAML manually
+# See docs/reference/yaml_schema.md for structure
 
-# Step 6: Validate before presenting
+# Step 5: Validate before presenting
 validate_yaml(yaml_content="<generated>")
 ```
 
@@ -789,80 +645,3 @@ validate_yaml(yaml_content="<generated>")
 - Required transforms (type casts, renames, null handling)
 - Output configuration
 - Validation rules (if applicable)
-
----
-
-## Recipe 15: "I'm Stuck / Can't Find It" (Active Recovery)
-
-**When:** Path not found, file missing, environment issues, or any error.
-
-**NEVER give up. Use these tools to self-recover:**
-
-```
-# Step 1: Diagnose the environment
-diagnose()
-# Returns: env vars, paths, connections, issues, suggestions
-
-# Step 2: Search for files
-find_path(pattern="**/*.yaml")           # Find all YAML files
-find_path(pattern="**/stories/**")       # Find story directories
-find_path(pattern="**/*bronze*")         # Find anything with 'bronze'
-
-# Step 3: Run Python to understand state
-run_python(code='''
-import os
-from pathlib import Path
-print("CWD:", os.getcwd())
-for p in Path(".").rglob("*.yaml"):
-    print("Found:", p)
-''')
-
-# Step 4: Test a fix
-run_odibi(args="doctor")                 # Check odibi health
-run_odibi(args="list transformers")      # Verify odibi works
-```
-
-**Key principle:** Use `run_python` to test hypotheses. Use `find_path` to search. Never say "I can't find it" without trying these tools first.
-
----
-
-## Recipe 16: "Run the Pipeline" (Execute After Generate)
-
-**When user says:** "Run it", "Execute the pipeline", "Test this"
-
-**Steps:**
-
-```
-# Step 1: Dry run first (validate without writing)
-execute_pipeline(config_path="projects/bronze.yaml", dry_run=True)
-
-# Step 2: If successful, run for real
-execute_pipeline(config_path="projects/bronze.yaml")
-
-# Step 3: Check results
-story_read(pipeline="bronze")
-node_sample(pipeline="bronze", node="<node_name>", max_rows=10)
-```
-
-**Alternative using CLI:**
-```
-run_odibi(args="run projects/bronze.yaml --dry-run")
-run_odibi(args="run projects/bronze.yaml")
-run_odibi(args="story last")
-```
-
----
-
-## Agent Behavior Summary
-
-**BE ACTIVE, not passive:**
-
-| Instead of... | Do this |
-|---------------|---------|
-| "I can't find the file" | `find_path("**/*.yaml")` |
-| "Try running this code" | `run_python(code)` |
-| "You should run this command" | `run_odibi(args)` |
-| "The pipeline should work" | `execute_pipeline(path, dry_run=True)` |
-| "I'm not sure about the path" | `diagnose()` then `find_path()` |
-
-**The tools exist to let you ACT. Use them.**

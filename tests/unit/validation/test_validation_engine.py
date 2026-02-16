@@ -8,10 +8,14 @@ Coverage targets:
 - Severity handling (WARN vs FAIL)
 """
 
-import pandas as pd
-import pytest
+import logging
 
-from odibi.config import (
+logging.getLogger("odibi").propagate = False
+
+import pandas as pd  # noqa: E402
+import pytest  # noqa: E402
+
+from odibi.config import (  # noqa: E402
     AcceptedValuesTest,
     ContractSeverity,
     CustomSQLTest,
@@ -25,7 +29,7 @@ from odibi.config import (
     UniqueTest,
     ValidationConfig,
 )
-from odibi.validation.engine import Validator
+from odibi.validation.engine import Validator  # noqa: E402
 
 
 class TestValidatorPandas:
@@ -883,6 +887,413 @@ class TestValidatorPolarsAdvanced:
         )
         failures = validator.validate(df, config)
         assert len(failures) == 0
+
+
+class TestPolarsLazyFrameExtended:
+    """Test Polars LazyFrame paths not covered by existing tests."""
+
+    @pytest.fixture
+    def validator(self):
+        return Validator()
+
+    def test_lazy_schema_strict_pass(self, validator):
+        """Schema validation passes with LazyFrame in strict mode."""
+
+    def test_polars_freshness_naive_timestamp(self, validator):
+        """Freshness test works with timezone-naive timestamps in Polars."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"id": [1, 2], "name": ["A", "B"]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
+        context = {"columns": {"id": "int64", "name": "str"}}
+        failures = validator.validate(lf, config, context)
+        assert len(failures) == 0
+
+    def test_lazy_schema_strict_fail(self, validator):
+        """Schema validation fails with LazyFrame when extra columns exist."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"id": [1, 2], "name": ["A", "B"], "extra": [1, 2]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
+        context = {"columns": {"id": "int64", "name": "str"}}
+        failures = validator.validate(lf, config, context)
+        assert len(failures) == 1
+        assert "mismatch" in failures[0].lower()
+
+    def test_lazy_schema_non_strict_pass(self, validator):
+        """Schema validation passes with LazyFrame in non-strict mode with extra columns."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"id": [1, 2], "name": ["A", "B"], "extra": [1, 2]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=False)])
+        context = {"columns": {"id": "int64", "name": "str"}}
+        failures = validator.validate(lf, config, context)
+        assert len(failures) == 0
+
+    def test_lazy_schema_non_strict_fail_missing(self, validator):
+        """Schema validation fails with LazyFrame when required columns missing."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"id": [1, 2]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=False)])
+        context = {"columns": {"id": "int64", "name": "str"}}
+        failures = validator.validate(lf, config, context)
+        assert len(failures) == 1
+        assert "Missing columns" in failures[0]
+
+    def test_lazy_row_count_pass(self, validator):
+        """ROW_COUNT passes with LazyFrame when within bounds."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"id": [1, 2, 3, 4, 5]})
+        config = ValidationConfig(tests=[RowCountTest(type=TestType.ROW_COUNT, min=1, max=10)])
+        failures = validator.validate(lf, config)
+        assert len(failures) == 0
+
+    def test_lazy_row_count_fail_min(self, validator):
+        """ROW_COUNT fails with LazyFrame when below minimum."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"id": [1, 2]})
+        config = ValidationConfig(tests=[RowCountTest(type=TestType.ROW_COUNT, min=100)])
+        failures = validator.validate(lf, config)
+        assert len(failures) == 1
+        assert "< min" in failures[0]
+
+    def test_lazy_row_count_fail_max(self, validator):
+        """ROW_COUNT fails with LazyFrame when above maximum."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"id": [1, 2, 3, 4, 5]})
+        config = ValidationConfig(tests=[RowCountTest(type=TestType.ROW_COUNT, max=2)])
+        failures = validator.validate(lf, config)
+        assert len(failures) == 1
+        assert "> max" in failures[0]
+
+    def test_lazy_not_null_fail_fast(self, validator):
+        """NOT_NULL with fail_fast returns early on LazyFrame."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"a": [None, 1], "b": [None, 2]})
+        config = ValidationConfig(
+            tests=[
+                NotNullTest(type=TestType.NOT_NULL, columns=["a", "b"]),
+            ],
+            fail_fast=True,
+        )
+        failures = validator.validate(lf, config)
+        assert len(failures) == 1
+        assert "'a'" in failures[0]
+
+    def test_lazy_accepted_values_examples_extraction(self, validator):
+        """ACCEPTED_VALUES extracts example values via lazy collect path."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"status": ["active", "bad1", "bad2", "bad3", "bad4"]})
+        config = ValidationConfig(
+            tests=[
+                AcceptedValuesTest(
+                    type=TestType.ACCEPTED_VALUES,
+                    column="status",
+                    values=["active"],
+                )
+            ]
+        )
+        failures = validator.validate(lf, config)
+        assert len(failures) == 1
+        assert "invalid values" in failures[0]
+        assert "bad1" in failures[0]
+
+
+class TestPandasEdgeCases:
+    """Test Pandas engine edge cases not covered by existing tests."""
+
+    @pytest.fixture
+    def validator(self):
+        return Validator()
+
+    def test_not_null_mixed_existing_and_missing_columns(self, validator):
+        """NOT_NULL with multiple columns where some exist and some don't."""
+        df = pd.DataFrame({"a": [1, 2, 3], "b": [None, 2, 3]})
+        config = ValidationConfig(
+            tests=[NotNullTest(type=TestType.NOT_NULL, columns=["a", "nonexistent", "b"])]
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 2
+        found_not_found = any("not found" in f for f in failures)
+        found_nulls = any("NULLs" in f for f in failures)
+        assert found_not_found
+        assert found_nulls
+
+    def test_range_min_only(self, validator):
+        """RANGE with only min specified (no max)."""
+        df = pd.DataFrame({"value": [-5, 10, 20]})
+        config = ValidationConfig(tests=[RangeTest(type=TestType.RANGE, column="value", min=0)])
+        failures = validator.validate(df, config)
+        assert len(failures) == 1
+        assert "out of range" in failures[0]
+
+    def test_range_min_only_pass(self, validator):
+        """RANGE with only min specified passes when all above min."""
+        df = pd.DataFrame({"value": [5, 10, 20]})
+        config = ValidationConfig(tests=[RangeTest(type=TestType.RANGE, column="value", min=0)])
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_range_max_only(self, validator):
+        """RANGE with only max specified (no min)."""
+        df = pd.DataFrame({"value": [5, 10, 200]})
+        config = ValidationConfig(tests=[RangeTest(type=TestType.RANGE, column="value", max=100)])
+        failures = validator.validate(df, config)
+        assert len(failures) == 1
+        assert "out of range" in failures[0]
+
+    def test_range_max_only_pass(self, validator):
+        """RANGE with only max specified passes when all below max."""
+        df = pd.DataFrame({"value": [5, 10, 20]})
+        config = ValidationConfig(tests=[RangeTest(type=TestType.RANGE, column="value", max=100)])
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_regex_match_all_null_column(self, validator):
+        """REGEX_MATCH with all-null column passes (valid_series.empty path)."""
+        df = pd.DataFrame({"col": [None, None, None]})
+        config = ValidationConfig(
+            tests=[
+                RegexMatchTest(
+                    type=TestType.REGEX_MATCH,
+                    column="col",
+                    pattern=r"^[A-Z]+$",
+                )
+            ]
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_accepted_values_all_valid(self, validator):
+        """ACCEPTED_VALUES passes when every value is in the accepted list."""
+        df = pd.DataFrame({"status": ["active", "active", "inactive"]})
+        config = ValidationConfig(
+            tests=[
+                AcceptedValuesTest(
+                    type=TestType.ACCEPTED_VALUES,
+                    column="status",
+                    values=["active", "inactive"],
+                )
+            ]
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_schema_without_context(self, validator):
+        """Schema test with no context produces no failure."""
+        df = pd.DataFrame({"id": [1, 2], "name": ["A", "B"]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_schema_with_context_missing_columns_key(self, validator):
+        """Schema test with context that has no 'columns' key produces no failure."""
+        df = pd.DataFrame({"id": [1, 2], "name": ["A", "B"]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
+        context = {"other_key": "value"}
+        failures = validator.validate(df, config, context)
+        assert len(failures) == 0
+
+
+class TestPolarsWarnSeverity:
+    """Test WARN severity with Polars engine."""
+
+    @pytest.fixture
+    def validator(self):
+        return Validator()
+
+    def test_polars_warn_not_null_no_failure(self, validator):
+        """WARN severity with Polars NOT_NULL does not add to failures."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        df = pl.DataFrame({"name": ["Alice", None, "Charlie"]})
+        config = ValidationConfig(
+            tests=[
+                NotNullTest(
+                    type=TestType.NOT_NULL,
+                    columns=["name"],
+                    on_fail=ContractSeverity.WARN,
+                )
+            ]
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_polars_warn_range_no_failure(self, validator):
+        """WARN severity with Polars RANGE does not add to failures."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        df = pl.DataFrame({"value": [10, 200, 30]})
+        config = ValidationConfig(
+            tests=[
+                RangeTest(
+                    type=TestType.RANGE,
+                    column="value",
+                    min=0,
+                    max=100,
+                    on_fail=ContractSeverity.WARN,
+                )
+            ]
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_polars_warn_unique_no_failure(self, validator):
+        """WARN severity with Polars UNIQUE does not add to failures."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        df = pl.DataFrame({"id": [1, 1, 2]})
+        config = ValidationConfig(
+            tests=[
+                UniqueTest(
+                    type=TestType.UNIQUE,
+                    columns=["id"],
+                    on_fail=ContractSeverity.WARN,
+                )
+            ]
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+
+class TestPolarsFailFastNotNull:
+    """Test Polars NOT_NULL fail_fast special path (continue + early return)."""
+
+    @pytest.fixture
+    def validator(self):
+        return Validator()
+
+    def test_polars_not_null_fail_fast_stops_at_first_column(self, validator):
+        """NOT_NULL with fail_fast returns after first null column in Polars."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        df = pl.DataFrame({"a": [None, 1, 2], "b": [None, None, 3]})
+        config = ValidationConfig(
+            tests=[
+                NotNullTest(type=TestType.NOT_NULL, columns=["a", "b"]),
+            ],
+            fail_fast=True,
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 1
+        assert "'a'" in failures[0]
+
+    def test_polars_not_null_fail_fast_skips_subsequent_tests(self, validator):
+        """NOT_NULL fail_fast prevents subsequent tests from running in Polars."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        df = pl.DataFrame({"a": [None, 1], "b": [1, 1]})
+        config = ValidationConfig(
+            tests=[
+                NotNullTest(type=TestType.NOT_NULL, columns=["a"]),
+                UniqueTest(type=TestType.UNIQUE, columns=["b"]),
+            ],
+            fail_fast=True,
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 1
+        assert "NULLs" in failures[0]
+
+
+class TestSchemaWithoutContext:
+    """Test schema validation when context is None or missing 'columns'."""
+
+    @pytest.fixture
+    def validator(self):
+        return Validator()
+
+    def test_polars_schema_without_context(self, validator):
+        """Schema test with Polars and no context produces no failure."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        df = pl.DataFrame({"id": [1, 2], "name": ["A", "B"]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_polars_schema_context_no_columns_key(self, validator):
+        """Schema test with Polars context missing 'columns' key produces no failure."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        df = pl.DataFrame({"id": [1, 2], "name": ["A", "B"]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
+        context = {"other_key": "value"}
+        failures = validator.validate(df, config, context)
+        assert len(failures) == 0
+
+    def test_lazy_schema_without_context(self, validator):
+        """Schema test with LazyFrame and no context produces no failure."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        lf = pl.LazyFrame({"id": [1, 2], "name": ["A", "B"]})
+        config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
+        failures = validator.validate(lf, config)
+        assert len(failures) == 0
+
+
+class TestPolarsFreshnessNaiveTimestamp:
+    """Test Polars freshness with timezone-naive timestamps."""
+
+    @pytest.fixture
+    def validator(self):
+        return Validator()
 
     def test_polars_freshness_naive_timestamp(self, validator):
         """Freshness test works with timezone-naive timestamps in Polars."""

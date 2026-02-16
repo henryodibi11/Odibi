@@ -1,12 +1,17 @@
 """Unit tests for Project class - unified semantic layer integration."""
 
-import pandas as pd
-import pytest
-import yaml
+import logging
 
-from odibi.project import Project, SourceResolver
-from odibi.config import ProjectConfig, LocalConnectionConfig, ConnectionType
-from odibi.semantics.metrics import (
+logging.getLogger("odibi").propagate = False
+
+import pandas as pd  # noqa: E402
+import pytest  # noqa: E402
+import yaml  # noqa: E402
+from unittest.mock import MagicMock  # noqa: E402
+
+from odibi.project import Project, SourceResolver  # noqa: E402
+from odibi.config import ProjectConfig, LocalConnectionConfig, ConnectionType  # noqa: E402
+from odibi.semantics.metrics import (  # noqa: E402
     MetricDefinition,
     DimensionDefinition,
     SemanticLayerConfig,
@@ -566,3 +571,506 @@ class TestProjectRegister:
 
         result = project.query("revenue")
         assert result.df["revenue"].iloc[0] == 300
+
+
+# ============================================================
+# New coverage tests
+# ============================================================
+
+
+class TestSourceResolverBuildPath:
+    """Test SourceResolver._build_path edge cases."""
+
+    def test_build_path_with_catalog_and_schema(self):
+        """Unity Catalog connection returns catalog.schema.table_name."""
+        mock_conn = MagicMock()
+        mock_conn.model_dump.return_value = {
+            "catalog": "my_catalog",
+            "schema": "my_schema",
+        }
+        connections = {"uc": mock_conn}
+        resolver = SourceResolver(connections)
+
+        path = resolver._build_path(mock_conn, "fact_orders")
+
+        assert path == "my_catalog.my_schema.fact_orders"
+
+    def test_build_path_with_path_field(self):
+        """Connection with 'path' instead of 'base_path'."""
+        mock_conn = MagicMock()
+        mock_conn.model_dump.return_value = {"path": "/mnt/data"}
+        connections = {"store": mock_conn}
+        resolver = SourceResolver(connections)
+
+        path = resolver._build_path(mock_conn, "orders")
+
+        assert path.replace("\\", "/") == "/mnt/data/orders"
+
+    def test_build_path_no_base_no_path_no_catalog(self):
+        """Connection with none of base_path, path, or catalog returns just table_name."""
+        mock_conn = MagicMock()
+        mock_conn.model_dump.return_value = {"type": "local"}
+        connections = {"bare": mock_conn}
+        resolver = SourceResolver(connections)
+
+        path = resolver._build_path(mock_conn, "my_table")
+
+        assert path == "my_table"
+
+    def test_build_path_absolute_base_path_skips_join(self):
+        """Absolute base_path is not joined with resolver base_path."""
+        connections = {
+            "abs": LocalConnectionConfig(type=ConnectionType.LOCAL, base_path="/absolute/gold"),
+        }
+        resolver = SourceResolver(connections, base_path="/project")
+
+        _, full_path = resolver.resolve("abs.orders")
+
+        assert "/project" not in full_path.replace("\\", "/")
+        assert "absolute" in full_path
+
+
+class TestSourceResolverFindDefaultConnection:
+    """Test _find_default_connection priority logic."""
+
+    def _make_conn(self):
+        return LocalConnectionConfig(type=ConnectionType.LOCAL, base_path="/data")
+
+    def test_silver_priority_when_no_gold(self):
+        """Silver is chosen when gold is absent."""
+        connections = {"bronze": self._make_conn(), "silver": self._make_conn()}
+        resolver = SourceResolver(connections)
+
+        conn_name, _ = resolver.resolve("orders")
+
+        assert conn_name == "silver"
+
+    def test_bronze_priority_when_no_gold_silver(self):
+        """Bronze is chosen when gold and silver are absent."""
+        connections = {
+            "bronze": self._make_conn(),
+            "staging": self._make_conn(),
+        }
+        resolver = SourceResolver(connections)
+
+        conn_name, _ = resolver.resolve("orders")
+
+        assert conn_name == "bronze"
+
+    def test_warehouse_priority(self):
+        """'warehouse' is chosen when gold/silver/bronze are absent."""
+        connections = {
+            "warehouse": self._make_conn(),
+            "archive": self._make_conn(),
+        }
+        resolver = SourceResolver(connections)
+
+        conn_name, _ = resolver.resolve("orders")
+
+        assert conn_name == "warehouse"
+
+    def test_default_priority(self):
+        """'default' is chosen when gold/silver/bronze/warehouse are absent."""
+        connections = {
+            "default": self._make_conn(),
+            "other": self._make_conn(),
+        }
+        resolver = SourceResolver(connections)
+
+        conn_name, _ = resolver.resolve("orders")
+
+        assert conn_name == "default"
+
+    def test_fallback_to_first_connection(self):
+        """Falls back to first connection when no priority names match."""
+        connections = {
+            "custom_a": self._make_conn(),
+            "custom_b": self._make_conn(),
+        }
+        resolver = SourceResolver(connections)
+
+        conn_name, _ = resolver.resolve("orders")
+
+        assert conn_name == "custom_a"
+
+
+class TestSourceResolverNodeReferenceEdgeCases:
+    """Test _resolve_node_reference edge cases."""
+
+    def _base_connections(self):
+        return {
+            "gold": LocalConnectionConfig(type=ConnectionType.LOCAL, base_path="/data/gold"),
+        }
+
+    def test_node_write_no_connection(self):
+        """Node write config without 'connection' raises ValueError."""
+        pipelines = [
+            {
+                "pipeline": "p1",
+                "nodes": [
+                    {"name": "n1", "write": {"table": "t1"}},
+                ],
+            }
+        ]
+        resolver = SourceResolver(self._base_connections(), pipelines=pipelines)
+
+        with pytest.raises(ValueError, match="no 'connection'"):
+            resolver.resolve("$p1.n1")
+
+    def test_node_write_no_table_no_path(self):
+        """Node write config without 'table' or 'path' raises ValueError."""
+        pipelines = [
+            {
+                "pipeline": "p1",
+                "nodes": [
+                    {"name": "n1", "write": {"connection": "gold"}},
+                ],
+            }
+        ]
+        resolver = SourceResolver(self._base_connections(), pipelines=pipelines)
+
+        with pytest.raises(ValueError, match="no 'table' or 'path'"):
+            resolver.resolve("$p1.n1")
+
+    def test_node_write_connection_not_found(self):
+        """Node write config referencing unknown connection raises ValueError."""
+        pipelines = [
+            {
+                "pipeline": "p1",
+                "nodes": [
+                    {
+                        "name": "n1",
+                        "write": {"connection": "missing", "table": "t1"},
+                    },
+                ],
+            }
+        ]
+        resolver = SourceResolver(self._base_connections(), pipelines=pipelines)
+
+        with pytest.raises(ValueError, match="not found"):
+            resolver.resolve("$p1.n1")
+
+    def test_node_write_uses_path_instead_of_table(self):
+        """Node write config with 'path' instead of 'table' resolves correctly."""
+        pipelines = [
+            {
+                "pipeline": "p1",
+                "nodes": [
+                    {
+                        "name": "n1",
+                        "write": {"connection": "gold", "path": "output/orders"},
+                    },
+                ],
+            }
+        ]
+        resolver = SourceResolver(self._base_connections(), pipelines=pipelines)
+
+        conn_name, full_path = resolver.resolve("$p1.n1")
+
+        assert conn_name == "gold"
+        assert "output" in full_path
+        assert "orders" in full_path
+
+
+class TestProjectProperties:
+    """Test Project property methods."""
+
+    @pytest.fixture
+    def minimal_config(self, tmp_path):
+        gold_path = tmp_path / "gold"
+        gold_path.mkdir()
+        return ProjectConfig(
+            project="props_test",
+            engine="pandas",
+            connections={
+                "gold": LocalConnectionConfig(type=ConnectionType.LOCAL, base_path=str(gold_path)),
+            },
+            story={"connection": "gold", "path": "stories"},
+            system={"connection": "gold", "path": "_system"},
+            pipelines=[
+                {
+                    "pipeline": "test",
+                    "nodes": [
+                        {
+                            "name": "n",
+                            "read": {
+                                "connection": "gold",
+                                "path": "r",
+                                "format": "parquet",
+                            },
+                            "write": {
+                                "connection": "gold",
+                                "path": "w",
+                                "format": "parquet",
+                            },
+                        }
+                    ],
+                }
+            ],
+        )
+
+    def test_connections_property(self, minimal_config):
+        """connections property returns the config connections dict."""
+        project = Project(config=minimal_config)
+
+        assert "gold" in project.connections
+        assert project.connections is minimal_config.connections
+
+    def test_metrics_without_semantic(self, minimal_config):
+        """metrics returns empty list when no semantic config."""
+        project = Project(config=minimal_config)
+
+        assert project.metrics == []
+
+    def test_dimensions_without_semantic(self, minimal_config):
+        """dimensions returns empty list when no semantic config."""
+        project = Project(config=minimal_config)
+
+        assert project.dimensions == []
+
+    def test_describe_without_semantic(self, minimal_config):
+        """describe() returns empty metrics/dimensions when no semantic config."""
+        project = Project(config=minimal_config)
+        desc = project.describe()
+
+        assert desc["project"] == "props_test"
+        assert desc["engine"] == "pandas"
+        assert desc["metrics"] == []
+        assert desc["dimensions"] == []
+        assert "gold" in desc["connections"]
+
+
+class TestProjectReadPandas:
+    """Test Project._read_pandas file reading."""
+
+    def test_read_csv(self, tmp_path):
+        """Reads .csv files via pandas."""
+        csv_path = tmp_path / "data.csv"
+        pd.DataFrame({"a": [1, 2], "b": [3, 4]}).to_csv(csv_path, index=False)
+
+        gold_path = tmp_path / "gold"
+        gold_path.mkdir()
+        config = ProjectConfig(
+            project="csv_test",
+            engine="pandas",
+            connections={
+                "gold": LocalConnectionConfig(type=ConnectionType.LOCAL, base_path=str(tmp_path))
+            },
+            story={"connection": "gold", "path": "stories"},
+            system={"connection": "gold", "path": "_system"},
+            pipelines=[
+                {
+                    "pipeline": "t",
+                    "nodes": [
+                        {
+                            "name": "n",
+                            "read": {
+                                "connection": "gold",
+                                "path": "r",
+                                "format": "parquet",
+                            },
+                            "write": {
+                                "connection": "gold",
+                                "path": "w",
+                                "format": "parquet",
+                            },
+                        }
+                    ],
+                }
+            ],
+        )
+        project = Project(config=config)
+        conn = config.connections["gold"]
+        conn_dict = conn.model_dump()
+
+        df = project._read_pandas(conn_dict, str(csv_path), "local")
+
+        assert list(df.columns) == ["a", "b"]
+        assert len(df) == 2
+
+    def test_read_parquet(self, tmp_path):
+        """Reads .parquet files via pandas."""
+        pq_path = tmp_path / "data.parquet"
+        pd.DataFrame({"x": [10, 20]}).to_parquet(pq_path, index=False)
+
+        gold_path = tmp_path / "gold"
+        gold_path.mkdir()
+        config = ProjectConfig(
+            project="pq_test",
+            engine="pandas",
+            connections={
+                "gold": LocalConnectionConfig(type=ConnectionType.LOCAL, base_path=str(tmp_path))
+            },
+            story={"connection": "gold", "path": "stories"},
+            system={"connection": "gold", "path": "_system"},
+            pipelines=[
+                {
+                    "pipeline": "t",
+                    "nodes": [
+                        {
+                            "name": "n",
+                            "read": {
+                                "connection": "gold",
+                                "path": "r",
+                                "format": "parquet",
+                            },
+                            "write": {
+                                "connection": "gold",
+                                "path": "w",
+                                "format": "parquet",
+                            },
+                        }
+                    ],
+                }
+            ],
+        )
+        project = Project(config=config)
+        conn_dict = config.connections["gold"].model_dump()
+
+        df = project._read_pandas(conn_dict, str(pq_path), "local")
+
+        assert list(df.columns) == ["x"]
+        assert len(df) == 2
+
+    def test_read_directory_as_parquet(self, tmp_path):
+        """Reads a directory (treated as parquet dataset)."""
+        data_dir = tmp_path / "partitioned"
+        data_dir.mkdir()
+        pd.DataFrame({"v": [1]}).to_parquet(data_dir / "part0.parquet", index=False)
+
+        gold_path = tmp_path / "gold"
+        gold_path.mkdir()
+        config = ProjectConfig(
+            project="dir_test",
+            engine="pandas",
+            connections={
+                "gold": LocalConnectionConfig(type=ConnectionType.LOCAL, base_path=str(tmp_path))
+            },
+            story={"connection": "gold", "path": "stories"},
+            system={"connection": "gold", "path": "_system"},
+            pipelines=[
+                {
+                    "pipeline": "t",
+                    "nodes": [
+                        {
+                            "name": "n",
+                            "read": {
+                                "connection": "gold",
+                                "path": "r",
+                                "format": "parquet",
+                            },
+                            "write": {
+                                "connection": "gold",
+                                "path": "w",
+                                "format": "parquet",
+                            },
+                        }
+                    ],
+                }
+            ],
+        )
+        project = Project(config=config)
+        conn_dict = config.connections["gold"].model_dump()
+
+        df = project._read_pandas(conn_dict, str(data_dir), "local")
+
+        assert "v" in df.columns
+        assert len(df) == 1
+
+
+class TestProjectReadPolars:
+    """Test Project._read_polars file reading."""
+
+    def test_read_csv_polars(self, tmp_path):
+        """Reads .csv files via polars."""
+        pl = pytest.importorskip("polars")
+
+        csv_path = tmp_path / "data.csv"
+        pd.DataFrame({"a": [1, 2], "b": [3, 4]}).to_csv(csv_path, index=False)
+
+        gold_path = tmp_path / "gold"
+        gold_path.mkdir()
+        config = ProjectConfig(
+            project="pl_csv",
+            engine="polars",
+            connections={
+                "gold": LocalConnectionConfig(type=ConnectionType.LOCAL, base_path=str(tmp_path))
+            },
+            story={"connection": "gold", "path": "stories"},
+            system={"connection": "gold", "path": "_system"},
+            pipelines=[
+                {
+                    "pipeline": "t",
+                    "nodes": [
+                        {
+                            "name": "n",
+                            "read": {
+                                "connection": "gold",
+                                "path": "r",
+                                "format": "parquet",
+                            },
+                            "write": {
+                                "connection": "gold",
+                                "path": "w",
+                                "format": "parquet",
+                            },
+                        }
+                    ],
+                }
+            ],
+        )
+        project = Project(config=config)
+        conn_dict = config.connections["gold"].model_dump()
+
+        df = project._read_polars(conn_dict, str(csv_path), "local")
+
+        assert isinstance(df, pl.DataFrame)
+        assert df.columns == ["a", "b"]
+        assert len(df) == 2
+
+    def test_read_parquet_polars(self, tmp_path):
+        """Reads .parquet files via polars."""
+        pl = pytest.importorskip("polars")
+
+        pq_path = tmp_path / "data.parquet"
+        pd.DataFrame({"x": [10, 20]}).to_parquet(pq_path, index=False)
+
+        gold_path = tmp_path / "gold"
+        gold_path.mkdir()
+        config = ProjectConfig(
+            project="pl_pq",
+            engine="polars",
+            connections={
+                "gold": LocalConnectionConfig(type=ConnectionType.LOCAL, base_path=str(tmp_path))
+            },
+            story={"connection": "gold", "path": "stories"},
+            system={"connection": "gold", "path": "_system"},
+            pipelines=[
+                {
+                    "pipeline": "t",
+                    "nodes": [
+                        {
+                            "name": "n",
+                            "read": {
+                                "connection": "gold",
+                                "path": "r",
+                                "format": "parquet",
+                            },
+                            "write": {
+                                "connection": "gold",
+                                "path": "w",
+                                "format": "parquet",
+                            },
+                        }
+                    ],
+                }
+            ],
+        )
+        project = Project(config=config)
+        conn_dict = config.connections["gold"].model_dump()
+
+        df = project._read_polars(conn_dict, str(pq_path), "local")
+
+        assert isinstance(df, pl.DataFrame)
+        assert df.columns == ["x"]
+        assert len(df) == 2
