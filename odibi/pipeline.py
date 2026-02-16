@@ -376,8 +376,7 @@ class Pipeline:
 
         # Filter out disabled nodes and their transitive dependents
         disabled_nodes = {name for name in execution_order if not self.graph.nodes[name].enabled}
-        print(f"[DEBUG enabled] execution_order={execution_order}")
-        print(f"[DEBUG enabled] disabled_nodes={disabled_nodes}")
+
         if disabled_nodes:
             disabled_dependents = set()
             for name in disabled_nodes:
@@ -402,7 +401,6 @@ class Pipeline:
                     metadata={"skipped": True, "reason": reason},
                 )
             execution_order = [n for n in execution_order if n not in all_disabled]
-            print(f"[DEBUG enabled] after filter execution_order={execution_order}")
 
         # Apply node filters (--tag, --node)
         filtered_nodes = set(execution_order)
