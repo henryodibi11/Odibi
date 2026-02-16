@@ -34,7 +34,7 @@ Each record has an "effective window" (`valid_from` to `valid_to`) and a flag (`
 | 101         | CA      | Gold | 2024-01-01 | 2024-02-01 | false      |
 | 101         | NY      | Gold | 2024-02-01 | NULL       | true       |
 
-> **Note:** The source column `txn_date` is automatically renamed to `valid_from` in the target, giving each version a complete time window `[valid_from, valid_to)`.
+> **Note:** The source column `txn_date` is automatically copied to `valid_from` in the target, giving each version a complete time window `[valid_from, valid_to)`. The original source column is preserved.
 
 ---
 
@@ -125,7 +125,7 @@ params:
   effective_time_col: "updated_at"
 
   # Target columns (optional — defaults shown)
-  start_time_col: "valid_from"         # effective_time_col renamed to this
+  start_time_col: "valid_from"         # effective_time_col copied to this
   end_time_col: "valid_to"
   current_flag_col: "is_current"
 
@@ -176,7 +176,7 @@ params:
 | `keys` | list[string] | Yes | - | Natural keys to identify unique entities |
 | `track_cols` | list[string] | Yes | - | Columns to monitor for changes |
 | `effective_time_col` | string | Yes | - | Source column indicating when change occurred |
-| `start_time_col` | string | No | "valid_from" | Name of the start timestamp column (effective_time_col renamed to this) |
+| `start_time_col` | string | No | "valid_from" | Name of the start timestamp column (effective_time_col copied to this) |
 | `end_time_col` | string | No | "valid_to" | Name of the end timestamp column |
 | `current_flag_col` | string | No | "is_current" | Name of the current record flag column |
 | `delete_col` | string | No | None | Column indicating soft deletion (boolean) |
@@ -201,7 +201,7 @@ The `scd2` transformer performs a complex set of operations automatically:
 1.  **Match**: Finds existing records in the `target` table using `keys`.
 2.  **Compare**: Checks `track_cols` to see if any data has changed.
 3.  **Close**: If a record changed, it updates the *old* record's `valid_to` to the new record's effective time, and sets `is_current = false`.
-4.  **Insert**: It adds the *new* record with `valid_from` (renamed from `effective_time_col`), `valid_to = NULL`, and `is_current = true`.
+4.  **Insert**: It adds the *new* record with `valid_from` (copied from `effective_time_col`), `valid_to = NULL`, and `is_current = true`.
 5.  **Preserve**: It keeps all unchanged history records as they are.
 
 ### Delta MERGE Optimization (Spark)

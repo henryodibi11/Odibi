@@ -51,9 +51,9 @@ class SCD2Params(BaseModel):
     4. **Insert**: Adds a new record with `start_time_col` (renamed from `effective_time_col`)
        as the version start, open-ended `end_time_col`, and `is_current = true`.
 
-    The ``effective_time_col`` (source column) is automatically renamed to ``start_time_col``
+    The ``effective_time_col`` value is copied into a new ``start_time_col`` column
     (default: ``valid_from``) in the target, giving each version a complete time window:
-    ``[valid_from, valid_to)``.
+    ``[valid_from, valid_to)``. The original source column is preserved.
 
     **Note:** SCD2 is self-contained — it writes directly to the target table on all
     engines. No separate ``write:`` block is needed in your pipeline YAML.
@@ -86,7 +86,7 @@ class SCD2Params(BaseModel):
     start_time_col: str = Field(
         default="valid_from",
         description="Name of the start timestamp column in the target. "
-        "The effective_time_col value is renamed to this column.",
+        "The effective_time_col value is copied to this column.",
     )
     end_time_col: str = Field(default="valid_to", description="Name of the end timestamp column")
     current_flag_col: str = Field(
@@ -317,8 +317,8 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
 
     if target_df is None:
         # First Run: write directly to target
-        if eff_col in new_records.columns:
-            new_records = new_records.withColumnRenamed(eff_col, start_col)
+        if eff_col in new_records.columns and eff_col != start_col:
+            new_records = new_records.withColumn(start_col, new_records[eff_col])
 
         is_path = (
             "/" in params.target
@@ -397,9 +397,9 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
         flag_col, F.lit(True)
     )
 
-    # Rename effective_time_col to start_time_col (e.g., txn_date → valid_from)
-    if eff_col in rows_to_insert.columns:
-        rows_to_insert = rows_to_insert.withColumnRenamed(eff_col, start_col)
+    # Copy effective_time_col to start_time_col (e.g., txn_date → valid_from)
+    if eff_col in rows_to_insert.columns and eff_col != start_col:
+        rows_to_insert = rows_to_insert.withColumn(start_col, rows_to_insert[eff_col])
 
     # B) Close Old Records
     # We need to update target_df.
@@ -456,9 +456,9 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
     )
 
     # 3. Union: Updated History + New Inserts
-    # Rename effective_time_col in final_target if it exists (legacy data migration)
-    if eff_col in final_target.columns:
-        final_target = final_target.withColumnRenamed(eff_col, start_col)
+    # Copy effective_time_col to start_time_col in final_target if needed
+    if eff_col in final_target.columns and start_col not in final_target.columns:
+        final_target = final_target.withColumn(start_col, final_target[eff_col])
 
     # UnionByName handles column order differences
     final_df = final_target.unionByName(rows_to_insert)
@@ -543,8 +543,8 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
             new_records = source_df.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
                 flag_col, F.lit(True)
             )
-            if eff_col in new_records.columns:
-                new_records = new_records.withColumnRenamed(eff_col, start_col)
+            if eff_col in new_records.columns and eff_col != start_col:
+                new_records = new_records.withColumn(start_col, new_records[eff_col])
 
             is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
             writer = new_records.write.format("delta").mode("overwrite")
@@ -606,7 +606,7 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
     merger.execute()
 
     # Return the source records with start_col (MERGE already wrote to target)
-    result_df = merge_source.drop(eff_col) if eff_col in merge_source.columns else merge_source
+    result_df = merge_source
 
     ctx.info("Delta MERGE SCD2 completed", target=target)
 
@@ -676,10 +676,10 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
             join_cond = " AND ".join([f"s.{k} = t.{k}" for k in keys])
 
             src_cols = [c for c in source_df.columns if c not in [end_col, flag_col]]
-            # Rename eff_col to start_col in SELECT
-            cols_select = ", ".join(
-                [f"s.{c} as {start_col}" if c == eff_col else f"s.{c}" for c in src_cols]
-            )
+            # Keep original columns and copy eff_col to start_col
+            cols_select = ", ".join([f"s.{c}" for c in src_cols])
+            if eff_col != start_col:
+                cols_select += f", s.{eff_col} as {start_col}"
             null_check = " AND ".join([f"t.{k} IS NULL" for k in keys])
 
             sql_new_inserts = f"""
@@ -759,7 +759,7 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
 
     # Prepare Source: rename eff_col to start_col, add SCD metadata
     source_df = source_df.copy()
-    source_df = source_df.rename(columns={eff_col: start_col})
+    source_df[start_col] = source_df[eff_col]
     source_df[end_col] = pd.NaT
     source_df[flag_col] = True
 

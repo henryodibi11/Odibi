@@ -71,7 +71,7 @@ class TestSCD2Pandas:
         assert "valid_from" in result_df.columns
         assert "valid_to" in result_df.columns
         assert "is_current" in result_df.columns
-        assert "updated_at" not in result_df.columns
+        assert "updated_at" in result_df.columns  # Original column preserved
         assert result_df["is_current"].all()  # All should be true
         assert result_df["valid_to"].isna().all()  # All open-ended
 
@@ -603,7 +603,7 @@ class TestSCD2PandasEdgeCases:
         mock_connection.get_path.assert_called_once_with("OEE/silver/dim_customers")
         assert len(result_df) == 1
         assert "valid_from" in result_df.columns
-        assert "updated_at" not in result_df.columns
+        assert "updated_at" in result_df.columns  # Original column preserved
         assert bool(result_df.iloc[0]["is_current"]) is True
 
 
@@ -756,8 +756,10 @@ class TestSCD2MergeOptimization:
             result = _scd2_spark_delta_merge(ctx, source_df, params)
             assert result is not None
             source_df.withColumn.assert_called()
-            # Verify eff_col renamed to start_col
-            source_df.withColumnRenamed.assert_called_with("txn_date", "valid_from")
+            # Verify eff_col copied to start_col (not renamed)
+            # withColumn is called for valid_to, is_current, and valid_from
+            with_col_calls = [str(c) for c in source_df.withColumn.call_args_list]
+            assert any("valid_from" in c for c in with_col_calls)
             # Verify it wrote directly to the target
             source_df.write.format.assert_called_once_with("delta")
             source_df.write.format.return_value.mode.assert_called_once_with("overwrite")
