@@ -48,6 +48,18 @@ class DateDimensionPattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate date dimension pattern configuration parameters.
+
+        Ensures that all required parameters are present and valid. Checks that:
+        - start_date is provided in YYYY-MM-DD format
+        - end_date is provided in YYYY-MM-DD format
+        - start_date is before or equal to end_date
+        - fiscal_year_start_month is an integer between 1-12 if provided
+
+        Raises:
+            ValueError: If required dates are missing, dates are invalid/unparseable,
+                start_date is after end_date, or fiscal_year_start_month is invalid.
+        """
         ctx = get_logging_context()
         ctx.debug(
             "DateDimensionPattern validation starting",
@@ -59,9 +71,10 @@ class DateDimensionPattern(Pattern):
             ctx.error(
                 "DateDimensionPattern validation failed: 'start_date' is required",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DateDimensionPattern: 'start_date' parameter is required. "
+                f"DateDimensionPattern (node '{self.config.name}'): 'start_date' parameter is required. "
                 "Expected format: 'YYYY-MM-DD' (e.g., '2024-01-01'). "
                 "Provide a valid start_date in params."
             )
@@ -70,9 +83,10 @@ class DateDimensionPattern(Pattern):
             ctx.error(
                 "DateDimensionPattern validation failed: 'end_date' is required",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DateDimensionPattern: 'end_date' parameter is required. "
+                f"DateDimensionPattern (node '{self.config.name}'): 'end_date' parameter is required. "
                 "Expected format: 'YYYY-MM-DD' (e.g., '2024-12-31'). "
                 "Provide a valid end_date in params."
             )
@@ -82,18 +96,19 @@ class DateDimensionPattern(Pattern):
             end = self._parse_date(self.params["end_date"])
             if start > end:
                 raise ValueError(
-                    f"start_date must be before or equal to end_date. "
+                    f"DateDimensionPattern (node '{self.config.name}'): start_date must be before or equal to end_date. "
                     f"Provided: start_date='{self.params['start_date']}', "
                     f"end_date='{self.params['end_date']}'. "
-                    f"Swap the values or adjust the date range."
+                    f"Fix: Swap the values or adjust the date range."
                 )
         except Exception as e:
             ctx.error(
                 f"DateDimensionPattern validation failed: {e}",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                f"DateDimensionPattern: Invalid date parameters. {e} "
+                f"DateDimensionPattern (node '{self.config.name}'): Invalid date parameters. {e} "
                 f"Provided: start_date='{self.params.get('start_date')}', "
                 f"end_date='{self.params.get('end_date')}'. "
                 f"Expected format: 'YYYY-MM-DD'."
@@ -104,9 +119,10 @@ class DateDimensionPattern(Pattern):
             ctx.error(
                 "DateDimensionPattern validation failed: invalid fiscal_year_start_month",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                f"DateDimensionPattern: 'fiscal_year_start_month' must be an integer 1-12. "
+                f"DateDimensionPattern (node '{self.config.name}'): 'fiscal_year_start_month' must be an integer 1-12. "
                 f"Provided: {fiscal_month!r} (type: {type(fiscal_month).__name__}). "
                 f"Use an integer like 1 for January or 7 for July."
             )
@@ -123,6 +139,27 @@ class DateDimensionPattern(Pattern):
         return datetime.strptime(date_str, "%Y-%m-%d").date()
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the date dimension pattern to generate a date dimension table.
+
+        Generates a complete date dimension table with pre-calculated date attributes for
+        the specified date range. The execution flow:
+        1. Parse start_date and end_date parameters
+        2. Generate one row per date in the range
+        3. Calculate all date attributes (day_of_week, quarter, fiscal_year, etc.)
+        4. Add unknown member row (date_sk=0) if configured
+
+        Generated columns include date_sk (surrogate key), full_date, day/week/month/quarter/year
+        attributes, fiscal year/quarter, and boolean flags for period boundaries.
+
+        Args:
+            context: Engine context for DataFrame creation and execution environment.
+
+        Returns:
+            DataFrame containing one row per date with all calculated date attributes.
+
+        Raises:
+            Exception: If date parsing fails or DataFrame generation encounters errors.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 
@@ -169,6 +206,7 @@ class DateDimensionPattern(Pattern):
             ctx.error(
                 f"DateDimensionPattern failed: {e}",
                 pattern="DateDimensionPattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )

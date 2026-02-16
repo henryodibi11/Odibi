@@ -2,6 +2,8 @@
 
 import hashlib
 import os
+import time
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 try:
@@ -67,6 +69,16 @@ class PolarsEngine(Engine):
         **kwargs,
     ) -> Any:
         """Read data using Polars (Lazy by default).
+
+        Args:
+            connection: Connection object providing base path and storage options.
+            format: Data format (csv, parquet, delta, json, sql, sql_server, azure_sql).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            streaming: Whether to enable streaming mode (uses scan methods when possible).
+            schema: Optional schema specification for SQL queries.
+            options: Additional read options to pass to Polars readers.
+            **kwargs: Additional keyword arguments.
 
         Returns:
             pl.LazyFrame or pl.DataFrame
@@ -254,7 +266,21 @@ class PolarsEngine(Engine):
         options: Optional[Dict[str, Any]] = None,
         streaming_config: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Write data using Polars."""
+        """Write data using Polars.
+
+        Args:
+            df: DataFrame or LazyFrame to write.
+            connection: Connection object providing base path and storage options.
+            format: Output format (csv, parquet, delta, json, sql, sql_server, azure_sql).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            mode: Write mode (overwrite, append, upsert, append_once).
+            options: Additional write options to pass to Polars writers.
+            streaming_config: Streaming configuration (not used in Polars engine).
+
+        Returns:
+            Optional dict with write statistics for Delta writes, None otherwise.
+        """
         options = options or {}
 
         if format in ["sql", "sql_server", "azure_sql"]:
@@ -481,7 +507,16 @@ class PolarsEngine(Engine):
         return ctx.execute(sql, eager=False)
 
     def execute_operation(self, operation: str, params: Dict[str, Any], df: Any) -> Any:
-        """Execute built-in operation."""
+        """Execute built-in operation.
+
+        Args:
+            operation: Name of the operation to execute (e.g., 'pivot', 'unpivot', 'explode').
+            params: Dictionary of parameters specific to the operation.
+            df: DataFrame or LazyFrame to operate on.
+
+        Returns:
+            Transformed DataFrame or LazyFrame.
+        """
         # Ensure LazyFrame for consistency if possible, but operations work on both usually.
         # If DataFrame, some operations might need different methods.
 
@@ -604,14 +639,28 @@ class PolarsEngine(Engine):
         return df
 
     def get_schema(self, df: Any) -> Any:
-        """Get DataFrame schema."""
+        """Get DataFrame schema.
+
+        Args:
+            df: DataFrame or LazyFrame to get schema from.
+
+        Returns:
+            Dictionary mapping column names to data type strings.
+        """
         # Polars schema is a dict {name: DataType}
         # We can return a dict of strings for compatibility
         schema = df.collect_schema() if isinstance(df, pl.LazyFrame) else df.schema
         return {name: str(dtype) for name, dtype in schema.items()}
 
     def get_shape(self, df: Any) -> tuple:
-        """Get DataFrame shape."""
+        """Get DataFrame shape.
+
+        Args:
+            df: DataFrame or LazyFrame to get shape from.
+
+        Returns:
+            Tuple of (rows, columns) as integers.
+        """
         if isinstance(df, pl.LazyFrame):
             # Expensive to count rows in LazyFrame without scan
             # But usually shape implies (rows, cols)
@@ -624,13 +673,28 @@ class PolarsEngine(Engine):
         return df.shape
 
     def count_rows(self, df: Any) -> int:
-        """Count rows in DataFrame."""
+        """Count rows in DataFrame.
+
+        Args:
+            df: DataFrame or LazyFrame to count rows from.
+
+        Returns:
+            Number of rows as integer.
+        """
         if isinstance(df, pl.LazyFrame):
             return df.select(pl.len()).collect().item()
         return len(df)
 
     def count_nulls(self, df: Any, columns: List[str]) -> Dict[str, int]:
-        """Count nulls in specified columns."""
+        """Count nulls in specified columns.
+
+        Args:
+            df: DataFrame or LazyFrame to analyze.
+            columns: List of column names to count nulls for.
+
+        Returns:
+            Dictionary mapping column names to null counts.
+        """
         if isinstance(df, pl.LazyFrame):
             # efficient null count
             return df.select([pl.col(c).null_count() for c in columns]).collect().to_dicts()[0]
@@ -638,7 +702,16 @@ class PolarsEngine(Engine):
         return df.select([pl.col(c).null_count() for c in columns]).to_dicts()[0]
 
     def validate_schema(self, df: Any, schema_rules: Dict[str, Any]) -> List[str]:
-        """Validate DataFrame schema."""
+        """Validate DataFrame schema.
+
+        Args:
+            df: DataFrame or LazyFrame to validate.
+            schema_rules: Dictionary containing schema validation rules
+                (e.g., required_columns, expected_types, disallowed_columns).
+
+        Returns:
+            List of validation failure messages (empty if all validations pass).
+        """
         failures = []
 
         # Schema is dict-like in Polars
@@ -745,13 +818,28 @@ class PolarsEngine(Engine):
         return failures
 
     def get_sample(self, df: Any, n: int = 10) -> List[Dict[str, Any]]:
-        """Get sample rows as list of dictionaries."""
+        """Get sample rows as list of dictionaries.
+
+        Args:
+            df: DataFrame or LazyFrame to sample from.
+            n: Number of rows to sample (default: 10).
+
+        Returns:
+            List of dictionaries, each representing a row.
+        """
         if isinstance(df, pl.LazyFrame):
             return df.limit(n).collect().to_dicts()
         return df.head(n).to_dicts()
 
     def profile_nulls(self, df: Any) -> Dict[str, float]:
-        """Calculate null percentage for each column."""
+        """Calculate null percentage for each column.
+
+        Args:
+            df: DataFrame or LazyFrame to profile.
+
+        Returns:
+            Dictionary mapping column names to null percentages (0.0 to 1.0).
+        """
         if isinstance(df, pl.LazyFrame):
             # null_count() / count()
             # We can do this in one expression
@@ -773,14 +861,33 @@ class PolarsEngine(Engine):
     def table_exists(
         self, connection: Any, table: Optional[str] = None, path: Optional[str] = None
     ) -> bool:
-        """Check if table or location exists."""
+        """Check if table or location exists.
+
+        Args:
+            connection: Connection object to resolve paths.
+            table: Table name to check (mutually exclusive with path).
+            path: File path to check (mutually exclusive with table).
+
+        Returns:
+            True if the table or path exists, False otherwise.
+        """
         if path:
             full_path = connection.get_path(path)
             return os.path.exists(full_path)
         return False
 
     def harmonize_schema(self, df: Any, target_schema: Dict[str, str], policy: Any) -> Any:
-        """Harmonize DataFrame schema."""
+        """Harmonize DataFrame schema.
+
+        Args:
+            df: DataFrame or LazyFrame to harmonize.
+            target_schema: Dictionary mapping column names to target data types.
+            policy: SchemaPolicyConfig object defining harmonization behavior
+                (mode, on_missing_columns, on_new_columns).
+
+        Returns:
+            DataFrame or LazyFrame with harmonized schema.
+        """
         # policy: SchemaPolicyConfig
         from odibi.config import OnMissingColumns, OnNewColumns, SchemaMode
 
@@ -860,7 +967,17 @@ class PolarsEngine(Engine):
     def anonymize(
         self, df: Any, columns: List[str], method: str, salt: Optional[str] = None
     ) -> Any:
-        """Anonymize specified columns."""
+        """Anonymize specified columns.
+
+        Args:
+            df: DataFrame or LazyFrame to anonymize.
+            columns: List of column names to anonymize.
+            method: Anonymization method ('mask', 'hash', 'redact').
+            salt: Optional salt string for hash-based anonymization.
+
+        Returns:
+            DataFrame or LazyFrame with anonymized columns.
+        """
         if method == "mask":
             # Mask all but last 4 characters: '******1234'
             # Regex look-around not supported in some envs.
@@ -1016,6 +1133,9 @@ class PolarsEngine(Engine):
             table: Table name
             path: Table path
             config: AutoOptimizeConfig object
+
+        Returns:
+            None
         """
         from odibi.utils.logging_context import get_logging_context
 
@@ -1215,3 +1335,191 @@ class PolarsEngine(Engine):
         )
 
         return history
+
+    def add_write_metadata(
+        self,
+        df: "pl.DataFrame",
+        metadata_config: Any,
+        source_connection: Optional[str] = None,
+        source_table: Optional[str] = None,
+        source_path: Optional[str] = None,
+        is_file_source: bool = False,
+    ) -> "pl.DataFrame":
+        """Add metadata columns to DataFrame before writing (Bronze layer lineage).
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            metadata_config: WriteMetadataConfig or True (for all defaults)
+            source_connection: Name of the source connection
+            source_table: Name of the source table (SQL sources)
+            source_path: Path of the source file (file sources)
+            is_file_source: True if source is a file-based read
+
+        Returns:
+            DataFrame with metadata columns added
+        """
+        from odibi.config import WriteMetadataConfig
+
+        if metadata_config is True:
+            config = WriteMetadataConfig()
+        elif isinstance(metadata_config, WriteMetadataConfig):
+            config = metadata_config
+        else:
+            return df
+
+        is_lazy = isinstance(df, pl.LazyFrame)
+        if is_lazy:
+            df = df.collect()
+
+        columns = []
+        if config.extracted_at:
+            columns.append(pl.lit(datetime.now(timezone.utc)).alias("_extracted_at"))
+        if config.source_file and is_file_source and source_path:
+            columns.append(pl.lit(source_path).alias("_source_file"))
+        if config.source_connection and source_connection:
+            columns.append(pl.lit(source_connection).alias("_source_connection"))
+        if config.source_table and source_table:
+            columns.append(pl.lit(source_table).alias("_source_table"))
+
+        if columns:
+            df = df.with_columns(columns)
+
+        return df.lazy() if is_lazy else df
+
+    def restore_delta(self, connection: Any, path: str, version: int) -> None:
+        """Restore Delta table to a specific version.
+
+        Args:
+            connection: Connection object
+            path: Delta table path
+            version: Version number to restore to
+        """
+        from odibi.utils.logging_context import get_logging_context
+
+        ctx = get_logging_context().with_context(engine="polars")
+        start = time.time()
+
+        ctx.info("Starting Delta table restore", path=path, target_version=version)
+
+        try:
+            from deltalake import DeltaTable
+        except ImportError:
+            ctx.error("Delta Lake library not installed", path=path)
+            raise ImportError(
+                "Delta Lake support requires 'pip install odibi[polars]' "
+                "or 'pip install deltalake'. See README.md for installation instructions."
+            )
+
+        full_path = connection.get_path(path) if connection else path
+
+        storage_opts = {}
+        if hasattr(connection, "pandas_storage_options"):
+            storage_opts = connection.pandas_storage_options()
+
+        dt = DeltaTable(full_path, storage_options=storage_opts)
+        dt.restore(version)
+
+        elapsed = (time.time() - start) * 1000
+        ctx.info(
+            "Delta table restored",
+            path=str(full_path),
+            restored_to_version=version,
+            elapsed_ms=round(elapsed, 2),
+        )
+
+    def filter_greater_than(self, df: "pl.DataFrame", column: str, value: Any) -> "pl.DataFrame":
+        """Filter DataFrame where column > value.
+
+        Automatically casts string columns to datetime for proper comparison.
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            column: Column name to filter on
+            value: Value to compare against
+
+        Returns:
+            Filtered DataFrame
+        """
+        is_lazy = isinstance(df, pl.LazyFrame)
+        if is_lazy:
+            df = df.collect()
+
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+
+        try:
+            col_dtype = df[column].dtype
+
+            if col_dtype == pl.Utf8:
+                df = df.with_columns(pl.col(column).str.to_datetime(time_unit="us", strict=False))
+                value = datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T"))
+            elif col_dtype in (pl.Datetime, pl.Date) and isinstance(value, str):
+                value = datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T"))
+
+            result = df.filter(pl.col(column) > value)
+            return result.lazy() if is_lazy else result
+        except Exception as e:
+            raise ValueError(f"Failed to filter {column} > {value}: {e}")
+
+    def filter_coalesce(
+        self,
+        df: "pl.DataFrame",
+        col1: str,
+        col2: str,
+        op: str,
+        value: Any,
+    ) -> "pl.DataFrame":
+        """Filter using COALESCE(col1, col2) op value.
+
+        Automatically casts string columns to datetime for proper comparison.
+
+        Args:
+            df: Polars DataFrame or LazyFrame
+            col1: Primary column name
+            col2: Fallback column name
+            op: Comparison operator (>=, >, <=, <, ==, =)
+            value: Value to compare against
+
+        Returns:
+            Filtered DataFrame
+        """
+        is_lazy = isinstance(df, pl.LazyFrame)
+        if is_lazy:
+            df = df.collect()
+
+        if col1 not in df.columns:
+            raise ValueError(f"Column '{col1}' not found")
+
+        def _cast_if_string(col_name: str) -> pl.Expr:
+            if df[col_name].dtype == pl.Utf8:
+                return pl.col(col_name).str.to_datetime(strict=False)
+            return pl.col(col_name)
+
+        expr1 = _cast_if_string(col1)
+        if col2 in df.columns:
+            expr2 = _cast_if_string(col2)
+            coalesced = pl.coalesce(expr1, expr2)
+        else:
+            coalesced = expr1
+
+        try:
+            coalesced_series = df.select(coalesced.alias("_coalesced"))["_coalesced"]
+            if coalesced_series.dtype in (pl.Datetime, pl.Date) and isinstance(value, str):
+                value = datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T"))
+
+            ops = {
+                ">=": coalesced >= value,
+                ">": coalesced > value,
+                "<=": coalesced <= value,
+                "<": coalesced < value,
+                "==": coalesced == value,
+                "=": coalesced == value,
+            }
+
+            if op not in ops:
+                raise ValueError(f"Unsupported operator: {op}")
+
+            result = df.filter(ops[op])
+            return result.lazy() if is_lazy else result
+        except Exception as e:
+            raise ValueError(f"Failed to filter COALESCE({col1}, {col2}) {op} {value}: {e}")

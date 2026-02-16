@@ -488,3 +488,21 @@ class TestMaterialized:
             executor.execute(config)
 
         mock_engine.write.assert_called_once()
+
+
+def test_write_phase_skipped_when_df_is_none(mock_context, mock_engine, connections):
+    """Test that write phase is skipped with a warning when result_df is None."""
+    config = NodeConfig(
+        name="test_node",
+        read={"connection": "src", "format": "csv", "path": "src.csv"},
+        write={"connection": "dst", "format": "csv", "path": "dst.csv"},
+    )
+
+    executor = NodeExecutor(mock_context, mock_engine, connections)
+
+    with patch.object(executor, "_execute_read_phase", return_value=(None, None)):
+        result = executor.execute(config)
+
+    assert result.success
+    mock_engine.write.assert_not_called()
+    assert any("Skipped write: no data" in step for step in executor._execution_steps)

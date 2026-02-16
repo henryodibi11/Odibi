@@ -7,7 +7,7 @@ Exposes odibi knowledge through the Model Context Protocol (MCP).
 
 from odibi_mcp.audit.logger import AuditLogger
 from odibi_mcp.audit.entry import AuditEntry
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -995,7 +995,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         "get_validation_rules",
     }
 
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
     request_id = str(arguments.get("request_id") or f"{name}-{int(start_time.timestamp())}")
     project = "unknown"  # Could extract this from result in future
     redacted_args = AuditLogger.redact_args(arguments)
@@ -1359,7 +1359,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         if name in CONTEXT_INJECTION_TOOLS:
             result = knowledge._with_context(result)
 
-        duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         audit_logger.log(
             AuditEntry(
                 timestamp=start_time,
@@ -1382,7 +1382,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     except Exception as e:
         from odibi_mcp.utils.errors import wrap_exception
 
-        duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         mcp_error = wrap_exception(e, tool_name=name, request_id=request_id)
 
         audit_logger.log(

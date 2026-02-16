@@ -36,6 +36,7 @@ def mock_engine():
 def mock_config():
     """Create a basic mock NodeConfig."""
     config = MagicMock(spec=NodeConfig)
+    config.name = "test_node"
     config.params = {}
     return config
 

@@ -5,10 +5,13 @@ for change detection in snapshot ingestion patterns.
 """
 
 import hashlib
+import logging
 from typing import TYPE_CHECKING, List, Optional, Any
 
 if TYPE_CHECKING:
     import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def compute_dataframe_hash(
@@ -171,7 +174,10 @@ def get_content_hash_from_state(state_backend, node_name: str, table_name: str) 
         if isinstance(value, dict):
             return value.get("hash")
         return None
-    except Exception:
+    except Exception as e:
+        logger.debug(
+            f"Failed to get content hash from state for node '{node_name}' table '{table_name}': {type(e).__name__}: {e}"
+        )
         return None
 
 

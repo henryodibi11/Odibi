@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
@@ -58,6 +58,19 @@ class DimensionPattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate dimension pattern configuration parameters.
+
+        Ensures that all required parameters are present and valid. Checks that:
+        - natural_key is provided (business key column(s))
+        - surrogate_key is provided (auto-generated primary key column name)
+        - scd_type is valid (0, 1, or 2)
+        - target is provided for SCD Type 2 (required for history comparison)
+        - track_cols is provided for SCD Type 1 and 2 (columns to monitor for changes)
+
+        Raises:
+            ValueError: If natural_key or surrogate_key is missing, scd_type is invalid,
+                target is missing for SCD2, or track_cols is missing for SCD1/2.
+        """
         ctx = get_logging_context()
         ctx.debug(
             "DimensionPattern validation starting",
@@ -69,9 +82,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 "DimensionPattern validation failed: 'natural_key' is required",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DimensionPattern: 'natural_key' parameter is required. "
+                f"DimensionPattern (node '{self.config.name}'): 'natural_key' parameter is required. "
                 "The natural_key identifies the business key column(s) that uniquely identify "
                 "each dimension record in the source system. "
                 "Provide natural_key as a string (single column) or list of strings (composite key)."
@@ -81,9 +95,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 "DimensionPattern validation failed: 'surrogate_key' is required",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DimensionPattern: 'surrogate_key' parameter is required. "
+                f"DimensionPattern (node '{self.config.name}'): 'surrogate_key' parameter is required. "
                 "The surrogate_key is the auto-generated primary key column for the dimension table, "
                 "used to join with fact tables instead of the natural key. "
                 "Provide surrogate_key as a string specifying the column name (e.g., 'customer_sk')."
@@ -94,9 +109,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 f"DimensionPattern validation failed: invalid scd_type {scd_type}",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                f"DimensionPattern: 'scd_type' must be 0, 1, or 2. Got: {scd_type}. "
+                f"DimensionPattern (node '{self.config.name}'): 'scd_type' must be 0, 1, or 2. Got: {scd_type}. "
                 "SCD Type 0: No changes tracked (static dimension). "
                 "SCD Type 1: Overwrite changes (no history). "
                 "SCD Type 2: Track full history with valid_from/valid_to dates."
@@ -106,9 +122,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 "DimensionPattern validation failed: 'target' required for SCD2",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DimensionPattern: 'target' parameter is required for scd_type=2. "
+                f"DimensionPattern (node '{self.config.name}'): 'target' parameter is required for scd_type=2. "
                 "SCD Type 2 compares incoming data against existing records to detect changes, "
                 "so a target DataFrame containing current dimension data must be provided. "
                 "Pass the existing dimension table as the 'target' parameter."
@@ -118,9 +135,10 @@ class DimensionPattern(Pattern):
             ctx.error(
                 "DimensionPattern validation failed: 'track_cols' required for SCD1/2",
                 pattern="DimensionPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "DimensionPattern: 'track_cols' parameter is required for scd_type 1 or 2. "
+                f"DimensionPattern (node '{self.config.name}'): 'track_cols' parameter is required for scd_type 1 or 2. "
                 "The track_cols specifies which columns to monitor for changes. "
                 "When these columns change, SCD1 overwrites values or SCD2 creates new history records. "
                 "Provide track_cols as a list of column names (e.g., ['address', 'phone', 'email'])."
@@ -132,6 +150,27 @@ class DimensionPattern(Pattern):
         )
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the dimension pattern to build a dimension table with surrogate keys.
+
+        Builds a complete dimension table with auto-generated surrogate keys and optional
+        slowly changing dimension (SCD) support. The execution flow varies by SCD type:
+        - SCD Type 0: Insert new records only, never update existing
+        - SCD Type 1: Update existing records in-place, insert new records
+        - SCD Type 2: Track full history with valid_from/valid_to dates and is_current flag
+
+        All modes generate surrogate keys starting from MAX(existing_sk) + 1 for new records.
+        Optionally adds audit columns and ensures unknown member row (SK=0) exists.
+
+        Args:
+            context: Engine context containing the source DataFrame and execution environment.
+
+        Returns:
+            DataFrame with surrogate keys assigned and SCD logic applied as configured.
+
+        Raises:
+            Exception: If target loading fails, SCD processing fails, or surrogate key
+                generation encounters errors.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 
@@ -195,122 +234,11 @@ class DimensionPattern(Pattern):
             ctx.error(
                 f"DimensionPattern failed: {e}",
                 pattern="DimensionPattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )
             raise
-
-    def _get_row_count(self, df, engine_type) -> Optional[int]:
-        try:
-            if engine_type == EngineType.SPARK:
-                return df.count()
-            else:
-                return len(df)
-        except Exception:
-            return None
-
-    def _load_existing_target(self, context: EngineContext, target: str):
-        """Load existing target table if it exists."""
-        if context.engine_type == EngineType.SPARK:
-            return self._load_existing_spark(context, target)
-        else:
-            return self._load_existing_pandas(context, target)
-
-    def _load_existing_spark(self, context: EngineContext, target: str):
-        """Load existing target table from Spark with multi-format support."""
-        ctx = get_logging_context()
-        spark = context.spark
-
-        # Try catalog table first
-        try:
-            return spark.table(target)
-        except Exception:
-            pass
-
-        # Check file extension for format detection
-        target_lower = target.lower()
-
-        try:
-            if target_lower.endswith(".parquet"):
-                return spark.read.parquet(target)
-            elif target_lower.endswith(".csv"):
-                return spark.read.option("header", "true").option("inferSchema", "true").csv(target)
-            elif target_lower.endswith(".json"):
-                return spark.read.json(target)
-            elif target_lower.endswith(".orc"):
-                return spark.read.orc(target)
-            else:
-                # Try Delta format as fallback (for paths without extension)
-                return spark.read.format("delta").load(target)
-        except Exception as e:
-            ctx.warning(
-                f"Could not load existing target '{target}': {e}. Treating as initial load.",
-                pattern="DimensionPattern",
-                target=target,
-            )
-            return None
-
-    def _load_existing_pandas(self, context: EngineContext, target: str):
-        """Load existing target table from Pandas with multi-format support."""
-        import os
-
-        import pandas as pd
-
-        ctx = get_logging_context()
-        path = target
-
-        # Handle connection-prefixed paths
-        if hasattr(context, "engine") and context.engine:
-            if "." in path:
-                parts = path.split(".", 1)
-                conn_name = parts[0]
-                rel_path = parts[1]
-                if conn_name in context.engine.connections:
-                    try:
-                        path = context.engine.connections[conn_name].get_path(rel_path)
-                    except Exception:
-                        pass
-
-        if not os.path.exists(path):
-            return None
-
-        path_lower = str(path).lower()
-
-        try:
-            # Parquet (file or directory)
-            if path_lower.endswith(".parquet") or os.path.isdir(path):
-                return pd.read_parquet(path)
-            # CSV
-            elif path_lower.endswith(".csv"):
-                return pd.read_csv(path)
-            # JSON
-            elif path_lower.endswith(".json"):
-                return pd.read_json(path)
-            # Excel
-            elif path_lower.endswith(".xlsx") or path_lower.endswith(".xls"):
-                return pd.read_excel(path)
-            # Feather / Arrow IPC
-            elif path_lower.endswith(".feather") or path_lower.endswith(".arrow"):
-                return pd.read_feather(path)
-            # Pickle
-            elif path_lower.endswith(".pickle") or path_lower.endswith(".pkl"):
-                return pd.read_pickle(path)
-            else:
-                ctx.warning(
-                    f"Unrecognized file format for target '{target}'. "
-                    "Supported formats: parquet, csv, json, xlsx, xls, feather, arrow, pickle. "
-                    "Treating as initial load.",
-                    pattern="DimensionPattern",
-                    target=target,
-                )
-                return None
-        except Exception as e:
-            ctx.warning(
-                f"Could not load existing target '{target}': {e}. Treating as initial load.",
-                pattern="DimensionPattern",
-                target=target,
-            )
-            return None
 
     def _get_max_sk(self, df, surrogate_key: str, engine_type) -> int:
         """Get the maximum surrogate key value from existing data."""
@@ -601,28 +529,10 @@ class DimensionPattern(Pattern):
         return result_df
 
     def _add_audit_columns(self, context: EngineContext, df, audit_config: dict):
-        """Add audit columns (load_timestamp, source_system) to the dataframe."""
-        load_timestamp = audit_config.get("load_timestamp", True)
-        source_system = audit_config.get("source_system")
-
-        if context.engine_type == EngineType.SPARK:
-            from pyspark.sql import functions as F
-
-            if load_timestamp:
-                df = df.withColumn("load_timestamp", F.current_timestamp())
-            if source_system:
-                df = df.withColumn("source_system", F.lit(source_system))
-        else:
-            df = df.copy()
-            if load_timestamp:
-                # Use timezone-aware timestamp for Delta Lake compatibility
-                from datetime import timezone
-
-                df["load_timestamp"] = datetime.now(timezone.utc)
-            if source_system:
-                df["source_system"] = source_system
-
-        return df
+        """Add audit columns with load_timestamp defaulting to True for dimensions."""
+        config = dict(audit_config)
+        config.setdefault("load_timestamp", True)
+        return super()._add_audit_columns(context, df, config)
 
     def _ensure_unknown_member(
         self,
@@ -632,7 +542,22 @@ class DimensionPattern(Pattern):
         surrogate_key: str,
         audit_config: dict,
     ):
-        """Ensure unknown member row exists with SK=0."""
+        """Ensure unknown member row exists with SK=0.
+
+        The unknown member is a special dimension row used to handle orphan facts
+        where the dimension lookup fails. It has a surrogate key of 0 and
+        standard 'Unknown' placeholder values.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The dimension DataFrame to ensure unknown member in.
+            natural_key: The natural key column name.
+            surrogate_key: The surrogate key column name.
+            audit_config: Audit configuration for source_system value.
+
+        Returns:
+            DataFrame with unknown member row added if not already present.
+        """
         valid_from_col = self.params.get("valid_from_col", "valid_from")
         valid_to_col = self.params.get("valid_to_col", "valid_to")
         is_current_col = self.params.get("is_current_col", "is_current")
@@ -652,15 +577,13 @@ class DimensionPattern(Pattern):
                 elif col == natural_key:
                     unknown_values.append("-1")
                 elif col == valid_from_col:
-                    unknown_values.append(datetime(1900, 1, 1))
+                    unknown_values.append(datetime(1900, 1, 1, tzinfo=timezone.utc))
                 elif col == valid_to_col:
                     unknown_values.append(None)
                 elif col == is_current_col:
                     unknown_values.append(True)
                 elif col == "load_timestamp":
                     # Use timezone-aware timestamp for Delta Lake compatibility
-                    from datetime import timezone
-
                     unknown_values.append(datetime.now(timezone.utc))
                 elif col == "source_system":
                     unknown_values.append(audit_config.get("source_system", "Unknown"))
@@ -682,15 +605,13 @@ class DimensionPattern(Pattern):
                 elif col == natural_key:
                     unknown_row[col] = "-1"
                 elif col == valid_from_col:
-                    unknown_row[col] = datetime(1900, 1, 1)
+                    unknown_row[col] = datetime(1900, 1, 1, tzinfo=timezone.utc)
                 elif col == valid_to_col:
                     unknown_row[col] = None
                 elif col == is_current_col:
                     unknown_row[col] = True
                 elif col == "load_timestamp":
                     # Use timezone-aware timestamp for Delta Lake compatibility
-                    from datetime import timezone
-
                     unknown_row[col] = datetime.now(timezone.utc)
                 elif col == "source_system":
                     unknown_row[col] = audit_config.get("source_system", "Unknown")
@@ -704,5 +625,8 @@ class DimensionPattern(Pattern):
             unknown_df = pd.DataFrame([unknown_row])
             for col in unknown_df.columns:
                 if col in df.columns:
-                    unknown_df[col] = unknown_df[col].astype(df[col].dtype)
+                    try:
+                        unknown_df[col] = unknown_df[col].astype(df[col].dtype)
+                    except (TypeError, ValueError):
+                        pass
             return pd.concat([unknown_df, df], ignore_index=True)

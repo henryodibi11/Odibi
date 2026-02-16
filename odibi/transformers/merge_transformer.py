@@ -1,7 +1,7 @@
 import os
 import time
 from enum import Enum
-from typing import List, Optional
+from typing import Any, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -16,12 +16,37 @@ except ImportError:
 
 
 class MergeStrategy(str, Enum):
+    """Merge operation strategies for combining source and target data.
+
+    Attributes:
+        UPSERT: Insert new records and update existing ones based on keys
+        APPEND_ONLY: Only insert new records, never update existing ones
+        DELETE_MATCH: Remove records from target that match source keys
+            (useful for GDPR deletion requests and compliance scenarios)
+    """
+
     UPSERT = "upsert"
     APPEND_ONLY = "append_only"
     DELETE_MATCH = "delete_match"
 
 
 class AuditColumnsConfig(BaseModel):
+    """Configuration for automatic audit timestamp columns during merge operations.
+
+    Attributes:
+        created_col: Column to set only on first insert (e.g., "created_at")
+        updated_col: Column to update on every merge operation (e.g., "updated_at")
+
+    At least one of created_col or updated_col must be specified.
+
+    Example:
+        ```yaml
+        audit_cols:
+          created_col: "created_at"
+          updated_col: "updated_at"
+        ```
+    """
+
     created_col: Optional[str] = Field(
         default=None, description="Column to set only on first insert"
     )
@@ -205,7 +230,12 @@ class MergeParams(BaseModel):
 
 
 @transform("merge", category="transformer", param_model=MergeParams)
-def merge(context, params=None, current=None, **kwargs):
+def merge(
+    context: EngineContext,
+    params: Optional[Union[MergeParams, Any]] = None,
+    current: Optional[Any] = None,
+    **kwargs: Any,
+) -> EngineContext:
     """
     Merge transformer implementation.
     Handles Upsert, Append-Only, and Delete-Match strategies.
@@ -370,22 +400,22 @@ def merge(context, params=None, current=None, **kwargs):
 
 
 def _merge_spark(
-    context,
-    source_df,
-    target,
-    keys,
-    strategy,
-    audit_cols,
-    optimize_write,
-    vacuum_hours,
-    zorder_by,
-    cluster_by,
-    update_condition,
-    insert_condition,
-    delete_condition,
-    table_properties,
-    params,
-):
+    context: EngineContext,
+    source_df: Any,
+    target: str,
+    keys: List[str],
+    strategy: MergeStrategy,
+    audit_cols: Optional[AuditColumnsConfig],
+    optimize_write: bool,
+    vacuum_hours: Optional[int],
+    zorder_by: Optional[List[str]],
+    cluster_by: Optional[List[str]],
+    update_condition: Optional[str],
+    insert_condition: Optional[str],
+    delete_condition: Optional[str],
+    table_properties: Optional[dict],
+    params: MergeParams,
+) -> Any:
     """
     Internal helper for merge transformer on Spark engine.
 
@@ -411,14 +441,14 @@ def _merge_spark(
         if created_col and created_col not in source_df.columns:
             source_df = source_df.withColumn(created_col, current_timestamp())
 
-    def get_delta_table():
+    def get_delta_table() -> Any:
         # Heuristic: if it looks like a path, use forPath, else forName
         # Path indicators: /, \, :, or starts with .
         if "/" in target or "\\" in target or ":" in target or target.startswith("."):
             return DeltaTable.forPath(spark, target)
         return DeltaTable.forName(spark, target)
 
-    def merge_batch(batch_df, batch_id=None):
+    def merge_batch(batch_df: Any, batch_id: Optional[int] = None) -> None:
         # Check if table exists
         is_delta = False
         try:
@@ -429,9 +459,17 @@ def _merge_spark(
                 try:
                     DeltaTable.forName(spark, target)
                     is_delta = True
-                except Exception:
+                except Exception as e:
+                    logger = get_logging_context()
+                    logger.debug(
+                        f"Target '{target}' not found as Delta table by name: {type(e).__name__}: {e}"
+                    )
                     is_delta = False
-        except Exception:
+        except Exception as e:
+            logger = get_logging_context()
+            logger.debug(
+                f"Failed to check if target '{target}' is a Delta table: {type(e).__name__}: {e}"
+            )
             is_delta = False
 
         if is_delta:
@@ -594,7 +632,15 @@ def _merge_spark(
         return source_df
 
 
-def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params):
+def _merge_pandas(
+    context: EngineContext,
+    source_df: Any,
+    target: str,
+    keys: List[str],
+    strategy: MergeStrategy,
+    audit_cols: Optional[AuditColumnsConfig],
+    params: MergeParams,
+) -> Any:
     """
     Internal helper for merge transformer on Pandas engine.
 
@@ -635,9 +681,10 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
         # For MVP, assuming it's a path or resolved by user.
         pass
 
-    # Audit columns
+    # Audit columns — copy to avoid mutating caller's DataFrame
     now = pd.Timestamp.now()
     if audit_cols:
+        source_df = source_df.copy()
         created_col = audit_cols.created_col
         updated_col = audit_cols.updated_col
 
@@ -665,7 +712,9 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
                     return source_df  # Nothing to delete from
 
                 # Initial Write
-                os.makedirs(os.path.dirname(path), exist_ok=True)
+                dir_name = os.path.dirname(path)
+                if dir_name:
+                    os.makedirs(dir_name, exist_ok=True)
                 con.execute(f"COPY (SELECT * FROM source_df) TO '{path}' (FORMAT PARQUET)")
                 return source_df
 
@@ -679,27 +728,35 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
 
             query = ""
             if strategy == MergeStrategy.UPSERT:
-                # Logic: (Source) UNION ALL (Target WHERE NOT EXISTS in Source)
-                # Note: This replaces the whole row with Source version (Update)
-                # Special handling for created_col: If updating, preserve target's created_col?
-
-                # If created_col exists, we want to use Target's created_col for updates?
-                # But "Source" row has new created_col (current time) which is wrong for update.
-                # Ideally: SELECT s.* EXCEPT (created_col), t.created_col ...
-                # But 'EXCEPT' is post-projection.
-                # Simpler: Just overwrite. If user wants to preserve, they shouldn't overwrite it in source.
-                # BUT audit logic above set created_col in source.
-                # If we are strictly upserting, maybe we should handle it.
-                # For performance, let's stick to standard Upsert (Source wins).
-
-                query = f"""
-                    SELECT * FROM source_df
-                    UNION ALL
-                    SELECT * FROM read_parquet('{path}') t
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM source_df s WHERE {join_cond}
+                if audit_cols and audit_cols.created_col:
+                    created = audit_cols.created_col
+                    # For updates: use target's created_col; for inserts: use source's
+                    src_cols = ", ".join(
+                        f'COALESCE(t."{created}", s."{created}") AS "{created}"'
+                        if c == created
+                        else f's."{c}"'
+                        for c in source_df.columns
                     )
-                """
+                    query = f"""
+                        SELECT {src_cols}
+                        FROM source_df s
+                        LEFT JOIN read_parquet('{path}') t
+                        ON {join_cond}
+                        UNION ALL
+                        SELECT * FROM read_parquet('{path}') t
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM source_df s WHERE {join_cond}
+                        )
+                    """
+                else:
+                    query = f"""
+                        SELECT * FROM source_df
+                        UNION ALL
+                        SELECT * FROM read_parquet('{path}') t
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM source_df s WHERE {join_cond}
+                        )
+                    """
 
             elif strategy == MergeStrategy.APPEND_ONLY:
                 # Logic: (Source WHERE NOT EXISTS in Target) UNION ALL (Target)
@@ -735,7 +792,8 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
                     os.remove(path)
                 os.rename(temp_path, path)
 
-            return source_df
+            final_df = pd.read_parquet(path)
+            return final_df
 
         except Exception as e:
             # Fallback to Pandas if DuckDB fails (e.g. complex types, memory)
@@ -756,7 +814,9 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
             return source_df
 
         # Write source as initial
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        dir_name = os.path.dirname(path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         source_df.to_parquet(path, index=False)
         return source_df
 
@@ -808,4 +868,4 @@ def _merge_pandas(context, source_df, target, keys, strategy, audit_cols, params
     # Write back
     final_df.to_parquet(path, index=False)
 
-    return source_df
+    return final_df

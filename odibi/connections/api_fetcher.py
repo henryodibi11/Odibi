@@ -50,7 +50,14 @@ from odibi.utils.logging_context import get_logging_context
 
 @dataclass
 class ApiRequest:
-    """Represents an API request to be made."""
+    """Represents an API request to be made.
+
+    Attributes:
+        method: HTTP method (GET, POST, etc.)
+        url: Full URL for the request
+        params: Query parameters as key-value pairs
+        json_body: Optional JSON body for POST/PUT requests
+    """
 
     method: str
     url: str
@@ -60,7 +67,15 @@ class ApiRequest:
 
 @dataclass
 class ApiPage:
-    """Represents a single page of API response."""
+    """Represents a single page of API response.
+
+    Attributes:
+        items: List of data items extracted from the response
+        raw: Full raw response body as dictionary
+        headers: HTTP response headers
+        request: The original request that generated this response
+        status_code: HTTP status code (default 200)
+    """
 
     items: List[Dict[str, Any]]
     raw: Dict[str, Any]
@@ -78,6 +93,7 @@ class FetchResult:
         error: Exception that occurred, or None if fetch completed successfully
         pages_fetched: Number of pages successfully fetched before error/completion
         complete: True if all pages were fetched, False if stopped due to error
+
     """
 
     df: pd.DataFrame
@@ -182,6 +198,7 @@ def _substitute_curly_brace_dates(value: str) -> str:
         {-30d:%Y%m%d} -> 20231216
         {now:%Y-%m-%dT%H:%M:%SZ} -> 2024-01-15T10:30:00Z
         {start_of_month} -> 2024-01-01
+
     """
     import datetime
     import re
@@ -238,7 +255,26 @@ def _substitute_curly_brace_dates(value: str) -> str:
 
 
 class ResponseExtractor:
-    """Extracts items from API responses using a dotted path."""
+    """Extracts items from API responses using a dotted path.
+
+    Supports flexible response structures with nested data extraction,
+    field addition, and dictionary-to-list conversion for key-value APIs.
+
+    Example:
+        Extract items from nested response:
+        ```python
+        extractor = ResponseExtractor(items_path="data.results")
+        items = extractor.extract(response_dict)
+        ```
+
+        Handle dict-based responses:
+        ```python
+        extractor = ResponseExtractor(items_path="metrics", dict_to_list=True)
+        items = extractor.extract({"metrics": {"cpu": 80, "mem": 60}})
+        # Returns: [{"_key": "cpu", "_value": 80}, {"_key": "mem", "_value": 60}]
+        # Dictionary keys become "_key" field, values become "_value" field
+        ```
+    """
 
     def __init__(
         self,
@@ -254,6 +290,10 @@ class ResponseExtractor:
             add_fields: Fields to add to each record (e.g., {"_fetched_at": "$now"})
             dict_to_list: If True and items_path resolves to a dict, extract dict
                          values as rows with keys preserved in '_key' field.
+                         Dict values become '_value' for scalars, or are merged for dicts.
+                         Example: {"cpu": 80, "mem": 60} becomes
+                         [{"_key": "cpu", "_value": 80}, {"_key": "mem", "_value": 60}]
+
         """
         self.items_path = items_path
         self.add_fields = add_fields or {}
@@ -330,6 +370,17 @@ class OffsetLimitPagination:
         stop_on_empty: bool = True,
         start_offset: int = 0,
     ):
+        """Initialize offset/limit pagination strategy.
+
+        Args:
+            offset_param: Name of the offset/skip parameter in the API request.
+            limit_param: Name of the limit/page size parameter in the API request.
+            limit: Number of items to request per page.
+            max_pages: Maximum number of pages to fetch before stopping.
+            stop_on_empty: If True, stop pagination when a page returns zero items.
+            start_offset: Initial offset value for the first page (usually 0).
+
+        """
         self.offset_param = offset_param
         self.limit_param = limit_param
         self.limit = limit
@@ -365,11 +416,34 @@ class OffsetLimitPagination:
             )
 
     def initial_request(self, base: ApiRequest) -> ApiRequest:
+        """Create the initial paginated request.
+
+        Resets internal state and applies pagination parameters for the first page.
+
+        Args:
+            base: The base API request to paginate.
+
+        Returns:
+            Modified request with pagination parameters for the first page.
+
+        """
         self._current_offset = self.start_offset
         self._page_count = 0
         return self._apply_pagination(base, self.start_offset)
 
     def next_request(self, page: ApiPage) -> Optional[ApiRequest]:
+        """Create the next paginated request based on the current page results.
+
+        Increments the offset and checks stopping conditions (max pages reached,
+        empty page, or fewer items than requested indicating last page).
+
+        Args:
+            page: The current page result containing items and the original request.
+
+        Returns:
+            Modified request for the next page, or None if pagination should stop.
+
+        """
         self._page_count += 1
 
         # Stop conditions
@@ -397,6 +471,17 @@ class PageNumberPagination:
         max_pages: int = 100,
         stop_on_empty: bool = True,
     ):
+        """Initialize page number pagination strategy.
+
+        Args:
+            page_param: Name of the page number parameter in the API request.
+            page_size_param: Name of the page size parameter in the API request.
+            page_size: Number of items to request per page.
+            start_page: Initial page number for the first page (usually 1).
+            max_pages: Maximum number of pages to fetch before stopping.
+            stop_on_empty: If True, stop pagination when a page returns zero items.
+
+        """
         self.page_param = page_param
         self.page_size_param = page_size_param
         self.page_size = page_size
@@ -407,6 +492,17 @@ class PageNumberPagination:
         self._page_count = 0
 
     def initial_request(self, base: ApiRequest) -> ApiRequest:
+        """Create the initial paginated request.
+
+        Resets internal state and adds page number and page size parameters.
+
+        Args:
+            base: The base API request to paginate.
+
+        Returns:
+            Modified request with pagination parameters for the first page.
+
+        """
         self._current_page = self.start_page
         self._page_count = 0
         params = dict(base.params)
@@ -420,6 +516,18 @@ class PageNumberPagination:
         )
 
     def next_request(self, page: ApiPage) -> Optional[ApiRequest]:
+        """Create the next paginated request based on the current page results.
+
+        Increments the page number and checks stopping conditions (max pages reached,
+        empty page, or fewer items than requested indicating last page).
+
+        Args:
+            page: The current page result containing items and the original request.
+
+        Returns:
+            Modified request for the next page, or None if pagination should stop.
+
+        """
         self._page_count += 1
 
         if self._page_count >= self.max_pages:
@@ -450,6 +558,17 @@ class CursorPagination:
         max_pages: int = 100,
         stop_when_cursor_missing: bool = True,
     ):
+        """Initialize cursor-based pagination strategy.
+
+        Args:
+            cursor_param: Name of the cursor parameter to include in API requests.
+            cursor_path: Dotted path to extract the next cursor from API response
+                        (e.g., "next_cursor", "pagination.next", "meta.cursor").
+            max_pages: Maximum number of pages to fetch before stopping.
+            stop_when_cursor_missing: If True, stop pagination when the cursor is
+                                     not found in the response or is None/empty.
+
+        """
         self.cursor_param = cursor_param
         self.cursor_path = cursor_path
         self.max_pages = max_pages
@@ -457,6 +576,17 @@ class CursorPagination:
         self._page_count = 0
 
     def initial_request(self, base: ApiRequest) -> ApiRequest:
+        """Create the initial paginated request.
+
+        Resets internal state. The first request typically has no cursor parameter.
+
+        Args:
+            base: The base API request to paginate.
+
+        Returns:
+            The unmodified base request (cursor is added in subsequent requests).
+
+        """
         self._page_count = 0
         return base
 
@@ -471,6 +601,19 @@ class CursorPagination:
         return str(obj) if obj else None
 
     def next_request(self, page: ApiPage) -> Optional[ApiRequest]:
+        """Create the next paginated request using cursor from the current page.
+
+        Extracts the next cursor from the response and adds it as a request parameter.
+        Stops if max pages reached or cursor is missing (when configured to stop).
+
+        Args:
+            page: The current page result containing the raw response and request.
+
+        Returns:
+            Modified request with the next cursor parameter, or None if pagination
+            should stop.
+
+        """
         self._page_count += 1
 
         if self._page_count >= self.max_pages:
@@ -494,11 +637,30 @@ class LinkHeaderPagination:
     """Pagination using RFC 5988 Link headers (GitHub style)."""
 
     def __init__(self, link_rel: str = "next", max_pages: int = 100):
+        """Initialize Link header pagination strategy.
+
+        Args:
+            link_rel: The rel attribute value to look for in Link headers
+                     (e.g., "next", "prev"). Typically "next" for forward pagination.
+            max_pages: Maximum number of pages to fetch before stopping.
+
+        """
         self.link_rel = link_rel
         self.max_pages = max_pages
         self._page_count = 0
 
     def initial_request(self, base: ApiRequest) -> ApiRequest:
+        """Create the initial paginated request.
+
+        Resets internal state. The first request has no special Link header handling.
+
+        Args:
+            base: The base API request to paginate.
+
+        Returns:
+            The unmodified base request (Link header is parsed from responses).
+
+        """
         self._page_count = 0
         return base
 
@@ -513,6 +675,20 @@ class LinkHeaderPagination:
         return links
 
     def next_request(self, page: ApiPage) -> Optional[ApiRequest]:
+        """Create the next paginated request using Link header from the current page.
+
+        Parses the RFC 5988 Link header from the response to extract the next page URL.
+        Stops if max pages reached or if the Link header is missing or doesn't contain
+        the specified rel value.
+
+        Args:
+            page: The current page result containing headers and the original request.
+
+        Returns:
+            Modified request with the URL from the Link header, or None if pagination
+            should stop.
+
+        """
         self._page_count += 1
 
         if self._page_count >= self.max_pages:
@@ -541,9 +717,27 @@ class NoPagination:
     """No pagination - single request only."""
 
     def initial_request(self, base: ApiRequest) -> ApiRequest:
+        """Create the initial (and only) request.
+
+        Args:
+            base: The base API request.
+
+        Returns:
+            The unmodified base request.
+
+        """
         return base
 
     def next_request(self, page: ApiPage) -> Optional[ApiRequest]:
+        """Always returns None since there is no pagination.
+
+        Args:
+            page: The current page result (unused).
+
+        Returns:
+            Always None to indicate no more pages.
+
+        """
         return None
 
 
@@ -581,6 +775,16 @@ class RateLimiter:
         mode: str = "auto",
         requests_per_second: Optional[float] = None,
     ):
+        """Initialize rate limiter.
+
+        Args:
+            mode: Rate limiting mode. "auto" detects from response headers
+                 (Retry-After, x-ratelimit-*), "fixed" uses a constant rate,
+                 or "off" to disable rate limiting.
+            requests_per_second: For "fixed" mode, the maximum requests per second
+                                allowed. Ignored for "auto" and "off" modes.
+
+        """
         self.mode = mode
         self.requests_per_second = requests_per_second
         self._last_request_time: Optional[float] = None
@@ -670,6 +874,22 @@ class ApiFetcher:
         rate_limiter: Optional[RateLimiter] = None,
         timeout_s: float = 30.0,
     ):
+        """Initialize the API fetcher.
+
+        Args:
+            base_url: Base URL for API requests. Trailing slashes are removed.
+            headers: Default HTTP headers to include in all requests (e.g., auth tokens).
+            extractor: ResponseExtractor to extract items from API responses.
+                      Defaults to ResponseExtractor() if not provided.
+            paginator: PaginationStrategy for handling paginated responses.
+                      Defaults to NoPagination() if not provided.
+            retry_policy: RetryPolicy for handling failed requests with exponential backoff.
+                         Defaults to RetryPolicy() if not provided.
+            rate_limiter: RateLimiter for throttling requests to avoid rate limits.
+                         Defaults to RateLimiter() if not provided.
+            timeout_s: Request timeout in seconds. Defaults to 30 seconds.
+
+        """
         self.base_url = base_url.rstrip("/")
         self.headers = headers or {}
         self.extractor = extractor or ResponseExtractor()
@@ -789,6 +1009,7 @@ class ApiFetcher:
 
         Yields:
             ApiPage objects for each page of results.
+
         """
         # Substitute date variables in params and request_body
         resolved_params = substitute_date_variables(params) if params else {}
@@ -850,6 +1071,7 @@ class ApiFetcher:
 
         Returns:
             DataFrame with all results concatenated
+
         """
         frames = []
         total_records = 0
@@ -895,6 +1117,7 @@ class ApiFetcher:
 
         Returns:
             FetchResult with df (partial or complete), error info, and metadata
+
         """
         frames = []
         total_records = 0
@@ -960,6 +1183,7 @@ def create_api_fetcher(
 
     Returns:
         Configured ApiFetcher instance
+
     """
     options = options or {}
 

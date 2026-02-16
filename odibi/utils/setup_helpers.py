@@ -1,9 +1,12 @@
 """Setup helpers for ODIBI - Phase 2C performance utilities."""
 
 import concurrent.futures
+import logging
 import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -141,11 +144,11 @@ def fetch_keyvault_secrets_parallel(
 
     if not kv_connections:
         if verbose:
-            print("- No Key Vault connections to fetch")
+            logger.info("- No Key Vault connections to fetch")
         return results
 
     if verbose:
-        print(f"⚡ Fetching {len(kv_connections)} Key Vault secrets in parallel...")
+        logger.info(f"⚡ Fetching {len(kv_connections)} Key Vault secrets in parallel...")
 
     start_time = time.time()
 
@@ -168,15 +171,15 @@ def fetch_keyvault_secrets_parallel(
 
             if verbose:
                 if result.success:
-                    print(f"  - {name}: {result.duration_ms:.0f}ms")
+                    logger.info(f"  - {name}: {result.duration_ms:.0f}ms")
                 else:
-                    print(f"  [X] {name}: {type(result.error).__name__}")
+                    logger.info(f"  [X] {name}: {type(result.error).__name__}")
 
     total_duration = (time.time() - start_time) * 1000
 
     if verbose:
         success_count = sum(1 for r in results.values() if r.success)
-        print(
+        logger.info(
             f"- Completed in {total_duration:.0f}ms ({success_count}/{len(kv_connections)} successful)"
         )
 
@@ -226,7 +229,9 @@ def configure_connections_parallel(
                 warnings.warn(error_msg, UserWarning)
         elif result.secret_value:
             conn = connections[name]
-            if hasattr(conn, "_cached_key"):
+            if hasattr(conn, "_cached_storage_key"):
+                conn._cached_storage_key = result.secret_value
+            elif hasattr(conn, "_cached_key"):
                 conn._cached_key = result.secret_value
 
     return connections, errors
@@ -288,15 +293,15 @@ def validate_databricks_environment(verbose: bool = True) -> Dict[str, Any]:
         results["errors"].append(f"dbutils check failed: {e}")
 
     if verbose:
-        print(f"  Databricks Runtime: {'[X]' if results['is_databricks'] else '[ ]'}")
+        logger.info(f"  Databricks Runtime: {'[X]' if results['is_databricks'] else '[ ]'}")
         if results["runtime_version"]:
-            print(f"  Runtime Version: {results['runtime_version']}")
-        print(f"  Spark Available: {'[X]' if results['spark_available'] else '[ ]'}")
-        print(f"  dbutils Available: {'[X]' if results['dbutils_available'] else '[ ]'}")
+            logger.info(f"  Runtime Version: {results['runtime_version']}")
+        logger.info(f"  Spark Available: {'[X]' if results['spark_available'] else '[ ]'}")
+        logger.info(f"  dbutils Available: {'[X]' if results['dbutils_available'] else '[ ]'}")
 
         if results["errors"]:
-            print("\n  Errors:")
+            logger.info("\n  Errors:")
             for error in results["errors"]:
-                print(f"    - {error}")
+                logger.info(f"    - {error}")
 
     return results

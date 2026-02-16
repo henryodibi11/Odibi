@@ -898,6 +898,9 @@ class TestPolarsLazyFrameExtended:
 
     def test_lazy_schema_strict_pass(self, validator):
         """Schema validation passes with LazyFrame in strict mode."""
+
+    def test_polars_freshness_naive_timestamp(self, validator):
+        """Freshness test works with timezone-naive timestamps in Polars."""
         try:
             import polars as pl
         except ImportError:
@@ -1283,3 +1286,47 @@ class TestSchemaWithoutContext:
         config = ValidationConfig(tests=[SchemaContract(type=TestType.SCHEMA, strict=True)])
         failures = validator.validate(lf, config)
         assert len(failures) == 0
+
+
+class TestPolarsFreshnessNaiveTimestamp:
+    """Test Polars freshness with timezone-naive timestamps."""
+
+    @pytest.fixture
+    def validator(self):
+        return Validator()
+
+    def test_polars_freshness_naive_timestamp(self, validator):
+        """Freshness test works with timezone-naive timestamps in Polars."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        from datetime import datetime
+
+        # Use timezone-naive datetime (no timezone.utc)
+        df = pl.DataFrame({"id": [1, 2], "updated_at": [datetime.now()] * 2})
+        config = ValidationConfig(
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 0
+
+    def test_polars_freshness_naive_timestamp_old(self, validator):
+        """Freshness test fails with old timezone-naive timestamps in Polars."""
+        try:
+            import polars as pl
+        except ImportError:
+            pytest.skip("Polars not installed")
+
+        from datetime import datetime, timedelta
+
+        # Use timezone-naive datetime that is old
+        old_time = datetime.now() - timedelta(hours=48)
+        df = pl.DataFrame({"id": [1, 2], "updated_at": [old_time] * 2})
+        config = ValidationConfig(
+            tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
+        )
+        failures = validator.validate(df, config)
+        assert len(failures) == 1
+        assert "too old" in failures[0].lower()

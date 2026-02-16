@@ -192,7 +192,12 @@ class Validator:
                             delta = timedelta(minutes=int(duration_str[:-1]))
 
                         if delta:
-                            if datetime.now(timezone.utc) - max_ts > delta:
+                            # Handle timezone-naive timestamps by using naive now()
+                            if hasattr(max_ts, "tzinfo") and max_ts.tzinfo is not None:
+                                now = datetime.now(timezone.utc)
+                            else:
+                                now = datetime.now()
+                            if now - max_ts > delta:
                                 msg = (
                                     f"Data too old. Max timestamp {max_ts} "
                                     f"is older than {test.max_age}"
@@ -413,10 +418,14 @@ class Validator:
                         elif duration_str.endswith("m"):
                             delta = timedelta(minutes=int(duration_str[:-1]))
 
-                        if delta and (datetime.now(timezone.utc) - max_ts > delta):
-                            msg = (
-                                f"Data too old. Max timestamp {max_ts} is older than {test.max_age}"
-                            )
+                        if delta:
+                            # Handle timezone-naive timestamps by using naive now()
+                            if hasattr(max_ts, "tzinfo") and max_ts.tzinfo is not None:
+                                now = datetime.now(timezone.utc)
+                            else:
+                                now = datetime.now()
+                            if now - max_ts > delta:
+                                msg = f"Data too old. Max timestamp {max_ts} is older than {test.max_age}"
                 else:
                     msg = f"Freshness check failed: Column '{col}' not found"
 
@@ -599,7 +608,11 @@ class Validator:
                         try:
                             s = pd.to_datetime(df[col])
                             max_ts = s.max()
-                        except Exception:
+                        except Exception as e:
+                            logger = get_logging_context()
+                            logger.debug(
+                                f"Failed to convert column '{col}' to datetime for max_age check: {type(e).__name__}: {e}"
+                            )
                             max_ts = None
                     else:
                         max_ts = df[col].max()
@@ -616,10 +629,14 @@ class Validator:
                         elif duration_str.endswith("m"):
                             delta = timedelta(minutes=int(duration_str[:-1]))
 
-                        if delta and (datetime.now(timezone.utc) - max_ts > delta):
-                            msg = (
-                                f"Data too old. Max timestamp {max_ts} is older than {test.max_age}"
-                            )
+                        if delta:
+                            # Handle timezone-naive timestamps by using naive now()
+                            if hasattr(max_ts, "tzinfo") and max_ts.tzinfo is not None:
+                                now = datetime.now(timezone.utc)
+                            else:
+                                now = datetime.now()
+                            if now - max_ts > delta:
+                                msg = f"Data too old. Max timestamp {max_ts} is older than {test.max_age}"
                 else:
                     msg = f"Freshness check failed: Column '{col}' not found"
 

@@ -641,6 +641,46 @@ class TestWriteMetadata:
         assert "_source_table" in result_with_table.columns
         assert result_with_table["_source_table"].iloc[0] == "dbo.Orders"
 
+    def test_soft_delete_no_setting_with_copy_warning(self, pandas_engine):
+        """Soft delete should not raise SettingWithCopyWarning (issue #210)."""
+        import warnings
+
+        current_df = pd.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+        prev_df = pd.DataFrame({"id": [1, 2, 3], "name": ["a", "b", "c"]})
+
+        mock_dt = MagicMock()
+        mock_dt.version.return_value = 1
+        mock_dt.to_pandas.return_value = prev_df
+
+        def delta_table_init(path, version=None):
+            return mock_dt
+
+        with patch.dict("sys.modules", {"deltalake": MagicMock()}):
+            import sys
+
+            sys.modules["deltalake"].DeltaTable = delta_table_init
+
+            pandas_ctx = PandasContext()
+            ctx = EngineContext(
+                context=pandas_ctx,
+                df=current_df,
+                engine_type=EngineType.PANDAS,
+            )
+            ctx.context._current_table_path = "/fake/delta/table"
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", category=pd.errors.SettingWithCopyWarning)
+                result = detect_deletes(
+                    ctx,
+                    mode="snapshot_diff",
+                    keys=["id"],
+                    soft_delete_col="_is_deleted",
+                )
+
+        result_df = result.df.sort_values("id").reset_index(drop=True)
+        assert len(result_df) == 3
+        assert bool(result_df.loc[result_df["id"] == 3, "_is_deleted"].iloc[0])
+
     def test_metadata_none_returns_unchanged(self, pandas_engine):
         """metadata_config=None should return DataFrame unchanged."""
         df = pd.DataFrame({"id": [1, 2]})

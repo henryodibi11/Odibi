@@ -188,7 +188,7 @@ def validate_command(args) -> int:
     return exit_code
 
 
-def add_secrets_parser(subparsers):
+def add_secrets_parser(subparsers) -> None:
     """Add secrets subparser to main parser.
 
     Args:

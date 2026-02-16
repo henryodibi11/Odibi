@@ -504,3 +504,445 @@ class TestThrottlingIntegration:
 
         assert result1 is True
         assert result2 is True
+
+
+class TestNodeDetailsAndRunHealth:
+    """Tests for node details and run health enrichments in alerts."""
+
+    def test_slack_payload_includes_node_details(self):
+        """Alert payload should include per-node row counts and durations."""
+        from odibi.utils.alerting import _build_slack_payload
+
+        context = {
+            "pipeline": "test",
+            "status": "SUCCESS",
+            "event_type": "on_success",
+            "node_details": [
+                {
+                    "node": "load_data",
+                    "success": True,
+                    "duration": 1.23,
+                    "rows_processed": 1000,
+                    "error": None,
+                },
+                {
+                    "node": "transform",
+                    "success": False,
+                    "duration": 0.5,
+                    "rows_processed": None,
+                    "error": "KeyError: 'col'",
+                },
+            ],
+        }
+        config = AlertConfig(type=AlertType.SLACK, url="http://test.com")
+        payload = _build_slack_payload(
+            pipeline="test",
+            project_name="Test",
+            status="SUCCESS",
+            duration=1.73,
+            message="done",
+            owner=None,
+            event_type="on_success",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+            color="#36a64f",
+            icon="✅",
+        )
+        blocks_text = json.dumps(payload["blocks"])
+        assert "load_data" in blocks_text
+        assert "1,000 rows" in blocks_text
+        assert "KeyError" in blocks_text
+
+    def test_slack_payload_includes_run_health(self):
+        """Alert payload should include run health summary on failure."""
+        from odibi.utils.alerting import _build_slack_payload
+
+        context = {
+            "pipeline": "test",
+            "status": "FAILED",
+            "event_type": "on_failure",
+            "run_health": {
+                "has_failures": True,
+                "failed_count": 1,
+                "failed_nodes": ["bad_node"],
+                "first_failure_error": "Connection refused",
+                "anomaly_count": 0,
+                "anomalous_nodes": [],
+            },
+        }
+        config = AlertConfig(type=AlertType.SLACK, url="http://test.com")
+        payload = _build_slack_payload(
+            pipeline="test",
+            project_name="Test",
+            status="FAILED",
+            duration=5.0,
+            message="failed",
+            owner=None,
+            event_type="on_failure",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+            color="#FF0000",
+            icon="❌",
+        )
+        blocks_text = json.dumps(payload["blocks"])
+        assert "1 node(s) failed" in blocks_text
+        assert "Connection refused" in blocks_text
+
+    def test_teams_payload_includes_node_details(self):
+        """Teams payload should include per-node details."""
+        from odibi.utils.alerting import _build_teams_workflow_payload
+
+        context = {
+            "pipeline": "test",
+            "status": "SUCCESS",
+            "event_type": "on_success",
+            "node_details": [
+                {
+                    "node": "ingest",
+                    "success": True,
+                    "duration": 2.5,
+                    "rows_processed": 5000,
+                    "error": None,
+                },
+            ],
+        }
+        config = AlertConfig(type=AlertType.TEAMS_WORKFLOW, url="http://test.com")
+        payload = _build_teams_workflow_payload(
+            pipeline="test",
+            project_name="Test",
+            status="SUCCESS",
+            duration=2.5,
+            message="done",
+            owner=None,
+            event_type="on_success",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+            style="Good",
+            icon="✅",
+        )
+        card_text = json.dumps(payload)
+        assert "ingest" in card_text
+        assert "5,000 rows" in card_text
+
+    def test_send_alerts_enriches_context_with_node_details(self):
+        """_send_alerts should include node_details in context."""
+        from odibi.node import NodeResult
+
+        alert_config = AlertConfig(
+            type=AlertType.WEBHOOK, url="http://test", on_events=["on_success"]
+        )
+
+        pipeline_config = MagicMock()
+        pipeline_config.pipeline = "enrich_test"
+        pipeline_config.nodes = []
+
+        results = MagicMock(
+            spec=[
+                "failed",
+                "completed",
+                "skipped",
+                "duration",
+                "node_results",
+                "start_time",
+                "end_time",
+                "story_path",
+                "pipeline_name",
+            ]
+        )
+        results.failed = []
+        results.completed = ["node_a"]
+        results.skipped = []
+        results.duration = 1.0
+        results.node_results = {
+            "node_a": NodeResult(
+                node_name="node_a", success=True, duration=0.5, rows_processed=100
+            ),
+        }
+
+        with (
+            patch("odibi.pipeline.DependencyGraph") as mock_graph,
+            patch("odibi.pipeline.send_alert") as mock_send,
+        ):
+            mock_graph.return_value.topological_sort.return_value = []
+            mock_graph.return_value.nodes = {}
+
+            pipeline = Pipeline(
+                pipeline_config=pipeline_config,
+                alerts=[alert_config],
+                generate_story=False,
+            )
+            pipeline.graph = mock_graph.return_value
+            pipeline._send_alerts("on_success", results)
+
+            mock_send.assert_called_once()
+            ctx = mock_send.call_args[0][2]
+            assert "node_details" in ctx
+            assert ctx["node_details"][0]["node"] == "node_a"
+            assert ctx["node_details"][0]["rows_processed"] == 100
+            assert ctx["nodes_passed"] == 1
+            assert ctx["nodes_total"] == 1
+
+    def test_slack_scoreboard_in_status_field(self):
+        """Slack payload should show pass/fail/skip scoreboard in status field."""
+        from odibi.utils.alerting import _build_slack_payload
+
+        context = {
+            "pipeline": "test",
+            "status": "FAILED",
+            "event_type": "on_failure",
+            "nodes_passed": 8,
+            "nodes_failed": 1,
+            "nodes_skipped": 1,
+            "nodes_total": 10,
+        }
+        config = AlertConfig(type=AlertType.SLACK, url="http://test.com")
+        payload = _build_slack_payload(
+            pipeline="test",
+            project_name="Test",
+            status="FAILED",
+            duration=5.0,
+            message="failed",
+            owner=None,
+            event_type="on_failure",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+            color="#FF0000",
+            icon="❌",
+        )
+        blocks_text = json.dumps(payload["blocks"], ensure_ascii=False)
+        assert "✅ 8" in blocks_text
+        assert "❌ 1" in blocks_text
+        assert "⏭ 1" in blocks_text
+
+    def test_teams_scoreboard_in_facts(self):
+        """Teams payload should show nodes scoreboard fact."""
+        from odibi.utils.alerting import _build_teams_workflow_payload
+
+        context = {
+            "pipeline": "test",
+            "status": "SUCCESS",
+            "event_type": "on_success",
+            "nodes_passed": 5,
+            "nodes_failed": 0,
+            "nodes_skipped": 0,
+            "nodes_total": 5,
+        }
+        config = AlertConfig(type=AlertType.TEAMS_WORKFLOW, url="http://test.com")
+        payload = _build_teams_workflow_payload(
+            pipeline="test",
+            project_name="Test",
+            status="SUCCESS",
+            duration=3.0,
+            message="done",
+            owner=None,
+            event_type="on_success",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+            style="Good",
+            icon="✅",
+        )
+        card_text = json.dumps(payload, ensure_ascii=False)
+        assert "✅ 5" in card_text
+        assert "📊 Nodes" in card_text
+
+    def test_slack_error_type_shown(self):
+        """Slack node details should show the exception class name."""
+        from odibi.utils.alerting import _build_slack_payload
+
+        context = {
+            "pipeline": "test",
+            "status": "FAILED",
+            "event_type": "on_failure",
+            "node_details": [
+                {
+                    "node": "bad_node",
+                    "success": False,
+                    "duration": 0.1,
+                    "rows_processed": None,
+                    "error": "'missing_col'",
+                    "error_type": "KeyError",
+                },
+            ],
+        }
+        config = AlertConfig(type=AlertType.SLACK, url="http://test.com")
+        payload = _build_slack_payload(
+            pipeline="test",
+            project_name="Test",
+            status="FAILED",
+            duration=0.1,
+            message="failed",
+            owner=None,
+            event_type="on_failure",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+            color="#FF0000",
+            icon="❌",
+        )
+        blocks_text = json.dumps(payload["blocks"])
+        assert "KeyError: " in blocks_text
+
+    def test_slack_data_quality_section(self):
+        """Slack payload should render data quality issues when present."""
+        from odibi.utils.alerting import _build_slack_payload
+
+        context = {
+            "pipeline": "test",
+            "status": "SUCCESS",
+            "event_type": "on_success",
+            "data_quality": {
+                "total_validations_failed": 3,
+                "total_failed_rows": 150,
+                "nodes_with_warnings": ["node_a", "node_b"],
+                "has_quality_issues": True,
+            },
+        }
+        config = AlertConfig(type=AlertType.SLACK, url="http://test.com")
+        payload = _build_slack_payload(
+            pipeline="test",
+            project_name="Test",
+            status="SUCCESS",
+            duration=2.0,
+            message="done",
+            owner=None,
+            event_type="on_success",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+            color="#36a64f",
+            icon="✅",
+        )
+        blocks_text = json.dumps(payload["blocks"])
+        assert "Data Quality" in blocks_text
+        assert "3 validation(s) failed" in blocks_text
+        assert "150 failed rows" in blocks_text
+        assert "node_a" in blocks_text
+
+    def test_teams_data_quality_section(self):
+        """Teams payload should render data quality issues when present."""
+        from odibi.utils.alerting import _build_teams_workflow_payload
+
+        context = {
+            "pipeline": "test",
+            "status": "FAILED",
+            "event_type": "on_failure",
+            "data_quality": {
+                "total_validations_failed": 2,
+                "total_failed_rows": 50,
+                "nodes_with_warnings": ["ingest"],
+                "has_quality_issues": True,
+            },
+        }
+        config = AlertConfig(type=AlertType.TEAMS_WORKFLOW, url="http://test.com")
+        payload = _build_teams_workflow_payload(
+            pipeline="test",
+            project_name="Test",
+            status="FAILED",
+            duration=4.0,
+            message="failed",
+            owner=None,
+            event_type="on_failure",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+            style="Attention",
+            icon="❌",
+        )
+        card_text = json.dumps(payload)
+        assert "Data Quality" in card_text
+        assert "2 validation(s) failed" in card_text
+
+    def test_richer_failure_message_includes_counts(self):
+        """_send_alerts msg should include pass/total counts on failure."""
+        from odibi.node import NodeResult
+
+        alert_config = AlertConfig(
+            type=AlertType.WEBHOOK, url="http://test", on_events=["on_failure"]
+        )
+
+        pipeline_config = MagicMock()
+        pipeline_config.pipeline = "msg_test"
+        pipeline_config.nodes = []
+
+        results = MagicMock(
+            spec=[
+                "failed",
+                "completed",
+                "skipped",
+                "duration",
+                "node_results",
+                "start_time",
+                "end_time",
+                "story_path",
+                "pipeline_name",
+            ]
+        )
+        results.failed = ["bad_node"]
+        results.completed = ["good1", "good2"]
+        results.skipped = []
+        results.duration = 2.0
+        results.node_results = {
+            "good1": NodeResult(node_name="good1", success=True, duration=0.5),
+            "good2": NodeResult(node_name="good2", success=True, duration=0.5),
+            "bad_node": NodeResult(
+                node_name="bad_node",
+                success=False,
+                duration=1.0,
+                error=KeyError("x"),
+            ),
+        }
+
+        with (
+            patch("odibi.pipeline.DependencyGraph") as mock_graph,
+            patch("odibi.pipeline.send_alert") as mock_send,
+        ):
+            mock_graph.return_value.topological_sort.return_value = []
+            mock_graph.return_value.nodes = {}
+
+            pipeline = Pipeline(
+                pipeline_config=pipeline_config,
+                alerts=[alert_config],
+                generate_story=False,
+            )
+            pipeline.graph = mock_graph.return_value
+            pipeline._send_alerts("on_failure", results)
+
+            mock_send.assert_called_once()
+            msg = mock_send.call_args[0][1]
+            assert "2/3 nodes passed" in msg
+            assert "bad_node" in msg
+            ctx = mock_send.call_args[0][2]
+            assert ctx["node_details"][2]["error_type"] == "KeyError"
+
+    def test_generic_payload_includes_scoreboard(self):
+        """Generic webhook payload should include scoreboard counts."""
+        from odibi.utils.alerting import _build_generic_payload
+
+        context = {
+            "event_type": "on_success",
+            "nodes_passed": 3,
+            "nodes_failed": 0,
+            "nodes_skipped": 1,
+            "nodes_total": 4,
+            "node_details": [{"node": "a", "success": True, "duration": 1.0}],
+            "run_health": {"overall_status": "success"},
+        }
+        config = AlertConfig(type=AlertType.WEBHOOK, url="http://test.com")
+        payload = _build_generic_payload(
+            pipeline="test",
+            status="SUCCESS",
+            duration=2.0,
+            message="done",
+            timestamp="2024-01-01",
+            context=context,
+            config=config,
+        )
+        assert payload["nodes_passed"] == 3
+        assert payload["nodes_total"] == 4
+        assert payload["node_details"][0]["node"] == "a"
+        assert payload["run_health"]["overall_status"] == "success"

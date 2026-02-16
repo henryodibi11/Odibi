@@ -6,7 +6,7 @@ Handles common patterns like cycle detection, phase analysis, and time-in-state 
 """
 
 import time
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -539,7 +539,7 @@ def _extract_metadata(
 # =============================================================================
 
 
-def _detect_phases_spark(spark_df, params: DetectSequentialPhasesParams):
+def _detect_phases_spark(spark_df: Any, params: DetectSequentialPhasesParams) -> Any:
     """
     Spark implementation using applyInPandas for parallel group processing.
 
@@ -596,7 +596,7 @@ def _detect_phases_spark(spark_df, params: DetectSequentialPhasesParams):
     return result_df
 
 
-def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
+def _detect_phases_spark_native(spark_df: Any, params: DetectSequentialPhasesParams) -> Any:
     """
     Native Spark implementation using window functions.
 
@@ -787,8 +787,12 @@ def _detect_phases_spark_native(spark_df, params: DetectSequentialPhasesParams):
 
 
 def _compute_status_durations_spark(
-    df, phase_bounds, params: DetectSequentialPhasesParams, timer_col: str, group_by_cols: List[str]
-):
+    df: Any,
+    phase_bounds: Any,
+    params: DetectSequentialPhasesParams,
+    timer_col: str,
+    group_by_cols: List[str],
+) -> Any:
     """Compute time spent in each status within a phase window using Spark."""
     from pyspark.sql import functions as F
     from pyspark.sql import Window
@@ -857,8 +861,12 @@ def _compute_status_durations_spark(
 
 
 def _compute_phase_metrics_spark(
-    df, phase_bounds, params: DetectSequentialPhasesParams, timer_col: str, group_by_cols: List[str]
-):
+    df: Any,
+    phase_bounds: Any,
+    params: DetectSequentialPhasesParams,
+    timer_col: str,
+    group_by_cols: List[str],
+) -> Any:
     """Compute aggregated metrics within a phase window using Spark."""
     from pyspark.sql import functions as F
 
@@ -885,8 +893,8 @@ def _compute_phase_metrics_spark(
 
 
 def _compute_metadata_spark(
-    df, summary_df, params: DetectSequentialPhasesParams, group_by_cols: List[str]
-):
+    df: Any, summary_df: Any, params: DetectSequentialPhasesParams, group_by_cols: List[str]
+) -> Any:
     """Compute metadata columns using Spark."""
     from pyspark.sql import functions as F
 
@@ -940,7 +948,7 @@ def _compute_metadata_spark(
 
 def _process_single_group_pandas(
     group: pd.DataFrame, params: DetectSequentialPhasesParams
-) -> Optional[Dict]:
+) -> Optional[Dict[str, Any]]:
     """Process a single group and return the summary row dict."""
     group_by_cols = _normalize_group_by(params.group_by)
 
@@ -1011,7 +1019,7 @@ def _process_single_group_pandas(
 # =============================================================================
 
 
-def _detect_phases_polars(polars_df, params: DetectSequentialPhasesParams):
+def _detect_phases_polars(polars_df: Any, params: DetectSequentialPhasesParams) -> Any:
     """Native Polars implementation of sequential phase detection."""
     import polars as pl
 
@@ -1125,11 +1133,11 @@ def _get_expected_columns_polars(params: "DetectSequentialPhasesParams") -> Dict
 
 
 def _detect_single_phase_polars(
-    group,
+    group: Any,
     timer_col: str,
     timestamp_col: str,
     threshold: int,
-    previous_phase_end,
+    previous_phase_end: Any,
     status_col: Optional[str],
     status_mapping: Optional[Dict[int, str]],
     phase_metrics: Optional[Dict[str, str]],
@@ -1233,9 +1241,9 @@ def _detect_single_phase_polars(
 
 
 def _calculate_status_times_polars(
-    group,
-    start_time,
-    end_time,
+    group: Any,
+    start_time: Any,
+    end_time: Any,
     timestamp_col: str,
     status_col: str,
     status_mapping: Dict[int, str],
@@ -1283,11 +1291,11 @@ def _calculate_status_times_polars(
 
 
 def _extract_metadata_polars(
-    group,
+    group: Any,
     metadata_config: Dict[str, str],
     timestamp_col: str,
-    first_phase_start,
-) -> Dict[str, any]:
+    first_phase_start: Any,
+) -> Dict[str, Any]:
     """Extract metadata columns with specified aggregation methods using Polars."""
     import polars as pl
 
@@ -1326,7 +1334,7 @@ def _extract_metadata_polars(
     return result
 
 
-def _fill_null_numeric_columns_polars(df, params: "DetectSequentialPhasesParams"):
+def _fill_null_numeric_columns_polars(df: Any, params: "DetectSequentialPhasesParams") -> Any:
     """Fill null values in numeric columns with 0 using Polars."""
     import polars as pl
 

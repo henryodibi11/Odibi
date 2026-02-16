@@ -45,6 +45,7 @@ def mock_engine():
 def mock_config():
     """Create a basic mock NodeConfig."""
     config = MagicMock(spec=NodeConfig)
+    config.name = "test_node"
     config.params = {}
     return config
 
@@ -488,3 +489,34 @@ class TestAggregationPatternIntegration:
         day1 = result[result["date_sk"] == 20240101]
         assert day1.iloc[0]["min_amount"] == 50.0
         assert day1.iloc[0]["max_amount"] == 100.0
+
+
+class TestAggregationLoadExistingPandas:
+    """Test _load_existing_pandas format support."""
+
+    def test_load_json_format(self, mock_engine, mock_config, tmp_path):
+        """Should load JSON format target files."""
+        target = tmp_path / "target.json"
+        df = pd.DataFrame({"date_sk": [1], "total": [100]})
+        df.to_json(target, orient="records")
+
+        mock_config.params = {"grain": ["date_sk"], "measures": []}
+        pattern = AggregationPattern(mock_engine, mock_config)
+        ctx = MagicMock()
+        ctx.engine_type = EngineType.PANDAS
+        ctx.engine = None
+
+        result = pattern._load_existing_pandas(ctx, str(target))
+        assert result is not None
+        assert len(result) == 1
+
+    def test_load_nonexistent_returns_none(self, mock_engine, mock_config):
+        """Should return None for nonexistent paths."""
+        mock_config.params = {"grain": ["date_sk"], "measures": []}
+        pattern = AggregationPattern(mock_engine, mock_config)
+        ctx = MagicMock()
+        ctx.engine_type = EngineType.PANDAS
+        ctx.engine = None
+
+        result = pattern._load_existing_pandas(ctx, "/nonexistent/path.parquet")
+        assert result is None

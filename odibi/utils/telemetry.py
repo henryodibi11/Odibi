@@ -1,8 +1,10 @@
 """Telemetry utilities for OpenTelemetry integration."""
 
+import logging
 import os
-import sys
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 try:
     from opentelemetry import metrics, trace
@@ -121,7 +123,7 @@ def setup_telemetry(service_name: str = "odibi") -> None:
         # OTLP exporter might not be installed
         pass
     except Exception as e:
-        print(f"Warning: Failed to initialize OpenTelemetry: {e}", file=sys.stderr)
+        logger.warning(f"Failed to initialize OpenTelemetry: {e}")
 
 
 # --- Global Instances ---

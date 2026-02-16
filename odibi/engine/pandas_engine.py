@@ -5,10 +5,11 @@ import glob
 import hashlib
 import os
 import random
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Union
 from urllib.parse import urlparse
@@ -102,7 +103,15 @@ class PandasEngine(Engine):
                 pass
 
     def materialize(self, df: Any) -> Any:
-        """Materialize lazy dataset."""
+        """Materialize lazy dataset.
+
+        Args:
+            df: DataFrame or LazyDataset to materialize.
+
+        Returns:
+            Materialized pandas DataFrame. If input is already a DataFrame,
+            returns it unchanged.
+        """
         if isinstance(df, LazyDataset):
             # Re-invoke read but force materialization (by bypassing Lazy check)
             # We pass the resolved path directly
@@ -647,7 +656,25 @@ class PandasEngine(Engine):
         as_of_version: Optional[int] = None,
         as_of_timestamp: Optional[str] = None,
     ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
-        """Read data using Pandas (or LazyDataset)."""
+        """Read data using Pandas (or LazyDataset).
+
+        Args:
+            connection: Connection object providing base path and storage options.
+            format: Data format (csv, parquet, delta, json, excel, avro, sql).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            streaming: Whether to enable streaming mode (not supported in Pandas).
+            schema: Optional schema specification (not used in Pandas engine).
+            options: Additional read options to pass to pandas readers.
+            as_of_version: Delta Lake version for time travel queries.
+            as_of_timestamp: Delta Lake timestamp for time travel queries.
+
+        Returns:
+            DataFrame or iterator of DataFrames containing the loaded data.
+
+        Raises:
+            ValueError: If streaming is requested or neither path nor table is provided.
+        """
         ctx = get_logging_context().with_context(engine="pandas")
         start = time.time()
 
@@ -1166,7 +1193,25 @@ class PandasEngine(Engine):
         options: Optional[Dict[str, Any]] = None,
         streaming_config: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Write data using Pandas."""
+        """Write data using Pandas.
+
+        Args:
+            df: DataFrame or iterator of DataFrames to write.
+            connection: Connection object providing base path and storage options.
+            format: Output format (csv, parquet, delta, json, excel, avro, sql).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            register_table: Optional table name to register in catalog (not used).
+            mode: Write mode (overwrite, append, upsert, append_once).
+            options: Additional write options to pass to pandas writers.
+            streaming_config: Streaming configuration (not used in Pandas engine).
+
+        Returns:
+            Optional dict with write statistics for Delta writes, None otherwise.
+
+        Raises:
+            ValueError: If neither path nor table is provided.
+        """
         ctx = get_logging_context().with_context(engine="pandas")
         start = time.time()
 
@@ -1430,14 +1475,25 @@ class PandasEngine(Engine):
         )
         return None
 
-    def _ensure_directory(self, full_path: str) -> None:
-        """Ensure parent directory exists for local files."""
-        parsed = urlparse(str(full_path))
+    def _is_local_path(self, path: str) -> bool:
+        """Check whether a path refers to a local file (not a remote URI).
+
+        Args:
+            path: File path or URI to check.
+
+        Returns:
+            True if the path is local (no scheme, ``file://``, or a Windows
+            drive letter like ``D:\\``).
+        """
+        parsed = urlparse(str(path))
         is_windows_drive = (
             len(parsed.scheme) == 1 and parsed.scheme.isalpha() if parsed.scheme else False
         )
+        return not parsed.scheme or parsed.scheme == "file" or is_windows_drive
 
-        if not parsed.scheme or parsed.scheme == "file" or is_windows_drive:
+    def _ensure_directory(self, full_path: str) -> None:
+        """Ensure parent directory exists for local files."""
+        if self._is_local_path(full_path):
             Path(full_path).parent.mkdir(parents=True, exist_ok=True)
 
     def _check_partitioning(self, options: Dict[str, Any]) -> None:
@@ -1569,7 +1625,7 @@ class PandasEngine(Engine):
 
         return {
             "version": dt.version(),
-            "timestamp": datetime.fromtimestamp(latest.get("timestamp", 0) / 1000),
+            "timestamp": datetime.fromtimestamp(latest.get("timestamp", 0) / 1000, tz=timezone.utc),
             "operation": latest.get("operation"),
             "operation_metrics": latest.get("operationMetrics", {}),
             "read_version": latest.get("readVersion"),
@@ -1652,60 +1708,95 @@ class PandasEngine(Engine):
         mode: str,
         merged_options: Dict[str, Any],
     ) -> None:
-        """Handle standard file writing (CSV, Parquet, etc.)."""
+        """Handle standard file writing (CSV, Parquet, etc.).
+
+        For local overwrite operations, writes to a temporary file first and
+        then atomically replaces the target via ``os.replace()``.  This
+        prevents data loss if the process crashes mid-write.
+        """
+        use_atomic = mode != "append" and self._is_local_path(full_path)
+
+        if use_atomic:
+            dir_name = os.path.dirname(full_path) or "."
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=f".{format}.tmp")
+            os.close(fd)
+        else:
+            tmp_path = None
+
+        target = tmp_path if use_atomic else full_path
+
+        try:
+            self._write_to_target(df, target, full_path, format, mode, merged_options)
+            if use_atomic:
+                os.replace(tmp_path, full_path)
+        except Exception:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
+
+    def _write_to_target(
+        self,
+        df: pd.DataFrame,
+        target: str,
+        full_path: str,
+        format: str,
+        mode: str,
+        merged_options: Dict[str, Any],
+    ) -> None:
+        """Write a DataFrame to the given target path.
+
+        Args:
+            df: DataFrame to write.
+            target: Path to write to (may be a temp file for atomic writes).
+            full_path: The final destination path (used for append existence
+                checks).
+            format: File format (csv, parquet, json, excel, avro).
+            mode: Write mode (overwrite, append, etc.).
+            merged_options: Writer options dict.
+        """
         writer_options = merged_options.copy()
         writer_options.pop("keys", None)
-
-        # Remove storage_options for local pandas writers usually?
-        # Some pandas writers accept storage_options (parquet, csv with fsspec)
 
         if format == "csv":
             mode_param = "w"
             if mode == "append":
                 mode_param = "a"
                 if not os.path.exists(full_path):
-                    # If file doesn't exist, include header
                     writer_options["header"] = True
                 else:
-                    # If appending, don't write header unless explicit
                     if "header" not in writer_options:
                         writer_options["header"] = False
 
-            df.to_csv(full_path, index=False, mode=mode_param, **writer_options)
+            df.to_csv(target, index=False, mode=mode_param, **writer_options)
 
         elif format == "parquet":
             if mode == "append":
-                # Pandas read_parquet doesn't support append directly usually.
-                # We implement simple read-concat-write for local files
                 if os.path.exists(full_path):
                     existing = pd.read_parquet(full_path, **merged_options)
                     df = pd.concat([existing, df], ignore_index=True)
 
-            df.to_parquet(full_path, index=False, **writer_options)
+            df.to_parquet(target, index=False, **writer_options)
 
         elif format == "json":
             if mode == "append":
                 writer_options["mode"] = "a"
 
-            # Default to records if not specified
             if "orient" not in writer_options:
                 writer_options["orient"] = "records"
 
-            # Include storage_options for cloud storage (ADLS, S3, GCS)
             if "storage_options" in merged_options:
                 writer_options["storage_options"] = merged_options["storage_options"]
 
-            df.to_json(full_path, **writer_options)
+            df.to_json(target, **writer_options)
 
         elif format == "excel":
             if mode == "append":
-                # Simple append for excel
                 if os.path.exists(full_path):
                     with pd.ExcelWriter(full_path, mode="a", if_sheet_exists="overlay") as writer:
                         df.to_excel(writer, index=False, **writer_options)
                     return
 
-            df.to_excel(full_path, index=False, **writer_options)
+            df.to_excel(target, index=False, **writer_options)
 
         elif format == "avro":
             try:
@@ -1713,7 +1804,6 @@ class PandasEngine(Engine):
             except ImportError:
                 raise ImportError("Avro support requires 'pip install fastavro'")
 
-            # Convert datetime columns to microseconds for Avro timestamp-micros
             df_avro = df.copy()
             for col in df_avro.columns:
                 if pd.api.types.is_datetime64_any_dtype(df_avro[col].dtype):
@@ -1724,10 +1814,8 @@ class PandasEngine(Engine):
             records = df_avro.to_dict("records")
             schema = self._infer_avro_schema(df)
 
-            # Use fsspec for remote URIs (abfss://, s3://, etc.)
             parsed = urlparse(full_path)
             if parsed.scheme and parsed.scheme not in ["file", ""]:
-                # Remote file - use fsspec
                 import fsspec
 
                 storage_opts = merged_options.get("storage_options", {})
@@ -1735,12 +1823,11 @@ class PandasEngine(Engine):
                 with fsspec.open(full_path, write_mode, **storage_opts) as f:
                     fastavro.writer(f, schema, records)
             else:
-                # Local file - use standard open
                 open_mode = "wb"
                 if mode == "append" and os.path.exists(full_path):
                     open_mode = "a+b"
 
-                with open(full_path, open_mode) as f:
+                with open(target, open_mode) as f:
                     fastavro.writer(f, schema, records)
         else:
             raise ValueError(f"Unsupported format for Pandas engine: {format}")
@@ -1837,9 +1924,6 @@ class PandasEngine(Engine):
             # Register all DataFrames from context
             for name in context.list_names():
                 dataset_obj = context.get(name)
-
-                # Debug check
-                # print(f"DEBUG: Registering {name} type={type(dataset_obj)} LazyDataset={LazyDataset}")
 
                 # Handle LazyDataset (DuckDB optimization)
                 # if isinstance(dataset_obj, LazyDataset):
@@ -2004,7 +2088,19 @@ class PandasEngine(Engine):
     def harmonize_schema(
         self, df: pd.DataFrame, target_schema: Dict[str, str], policy: Any
     ) -> pd.DataFrame:
-        """Harmonize DataFrame schema with target schema according to policy."""
+        """Harmonize DataFrame schema with target schema according to policy.
+
+        Args:
+            df: Input DataFrame to harmonize.
+            target_schema: Target schema as dict of column_name -> type_string.
+            policy: Schema policy defining how to handle missing/new columns.
+
+        Returns:
+            DataFrame with schema harmonized to match target_schema.
+
+        Raises:
+            ValueError: If policy validation fails for missing or new columns.
+        """
         # Ensure materialization
         df = self.materialize(df)
 
@@ -2038,7 +2134,17 @@ class PandasEngine(Engine):
     def anonymize(
         self, df: Any, columns: List[str], method: str, salt: Optional[str] = None
     ) -> pd.DataFrame:
-        """Anonymize specified columns."""
+        """Anonymize specified columns.
+
+        Args:
+            df: DataFrame or LazyDataset to anonymize.
+            columns: List of column names to anonymize.
+            method: Anonymization method (hash, mask, or redact).
+            salt: Optional salt string for hash method.
+
+        Returns:
+            DataFrame with specified columns anonymized.
+        """
         # Ensure materialization
         df = self.materialize(df)
 
@@ -2383,7 +2489,18 @@ class PandasEngine(Engine):
         path: Optional[str] = None,
         format: Optional[str] = None,
     ) -> Optional[Dict[str, str]]:
-        """Get schema of an existing table/file."""
+        """Get schema of an existing table/file.
+
+        Args:
+            connection: Connection object providing base path and storage options.
+            table: Table name (for SQL sources).
+            path: File path (for file sources).
+            format: Data format (delta, parquet, csv, sql, sql_server, azure_sql).
+
+        Returns:
+            Dict mapping column names to type strings, or None if schema
+            cannot be inferred.
+        """
         try:
             if table and format in ["sql", "sql_server", "azure_sql"]:
                 # SQL Server: Read empty result
@@ -2597,7 +2714,15 @@ class PandasEngine(Engine):
         path: Optional[str] = None,
         config: Optional[Any] = None,
     ) -> None:
-        """Run table maintenance operations (optimize, vacuum)."""
+        """Run table maintenance operations (optimize, vacuum).
+
+        Args:
+            connection: Connection object providing base path and storage options.
+            format: Data format (only delta is supported).
+            table: Table name (mutually exclusive with path).
+            path: File path (mutually exclusive with table).
+            config: Maintenance configuration specifying operations to run.
+        """
         ctx = get_logging_context().with_context(engine="pandas")
 
         if format != "delta" or not config or not config.enabled:

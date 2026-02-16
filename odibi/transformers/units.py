@@ -184,7 +184,11 @@ def _parse_gauge_offset(offset_str: str) -> float:
     try:
         quantity = _ureg(offset_str)
         return quantity.to("psi").magnitude
-    except Exception:
+    except Exception as e:
+        logger = get_logging_context()
+        logger.debug(
+            f"Failed to parse gauge offset '{offset_str}', using default 14.696 psia: {type(e).__name__}: {e}"
+        )
         return 14.696  # Default to sea level
 
 
@@ -306,7 +310,11 @@ def _convert_column_spark(
 
             return pd.Series(converted)
 
-        except Exception:
+        except Exception as e:
+            logger = get_logging_context()
+            logger.debug(
+                f"Failed to convert values from '{from_unit_captured}' to '{to_unit_captured}': {type(e).__name__}: {e}"
+            )
             if errors_captured == "raise":
                 raise
             elif errors_captured == "null":

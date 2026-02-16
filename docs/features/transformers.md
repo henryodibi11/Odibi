@@ -269,6 +269,112 @@ params:
   output_col: "full_name"
 ```
 
+#### normalize_column_names
+
+Standardize column names to consistent style.
+
+```yaml
+transformer: "normalize_column_names"
+params:
+  style: "snake_case"  # Convert to snake_case
+  lowercase: true      # Convert to lowercase
+  remove_special: true # Remove special characters
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `style` | string | No | Naming style: `snake_case` or `none` (default: `snake_case`) |
+| `lowercase` | boolean | No | Convert names to lowercase (default: `true`) |
+| `remove_special` | boolean | No | Remove special characters except underscores (default: `true`) |
+
+**Engine Support:** Spark, Pandas, Polars
+
+#### coalesce_columns
+
+Return first non-null value from multiple columns.
+
+```yaml
+# Phone number fallback
+transformer: "coalesce_columns"
+params:
+  columns: ["mobile_phone", "work_phone", "home_phone"]
+  output_col: "primary_phone"
+  drop_source: false  # Keep original columns
+
+# Timestamp fallback
+transformer: "coalesce_columns"
+params:
+  columns: ["updated_at", "modified_at", "created_at"]
+  output_col: "last_change_at"
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `columns` | list[string] | Yes | List of columns to coalesce (in priority order) |
+| `output_col` | string | Yes | Name of the output column |
+| `drop_source` | boolean | No | Drop the source columns after coalescing (default: `false`) |
+
+**Engine Support:** Spark, Pandas, Polars
+
+#### replace_values
+
+Find and replace values in specified columns.
+
+```yaml
+# Standardize nulls
+transformer: "replace_values"
+params:
+  columns: ["status", "category"]
+  mapping:
+    "N/A": null
+    "": null
+    "Unknown": null
+
+# Code replacement
+transformer: "replace_values"
+params:
+  columns: ["country_code"]
+  mapping:
+    "US": "USA"
+    "UK": "GBR"
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `columns` | list[string] | Yes | Columns to apply replacements to |
+| `mapping` | dict | Yes | Map of old value to new value (use `null` for NULL) |
+
+**Engine Support:** Spark, Pandas, Polars
+
+#### trim_whitespace
+
+Trim leading and trailing whitespace from string columns.
+
+```yaml
+# All string columns
+transformer: "trim_whitespace"
+params: {}
+
+# Specific columns
+transformer: "trim_whitespace"
+params:
+  columns: ["name", "address", "city"]
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `columns` | list[string] | No | Columns to trim (default: all string columns detected at runtime) |
+
+**Engine Support:** Spark, Pandas, Polars
+
 ### Relational Transformers
 
 Operations involving multiple datasets.
@@ -485,6 +591,70 @@ params:
   threshold_seconds: 1800  # 30 minutes
   session_col: "session_id"
 ```
+
+#### split_events_by_period
+
+Split events that span multiple time periods into individual segments.
+
+For events spanning multiple days/hours/shifts, this creates separate rows for each period with adjusted start/end times and recalculated durations. Useful for OEE/downtime analysis, billing, and time-based aggregations.
+
+```yaml
+# Split by day
+transformer: "split_events_by_period"
+params:
+  start_col: "shutdown_start_time"
+  end_col: "shutdown_end_time"
+  period: "day"
+  duration_col: "shutdown_duration_min"
+
+# Split by hour
+transformer: "split_events_by_period"
+params:
+  start_col: "event_start"
+  end_col: "event_end"
+  period: "hour"
+  duration_col: "duration_minutes"
+
+# Split by shift
+transformer: "split_events_by_period"
+params:
+  start_col: "event_start"
+  end_col: "event_end"
+  period: "shift"
+  duration_col: "duration_minutes"
+  shift_col: "shift_name"
+  shifts:
+    - name: "Day"
+      start: "06:00"
+      end: "14:00"
+    - name: "Swing"
+      start: "14:00"
+      end: "22:00"
+    - name: "Night"
+      start: "22:00"
+      end: "06:00"
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `start_col` | string | Yes | Column containing the event start timestamp |
+| `end_col` | string | Yes | Column containing the event end timestamp |
+| `period` | string | No | Period type to split by: `day`, `hour`, or `shift` (default: `day`) |
+| `duration_col` | string | No | Output column name for duration in minutes. If not set, no duration column is added |
+| `shifts` | list | Conditional | List of shift definitions (required when `period='shift'`) |
+| `shift_col` | string | No | Output column name for shift name (only used when `period='shift'`, default: `shift_name`) |
+
+**Shift Definition:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Name of the shift (e.g., "Day", "Night") |
+| `start` | string | Yes | Start time in HH:MM format (e.g., "06:00") |
+| `end` | string | Yes | End time in HH:MM format (e.g., "14:00") |
+
+**Engine Support:** Spark, Pandas
 
 ### SCD (Slowly Changing Dimensions)
 

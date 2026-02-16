@@ -39,6 +39,7 @@ class AzureSQL(BaseConnection):
         secret_name: Optional[str] = None,
         port: int = 1433,
         timeout: int = 30,
+        trust_server_certificate: bool = True,
         **kwargs,
     ):
         """
@@ -55,6 +56,8 @@ class AzureSQL(BaseConnection):
             secret_name: Secret name containing password (required if auth_mode='key_vault')
             port: SQL Server port (default: 1433)
             timeout: Connection timeout in seconds (default: 30)
+            trust_server_certificate: Whether to trust the server certificate
+                (default: True for backward compatibility).
         """
         ctx = get_logging_context()
         ctx.log_connection(
@@ -77,6 +80,7 @@ class AzureSQL(BaseConnection):
         self.secret_name = secret_name
         self.port = port
         self.timeout = timeout
+        self.trust_server_certificate = trust_server_certificate
         self._engine = None
         self._cached_key = None  # For consistency with ADLS / parallel fetch
 
@@ -188,7 +192,7 @@ class AzureSQL(BaseConnection):
             f"Server=tcp:{self.server},{self.port};"
             f"Database={self.database};"
             f"Encrypt=yes;"
-            f"TrustServerCertificate=yes;"
+            f"TrustServerCertificate={'yes' if self.trust_server_certificate else 'no'};"
             f"Connection Timeout={self.timeout};"
         )
 
@@ -216,7 +220,17 @@ class AzureSQL(BaseConnection):
         return dsn
 
     def get_path(self, relative_path: str) -> str:
-        """Get table reference for relative path."""
+        """Get table reference for relative path.
+
+        In Azure SQL, the relative path is the table reference itself
+        (e.g., "schema.table" or "table"), so this method returns it as-is.
+
+        Args:
+            relative_path: Table reference (e.g., "dbo.users", "customers")
+
+        Returns:
+            Same table reference unchanged
+        """
         return relative_path
 
     def validate(self) -> None:
@@ -379,7 +393,7 @@ class AzureSQL(BaseConnection):
             )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
-                reason=f"Failed to create engine: {str(e)}",
+                reason=f"Failed to create engine: {self._sanitize_error(str(e))}",
                 suggestions=suggestions,
             )
 
@@ -429,7 +443,7 @@ class AzureSQL(BaseConnection):
             )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
-                reason=f"Query execution failed: {str(e)}",
+                reason=f"Query execution failed: {self._sanitize_error(str(e))}",
                 suggestions=self._get_error_suggestions(str(e)),
             )
 
@@ -547,7 +561,7 @@ class AzureSQL(BaseConnection):
             )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
-                reason=f"Write operation failed: {str(e)}",
+                reason=f"Write operation failed: {self._sanitize_error(str(e))}",
                 suggestions=self._get_error_suggestions(str(e)),
             )
 
@@ -622,12 +636,17 @@ class AzureSQL(BaseConnection):
             )
             raise ConnectionError(
                 connection_name=f"AzureSQL({self.server})",
-                reason=f"Statement execution failed: {str(e)}",
+                reason=f"Statement execution failed: {self._sanitize_error(str(e))}",
                 suggestions=self._get_error_suggestions(str(e)),
             )
 
     def close(self):
-        """Close database connection and dispose of engine."""
+        """Close database connection and dispose of engine.
+
+        Cleanly closes the SQLAlchemy connection pool and disposes of the engine.
+        Safe to call multiple times (subsequent calls are no-ops).
+        Should be called when done with the connection to free database resources.
+        """
         ctx = get_logging_context()
         ctx.debug(
             "Closing AzureSQL connection",
@@ -643,6 +662,23 @@ class AzureSQL(BaseConnection):
                 server=self.server,
                 database=self.database,
             )
+
+    def _sanitize_error(self, error_msg: str) -> str:
+        """Remove credentials from error messages to prevent leaks.
+
+        Args:
+            error_msg: Raw error message that may contain credentials.
+
+        Returns:
+            Sanitized error message with credentials redacted.
+        """
+        import re
+
+        sanitized = re.sub(r"PWD=[^;]*", "PWD=***", error_msg)
+        sanitized = re.sub(r"password=[^;]*", "password=***", sanitized, flags=re.IGNORECASE)
+        sanitized = re.sub(r"UID=[^;]*", "UID=***", sanitized)
+        sanitized = re.sub(r"user=[^;]*", "user=***", sanitized, flags=re.IGNORECASE)
+        return sanitized
 
     def _get_error_suggestions(self, error_msg: str) -> List[str]:
         """Generate suggestions using centralized error suggestion engine."""
@@ -673,7 +709,8 @@ class AzureSQL(BaseConnection):
 
         jdbc_url = (
             f"jdbc:sqlserver://{self.server}:{self.port};"
-            f"databaseName={self.database};encrypt=true;trustServerCertificate=true;"
+            f"databaseName={self.database};encrypt=true;"
+            f"trustServerCertificate={'true' if self.trust_server_certificate else 'false'};"
         )
 
         if self.auth_mode == "aad_msi":

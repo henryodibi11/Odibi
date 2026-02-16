@@ -22,6 +22,15 @@ class SCD2Pattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate SCD2 pattern configuration parameters.
+
+        Ensures that all required parameters are present for SCD Type 2 operations. Checks that:
+        - keys are provided (business keys to track changes)
+        - target is provided (existing dimension table for comparison)
+
+        Raises:
+            ValueError: If keys are missing or target is missing.
+        """
         ctx = get_logging_context()
         ctx.debug(
             "SCD2Pattern validation starting",
@@ -34,9 +43,10 @@ class SCD2Pattern(Pattern):
             ctx.error(
                 "SCD2Pattern validation failed: 'keys' parameter is required",
                 pattern="SCD2Pattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "SCD2Pattern: 'keys' parameter is required. "
+                f"SCD2Pattern (node '{self.config.name}'): 'keys' parameter is required. "
                 f"Expected a list of business key column names, but got: {self.params.get('keys')!r}. "
                 f"Available params: {list(self.params.keys())}. "
                 "Fix: Provide 'keys' as a list, e.g., keys=['customer_id']."
@@ -45,9 +55,10 @@ class SCD2Pattern(Pattern):
             ctx.error(
                 "SCD2Pattern validation failed: 'target' parameter is required",
                 pattern="SCD2Pattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "SCD2Pattern: 'target' parameter is required. "
+                f"SCD2Pattern (node '{self.config.name}'): 'target' parameter is required. "
                 f"Expected a table name or path string, but got: {self.params.get('target')!r}. "
                 "Fix: Provide 'target' as a string, e.g., target='dim_customer'."
             )
@@ -60,6 +71,29 @@ class SCD2Pattern(Pattern):
         )
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the SCD2 pattern to track dimension history with versioning.
+
+        Implements Slowly Changing Dimension Type 2 logic by delegating to the scd2 transformer.
+        The execution flow:
+        1. Load existing target dimension table
+        2. Compare source records with current dimension records using business keys
+        3. Expire changed records (set valid_to date, is_current=false)
+        4. Insert new versions for changed records (new valid_from, is_current=true)
+        5. Insert new records for keys not in target
+
+        The result includes version history with valid_from, valid_to, and is_current columns.
+
+        Args:
+            context: Engine context containing the source DataFrame and execution environment.
+
+        Returns:
+            DataFrame with SCD2 logic applied, including versioned records with valid_from,
+            valid_to, and is_current columns.
+
+        Raises:
+            ValueError: If SCD2 parameters are invalid or cannot be parsed.
+            Exception: If target loading fails, change detection fails, or versioning fails.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 
@@ -100,11 +134,12 @@ class SCD2Pattern(Pattern):
             ctx.error(
                 f"SCD2 invalid parameters: {e}",
                 pattern="SCD2Pattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 params=filtered_params,
             )
             raise ValueError(
-                f"Invalid SCD2 parameters: {e}. "
+                f"Invalid SCD2 parameters in node '{self.config.name}': {e}. "
                 f"Provided params: {filtered_params}. "
                 f"Valid param names: {list(valid_keys)}."
             )
@@ -116,6 +151,7 @@ class SCD2Pattern(Pattern):
             ctx.error(
                 f"SCD2 pattern execution failed: {e}",
                 pattern="SCD2Pattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )

@@ -831,9 +831,6 @@ def create_state_backend(
     """
     # Fallback to Local JSON if no System Config
     if not config.system:
-        import logging
-
-        logger = logging.getLogger(__name__)
         logger.warning(
             "No system catalog configured. Using local JSON state backend (local-only mode)."
         )

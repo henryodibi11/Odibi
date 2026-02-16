@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -275,7 +275,7 @@ class Pipeline:
                     self._ctx.warning(f"Failed to close connection {name}: {e}", exc_info=True)
 
     @classmethod
-    def from_yaml(cls, yaml_path: str) -> "PipelineManager":
+    def from_yaml(cls: Type["Pipeline"], yaml_path: str) -> "PipelineManager":
         """Create PipelineManager from YAML file (recommended).
 
         This method now returns a PipelineManager that can run all or specific pipelines.
@@ -538,6 +538,17 @@ class Pipeline:
             node_ctx = self._ctx.with_context(node_id=node_name)
 
             node_config = self.graph.nodes[node_name]
+
+            # Hard guard: never execute disabled nodes regardless of scheduling
+            if not node_config.enabled:
+                node_ctx.info("Skipping disabled node", skipped=True, reason="disabled")
+                return NodeResult(
+                    node_name=node_name,
+                    success=True,
+                    duration=0.0,
+                    metadata={"skipped": True, "reason": "disabled"},
+                )
+
             deps_failed_list = [dep for dep in node_config.depends_on if dep in results.failed]
             deps_failed = len(deps_failed_list) > 0
 
@@ -846,7 +857,6 @@ class Pipeline:
 
         else:
             self._ctx.info("Starting serial execution")
-            execution_order = self.graph.topological_sort()
             for idx, node_name in enumerate(execution_order):
                 self._ctx.debug(
                     f"Executing node {idx + 1}/{len(execution_order)}",
@@ -1201,7 +1211,7 @@ class Pipeline:
                     if field in project_dump and project_dump[field]:
                         config_dump[field] = project_dump[field]
 
-            def generate_story():
+            def generate_story() -> Optional[str]:
                 try:
                     # Get graph data for interactive DAG visualization
                     graph_data_dict = self.graph.to_dict() if self.graph else None
@@ -1338,14 +1348,54 @@ class Pipeline:
                     "event_type": event,
                 }
 
+                # Enrich with per-node details from results
+                node_details = []
+                for name, nr in results.node_results.items():
+                    node_details.append(
+                        {
+                            "node": name,
+                            "success": nr.success,
+                            "duration": round(nr.duration, 2),
+                            "rows_processed": nr.rows_processed,
+                            "error": str(nr.error) if nr.error else None,
+                            "error_type": type(nr.error).__name__ if nr.error else None,
+                        }
+                    )
+                context["node_details"] = node_details
+
+                # Add scoreboard counts
+                context["nodes_passed"] = len(results.completed)
+                context["nodes_failed"] = len(results.failed)
+                context["nodes_skipped"] = len(results.skipped)
+                context["nodes_total"] = (
+                    len(results.completed) + len(results.failed) + len(results.skipped)
+                )
+
                 # Enrich with story summary (row counts, story URL)
                 if event != "on_start" and self.generate_story:
                     story_summary = self.story_generator.get_alert_summary()
                     context.update(story_summary)
 
+                    # Enrich with run health summary from story metadata
+                    if self.story_generator._last_metadata:
+                        context["run_health"] = (
+                            self.story_generator._last_metadata.get_run_health_summary()
+                        )
+
+                        # Enrich with data quality summary
+                        quality = self.story_generator._last_metadata.get_data_quality_summary()
+                        if quality.get("has_quality_issues"):
+                            context["data_quality"] = quality
+
+                total = len(results.completed) + len(results.failed) + len(results.skipped)
                 msg = f"Pipeline '{self.config.pipeline}' {status}"
                 if results.failed:
-                    msg += f". Failed nodes: {', '.join(results.failed)}"
+                    msg += (
+                        f" ({len(results.completed)}/{total} nodes passed)."
+                        f" Failed: {', '.join(results.failed)}"
+                    )
+                elif total > 0:
+                    msg += f" ({total}/{total} nodes passed)"
 
                 send_alert(alert_config, msg, context)
 
@@ -1870,7 +1920,9 @@ class PipelineManager:
         }
 
     @classmethod
-    def from_yaml(cls, yaml_path: str, env: str = None) -> "PipelineManager":
+    def from_yaml(
+        cls: Type["PipelineManager"], yaml_path: str, env: str = None
+    ) -> "PipelineManager":
         """Create PipelineManager from YAML file.
 
         Args:
@@ -1906,7 +1958,7 @@ class PipelineManager:
             except ImportError:
                 logger.warning("python-dotenv not installed, skipping .env file")
 
-        def load_transforms_module(path):
+        def load_transforms_module(path: str) -> None:
             if os.path.exists(path):
                 try:
                     spec = importlib.util.spec_from_file_location("transforms_autodiscovered", path)

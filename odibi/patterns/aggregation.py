@@ -1,5 +1,4 @@
 import time
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from odibi.context import EngineContext
@@ -48,6 +47,16 @@ class AggregationPattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate aggregation pattern configuration parameters.
+
+        Ensures that all required parameters are present and valid. Checks that:
+        - grain is specified (list of GROUP BY columns)
+        - measures are provided with correct structure (list of dicts with 'name' and 'expr')
+        - incremental config is valid if provided (requires 'timestamp_column' and valid merge_strategy)
+
+        Raises:
+            ValueError: If grain is missing, measures are missing/invalid, or incremental config is invalid.
+        """
         ctx = get_logging_context()
         grain = self.params.get("grain")
         measures = self.params.get("measures", [])
@@ -63,9 +72,10 @@ class AggregationPattern(Pattern):
             ctx.error(
                 "AggregationPattern validation failed: 'grain' is required",
                 pattern="AggregationPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "AggregationPattern: 'grain' parameter is required. "
+                f"AggregationPattern (node '{self.config.name}'): 'grain' parameter is required. "
                 "Grain defines the grouping columns for aggregation (e.g., ['date', 'region']). "
                 "Provide a list of column names to group by."
             )
@@ -74,9 +84,10 @@ class AggregationPattern(Pattern):
             ctx.error(
                 "AggregationPattern validation failed: 'measures' is required",
                 pattern="AggregationPattern",
+                node=self.config.name,
             )
             raise ValueError(
-                "AggregationPattern: 'measures' parameter is required. "
+                f"AggregationPattern (node '{self.config.name}'): 'measures' parameter is required. "
                 "Measures define the aggregations to compute (e.g., [{'name': 'total_sales', 'expr': 'sum(amount)'}]). "
                 "Provide a list of dicts, each with 'name' and 'expr' keys."
             )
@@ -86,9 +97,10 @@ class AggregationPattern(Pattern):
                 ctx.error(
                     f"AggregationPattern validation failed: measure[{i}] must be a dict",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"AggregationPattern: measure[{i}] must be a dict with 'name' and 'expr'. "
+                    f"AggregationPattern (node '{self.config.name}'): measure[{i}] must be a dict with 'name' and 'expr'. "
                     f"Got {type(measure).__name__}: {measure!r}. "
                     "Example: {'name': 'total_sales', 'expr': 'sum(amount)'}"
                 )
@@ -96,18 +108,20 @@ class AggregationPattern(Pattern):
                 ctx.error(
                     f"AggregationPattern validation failed: measure[{i}] missing 'name'",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"AggregationPattern: measure[{i}] missing 'name'. "
+                    f"AggregationPattern (node '{self.config.name}'): measure[{i}] missing 'name'. "
                     f"Got: {measure!r}. Add a 'name' key for the output column name."
                 )
             if "expr" not in measure:
                 ctx.error(
                     f"AggregationPattern validation failed: measure[{i}] missing 'expr'",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"AggregationPattern: measure[{i}] missing 'expr'. "
+                    f"AggregationPattern (node '{self.config.name}'): measure[{i}] missing 'expr'. "
                     f"Got: {measure!r}. Add an 'expr' key with the aggregation expression (e.g., 'sum(amount)')."
                 )
 
@@ -117,9 +131,10 @@ class AggregationPattern(Pattern):
                 ctx.error(
                     "AggregationPattern validation failed: incremental missing 'timestamp_column'",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    "AggregationPattern: incremental config requires 'timestamp_column'. "
+                    f"AggregationPattern (node '{self.config.name}'): incremental config requires 'timestamp_column'. "
                     f"Got: {incremental!r}. "
                     "Add 'timestamp_column' to specify which column tracks record timestamps."
                 )
@@ -128,9 +143,10 @@ class AggregationPattern(Pattern):
                 ctx.error(
                     f"AggregationPattern validation failed: invalid merge_strategy '{merge_strategy}'",
                     pattern="AggregationPattern",
+                    node=self.config.name,
                 )
                 raise ValueError(
-                    f"AggregationPattern: 'merge_strategy' must be 'replace', 'sum', 'min', or 'max'. "
+                    f"AggregationPattern (node '{self.config.name}'): 'merge_strategy' must be 'replace', 'sum', 'min', or 'max'. "
                     f"Got: {merge_strategy}"
                 )
 
@@ -140,6 +156,24 @@ class AggregationPattern(Pattern):
         )
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the aggregation pattern on the input data.
+
+        Performs aggregation operations on the source DataFrame, optionally applying incremental
+        merge with existing target data. The execution flow:
+        1. Aggregate source data by grain columns with specified measures
+        2. Apply HAVING clause filtering if configured
+        3. Merge with existing target data if incremental mode is enabled
+        4. Add audit columns (load_timestamp, source_system) if configured
+
+        Args:
+            context: Engine context containing the source DataFrame and execution environment.
+
+        Returns:
+            Aggregated DataFrame with measures computed at the specified grain level.
+
+        Raises:
+            Exception: If aggregation fails, incremental merge fails, or target loading fails.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 
@@ -195,19 +229,11 @@ class AggregationPattern(Pattern):
             ctx.error(
                 f"AggregationPattern failed: {e}",
                 pattern="AggregationPattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
             )
             raise
-
-    def _get_row_count(self, df, engine_type) -> Optional[int]:
-        try:
-            if engine_type == EngineType.SPARK:
-                return df.count()
-            else:
-                return len(df)
-        except Exception:
-            return None
 
     def _aggregate(
         self,
@@ -217,7 +243,18 @@ class AggregationPattern(Pattern):
         measures: List[Dict],
         having: Optional[str],
     ):
-        """Perform the aggregation using SQL."""
+        """Perform the aggregation using SQL.
+
+        Args:
+            context: Engine context containing engine type and configuration.
+            df: The source DataFrame to aggregate.
+            grain: List of column names to group by.
+            measures: List of measure definitions with aggregation functions.
+            having: Optional SQL HAVING clause filter for post-aggregation filtering.
+
+        Returns:
+            Aggregated DataFrame with grain columns and calculated measures.
+        """
         if context.engine_type == EngineType.SPARK:
             return self._aggregate_spark(context, df, grain, measures, having)
         else:
@@ -300,53 +337,6 @@ class AggregationPattern(Pattern):
             return self._merge_min(context, existing_df, new_agg_df, grain, measures)
         else:  # max
             return self._merge_max(context, existing_df, new_agg_df, grain, measures)
-
-    def _load_existing_target(self, context: EngineContext, target: str):
-        """Load existing target table if it exists."""
-        if context.engine_type == EngineType.SPARK:
-            return self._load_existing_spark(context, target)
-        else:
-            return self._load_existing_pandas(context, target)
-
-    def _load_existing_spark(self, context: EngineContext, target: str):
-        spark = context.spark
-        try:
-            return spark.table(target)
-        except Exception:
-            try:
-                return spark.read.format("delta").load(target)
-            except Exception:
-                return None
-
-    def _load_existing_pandas(self, context: EngineContext, target: str):
-        import os
-
-        import pandas as pd
-
-        path = target
-        if hasattr(context, "engine") and context.engine:
-            if "." in path:
-                parts = path.split(".", 1)
-                conn_name = parts[0]
-                rel_path = parts[1]
-                if conn_name in context.engine.connections:
-                    try:
-                        path = context.engine.connections[conn_name].get_path(rel_path)
-                    except Exception:
-                        pass
-
-        if not os.path.exists(path):
-            return None
-
-        try:
-            if str(path).endswith(".parquet") or os.path.isdir(path):
-                return pd.read_parquet(path)
-            elif str(path).endswith(".csv"):
-                return pd.read_csv(path)
-        except Exception:
-            return None
-
-        return None
 
     def _merge_replace(self, context: EngineContext, existing_df, new_df, grain: List[str]):
         """
@@ -575,28 +565,3 @@ class AggregationPattern(Pattern):
                     result[col] = merged[n_col]
 
             return result
-
-    def _add_audit_columns(self, context: EngineContext, df, audit_config: Dict):
-        """Add audit columns (load_timestamp, source_system)."""
-        load_timestamp = audit_config.get("load_timestamp", False)
-        source_system = audit_config.get("source_system")
-
-        if context.engine_type == EngineType.SPARK:
-            from pyspark.sql import functions as F
-
-            if load_timestamp:
-                df = df.withColumn("load_timestamp", F.current_timestamp())
-            if source_system:
-                df = df.withColumn("source_system", F.lit(source_system))
-        else:
-            if load_timestamp or source_system:
-                df = df.copy()
-            if load_timestamp:
-                # Use timezone-aware timestamp for Delta Lake compatibility
-                from datetime import timezone
-
-                df["load_timestamp"] = datetime.now(timezone.utc)
-            if source_system:
-                df["source_system"] = source_system
-
-        return df

@@ -18,6 +18,15 @@ class MergePattern(Pattern):
     """
 
     def validate(self) -> None:
+        """Validate merge pattern configuration parameters.
+
+        Ensures that all required parameters are present for merge operations. Checks that:
+        - target (or path) is provided (destination table/path for merge)
+        - keys are provided (columns to match source and target rows)
+
+        Raises:
+            ValueError: If target/path is missing or keys are missing.
+        """
         ctx = get_logging_context()
 
         # Support both 'target' and 'path' for compatibility with merge transformer
@@ -35,10 +44,11 @@ class MergePattern(Pattern):
             ctx.error(
                 "MergePattern validation failed: 'target' or 'path' is required",
                 pattern="MergePattern",
+                node=self.config.name,
             )
             provided_params = {k: v for k, v in self.params.items() if v is not None}
             raise ValueError(
-                f"MergePattern: 'target' or 'path' is required. "
+                f"MergePattern (node '{self.config.name}'): 'target' or 'path' is required. "
                 f"Expected: A target table path string. "
                 f"Provided params: {list(provided_params.keys())}. "
                 f"Fix: Add 'target' or 'path' to your pattern configuration."
@@ -47,10 +57,11 @@ class MergePattern(Pattern):
             ctx.error(
                 "MergePattern validation failed: 'keys' is required",
                 pattern="MergePattern",
+                node=self.config.name,
             )
             source_columns = list(self.source.columns) if hasattr(self.source, "columns") else []
             raise ValueError(
-                f"MergePattern: 'keys' is required. "
+                f"MergePattern (node '{self.config.name}'): 'keys' is required. "
                 f"Expected: A list of column names to match source and target rows for merge. "
                 f"Available source columns: {source_columns}. "
                 f"Fix: Add 'keys' with columns that uniquely identify rows (e.g., keys=['id'])."
@@ -65,6 +76,26 @@ class MergePattern(Pattern):
         )
 
     def execute(self, context: EngineContext) -> Any:
+        """Execute the merge pattern to upsert data into the target table.
+
+        Performs a merge/upsert operation by delegating to the merge transformer. The merge
+        strategy determines the behavior:
+        - 'upsert': Insert new rows, update matching rows
+        - 'append_only': Insert new rows only, never update
+        - 'delete_match': Delete rows matching the keys
+
+        The merge transformer handles loading the target table, comparing keys, and applying
+        the specified merge strategy.
+
+        Args:
+            context: Engine context containing the source DataFrame and execution environment.
+
+        Returns:
+            Source DataFrame (unchanged, as merge writes to target directly).
+
+        Raises:
+            Exception: If merge operation fails, target loading fails, or parameters are invalid.
+        """
         ctx = get_logging_context()
         start_time = time.time()
 
@@ -105,6 +136,7 @@ class MergePattern(Pattern):
             ctx.error(
                 f"Merge pattern execution failed: {e}",
                 pattern="MergePattern",
+                node=self.config.name,
                 error_type=type(e).__name__,
                 elapsed_ms=round(elapsed_ms, 2),
                 target=target,

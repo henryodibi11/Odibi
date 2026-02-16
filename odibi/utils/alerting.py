@@ -246,9 +246,19 @@ def _build_slack_payload(
         }
     ]
 
+    # Build scoreboard line if counts available
+    nodes_passed = context.get("nodes_passed", 0)
+    nodes_failed = context.get("nodes_failed", 0)
+    nodes_skipped = context.get("nodes_skipped", 0)
+    nodes_total = context.get("nodes_total", 0)
+
+    status_text = status
+    if nodes_total > 0:
+        status_text = f"{status}\n✅ {nodes_passed} · ❌ {nodes_failed} · ⏭ {nodes_skipped}"
+
     fields = [
         {"type": "mrkdwn", "text": f"*Project:*\n{project_name}"},
-        {"type": "mrkdwn", "text": f"*Status:*\n{status}"},
+        {"type": "mrkdwn", "text": f"*Status:*\n{status_text}"},
         {"type": "mrkdwn", "text": f"*Duration:*\n{duration:.2f}s"},
     ]
 
@@ -327,6 +337,76 @@ def _build_slack_payload(
             }
         )
 
+    # Node details section
+    node_details = context.get("node_details", [])
+    if node_details:
+        node_lines = []
+        for nd in node_details:
+            status_icon = "✅" if nd["success"] else "❌"
+            line = f"{status_icon} *{nd['node']}* — {nd['duration']}s"
+            if nd.get("rows_processed"):
+                line += f" | {nd['rows_processed']:,} rows"
+            if nd.get("error"):
+                err_prefix = f"{nd['error_type']}: " if nd.get("error_type") else ""
+                line += f"\n    ↳ `{err_prefix}{nd['error'][:100]}`"
+            node_lines.append(line)
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*📋 Node Results:*\n" + "\n".join(node_lines),
+                },
+            }
+        )
+
+    # Run health summary
+    run_health = context.get("run_health", {})
+    if run_health and run_health.get("has_failures"):
+        health_text = f"❌ *{run_health['failed_count']} node(s) failed*"
+        if run_health.get("first_failure_error"):
+            health_text += f"\nFirst failure: `{run_health['first_failure_error'][:150]}`"
+        if run_health.get("anomalous_nodes"):
+            health_text += f"\n⚠️ Anomalies: {', '.join(run_health['anomalous_nodes'])}"
+        blocks.append(
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": health_text},
+            }
+        )
+    elif run_health and run_health.get("anomaly_count", 0) > 0:
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"⚠️ *{run_health['anomaly_count']} anomalous node(s):* "
+                    + ", ".join(run_health.get("anomalous_nodes", [])),
+                },
+            }
+        )
+
+    # Data quality summary
+    data_quality = context.get("data_quality", {})
+    if data_quality:
+        dq_parts = []
+        if data_quality.get("total_validations_failed"):
+            dq_parts.append(f"❌ {data_quality['total_validations_failed']} validation(s) failed")
+        if data_quality.get("total_failed_rows"):
+            dq_parts.append(f"🚫 {data_quality['total_failed_rows']:,} failed rows")
+        if data_quality.get("nodes_with_warnings"):
+            dq_parts.append(f"⚠️ Warnings in: {', '.join(data_quality['nodes_with_warnings'][:5])}")
+        if dq_parts:
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*🔍 Data Quality:*\n" + "\n".join(dq_parts),
+                    },
+                }
+            )
+
     payload = {"blocks": blocks}
 
     if color:
@@ -359,10 +439,24 @@ def _build_teams_workflow_payload(
     just the Adaptive Card content wrapped in an 'attachments' array,
     not the full message envelope used by classic webhooks.
     """
+    # Build scoreboard
+    nodes_passed = context.get("nodes_passed", 0)
+    nodes_failed = context.get("nodes_failed", 0)
+    nodes_skipped = context.get("nodes_skipped", 0)
+    nodes_total = context.get("nodes_total", 0)
+
     facts = [
         {"title": "⏱ Duration", "value": f"{duration:.2f}s"},
         {"title": "📅 Time", "value": timestamp},
     ]
+    if nodes_total > 0:
+        facts.insert(
+            0,
+            {
+                "title": "📊 Nodes",
+                "value": f"✅ {nodes_passed} · ❌ {nodes_failed} · ⏭ {nodes_skipped}",
+            },
+        )
 
     if total_rows > 0 or final_rows is not None:
         row_text = f"{final_rows:,}" if final_rows else f"{total_rows:,}"
@@ -441,6 +535,73 @@ def _build_teams_workflow_payload(
                 "wrap": True,
             }
         )
+
+    # Node details section
+    node_details = context.get("node_details", [])
+    if node_details:
+        node_facts = []
+        for nd in node_details:
+            status_icon = "✅" if nd["success"] else "❌"
+            value = f"{nd['duration']}s"
+            if nd.get("rows_processed"):
+                value += f" | {nd['rows_processed']:,} rows"
+            if nd.get("error"):
+                err_prefix = f"{nd['error_type']}: " if nd.get("error_type") else ""
+                value += f" | {err_prefix}{nd['error'][:80]}"
+            node_facts.append({"title": f"{status_icon} {nd['node']}", "value": value})
+        body_items.append(
+            {
+                "type": "TextBlock",
+                "text": "📋 Node Results",
+                "weight": "Bolder",
+                "spacing": "Medium",
+            }
+        )
+        body_items.append({"type": "FactSet", "facts": node_facts})
+
+    # Run health summary
+    run_health = context.get("run_health", {})
+    if run_health and run_health.get("has_failures"):
+        health_text = f"❌ {run_health['failed_count']} node(s) failed"
+        if run_health.get("first_failure_error"):
+            health_text += f" — {run_health['first_failure_error'][:150]}"
+        body_items.append(
+            {
+                "type": "TextBlock",
+                "text": health_text,
+                "wrap": True,
+                "color": "Attention",
+            }
+        )
+    if run_health and run_health.get("anomaly_count", 0) > 0:
+        body_items.append(
+            {
+                "type": "TextBlock",
+                "text": "⚠️ Anomalies: " + ", ".join(run_health.get("anomalous_nodes", [])),
+                "wrap": True,
+                "color": "Warning",
+            }
+        )
+
+    # Data quality summary
+    data_quality = context.get("data_quality", {})
+    if data_quality:
+        dq_parts = []
+        if data_quality.get("total_validations_failed"):
+            dq_parts.append(f"❌ {data_quality['total_validations_failed']} validation(s) failed")
+        if data_quality.get("total_failed_rows"):
+            dq_parts.append(f"🚫 {data_quality['total_failed_rows']:,} failed rows")
+        if data_quality.get("nodes_with_warnings"):
+            dq_parts.append(f"⚠️ Warnings in: {', '.join(data_quality['nodes_with_warnings'][:5])}")
+        if dq_parts:
+            body_items.append(
+                {
+                    "type": "TextBlock",
+                    "text": "🔍 Data Quality: " + " | ".join(dq_parts),
+                    "wrap": True,
+                    "spacing": "Medium",
+                }
+            )
 
     # Handle @mentions
     # 'mention' applies to all events, 'mention_on_failure' only to failure events
@@ -524,6 +685,22 @@ def _build_generic_payload(
         "event_type": context.get("event_type"),
         "metadata": config.metadata,
     }
+
+    # Add scoreboard if available
+    if context.get("nodes_total"):
+        payload["nodes_passed"] = context.get("nodes_passed", 0)
+        payload["nodes_failed"] = context.get("nodes_failed", 0)
+        payload["nodes_skipped"] = context.get("nodes_skipped", 0)
+        payload["nodes_total"] = context.get("nodes_total", 0)
+
+    if context.get("node_details"):
+        payload["node_details"] = context["node_details"]
+
+    if context.get("run_health"):
+        payload["run_health"] = context["run_health"]
+
+    if context.get("data_quality"):
+        payload["data_quality"] = context["data_quality"]
 
     if context.get("event_type") == AlertEvent.ON_QUARANTINE.value:
         payload["quarantine_details"] = context.get("quarantine_details", {})

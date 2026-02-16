@@ -135,6 +135,9 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
         # Pandas defaults to ('_x', '_y'). We want ('', '_{prefix or right_dataset}')
         suffix = f"_{params.prefix}" if params.prefix else f"_{params.right_dataset}"
 
+        # Map 'full' to 'outer' for Pandas compatibility
+        pandas_how = "outer" if params.how == "full" else params.how
+
         # Handle anti and semi joins for pandas
         if params.how == "anti":
             # Anti join: rows in left that don't match right
@@ -145,7 +148,7 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
             merged = context.df.merge(right_df[params.on], on=params.on, how="inner")
             res = merged.drop_duplicates(subset=params.on)
         else:
-            res = context.df.merge(right_df, on=params.on, how=params.how, suffixes=("", suffix))
+            res = context.df.merge(right_df, on=params.on, how=pandas_how, suffixes=("", suffix))
 
         rows_after = res.shape[0] if hasattr(res, "shape") else None
         elapsed_ms = (time.time() - start_time) * 1000
@@ -436,13 +439,16 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
     elif context.engine_type == EngineType.PANDAS:
         import pandas as pd
 
+        # Map 'avg' to 'mean' for pandas compatibility
+        agg_func_mapped = "mean" if params.agg_func == "avg" else params.agg_func
+
         # pivot_table is robust
         res = pd.pivot_table(
             context.df,
             index=params.group_by,
             columns=params.pivot_col,
             values=params.agg_col,
-            aggfunc=params.agg_func,
+            aggfunc=agg_func_mapped,
         ).reset_index()
 
         rows_after = res.shape[0] if hasattr(res, "shape") else None

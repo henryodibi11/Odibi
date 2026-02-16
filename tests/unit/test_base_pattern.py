@@ -3,6 +3,7 @@
 import time
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from odibi.config import NodeConfig
@@ -181,6 +182,90 @@ class TestPatternAbstractMethods:
             IncompletePattern(mock_engine, mock_config)
 
 
+class TestLoadExistingPandas:
+    """Test _load_existing_pandas loads parquet files correctly."""
+
+    def test_load_existing_pandas_parquet(self, mock_engine, mock_config, tmp_path):
+        """Test _load_existing_pandas loads a parquet file."""
+        pattern = ConcretePattern(mock_engine, mock_config)
+
+        df = pd.DataFrame({"id": [1, 2, 3], "name": ["a", "b", "c"]})
+        parquet_path = str(tmp_path / "target.parquet")
+        df.to_parquet(parquet_path, index=False)
+
+        pandas_context = PandasContext()
+        context = EngineContext(
+            context=pandas_context,
+            df=pd.DataFrame(),
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+        result = pattern._load_existing_pandas(context, parquet_path)
+        assert result is not None
+        assert len(result) == 3
+        assert list(result.columns) == ["id", "name"]
+        assert result["id"].tolist() == [1, 2, 3]
+
+    def test_load_existing_pandas_missing_file(self, mock_engine, mock_config):
+        """Test _load_existing_pandas returns None for missing files."""
+        pattern = ConcretePattern(mock_engine, mock_config)
+
+        pandas_context = PandasContext()
+        context = EngineContext(
+            context=pandas_context,
+            df=pd.DataFrame(),
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+        result = pattern._load_existing_pandas(context, "/nonexistent/path.parquet")
+        assert result is None
+
+    def test_load_existing_pandas_unrecognized_format_tries_parquet(
+        self, mock_engine, mock_config, tmp_path
+    ):
+        """Bug #193: unrecognized format should attempt parquet read."""
+        pattern = ConcretePattern(mock_engine, mock_config)
+
+        df = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        path = tmp_path / "data.dat"
+        df.to_parquet(path, index=False)
+
+        pandas_context = PandasContext()
+        context = EngineContext(
+            context=pandas_context,
+            df=pd.DataFrame(),
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+        result = pattern._load_existing_pandas(context, str(path))
+        assert result is not None
+        assert len(result) == 2
+        assert list(result.columns) == ["id", "val"]
+
+    def test_load_existing_pandas_unrecognized_format_unreadable_returns_none(
+        self, mock_engine, mock_config, tmp_path
+    ):
+        """Bug #193: truly unreadable file with unrecognized extension returns None."""
+        pattern = ConcretePattern(mock_engine, mock_config)
+
+        path = tmp_path / "data.dat"
+        path.write_text("not valid parquet data")
+
+        pandas_context = PandasContext()
+        context = EngineContext(
+            context=pandas_context,
+            df=pd.DataFrame(),
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+        result = pattern._load_existing_pandas(context, str(path))
+        assert result is None
+
+
 class TestPatternExecution:
     """Test Pattern execution behavior."""
 
@@ -219,3 +304,78 @@ class TestPatternExecution:
 
         with pytest.raises(ValueError, match="Test error"):
             pattern.execute(context)
+
+
+class TestAddAuditColumns:
+    """Test base Pattern._add_audit_columns (issue #191)."""
+
+    @pytest.fixture
+    def pattern(self, mock_engine, mock_config):
+        return ConcretePattern(mock_engine, mock_config)
+
+    @pytest.fixture
+    def pandas_context(self, mock_engine):
+        df = pd.DataFrame({"id": [1, 2], "value": [10, 20]})
+        return EngineContext(
+            context=PandasContext(),
+            df=df,
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+    def test_no_audit_columns_by_default(self, pattern, pandas_context):
+        """Default audit_config adds no columns (load_timestamp defaults to False)."""
+        result = pattern._add_audit_columns(pandas_context, pandas_context.df, {})
+        assert "load_timestamp" not in result.columns
+        assert "source_system" not in result.columns
+
+    def test_load_timestamp_adds_tz_aware_column(self, pattern, pandas_context):
+        """load_timestamp=True adds a timezone-aware UTC timestamp column."""
+        result = pattern._add_audit_columns(
+            pandas_context, pandas_context.df, {"load_timestamp": True}
+        )
+        assert "load_timestamp" in result.columns
+        ts = result["load_timestamp"].iloc[0]
+        assert ts.tzinfo is not None
+
+    def test_source_system_adds_column(self, pattern, pandas_context):
+        """source_system adds a constant string column."""
+        result = pattern._add_audit_columns(
+            pandas_context, pandas_context.df, {"source_system": "erp"}
+        )
+        assert "source_system" in result.columns
+        assert (result["source_system"] == "erp").all()
+
+    def test_both_audit_columns(self, pattern, pandas_context):
+        """Both load_timestamp and source_system can be added together."""
+        result = pattern._add_audit_columns(
+            pandas_context,
+            pandas_context.df,
+            {"load_timestamp": True, "source_system": "pos"},
+        )
+        assert "load_timestamp" in result.columns
+        assert "source_system" in result.columns
+        assert (result["source_system"] == "pos").all()
+
+    def test_does_not_modify_original(self, pattern, pandas_context):
+        """Audit columns should not modify the original DataFrame."""
+        original_cols = list(pandas_context.df.columns)
+        pattern._add_audit_columns(pandas_context, pandas_context.df, {"load_timestamp": True})
+        assert list(pandas_context.df.columns) == original_cols
+
+    @patch("odibi.patterns.base.EngineType")
+    def test_non_pandas_context_calls_withcolumn(self, mock_engine_type, pattern):
+        """Non-Pandas engine path uses withColumn for audit columns."""
+        mock_df = MagicMock()
+        mock_df.withColumn.return_value = mock_df
+        mock_context = MagicMock(spec=EngineContext)
+        mock_context.engine_type = mock_engine_type.SPARK
+
+        mock_f = MagicMock()
+        with patch.dict(
+            "sys.modules", {"pyspark.sql.functions": mock_f, "pyspark.sql": MagicMock()}
+        ):
+            pattern._add_audit_columns(
+                mock_context, mock_df, {"load_timestamp": True, "source_system": "test"}
+            )
+        assert mock_df.withColumn.call_count == 2

@@ -469,6 +469,38 @@ class TestNodeExecuteWithRetries:
         """Test that HWM state is passed to executor."""
         pytest.skip("HWM state functionality not implemented", allow_module_level=True)
 
+    def test_execute_with_retries_hwm_update_failure_marks_result_failed(
+        self, mock_context, mock_engine, connections, basic_config
+    ):
+        """Test that HWM update failure sets result.success to False."""
+        mock_result = NodeResult(
+            node_name="test_node",
+            success=True,
+            duration=1.0,
+            rows_processed=100,
+            metadata={
+                "hwm_pending": True,
+                "hwm_update": {"key": "test_hwm", "value": "2024-01-01"},
+            },
+        )
+
+        node = Node(
+            config=basic_config,
+            context=mock_context,
+            engine=mock_engine,
+            connections=connections,
+        )
+        node.state_manager = MagicMock()
+        hwm_error = RuntimeError("HWM write failed")
+        node.state_manager.set_hwm.side_effect = hwm_error
+
+        with patch.object(node.executor, "execute", return_value=mock_result):
+            result = node._execute_with_retries()
+
+            assert result.success is False
+            assert result.error is hwm_error
+            assert result.metadata["hwm_error"] == "HWM write failed"
+
     def test_execute_with_retries_caches_result_when_enabled(
         self, mock_context, mock_engine, connections, basic_config
     ):
@@ -498,3 +530,171 @@ class TestNodeExecuteWithRetries:
             assert node._cached_result == cached_df
             # Verify result comes from context cache
             mock_context.get.assert_called_with(basic_config.name)
+
+    def test_graceful_failure_applies_exponential_backoff(
+        self, mock_context, mock_engine, connections, basic_config
+    ):
+        """Test that graceful failures (result.success=False) apply exponential backoff."""
+        retry_config = RetryConfig(enabled=True, max_attempts=3, backoff="exponential")
+
+        failed_result = NodeResult(
+            node_name="test_node",
+            success=False,
+            duration=0.5,
+            error=Exception("Graceful failure"),
+        )
+
+        node = Node(
+            config=basic_config,
+            context=mock_context,
+            engine=mock_engine,
+            connections=connections,
+            retry_config=retry_config,
+        )
+
+        with patch.object(node.executor, "execute", return_value=failed_result):
+            with patch("odibi.node.time.sleep") as mock_sleep:
+                node._execute_with_retries()
+
+                # Should have slept for 1.0s (2^0), then 2.0s (2^1)
+                mock_sleep.assert_has_calls([call(1.0), call(2.0)])
+                assert mock_sleep.call_count == 2
+
+    def test_graceful_failure_applies_linear_backoff(
+        self, mock_context, mock_engine, connections, basic_config
+    ):
+        """Test that graceful failures apply linear backoff."""
+        retry_config = RetryConfig(enabled=True, max_attempts=3, backoff="linear")
+
+        failed_result = NodeResult(
+            node_name="test_node",
+            success=False,
+            duration=0.5,
+            error=Exception("Graceful failure"),
+        )
+
+        node = Node(
+            config=basic_config,
+            context=mock_context,
+            engine=mock_engine,
+            connections=connections,
+            retry_config=retry_config,
+        )
+
+        with patch.object(node.executor, "execute", return_value=failed_result):
+            with patch("odibi.node.time.sleep") as mock_sleep:
+                node._execute_with_retries()
+
+                # Should have slept for 1.0s (attempt 1), then 2.0s (attempt 2)
+                mock_sleep.assert_has_calls([call(1.0), call(2.0)])
+                assert mock_sleep.call_count == 2
+
+    def test_graceful_failure_applies_constant_backoff(
+        self, mock_context, mock_engine, connections, basic_config
+    ):
+        """Test that graceful failures apply constant backoff."""
+        retry_config = RetryConfig(enabled=True, max_attempts=3, backoff="constant")
+
+        failed_result = NodeResult(
+            node_name="test_node",
+            success=False,
+            duration=0.5,
+            error=Exception("Graceful failure"),
+        )
+
+        node = Node(
+            config=basic_config,
+            context=mock_context,
+            engine=mock_engine,
+            connections=connections,
+            retry_config=retry_config,
+        )
+
+        with patch.object(node.executor, "execute", return_value=failed_result):
+            with patch("odibi.node.time.sleep") as mock_sleep:
+                node._execute_with_retries()
+
+                # Should have slept for 1.0s each time
+                mock_sleep.assert_has_calls([call(1.0), call(1.0)])
+                assert mock_sleep.call_count == 2
+
+    def test_graceful_failure_no_backoff_on_last_attempt(
+        self, mock_context, mock_engine, connections, basic_config
+    ):
+        """Test that no backoff is applied on the final attempt."""
+        retry_config = RetryConfig(enabled=True, max_attempts=2, backoff="exponential")
+
+        failed_result = NodeResult(
+            node_name="test_node",
+            success=False,
+            duration=0.5,
+            error=Exception("Graceful failure"),
+        )
+
+        node = Node(
+            config=basic_config,
+            context=mock_context,
+            engine=mock_engine,
+            connections=connections,
+            retry_config=retry_config,
+        )
+
+        with patch.object(node.executor, "execute", return_value=failed_result):
+            with patch("odibi.node.time.sleep") as mock_sleep:
+                node._execute_with_retries()
+
+                # Only 1 sleep (after attempt 1, not after attempt 2)
+                mock_sleep.assert_called_once_with(1.0)
+
+
+class TestCalculateBackoff:
+    """Tests for _calculate_backoff method."""
+
+    @pytest.fixture
+    def node(self, mock_context, mock_engine, connections, basic_config):
+        """Create a node with exponential backoff by default."""
+        return Node(
+            config=basic_config,
+            context=mock_context,
+            engine=mock_engine,
+            connections=connections,
+            retry_config=RetryConfig(enabled=True, max_attempts=5, backoff="exponential"),
+        )
+
+    def test_exponential_backoff_values(self, node):
+        """Test exponential backoff returns 2^(attempt-1)."""
+        assert node._calculate_backoff(1) == 1.0
+        assert node._calculate_backoff(2) == 2.0
+        assert node._calculate_backoff(3) == 4.0
+        assert node._calculate_backoff(4) == 8.0
+
+    def test_linear_backoff_values(self, mock_context, mock_engine, connections, basic_config):
+        """Test linear backoff returns attempt number as float."""
+        node = Node(
+            config=basic_config,
+            context=mock_context,
+            engine=mock_engine,
+            connections=connections,
+            retry_config=RetryConfig(enabled=True, max_attempts=5, backoff="linear"),
+        )
+        assert node._calculate_backoff(1) == 1.0
+        assert node._calculate_backoff(2) == 2.0
+        assert node._calculate_backoff(3) == 3.0
+
+    def test_constant_backoff_values(self, mock_context, mock_engine, connections, basic_config):
+        """Test constant backoff always returns 1.0."""
+        node = Node(
+            config=basic_config,
+            context=mock_context,
+            engine=mock_engine,
+            connections=connections,
+            retry_config=RetryConfig(enabled=True, max_attempts=5, backoff="constant"),
+        )
+        assert node._calculate_backoff(1) == 1.0
+        assert node._calculate_backoff(2) == 1.0
+        assert node._calculate_backoff(5) == 1.0
+
+    def test_backoff_returns_float(self, node):
+        """Test that backoff always returns a float."""
+        result = node._calculate_backoff(1)
+        assert isinstance(result, float)

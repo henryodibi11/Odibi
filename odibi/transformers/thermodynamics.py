@@ -98,7 +98,7 @@ ATM_PSIA = 14.696
 # =============================================================================
 
 
-def _ensure_coolprop():
+def _ensure_coolprop() -> Any:
     """Import CoolProp and raise helpful error if not installed."""
     try:
         import CoolProp.CoolProp as CP
@@ -402,7 +402,9 @@ def _compute_fluid_properties_row(
 
             result[col_name] = raw_value
 
-    except Exception:
+    except Exception as e:
+        logger = get_logging_context()
+        logger.debug(f"Failed to calculate fluid properties for row: {type(e).__name__}: {e}")
         # Return nulls for all outputs on error
         for out_cfg in params.outputs:
             if out_cfg.output_column:
@@ -458,7 +460,7 @@ def fluid_properties(context: EngineContext, params: FluidPropertiesParams) -> E
     return context.with_df(result_df)
 
 
-def _fluid_properties_pandas(df, params: FluidPropertiesParams, CP) -> Any:
+def _fluid_properties_pandas(df: Any, params: FluidPropertiesParams, CP: Any) -> Any:
     """Pandas implementation using vectorized apply."""
 
     df = df.copy()
@@ -474,7 +476,7 @@ def _fluid_properties_pandas(df, params: FluidPropertiesParams, CP) -> Any:
     if params.enthalpy_col:
         input_cols.append(params.enthalpy_col)
 
-    def compute_row(row):
+    def compute_row(row: Any) -> Dict[str, Optional[float]]:
         row_dict = row.to_dict() if hasattr(row, "to_dict") else dict(row)
         return _compute_fluid_properties_row(row_dict, params, CP)
 
@@ -485,7 +487,7 @@ def _fluid_properties_pandas(df, params: FluidPropertiesParams, CP) -> Any:
     return df
 
 
-def _fluid_properties_spark(df, params: FluidPropertiesParams, CP) -> Any:
+def _fluid_properties_spark(df: Any, params: FluidPropertiesParams, CP: Any) -> Any:
     """Spark implementation using Pandas UDF."""
     import pandas as pd
     from pyspark.sql.functions import pandas_udf
@@ -546,7 +548,7 @@ def _fluid_properties_spark(df, params: FluidPropertiesParams, CP) -> Any:
     return result.drop("__fluid_props__")
 
 
-def _fluid_properties_polars(df, params: FluidPropertiesParams, CP) -> Any:
+def _fluid_properties_polars(df: Any, params: FluidPropertiesParams, CP: Any) -> Any:
     """Polars implementation - converts through Pandas for CoolProp compatibility."""
     import polars as pl
 
@@ -918,7 +920,11 @@ def _compute_psychrometrics_row(
 
             result[col_name] = raw_value
 
-    except Exception:
+    except Exception as e:
+        logger = get_logging_context()
+        logger.debug(
+            f"Failed to calculate psychrometric properties for row: {type(e).__name__}: {e}"
+        )
         for out_cfg in params.outputs:
             col_name = out_cfg.output_column or (
                 f"{params.prefix}_{out_cfg.property}" if params.prefix else out_cfg.property
@@ -966,12 +972,12 @@ def psychrometrics(context: EngineContext, params: PsychrometricsParams) -> Engi
     return context.with_df(result_df)
 
 
-def _psychrometrics_pandas(df, params: PsychrometricsParams, CP) -> Any:
+def _psychrometrics_pandas(df: Any, params: PsychrometricsParams, CP: Any) -> Any:
     """Pandas implementation."""
 
     df = df.copy()
 
-    def compute_row(row):
+    def compute_row(row: Any) -> Dict[str, Optional[float]]:
         row_dict = row.to_dict() if hasattr(row, "to_dict") else dict(row)
         return _compute_psychrometrics_row(row_dict, params, CP)
 
@@ -982,7 +988,7 @@ def _psychrometrics_pandas(df, params: PsychrometricsParams, CP) -> Any:
     return df
 
 
-def _psychrometrics_spark(df, params: PsychrometricsParams, CP) -> Any:
+def _psychrometrics_spark(df: Any, params: PsychrometricsParams, CP: Any) -> Any:
     """Spark implementation using Pandas UDF."""
     import pandas as pd
     from pyspark.sql.functions import pandas_udf
@@ -1039,7 +1045,7 @@ def _psychrometrics_spark(df, params: PsychrometricsParams, CP) -> Any:
     return result.drop("__psychro_props__")
 
 
-def _psychrometrics_polars(df, params: PsychrometricsParams, CP) -> Any:
+def _psychrometrics_polars(df: Any, params: PsychrometricsParams, CP: Any) -> Any:
     """Polars implementation."""
     import polars as pl
 

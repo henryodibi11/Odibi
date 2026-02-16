@@ -216,7 +216,7 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
     return result
 
 
-def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
+def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> EngineContext:
     """
     Internal helper for SCD2 logic on Spark engine.
 
@@ -263,11 +263,18 @@ def _scd2_spark(context: EngineContext, source_df, params: SCD2Params) -> Engine
     try:
         # Try reading as table first
         target_df = spark.table(params.target)
-    except Exception:
+    except Exception as e:
+        logger = get_logging_context()
+        logger.debug(
+            f"Target table '{params.target}' not found as registered table: {type(e).__name__}: {e}"
+        )
         try:
             # Try reading as Delta path
             target_df = spark.read.format("delta").load(params.target)
-        except Exception:
+        except Exception as e2:
+            logger.debug(
+                f"Target '{params.target}' not found as Delta path - assuming first run: {type(e2).__name__}: {e2}"
+            )
             # Target doesn't exist yet - First Run
             pass
 
@@ -642,13 +649,14 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
             cols_select = ", ".join(
                 [f"s.{c} as {start_col}" if c == eff_col else f"s.{c}" for c in src_cols]
             )
+            null_check = " AND ".join([f"t.{k} IS NULL" for k in keys])
 
             sql_new_inserts = f"""
                 SELECT {cols_select}, NULL::TIMESTAMP as {end_col}, True as {flag_col}
                 FROM source_df s
                 LEFT JOIN (SELECT * FROM read_parquet('{path}') WHERE {flag_col} = True) t
                 ON {join_cond}
-                WHERE t.{keys[0]} IS NULL
+                WHERE {null_check}
             """
 
             sql_changed_inserts = f"""
@@ -721,7 +729,7 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
     # Prepare Source: rename eff_col to start_col, add SCD metadata
     source_df = source_df.copy()
     source_df = source_df.rename(columns={eff_col: start_col})
-    source_df[end_col] = None
+    source_df[end_col] = pd.NaT
     source_df[flag_col] = True
 
     if target_df.empty:
@@ -761,7 +769,7 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
     updates = merged[merged["_merge"] == "both"].copy()
 
     # Detect Changes
-    def has_changed(row):
+    def has_changed(row: Any) -> bool:
         for col in track:
             s = row.get(col)
             t = row.get(col + "_tgt")
@@ -794,6 +802,9 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
 
         # Prepare DataFrame of keys to close + new end date
         keys_to_close = changed_records[keys + [start_col]].rename(columns={start_col: "__new_end"})
+        keys_to_close = keys_to_close.sort_values("__new_end").drop_duplicates(
+            subset=keys, keep="last"
+        )
 
         # Merge original target with closing info
         # We use left merge to preserve all target rows

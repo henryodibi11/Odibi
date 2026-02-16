@@ -22,7 +22,15 @@ logger = logging.getLogger(__name__)
 
 
 class DeleteThresholdExceeded(Exception):
-    """Raised when delete percentage exceeds configured threshold."""
+    """Raised when delete percentage exceeds configured threshold.
+
+    This exception is raised during delete detection when the percentage of
+    deleted records exceeds the configured safety threshold, preventing
+    accidental mass deletions due to data source issues.
+
+    See DeleteDetectionConfig.threshold and threshold_breach_action for
+    configuration options.
+    """
 
     pass
 
@@ -424,7 +432,7 @@ def _apply_soft_delete(
             df[soft_delete_col] = pd.Series([False] * len(df), dtype="bool")
 
             # Get full deleted rows from target
-            deleted_rows = prev_df.merge(deleted_keys, on=keys, how="inner")
+            deleted_rows = prev_df.merge(deleted_keys, on=keys, how="inner").copy()
             deleted_rows[soft_delete_col] = True
 
             # Align columns to match source schema

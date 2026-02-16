@@ -23,7 +23,7 @@ class PolicyApplied(BaseModel):
 
 # ... existing code ...
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 from odibi_mcp.contracts.enums import TruncatedReason
 from odibi import __version__  # Ensure odibi core is in your PYTHONPATH
@@ -41,7 +41,7 @@ class MCPEnvelope(BaseModel):
     mcp_schema_version: str = __version__
     project: str
     environment: str = "production"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     duration_ms: Optional[float] = None
     truncated: bool = False
     truncated_reason: Optional[TruncatedReason] = None

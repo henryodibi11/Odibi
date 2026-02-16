@@ -110,10 +110,12 @@ pipelines:
 | Feature | Description |
 |---------|-------------|
 | **Data Stories** | Every run generates an HTML audit report |
-| **Dimensional Patterns** | SCD1/SCD2, date dimension, fact tables built-in |
+| **Dimensional Patterns** | 6 built-in patterns: SCD1/SCD2, date dimension, fact tables, merge, aggregation |
+| **56 Transformers** | Comprehensive library for data manipulation and quality |
 | **Validation & Contracts** | Fail-fast checks, quarantine bad rows |
-| **Dual Engine** | Pandas locally, Spark in production — same config |
+| **Multi-Engine** | Pandas, Polars, and Spark — same config across all engines |
 | **Production Ready** | Retry, alerting, secrets, Delta Lake support |
+| **Battle-Tested** | 2700+ tests ensure reliability and correctness |
 
 ---
 
@@ -135,8 +137,14 @@ pipelines:
 # Standard (Pandas engine)
 pip install odibi
 
+# With Polars engine
+pip install "odibi[polars]"
+
 # With Spark + Azure support
 pip install "odibi[spark,azure]"
+
+# All engines and features
+pip install "odibi[all]"
 ```
 
 ---

@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -7,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from odibi.state import StateManager
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Odibi UI")
 
@@ -39,7 +42,7 @@ async def dashboard(request: Request):
             state_mgr = StateManager(backend=backend)
             state = state_mgr.backend.load_state()
         except Exception as e:
-            print(f"Failed to load state backend: {e}")
+            logger.debug(f"[state backend load]: {type(e).__name__}: {e}")
             state = {}
     else:
         state = {}
@@ -156,7 +159,6 @@ async def config_view(request: Request):
 # This is tricky because mounting happens at startup, but config might change per request?
 # Actually config is set via env var before startup in CLI.
 config_path_env = os.getenv("ODIBI_CONFIG")
-print(f"DEBUG: ODIBI_CONFIG Env Var: {config_path_env}")
 static_stories_dir = Path("stories")
 
 if config_path_env and os.path.exists(config_path_env):
@@ -171,8 +173,6 @@ if config_path_env and os.path.exists(config_path_env):
 
         s_conn = config.story.connection
         s_path = config.story.path
-        print(f"DEBUG: Story Conn: {s_conn}, Path: {s_path}")
-        print(f"DEBUG: Available Connections: {list(config.connections.keys())}")
 
         if s_conn in config.connections:
             c_conf = config.connections[s_conn]
@@ -181,15 +181,10 @@ if config_path_env and os.path.exists(config_path_env):
                 if not os.path.isabs(base):
                     base = os.path.join(abs_config_path.parent, base)
                 static_stories_dir = Path(base) / s_path
-                print(f"DEBUG: Config Path: {abs_config_path}")
-                print(f"DEBUG: Calculated Base: {base}")
-                print(f"DEBUG: Calculated Stories Dir: {static_stories_dir}")
-                print(f"DEBUG: Exists? {static_stories_dir.exists()}")
     except Exception as e:
-        print(f"DEBUG: Failed to resolve story path: {e}")
+        logger.debug(f"[story path resolution]: {type(e).__name__}: {e}")
 
 if static_stories_dir.exists():
-    print(f"DEBUG: Mounting stories from {static_stories_dir}")
     app.mount(
         "/stories_static", StaticFiles(directory=str(static_stories_dir)), name="stories_static"
     )
