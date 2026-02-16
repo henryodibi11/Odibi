@@ -137,11 +137,11 @@ class TestSCD2Pandas:
         )
 
         ctx = context.with_df(source_df)
-
+        params = params.model_copy(update={"target": "target.csv"})
         with (
-            patch("pandas.read_parquet", return_value=target_df),
             patch("os.path.exists", return_value=True),
-            patch("pandas.DataFrame.to_parquet"),
+            patch("pandas.read_csv", return_value=target_df),
+            patch("pandas.DataFrame.to_csv"),
         ):
             result_ctx = scd2(ctx, params)
             result_df = result_ctx.df
@@ -185,11 +185,11 @@ class TestSCD2Pandas:
         )
 
         ctx = context.with_df(source_df)
-
+        params = params.model_copy(update={"target": "target.csv"})
         with (
-            patch("pandas.read_parquet", return_value=target_df),
             patch("os.path.exists", return_value=True),
-            patch("pandas.DataFrame.to_parquet"),
+            patch("pandas.read_csv", return_value=target_df),
+            patch("pandas.DataFrame.to_csv"),
         ):
             result_ctx = scd2(ctx, params)
             result_df = result_ctx.df
@@ -545,7 +545,7 @@ class TestSCD2PandasEdgeCases:
             }
         )
         params = SCD2Params(
-            target="dummy.parquet",
+            target="dummy.csv",
             keys=["id"],
             track_cols=["status"],
             effective_time_col="updated_at",
@@ -554,9 +554,9 @@ class TestSCD2PandasEdgeCases:
         )
         ctx = context.with_df(source_df)
         with (
-            patch("pandas.read_parquet", return_value=target_df),
+            patch("pandas.read_csv", return_value=target_df),
             patch("os.path.exists", return_value=True),
-            patch("pandas.DataFrame.to_parquet"),
+            patch("pandas.DataFrame.to_csv"),
         ):
             result_ctx = scd2(ctx, params)
             result_df = result_ctx.df
