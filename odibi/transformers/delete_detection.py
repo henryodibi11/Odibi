@@ -17,7 +17,7 @@ from odibi.config import (
 from odibi.context import EngineContext
 from odibi.enums import EngineType
 from odibi.exceptions import OdibiException
-from odibi.registry import transform
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,6 @@ class DeleteThresholdExceeded(OdibiException):
     pass
 
 
-@transform("detect_deletes", category="transformer", param_model=DeleteDetectionConfig)
 def detect_deletes(
     context: EngineContext, config: DeleteDetectionConfig = None, **params
 ) -> EngineContext:

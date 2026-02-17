@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from odibi.context import EngineContext
 from odibi.exceptions import ValidationError
-from odibi.registry import transform
+
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -38,7 +38,6 @@ class CrossCheckParams(BaseModel):
     threshold: float = Field(default=0.0, description="Threshold for diff (0.0-1.0)")
 
 
-@transform("cross_check", param_model=CrossCheckParams)
 def cross_check(context: EngineContext, params: CrossCheckParams) -> Any:
     """
     Perform cross-node validation checks.

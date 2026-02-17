@@ -18,14 +18,19 @@ from odibi.transformers import (
 _MODULES = [sql_core, relational, advanced, scd, validation, delete_detection]
 
 
+_standard_library_registered = False
+
+
 def register_standard_library():
     """
     Registers all standard transformations into the global registry.
     This is called automatically when the framework initializes.
+    Idempotent — safe to call multiple times.
     """
-    # Helper to register functions from a module
-    # We look for functions that match the transform signature or are explicitly exported
-    # For now, we manually register the known list to be safe and explicit.
+    global _standard_library_registered
+    if _standard_library_registered:
+        return
+    _standard_library_registered = True
 
     registry = FunctionRegistry
 

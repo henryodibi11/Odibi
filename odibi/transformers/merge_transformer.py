@@ -6,7 +6,7 @@ from typing import Any, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from odibi.context import EngineContext, PandasContext, SparkContext
-from odibi.registry import transform
+
 from odibi.utils.logging_context import get_logging_context
 
 try:
@@ -229,7 +229,6 @@ class MergeParams(BaseModel):
         return self
 
 
-@transform("merge", category="transformer", param_model=MergeParams)
 def merge(
     context: EngineContext,
     params: Optional[Union[MergeParams, Any]] = None,
