@@ -596,7 +596,7 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
     insert_cols = [c for c in merge_source.columns if c != eff_col]
     insert_values = {f"`{col}`": f"source.`{col}`" for col in insert_cols}
 
-    # Execute MERGE
+    # Execute MERGE — closes old versions and inserts brand-new keys
     merger = (
         delta_table.alias("target")
         .merge(merge_source.alias("source"), match_condition)
@@ -604,6 +604,57 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
         .whenNotMatchedInsert(values=insert_values)
     )
     merger.execute()
+
+    # The MERGE above only *closes* changed rows — it does NOT insert the
+    # new version for keys that already existed.  `whenNotMatchedInsert` only
+    # fires for keys absent from the target, so changed rows need a separate
+    # append.  We detect them by reading the (now-closed) target rows and
+    # finding keys whose current version was just closed (is_current=false,
+    # valid_to set to the source effective time).
+    #
+    # Simpler approach: re-read current target, left-anti-join the source to
+    # find keys that have NO current row, then append those from merge_source.
+
+    try:
+        # Re-read target after MERGE
+        try:
+            updated_target = DeltaTable.forName(spark, target).toDF()
+        except Exception:
+            updated_target = DeltaTable.forPath(spark, target).toDF()
+
+        # Keys in source that do NOT have an is_current=true row in target
+        current_keys = updated_target.filter(F.col(f"`{flag_col}`") == F.lit(True)).select(
+            [F.col(f"`{k}`") for k in keys]
+        )
+
+        # Anti-join: source keys missing from current target = changed rows
+        # whose new version was never inserted
+        changed_new_versions = merge_source.join(current_keys, on=keys, how="left_anti")
+
+        if changed_new_versions.count() > 0:
+            # Select only the columns that exist in the target schema
+            target_columns = updated_target.columns
+            write_cols = [c for c in changed_new_versions.columns if c in target_columns]
+            changed_new_versions = changed_new_versions.select(
+                [F.col(f"`{c}`") for c in write_cols]
+            )
+
+            is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
+            if is_path:
+                changed_new_versions.write.format("delta").mode("append").save(target)
+            else:
+                changed_new_versions.write.format("delta").mode("append").saveAsTable(target)
+
+            ctx.info(
+                "Appended new versions for changed keys",
+                target=target,
+                appended_rows=changed_new_versions.count(),
+            )
+    except Exception as e:
+        ctx.warning(
+            f"Failed to append new versions for changed keys: {e}",
+            target=target,
+        )
 
     # Return the source records with start_col (MERGE already wrote to target)
     result_df = merge_source
