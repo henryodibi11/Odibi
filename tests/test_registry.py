@@ -17,8 +17,7 @@ class TestTransformDecorator:
 
     def setup_method(self):
         """Clear registry before each test."""
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def test_decorator_registers_function(self):
         """@transform decorator registers function."""
@@ -61,8 +60,7 @@ class TestFunctionRegistry:
 
     def setup_method(self):
         """Clear registry before each test."""
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def test_get_registered_function(self):
         """Can retrieve registered function."""
@@ -117,8 +115,7 @@ class TestParameterValidation:
 
     def setup_method(self):
         """Clear registry before each test."""
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def test_validate_required_parameters(self):
         """Validation passes when all required params provided."""
@@ -184,8 +181,7 @@ class TestFunctionInfo:
 
     def setup_method(self):
         """Clear registry before each test."""
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def test_get_function_info(self):
         """Can retrieve function metadata."""
@@ -228,8 +224,7 @@ class TestGetRegisteredFunction:
 
     def setup_method(self):
         """Clear registry before each test."""
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def test_get_registered_function_helper(self):
         """get_registered_function() helper works."""
@@ -248,8 +243,7 @@ class TestValidateFunctionParams:
 
     def setup_method(self):
         """Clear registry before each test."""
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def test_validate_function_params_helper(self):
         """validate_function_params() helper works."""
@@ -271,8 +265,7 @@ class TestRealWorldUsage:
 
     def setup_method(self):
         """Clear registry before each test."""
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def test_transform_function_with_dataframe_operations(self):
         """Transform function can operate on DataFrames from context."""

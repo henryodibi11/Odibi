@@ -29,8 +29,7 @@ class TestPipelineExecution:
         test_data.to_csv(self.test_path / "input.csv", index=False)
 
         # Clear function registry
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def teardown_method(self):
         """Clean up test fixtures."""
@@ -135,8 +134,7 @@ class TestPipelineFailures:
         test_data.to_csv(self.test_path / "input.csv", index=False)
 
         # Clear registry
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def teardown_method(self):
         """Clean up test fixtures."""
@@ -266,8 +264,7 @@ class TestRunSingleNode:
 
     def setup_method(self):
         """Set up test fixtures."""
-        FunctionRegistry._functions.clear()
-        FunctionRegistry._signatures.clear()
+        FunctionRegistry.clear()
 
     def test_run_node_with_mock_data(self):
         """Test running single node with mock data."""

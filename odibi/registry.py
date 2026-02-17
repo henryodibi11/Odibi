@@ -16,6 +16,15 @@ class FunctionRegistry:
     _param_models: Dict[str, Any] = {}  # New: Store Pydantic models
 
     @classmethod
+    def clear(cls):
+        """Clear all registered functions and reset the standard library flag."""
+        cls._functions.clear()
+        cls._signatures.clear()
+        cls._param_models.clear()
+        import odibi.transformers as _t
+        _t._standard_library_registered = False
+
+    @classmethod
     def register(cls, func: Callable, name: str = None, param_model: Any = None) -> Callable:
         """Register a transform function.
 

@@ -10,9 +10,7 @@ from odibi.registry import (
 # Fixture to clear the registry between tests
 @pytest.fixture(autouse=True)
 def clear_registry():
-    FunctionRegistry._functions.clear()
-    FunctionRegistry._signatures.clear()
-    FunctionRegistry._param_models.clear()
+    FunctionRegistry.clear()
 
 
 # Dummy functions for testing
