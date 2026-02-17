@@ -302,10 +302,19 @@ def create_sql_server_connection(name: str, config: Dict[str, Any]) -> Any:
         logger.register_secret(password)
         ctx.debug(f"Registered password secret for connection '{name}'", connection_name=name)
 
+    database = config.get("database")
+    if not database:
+        ctx.error(
+            f"Connection '{name}' missing 'database'",
+            connection_name=name,
+            config_keys=list(config.keys()),
+        )
+        raise ValueError(f"Connection '{name}' missing 'database'. Got keys: {list(config.keys())}")
+
     try:
         connection = AzureSQL(
             server=server,
-            database=config["database"],
+            database=database,
             driver=config.get("driver", "ODBC Driver 18 for SQL Server"),
             username=username,
             password=password,
@@ -321,7 +330,7 @@ def create_sql_server_connection(name: str, config: Dict[str, Any]) -> Any:
             connection_name=name,
             action="created",
             server=server,
-            database=config["database"],
+            database=database,
             auth_mode=auth_mode,
             port=config.get("port", 1433),
         )

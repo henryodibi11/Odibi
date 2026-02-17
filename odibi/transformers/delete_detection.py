@@ -16,12 +16,13 @@ from odibi.config import (
 )
 from odibi.context import EngineContext
 from odibi.enums import EngineType
+from odibi.exceptions import OdibiException
 from odibi.registry import transform
 
 logger = logging.getLogger(__name__)
 
 
-class DeleteThresholdExceeded(Exception):
+class DeleteThresholdExceeded(OdibiException):
     """Raised when delete percentage exceeds configured threshold.
 
     This exception is raised during delete detection when the percentage of

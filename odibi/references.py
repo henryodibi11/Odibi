@@ -12,9 +12,10 @@ Example:
 from typing import Any, Dict, Union
 
 from odibi.catalog import CatalogManager
+from odibi.exceptions import OdibiException
 
 
-class ReferenceResolutionError(Exception):
+class ReferenceResolutionError(OdibiException):
     """Raised when a cross-pipeline reference cannot be resolved."""
 
     pass

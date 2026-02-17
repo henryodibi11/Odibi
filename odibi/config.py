@@ -1941,6 +1941,14 @@ class RangeTest(BaseTestConfig):
         default=None, description="Maximum value (inclusive)"
     )
 
+    @model_validator(mode="after")
+    def validate_min_max(self) -> "RangeTest":
+        """Ensures min <= max when both are provided."""
+        if self.min is not None and self.max is not None:
+            if isinstance(self.min, type(self.max)) and self.min > self.max:
+                raise ValueError(f"Range test min ({self.min}) must be <= max ({self.max})")
+        return self
+
 
 class RegexMatchTest(BaseTestConfig):
     """

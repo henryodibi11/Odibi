@@ -1,8 +1,11 @@
 """Function registry for transform functions."""
 
 import inspect
+import logging
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 class FunctionRegistry:
@@ -26,6 +29,16 @@ class FunctionRegistry:
         """
         if name is None:
             name = func.__name__
+
+        if name in cls._functions:
+            old_module = getattr(cls._functions[name], "__module__", "unknown")
+            new_module = getattr(func, "__module__", "unknown")
+            logger.warning(
+                "Overwriting registered transform '%s' (old: %s, new: %s)",
+                name,
+                old_module,
+                new_module,
+            )
 
         cls._functions[name] = func
         cls._signatures[name] = inspect.signature(func)

@@ -91,7 +91,7 @@ def evaluate_gate(
         if all_pass_mask:
             passed_rows = sum(all_pass_mask)
 
-    pass_rate = passed_rows / total_rows if total_rows > 0 else 1.0
+    pass_rate = round(passed_rows / total_rows, 10) if total_rows > 0 else 1.0
     failed_rows = total_rows - passed_rows
 
     details: Dict[str, Any] = {

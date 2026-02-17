@@ -506,7 +506,7 @@ class Pipeline:
                         hash=local_hash[:8],
                     )
             except Exception as e:
-                self._ctx.debug(f"Drift detection check failed: {e}")
+                self._ctx.warning(f"Drift detection check failed: {e}")
 
         state_manager = None
         if resume_from_failure:
