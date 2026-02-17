@@ -433,14 +433,14 @@ class TestDimensionPatternUnknownMember:
         except TypeError as e:
             pytest.fail(f"Cannot compare datetimes due to timezone mismatch: {e}")
 
-    def test_ensure_unknown_member_incompatible_dtypes(self, mock_engine, mock_config):
+    def test_ensure_unknown_member_incompatible_dtypes(self, mock_engine, mock_config, tmp_path):
         """Bug #183: astype must not crash on datetime/incompatible columns."""
         mock_config.params = {
             "natural_key": "nk",
             "surrogate_key": "sk",
             "scd_type": 2,
             "track_cols": ["amount"],
-            "target": "test.parquet",
+            "target": str(tmp_path / "test.parquet"),
             "unknown_member": True,
             "audit": {"load_timestamp": False},
         }

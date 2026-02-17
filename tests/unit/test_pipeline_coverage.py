@@ -2191,12 +2191,13 @@ class TestPipelineManagerListQueryWithCatalog:
     def test_get_node_stats_with_data(self):
         cat = MagicMock()
         cat.get_average_duration.return_value = 2.5
+        now = pd.Timestamp.now(tz="UTC")
         cat._read_local_table.return_value = pd.DataFrame(
             {
                 "node_name": ["n1", "n1"],
                 "status": ["SUCCESS", "FAILURE"],
                 "rows_processed": [100, 50],
-                "timestamp": pd.to_datetime(["2026-02-10", "2026-02-11"]),
+                "timestamp": [now - pd.Timedelta(days=1), now - pd.Timedelta(hours=1)],
             }
         )
         mgr, _ = _make_manager(catalog_manager=cat)
