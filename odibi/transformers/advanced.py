@@ -57,6 +57,11 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
         ctx.debug(f"Could not get row count before transform: {type(e).__name__}")
 
     partition_clause = ", ".join(params.keys)
+    if not params.order_by:
+        ctx.warning(
+            "Deduplicate without order_by is non-deterministic — results may vary between runs",
+            keys=params.keys,
+        )
     order_clause = params.order_by if params.order_by else "(SELECT NULL)"
 
     # Dialect handling for EXCEPT/EXCLUDE

@@ -82,10 +82,10 @@ def _resolve_date_expression(expression: str, fmt: str | None = None) -> str:
         elif unit == "w":
             result = base + timedelta(weeks=amount)
         elif unit == "m":
-            # Approximate month calculation
-            new_month = base.month + amount
-            new_year = base.year + (new_month - 1) // 12
-            new_month = ((new_month - 1) % 12) + 1
+            # Month calculation using divmod for correct negative offset handling
+            total_months = (base.year * 12 + base.month - 1) + amount
+            new_year, new_month = divmod(total_months, 12)
+            new_month += 1
             # Handle day overflow (e.g., Jan 31 + 1 month)
             try:
                 result = base.replace(year=new_year, month=new_month)

@@ -35,12 +35,34 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterator, List, Optional, Protocol, Tuple, Type
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 import pandas as pd
 
 from odibi.utils.logging_context import get_logging_context
+
+_SENSITIVE_PARAMS = {
+    "key",
+    "token",
+    "secret",
+    "password",
+    "auth",
+    "api_key",
+    "apikey",
+    "access_token",
+}
+
+
+def _sanitize_url(url: str) -> str:
+    """Strip sensitive query parameters from a URL for safe logging."""
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+    qs = parse_qs(parsed.query, keep_blank_values=True)
+    sanitized = {k: ["***"] if k.lower() in _SENSITIVE_PARAMS else v for k, v in qs.items()}
+    clean_query = urlencode(sanitized, doseq=True)
+    return urlunparse(parsed._replace(query=clean_query))
 
 
 # =============================================================================
@@ -917,7 +939,7 @@ class ApiFetcher:
                 self._ctx.debug(
                     "API request",
                     method=request.method,
-                    url=url,
+                    url=_sanitize_url(url),
                     attempt=attempt,
                 )
 
@@ -1042,7 +1064,12 @@ class ApiFetcher:
 
         while request is not None:
             page_num += 1
-            self._ctx.info("Fetching page", page=page_num, method=request.method, url=request.url)
+            self._ctx.info(
+                "Fetching page",
+                page=page_num,
+                method=request.method,
+                url=_sanitize_url(request.url),
+            )
 
             page = self._fetch_page(request)
             yield page

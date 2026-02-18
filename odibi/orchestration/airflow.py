@@ -64,8 +64,15 @@ class AirflowExporter:
             raise ValueError(f"Pipeline '{pipeline_name}' not found in config")
 
         nodes_ctx = []
+        seen_names: dict[str, str] = {}
         for node in pipeline.nodes:
             safe_name = self._sanitize(node.name)
+            if safe_name in seen_names:
+                raise ValueError(
+                    f"Sanitized task ID collision: '{node.name}' and "
+                    f"'{seen_names[safe_name]}' both produce '{safe_name}'"
+                )
+            seen_names[safe_name] = node.name
             upstream_vars = [self._sanitize(dep) for dep in node.depends_on]
 
             nodes_ctx.append(

@@ -621,8 +621,11 @@ class SemanticQuery:
             if comp_lower in df.columns:
                 local_vars[comp_lower] = df[comp_lower]
 
+        import numpy as np
+
         try:
-            df[metric_def.name] = eval(formula, {"__builtins__": {}}, local_vars)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                df[metric_def.name] = eval(formula, {"__builtins__": {}}, local_vars)
         except ZeroDivisionError:
             df[metric_def.name] = float("nan")
 
@@ -669,7 +672,16 @@ class SemanticQuery:
                 "MAX": "max",
             }
 
-            return (col, func_map.get(func, func.lower()))
+            agg_func = func_map.get(func)
+            if agg_func is None:
+                from odibi.utils.logging_context import get_logging_context
+
+                get_logging_context().warning(
+                    f"Unrecognized aggregation function '{func}', defaulting to first()",
+                    expression=expr_stripped,
+                )
+                agg_func = func.lower()
+            return (col, agg_func)
 
         return (expr_stripped, "first")
 

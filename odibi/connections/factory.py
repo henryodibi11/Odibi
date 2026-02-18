@@ -99,6 +99,11 @@ def create_azure_blob_connection(name: str, config: Dict[str, Any]) -> Any:
             auth_mode = "service_principal"
         else:
             auth_mode = "managed_identity"
+            ctx.warning(
+                f"No explicit auth configured for connection '{name}', "
+                "defaulting to managed_identity. This will fail in local development.",
+                connection_name=name,
+            )
 
         ctx.debug(
             f"Auto-detected auth_mode for connection '{name}'",
