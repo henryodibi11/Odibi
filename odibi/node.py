@@ -2242,6 +2242,15 @@ class NodeExecutor:
                     ctx.debug("Schema merge mode enabled")
                     self._execution_steps.append("Schema merge mode enabled")
 
+            # Extract overwrite_schema from WriteConfig (Delta schema overwrite)
+            if write_config.overwrite_schema:
+                if write_config.format == "delta":
+                    write_options["overwriteSchema"] = True
+                    # For delta-rs (Pandas engine), also set the snake_case variant
+                    write_options["overwrite_schema"] = True
+                    ctx.debug("Schema overwrite enabled (overwriteSchema=true)")
+                    self._execution_steps.append("Schema overwrite enabled (overwriteSchema)")
+
             # Extract merge_keys and merge_options from WriteConfig (SQL Server MERGE)
             if write_config.merge_keys:
                 write_options["merge_keys"] = write_config.merge_keys

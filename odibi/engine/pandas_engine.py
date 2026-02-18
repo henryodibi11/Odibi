@@ -571,7 +571,8 @@ class PandasEngine(Engine):
             source, file_name: str, excel_kwargs: dict, fastexcel
         ) -> pd.DataFrame:
             """Read Excel using fastexcel/calamine (Rust-based, fast)."""
-            import warnings
+            import os
+            import sys
 
             # fastexcel needs bytes for file handles
             if hasattr(source, "read"):
@@ -618,10 +619,17 @@ class PandasEngine(Engine):
 
             dfs = []
             for sheet in sheets_to_read:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", message="Could not determine dtype")
+                # Suppress "Could not determine dtype" warnings from Rust/calamine.
+                # These bypass Python's warnings module and print directly to stderr,
+                # so we temporarily redirect stderr to devnull.
+                old_stderr = sys.stderr
+                try:
+                    sys.stderr = open(os.devnull, "w")
                     ws = parser.load_sheet_by_name(sheet)
                     df = ws.to_pandas()
+                finally:
+                    sys.stderr.close()
+                    sys.stderr = old_stderr
                 if force_string:
                     df = df.astype(str)
                 if add_source_file:

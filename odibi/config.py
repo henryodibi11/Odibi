@@ -3009,6 +3009,13 @@ class WriteConfig(BaseModel):
     merge_schema: bool = Field(
         default=False, description="Allow schema evolution (mergeSchema option in Delta)"
     )
+    overwrite_schema: bool = Field(
+        default=False,
+        description=(
+            "Allow schema overwrite on mode=overwrite (overwriteSchema option in Delta). "
+            "Use when the incoming schema differs from the existing table schema."
+        ),
+    )
     first_run_query: Optional[str] = Field(
         default=None,
         description=(
