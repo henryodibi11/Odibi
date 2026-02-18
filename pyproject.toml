@@ -43,6 +43,7 @@ dependencies = [
     "importlib_metadata>=4.0.0",
     "duckdb>=0.9.0,<1.1.0",
     "openpyxl>=3.1.0,<4.0.0",
+    "fastexcel>=0.9.0",  # Rust/calamine Excel reader — 5-10x faster than openpyxl
     "fsspec>=2023.1.0",  # Used by odibi_mcp for cloud file access
     "pint>=0.23,<1.0.0",  # Unit conversion - core to data engineering
 ]
