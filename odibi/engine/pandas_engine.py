@@ -571,6 +571,8 @@ class PandasEngine(Engine):
             source, file_name: str, excel_kwargs: dict, fastexcel
         ) -> pd.DataFrame:
             """Read Excel using fastexcel/calamine (Rust-based, fast)."""
+            import warnings
+
             # fastexcel needs bytes for file handles
             if hasattr(source, "read"):
                 source_data = source.read()
@@ -610,14 +612,17 @@ class PandasEngine(Engine):
                 matching_sheets=sheets_to_read,
             )
 
-            # Extract dtype option if present (force all columns to string)
+            # Check if dtype=str requested (from YAML it arrives as string "str")
             force_dtype = excel_kwargs.get("dtype")
+            force_string = force_dtype is str or force_dtype == "str"
 
             dfs = []
             for sheet in sheets_to_read:
-                ws = parser.load_sheet_by_name(sheet)
-                df = ws.to_pandas()
-                if force_dtype is str:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", message="Could not determine dtype")
+                    ws = parser.load_sheet_by_name(sheet)
+                    df = ws.to_pandas()
+                if force_string:
                     df = df.astype(str)
                 if add_source_file:
                     df["_source_file"] = file_name
