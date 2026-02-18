@@ -571,6 +571,7 @@ class PandasEngine(Engine):
             source, file_name: str, excel_kwargs: dict, fastexcel
         ) -> pd.DataFrame:
             """Read Excel using fastexcel/calamine (Rust-based, fast)."""
+            import io
             import os
             import sys
 
@@ -620,19 +621,27 @@ class PandasEngine(Engine):
             dfs = []
             for sheet in sheets_to_read:
                 # Suppress "Could not determine dtype" warnings from Rust/calamine.
-                # Rust writes directly to OS file descriptor 2 (stderr), bypassing
-                # Python's sys.stderr, so we must redirect at the OS fd level.
-                stderr_fd = sys.stderr.fileno()
-                old_stderr_fd = os.dup(stderr_fd)
+                # Rust writes directly to OS file descriptor 2, bypassing Python's
+                # sys.stderr. Use os.dup2 to redirect at the OS fd level.
+                # In environments without real fds (e.g. Databricks notebooks),
+                # fileno() raises UnsupportedOperation — fall back gracefully.
+                old_stderr_fd = None
                 try:
+                    stderr_fd = sys.stderr.fileno()
+                    old_stderr_fd = os.dup(stderr_fd)
                     devnull = os.open(os.devnull, os.O_WRONLY)
                     os.dup2(devnull, stderr_fd)
                     os.close(devnull)
+                except (OSError, io.UnsupportedOperation, AttributeError):
+                    stderr_fd = None
+
+                try:
                     ws = parser.load_sheet_by_name(sheet)
                     df = ws.to_pandas()
                 finally:
-                    os.dup2(old_stderr_fd, stderr_fd)
-                    os.close(old_stderr_fd)
+                    if old_stderr_fd is not None:
+                        os.dup2(old_stderr_fd, stderr_fd)
+                        os.close(old_stderr_fd)
                 if force_string:
                     df = df.astype(str)
                 if add_source_file:
