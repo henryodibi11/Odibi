@@ -541,11 +541,93 @@ class PandasEngine(Engine):
         def _read_excel_from_source(source, file_name: str, excel_kwargs: dict) -> pd.DataFrame:
             """Read Excel data from a path or file handle with sheet pattern matching.
 
+            Uses fastexcel (Rust/calamine) when available for 5-10x faster Excel
+            parsing compared to openpyxl. Falls back to pandas/openpyxl if
+            fastexcel is not installed.
+
             Args:
                 source: File path (str) or file handle for pandas to read from
                 file_name: Display name for the file (used in _source_file column)
                 excel_kwargs: Keyword arguments to pass to pd.read_excel
             """
+            # Try fastexcel (Rust/calamine) first — much faster than openpyxl
+            try:
+                import fastexcel
+
+                return _read_excel_fastexcel(source, file_name, excel_kwargs, fastexcel)
+            except ImportError:
+                pass
+            except Exception as e:
+                ctx.debug(
+                    "fastexcel failed, falling back to openpyxl",
+                    file=file_name,
+                    error=str(e),
+                )
+
+            # Fallback to pandas/openpyxl
+            return _read_excel_pandas(source, file_name, excel_kwargs)
+
+        def _read_excel_fastexcel(
+            source, file_name: str, excel_kwargs: dict, fastexcel
+        ) -> pd.DataFrame:
+            """Read Excel using fastexcel/calamine (Rust-based, fast)."""
+            # fastexcel needs bytes for file handles
+            if hasattr(source, "read"):
+                source_data = source.read()
+                if hasattr(source, "seek"):
+                    source.seek(0)
+            else:
+                source_data = source
+
+            parser = fastexcel.read_excel(source_data)
+            all_sheet_names = parser.sheet_names
+
+            # Determine which sheets to read
+            if patterns is None:
+                # No pattern — read first sheet only
+                sheet_name_hint = excel_kwargs.get("sheet_name", 0)
+                if isinstance(sheet_name_hint, int):
+                    sheets_to_read = [all_sheet_names[sheet_name_hint]]
+                elif isinstance(sheet_name_hint, str):
+                    sheets_to_read = [sheet_name_hint]
+                else:
+                    sheets_to_read = [all_sheet_names[0]]
+            else:
+                sheets_to_read = [s for s in all_sheet_names if match_sheet(s)]
+
+            if not sheets_to_read:
+                ctx.debug(
+                    "No matching sheets in Excel file",
+                    file=file_name,
+                    patterns=patterns,
+                    available_sheets=all_sheet_names,
+                )
+                return pd.DataFrame()
+
+            ctx.debug(
+                "Reading Excel sheets (fastexcel/calamine)",
+                file=file_name,
+                matching_sheets=sheets_to_read,
+            )
+
+            # Extract dtype option if present (force all columns to string)
+            force_dtype = excel_kwargs.get("dtype")
+
+            dfs = []
+            for sheet in sheets_to_read:
+                ws = parser.load_sheet_by_name(sheet)
+                df = ws.to_pandas()
+                if force_dtype is str:
+                    df = df.astype(str)
+                if add_source_file:
+                    df["_source_file"] = file_name
+                    df["_source_sheet"] = sheet
+                dfs.append(df)
+
+            return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        def _read_excel_pandas(source, file_name: str, excel_kwargs: dict) -> pd.DataFrame:
+            """Read Excel using pandas/openpyxl (slower fallback)."""
             # If no sheet pattern, use simple read_excel
             if patterns is None:
                 df = pd.read_excel(source, **excel_kwargs)
@@ -568,7 +650,7 @@ class PandasEngine(Engine):
                 return pd.DataFrame()
 
             ctx.debug(
-                "Reading Excel sheets",
+                "Reading Excel sheets (openpyxl)",
                 file=file_name,
                 matching_sheets=matching_sheets,
             )
