@@ -571,9 +571,7 @@ class PandasEngine(Engine):
             source, file_name: str, excel_kwargs: dict, fastexcel
         ) -> pd.DataFrame:
             """Read Excel using fastexcel/calamine (Rust-based, fast)."""
-            import io
-            import os
-            import sys
+            import logging
 
             # fastexcel needs bytes for file handles
             if hasattr(source, "read"):
@@ -618,44 +616,47 @@ class PandasEngine(Engine):
             force_dtype = excel_kwargs.get("dtype")
             force_string = force_dtype is str or force_dtype == "str"
 
-            dfs = []
-            for sheet in sheets_to_read:
-                # Suppress "Could not determine dtype" warnings from Rust/calamine.
-                # Rust writes directly to OS file descriptor 2, bypassing Python's
-                # sys.stderr. Use os.dup2 to redirect at the OS fd level.
-                # In environments without real fds (e.g. Databricks notebooks),
-                # fileno() raises UnsupportedOperation — fall back gracefully.
-                old_stderr_fd = None
-                try:
-                    stderr_fd = sys.stderr.fileno()
-                    old_stderr_fd = os.dup(stderr_fd)
-                    devnull = os.open(os.devnull, os.O_WRONLY)
-                    os.dup2(devnull, stderr_fd)
-                    os.close(devnull)
-                except (OSError, io.UnsupportedOperation, AttributeError):
-                    stderr_fd = None
+            # Suppress "Could not determine dtype" warnings from fastexcel.
+            # These come through Python's logging module as logger
+            # "fastexcel.types.dtype" at WARNING level.
+            fe_logger = logging.getLogger("fastexcel.types.dtype")
+            original_level = fe_logger.level
+            fe_logger.setLevel(logging.ERROR)
 
-                try:
+            dfs = []
+            try:
+                for sheet in sheets_to_read:
                     ws = parser.load_sheet_by_name(sheet)
                     df = ws.to_pandas()
-                finally:
-                    if old_stderr_fd is not None:
-                        os.dup2(old_stderr_fd, stderr_fd)
-                        os.close(old_stderr_fd)
-                if force_string:
-                    df = df.astype(str)
-                if add_source_file:
-                    df["_source_file"] = file_name
-                    df["_source_sheet"] = sheet
-                dfs.append(df)
+                    if force_string:
+                        df = df.astype(str)
+                        # astype(str) turns NaN/NaT/None into literal strings
+                        # "nan", "NaT", "None" — restore them to real nulls
+                        # so SQL IS NOT NULL filters work as expected.
+                        df = df.replace({"nan": None, "NaT": None, "None": None})
+                    if add_source_file:
+                        df["_source_file"] = file_name
+                        df["_source_sheet"] = sheet
+                    dfs.append(df)
+            finally:
+                fe_logger.setLevel(original_level)
 
             return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
         def _read_excel_pandas(source, file_name: str, excel_kwargs: dict) -> pd.DataFrame:
             """Read Excel using pandas/openpyxl (slower fallback)."""
+            force_dtype = excel_kwargs.get("dtype")
+            _force_str = force_dtype is str or force_dtype == "str"
+
+            def _fix_str_nulls(df: pd.DataFrame) -> pd.DataFrame:
+                """Replace stringified nulls back to real None after dtype=str."""
+                if _force_str:
+                    df = df.replace({"nan": None, "NaT": None, "None": None})
+                return df
+
             # If no sheet pattern, use simple read_excel
             if patterns is None:
-                df = pd.read_excel(source, **excel_kwargs)
+                df = _fix_str_nulls(pd.read_excel(source, **excel_kwargs))
                 if add_source_file:
                     df["_source_file"] = file_name
                     df["_source_sheet"] = excel_kwargs.get("sheet_name", 0)
@@ -682,7 +683,7 @@ class PandasEngine(Engine):
 
             dfs = []
             for sheet in matching_sheets:
-                df = pd.read_excel(xls, sheet_name=sheet, **excel_kwargs)
+                df = _fix_str_nulls(pd.read_excel(xls, sheet_name=sheet, **excel_kwargs))
                 if add_source_file:
                     df["_source_file"] = file_name
                     df["_source_sheet"] = sheet
