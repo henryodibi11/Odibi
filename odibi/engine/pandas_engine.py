@@ -620,16 +620,19 @@ class PandasEngine(Engine):
             dfs = []
             for sheet in sheets_to_read:
                 # Suppress "Could not determine dtype" warnings from Rust/calamine.
-                # These bypass Python's warnings module and print directly to stderr,
-                # so we temporarily redirect stderr to devnull.
-                old_stderr = sys.stderr
+                # Rust writes directly to OS file descriptor 2 (stderr), bypassing
+                # Python's sys.stderr, so we must redirect at the OS fd level.
+                stderr_fd = sys.stderr.fileno()
+                old_stderr_fd = os.dup(stderr_fd)
                 try:
-                    sys.stderr = open(os.devnull, "w")
+                    devnull = os.open(os.devnull, os.O_WRONLY)
+                    os.dup2(devnull, stderr_fd)
+                    os.close(devnull)
                     ws = parser.load_sheet_by_name(sheet)
                     df = ws.to_pandas()
                 finally:
-                    sys.stderr.close()
-                    sys.stderr = old_stderr
+                    os.dup2(old_stderr_fd, stderr_fd)
+                    os.close(old_stderr_fd)
                 if force_string:
                     df = df.astype(str)
                 if add_source_file:
