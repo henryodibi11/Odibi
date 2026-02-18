@@ -1404,26 +1404,30 @@ def replace_values(context: EngineContext, params: ReplaceValuesParams) -> Engin
             "PENDING": "pending"
         ```
     """
+    from odibi.enums import EngineType
+
     current_cols = context.columns
     select_parts = []
+    q = "`" if context.engine_type == EngineType.SPARK else '"'
 
     for col in current_cols:
+        quoted = f"{q}{col}{q}"
         if col in params.columns:
             # Build nested CASE WHEN for replacements
             case_parts = []
             for old_val, new_val in params.mapping.items():
                 if old_val == "":
-                    case_parts.append(f"WHEN {col} = '' THEN {_sql_value(new_val)}")
+                    case_parts.append(f"WHEN {quoted} = '' THEN {_sql_value(new_val)}")
                 else:
-                    case_parts.append(f"WHEN {col} = '{old_val}' THEN {_sql_value(new_val)}")
+                    case_parts.append(f"WHEN {quoted} = '{old_val}' THEN {_sql_value(new_val)}")
 
             if case_parts:
-                case_expr = f"CASE {' '.join(case_parts)} ELSE {col} END AS {col}"
+                case_expr = f"CASE {' '.join(case_parts)} ELSE {quoted} END AS {quoted}"
                 select_parts.append(case_expr)
             else:
-                select_parts.append(col)
+                select_parts.append(quoted)
         else:
-            select_parts.append(col)
+            select_parts.append(quoted)
 
     cols_str = ", ".join(select_parts)
     sql_query = f"SELECT {cols_str} FROM df"
