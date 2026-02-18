@@ -667,6 +667,41 @@ def test_replace_values_with_null():
 
 
 # -------------------------------------------------------------------------
+# Test replace_values / rename_columns with spaced column names
+# -------------------------------------------------------------------------
+
+
+def test_replace_values_spaced_columns():
+    """Test replace_values with column names containing spaces."""
+    df = pd.DataFrame({"SAP Number": ["123", "nan", "456"], "Work Center": ["A", "nan", "B"]})
+    context = setup_context(df)
+    params = ReplaceValuesParams(columns=["SAP Number", "Work Center"], mapping={"nan": None})
+    result_ctx = replace_values(context, params)
+    result = result_ctx.df
+
+    assert result.iloc[0]["SAP Number"] == "123"
+    assert pd.isna(result.iloc[1]["SAP Number"])
+    assert result.iloc[0]["Work Center"] == "A"
+    assert pd.isna(result.iloc[1]["Work Center"])
+
+
+def test_rename_columns_spaced_columns():
+    """Test rename_columns with column names containing spaces."""
+    df = pd.DataFrame({"Plant Code": [1, 2], "Employee Name": ["Alice", "Bob"], "SPC": ["X", "Y"]})
+    context = setup_context(df)
+    params = RenameColumnsParams(
+        mapping={"Plant Code": "Plant_Code", "Employee Name": "Employee_Name"}
+    )
+    result_ctx = rename_columns(context, params)
+    result = result_ctx.df
+
+    assert "Plant_Code" in result.columns
+    assert "Employee_Name" in result.columns
+    assert "SPC" in result.columns
+    assert list(result["Plant_Code"]) == [1, 2]
+
+
+# -------------------------------------------------------------------------
 # Test trim_whitespace
 # -------------------------------------------------------------------------
 

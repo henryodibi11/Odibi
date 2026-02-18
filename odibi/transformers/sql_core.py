@@ -1073,15 +1073,18 @@ def rename_columns(context: EngineContext, params: RenameColumnsParams) -> Engin
     Renames columns according to the provided mapping.
     Columns not in the mapping are kept unchanged.
     """
+    from odibi.enums import EngineType
+
     # Build SELECT with aliases for renamed columns
     current_cols = context.columns
     select_parts = []
+    q = "`" if context.engine_type == EngineType.SPARK else '"'
 
     for col in current_cols:
         if col in params.mapping:
-            select_parts.append(f"{col} AS {params.mapping[col]}")
+            select_parts.append(f"{q}{col}{q} AS {q}{params.mapping[col]}{q}")
         else:
-            select_parts.append(col)
+            select_parts.append(f"{q}{col}{q}")
 
     cols_str = ", ".join(select_parts)
     sql_query = f"SELECT {cols_str} FROM df"
