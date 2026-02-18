@@ -731,7 +731,7 @@ def test_sql_value_empty_string():
 
 def test_sql_value_special_characters():
     """Test _sql_value with special characters."""
-    assert _sql_value("O'Brien") == "'O'Brien'"
+    assert _sql_value("O'Brien") == "'O''Brien'"
     assert _sql_value("test@example.com") == "'test@example.com'"
 
 

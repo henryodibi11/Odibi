@@ -212,7 +212,7 @@ class FKValidator:
                 relationship_name=relationship.name,
                 valid=False,
                 total_rows=0,
-                orphan_count=0,
+                orphan_count=-1,
                 null_count=0,
                 elapsed_ms=elapsed_ms,
                 error=f"Dimension table '{relationship.dimension}' not found",

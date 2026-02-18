@@ -1302,10 +1302,12 @@ class TestPolarsFreshnessNaiveTimestamp:
         except ImportError:
             pytest.skip("Polars not installed")
 
-        from datetime import datetime
+        from datetime import datetime, timezone
 
-        # Use timezone-naive datetime (no timezone.utc)
-        df = pl.DataFrame({"id": [1, 2], "updated_at": [datetime.now()] * 2})
+        # Use timezone-naive datetime representing UTC (no tzinfo)
+        df = pl.DataFrame(
+            {"id": [1, 2], "updated_at": [datetime.now(timezone.utc).replace(tzinfo=None)] * 2}
+        )
         config = ValidationConfig(
             tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]
         )
@@ -1319,10 +1321,10 @@ class TestPolarsFreshnessNaiveTimestamp:
         except ImportError:
             pytest.skip("Polars not installed")
 
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
-        # Use timezone-naive datetime that is old
-        old_time = datetime.now() - timedelta(hours=48)
+        # Use timezone-naive datetime representing UTC that is old
+        old_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=48)
         df = pl.DataFrame({"id": [1, 2], "updated_at": [old_time] * 2})
         config = ValidationConfig(
             tests=[FreshnessContract(type=TestType.FRESHNESS, column="updated_at", max_age="1h")]

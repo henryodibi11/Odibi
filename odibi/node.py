@@ -974,7 +974,14 @@ class NodeExecutor:
             - "iso": Explicit ISO format with T separator
         """
         if date_format == "oracle":
-            cutoff_str = cutoff.strftime("%d-%b-%y %H:%M:%S").upper()
+            import locale
+
+            saved_locale = locale.getlocale(locale.LC_TIME)
+            try:
+                locale.setlocale(locale.LC_TIME, ("C", None))
+                cutoff_str = cutoff.strftime("%d-%b-%y %H:%M:%S").upper()
+            finally:
+                locale.setlocale(locale.LC_TIME, saved_locale)
             col_expr = f"TO_TIMESTAMP({quoted_col}, 'DD-MON-RR HH24:MI:SS.FF')"
             cutoff_expr = f"TO_TIMESTAMP('{cutoff_str}', 'DD-MON-RR HH24:MI:SS')"
         elif date_format == "oracle_sqlserver":
@@ -3169,7 +3176,11 @@ class NodeExecutor:
                 else:
                     row = df.select(F.max(column)).first()
                 return row[0] if row else None
-            except Exception:
+            except Exception as e:
+                self._ctx.warning(
+                    f"HWM calculation failed (Spark): {e}",
+                    column=column,
+                )
                 return None
         else:
             try:
@@ -3191,7 +3202,11 @@ class NodeExecutor:
                 if isinstance(val, np.datetime64):
                     return str(val)
                 return val
-            except Exception:
+            except Exception as e:
+                self._ctx.warning(
+                    f"HWM calculation failed (Pandas): {e}",
+                    column=column,
+                )
                 return None
 
     def _generate_suggestions(self, error: Exception, config: NodeConfig) -> List[str]:

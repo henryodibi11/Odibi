@@ -1447,7 +1447,7 @@ def _sql_value(val: Optional[str]) -> str:
     """
     if val is None:
         return "NULL"
-    return f"'{val}'"
+    return f"'{str(val).replace(chr(39), chr(39) + chr(39))}'"
 
 
 # -------------------------------------------------------------------------

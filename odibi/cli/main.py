@@ -1,6 +1,7 @@
 """Main CLI entry point."""
 
 import argparse
+import os
 import sys
 
 from odibi.cli.catalog import add_catalog_parser, catalog_command
@@ -253,4 +254,14 @@ Learn more: https://henryodibi11.github.io/Odibi/golden_path/
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+        sys.exit(130)
+    except Exception as e:
+        print(f"\nodibi error: {e}", file=sys.stderr)
+        print("Run with ODIBI_DEBUG=1 for full traceback.", file=sys.stderr)
+        if os.environ.get("ODIBI_DEBUG"):
+            raise
+        sys.exit(1)
