@@ -1484,8 +1484,6 @@ class CatalogManager:
         Returns:
             Number of outputs registered
         """
-        from datetime import datetime
-
         records = []
         pipeline_name = pipeline_config.pipeline
 
@@ -1501,7 +1499,7 @@ class CatalogManager:
                         "path": output_info.get("path"),
                         "format": output_info.get("format", "delta"),
                         "table_name": output_info.get("register_table"),
-                        "last_run": datetime.now(),
+                        "last_run": None,
                         "row_count": None,
                     }
                 )

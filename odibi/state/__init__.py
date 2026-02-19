@@ -123,14 +123,20 @@ class LocalJSONStateBackend(StateBackend):
             try:
                 with open(self.state_path, "r") as f:
                     return json.load(f)
+            except FileNotFoundError:
+                pass
             except Exception as e:
-                logger.warning(f"Failed to load state from {self.state_path}: {e}")
+                logger.warning(f"Corrupted state file {self.state_path}: {e}")
         return {"pipelines": {}, "hwm": {}}
 
     def _save_to_disk(self) -> None:
-        os.makedirs(os.path.dirname(self.state_path), exist_ok=True)
-        with open(self.state_path, "w") as f:
+        dir_path = os.path.dirname(self.state_path)
+        if dir_path:
+            os.makedirs(dir_path, exist_ok=True)
+        tmp_path = self.state_path + ".tmp"
+        with open(tmp_path, "w") as f:
             json.dump(self.state, f, indent=2, default=str)
+        os.replace(tmp_path, self.state_path)
 
     def load_state(self) -> Dict[str, Any]:
         return self.state

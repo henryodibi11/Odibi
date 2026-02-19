@@ -145,8 +145,8 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
             res = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
         elif params.how == "semi":
             # Semi join: rows in left that match right (no columns from right)
-            merged = context.df.merge(right_df[params.on], on=params.on, how="inner")
-            res = merged.drop_duplicates(subset=params.on)
+            right_keys = right_df[params.on].drop_duplicates()
+            res = context.df.merge(right_keys, on=params.on, how="inner")
         else:
             res = context.df.merge(right_df, on=params.on, how=pandas_how, suffixes=("", suffix))
 

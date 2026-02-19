@@ -872,7 +872,6 @@ class Pipeline:
                         and result.metadata.get("reason") == "dependency_failed"
                     ):
                         results.skipped.append(node_name)
-                        results.failed.append(node_name)
                         if progress:
                             progress.update_node(
                                 node_name,
@@ -897,7 +896,6 @@ class Pipeline:
                 else:
                     if result.metadata.get("skipped"):
                         results.skipped.append(node_name)
-                        results.failed.append(node_name)
                         if progress:
                             progress.update_node(
                                 node_name,

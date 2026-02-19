@@ -101,7 +101,7 @@ def send_alert(
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(config.url, data=data, headers=headers)
 
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             if response.status >= 400:
                 logger.error(f"Alert failed: HTTP {response.status}")
                 return False

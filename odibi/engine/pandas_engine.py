@@ -240,13 +240,12 @@ class PandasEngine(Engine):
                     conn.execute(f"SET s3_region = '{storage_options['AWS_REGION']}';")
 
         # Build the delta_scan query
-        # Note: DuckDB delta_scan doesn't support version/timestamp time travel yet
+        # DuckDB delta_scan doesn't support version/timestamp time travel
         if version is not None or timestamp is not None:
-            ctx.warning(
-                "DuckDB delta_scan does not support time travel yet. "
-                "Reading latest version instead.",
-                requested_version=version,
-                requested_timestamp=timestamp,
+            raise NotImplementedError(
+                "DuckDB delta_scan does not support time travel. "
+                "Install 'deltalake' package for time travel support, "
+                "or remove the version/timestamp option."
             )
 
         query = f"SELECT * FROM delta_scan('{path}')"
@@ -1635,12 +1634,6 @@ class PandasEngine(Engine):
 
         storage_opts = merged_options.get("storage_options", {})
 
-        # Handle null-only columns: Delta Lake doesn't support Null dtype
-        # Cast columns with all-null values to string to avoid schema errors
-        for col in df.columns:
-            if df[col].isna().all():
-                df[col] = df[col].astype("string")
-
         # Map modes
         delta_mode = "overwrite"
         if mode == "append":
@@ -1649,6 +1642,35 @@ class PandasEngine(Engine):
             delta_mode = "error"
         elif mode == "ignore":
             delta_mode = "ignore"
+
+        # Handle null-only columns: Delta Lake doesn't support Null dtype
+        # Try to match existing schema on append; fall back to string
+        existing_schema = {}
+        if delta_mode == "append":
+            try:
+                dt = DeltaTable(full_path, storage_options=storage_opts or None)
+                existing_schema = {f.name: f.type for f in dt.schema().fields}
+            except Exception:
+                pass
+
+        for col in df.columns:
+            if df[col].isna().all():
+                if col in existing_schema:
+                    arrow_type = str(existing_schema[col])
+                    type_map = {
+                        "int32": "Int32",
+                        "int64": "Int64",
+                        "float": "float64",
+                        "double": "float64",
+                        "string": "string",
+                        "timestamp[us]": "datetime64[us]",
+                        "timestamp[us, tz=UTC]": "datetime64[us, UTC]",
+                        "bool": "boolean",
+                    }
+                    pd_type = type_map.get(arrow_type, "string")
+                    df[col] = df[col].astype(pd_type)
+                else:
+                    df[col] = df[col].astype("string")
 
         # Handle upsert/append_once logic
         if mode == "upsert":
