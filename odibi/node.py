@@ -7,7 +7,7 @@ import re
 import time
 import traceback
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -3091,7 +3091,7 @@ class NodeExecutor:
                 "path": write_cfg.path,
                 "format": write_cfg.format,
                 "table_name": write_cfg.register_table or write_cfg.table,
-                "last_run": datetime.now(),
+                "last_run": datetime.now(timezone.utc),
                 "row_count": row_count,
             }
 
@@ -3105,7 +3105,7 @@ class NodeExecutor:
                 "path": output_info.get("path"),
                 "format": output_info.get("format", "delta"),
                 "table_name": output_info.get("register_table"),
-                "last_run": datetime.now(),
+                "last_run": datetime.now(timezone.utc),
                 "row_count": row_count,
             }
 
