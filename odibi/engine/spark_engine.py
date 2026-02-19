@@ -2143,8 +2143,8 @@ class SparkEngine(Engine):
 
         # Escape column names with backticks to handle special characters (., ,, spaces)
         aggs = [count(when(col(f"`{c}`").isNull(), c)).alias(c) for c in columns]
-        result = df.select(*aggs).collect()[0].asDict()
-        return result
+        rows = df.select(*aggs).collect()
+        return rows[0].asDict() if rows else {c: 0 for c in columns}
 
     def validate_schema(self, df, schema_rules: Dict[str, Any]) -> List[str]:
         """Validate DataFrame schema."""
@@ -2557,8 +2557,8 @@ class SparkEngine(Engine):
             return {}
 
         try:
-            result = df.select(*aggs).collect()[0].asDict()
-            return result
+            rows = df.select(*aggs).collect()
+            return rows[0].asDict() if rows else {}
         except Exception:
             return {}
 

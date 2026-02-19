@@ -185,3 +185,78 @@ class TestDependencyGraph:
         with pytest.raises(ValueError) as exc_info:
             graph.get_dependents("NonExistent")
         assert "not found" in str(exc_info.value)
+
+    def test_cross_pipeline_no_cycle(self):
+        """No error when cross-pipeline deps are acyclic."""
+        node_a = NodeConfig.model_construct(
+            name="A",
+            depends_on=[],
+            inputs={"src": "$pipeline2.X"},
+        )
+        node_x = make_node("X")
+        DependencyGraph.check_cross_pipeline_cycles(
+            {
+                "pipeline1": [node_a],
+                "pipeline2": [node_x],
+            }
+        )
+
+    def test_cross_pipeline_cycle_detected(self):
+        """Cross-pipeline cycle raises DependencyError."""
+        node_a = NodeConfig.model_construct(
+            name="A",
+            depends_on=[],
+            inputs={"src": "$pipeline2.X"},
+        )
+        node_x = NodeConfig.model_construct(
+            name="X",
+            depends_on=[],
+            inputs={"src": "$pipeline1.A"},
+        )
+        with pytest.raises(DependencyError, match="Cross-pipeline circular dependency"):
+            DependencyGraph.check_cross_pipeline_cycles(
+                {
+                    "pipeline1": [node_a],
+                    "pipeline2": [node_x],
+                }
+            )
+
+    def test_cross_pipeline_transitive_cycle(self):
+        """Transitive cross-pipeline cycle (A->B->C->A) detected."""
+        node_a = NodeConfig.model_construct(
+            name="A",
+            depends_on=[],
+            inputs={"src": "$pipeline2.X"},
+        )
+        node_x = NodeConfig.model_construct(
+            name="X",
+            depends_on=[],
+            inputs={"src": "$pipeline3.Y"},
+        )
+        node_y = NodeConfig.model_construct(
+            name="Y",
+            depends_on=[],
+            inputs={"src": "$pipeline1.A"},
+        )
+        with pytest.raises(DependencyError, match="Cross-pipeline circular dependency"):
+            DependencyGraph.check_cross_pipeline_cycles(
+                {
+                    "pipeline1": [node_a],
+                    "pipeline2": [node_x],
+                    "pipeline3": [node_y],
+                }
+            )
+
+    def test_cross_pipeline_self_ref_ignored(self):
+        """References within same pipeline are not cross-pipeline deps."""
+        node_a = NodeConfig.model_construct(
+            name="A",
+            depends_on=[],
+            inputs={"src": "$pipeline1.B"},
+        )
+        node_b = make_node("B")
+        DependencyGraph.check_cross_pipeline_cycles(
+            {
+                "pipeline1": [node_a, node_b],
+            }
+        )

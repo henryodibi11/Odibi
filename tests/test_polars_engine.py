@@ -1044,3 +1044,50 @@ class TestFilterCoalesce:
         result = polars_engine.filter_coalesce(df, "a", "b", ">", 5)
         assert isinstance(result, pl.LazyFrame)
         assert len(result.collect()) == 1
+
+
+class TestPolarsLazyPreservation:
+    """Tests for #274: Methods should not force premature .collect()."""
+
+    def test_add_write_metadata_stays_lazy(self, polars_engine):
+        """add_write_metadata should not collect a LazyFrame."""
+        from odibi.config import WriteMetadataConfig
+
+        lf = pl.LazyFrame({"a": [1, 2, 3]})
+        result = polars_engine.add_write_metadata(
+            lf,
+            metadata_config=WriteMetadataConfig(extracted_at=True),
+            is_file_source=False,
+            source_path=None,
+            source_connection=None,
+            source_table=None,
+        )
+        assert isinstance(result, pl.LazyFrame)
+
+    def test_filter_greater_than_stays_lazy(self, polars_engine):
+        """filter_greater_than should not collect a LazyFrame."""
+        lf = pl.LazyFrame({"val": [1, 2, 3, 4, 5]})
+        result = polars_engine.filter_greater_than(lf, "val", 3)
+        assert isinstance(result, pl.LazyFrame)
+        assert result.collect().shape[0] == 2
+
+    def test_filter_coalesce_stays_lazy(self, polars_engine):
+        """filter_coalesce should not collect a LazyFrame."""
+        lf = pl.LazyFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        result = polars_engine.filter_coalesce(lf, "a", "b", ">", 1)
+        assert isinstance(result, pl.LazyFrame)
+        assert result.collect().shape[0] == 2
+
+    def test_filter_greater_than_eager_still_works(self, polars_engine):
+        """filter_greater_than still works with eager DataFrames."""
+        df = pl.DataFrame({"val": [1, 2, 3, 4, 5]})
+        result = polars_engine.filter_greater_than(df, "val", 3)
+        assert isinstance(result, pl.DataFrame)
+        assert result.shape[0] == 2
+
+    def test_filter_coalesce_eager_still_works(self, polars_engine):
+        """filter_coalesce still works with eager DataFrames."""
+        df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        result = polars_engine.filter_coalesce(df, "a", "b", ">", 1)
+        assert isinstance(result, pl.DataFrame)
+        assert result.shape[0] == 2

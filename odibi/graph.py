@@ -156,6 +156,68 @@ class DependencyGraph:
 
         logger.debug(f"No circular dependencies found across {len(self.nodes)} nodes")
 
+    @staticmethod
+    def check_cross_pipeline_cycles(
+        pipelines: Dict[str, List["NodeConfig"]],
+    ) -> None:
+        """Check for circular dependencies across pipelines.
+
+        Builds a pipeline-level dependency graph from inputs blocks
+        and checks for cycles.
+
+        Args:
+            pipelines: Mapping of pipeline name to its node configs
+
+        Raises:
+            DependencyError: If cross-pipeline cycle detected
+        """
+        pipeline_deps: Dict[str, Set[str]] = defaultdict(set)
+
+        for pipeline_name, nodes in pipelines.items():
+            for node in nodes:
+                if not node.inputs:
+                    continue
+                for input_val in node.inputs.values():
+                    if isinstance(input_val, str) and input_val.startswith("$"):
+                        ref = input_val[1:]
+                        if "." in ref:
+                            dep_pipeline = ref.split(".", 1)[0]
+                            if dep_pipeline != pipeline_name:
+                                pipeline_deps[pipeline_name].add(dep_pipeline)
+
+        # DFS cycle detection on pipeline-level graph
+        visited: Set[str] = set()
+        rec_stack: Set[str] = set()
+
+        def visit(node: str, path: List[str]) -> Optional[List[str]]:
+            if node in rec_stack:
+                cycle_start = path.index(node)
+                return path[cycle_start:] + [node]
+            if node in visited:
+                return None
+            visited.add(node)
+            rec_stack.add(node)
+            path.append(node)
+            for dep in pipeline_deps.get(node, set()):
+                cycle = visit(dep, path[:])
+                if cycle:
+                    return cycle
+            rec_stack.remove(node)
+            return None
+
+        all_pipelines = set(pipelines.keys()) | {
+            dep for deps in pipeline_deps.values() for dep in deps
+        }
+        for pipeline in all_pipelines:
+            if pipeline not in visited:
+                cycle = visit(pipeline, [])
+                if cycle:
+                    cycle_path = " -> ".join(cycle)
+                    raise DependencyError(
+                        f"Cross-pipeline circular dependency detected: {cycle_path}",
+                        cycle=cycle,
+                    )
+
     def topological_sort(self) -> List[str]:
         """Return nodes in topological order (dependencies first).
 

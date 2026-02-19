@@ -1367,10 +1367,6 @@ class PolarsEngine(Engine):
         else:
             return df
 
-        is_lazy = isinstance(df, pl.LazyFrame)
-        if is_lazy:
-            df = df.collect()
-
         columns = []
         if config.extracted_at:
             columns.append(pl.lit(datetime.now(timezone.utc)).alias("_extracted_at"))
@@ -1384,7 +1380,7 @@ class PolarsEngine(Engine):
         if columns:
             df = df.with_columns(columns)
 
-        return df.lazy() if is_lazy else df
+        return df
 
     def restore_delta(self, connection: Any, path: str, version: int) -> None:
         """Restore Delta table to a specific version.
@@ -1441,14 +1437,13 @@ class PolarsEngine(Engine):
             Filtered DataFrame
         """
         is_lazy = isinstance(df, pl.LazyFrame)
-        if is_lazy:
-            df = df.collect()
+        schema = df.collect_schema() if is_lazy else df.schema
 
-        if column not in df.columns:
+        if column not in schema.names():
             raise ValueError(f"Column '{column}' not found in DataFrame")
 
         try:
-            col_dtype = df[column].dtype
+            col_dtype = schema[column]
 
             if col_dtype == pl.Utf8:
                 df = df.with_columns(pl.col(column).str.to_datetime(time_unit="us", strict=False))
@@ -1456,8 +1451,7 @@ class PolarsEngine(Engine):
             elif col_dtype in (pl.Datetime, pl.Date) and isinstance(value, str):
                 value = datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T"))
 
-            result = df.filter(pl.col(column) > value)
-            return result.lazy() if is_lazy else result
+            return df.filter(pl.col(column) > value)
         except Exception as e:
             raise ValueError(f"Failed to filter {column} > {value}: {e}")
 
@@ -1484,27 +1478,33 @@ class PolarsEngine(Engine):
             Filtered DataFrame
         """
         is_lazy = isinstance(df, pl.LazyFrame)
-        if is_lazy:
-            df = df.collect()
+        schema = df.collect_schema() if is_lazy else df.schema
 
-        if col1 not in df.columns:
+        if col1 not in schema.names():
             raise ValueError(f"Column '{col1}' not found")
 
         def _cast_if_string(col_name: str) -> pl.Expr:
-            if df[col_name].dtype == pl.Utf8:
+            if schema[col_name] == pl.Utf8:
                 return pl.col(col_name).str.to_datetime(strict=False)
             return pl.col(col_name)
 
         expr1 = _cast_if_string(col1)
-        if col2 in df.columns:
+        if col2 in schema.names():
             expr2 = _cast_if_string(col2)
             coalesced = pl.coalesce(expr1, expr2)
         else:
             coalesced = expr1
 
         try:
-            coalesced_series = df.select(coalesced.alias("_coalesced"))["_coalesced"]
-            if coalesced_series.dtype in (pl.Datetime, pl.Date) and isinstance(value, str):
+            # Determine if value needs datetime parsing by checking schema types
+            col1_dtype = schema[col1]
+            needs_datetime = False
+            if col1_dtype == pl.Utf8:
+                needs_datetime = True
+            elif col1_dtype in (pl.Datetime, pl.Date):
+                needs_datetime = True
+
+            if needs_datetime and isinstance(value, str):
                 value = datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T"))
 
             ops = {
@@ -1519,7 +1519,6 @@ class PolarsEngine(Engine):
             if op not in ops:
                 raise ValueError(f"Unsupported operator: {op}")
 
-            result = df.filter(ops[op])
-            return result.lazy() if is_lazy else result
+            return df.filter(ops[op])
         except Exception as e:
             raise ValueError(f"Failed to filter COALESCE({col1}, {col2}) {op} {value}: {e}")
