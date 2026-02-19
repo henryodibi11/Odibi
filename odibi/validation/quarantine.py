@@ -75,6 +75,14 @@ def _evaluate_test_mask(
             return F.lit(True)
 
         elif test.type == TestType.UNIQUE:
+            from pyspark.sql import Window
+
+            cols = test.columns
+            existing = [c for c in cols if c in df.columns]
+            if existing:
+                w = Window.partitionBy(*[F.col(c) for c in existing])
+                count_col = F.count("*").over(w)
+                return count_col == 1
             return F.lit(True)
 
         elif test.type == TestType.ACCEPTED_VALUES:
@@ -167,6 +175,10 @@ def _evaluate_test_mask(
             return pd.Series([True] * len(df), index=df.index)
 
         elif test.type == TestType.UNIQUE:
+            cols = test.columns
+            existing = [c for c in cols if c in df.columns]
+            if existing:
+                return ~df.duplicated(subset=existing, keep=False)
             return pd.Series([True] * len(df), index=df.index)
 
         elif test.type == TestType.ACCEPTED_VALUES:
@@ -404,7 +416,7 @@ def add_quarantine_metadata(
     quarantine_tests = [t for t in tests if t.on_fail == ContractSeverity.QUARANTINE]
     test_names = [t.name or f"{t.type.value}" for t in quarantine_tests]
     failed_tests_str = ",".join(test_names)
-    rejection_reason = f"Failed tests: {failed_tests_str}"
+    all_tests_reason = f"Failed tests: {failed_tests_str}"
 
     if is_spark:
         from pyspark.sql import functions as F
@@ -412,7 +424,7 @@ def add_quarantine_metadata(
         result_df = invalid_df
 
         if config.rejection_reason:
-            result_df = result_df.withColumn("_rejection_reason", F.lit(rejection_reason))
+            result_df = result_df.withColumn("_rejection_reason", F.lit(all_tests_reason))
 
         if config.rejected_at:
             result_df = result_df.withColumn("_rejected_at", F.lit(rejected_at))
@@ -434,7 +446,7 @@ def add_quarantine_metadata(
         result_df = invalid_df
 
         if config.rejection_reason:
-            result_df = result_df.with_columns(pl.lit(rejection_reason).alias("_rejection_reason"))
+            result_df = result_df.with_columns(pl.lit(all_tests_reason).alias("_rejection_reason"))
 
         if config.rejected_at:
             result_df = result_df.with_columns(pl.lit(rejected_at).alias("_rejected_at"))
@@ -451,10 +463,19 @@ def add_quarantine_metadata(
         return result_df
 
     else:
+        import pandas as pd
+
         result_df = invalid_df.copy()
 
         if config.rejection_reason:
-            result_df["_rejection_reason"] = rejection_reason
+            # Build per-row rejection reasons
+            reasons = pd.Series([""] * len(result_df), index=result_df.index)
+            for qt in quarantine_tests:
+                mask = _evaluate_test_mask(result_df, qt, is_spark=False, is_polars=False)
+                failed = ~mask
+                name = qt.name or qt.type.value
+                reasons = reasons.where(~failed, reasons + name + ",")
+            result_df["_rejection_reason"] = "Failed: " + reasons.str.rstrip(",")
 
         if config.rejected_at:
             result_df["_rejected_at"] = rejected_at

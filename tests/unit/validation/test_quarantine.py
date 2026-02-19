@@ -942,9 +942,24 @@ class TestWriteQuarantinePolars:
 class TestEvaluateTestMaskPandasExtended:
     """Additional Pandas-path tests for _evaluate_test_mask to cover remaining branches."""
 
-    def test_unique_test_returns_all_true(self):
-        """UNIQUE test type returns all-True mask (checked at aggregate level)."""
+    def test_unique_test_detects_duplicates(self):
+        """UNIQUE test type marks duplicate rows as failing."""
         df = pd.DataFrame({"id": [1, 2, 2, 3]})
+        test = UniqueTest(
+            type=TestType.UNIQUE,
+            columns=["id"],
+            on_fail=ContractSeverity.QUARANTINE,
+        )
+        mask = _evaluate_test_mask(df, test, is_spark=False, is_polars=False)
+        assert len(mask) == 4
+        assert mask.iloc[0] is True or mask.iloc[0] == True  # noqa: E712
+        assert mask.iloc[1] == False  # noqa: E712  # duplicate
+        assert mask.iloc[2] == False  # noqa: E712  # duplicate
+        assert mask.iloc[3] is True or mask.iloc[3] == True  # noqa: E712
+
+    def test_unique_test_all_unique(self):
+        """UNIQUE test passes when all values are unique."""
+        df = pd.DataFrame({"id": [1, 2, 3, 4]})
         test = UniqueTest(
             type=TestType.UNIQUE,
             columns=["id"],

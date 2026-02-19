@@ -201,11 +201,13 @@ class SqlServerMergeWriter:
             True if table exists
         """
         schema, table_name = self.parse_table_name(table)
-        sql = f"""
+        sql = """
         SELECT 1 FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
+        WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table_name
         """
-        result = self.connection.execute_sql(sql)
+        result = self.connection.execute_sql(
+            sql, params={"schema": schema, "table_name": table_name}
+        )
         # Result is now a list of rows (fetchall already called in AzureSQL.execute)
         row = result[0] if result else None
         return row is not None
@@ -704,8 +706,8 @@ class SqlServerMergeWriter:
 
     def check_schema_exists(self, schema: str) -> bool:
         """Check if a schema exists in SQL Server."""
-        sql = f"SELECT 1 FROM sys.schemas WHERE name = '{schema}'"
-        result = self.connection.execute_sql(sql)
+        sql = "SELECT 1 FROM sys.schemas WHERE name = :schema"
+        result = self.connection.execute_sql(sql, params={"schema": schema})
         # Result is now a list of rows (fetchall already called in AzureSQL.execute)
         row = result[0] if result else None
         return row is not None
@@ -1782,13 +1784,21 @@ class SqlServerMergeWriter:
                 )
                 self.add_columns(target_table, new_cols_with_types)
 
-        result = self.execute_merge(
-            target_table=target_table,
-            staging_table=staging_table,
-            merge_keys=merge_keys,
-            columns=columns,
-            options=options,
-        )
+        try:
+            result = self.execute_merge(
+                target_table=target_table,
+                staging_table=staging_table,
+                merge_keys=merge_keys,
+                columns=columns,
+                options=options,
+            )
+        except Exception:
+            try:
+                self.truncate_staging(staging_table)
+                self.ctx.debug("Cleaned up staging table after merge failure")
+            except Exception as cleanup_err:
+                self.ctx.warning(f"Failed to clean up staging table: {cleanup_err}")
+            raise
 
         return result
 
@@ -1953,13 +1963,21 @@ class SqlServerMergeWriter:
                 )
                 self.add_columns(target_table, new_cols_with_types)
 
-        result = self.execute_merge(
-            target_table=target_table,
-            staging_table=staging_table,
-            merge_keys=merge_keys,
-            columns=columns,
-            options=options,
-        )
+        try:
+            result = self.execute_merge(
+                target_table=target_table,
+                staging_table=staging_table,
+                merge_keys=merge_keys,
+                columns=columns,
+                options=options,
+            )
+        except Exception:
+            try:
+                self.truncate_staging(staging_table)
+                self.ctx.debug("Cleaned up staging table after merge failure")
+            except Exception as cleanup_err:
+                self.ctx.warning(f"Failed to clean up staging table: {cleanup_err}")
+            raise
 
         return result
 

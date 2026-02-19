@@ -334,8 +334,8 @@ class TestCheckTableExists:
 
         assert result is False
 
-    def test_sql_query_contains_schema_and_table(self):
-        """Should query INFORMATION_SCHEMA with correct params."""
+    def test_sql_query_uses_parameterized_query(self):
+        """Should query INFORMATION_SCHEMA with parameterized values."""
         conn = create_mock_connection()
         conn.execute_sql.return_value = []
         writer = SqlServerMergeWriter(conn)
@@ -343,8 +343,11 @@ class TestCheckTableExists:
         writer.check_table_exists("sales.orders")
 
         sql = conn.execute_sql.call_args[0][0]
-        assert "TABLE_SCHEMA = 'sales'" in sql
-        assert "TABLE_NAME = 'orders'" in sql
+        assert "TABLE_SCHEMA = :schema" in sql
+        assert "TABLE_NAME = :table_name" in sql
+        params = conn.execute_sql.call_args[1]["params"]
+        assert params["schema"] == "sales"
+        assert params["table_name"] == "orders"
 
 
 class TestCheckSchemaExists:

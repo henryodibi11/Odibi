@@ -2807,13 +2807,22 @@ class NodeExecutor:
                                 1
                             ).collect()
                             return True
-                        except Exception:
+                        except Exception as e:
+                            self._ctx.warning(
+                                f"Delta table check failed: {e}",
+                                path=full_path,
+                            )
                             return False
                 return True  # Assume exists for non-Spark engines
 
             return True  # No table or path specified, assume exists
-        except Exception:
-            return False  # On any error, assume doesn't exist (safer to write)
+        except (FileNotFoundError, OSError):
+            return False
+        except Exception as e:
+            self._ctx.warning(
+                f"Table existence check failed (treating as not exists): {e}",
+            )
+            return False
 
     def _calculate_delta_diagnostics(
         self,
