@@ -307,6 +307,12 @@ class PolarsEngine(Engine):
 
         is_lazy = isinstance(df, pl.LazyFrame)
 
+        # Handle upsert/append_once for non-Delta formats
+        if mode in ["upsert", "append_once"] and format != "delta":
+            df, mode = self._handle_generic_upsert(df, full_path, format, mode, options)
+            is_lazy = isinstance(df, pl.LazyFrame)
+            options = {k: v for k, v in options.items() if k != "keys"}
+
         parent_dir = os.path.dirname(full_path)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
@@ -476,6 +482,59 @@ class PolarsEngine(Engine):
             chunksize=chunksize,
         )
         return None
+
+    def _handle_generic_upsert(
+        self,
+        df: Any,
+        full_path: str,
+        format: str,
+        mode: str,
+        options: Dict[str, Any],
+    ) -> tuple:
+        """Handle upsert/append_once for standard files by merging with existing data."""
+        if "keys" not in options:
+            raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
+
+        keys = options["keys"]
+        if isinstance(keys, str):
+            keys = [keys]
+
+        # Materialize LazyFrame for join operations
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+
+        # Try to read existing file
+        existing_df = None
+        try:
+            if format == "csv":
+                existing_df = pl.read_csv(full_path)
+            elif format == "parquet":
+                existing_df = pl.read_parquet(full_path)
+            elif format == "json":
+                existing_df = pl.read_ndjson(full_path)
+        except Exception:
+            return df, "overwrite"
+
+        if existing_df is None:
+            return df, "overwrite"
+
+        if mode == "append_once":
+            missing_keys = set(keys) - set(df.columns)
+            if missing_keys:
+                raise KeyError(f"Keys {missing_keys} not found in input data")
+
+            new_rows = df.join(existing_df.select(keys), on=keys, how="anti")
+            return pl.concat([existing_df, new_rows]), "overwrite"
+
+        elif mode == "upsert":
+            missing_keys = set(keys) - set(df.columns)
+            if missing_keys:
+                raise KeyError(f"Keys {missing_keys} not found in input data")
+
+            rows_to_keep = existing_df.join(df.select(keys), on=keys, how="anti")
+            return pl.concat([rows_to_keep, df]), "overwrite"
+
+        return df, mode
 
     def execute_sql(self, sql: str, context: Context) -> Any:
         """Execute SQL query using Polars SQLContext.

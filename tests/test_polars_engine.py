@@ -1091,3 +1091,175 @@ class TestPolarsLazyPreservation:
         result = polars_engine.filter_coalesce(df, "a", "b", ">", 1)
         assert isinstance(result, pl.DataFrame)
         assert result.shape[0] == 2
+
+
+class TestPolarsUpsertAppendOnce:
+    """Tests for #255: Polars engine upsert/append_once write modes."""
+
+    def test_upsert_updates_existing_and_adds_new(self, tmp_path, polars_engine):
+        """Upsert should replace matching rows and add new ones."""
+        existing = pl.DataFrame({"id": [1, 2, 3], "val": ["a", "b", "c"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [2, 4], "val": ["B_updated", "d_new"]})
+        conn = MockConnection()
+        polars_engine.write(
+            new_data,
+            conn,
+            format="parquet",
+            path=str(tmp_path / "data.parquet"),
+            mode="upsert",
+            options={"keys": ["id"]},
+        )
+
+        result = pl.read_parquet(tmp_path / "data.parquet")
+        assert len(result) == 4
+        assert sorted(result["id"].to_list()) == [1, 2, 3, 4]
+        row2 = result.filter(pl.col("id") == 2)["val"][0]
+        assert row2 == "B_updated"
+
+    def test_append_once_skips_existing_keys(self, tmp_path, polars_engine):
+        """Append_once should only add rows with new keys."""
+        existing = pl.DataFrame({"id": [1, 2, 3], "val": ["a", "b", "c"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [2, 4], "val": ["b_dup", "d_new"]})
+        conn = MockConnection()
+        polars_engine.write(
+            new_data,
+            conn,
+            format="parquet",
+            path=str(tmp_path / "data.parquet"),
+            mode="append_once",
+            options={"keys": ["id"]},
+        )
+
+        result = pl.read_parquet(tmp_path / "data.parquet")
+        assert len(result) == 4
+        assert sorted(result["id"].to_list()) == [1, 2, 3, 4]
+        row2 = result.filter(pl.col("id") == 2)["val"][0]
+        assert row2 == "b"  # original value preserved
+
+    def test_upsert_no_existing_file_creates_new(self, tmp_path, polars_engine):
+        """Upsert on non-existent file should create it."""
+        new_data = pl.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        conn = MockConnection()
+        polars_engine.write(
+            new_data,
+            conn,
+            format="parquet",
+            path=str(tmp_path / "new.parquet"),
+            mode="upsert",
+            options={"keys": ["id"]},
+        )
+
+        result = pl.read_parquet(tmp_path / "new.parquet")
+        assert len(result) == 2
+
+    def test_upsert_missing_keys_raises(self, tmp_path, polars_engine):
+        """Upsert without keys option should raise ValueError."""
+        new_data = pl.DataFrame({"id": [1], "val": ["a"]})
+        conn = MockConnection()
+        with pytest.raises(ValueError, match="requires 'keys'"):
+            polars_engine.write(
+                new_data,
+                conn,
+                format="parquet",
+                path=str(tmp_path / "data.parquet"),
+                mode="upsert",
+                options={},
+            )
+
+    def test_upsert_missing_key_column_raises(self, tmp_path, polars_engine):
+        """Upsert with key not in data should raise KeyError."""
+        existing = pl.DataFrame({"id": [1], "val": ["a"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [1], "val": ["b"]})
+        conn = MockConnection()
+        with pytest.raises(KeyError, match="missing_col"):
+            polars_engine.write(
+                new_data,
+                conn,
+                format="parquet",
+                path=str(tmp_path / "data.parquet"),
+                mode="upsert",
+                options={"keys": ["missing_col"]},
+            )
+
+    def test_upsert_csv_format(self, tmp_path, polars_engine):
+        """Upsert should work with CSV format."""
+        existing = pl.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        existing.write_csv(tmp_path / "data.csv")
+
+        new_data = pl.DataFrame({"id": [2, 3], "val": ["B_updated", "c_new"]})
+        conn = MockConnection()
+        polars_engine.write(
+            new_data,
+            conn,
+            format="csv",
+            path=str(tmp_path / "data.csv"),
+            mode="upsert",
+            options={"keys": ["id"]},
+        )
+
+        result = pl.read_csv(tmp_path / "data.csv")
+        assert len(result) == 3
+
+    def test_append_once_csv_appends(self, tmp_path, polars_engine):
+        """Append_once on CSV should append only new rows."""
+        existing = pl.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        existing.write_csv(tmp_path / "data.csv")
+
+        new_data = pl.DataFrame({"id": [2, 3], "val": ["b_dup", "c_new"]})
+        conn = MockConnection()
+        polars_engine.write(
+            new_data,
+            conn,
+            format="csv",
+            path=str(tmp_path / "data.csv"),
+            mode="append_once",
+            options={"keys": ["id"]},
+        )
+
+        result = pl.read_csv(tmp_path / "data.csv")
+        assert len(result) == 3
+        assert sorted(result["id"].to_list()) == [1, 2, 3]
+
+    def test_upsert_with_lazyframe(self, tmp_path, polars_engine):
+        """Upsert should work when input is a LazyFrame."""
+        existing = pl.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [2, 3], "val": ["B_updated", "c_new"]}).lazy()
+        conn = MockConnection()
+        polars_engine.write(
+            new_data,
+            conn,
+            format="parquet",
+            path=str(tmp_path / "data.parquet"),
+            mode="upsert",
+            options={"keys": ["id"]},
+        )
+
+        result = pl.read_parquet(tmp_path / "data.parquet")
+        assert len(result) == 3
+
+    def test_upsert_string_key_coerced_to_list(self, tmp_path, polars_engine):
+        """A single string key should be coerced to a list."""
+        existing = pl.DataFrame({"id": [1], "val": ["a"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [1], "val": ["updated"]})
+        conn = MockConnection()
+        polars_engine.write(
+            new_data,
+            conn,
+            format="parquet",
+            path=str(tmp_path / "data.parquet"),
+            mode="upsert",
+            options={"keys": "id"},
+        )
+
+        result = pl.read_parquet(tmp_path / "data.parquet")
+        assert result["val"][0] == "updated"
