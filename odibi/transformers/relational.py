@@ -319,13 +319,22 @@ def union(context: EngineContext, params: UnionParams) -> EngineContext:
     )
 
     # Construct Query
-    # DuckDB supports "UNION ALL BY NAME", Spark does too in recent versions.
-    operator = "UNION ALL BY NAME" if params.by_name else "UNION ALL"
+    if params.by_name and context.engine_type == EngineType.SPARK:
+        # Spark < 3.5 doesn't support UNION ALL BY NAME.
+        # Align columns explicitly: use the current df's columns as the reference
+        # and SELECT each dataset's columns in that order.
+        ref_columns = context.df.columns
+        aligned_sqls = []
+        for sql_part in union_sqls:
+            # Extract table/view name from "SELECT * FROM <name>"
+            table_name = sql_part.replace("SELECT * FROM ", "")
+            col_selects = ", ".join(f"`{c}`" for c in ref_columns)
+            aligned_sqls.append(f"SELECT {col_selects} FROM {table_name}")
+        sql_query = " UNION ALL ".join(aligned_sqls)
+    else:
+        operator = "UNION ALL BY NAME" if params.by_name else "UNION ALL"
+        sql_query = f" {operator} ".join(union_sqls)
 
-    # Fallback for engines without BY NAME if needed (omitted for brevity, assuming modern engines)
-    # Spark < 3.1 might need logic.
-
-    sql_query = f" {operator} ".join(union_sqls)
     result = context.sql(sql_query)
 
     # Log completion
