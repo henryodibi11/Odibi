@@ -1742,7 +1742,6 @@ class PandasEngine(Engine):
                 in [
                     "partition_by",
                     "mode",
-                    "overwrite_schema",
                     "schema_mode",
                     "name",
                     "description",
@@ -1750,6 +1749,11 @@ class PandasEngine(Engine):
                     "writer_properties",
                 ]
             }
+
+            # Translate legacy overwrite_schema=True to schema_mode="overwrite"
+            # (overwrite_schema was removed in deltalake >= 0.18)
+            if merged_options.get("overwrite_schema") and "schema_mode" not in write_kwargs:
+                write_kwargs["schema_mode"] = "overwrite"
 
             def do_write():
                 write_deltalake(

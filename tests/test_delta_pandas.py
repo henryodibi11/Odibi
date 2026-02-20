@@ -284,3 +284,70 @@ class TestDeltaErrorHandling:
 
         with pytest.raises(ImportError, match="Delta Lake support requires"):
             engine.write(sample_df, conn, format="delta", path="test.delta")
+
+
+class TestDeltaSchemaMode:
+    """Tests for #214: schema_mode vs overwrite_schema handling."""
+
+    def test_overwrite_schema_translated_to_schema_mode(self, engine, temp_dir, sample_df):
+        """Legacy overwrite_schema=True should be translated to schema_mode='overwrite'."""
+        conn = LocalConnection(base_path=temp_dir)
+
+        # First write to create the table
+        engine.write(sample_df, conn, format="delta", path="test.delta", mode="overwrite")
+
+        # Second write with different schema + overwrite_schema=True
+        df2 = sample_df.copy()
+        df2["new_col"] = [10, 20, 30, 40, 50]
+        engine.write(
+            df2,
+            conn,
+            format="delta",
+            path="test.delta",
+            mode="overwrite",
+            options={"overwrite_schema": True},
+        )
+
+        # Verify the new column exists
+        result = engine.read(conn, format="delta", path="test.delta")
+        assert "new_col" in result.columns
+
+    def test_schema_mode_merge_adds_columns(self, engine, temp_dir, sample_df):
+        """schema_mode='merge' should add new columns on append."""
+        conn = LocalConnection(base_path=temp_dir)
+
+        engine.write(sample_df, conn, format="delta", path="test.delta", mode="overwrite")
+
+        df2 = sample_df.copy()
+        df2["extra"] = ["x", "y", "z", "w", "v"]
+        engine.write(
+            df2,
+            conn,
+            format="delta",
+            path="test.delta",
+            mode="append",
+            options={"schema_mode": "merge"},
+        )
+
+        result = engine.read(conn, format="delta", path="test.delta")
+        assert "extra" in result.columns
+
+    def test_schema_mode_not_overridden_by_legacy(self, engine, temp_dir, sample_df):
+        """If both schema_mode and overwrite_schema are set, schema_mode wins."""
+        conn = LocalConnection(base_path=temp_dir)
+
+        engine.write(sample_df, conn, format="delta", path="test.delta", mode="overwrite")
+
+        df2 = sample_df.copy()
+        df2["new_col"] = [1, 2, 3, 4, 5]
+        engine.write(
+            df2,
+            conn,
+            format="delta",
+            path="test.delta",
+            mode="overwrite",
+            options={"overwrite_schema": True, "schema_mode": "overwrite"},
+        )
+
+        result = engine.read(conn, format="delta", path="test.delta")
+        assert "new_col" in result.columns
