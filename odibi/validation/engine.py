@@ -472,7 +472,7 @@ class Validator:
             elif test.type == TestType.ACCEPTED_VALUES:
                 col = test.column
                 if col in df_work.columns:
-                    invalid_df = df_work.filter(~F.col(col).isin(test.values))
+                    invalid_df = df_work.filter(~F.col(col).isin(*test.values))
                     invalid_count = invalid_df.count()
                     if invalid_count > 0:
                         examples_rows = invalid_df.select(col).limit(3).collect()
@@ -490,19 +490,18 @@ class Validator:
             elif test.type == TestType.RANGE:
                 col = test.column
                 if col in df_work.columns:
-                    conditions = []
+                    # Build range filter without Python | operator to avoid
+                    # Py4J .or() dispatch issues across PySpark versions
+                    range_parts = []
                     if test.min is not None:
-                        conditions.append(F.col(col) < test.min)
+                        range_parts.append(f"`{col}` < {test.min}")
                     if test.max is not None:
-                        conditions.append(F.col(col) > test.max)
+                        range_parts.append(f"`{col}` > {test.max}")
 
-                    if not conditions:
+                    if not range_parts:
                         continue
-                    cond = conditions[0]
-                    for c in conditions[1:]:
-                        cond = cond | c
 
-                    invalid_count = df_work.filter(cond).count()
+                    invalid_count = df_work.filter(" OR ".join(range_parts)).count()
                     if invalid_count > 0:
                         msg = f"Column '{col}' contains {invalid_count} values out of range"
                         ctx.debug(
@@ -518,8 +517,10 @@ class Validator:
             elif test.type == TestType.REGEX_MATCH:
                 col = test.column
                 if col in df_work.columns:
+                    # Use SQL string filter to avoid Py4J .and() dispatch issues
+                    escaped_pattern = test.pattern.replace("'", "\\'")
                     invalid_count = df_work.filter(
-                        F.col(col).isNotNull() & ~F.col(col).rlike(test.pattern)
+                        f"`{col}` IS NOT NULL AND NOT `{col}` RLIKE '{escaped_pattern}'"
                     ).count()
                     if invalid_count > 0:
                         msg = (
