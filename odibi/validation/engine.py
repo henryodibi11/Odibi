@@ -490,11 +490,17 @@ class Validator:
             elif test.type == TestType.RANGE:
                 col = test.column
                 if col in df_work.columns:
-                    cond = F.lit(False)
+                    conditions = []
                     if test.min is not None:
-                        cond = cond | (F.col(col) < test.min)
+                        conditions.append(F.col(col) < test.min)
                     if test.max is not None:
-                        cond = cond | (F.col(col) > test.max)
+                        conditions.append(F.col(col) > test.max)
+
+                    if not conditions:
+                        continue
+                    cond = conditions[0]
+                    for c in conditions[1:]:
+                        cond = cond | c
 
                     invalid_count = df_work.filter(cond).count()
                     if invalid_count > 0:
