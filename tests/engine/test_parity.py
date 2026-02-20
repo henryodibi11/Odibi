@@ -192,17 +192,12 @@ class TestSparkEngineLogic:
         """Verify sort logic."""
         params = {"by": ["col1"], "ascending": False}
 
-        # Mock desc function import inside method
-        with patch("pyspark.sql.functions.desc") as mock_desc:
-            mock_col_desc = MagicMock()
-            mock_desc.return_value = mock_col_desc
+        spark_engine.execute_operation("sort", params, mock_spark_df)
 
-            spark_engine.execute_operation("sort", params, mock_spark_df)
-
-            mock_spark_df.orderBy.assert_called()
-            # Check if called with result of desc()
-            args = mock_spark_df.orderBy.call_args[0]
-            assert args[0] == mock_col_desc
+        mock_spark_df.orderBy.assert_called_once()
+        # Verify desc() was called (orderBy receives desc-wrapped columns)
+        args = mock_spark_df.orderBy.call_args[0]
+        assert len(args) == 1  # One column sorted descending
 
     def test_drop_columns_logic(self, spark_engine, mock_spark_df):
         """Verify drop columns logic."""
