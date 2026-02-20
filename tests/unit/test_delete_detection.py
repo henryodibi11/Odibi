@@ -246,6 +246,7 @@ class TestDetectDeletesTransformerPandas:
 
         mock_dt = MagicMock()
         mock_dt.version.return_value = 1
+        mock_dt.history.return_value = [{"version": 1}, {"version": 0}]
         mock_dt.to_pandas.return_value = prev_df
 
         def delta_table_init(path, version=None):
@@ -650,6 +651,7 @@ class TestWriteMetadata:
 
         mock_dt = MagicMock()
         mock_dt.version.return_value = 1
+        mock_dt.history.return_value = [{"version": 1}, {"version": 0}]
         mock_dt.to_pandas.return_value = prev_df
 
         def delta_table_init(path, version=None):

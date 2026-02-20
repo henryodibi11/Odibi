@@ -247,6 +247,34 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
     return result
 
 
+def _get_timestamp_type(df, reference_cols: List[str]) -> str:
+    """Determine timestamp cast type from existing DataFrame columns.
+
+    Checks reference columns for timezone-aware timestamp types and returns
+    the matching cast string. Falls back to 'timestamp' (naive) if no
+    tz-aware columns are found.
+
+    Args:
+        df: Spark DataFrame to inspect
+        reference_cols: Column names to check for timestamp type
+
+    Returns:
+        Cast type string (e.g., 'timestamp' or 'timestamp_ntz')
+    """
+    if df is None:
+        return "timestamp"
+    from pyspark.sql.types import TimestampNTZType, TimestampType
+
+    for col_name in reference_cols:
+        if col_name in df.columns:
+            col_type = df.schema[col_name].dataType
+            if isinstance(col_type, TimestampNTZType):
+                return "timestamp_ntz"
+            if isinstance(col_type, TimestampType):
+                return "timestamp"
+    return "timestamp"
+
+
 def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> EngineContext:
     """
     Internal helper for SCD2 logic on Spark engine.
@@ -311,7 +339,8 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
 
     # Prepare Source: Add SCD metadata columns
     # New records start as Current
-    new_records = source_df.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
+    ts_type = _get_timestamp_type(source_df, [eff_col, start_col])
+    new_records = source_df.withColumn(end_col, F.lit(None).cast(ts_type)).withColumn(
         flag_col, F.lit(True)
     )
 
@@ -393,7 +422,7 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
     ).select([F.col(f"`__source`.`{c}`").alias(c) for c in source_df.columns])
 
     # Add metadata to inserts (Start=eff_col, End=Null, Current=True)
-    rows_to_insert = rows_to_insert.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
+    rows_to_insert = rows_to_insert.withColumn(end_col, F.lit(None).cast(ts_type)).withColumn(
         flag_col, F.lit(True)
     )
 
@@ -510,6 +539,7 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
     end_col = params.end_time_col
     flag_col = params.current_flag_col
     ctx = get_logging_context()
+    ts_type = _get_timestamp_type(source_df, [eff_col, start_col])
 
     # Check if target is a Delta table
     is_delta = False
@@ -540,7 +570,7 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
 
         if not target_exists:
             # First run: write directly to target (same pattern as merge transformer)
-            new_records = source_df.withColumn(end_col, F.lit(None).cast("timestamp")).withColumn(
+            new_records = source_df.withColumn(end_col, F.lit(None).cast(ts_type)).withColumn(
                 flag_col, F.lit(True)
             )
             if eff_col in new_records.columns and eff_col != start_col:
@@ -574,7 +604,7 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
     # Also keep eff_col temporarily as __eff_col for the update_set reference
     merge_source = (
         source_df.withColumn(start_col, F.col(f"`{eff_col}`"))
-        .withColumn(end_col, F.lit(None).cast("timestamp"))
+        .withColumn(end_col, F.lit(None).cast(ts_type))
         .withColumn(flag_col, F.lit(True))
     )
 

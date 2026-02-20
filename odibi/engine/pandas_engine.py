@@ -1632,6 +1632,10 @@ class PandasEngine(Engine):
                 "See README.md for installation instructions."
             )
 
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         storage_opts = merged_options.get("storage_options", {})
 
         # Map modes
@@ -1668,8 +1672,19 @@ class PandasEngine(Engine):
                         "bool": "boolean",
                     }
                     pd_type = type_map.get(arrow_type, "string")
+                    if pd_type == "string" and arrow_type != "string":
+                        logger.warning(
+                            f"Delta write: all-null column '{col}' has unmapped Arrow type "
+                            f"'{arrow_type}', falling back to string. Schema mismatch may "
+                            f"occur on future writes with actual data."
+                        )
                     df[col] = df[col].astype(pd_type)
                 else:
+                    logger.warning(
+                        f"Delta write: all-null column '{col}' cast to string (no existing "
+                        f"schema found). If this column should be int/float/datetime, the "
+                        f"Delta schema will need schema evolution on future writes."
+                    )
                     df[col] = df[col].astype("string")
 
         # Handle upsert/append_once logic

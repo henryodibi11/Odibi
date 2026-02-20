@@ -154,6 +154,7 @@ class TestSnapshotDiffPandas:
         # First call: current version (version=1)
         mock_dt_current = MagicMock()
         mock_dt_current.version.return_value = 1
+        mock_dt_current.history.return_value = [{"version": 1}, {"version": 0}]
         # Second call: previous version (to_pandas)
         mock_dt_prev = MagicMock()
         mock_dt_prev.to_pandas.return_value = prev_df
@@ -181,6 +182,7 @@ class TestSnapshotDiffPandas:
         mock_target_path.return_value = "/data/silver/t"
         mock_dt_instance = MagicMock()
         mock_dt_instance.version.return_value = 1
+        mock_dt_instance.history.return_value = [{"version": 1}, {"version": 0}]
         mock_dt_cls.return_value = mock_dt_instance
 
         df = pd.DataFrame({"other_col": [1, 2]})
@@ -206,6 +208,7 @@ class TestSnapshotDiffPandas:
 
         mock_dt_current = MagicMock()
         mock_dt_current.version.return_value = 1
+        mock_dt_current.history.return_value = [{"version": 1}, {"version": 0}]
         mock_dt_prev = MagicMock()
         mock_dt_prev.to_pandas.return_value = prev_df
 
@@ -271,6 +274,7 @@ class TestSnapshotDiffPandas:
 
         mock_dt_current = MagicMock()
         mock_dt_current.version.return_value = 1
+        mock_dt_current.history.return_value = [{"version": 1}, {"version": 0}]
         mock_dt_prev = MagicMock()
         mock_dt_prev.to_pandas.return_value = prev_df
         mock_dt_cls.side_effect = [mock_dt_current, mock_dt_prev]

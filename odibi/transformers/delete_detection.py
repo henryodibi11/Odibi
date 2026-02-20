@@ -123,7 +123,21 @@ def _snapshot_diff_spark(
         logger.info("detect_deletes: First run detected (version 0). Skipping delete detection.")
         return _ensure_delete_column(context, config)
 
-    prev_version = current_version - 1
+    # Find actual previous version from Delta history (versions may be non-sequential after VACUUM)
+    history = dt.history().select("version").collect()
+    versions = sorted([row["version"] for row in history], reverse=True)
+    prev_candidates = [v for v in versions if v < current_version]
+    if not prev_candidates:
+        if config.on_first_run == FirstRunBehavior.ERROR:
+            raise ValueError("detect_deletes: No previous version available for snapshot_diff.")
+        logger.info(
+            "detect_deletes: No previous version available after VACUUM. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+    prev_version = prev_candidates[0]
+    logger.debug(
+        f"detect_deletes: Using version {prev_version} as previous (current: {current_version})"
+    )
 
     # Validate keys exist in current DataFrame
     curr_columns = [c.lower() for c in context.df.columns]
@@ -204,7 +218,23 @@ def _snapshot_diff_pandas(
         logger.info("detect_deletes: First run detected (version 0). Skipping delete detection.")
         return _ensure_delete_column(context, config)
 
-    prev_version = current_version - 1
+    # Find actual previous version from Delta history (versions may be non-sequential after VACUUM)
+    history_list = dt.history()
+    versions = sorted(
+        [entry["version"] for entry in history_list if entry["version"] < current_version],
+        reverse=True,
+    )
+    if not versions:
+        if config.on_first_run == FirstRunBehavior.ERROR:
+            raise ValueError("detect_deletes: No previous version available for snapshot_diff.")
+        logger.info(
+            "detect_deletes: No previous version available after VACUUM. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+    prev_version = versions[0]
+    logger.debug(
+        f"detect_deletes: Using version {prev_version} as previous (current: {current_version})"
+    )
 
     # Validate keys exist in current DataFrame
     curr_columns = [c.lower() for c in context.df.columns]
