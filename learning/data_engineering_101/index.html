@@ -1,0 +1,7002 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A declarative data engineering framework - Explicit over implicit, Stories over magic.">
+      
+      
+      
+        <link rel="canonical" href="https://henryodibi11.github.io/Odibi/learning/data_engineering_101/">
+      
+      
+        <link rel="prev" href="../curriculum/">
+      
+      
+        <link rel="next" href="../glossary/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+    
+    
+      
+        <title>Data Engineering 101 - Odibi Framework</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#data-engineering-101-a-complete-beginners-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Odibi Framework" class="md-header__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Odibi Framework
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Data Engineering 101
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../.." class="md-tabs__link">
+          
+  
+  
+  Start Here
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../philosophy/" class="md-tabs__link">
+          
+  
+  
+  Learn
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/the_definitive_guide/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../validation/" class="md-tabs__link">
+          
+  
+  
+  Operate
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cheatsheet/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Odibi Framework" class="md-nav__button md-logo" aria-label="Odibi Framework" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Odibi Framework
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/henryodibi11/Odibi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    henryodibi11/Odibi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Start Here
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Start Here
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../golden_path/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Golden Path
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../playbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Playbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learn
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Learn
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/medallion_architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Medallion Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines & Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/transformers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transformers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loading Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/stories/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stories
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orchestration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/bulk_copy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk Copy (SQL Server)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Engineering 101
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Engineering 101
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../curriculum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curriculum
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Engineering 101
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Engineering 101
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is Data?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is Data?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-is-just-information-stored-somewhere" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data is Just Information Stored Somewhere
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-does-data-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where Does Data Live?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#types-of-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types of Data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Types of Data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#structured-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semi-structured-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semi-Structured Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unstructured-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unstructured Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-you-encounter-daily" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data You Encounter Daily
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-data-engineering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is Data Engineering?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is Data Engineering?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-plumbing-of-the-data-world" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "Plumbing" of the Data World
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-data-engineers-actually-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Data Engineers Actually Do
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-engineering-vs-data-science-vs-data-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Engineering vs Data Science vs Data Analytics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-real-job-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Real Job Scenario
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-data-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a Data Pipeline?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is a Data Pipeline?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-factory-assembly-line-analogy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Factory Assembly Line Analogy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-visual-explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Visual Explanation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-manual-excel-work-doesnt-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Manual Excel Work Doesn't Scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-problems-do-pipelines-solve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Problems Do Pipelines Solve?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What Problems Do Pipelines Solve?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem-1-messy-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 1: Messy Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#problem-2-manual-work-and-human-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 2: Manual Work and Human Error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#problem-3-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 3: Scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#problem-4-reproducibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 4: Reproducibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#problem-5-freshness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 5: Freshness
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#etl-vs-elt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ETL vs ELT
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ETL vs ELT">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#etl-extract-transform-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ETL: Extract, Transform, Load
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elt-extract-load-transform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ELT: Extract, Load, Transform
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visual-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-which" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use Which
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-odibi-supports-both" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Odibi Supports Both
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-schema-why-does-it-matter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a Schema? Why Does It Matter?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is a Schema? Why Does It Matter?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-spreadsheet-headers-analogy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Spreadsheet Headers Analogy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type-safety-why-it-matters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type Safety: Why It Matters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-happens-when-schemas-dont-match" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Happens When Schemas Don't Match
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Evolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-quality-basics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Quality Basics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Quality Basics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-five-pillars-of-data-quality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Five Pillars of Data Quality
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Five Pillars of Data Quality">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-completeness-are-required-values-present" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Completeness: Are required values present?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-uniqueness-are-there-duplicate-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Uniqueness: Are there duplicate records?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-validity-are-values-within-acceptable-ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Validity: Are values within acceptable ranges?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-consistency-does-the-same-thing-have-the-same-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Consistency: Does the same thing have the same representation?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-referential-integrity-do-relationships-make-sense" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Referential Integrity: Do relationships make sense?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#garbage-in-garbage-out-in-practice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Garbage In, Garbage Out" in Practice
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-medallion-architecture-bronzesilvergold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Medallion Architecture (Bronze/Silver/Gold)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Medallion Architecture (Bronze/Silver/Gold)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-manufacturing-analogy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Manufacturing Analogy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visual-diagram-of-the-medallion-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Diagram of the Medallion Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-belongs-in-each-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Belongs in Each Layer?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What Belongs in Each Layer?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bronze-layer-raw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📦 Bronze Layer (Raw)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#silver-layer-cleaned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🥈 Silver Layer (Cleaned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gold-layer-business-ready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🥇 Gold Layer (Business-Ready)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-this-pattern-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why This Pattern Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-odibi-fits-into-the-ecosystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Odibi Fits Into the Ecosystem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How Odibi Fits Into the Ecosystem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#odibi-vs-dbt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Odibi vs dbt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#odibi-vs-airflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Odibi vs Airflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#odibi-vs-raw-sparkpandas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Odibi vs Raw Spark/Pandas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-odibi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use Odibi
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-first-mental-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your First Mental Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Your First Mental Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-journey-source-bronze-silver-gold-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Journey: Source → Bronze → Silver → Gold → Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-sample-source-data-csv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Sample Source Data (CSV)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-bronze-layer-raw-copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Bronze Layer (Raw Copy)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-silver-layer-cleaned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Silver Layer (Cleaned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-gold-layer-aggregated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Gold Layer (Aggregated)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-dashboard-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Dashboard Visualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Next?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What&#39;s Next?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continue-your-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continue Your Learning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-concepts-to-explore-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Concepts to Explore Next
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remember" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remember
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimensional Modeling (Tutorial)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dimensional Modeling (Tutorial)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/01_introduction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/02_dimension_pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/03_date_dimension_pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Date Dimension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/04_fact_pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/05_aggregation_pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/06_full_star_schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Star Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/07_semantic_layer_intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semantic Layer Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/08_defining_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/09_defining_dimensions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Dimensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/10_querying_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Querying Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/11_materializing_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Materializing Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/12_semantic_full_example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Semantic Example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/dimensional_modeling/13_fk_validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/the_definitive_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Definitive Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/decision_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/bronze_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bronze Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/silver_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silver Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/gold_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/spark_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/azure_connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples (Copy/Paste)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples (Copy/Paste)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/canonical/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/canonical/01_hello_world/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Hello World
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/canonical/02_incremental_sql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. Incremental SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/canonical/03_scd2_dimension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. SCD2 Dimension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/canonical/04_fact_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Fact Table
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/canonical/05_full_pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Full Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns (Problem → Solution)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Patterns (Problem → Solution)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5_2" id="__nav_3_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Loading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Loading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/append_only_raw/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Append-Only Raw
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/incremental_stateful/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Stateful
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/merge_upsert/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge/Upsert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/sql_server_merge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQL Server Merge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/windowed_reprocess/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windowed Reprocess
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/smart_read/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Smart Read
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/skip_if_unchanged/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skip If Unchanged
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5_3" id="__nav_3_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimensional Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dimensional Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/dimension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/date_dimension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Date Dimension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/fact/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/aggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregation Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/scd2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCD2 Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5_4" id="__nav_3_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manufacturing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Manufacturing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/manufacturing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5_5" id="__nav_3_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Engineering
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/unit_conversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unit Conversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/thermodynamics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thermodynamics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/anti_patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Tasks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Common Tasks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/writing_transformations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/custom_functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Functions Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/variable_substitution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Variable Substitution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/explanation_feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/api_data_sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook (Recipes)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/best_practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interfaces
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interfaces
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli_master_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Master Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/python_api_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semantic Layer
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Semantic Layer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../semantics/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../semantics/query/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Querying
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../semantics/materialize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Materializing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../semantics/runner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operate
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operate
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Quality
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/quality_gates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Gates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/quarantine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quarantine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/fk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/alerting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alerting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/schema_tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/catalog_sync/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catalog Sync
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/production_deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/secrets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/setup_azure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/performance_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/wsl_setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WSL Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cheatsheet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cheatsheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml_schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/supported_formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supported Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/PARITY_TABLE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Parity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ODIBI_DEEP_CONTEXT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Deep Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_10" id="__nav_5_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="data-engineering-101-a-complete-beginners-guide">Data Engineering 101: A Complete Beginner's Guide<a class="headerlink" href="#data-engineering-101-a-complete-beginners-guide" title="Permanent link">&para;</a></h1>
+<p>Welcome to the world of data engineering. If you've never heard this term before, that's perfectly fine. This guide assumes you're starting from absolute zero. We'll explain every concept, every term, and every idea from the ground up.</p>
+<p>By the end of this guide, you'll understand what data engineers do, why their work matters, and how tools like Odibi help solve real problems.</p>
+<hr />
+<h2 id="what-is-data">What is Data?<a class="headerlink" href="#what-is-data" title="Permanent link">&para;</a></h2>
+<p>Before we talk about "data engineering," let's talk about "data." You interact with data every single day, even if you don't realize it.</p>
+<h3 id="data-is-just-information-stored-somewhere">Data is Just Information Stored Somewhere<a class="headerlink" href="#data-is-just-information-stored-somewhere" title="Permanent link">&para;</a></h3>
+<p>When you check your bank account online, you see a list of transactions. That list—the dates, amounts, descriptions—is data. It's information that's been recorded and stored so you can look at it later.</p>
+<p>When you shop online and receive an email receipt, that receipt contains data: what you bought, how much you paid, when the order was placed, where it's being shipped.</p>
+<p>When you scroll through your phone's photo gallery, each photo has data attached to it: the date it was taken, the location (if GPS was on), the file size, the camera settings.</p>
+<p><strong>Data is simply recorded information.</strong> It can be numbers, text, dates, images, or anything else that can be stored.</p>
+<h3 id="where-does-data-live">Where Does Data Live?<a class="headerlink" href="#where-does-data-live" title="Permanent link">&para;</a></h3>
+<p>Data needs a home. Just like you keep physical documents in folders and filing cabinets, digital data lives in specific places:</p>
+<p><strong>Files</strong> are the simplest form. A file is just a container for data sitting on a computer's hard drive:
+- A <code>.csv</code> file (Comma-Separated Values) is like a spreadsheet saved as plain text
+- A <code>.json</code> file stores data in a structured, nested format
+- A <code>.txt</code> file is just raw text
+- An <code>.xlsx</code> file is a Microsoft Excel spreadsheet</p>
+<p><strong>Databases</strong> are specialized software designed to store, organize, and retrieve large amounts of data efficiently. Think of a database as a super-powered filing cabinet that can find any document instantly, even if you have millions of them. Examples include PostgreSQL, MySQL, SQL Server, and Oracle.</p>
+<p><strong>APIs</strong> (Application Programming Interfaces) are not storage themselves, but they're how different systems share data. When a weather app on your phone shows today's forecast, it's calling a weather API to get that data. The API is like a waiter in a restaurant—you tell it what you want, and it brings it to you from the kitchen (the database).</p>
+<p><strong>Data Lakes and Warehouses</strong> are massive storage systems designed for analytics. A data lake stores raw data in its original format (like a lake that collects water from many streams). A data warehouse stores cleaned, organized data ready for analysis (like a warehouse with neatly arranged shelves).</p>
+<h3 id="types-of-data">Types of Data<a class="headerlink" href="#types-of-data" title="Permanent link">&para;</a></h3>
+<p>Not all data is created equal. Data comes in three main flavors:</p>
+<h4 id="structured-data">Structured Data<a class="headerlink" href="#structured-data" title="Permanent link">&para;</a></h4>
+<p>Structured data fits neatly into rows and columns, like a spreadsheet. Every row follows the same pattern. Every column has a specific type of information.</p>
+<p><strong>Example: A customer table</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>| customer_id | name          | email                | signup_date |
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|-------------|---------------|----------------------|-------------|
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>| 1           | Alice Smith   | alice@email.com      | 2024-01-15  |
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>| 2           | Bob Johnson   | bob@email.com        | 2024-02-20  |
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>| 3           | Carol White   | carol@email.com      | 2024-03-10  |
+</code></pre></div></p>
+<p>This is structured data because:
+- Every customer has exactly the same fields
+- Each field has a consistent type (IDs are numbers, names are text, dates are dates)
+- You can easily search, sort, and filter this data</p>
+<p>Most business data is structured: sales records, inventory counts, employee information, financial transactions.</p>
+<h4 id="semi-structured-data">Semi-Structured Data<a class="headerlink" href="#semi-structured-data" title="Permanent link">&para;</a></h4>
+<p>Semi-structured data has some organization, but it's flexible. Not every record needs to have the same fields.</p>
+<p><strong>Example: JSON data from an API</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;customer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice Smith&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">&quot;email&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;alice@email.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">&quot;preferences&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">&quot;newsletter&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">&quot;theme&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;dark&quot;</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;premium&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;early-adopter&quot;</span><span class="p">]</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">}</span>
+</code></pre></div></p>
+<p>This is semi-structured because:
+- There's a clear organization (fields have names)
+- But the structure can vary (some customers might have a <code>phone</code> field, others might not)
+- Nested data is allowed (preferences contains its own sub-fields)</p>
+<p>JSON (JavaScript Object Notation) and XML are common semi-structured formats. They're often used for web data and configuration files.</p>
+<h4 id="unstructured-data">Unstructured Data<a class="headerlink" href="#unstructured-data" title="Permanent link">&para;</a></h4>
+<p>Unstructured data has no predefined format. It's raw and messy by nature.</p>
+<p><strong>Examples:</strong>
+- A paragraph of text from a customer support email
+- An image file
+- A video recording
+- A voice memo</p>
+<p>Unstructured data is the hardest to work with because computers can't easily understand its meaning without special processing.</p>
+<h3 id="data-you-encounter-daily">Data You Encounter Daily<a class="headerlink" href="#data-you-encounter-daily" title="Permanent link">&para;</a></h3>
+<p>To make this concrete, here are data examples from everyday life:</p>
+<table>
+<thead>
+<tr>
+<th>Everyday Activity</th>
+<th>The Data Behind It</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Checking your bank balance</td>
+<td>Account numbers, transaction history, balances</td>
+</tr>
+<tr>
+<td>Getting a grocery receipt</td>
+<td>Product names, prices, quantities, totals, timestamps</td>
+</tr>
+<tr>
+<td>Using GPS navigation</td>
+<td>Location coordinates, road maps, traffic patterns</td>
+</tr>
+<tr>
+<td>Streaming music</td>
+<td>Song titles, artists, play counts, user preferences</td>
+</tr>
+<tr>
+<td>Ordering food delivery</td>
+<td>Menu items, prices, addresses, delivery times</td>
+</tr>
+</tbody>
+</table>
+<p>Every digital interaction creates data. Data engineering is about managing, moving, and transforming all of this information so it can be useful.</p>
+<hr />
+<h2 id="what-is-data-engineering">What is Data Engineering?<a class="headerlink" href="#what-is-data-engineering" title="Permanent link">&para;</a></h2>
+<p>Now that you understand what data is, let's talk about what data engineers actually do.</p>
+<h3 id="the-plumbing-of-the-data-world">The "Plumbing" of the Data World<a class="headerlink" href="#the-plumbing-of-the-data-world" title="Permanent link">&para;</a></h3>
+<p>Imagine a city's water system. Water needs to flow from reservoirs, through treatment plants, into pipes, and eventually out of your faucet. Someone has to design those pipes, build them, maintain them, and make sure clean water arrives when you turn the handle.</p>
+<p>Data engineering is the same idea, but for data instead of water.</p>
+<p><strong>Data engineers build and maintain the systems that move data from where it's created to where it's needed.</strong></p>
+<p>Just like you don't think about water pipes when you take a shower, most people don't think about data pipelines when they look at a dashboard. But those pipelines are essential. Without them, the data would never arrive.</p>
+<h3 id="what-data-engineers-actually-do">What Data Engineers Actually Do<a class="headerlink" href="#what-data-engineers-actually-do" title="Permanent link">&para;</a></h3>
+<p>On a typical day, a data engineer might:</p>
+<ol>
+<li>
+<p><strong>Build data pipelines</strong>: Create automated processes that move data from one place to another. For example, extracting sales data from an e-commerce system and loading it into a data warehouse.</p>
+</li>
+<li>
+<p><strong>Transform data</strong>: Clean, reshape, and combine data so it's ready for analysis. Raw data is often messy—data engineers make it usable.</p>
+</li>
+<li>
+<p><strong>Ensure data quality</strong>: Check that data is accurate, complete, and consistent. If bad data gets into a system, every report and decision based on it will be wrong.</p>
+</li>
+<li>
+<p><strong>Maintain infrastructure</strong>: Keep databases running, optimize queries that are too slow, and troubleshoot when something breaks.</p>
+</li>
+<li>
+<p><strong>Collaborate with analysts and scientists</strong>: Data engineers don't usually create the final reports or machine learning models—they provide the clean data that makes those things possible.</p>
+</li>
+</ol>
+<h3 id="data-engineering-vs-data-science-vs-data-analytics">Data Engineering vs Data Science vs Data Analytics<a class="headerlink" href="#data-engineering-vs-data-science-vs-data-analytics" title="Permanent link">&para;</a></h3>
+<p>These three roles are related but distinct:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Focus</th>
+<th>Key Question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Data Engineer</strong></td>
+<td>Building systems to move and prepare data</td>
+<td>"How do we get clean data from A to B?"</td>
+</tr>
+<tr>
+<td><strong>Data Analyst</strong></td>
+<td>Creating reports and dashboards from data</td>
+<td>"What happened? What does the data show?"</td>
+</tr>
+<tr>
+<td><strong>Data Scientist</strong></td>
+<td>Building predictive models and finding patterns</td>
+<td>"What will happen? Can we predict X?"</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Analogy</strong>: Think of a restaurant.
+- The <strong>Data Engineer</strong> is the chef who prepares the ingredients—washing vegetables, cutting meat, making sure everything is fresh and ready.
+- The <strong>Data Analyst</strong> is the cook who follows recipes to create dishes (reports) from those ingredients.
+- The <strong>Data Scientist</strong> is the chef who invents new recipes, experimenting with ingredients to create something new (predictions, recommendations).</p>
+<p>You can't have great dishes without properly prepared ingredients. That's why data engineering is foundational.</p>
+<h3 id="a-real-job-scenario">A Real Job Scenario<a class="headerlink" href="#a-real-job-scenario" title="Permanent link">&para;</a></h3>
+<p>Let's say you work at an online clothing retailer. The company wants to know which products are selling best in each region.</p>
+<p><strong>Without data engineering</strong>, someone would:
+1. Log into the sales system manually
+2. Export data to Excel
+3. Spend hours cleaning up the data (fixing typos, removing duplicates)
+4. Copy-paste data from different sources
+5. Manually calculate totals
+6. Repeat this process every week</p>
+<p><strong>With data engineering</strong>, you would:
+1. Build a pipeline that automatically extracts sales data every night
+2. Join it with product and region data
+3. Clean and standardize everything automatically
+4. Load it into a warehouse where analysts can query it instantly
+5. The pipeline runs every night without human intervention</p>
+<p>The first approach might work for a small company. But when you have millions of transactions, hundreds of products, and dozens of regions, manual work becomes impossible. That's when you need data engineering.</p>
+<hr />
+<h2 id="what-is-a-data-pipeline">What is a Data Pipeline?<a class="headerlink" href="#what-is-a-data-pipeline" title="Permanent link">&para;</a></h2>
+<p>A <strong>data pipeline</strong> is an automated process that moves data from one place to another, often transforming it along the way.</p>
+<h3 id="the-factory-assembly-line-analogy">The Factory Assembly Line Analogy<a class="headerlink" href="#the-factory-assembly-line-analogy" title="Permanent link">&para;</a></h3>
+<p>Imagine a car factory. Raw materials (steel, glass, rubber) enter at one end. They pass through various stations where workers and machines shape them, assemble them, and quality-check them. At the other end, finished cars roll off the line.</p>
+<p>A data pipeline works the same way:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>│   Raw Data  │───▶│  Station 1  │───▶│  Station 2  │───▶│ Final Data  │
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│   (Input)   │    │  (Extract)  │    │ (Transform) │    │  (Output)   │
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+</code></pre></div>
+<p><strong>Input</strong>: The raw data enters the pipeline. This might be CSV files, API responses, database tables, or event streams.</p>
+<p><strong>Processing Stations</strong>: Each station does something specific to the data:
+- Clean up messy values
+- Convert data types (text to dates, for example)
+- Join data from multiple sources
+- Calculate new fields
+- Filter out irrelevant records</p>
+<p><strong>Output</strong>: Clean, transformed data arrives at its destination—ready to be used for reports, dashboards, or further analysis.</p>
+<h3 id="a-visual-explanation">A Visual Explanation<a class="headerlink" href="#a-visual-explanation" title="Permanent link">&para;</a></h3>
+<p>Let's trace a specific piece of data through a pipeline:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>                        DATA PIPELINE EXAMPLE
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>═══════════════════════════════════════════════════════════════════════
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>📦 INPUT: Raw sales data from a point-of-sale system
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>┌────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│ transaction_id,product,price,date,store                           │
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│ T001,SHRT-BLU-M,$29.99,2024-03-15,Store #42                       │
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│ T002,SHRT-BLU-M,29.99,15/03/2024,42                               │
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│ T003,,29.99,2024-03-15,Store 42                                   │
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>└────────────────────────────────────────────────────────────────────┘
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>Notice the problems? Inconsistent date formats, missing product, 
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>dollar signs in some prices, store names formatted differently.
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>              │
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>              ▼
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>⚙️ STATION 1: Parse and Validate
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>- Convert all dates to YYYY-MM-DD format
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>- Remove currency symbols from prices
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>- Flag records with missing required fields
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>              │
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>              ▼
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>⚙️ STATION 2: Standardize
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>- Normalize store names to IDs
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>- Convert product codes to full names
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>- Ensure prices are decimal numbers
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>              │
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>              ▼
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>⚙️ STATION 3: Enrich
+<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>- Look up product category from product catalog
+<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>- Look up store region from store table
+<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>- Calculate sales tax based on region
+<a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>
+<a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>              │
+<a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>              ▼
+<a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>
+<a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a>✅ OUTPUT: Clean, enriched sales data
+<a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a>┌────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>│ transaction_id │ product_name   │ price │ date       │ store_id │  │
+<a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>│ T001           │ Blue Shirt (M) │ 29.99 │ 2024-03-15 │ 42       │  │
+<a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a>│ T002           │ Blue Shirt (M) │ 29.99 │ 2024-03-15 │ 42       │  │
+<a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>│ T003           │ NULL           │ 29.99 │ 2024-03-15 │ 42       │  │ ← Quarantined
+<a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a>└────────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<p>The pipeline took messy, inconsistent input and produced clean, standardized output. It also flagged the problematic record (T003) so someone can investigate the missing product.</p>
+<h3 id="why-manual-excel-work-doesnt-scale">Why Manual Excel Work Doesn't Scale<a class="headerlink" href="#why-manual-excel-work-doesnt-scale" title="Permanent link">&para;</a></h3>
+<p>You might wonder: "Can't I just do this in Excel?"</p>
+<p>For small amounts of data, yes. But consider these scenarios:</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Manual Approach</th>
+<th>Pipeline Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>100 rows, once</td>
+<td>✅ Totally fine</td>
+<td>Overkill</td>
+</tr>
+<tr>
+<td>100 rows, daily</td>
+<td>😓 Tedious, error-prone</td>
+<td>✅ Automated</td>
+</tr>
+<tr>
+<td>100,000 rows</td>
+<td>❌ Excel slows down</td>
+<td>✅ No problem</td>
+</tr>
+<tr>
+<td>10 million rows</td>
+<td>❌ Excel crashes</td>
+<td>✅ Still fine</td>
+</tr>
+<tr>
+<td>1 billion rows</td>
+<td>❌ Impossible</td>
+<td>✅ Use distributed processing</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Scale is one reason.</strong> But there are others:</p>
+<p><strong>Reproducibility</strong>: If you clean data manually in Excel, can you do it exactly the same way next time? What if you're sick and a colleague has to do it? With a pipeline, the logic is written in code—it runs the same way every time.</p>
+<p><strong>Audit trail</strong>: When something goes wrong with a report, you need to trace back to see what happened. With Excel, you'd have to remember every click and formula change. With a pipeline, you can review the code and logs.</p>
+<p><strong>Speed</strong>: A pipeline can run automatically at 3 AM while you sleep. Manual work requires a human to be present.</p>
+<hr />
+<h2 id="what-problems-do-pipelines-solve">What Problems Do Pipelines Solve?<a class="headerlink" href="#what-problems-do-pipelines-solve" title="Permanent link">&para;</a></h2>
+<p>Let's get specific about the problems data pipelines address.</p>
+<h3 id="problem-1-messy-data">Problem 1: Messy Data<a class="headerlink" href="#problem-1-messy-data" title="Permanent link">&para;</a></h3>
+<p>Real-world data is almost never clean. Here are common issues:</p>
+<p><strong>Inconsistent formatting</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a># These all mean the same thing, but are written differently
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>&quot;United States&quot;, &quot;USA&quot;, &quot;U.S.A.&quot;, &quot;US&quot;, &quot;united states&quot;, &quot;UNITED STATES&quot;
+</code></pre></div></p>
+<p><strong>Duplicate records</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a># Same customer entered twice
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>customer_id: 1001, name: &quot;John Smith&quot;, email: &quot;john@email.com&quot;
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>customer_id: 1002, name: &quot;John Smith&quot;, email: &quot;john@email.com&quot;
+</code></pre></div></p>
+<p><strong>Invalid values</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a># Age can&#39;t be negative
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>age: -5
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a># Birth date can&#39;t be in the future
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>birth_date: 2050-01-01
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a># Email missing @ symbol
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>email: &quot;invalidemail.com&quot;
+</code></pre></div></p>
+<p><strong>Mixed data types</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a># Price column has different formats
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>price: 29.99
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>price: &quot;$29.99&quot;
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>price: &quot;29,99&quot;  (European format)
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>price: &quot;twenty-nine ninety-nine&quot;
+</code></pre></div></p>
+<p>A pipeline includes validation and cleaning steps that catch and fix these issues automatically.</p>
+<h3 id="problem-2-manual-work-and-human-error">Problem 2: Manual Work and Human Error<a class="headerlink" href="#problem-2-manual-work-and-human-error" title="Permanent link">&para;</a></h3>
+<p>Every time a human touches data manually, there's a chance for error:</p>
+<ul>
+<li>Copy-pasting the wrong range</li>
+<li>Forgetting to apply a filter</li>
+<li>Typing a formula incorrectly</li>
+<li>Saving over the wrong file</li>
+<li>Using last month's template instead of the updated one</li>
+</ul>
+<p>These mistakes are expensive. A single typo in a financial report could cost millions. A forgotten filter could lead to wrong business decisions.</p>
+<p>💡 <strong>Automation removes human error from repetitive tasks.</strong> A pipeline runs the same logic every time, exactly as written.</p>
+<h3 id="problem-3-scale">Problem 3: Scale<a class="headerlink" href="#problem-3-scale" title="Permanent link">&para;</a></h3>
+<p>Consider this: A small retail store might have 100 transactions per day. That's 36,500 transactions per year—manageable in Excel.</p>
+<p>Now consider Amazon. They process roughly 8,500 transactions per <strong>second</strong>. That's 734 million transactions per day. 268 billion per year.</p>
+<p>You cannot process 268 billion rows in Excel. You need distributed computing systems that can split the work across hundreds or thousands of machines. Data pipelines built with tools like Apache Spark are designed for this scale.</p>
+<p>Even at smaller scales, performance matters. If generating a report takes 4 hours manually but 4 minutes with a pipeline, that's meaningful time savings.</p>
+<h3 id="problem-4-reproducibility">Problem 4: Reproducibility<a class="headerlink" href="#problem-4-reproducibility" title="Permanent link">&para;</a></h3>
+<p>Imagine this scenario:</p>
+<blockquote>
+<p>"Hey, the revenue numbers in last month's report look wrong. Can you re-run the analysis?"</p>
+</blockquote>
+<p>If you did it manually in Excel:
+- Do you still have the original files?
+- Did you document every step?
+- Can you replicate exactly what you did?</p>
+<p>If you have a pipeline:
+- Run the pipeline with last month's parameters
+- Get the same result
+- Compare to find the discrepancy</p>
+<p><strong>Reproducibility is essential for trust.</strong> If you can't reproduce a result, how do you know it was right in the first place?</p>
+<h3 id="problem-5-freshness">Problem 5: Freshness<a class="headerlink" href="#problem-5-freshness" title="Permanent link">&para;</a></h3>
+<p>Business moves fast. Executives want to see yesterday's numbers this morning, not next week.</p>
+<p>Manual processes have inherent delays:
+- Someone has to be available to run them
+- They can only run during business hours
+- If something fails, you might not notice until someone complains</p>
+<p>Automated pipelines can:
+- Run on a schedule (every night at 2 AM)
+- Run on triggers (whenever new data arrives)
+- Alert you immediately if something fails
+- Retry automatically after transient failures</p>
+<hr />
+<h2 id="etl-vs-elt">ETL vs ELT<a class="headerlink" href="#etl-vs-elt" title="Permanent link">&para;</a></h2>
+<p>You'll often hear these acronyms in data engineering. They describe two different approaches to moving and transforming data.</p>
+<h3 id="etl-extract-transform-load">ETL: Extract, Transform, Load<a class="headerlink" href="#etl-extract-transform-load" title="Permanent link">&para;</a></h3>
+<p><strong>ETL</strong> is the traditional approach. It works like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>┌──────────────┐         ┌───────────────┐         ┌───────────────┐
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>│    SOURCE    │────────▶│   TRANSFORM   │────────▶│  DESTINATION  │
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>│   Systems    │ Extract │   (Outside)   │  Load   │  (Warehouse)  │
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>└──────────────┘         └───────────────┘         └───────────────┘
+</code></pre></div>
+<ol>
+<li><strong>Extract</strong>: Pull data from source systems (databases, APIs, files)</li>
+<li><strong>Transform</strong>: Clean and reshape the data <strong>before</strong> loading it</li>
+<li><strong>Load</strong>: Insert the transformed data into the destination</li>
+</ol>
+<p><strong>Why ETL?</strong> In the past, storage and computing power in data warehouses were expensive. It made sense to clean and shrink the data before loading it—you'd only store what you actually needed.</p>
+<p><strong>ETL Example</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Source: 10 million raw transaction records
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Transform: Filter to only completed orders, aggregate by day
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Load: 365 daily summary records into the warehouse
+</code></pre></div></p>
+<p>You've reduced 10 million records to 365, saving storage and making queries faster.</p>
+<h3 id="elt-extract-load-transform">ELT: Extract, Load, Transform<a class="headerlink" href="#elt-extract-load-transform" title="Permanent link">&para;</a></h3>
+<p><strong>ELT</strong> is the modern approach, enabled by cheap cloud storage and powerful cloud warehouses.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>┌──────────────┐         ┌───────────────┐         ┌───────────────┐
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>│    SOURCE    │────────▶│  DESTINATION  │────────▶│   TRANSFORM   │
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>│   Systems    │ Extract │  (Warehouse)  │  Load   │   (Inside)    │
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>└──────────────┘         └───────────────┘         └───────────────┘
+</code></pre></div>
+<ol>
+<li><strong>Extract</strong>: Pull data from source systems</li>
+<li><strong>Load</strong>: Load the raw data into the destination <strong>first</strong></li>
+<li><strong>Transform</strong>: Transform the data <strong>inside</strong> the warehouse using SQL</li>
+</ol>
+<p><strong>Why ELT?</strong> Modern cloud warehouses (Snowflake, BigQuery, Databricks) can store huge amounts of data cheaply and process it incredibly fast. Loading raw data first gives you:
+- A complete historical record (nothing is lost)
+- Flexibility to transform in different ways later
+- The ability to re-transform if requirements change</p>
+<p><strong>ELT Example</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Source: 10 million raw transaction records
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>Load: All 10 million records into the warehouse (raw layer)
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>Transform: Create views or tables for different purposes
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>  - Daily summaries for executives
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>  - Detailed records for fraud analysis
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>  - Customer-level aggregations for marketing
+</code></pre></div></p>
+<h3 id="visual-comparison">Visual Comparison<a class="headerlink" href="#visual-comparison" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>                    ETL (Traditional)
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>═══════════════════════════════════════════════════════════════
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    SOURCE              ETL SERVER              WAREHOUSE
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>  ┌─────────┐          ┌─────────┐           ┌─────────┐
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>  │ Sales   │          │         │           │         │
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>  │ System  │────────▶ │ Clean   │─────────▶ │ Clean   │
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>  │         │          │ Filter  │           │ Data    │
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>  └─────────┘          │ Aggregate           └─────────┘
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>  ┌─────────┐          │         │
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>  │ CRM     │────────▶ │         │
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>  └─────────┘          └─────────┘
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>  ⚠️ Transformation happens OUTSIDE the warehouse
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>  ⚠️ Raw data is discarded after transformation
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>                    ELT (Modern)
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a>═══════════════════════════════════════════════════════════════
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>
+<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a>    SOURCE              WAREHOUSE                WAREHOUSE
+<a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a>  ┌─────────┐          ┌─────────┐           ┌─────────┐
+<a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a>  │ Sales   │          │ RAW     │           │ CLEAN   │
+<a id="__codelineno-12-24" name="__codelineno-12-24" href="#__codelineno-12-24"></a>  │ System  │────────▶ │ Layer   │─────────▶ │ Layer   │
+<a id="__codelineno-12-25" name="__codelineno-12-25" href="#__codelineno-12-25"></a>  │         │          │ (All    │   SQL     │ (Views  │
+<a id="__codelineno-12-26" name="__codelineno-12-26" href="#__codelineno-12-26"></a>  └─────────┘          │  Data)  │  Transforms  &amp; Tables)
+<a id="__codelineno-12-27" name="__codelineno-12-27" href="#__codelineno-12-27"></a>  ┌─────────┐          │         │           │         │
+<a id="__codelineno-12-28" name="__codelineno-12-28" href="#__codelineno-12-28"></a>  │ CRM     │────────▶ │         │           │         │
+<a id="__codelineno-12-29" name="__codelineno-12-29" href="#__codelineno-12-29"></a>  └─────────┘          └─────────┘           └─────────┘
+<a id="__codelineno-12-30" name="__codelineno-12-30" href="#__codelineno-12-30"></a>
+<a id="__codelineno-12-31" name="__codelineno-12-31" href="#__codelineno-12-31"></a>  ✅ Raw data is preserved
+<a id="__codelineno-12-32" name="__codelineno-12-32" href="#__codelineno-12-32"></a>  ✅ Transformations use warehouse compute power
+<a id="__codelineno-12-33" name="__codelineno-12-33" href="#__codelineno-12-33"></a>  ✅ Can re-transform any time
+</code></pre></div>
+<h3 id="when-to-use-which">When to Use Which<a class="headerlink" href="#when-to-use-which" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Consideration</th>
+<th>ETL</th>
+<th>ELT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Warehouse storage is expensive</td>
+<td>✅ Preferred</td>
+<td></td>
+</tr>
+<tr>
+<td>Warehouse compute is powerful</td>
+<td></td>
+<td>✅ Preferred</td>
+</tr>
+<tr>
+<td>Need to preserve raw data</td>
+<td></td>
+<td>✅ Preferred</td>
+</tr>
+<tr>
+<td>Complex transformations before loading</td>
+<td>✅ Preferred</td>
+<td></td>
+</tr>
+<tr>
+<td>Privacy/compliance requires filtering before loading</td>
+<td>✅ Preferred</td>
+<td></td>
+</tr>
+<tr>
+<td>Want flexibility to change transformations later</td>
+<td></td>
+<td>✅ Preferred</td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-odibi-supports-both">How Odibi Supports Both<a class="headerlink" href="#how-odibi-supports-both" title="Permanent link">&para;</a></h3>
+<p>Odibi is designed to work with either approach:</p>
+<p><strong>For ETL workflows</strong>: You can define transformation patterns that run during the extract phase, cleaning and reshaping data before it reaches your destination.</p>
+<p><strong>For ELT workflows</strong>: You can use Odibi to manage the "E" and "L" (extracting from sources and loading to raw layers), then define separate transformation jobs that run inside your warehouse.</p>
+<p><strong>Hybrid approaches</strong>: Many real-world pipelines use both. You might:
+1. Extract data from a source
+2. Do light cleaning (ETL-style) to fix obvious issues
+3. Load to a raw layer
+4. Do heavy transformations (ELT-style) in the warehouse</p>
+<p>Odibi's pattern-based approach lets you mix and match as needed.</p>
+<hr />
+<h2 id="what-is-a-schema-why-does-it-matter">What is a Schema? Why Does It Matter?<a class="headerlink" href="#what-is-a-schema-why-does-it-matter" title="Permanent link">&para;</a></h2>
+<p>A <strong>schema</strong> is the structure or blueprint of your data. It defines what fields exist, what types they are, and how they relate to each other.</p>
+<h3 id="the-spreadsheet-headers-analogy">The Spreadsheet Headers Analogy<a class="headerlink" href="#the-spreadsheet-headers-analogy" title="Permanent link">&para;</a></h3>
+<p>When you create a spreadsheet, the first row usually contains headers:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>| Name       | Age | Email              | Salary   |
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>|------------|-----|--------------------|----------|
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>| Alice      | 30  | alice@email.com    | 75000    |
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>| Bob        | 25  | bob@email.com      | 65000    |
+</code></pre></div>
+<p>Those headers are a simple schema. They tell you:
+- What each column means
+- In what order columns appear</p>
+<p>A database schema goes further:
+- <strong>Name</strong>: Text, maximum 100 characters, cannot be empty
+- <strong>Age</strong>: Integer, must be between 0 and 150
+- <strong>Email</strong>: Text, must contain "@", must be unique
+- <strong>Salary</strong>: Decimal number, cannot be negative</p>
+<h3 id="type-safety-why-it-matters">Type Safety: Why It Matters<a class="headerlink" href="#type-safety-why-it-matters" title="Permanent link">&para;</a></h3>
+<p>Every piece of data has a <strong>type</strong>. Common types include:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>What It Stores</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>String/Text</td>
+<td>Letters, words, sentences</td>
+<td>"Hello", "Product-123"</td>
+</tr>
+<tr>
+<td>Integer</td>
+<td>Whole numbers</td>
+<td>1, 42, -7, 1000000</td>
+</tr>
+<tr>
+<td>Float/Decimal</td>
+<td>Numbers with decimals</td>
+<td>3.14, 29.99, -0.5</td>
+</tr>
+<tr>
+<td>Boolean</td>
+<td>True or false</td>
+<td>true, false</td>
+</tr>
+<tr>
+<td>Date</td>
+<td>Calendar dates</td>
+<td>2024-03-15</td>
+</tr>
+<tr>
+<td>Timestamp</td>
+<td>Date and time</td>
+<td>2024-03-15 10:30:00</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why does this matter?</strong></p>
+<p>Imagine someone puts text in a number column:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>| product_id | quantity |
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>|------------|----------|
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>| P001       | 10       |
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>| P002       | 5        |
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>| P003       | &quot;TBD&quot;    |  ← This is text, not a number!
+</code></pre></div>
+<p>Now try to calculate total quantity: <code>10 + 5 + "TBD" = ???</code></p>
+<p>The calculation fails because you can't add a number to text. This is a <strong>type mismatch</strong>, and it breaks things.</p>
+<p>A schema with proper types <strong>prevents</strong> this. If the <code>quantity</code> column is defined as an integer, the system will reject "TBD" when someone tries to insert it.</p>
+<h3 id="what-happens-when-schemas-dont-match">What Happens When Schemas Don't Match<a class="headerlink" href="#what-happens-when-schemas-dont-match" title="Permanent link">&para;</a></h3>
+<p>Schema mismatches are a major source of pipeline failures. Here are common scenarios:</p>
+<p><strong>Scenario 1: Source adds a new column</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a># Your schema expects:
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>name, email, signup_date
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a># Source now sends:
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>name, email, signup_date, phone_number  ← New column!
+</code></pre></div>
+Your pipeline might fail because it doesn't know what to do with <code>phone_number</code>.</p>
+<p><strong>Scenario 2: Source changes a column type</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a># Previously:
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>order_id: 12345 (integer)
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a># Now:
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>order_id: &quot;ORD-12345&quot; (string)  ← Type changed!
+</code></pre></div>
+Your pipeline expects an integer but receives a string. Crash.</p>
+<p><strong>Scenario 3: Source renames a column</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a># Previously:
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>customer_name
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a># Now:
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>cust_name  ← Different name, same data
+</code></pre></div>
+Your pipeline looks for <code>customer_name</code>, finds nothing, and fails.</p>
+<h3 id="schema-evolution">Schema Evolution<a class="headerlink" href="#schema-evolution" title="Permanent link">&para;</a></h3>
+<p>Schemas change over time. Business requirements evolve. New data becomes available. This is called <strong>schema evolution</strong>, and it's one of the trickiest parts of data engineering.</p>
+<p>Good data engineering practices handle schema evolution gracefully:</p>
+<ol>
+<li>
+<p><strong>Additive changes</strong> (new columns): Usually safe. Ignore new columns or add them as optional.</p>
+</li>
+<li>
+<p><strong>Removal changes</strong> (dropped columns): Dangerous. If your pipeline depends on that column, it will break.</p>
+</li>
+<li>
+<p><strong>Type changes</strong>: Very dangerous. Requires careful migration.</p>
+</li>
+<li>
+<p><strong>Rename changes</strong>: Dangerous. Requires mapping old names to new names.</p>
+</li>
+</ol>
+<p>Odibi helps with schema evolution by:
+- Validating incoming data against expected schemas
+- Providing clear error messages when schemas don't match
+- Supporting schema transformation patterns (renaming, type conversion)</p>
+<hr />
+<h2 id="data-quality-basics">Data Quality Basics<a class="headerlink" href="#data-quality-basics" title="Permanent link">&para;</a></h2>
+<p>"Garbage in, garbage out" is the oldest saying in data. If the data going into your pipeline is bad, the output will be bad too—no matter how sophisticated your transformations are.</p>
+<h3 id="the-five-pillars-of-data-quality">The Five Pillars of Data Quality<a class="headerlink" href="#the-five-pillars-of-data-quality" title="Permanent link">&para;</a></h3>
+<h4 id="1-completeness-are-required-values-present">1. Completeness: Are required values present?<a class="headerlink" href="#1-completeness-are-required-values-present" title="Permanent link">&para;</a></h4>
+<p><strong>Nulls</strong> (missing values) are the most common data quality issue.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>| order_id | customer_id | total   |
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>|----------|-------------|---------|
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>| 1001     | C100        | 59.99   |
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>| 1002     | NULL        | 29.99   |  ← Who placed this order?
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>| 1003     | C102        | NULL    |  ← How much was it?
+</code></pre></div>
+<p>Some nulls are acceptable (an optional phone number might be null). Others are critical failures (an order without a total is useless).</p>
+<p><strong>Questions to ask</strong>:
+- Which fields are required?
+- What should happen when a required field is null?
+- Should we reject the record? Fill in a default? Quarantine for review?</p>
+<h4 id="2-uniqueness-are-there-duplicate-records">2. Uniqueness: Are there duplicate records?<a class="headerlink" href="#2-uniqueness-are-there-duplicate-records" title="Permanent link">&para;</a></h4>
+<p>Duplicates inflate counts and totals, leading to wrong conclusions.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>| transaction_id | amount |
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>|----------------|--------|
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>| T001           | 100.00 |
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>| T001           | 100.00 |  ← Duplicate!
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>| T002           | 50.00  |
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>Total without duplicates: $150.00
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>Total with duplicates: $250.00  ← Wrong!
+</code></pre></div>
+<p><strong>Questions to ask</strong>:
+- What makes a record unique? (Usually a primary key)
+- How did duplicates get created? (Fix the source if possible)
+- How do we handle duplicates? (Keep first? Keep last? Merge?)</p>
+<h4 id="3-validity-are-values-within-acceptable-ranges">3. Validity: Are values within acceptable ranges?<a class="headerlink" href="#3-validity-are-values-within-acceptable-ranges" title="Permanent link">&para;</a></h4>
+<p>Invalid values don't make sense in context.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a># Invalid examples:
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>age: -5              # Age cannot be negative
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>temperature: 500°C   # Unless it&#39;s a volcano, this is wrong
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>discount: 150%       # Can&#39;t discount more than 100%
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>birth_date: 2099-01-01  # This date hasn&#39;t happened yet
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>status: &quot;Pneding&quot;    # Typo in status value
+</code></pre></div>
+<p><strong>Questions to ask</strong>:
+- What are the valid ranges for numeric fields?
+- What are the valid values for categorical fields?
+- What date ranges make sense?</p>
+<h4 id="4-consistency-does-the-same-thing-have-the-same-representation">4. Consistency: Does the same thing have the same representation?<a class="headerlink" href="#4-consistency-does-the-same-thing-have-the-same-representation" title="Permanent link">&para;</a></h4>
+<p>Inconsistent data is technically valid but difficult to work with.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a># Inconsistent country names:
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>&quot;United States&quot;
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>&quot;USA&quot;
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>&quot;U.S.A.&quot;
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>&quot;United States of America&quot;
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>&quot;US&quot;
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a># Inconsistent date formats:
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>&quot;2024-03-15&quot;
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>&quot;03/15/2024&quot;
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>&quot;15-Mar-2024&quot;
+<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>&quot;March 15, 2024&quot;
+</code></pre></div>
+<p>All of these mean the same thing, but a computer sees them as different values. Reports will show separate counts for "USA" and "United States" when they should be combined.</p>
+<p><strong>Solution</strong>: Standardize during transformation. Pick one format and convert everything to it.</p>
+<h4 id="5-referential-integrity-do-relationships-make-sense">5. Referential Integrity: Do relationships make sense?<a class="headerlink" href="#5-referential-integrity-do-relationships-make-sense" title="Permanent link">&para;</a></h4>
+<p>When records refer to other records, those references should be valid.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a># Orders table:
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>| order_id | customer_id |
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>|----------|-------------|
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>| 1001     | C100        |
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>| 1002     | C999        |  ← This customer doesn&#39;t exist!
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a># Customers table:
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>| customer_id | name    |
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>|-------------|---------|
+<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>| C100        | Alice   |
+<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>| C101        | Bob     |
+</code></pre></div>
+<p>Order 1002 references customer C999, but that customer isn't in the customers table. This is called an <strong>orphan record</strong>—it has no parent.</p>
+<p><strong>Why it matters</strong>:
+- You can't look up the customer name for order 1002
+- Reports will show orders without customer information
+- Joins between tables will lose data</p>
+<h3 id="garbage-in-garbage-out-in-practice">"Garbage In, Garbage Out" in Practice<a class="headerlink" href="#garbage-in-garbage-out-in-practice" title="Permanent link">&para;</a></h3>
+<p>Imagine building a dashboard showing "Average Order Value by Region."</p>
+<p>If your data has:
+- ❌ Missing order totals → Averages will be wrong
+- ❌ Duplicate orders → Totals will be inflated
+- ❌ Invalid region codes → Some orders won't be assigned to any region
+- ❌ Inconsistent region names → "West Coast" and "WEST COAST" counted separately</p>
+<p>Your dashboard will show wrong numbers, and executives will make wrong decisions based on it.</p>
+<p>💡 <strong>Data quality is not optional.</strong> It's the foundation that everything else depends on.</p>
+<p>Odibi includes built-in validation patterns to catch these issues before they pollute your data.</p>
+<hr />
+<h2 id="the-medallion-architecture-bronzesilvergold">The Medallion Architecture (Bronze/Silver/Gold)<a class="headerlink" href="#the-medallion-architecture-bronzesilvergold" title="Permanent link">&para;</a></h2>
+<p>The <strong>Medallion Architecture</strong> is a design pattern for organizing data in layers. Each layer has a specific purpose and quality level.</p>
+<h3 id="the-manufacturing-analogy">The Manufacturing Analogy<a class="headerlink" href="#the-manufacturing-analogy" title="Permanent link">&para;</a></h3>
+<p>Think of a factory that turns raw materials into finished products:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>│    RAW ORE      │    │  REFINED METAL  │    │ FINISHED PRODUCT│
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>│   (Bronze)      │───▶│    (Silver)     │───▶│     (Gold)      │
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>│                 │    │                 │    │                 │
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>│ Rocks, dirt,    │    │ Pure metal      │    │ Jewelry, tools  │
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>│ impurities      │    │ ingots          │    │ ready to sell   │
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>└─────────────────┘    └─────────────────┘    └─────────────────┘
+</code></pre></div>
+<p>Data flows through similar stages, becoming more refined at each step.</p>
+<h3 id="visual-diagram-of-the-medallion-architecture">Visual Diagram of the Medallion Architecture<a class="headerlink" href="#visual-diagram-of-the-medallion-architecture" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>═══════════════════════════════════════════════════════════════════════════
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>                        MEDALLION ARCHITECTURE
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>═══════════════════════════════════════════════════════════════════════════
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>   SOURCES                BRONZE               SILVER               GOLD
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>  (External)            (Raw Data)          (Cleaned)          (Business-Ready)
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>┌──────────────┐      ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>│ Sales API    │─────▶│             │     │             │     │             │
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>├──────────────┤      │ Exact copy  │     │ Validated   │     │ Aggregated  │
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>│ CRM Database │─────▶│ of source   │────▶│ Cleaned     │────▶│ Joined      │
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>├──────────────┤      │ data        │     │ Standardized│     │ Business    │
+<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>│ CSV Files    │─────▶│             │     │             │     │ Metrics     │
+<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>├──────────────┤      │ No changes  │     │ Quality     │     │             │
+<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>│ Event Stream │─────▶│ whatsoever  │     │ checked     │     │ Ready for   │
+<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>└──────────────┘      └─────────────┘     └─────────────┘     │ dashboards  │
+<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>                                                               └─────────────┘
+<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>
+<a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a>                      📦 STORAGE:          📦 STORAGE:        📦 STORAGE:
+<a id="__codelineno-24-19" name="__codelineno-24-19" href="#__codelineno-24-19"></a>                      Everything           Reliable data      Curated datasets
+<a id="__codelineno-24-20" name="__codelineno-24-20" href="#__codelineno-24-20"></a>                      (even garbage)       for analysis       for specific uses
+</code></pre></div>
+<h3 id="what-belongs-in-each-layer">What Belongs in Each Layer?<a class="headerlink" href="#what-belongs-in-each-layer" title="Permanent link">&para;</a></h3>
+<h4 id="bronze-layer-raw">📦 Bronze Layer (Raw)<a class="headerlink" href="#bronze-layer-raw" title="Permanent link">&para;</a></h4>
+<p><strong>Purpose</strong>: Preserve the original data exactly as received.</p>
+<p><strong>Contents</strong>:
+- Exact copies of source data
+- No transformations
+- No cleaning
+- No filtering</p>
+<p><strong>Why keep raw data?</strong>
+- If something goes wrong, you can reprocess from scratch
+- If requirements change, you have the original data
+- For auditing and compliance, you can prove what was received</p>
+<p><strong>Example Bronze table</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>| _raw_json                                          | _source   | _loaded_at          |
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>|----------------------------------------------------|-----------|---------------------|
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>| {&quot;id&quot;:1,&quot;name&quot;:&quot;Alice&quot;,&quot;date&quot;:&quot;2024-03-15&quot;}       | crm_api   | 2024-03-15 10:00:00 |
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>| {&quot;id&quot;:2,&quot;name&quot;:&quot;Bob&quot;,&quot;date&quot;:&quot;15/03/2024&quot;}         | crm_api   | 2024-03-15 10:00:00 |
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>| {&quot;id&quot;:&quot;X&quot;,&quot;name&quot;:null,&quot;date&quot;:&quot;invalid&quot;}           | crm_api   | 2024-03-15 10:00:00 |
+</code></pre></div></p>
+<p>Even the bad data (ID "X" with null name and invalid date) is preserved.</p>
+<h4 id="silver-layer-cleaned">🥈 Silver Layer (Cleaned)<a class="headerlink" href="#silver-layer-cleaned" title="Permanent link">&para;</a></h4>
+<p><strong>Purpose</strong>: Validated, cleaned, standardized data ready for analysis.</p>
+<p><strong>Contents</strong>:
+- Data types enforced (dates are dates, numbers are numbers)
+- Invalid records filtered out or quarantined
+- Formats standardized (consistent date formats, normalized text)
+- Duplicates removed
+- Basic business logic applied</p>
+<p><strong>Example Silver table</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>| id   | name   | registration_date | _is_valid | _quality_score |
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>|------|--------|-------------------|-----------|----------------|
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>| 1    | Alice  | 2024-03-15        | true      | 100            |
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>| 2    | Bob    | 2024-03-15        | true      | 100            |
+</code></pre></div></p>
+<p>Notice the bad record from Bronze didn't make it to Silver. It was quarantined because it had invalid values.</p>
+<h4 id="gold-layer-business-ready">🥇 Gold Layer (Business-Ready)<a class="headerlink" href="#gold-layer-business-ready" title="Permanent link">&para;</a></h4>
+<p><strong>Purpose</strong>: Aggregated, joined, business-specific datasets for end users.</p>
+<p><strong>Contents</strong>:
+- Pre-calculated metrics
+- Data from multiple Silver tables joined together
+- Optimized for specific use cases (dashboards, reports, ML models)
+- Business terminology (not technical column names)</p>
+<p><strong>Example Gold table</strong> (Daily Sales Summary):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>| report_date | region      | total_orders | total_revenue | avg_order_value |
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>|-------------|-------------|--------------|---------------|-----------------|
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>| 2024-03-15  | Northeast   | 1,234        | $98,456.78    | $79.78          |
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>| 2024-03-15  | Southeast   | 987          | $76,543.21    | $77.55          |
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>| 2024-03-15  | Midwest     | 1,567        | $123,456.89   | $78.78          |
+</code></pre></div></p>
+<p>This is what business users see in their dashboards. They don't need to know about raw JSON or data cleaning—they just want the numbers.</p>
+<h3 id="why-this-pattern-exists">Why This Pattern Exists<a class="headerlink" href="#why-this-pattern-exists" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Separation of concerns</strong>: Each layer has one job. Bronze preserves. Silver cleans. Gold serves.</p>
+</li>
+<li>
+<p><strong>Reprocessing</strong>: If cleaning logic changes, reprocess Silver from Bronze. If aggregation logic changes, reprocess Gold from Silver.</p>
+</li>
+<li>
+<p><strong>Debugging</strong>: When something looks wrong in Gold, you can trace back to Silver, then Bronze, to find where the problem started.</p>
+</li>
+<li>
+<p><strong>Performance</strong>: Gold tables are pre-aggregated, so dashboards load instantly instead of calculating on the fly.</p>
+</li>
+<li>
+<p><strong>Access control</strong>: Raw data in Bronze might be sensitive. You can restrict access to Bronze while allowing wider access to sanitized Gold data.</p>
+</li>
+</ol>
+<hr />
+<h2 id="how-odibi-fits-into-the-ecosystem">How Odibi Fits Into the Ecosystem<a class="headerlink" href="#how-odibi-fits-into-the-ecosystem" title="Permanent link">&para;</a></h2>
+<p>There are many tools in the data engineering world. Here's how Odibi compares.</p>
+<h3 id="odibi-vs-dbt">Odibi vs dbt<a class="headerlink" href="#odibi-vs-dbt" title="Permanent link">&para;</a></h3>
+<p><strong>dbt</strong> (data build tool) is popular for transforming data inside a warehouse using SQL.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>dbt</th>
+<th>Odibi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Primary language</td>
+<td>SQL</td>
+<td>Python (with YAML config)</td>
+</tr>
+<tr>
+<td>Transform location</td>
+<td>Inside the warehouse</td>
+<td>Flexible (Spark, Pandas, Polars)</td>
+</tr>
+<tr>
+<td>Focus</td>
+<td>Transformations only</td>
+<td>Full pipeline patterns</td>
+</tr>
+<tr>
+<td>Approach</td>
+<td>Write SQL, dbt manages</td>
+<td>Declarative patterns</td>
+</tr>
+</tbody>
+</table>
+<p><strong>When to use dbt</strong>: Your team is SQL-strong, your data is already in a warehouse, and you want a SQL-centric workflow.</p>
+<p><strong>When to use Odibi</strong>: You need to work with data before it reaches the warehouse, want Python flexibility, or prefer pattern-based configuration over writing SQL.</p>
+<h3 id="odibi-vs-airflow">Odibi vs Airflow<a class="headerlink" href="#odibi-vs-airflow" title="Permanent link">&para;</a></h3>
+<p><strong>Airflow</strong> is an orchestrator—it schedules and monitors when jobs run, but it doesn't define what those jobs do.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Airflow</th>
+<th>Odibi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Purpose</td>
+<td>Orchestration (when)</td>
+<td>Transformation (what)</td>
+</tr>
+<tr>
+<td>What it does</td>
+<td>Schedules tasks, manages dependencies</td>
+<td>Defines data transformations</td>
+</tr>
+<tr>
+<td>Scope</td>
+<td>Runs any task (data, ML, DevOps)</td>
+<td>Data pipelines specifically</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Relationship</strong>: You can use Airflow to schedule Odibi jobs. Airflow says "run this at 3 AM," Odibi says "here's what to do when you run."</p>
+<h3 id="odibi-vs-raw-sparkpandas">Odibi vs Raw Spark/Pandas<a class="headerlink" href="#odibi-vs-raw-sparkpandas" title="Permanent link">&para;</a></h3>
+<p><strong>Spark</strong> and <strong>Pandas</strong> are processing engines. They're extremely powerful but require you to write all the logic yourself.</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Raw Spark/Pandas</th>
+<th>Odibi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Approach</td>
+<td>Write code for everything</td>
+<td>Use pre-built patterns</td>
+</tr>
+<tr>
+<td>SCD2 logic</td>
+<td>Write 50+ lines of code</td>
+<td>One config option</td>
+</tr>
+<tr>
+<td>Data quality</td>
+<td>Build it yourself</td>
+<td>Built-in validation</td>
+</tr>
+<tr>
+<td>Learning curve</td>
+<td>Steep</td>
+<td>Gentler</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Odibi adds patterns on top of these engines.</strong> Instead of writing the same boilerplate code for SCD2 (Slowly Changing Dimension Type 2) over and over, you declare what you want in YAML and Odibi generates the code.</p>
+<p><strong>When to use raw Spark/Pandas</strong>: You need custom logic that doesn't fit any pattern, or you're learning how these engines work.</p>
+<p><strong>When to use Odibi</strong>: You're building production pipelines and want to move fast with proven patterns.</p>
+<h3 id="when-to-use-odibi">When to Use Odibi<a class="headerlink" href="#when-to-use-odibi" title="Permanent link">&para;</a></h3>
+<p>Odibi is a good fit when:</p>
+<p>✅ You're building data pipelines in Python<br />
+✅ You want to use Spark, Pandas, or Polars<br />
+✅ You need SCD2, merge patterns, or data quality checks<br />
+✅ You prefer configuration over code<br />
+✅ You're a small team (or solo) and need to move fast  </p>
+<p>Odibi might not be the best fit when:</p>
+<p>❌ Your entire workflow is SQL-based (consider dbt)<br />
+❌ You need a scheduler/orchestrator (use Airflow, Dagster, or Prefect)<br />
+❌ You're doing real-time streaming (consider Kafka, Flink)  </p>
+<hr />
+<h2 id="your-first-mental-model">Your First Mental Model<a class="headerlink" href="#your-first-mental-model" title="Permanent link">&para;</a></h2>
+<p>Let's put everything together with a complete example. We'll trace data from source to dashboard.</p>
+<h3 id="the-journey-source-bronze-silver-gold-dashboard">The Journey: Source → Bronze → Silver → Gold → Dashboard<a class="headerlink" href="#the-journey-source-bronze-silver-gold-dashboard" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>═══════════════════════════════════════════════════════════════════════════
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>                    THE COMPLETE DATA JOURNEY
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>═══════════════════════════════════════════════════════════════════════════
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>    📄 SOURCE            📦 BRONZE           🥈 SILVER           🥇 GOLD
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>    (CSV file)          (Raw copy)         (Cleaned)          (Aggregated)
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>        │                   │                  │                  │
+<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>        ▼                   ▼                  ▼                  ▼
+<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>   ┌─────────┐         ┌─────────┐        ┌─────────┐       ┌─────────┐
+<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>   │ orders  │────────▶│  raw_   │───────▶│ clean_  │──────▶│ daily_  │
+<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>   │  .csv   │         │ orders  │        │ orders  │       │ summary │
+<a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>   └─────────┘         └─────────┘        └─────────┘       └─────────┘
+<a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a>                                                                  │
+<a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>                                                                  ▼
+<a id="__codelineno-28-15" name="__codelineno-28-15" href="#__codelineno-28-15"></a>                                                            ┌──────────┐
+<a id="__codelineno-28-16" name="__codelineno-28-16" href="#__codelineno-28-16"></a>                                                            │ Dashboard│
+<a id="__codelineno-28-17" name="__codelineno-28-17" href="#__codelineno-28-17"></a>                                                            │  📊📈    │
+<a id="__codelineno-28-18" name="__codelineno-28-18" href="#__codelineno-28-18"></a>                                                            └──────────┘
+</code></pre></div>
+<h3 id="step-1-sample-source-data-csv">Step 1: Sample Source Data (CSV)<a class="headerlink" href="#step-1-sample-source-data-csv" title="Permanent link">&para;</a></h3>
+<p>This is what arrives from the source system—an orders CSV file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>order_id,customer_name,product,quantity,price,order_date,region
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>ORD001,Alice Smith,Widget A,2,29.99,2024-03-15,Northeast
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>ORD002,BOB JOHNSON,Widget B,1,$49.99,03/15/2024,northeast
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>ORD003,Carol White,Widget A,-1,29.99,2024-03-15,Southeast
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>ORD004,,Widget C,3,19.99,2024-03-15,Midwest
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>ORD001,Alice Smith,Widget A,2,29.99,2024-03-15,Northeast
+<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a>ORD005,Dave Brown,Widget B,1,49.99,2024-03-99,West
+</code></pre></div>
+<p><strong>Problems in this data</strong>:
+- 📛 Row 2: Name in ALL CAPS, price has "$", date format different, region lowercase
+- ❌ Row 3: Negative quantity (invalid)
+- ❌ Row 4: Missing customer name
+- ❌ Row 5: Duplicate of row 1
+- ❌ Row 6: Invalid date (March 99th doesn't exist)</p>
+<h3 id="step-2-bronze-layer-raw-copy">Step 2: Bronze Layer (Raw Copy)<a class="headerlink" href="#step-2-bronze-layer-raw-copy" title="Permanent link">&para;</a></h3>
+<p>The Bronze layer stores this data exactly as received:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>| order_id | customer_name | product  | quantity | price   | order_date | region    | _loaded_at          |
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>|----------|---------------|----------|----------|---------|------------|-----------|---------------------|
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>| ORD001   | Alice Smith   | Widget A | 2        | 29.99   | 2024-03-15 | Northeast | 2024-03-16 02:00:00 |
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>| ORD002   | BOB JOHNSON   | Widget B | 1        | $49.99  | 03/15/2024 | northeast | 2024-03-16 02:00:00 |
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>| ORD003   | Carol White   | Widget A | -1       | 29.99   | 2024-03-15 | Southeast | 2024-03-16 02:00:00 |
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>| ORD004   |               | Widget C | 3        | 19.99   | 2024-03-15 | Midwest   | 2024-03-16 02:00:00 |
+<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a>| ORD001   | Alice Smith   | Widget A | 2        | 29.99   | 2024-03-15 | Northeast | 2024-03-16 02:00:00 |
+<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>| ORD005   | Dave Brown    | Widget B | 1        | 49.99   | 2024-03-99 | West      | 2024-03-16 02:00:00 |
+</code></pre></div>
+<p>Nothing changed except adding a timestamp of when we loaded it. All the messy data is preserved.</p>
+<h3 id="step-3-silver-layer-cleaned">Step 3: Silver Layer (Cleaned)<a class="headerlink" href="#step-3-silver-layer-cleaned" title="Permanent link">&para;</a></h3>
+<p>The Silver layer applies transformations and validations:</p>
+<p><strong>Transformations applied</strong>:
+1. Standardize customer names to Title Case
+2. Remove "$" from prices, convert to decimal
+3. Parse dates to YYYY-MM-DD format
+4. Standardize region names to Title Case
+5. Remove duplicates based on order_id</p>
+<p><strong>Validations applied</strong>:
+1. Quantity must be positive
+2. Customer name cannot be empty
+3. Date must be valid</p>
+<p><strong>Resulting Silver table</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>| order_id | customer_name | product  | quantity | price | order_date | region    | _is_valid |
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>|----------|---------------|----------|----------|-------|------------|-----------|-----------|
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>| ORD001   | Alice Smith   | Widget A | 2        | 29.99 | 2024-03-15 | Northeast | ✅        |
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>| ORD002   | Bob Johnson   | Widget B | 1        | 49.99 | 2024-03-15 | Northeast | ✅        |
+</code></pre></div></p>
+<p><strong>Quarantined records</strong> (sent to a separate table for review):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>| order_id | reason                              |
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>|----------|-------------------------------------|
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>| ORD003   | Quantity must be positive: -1       |
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>| ORD004   | Customer name is required           |
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>| ORD005   | Invalid date: 2024-03-99            |
+</code></pre></div></p>
+<p>Only 2 of the original 6 records (after deduplication) made it through. The bad records are quarantined so someone can investigate and fix the source.</p>
+<h3 id="step-4-gold-layer-aggregated">Step 4: Gold Layer (Aggregated)<a class="headerlink" href="#step-4-gold-layer-aggregated" title="Permanent link">&para;</a></h3>
+<p>The Gold layer aggregates for business use:</p>
+<p><strong>Daily Sales Summary</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>| report_date | region    | total_orders | total_quantity | total_revenue |
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>|-------------|-----------|--------------|----------------|---------------|
+<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>| 2024-03-15  | Northeast | 2            | 3              | $79.98        |
+</code></pre></div></p>
+<p><strong>Product Performance</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>| product  | units_sold | revenue |
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>|----------|------------|---------|
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>| Widget A | 2          | $59.98  |
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>| Widget B | 1          | $49.99  |
+</code></pre></div></p>
+<h3 id="step-5-dashboard-visualization">Step 5: Dashboard Visualization<a class="headerlink" href="#step-5-dashboard-visualization" title="Permanent link">&para;</a></h3>
+<p>Finally, users see clean visualizations:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>╔═══════════════════════════════════════════════════════════════════════╗
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>║                    DAILY SALES DASHBOARD                              ║
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>║                       March 15, 2024                                  ║
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>╠═══════════════════════════════════════════════════════════════════════╣
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>║                                                                       ║
+<a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a>║   TOTAL REVENUE        TOTAL ORDERS        AVG ORDER VALUE            ║
+<a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a>║   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐            ║
+<a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a>║   │  $79.98     │     │     2       │     │   $39.99    │            ║
+<a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a>║   └─────────────┘     └─────────────┘     └─────────────┘            ║
+<a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a>║                                                                       ║
+<a id="__codelineno-35-11" name="__codelineno-35-11" href="#__codelineno-35-11"></a>║   SALES BY REGION                    TOP PRODUCTS                     ║
+<a id="__codelineno-35-12" name="__codelineno-35-12" href="#__codelineno-35-12"></a>║   ┌───────────────────────┐         ┌─────────────────────────┐      ║
+<a id="__codelineno-35-13" name="__codelineno-35-13" href="#__codelineno-35-13"></a>║   │ ██████████ Northeast  │         │ Widget A  ████████ $59.98│     ║
+<a id="__codelineno-35-14" name="__codelineno-35-14" href="#__codelineno-35-14"></a>║   │            $79.98     │         │ Widget B  ████     $49.99│     ║
+<a id="__codelineno-35-15" name="__codelineno-35-15" href="#__codelineno-35-15"></a>║   └───────────────────────┘         └─────────────────────────┘      ║
+<a id="__codelineno-35-16" name="__codelineno-35-16" href="#__codelineno-35-16"></a>║                                                                       ║
+<a id="__codelineno-35-17" name="__codelineno-35-17" href="#__codelineno-35-17"></a>║   ⚠️ DATA QUALITY ALERT: 3 records quarantined for review            ║
+<a id="__codelineno-35-18" name="__codelineno-35-18" href="#__codelineno-35-18"></a>║                                                                       ║
+<a id="__codelineno-35-19" name="__codelineno-35-19" href="#__codelineno-35-19"></a>╚═══════════════════════════════════════════════════════════════════════╝
+</code></pre></div>
+<p><strong>What the user sees</strong>: Clean numbers, clear charts, actionable insights.</p>
+<p><strong>What they don't see</strong>: All the messy data, parsing errors, and transformations that happened behind the scenes.</p>
+<p><strong>That's data engineering.</strong> You built the invisible plumbing that makes this dashboard possible.</p>
+<hr />
+<h2 id="whats-next">What's Next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
+<p>Congratulations! You now understand the fundamentals of data engineering:</p>
+<ul>
+<li>✅ What data is and where it lives</li>
+<li>✅ What data engineers do</li>
+<li>✅ How data pipelines work</li>
+<li>✅ ETL vs ELT approaches</li>
+<li>✅ Schemas and data types</li>
+<li>✅ Data quality fundamentals</li>
+<li>✅ The Medallion Architecture</li>
+<li>✅ How Odibi fits in the ecosystem</li>
+</ul>
+<h3 id="continue-your-learning">Continue Your Learning<a class="headerlink" href="#continue-your-learning" title="Permanent link">&para;</a></h3>
+<p>📘 <strong><a href="../curriculum/">Curriculum</a></strong> - A structured learning path from beginner to advanced</p>
+<p>📖 <strong><a href="../glossary/">Glossary</a></strong> - Quick definitions for data engineering terms</p>
+<p>🛠️ <strong><a href="../../tutorials/getting_started/">First Tutorial</a></strong> - Build your first Odibi pipeline</p>
+<h3 id="key-concepts-to-explore-next">Key Concepts to Explore Next<a class="headerlink" href="#key-concepts-to-explore-next" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Slowly Changing Dimensions (SCD2)</strong> - How to track historical changes</li>
+<li><strong>Data Modeling</strong> - Designing efficient schemas</li>
+<li><strong>Orchestration</strong> - Scheduling and monitoring pipelines</li>
+<li><strong>Testing</strong> - Validating that your pipelines work correctly</li>
+</ol>
+<h3 id="remember">Remember<a class="headerlink" href="#remember" title="Permanent link">&para;</a></h3>
+<p>Data engineering is a journey. You don't need to understand everything at once. Start with simple pipelines, add complexity gradually, and always focus on data quality.</p>
+<p>The best data engineers aren't those who know the most tools—they're the ones who understand the fundamentals deeply and can apply them to any situation.</p>
+<p>Welcome to data engineering. 🎉</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
