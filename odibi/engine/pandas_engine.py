@@ -1919,12 +1919,43 @@ class PandasEngine(Engine):
             df.to_csv(target, index=False, mode=mode_param, **writer_options)
 
         elif format == "parquet":
-            if mode == "append":
-                if os.path.exists(full_path):
-                    existing = pd.read_parquet(full_path, **merged_options)
-                    df = pd.concat([existing, df], ignore_index=True)
+            if mode == "append" and os.path.exists(full_path):
+                import pyarrow as pa
+                import pyarrow.parquet as pq
 
-            df.to_parquet(target, index=False, **writer_options)
+                new_table = pa.Table.from_pandas(df, preserve_index=False)
+                dir_name = os.path.dirname(full_path) or "."
+                fd, tmp = tempfile.mkstemp(dir=dir_name, suffix=".parquet.tmp")
+                os.close(fd)
+                try:
+                    existing_file = pq.ParquetFile(full_path)
+                    existing_schema = existing_file.schema_arrow
+                    unified_schema = pa.unify_schemas(
+                        [existing_schema, new_table.schema], promote_options="permissive"
+                    )
+
+                    def _align_table(tbl, target_schema):
+                        for field in target_schema:
+                            if field.name not in tbl.schema.names:
+                                tbl = tbl.append_column(field, pa.nulls(len(tbl), type=field.type))
+                        return tbl.select([f.name for f in target_schema])
+
+                    with pq.ParquetWriter(tmp, unified_schema) as writer:
+                        for batch in existing_file.iter_batches():
+                            table = pa.Table.from_batches([batch], schema=existing_schema)
+                            writer.write_table(_align_table(table, unified_schema))
+                        existing_file.close()
+                        writer.write_table(_align_table(new_table, unified_schema))
+                    os.replace(tmp, full_path)
+                except Exception:
+                    if os.path.exists(tmp):
+                        try:
+                            os.remove(tmp)
+                        except OSError:
+                            pass
+                    raise
+            else:
+                df.to_parquet(target, index=False, **writer_options)
 
         elif format == "json":
             if mode == "append":

@@ -469,6 +469,90 @@ class TestPandasEngineWrite:
 
 
 # ========================
+# Parquet Append (#280)
+# ========================
+
+
+class TestParquetAppendStreaming:
+    """Tests for #280: Parquet append uses streaming instead of full read."""
+
+    def test_append_to_existing_parquet(self, engine, tmp_path):
+        """Appending to existing parquet produces correct result."""
+        conn = FakeConnection(str(tmp_path))
+        existing = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        existing.to_parquet(tmp_path / "data.parquet", index=False)
+
+        new_data = pd.DataFrame({"id": [3, 4], "val": ["c", "d"]})
+        engine.write(new_data, conn, "parquet", path="data.parquet", mode="append")
+
+        result = pd.read_parquet(tmp_path / "data.parquet")
+        assert len(result) == 4
+        assert list(result["id"]) == [1, 2, 3, 4]
+
+    def test_append_no_existing_file_creates_new(self, engine, tmp_path):
+        """Appending when no file exists creates a new file."""
+        conn = FakeConnection(str(tmp_path))
+        df = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        engine.write(df, conn, "parquet", path="new.parquet", mode="append")
+
+        result = pd.read_parquet(tmp_path / "new.parquet")
+        assert len(result) == 2
+
+    def test_append_preserves_existing_data(self, engine, tmp_path):
+        """Append does not modify existing rows."""
+        conn = FakeConnection(str(tmp_path))
+        existing = pd.DataFrame({"id": [1], "val": ["original"]})
+        existing.to_parquet(tmp_path / "data.parquet", index=False)
+
+        new_data = pd.DataFrame({"id": [2], "val": ["new"]})
+        engine.write(new_data, conn, "parquet", path="data.parquet", mode="append")
+
+        result = pd.read_parquet(tmp_path / "data.parquet")
+        assert result.loc[result["id"] == 1, "val"].iloc[0] == "original"
+
+    def test_append_does_not_load_full_dataframe(self, engine, tmp_path, monkeypatch):
+        """Append should NOT call pd.read_parquet (the old OOM path)."""
+        conn = FakeConnection(str(tmp_path))
+        existing = pd.DataFrame({"id": [1], "val": ["a"]})
+        existing.to_parquet(tmp_path / "data.parquet", index=False)
+
+        calls = []
+        original_read = pd.read_parquet
+
+        def tracking_read(*args, **kwargs):
+            calls.append(args)
+            return original_read(*args, **kwargs)
+
+        monkeypatch.setattr(pd, "read_parquet", tracking_read)
+
+        new_data = pd.DataFrame({"id": [2], "val": ["b"]})
+        engine.write(new_data, conn, "parquet", path="data.parquet", mode="append")
+
+        assert len(calls) == 0, "pd.read_parquet should not be called during append"
+
+    def test_append_cleans_up_temp_on_failure(self, engine, tmp_path, monkeypatch):
+        """Temp file is cleaned up if write fails."""
+        import pyarrow.parquet as pq
+
+        conn = FakeConnection(str(tmp_path))
+        existing = pd.DataFrame({"id": [1], "val": ["a"]})
+        existing.to_parquet(tmp_path / "data.parquet", index=False)
+
+        def failing_parquet_file(*args, **kwargs):
+            raise IOError("Simulated write failure")
+
+        monkeypatch.setattr(pq, "ParquetFile", failing_parquet_file)
+
+        new_data = pd.DataFrame({"id": [2], "val": ["b"]})
+        with pytest.raises(IOError, match="Simulated write failure"):
+            engine.write(new_data, conn, "parquet", path="data.parquet", mode="append")
+
+        # No temp files left behind
+        tmp_files = list(tmp_path.glob("*.tmp"))
+        assert len(tmp_files) == 0
+
+
+# ========================
 # SQL Execution
 # ========================
 
