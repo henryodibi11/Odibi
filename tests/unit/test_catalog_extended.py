@@ -1,6 +1,7 @@
 """Extended unit tests for catalog.py - batch operations, edge cases, and error handling."""
 
 import json
+import threading
 from datetime import date, datetime, timezone
 
 import pytest
@@ -641,6 +642,43 @@ class TestCacheInvalidation:
 
         assert catalog_manager._pipelines_cache is None
         assert catalog_manager._nodes_cache is None
+
+
+class TestCacheThreadSafety:
+    """Tests for #275: CatalogManager cache thread-safety."""
+
+    def test_concurrent_cache_access(self, catalog_manager):
+        """Concurrent threads should not corrupt cache."""
+        import threading
+
+        results = []
+        errors = []
+
+        def access_cache():
+            try:
+                catalog_manager.invalidate_cache()
+                pipelines = catalog_manager._get_all_pipelines_cached()
+                nodes = catalog_manager._get_all_nodes_cached()
+                outputs = catalog_manager._get_all_outputs_cached()
+                results.append((type(pipelines), type(nodes), type(outputs)))
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=access_cache) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0, f"Thread errors: {errors}"
+        assert len(results) == 10
+        for r in results:
+            assert all(t is dict for t in r)
+
+    def test_cache_lock_exists(self, catalog_manager):
+        """CatalogManager should have a threading lock."""
+        assert hasattr(catalog_manager, "_cache_lock")
+        assert isinstance(catalog_manager._cache_lock, type(threading.Lock()))
 
 
 class TestModeDetection:

@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import random
+import threading
 import time
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -199,6 +200,7 @@ class CatalogManager:
         self._pipelines_cache: Optional[Dict[str, Dict[str, Any]]] = None
         self._nodes_cache: Optional[Dict[str, Dict[str, str]]] = None
         self._outputs_cache: Optional[Dict[str, Dict[str, Any]]] = None
+        self._cache_lock = threading.Lock()
 
     @property
     def is_spark_mode(self) -> bool:
@@ -248,9 +250,10 @@ class CatalogManager:
 
     def invalidate_cache(self) -> None:
         """Invalidate all cached meta table data."""
-        self._pipelines_cache = None
-        self._nodes_cache = None
-        self._outputs_cache = None
+        with self._cache_lock:
+            self._pipelines_cache = None
+            self._nodes_cache = None
+            self._outputs_cache = None
 
     def _retry_with_backoff(self, func, max_retries: int = 5, base_delay: float = 1.0):
         """Retry a function with exponential backoff and jitter for concurrent writes.
@@ -301,59 +304,69 @@ class CatalogManager:
         if self._pipelines_cache is not None:
             return self._pipelines_cache
 
-        self._pipelines_cache = {}
-        if not self.spark and not self.engine:
+        with self._cache_lock:
+            if self._pipelines_cache is not None:
+                return self._pipelines_cache
+
+            cache: Dict[str, Dict[str, Any]] = {}
+            if not self.spark and not self.engine:
+                self._pipelines_cache = cache
+                return self._pipelines_cache
+
+            try:
+                if self.spark:
+                    df = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                    rows = df.collect()
+                    for row in rows:
+                        row_dict = row.asDict()
+                        cache[row_dict["pipeline_name"]] = row_dict
+                elif self.engine:
+                    df = self._read_local_table(self.tables["meta_pipelines"])
+                    if not df.empty and "pipeline_name" in df.columns:
+                        for _, row in df.iterrows():
+                            cache[row["pipeline_name"]] = row.to_dict()
+            except Exception as e:
+                logger.debug(f"Could not cache pipelines: {e}")
+
+            self._pipelines_cache = cache
             return self._pipelines_cache
-
-        try:
-            if self.spark:
-                df = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
-                rows = df.collect()
-                for row in rows:
-                    row_dict = row.asDict()
-                    self._pipelines_cache[row_dict["pipeline_name"]] = row_dict
-            elif self.engine:
-                df = self._read_local_table(self.tables["meta_pipelines"])
-                if not df.empty and "pipeline_name" in df.columns:
-                    for _, row in df.iterrows():
-                        self._pipelines_cache[row["pipeline_name"]] = row.to_dict()
-        except Exception as e:
-            logger.debug(f"Could not cache pipelines: {e}")
-            self._pipelines_cache = {}
-
-        return self._pipelines_cache
 
     def _get_all_nodes_cached(self) -> Dict[str, Dict[str, str]]:
         """Get all nodes grouped by pipeline with caching."""
         if self._nodes_cache is not None:
             return self._nodes_cache
 
-        self._nodes_cache = {}
-        if not self.spark and not self.engine:
-            return self._nodes_cache
+        with self._cache_lock:
+            if self._nodes_cache is not None:
+                return self._nodes_cache
 
-        try:
-            if self.spark:
-                df = self.spark.read.format("delta").load(self.tables["meta_nodes"])
-                rows = df.select("pipeline_name", "node_name", "version_hash").collect()
-                for row in rows:
-                    p_name = row["pipeline_name"]
-                    if p_name not in self._nodes_cache:
-                        self._nodes_cache[p_name] = {}
-                    self._nodes_cache[p_name][row["node_name"]] = row["version_hash"]
-            elif self.engine:
-                df = self._read_local_table(self.tables["meta_nodes"])
-                if not df.empty and "pipeline_name" in df.columns:
-                    for _, row in df.iterrows():
+            cache: Dict[str, Dict[str, str]] = {}
+            if not self.spark and not self.engine:
+                self._nodes_cache = cache
+                return self._nodes_cache
+
+            try:
+                if self.spark:
+                    df = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                    rows = df.select("pipeline_name", "node_name", "version_hash").collect()
+                    for row in rows:
                         p_name = row["pipeline_name"]
-                        if p_name not in self._nodes_cache:
-                            self._nodes_cache[p_name] = {}
-                        self._nodes_cache[p_name][row["node_name"]] = row["version_hash"]
-        except Exception as e:
-            logger.debug(f"Could not cache nodes: {e}")
-            self._nodes_cache = {}
+                        if p_name not in cache:
+                            cache[p_name] = {}
+                        cache[p_name][row["node_name"]] = row["version_hash"]
+                elif self.engine:
+                    df = self._read_local_table(self.tables["meta_nodes"])
+                    if not df.empty and "pipeline_name" in df.columns:
+                        for _, row in df.iterrows():
+                            p_name = row["pipeline_name"]
+                            if p_name not in cache:
+                                cache[p_name] = {}
+                            cache[p_name][row["node_name"]] = row["version_hash"]
+            except Exception as e:
+                logger.debug(f"Could not cache nodes: {e}")
 
-        return self._nodes_cache
+            self._nodes_cache = cache
+            return self._nodes_cache
 
     def bootstrap(self) -> None:
         """
@@ -1413,36 +1426,39 @@ class CatalogManager:
         Returns:
             Dict mapping "{pipeline_name}.{node_name}" -> output record
         """
-        # Thread-safe check: if cache exists and is populated, return it
         if self._outputs_cache is not None:
             return self._outputs_cache
 
-        # Build cache in a local variable first to avoid race conditions
-        cache: Dict[str, Dict[str, Any]] = {}
-        if not self.spark and not self.engine:
+        with self._cache_lock:
+            if self._outputs_cache is not None:
+                return self._outputs_cache
+
+            cache: Dict[str, Dict[str, Any]] = {}
+            if not self.spark and not self.engine:
+                self._outputs_cache = cache
+                return self._outputs_cache
+
+            try:
+                if self.spark:
+                    df = self.spark.read.format("delta").load(self.tables["meta_outputs"])
+                    rows = df.collect()
+                    for row in rows:
+                        row_dict = row.asDict()
+                        key = f"{row_dict['pipeline_name']}.{row_dict['node_name']}"
+                        cache[key] = row_dict
+                elif self.engine:
+                    df = self._read_local_table(self.tables["meta_outputs"])
+                    if not df.empty and "pipeline_name" in df.columns:
+                        for _, row in df.iterrows():
+                            key = f"{row['pipeline_name']}.{row['node_name']}"
+                            cache[key] = row.to_dict()
+            except Exception as e:
+                logger.warning(
+                    f"Could not cache outputs from {self.tables.get('meta_outputs')}: {e}"
+                )
+
             self._outputs_cache = cache
             return self._outputs_cache
-
-        try:
-            if self.spark:
-                df = self.spark.read.format("delta").load(self.tables["meta_outputs"])
-                rows = df.collect()
-                for row in rows:
-                    row_dict = row.asDict()
-                    key = f"{row_dict['pipeline_name']}.{row_dict['node_name']}"
-                    cache[key] = row_dict
-            elif self.engine:
-                df = self._read_local_table(self.tables["meta_outputs"])
-                if not df.empty and "pipeline_name" in df.columns:
-                    for _, row in df.iterrows():
-                        key = f"{row['pipeline_name']}.{row['node_name']}"
-                        cache[key] = row.to_dict()
-        except Exception as e:
-            logger.warning(f"Could not cache outputs from {self.tables.get('meta_outputs')}: {e}")
-
-        # Atomic assignment after building complete cache
-        self._outputs_cache = cache
-        return self._outputs_cache
 
     def get_node_output(
         self,
