@@ -676,3 +676,41 @@ def test_sql_does_not_replace_df_substring(mock_view, engine_context_with_sql):
     ctx, captured = engine_context_with_sql
     ctx.sql("SELECT pdf_count FROM df")
     assert captured["query"] == "SELECT pdf_count FROM _df_test_1"
+
+
+class TestPandasContextThreadSafety:
+    """Tests for #246: PandasContext thread-safety."""
+
+    def test_concurrent_register_and_get(self):
+        """Concurrent register/get should not raise RuntimeError."""
+        import threading
+
+        ctx = PandasContext()
+        errors = []
+
+        def worker(i):
+            try:
+                name = f"df_{i}"
+                ctx.register(name, pd.DataFrame({"id": [i]}))
+                ctx.get(name)
+                ctx.has(name)
+                ctx.list_names()
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(20)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0, f"Thread errors: {errors}"
+        assert len(ctx.list_names()) == 20
+
+    def test_lock_exists(self):
+        """PandasContext should have a threading lock."""
+        import threading
+
+        ctx = PandasContext()
+        assert hasattr(ctx, "_lock")
+        assert isinstance(ctx._lock, type(threading.Lock()))

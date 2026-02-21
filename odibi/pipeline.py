@@ -1,5 +1,6 @@
 """Pipeline executor and orchestration."""
 
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -167,6 +168,7 @@ class Pipeline:
         self._pending_asset_records: List[Dict[str, Any]] = []
         self._pending_hwm_updates: List[Dict[str, Any]] = []
         self._batch_mode_enabled: bool = True  # Enable batch mode by default
+        self._buffer_lock = threading.Lock()
 
         # Track async story futures for flush_stories()
         self._story_future = None
@@ -1402,7 +1404,8 @@ class Pipeline:
             record: Dict with keys: source_table, target_table, target_pipeline,
                     target_node, run_id, and optional source_pipeline, source_node
         """
-        self._pending_lineage_records.append(record)
+        with self._buffer_lock:
+            self._pending_lineage_records.append(record)
 
     def buffer_asset_record(self, record: Dict[str, Any]) -> None:
         """Buffer an asset registration record for batch write at pipeline end.
@@ -1411,7 +1414,8 @@ class Pipeline:
             record: Dict with keys: project_name, table_name, path, format,
                     pattern_type, and optional schema_hash
         """
-        self._pending_asset_records.append(record)
+        with self._buffer_lock:
+            self._pending_asset_records.append(record)
 
     def buffer_hwm_update(self, key: str, value: Any) -> None:
         """Buffer a HWM update for batch write at pipeline end.
@@ -1420,7 +1424,8 @@ class Pipeline:
             key: HWM state key
             value: HWM value
         """
-        self._pending_hwm_updates.append({"key": key, "value": value})
+        with self._buffer_lock:
+            self._pending_hwm_updates.append({"key": key, "value": value})
 
     def _get_databricks_cluster_id(self) -> Optional[str]:
         """Extract Databricks cluster ID from Spark context."""

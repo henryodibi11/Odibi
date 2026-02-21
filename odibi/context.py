@@ -211,6 +211,7 @@ class PandasContext(Context):
         """Initialize Pandas context."""
         self._data: Dict[str, Union[pd.DataFrame, Iterator[pd.DataFrame]]] = {}
         self._metadata: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.Lock()
 
     def register(
         self,
@@ -237,9 +238,10 @@ class PandasContext(Context):
                 f"Expected pandas.DataFrame, Iterator, or LazyDataset, got {type(df).__module__}.{type(df).__name__}"
             )
 
-        self._data[name] = df
-        if metadata:
-            self._metadata[name] = metadata
+        with self._lock:
+            self._data[name] = df
+            if metadata:
+                self._metadata[name] = metadata
 
     def get(self, name: str) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
         """Retrieve a registered Pandas DataFrame or Iterator.
@@ -253,14 +255,16 @@ class PandasContext(Context):
         Raises:
             KeyError: If name not found in context
         """
-        if name not in self._data:
-            available = ", ".join(self._data.keys()) if self._data else "none"
-            raise KeyError(f"DataFrame '{name}' not found in context. Available: {available}")
-        return self._data[name]
+        with self._lock:
+            if name not in self._data:
+                available = ", ".join(self._data.keys()) if self._data else "none"
+                raise KeyError(f"DataFrame '{name}' not found in context. Available: {available}")
+            return self._data[name]
 
     def get_metadata(self, name: str) -> Dict[str, Any]:
         """Retrieve metadata."""
-        return self._metadata.get(name, {})
+        with self._lock:
+            return self._metadata.get(name, {})
 
     def has(self, name: str) -> bool:
         """Check if a DataFrame exists.
@@ -271,7 +275,8 @@ class PandasContext(Context):
         Returns:
             True if exists, False otherwise
         """
-        return name in self._data
+        with self._lock:
+            return name in self._data
 
     def list_names(self) -> list[str]:
         """List all registered DataFrame names.
@@ -279,16 +284,19 @@ class PandasContext(Context):
         Returns:
             List of registered names
         """
-        return list(self._data.keys())
+        with self._lock:
+            return list(self._data.keys())
 
     def clear(self) -> None:
         """Clear all registered DataFrames."""
-        self._data.clear()
+        with self._lock:
+            self._data.clear()
 
     def unregister(self, name: str) -> None:
         """Unregister a DataFrame from the context."""
-        self._data.pop(name, None)
-        self._metadata.pop(name, None)
+        with self._lock:
+            self._data.pop(name, None)
+            self._metadata.pop(name, None)
 
 
 class PolarsContext(Context):
