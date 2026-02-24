@@ -547,3 +547,171 @@ class TestSCD2RegisterTable:
         with patch("os.path.exists", return_value=False):
             result = scd2(ctx, params)
         assert result.df.shape[0] == 1
+
+
+# ---------------------------------------------------------------------------
+# vacuum_hours parameter
+# ---------------------------------------------------------------------------
+class TestSCD2VacuumHours:
+    """Tests for the vacuum_hours parameter on SCD2."""
+
+    def test_param_default_none(self):
+        p = _base_params()
+        assert p.vacuum_hours is None
+
+    def test_param_set(self):
+        p = _base_params(vacuum_hours=168)
+        assert p.vacuum_hours == 168
+
+    def test_vacuum_skipped_on_pandas(self):
+        """VACUUM is Spark-only; Pandas should complete without error."""
+        src = pd.DataFrame(
+            {
+                "id": [1],
+                "status": ["a"],
+                "updated_at": [datetime(2024, 1, 1)],
+            }
+        )
+        ctx = _make_context(src)
+        params = _base_params(vacuum_hours=168)
+        with patch("os.path.exists", return_value=False):
+            result = scd2(ctx, params)
+        assert result.df.shape[0] == 1
+
+    def test_vacuum_runs_on_engine_with_sql(self):
+        """Verify VACUUM SQL is called when vacuum_hours is set on a mock engine."""
+        mock_spark = MagicMock()
+        mock_engine = MagicMock()
+        mock_engine.spark = mock_spark
+
+        ctx = EngineContext(
+            context=MagicMock(),
+            df=pd.DataFrame(
+                {
+                    "id": [1],
+                    "status": ["a"],
+                    "updated_at": [datetime(2024, 1, 1)],
+                }
+            ),
+            engine_type=EngineType.SPARK,
+            engine=mock_engine,
+        )
+        params = _base_params(target="silver.dim_customers", vacuum_hours=168)
+
+        with patch(
+            "odibi.transformers.scd._scd2_spark",
+            return_value=EngineContext(
+                context=ctx.context,
+                df=pd.DataFrame({"id": [1], "is_current": [True]}),
+                engine_type=EngineType.SPARK,
+                engine=mock_engine,
+            ),
+        ):
+            scd2(ctx, params)
+
+        vacuum_calls = [c for c in mock_spark.sql.call_args_list if "VACUUM" in str(c)]
+        assert len(vacuum_calls) == 1
+        assert "RETAIN 168 HOURS" in str(vacuum_calls[0])
+
+    def test_vacuum_uses_path_syntax(self):
+        """Path-based targets should use delta.`path` syntax."""
+        mock_spark = MagicMock()
+        mock_engine = MagicMock()
+        mock_engine.spark = mock_spark
+
+        ctx = EngineContext(
+            context=MagicMock(),
+            df=pd.DataFrame(
+                {
+                    "id": [1],
+                    "status": ["a"],
+                    "updated_at": [datetime(2024, 1, 1)],
+                }
+            ),
+            engine_type=EngineType.SPARK,
+            engine=mock_engine,
+        )
+        params = _base_params(target="/mnt/data/silver/dim", vacuum_hours=72)
+
+        with patch(
+            "odibi.transformers.scd._scd2_spark",
+            return_value=EngineContext(
+                context=ctx.context,
+                df=pd.DataFrame({"id": [1]}),
+                engine_type=EngineType.SPARK,
+                engine=mock_engine,
+            ),
+        ):
+            scd2(ctx, params)
+
+        vacuum_calls = [c for c in mock_spark.sql.call_args_list if "VACUUM" in str(c)]
+        assert len(vacuum_calls) == 1
+        assert "delta.`/mnt/data/silver/dim`" in str(vacuum_calls[0])
+
+    def test_vacuum_failure_is_warning_not_error(self):
+        """VACUUM failure should log a warning, not crash."""
+        mock_spark = MagicMock()
+        mock_spark.sql.side_effect = RuntimeError("VACUUM failed")
+        mock_engine = MagicMock()
+        mock_engine.spark = mock_spark
+
+        ctx = EngineContext(
+            context=MagicMock(),
+            df=pd.DataFrame(
+                {
+                    "id": [1],
+                    "status": ["a"],
+                    "updated_at": [datetime(2024, 1, 1)],
+                }
+            ),
+            engine_type=EngineType.SPARK,
+            engine=mock_engine,
+        )
+        params = _base_params(target="silver.dim_customers", vacuum_hours=168)
+
+        with patch(
+            "odibi.transformers.scd._scd2_spark",
+            return_value=EngineContext(
+                context=ctx.context,
+                df=pd.DataFrame({"id": [1]}),
+                engine_type=EngineType.SPARK,
+                engine=mock_engine,
+            ),
+        ):
+            # Should not raise
+            result = scd2(ctx, params)
+        assert result.df is not None
+
+    def test_vacuum_not_called_when_none(self):
+        """No VACUUM when vacuum_hours is None (default)."""
+        mock_spark = MagicMock()
+        mock_engine = MagicMock()
+        mock_engine.spark = mock_spark
+
+        ctx = EngineContext(
+            context=MagicMock(),
+            df=pd.DataFrame(
+                {
+                    "id": [1],
+                    "status": ["a"],
+                    "updated_at": [datetime(2024, 1, 1)],
+                }
+            ),
+            engine_type=EngineType.SPARK,
+            engine=mock_engine,
+        )
+        params = _base_params(target="silver.dim_customers")  # vacuum_hours=None
+
+        with patch(
+            "odibi.transformers.scd._scd2_spark",
+            return_value=EngineContext(
+                context=ctx.context,
+                df=pd.DataFrame({"id": [1]}),
+                engine_type=EngineType.SPARK,
+                engine=mock_engine,
+            ),
+        ):
+            scd2(ctx, params)
+
+        vacuum_calls = [c for c in mock_spark.sql.call_args_list if "VACUUM" in str(c)]
+        assert len(vacuum_calls) == 0

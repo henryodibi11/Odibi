@@ -105,6 +105,11 @@ class SCD2Params(BaseModel):
         description="Register as Unity Catalog/metastore table after write "
         "(e.g., 'silver.dim_customers'). Spark only.",
     )
+    vacuum_hours: Optional[int] = Field(
+        default=None,
+        description="Hours to retain for VACUUM after SCD2 write (Spark only). "
+        "Set to 168 for 7 days. None disables VACUUM.",
+    )
 
     @model_validator(mode="after")
     def check_target_or_connection(self):
@@ -226,6 +231,25 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
                 table_name=params.register_table,
                 error=str(e),
             )
+
+    # Post-write VACUUM (Spark only)
+    if params.vacuum_hours is not None and params.vacuum_hours > 0:
+        if context.engine_type == EngineType.SPARK:
+            try:
+                spark = context.engine.spark if hasattr(context.engine, "spark") else None
+                if spark:
+                    is_path = target and ("/" in target or "\\" in target)
+                    if is_path:
+                        vacuum_sql = f"VACUUM delta.`{target}` RETAIN {params.vacuum_hours} HOURS"
+                    else:
+                        vacuum_sql = f"VACUUM {target} RETAIN {params.vacuum_hours} HOURS"
+                    spark.sql(vacuum_sql)
+                    ctx.debug(
+                        f"VACUUM completed for {target}",
+                        retention_hours=params.vacuum_hours,
+                    )
+            except Exception as e:
+                ctx.warning(f"VACUUM failed for {target}: {e}")
 
     rows_after = None
     try:
