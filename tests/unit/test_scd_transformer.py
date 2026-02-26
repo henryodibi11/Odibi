@@ -715,3 +715,154 @@ class TestSCD2VacuumHours:
 
         vacuum_calls = [c for c in mock_spark.sql.call_args_list if "VACUUM" in str(c)]
         assert len(vacuum_calls) == 0
+
+
+# ---------------------------------------------------------------------------
+# _safe_isna & has_changed float/NaN handling  (issue #248)
+# ---------------------------------------------------------------------------
+class TestSafeIsna:
+    """Tests for _safe_isna helper."""
+
+    def test_nan_returns_true(self):
+        from odibi.transformers.scd import _safe_isna
+
+        assert _safe_isna(float("nan")) is True
+
+    def test_none_returns_true(self):
+        from odibi.transformers.scd import _safe_isna
+
+        assert _safe_isna(None) is True
+
+    def test_nat_returns_true(self):
+        from odibi.transformers.scd import _safe_isna
+
+        assert _safe_isna(pd.NaT) is True
+
+    def test_normal_value_returns_false(self):
+        from odibi.transformers.scd import _safe_isna
+
+        assert _safe_isna(42) is False
+        assert _safe_isna("hello") is False
+        assert _safe_isna(3.14) is False
+
+    def test_list_returns_false(self):
+        """pd.isna raises ValueError on lists; _safe_isna should not."""
+        from odibi.transformers.scd import _safe_isna
+
+        assert _safe_isna([1, 2, 3]) is False
+
+
+class TestHasChangedFloatPrecision:
+    """Regression tests: SCD2 Pandas change detection with floats and NaN."""
+
+    @pytest.fixture
+    def target_df(self):
+        return pd.DataFrame(
+            {
+                "id": [1, 2, 3],
+                "price": [19.99, 100.0, float("nan")],
+                "valid_from": [datetime(2023, 1, 1)] * 3,
+                "valid_to": [None] * 3,
+                "is_current": [True] * 3,
+            }
+        )
+
+    def test_float_precision_no_false_change(self, target_df, tmp_path):
+        """Identical floats with tiny representation drift should NOT be flagged as changed."""
+        target_file = tmp_path / "target.parquet"
+        target_df.to_parquet(target_file, index=False)
+
+        # Simulate float precision drift (e.g., from read-back)
+        src = pd.DataFrame(
+            {
+                "id": [1, 2],
+                "price": [19.99 + 1e-15, 100.0 - 1e-14],
+                "updated_at": [datetime(2024, 1, 1)] * 2,
+            }
+        )
+        ctx = _make_context(src)
+        params = _base_params(target=str(target_file), track_cols=["price"], keys=["id"])
+        result = _scd2_pandas(ctx, src.copy(), params)
+        df = result.df
+        # No old records should be closed (no changes detected)
+        current_rows = df[df["is_current"] == True]  # noqa: E712
+        assert len(current_rows) == 3  # original 3 still current
+
+    def test_real_float_change_detected(self, target_df, tmp_path):
+        """A genuine float value change should still be detected."""
+        target_file = tmp_path / "target.parquet"
+        target_df.to_parquet(target_file, index=False)
+
+        src = pd.DataFrame(
+            {
+                "id": [1],
+                "price": [29.99],  # genuinely different from 19.99
+                "updated_at": [datetime(2024, 1, 1)],
+            }
+        )
+        ctx = _make_context(src)
+        params = _base_params(target=str(target_file), track_cols=["price"], keys=["id"])
+        result = _scd2_pandas(ctx, src.copy(), params)
+        df = result.df
+        # id=1 should have 2 rows: old closed + new current
+        id1_rows = df[df["id"] == 1]
+        assert len(id1_rows) == 2
+        assert id1_rows[id1_rows["is_current"] == True].iloc[0]["price"] == 29.99  # noqa: E712
+
+    def test_both_nan_no_change(self, target_df, tmp_path):
+        """NaN in both source and target should NOT be flagged as changed."""
+        target_file = tmp_path / "target.parquet"
+        target_df.to_parquet(target_file, index=False)
+
+        src = pd.DataFrame(
+            {
+                "id": [3],
+                "price": [float("nan")],  # same as target
+                "updated_at": [datetime(2024, 1, 1)],
+            }
+        )
+        ctx = _make_context(src)
+        params = _base_params(target=str(target_file), track_cols=["price"], keys=["id"])
+        result = _scd2_pandas(ctx, src.copy(), params)
+        df = result.df
+        # id=3 should still have only 1 current row (no change)
+        id3_current = df[(df["id"] == 3) & (df["is_current"] == True)]  # noqa: E712
+        assert len(id3_current) == 1
+
+    def test_nan_to_value_is_change(self, target_df, tmp_path):
+        """NaN → real value should be detected as a change."""
+        target_file = tmp_path / "target.parquet"
+        target_df.to_parquet(target_file, index=False)
+
+        src = pd.DataFrame(
+            {
+                "id": [3],
+                "price": [50.0],  # was NaN
+                "updated_at": [datetime(2024, 1, 1)],
+            }
+        )
+        ctx = _make_context(src)
+        params = _base_params(target=str(target_file), track_cols=["price"], keys=["id"])
+        result = _scd2_pandas(ctx, src.copy(), params)
+        df = result.df
+        id3_rows = df[df["id"] == 3]
+        assert len(id3_rows) == 2  # old closed + new current
+
+    def test_value_to_nan_is_change(self, target_df, tmp_path):
+        """Real value → NaN should be detected as a change."""
+        target_file = tmp_path / "target.parquet"
+        target_df.to_parquet(target_file, index=False)
+
+        src = pd.DataFrame(
+            {
+                "id": [1],
+                "price": [float("nan")],  # was 19.99
+                "updated_at": [datetime(2024, 1, 1)],
+            }
+        )
+        ctx = _make_context(src)
+        params = _base_params(target=str(target_file), track_cols=["price"], keys=["id"])
+        result = _scd2_pandas(ctx, src.copy(), params)
+        df = result.df
+        id1_rows = df[df["id"] == 1]
+        assert len(id1_rows) == 2  # old closed + new current

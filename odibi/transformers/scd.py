@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import time
 from typing import Any, List, Optional
@@ -718,6 +719,16 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
     return context.with_df(result_df)
 
 
+def _safe_isna(val: Any) -> bool:
+    """Null/NaN check that never raises on non-scalar types."""
+    import pandas as pd
+
+    try:
+        return bool(pd.isna(val))
+    except (ValueError, TypeError):
+        return False
+
+
 def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
     """
     Internal helper for SCD2 logic on Pandas engine.
@@ -909,8 +920,18 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
         for col in track:
             s = row.get(col)
             t = row.get(col + "_tgt")
-            # Handle NaNs
-            if pd.isna(s) and pd.isna(t):
+            # Both null/NaN → no change
+            s_na = _safe_isna(s)
+            t_na = _safe_isna(t)
+            if s_na and t_na:
+                continue
+            # One null, other not → changed
+            if s_na or t_na:
+                return True
+            # Float precision: use tolerance-based comparison
+            if isinstance(s, float) and isinstance(t, float):
+                if not math.isclose(s, t, rel_tol=1e-9, abs_tol=1e-12):
+                    return True
                 continue
             if s != t:
                 return True
