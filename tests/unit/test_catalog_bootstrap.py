@@ -222,11 +222,12 @@ class TestTableExists:
 class TestMigrateSchemaIfNeeded:
     """Tests for CatalogManager._migrate_schema_if_needed()."""
 
-    def test_no_crash_on_nonexistent_path(self, catalog_manager):
+    def test_no_crash_on_nonexistent_path(self, catalog_manager, tmp_path):
         """_migrate_schema_if_needed should not crash on a non-existent path."""
         schema = StructType([StructField("id", StringType(), True)])
-        # Should warn but not raise
-        catalog_manager._migrate_schema_if_needed("test_table", "/nonexistent/path", schema)
+        # Use a valid but nonexistent local path (avoids Rust panic on permission errors)
+        bogus = str(tmp_path / "does_not_exist_table")
+        catalog_manager._migrate_schema_if_needed("test_table", bogus, schema)
 
     def test_no_op_when_schemas_match(self, bootstrapped_catalog, caplog):
         """_migrate_schema_if_needed should be a no-op when schemas already match."""
@@ -237,19 +238,14 @@ class TestMigrateSchemaIfNeeded:
         # Should NOT log "Migrating schema" since schemas match
         assert not any("Migrating schema" in msg for msg in caplog.messages)
 
-    def test_warning_logged_on_migration_failure(self, catalog_manager, caplog):
+    def test_warning_logged_on_migration_failure(self, catalog_manager, tmp_path, caplog):
         """_migrate_schema_if_needed should log a warning on failure."""
         schema = StructType([StructField("id", StringType(), True)])
-        # Patch the engine to be pandas mode but make the import fail
+        # Create a directory that exists but isn't a valid table
+        bogus = str(tmp_path / "not_a_table")
+        os.makedirs(bogus, exist_ok=True)
         with caplog.at_level(logging.WARNING, logger="odibi.catalog"):
-            with patch(
-                "odibi.catalog.CatalogManager.is_pandas_mode",
-                new_callable=lambda: property(lambda self: True),
-            ):
-                # Trigger with a path that will cause DeltaTable to fail
-                catalog_manager._migrate_schema_if_needed(
-                    "test_table", "/bogus/path/for/migration", schema
-                )
+            catalog_manager._migrate_schema_if_needed("test_table", bogus, schema)
         assert any("Schema migration check failed" in msg for msg in caplog.messages)
 
 

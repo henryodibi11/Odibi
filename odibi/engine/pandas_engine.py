@@ -1638,6 +1638,10 @@ class PandasEngine(Engine):
 
         storage_opts = merged_options.get("storage_options", {})
 
+        # Reset index to avoid write_deltalake including it as an extra column,
+        # which causes "number of fields does not match" errors on overwrite.
+        df = df.reset_index(drop=True)
+
         # Map modes
         delta_mode = "overwrite"
         if mode == "append":
