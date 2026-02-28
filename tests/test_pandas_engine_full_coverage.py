@@ -1471,3 +1471,302 @@ class TestAddWriteMetadata:
         engine.add_write_metadata(df, metadata_config=True, is_file_source=False)
 
         assert df.columns.tolist() == original_cols
+
+
+# ========================
+# Execute Operation: All Branches
+# ========================
+
+
+class TestExecuteOperationBranches:
+    """Cover all operation branches in execute_operation."""
+
+    def test_execute_operation_iterator_input(self, engine):
+        """Iterator input gets concatenated before operation."""
+        dfs = iter([pd.DataFrame({"a": [1]}), pd.DataFrame({"a": [2]})])
+        result = engine.execute_operation("drop_duplicates", {}, dfs)
+        assert len(result) == 2
+        assert list(result["a"]) == [1, 2]
+
+    def test_execute_operation_drop_duplicates(self, engine):
+        """drop_duplicates operation."""
+        df = pd.DataFrame({"a": [1, 1, 2]})
+        result = engine.execute_operation("drop_duplicates", {}, df)
+        assert len(result) == 2
+
+    def test_execute_operation_fillna(self, engine):
+        """fillna operation."""
+        df = pd.DataFrame({"a": [1.0, None, 3.0]})
+        result = engine.execute_operation("fillna", {"value": 0}, df)
+        assert result["a"].tolist() == [1.0, 0.0, 3.0]
+
+    def test_execute_operation_drop(self, engine):
+        """drop operation."""
+        df = pd.DataFrame({"a": [1], "b": [2]})
+        result = engine.execute_operation("drop", {"columns": ["b"]}, df)
+        assert list(result.columns) == ["a"]
+
+    def test_execute_operation_rename(self, engine):
+        """rename operation."""
+        df = pd.DataFrame({"a": [1]})
+        result = engine.execute_operation("rename", {"columns": {"a": "x"}}, df)
+        assert list(result.columns) == ["x"]
+
+    def test_execute_operation_sort(self, engine):
+        """sort operation delegates to sort_values."""
+        df = pd.DataFrame({"a": [3, 1, 2]})
+        result = engine.execute_operation("sort", {"by": "a"}, df)
+        assert result["a"].tolist() == [1, 2, 3]
+
+    def test_execute_operation_sample(self, engine):
+        """sample operation."""
+        df = pd.DataFrame({"a": range(100)})
+        result = engine.execute_operation("sample", {"n": 5, "random_state": 42}, df)
+        assert len(result) == 5
+
+    def test_execute_operation_function_registry_with_param_model(self, engine):
+        """FunctionRegistry fallback with param_model."""
+        from unittest.mock import MagicMock, patch
+
+        df = pd.DataFrame({"a": [1, 2]})
+        mock_result_ctx = MagicMock()
+        mock_result_ctx.df = pd.DataFrame({"a": [10, 20]})
+        mock_func = MagicMock(return_value=mock_result_ctx)
+        mock_param_model = MagicMock()
+
+        with (
+            patch("odibi.registry.FunctionRegistry.has_function", return_value=True),
+            patch("odibi.registry.FunctionRegistry.get_function", return_value=mock_func),
+            patch("odibi.registry.FunctionRegistry.get_param_model", return_value=mock_param_model),
+        ):
+            result = engine.execute_operation("custom_op", {"x": 1}, df)
+
+        assert list(result["a"]) == [10, 20]
+        mock_param_model.assert_called_once_with(x=1)
+        mock_func.assert_called_once()
+
+    def test_execute_operation_function_registry_no_param_model(self, engine):
+        """FunctionRegistry fallback without param_model (kwargs passed directly)."""
+        from unittest.mock import MagicMock, patch
+
+        df = pd.DataFrame({"a": [1]})
+        mock_result_ctx = MagicMock()
+        mock_result_ctx.df = pd.DataFrame({"a": [99]})
+        mock_func = MagicMock(return_value=mock_result_ctx)
+
+        with (
+            patch("odibi.registry.FunctionRegistry.has_function", return_value=True),
+            patch("odibi.registry.FunctionRegistry.get_function", return_value=mock_func),
+            patch("odibi.registry.FunctionRegistry.get_param_model", return_value=None),
+        ):
+            result = engine.execute_operation("custom_op", {"y": 2}, df)
+
+        assert list(result["a"]) == [99]
+        mock_func.assert_called_once()
+        # kwargs passed directly
+        _, kwargs = mock_func.call_args
+        assert kwargs.get("y") == 2
+
+
+# ========================
+# Pivot Edge Cases
+# ========================
+
+
+class TestPivotEdgeCases:
+    """Cover _pivot edge cases."""
+
+    def test_pivot_group_by_as_string(self, engine):
+        """group_by as string gets converted to list."""
+        df = pd.DataFrame({"g": [1, 1, 2, 2], "p": ["A", "B", "A", "B"], "v": [10, 20, 30, 40]})
+        result = engine._pivot(
+            df,
+            {
+                "group_by": "g",  # string, not list
+                "pivot_column": "p",
+                "value_column": "v",
+            },
+        )
+        assert "g" in result.columns
+
+    def test_pivot_missing_columns_raises(self, engine):
+        """Missing columns in pivot raises KeyError."""
+        df = pd.DataFrame({"a": [1]})
+        with pytest.raises(KeyError, match="Columns not found"):
+            engine._pivot(
+                df,
+                {
+                    "group_by": ["nonexistent"],
+                    "pivot_column": "also_missing",
+                    "value_column": "a",
+                },
+            )
+
+
+# ========================
+# LazyDataset Utility Methods
+# ========================
+
+
+class TestLazyDatasetUtilities:
+    """Test get_schema, get_shape, count_rows, get_sample with LazyDataset inputs."""
+
+    def _make_lazy(self, tmp_path):
+        """Create a LazyDataset backed by a real CSV file."""
+        from odibi.engine.pandas_engine import LazyDataset
+
+        csv_path = tmp_path / "data.csv"
+        pd.DataFrame({"x": [1, 2, 3], "y": ["a", "b", "c"]}).to_csv(csv_path, index=False)
+        return LazyDataset(path=str(csv_path), format="csv", options={})
+
+    def test_get_schema_lazy_dataset_duckdb_fallback(self, engine, tmp_path):
+        """get_schema with LazyDataset falls through duckdb (missing _register_lazy_view)."""
+        lazy = self._make_lazy(tmp_path)
+        engine.use_duckdb = True
+        schema = engine.get_schema(lazy)
+        # Falls through to materialize since _register_lazy_view doesn't exist
+        assert "x" in schema
+        assert "y" in schema
+
+    def test_get_schema_lazy_dataset_no_duckdb(self, engine, tmp_path):
+        """get_schema with LazyDataset and use_duckdb=False materializes directly."""
+        lazy = self._make_lazy(tmp_path)
+        engine.use_duckdb = False
+        schema = engine.get_schema(lazy)
+        assert "x" in schema
+        assert "y" in schema
+
+    def test_get_shape_lazy_dataset(self, engine, tmp_path):
+        """get_shape with LazyDataset returns (rows, cols)."""
+        lazy = self._make_lazy(tmp_path)
+        engine.use_duckdb = False
+        shape = engine.get_shape(lazy)
+        assert shape == (3, 2)
+
+    def test_count_rows_lazy_dataset_duckdb_fallback(self, engine, tmp_path):
+        """count_rows with LazyDataset falls through duckdb to materialize."""
+        lazy = self._make_lazy(tmp_path)
+        engine.use_duckdb = True
+        count = engine.count_rows(lazy)
+        assert count == 3
+
+    def test_count_rows_lazy_dataset_no_duckdb(self, engine, tmp_path):
+        """count_rows with LazyDataset and use_duckdb=False materializes."""
+        lazy = self._make_lazy(tmp_path)
+        engine.use_duckdb = False
+        count = engine.count_rows(lazy)
+        assert count == 3
+
+    def test_get_sample_lazy_dataset_duckdb_fallback(self, engine, tmp_path):
+        """get_sample with LazyDataset falls through duckdb to materialize."""
+        lazy = self._make_lazy(tmp_path)
+        engine.use_duckdb = True
+        sample = engine.get_sample(lazy, n=2)
+        assert len(sample) == 2
+        assert "x" in sample[0]
+
+    def test_get_sample_lazy_dataset_no_duckdb(self, engine, tmp_path):
+        """get_sample with LazyDataset and use_duckdb=False materializes."""
+        lazy = self._make_lazy(tmp_path)
+        engine.use_duckdb = False
+        sample = engine.get_sample(lazy, n=2)
+        assert len(sample) == 2
+
+
+# ========================
+# validate_schema: pyarrow type handling
+# ========================
+
+
+class TestValidateSchemaPyarrow:
+    """Test validate_schema with pyarrow-style type strings."""
+
+    def test_validate_schema_pyarrow_type_stripped(self, engine):
+        """pyarrow type strings like 'int64[pyarrow]' are stripped to base type."""
+        df = pd.DataFrame({"a": [1, 2]})
+        # Manually override dtype string to simulate pyarrow backend
+        from unittest.mock import patch, PropertyMock
+
+        class FakeDtype:
+            def __str__(self):
+                return "int64[pyarrow]"
+
+        with patch.object(type(df["a"]), "dtype", new_callable=PropertyMock) as mock_dtype:
+            mock_dtype.return_value = FakeDtype()
+            failures = engine.validate_schema(df, {"types": {"a": "int"}})
+
+        assert len(failures) == 0
+
+
+# ========================
+# _infer_avro_schema: date and timedelta
+# ========================
+
+
+class TestAvroSchemaTemporalTypes:
+    """Test _infer_avro_schema date and timedelta type handling."""
+
+    def test_infer_avro_schema_duration_type(self, engine):
+        """timedelta columns map to time-micros logical type."""
+        df = pd.DataFrame({"dur": pd.to_timedelta(["1 days", "2 days"])})
+        schema = engine._infer_avro_schema(df)
+        field = schema["fields"][0]
+        assert field["name"] == "dur"
+        assert field["type"]["type"] == "long"
+        assert field["type"]["logicalType"] == "time-micros"
+
+
+# ========================
+# validate_data: Missing Branches
+# ========================
+
+
+class TestValidateDataMissingBranches:
+    """Test validate_data branches not covered by existing tests."""
+
+    def test_validate_data_schema_validation(self, engine):
+        """schema_validation path delegates to validate_schema."""
+        from types import SimpleNamespace
+
+        config = SimpleNamespace(
+            not_empty=False,
+            no_nulls=[],
+            schema_validation={"required_columns": ["a", "missing_col"]},
+            ranges=None,
+            allowed_values=None,
+        )
+        df = pd.DataFrame({"a": [1, 2]})
+        failures = engine.validate_data(df, config)
+        assert any("Missing required columns" in f for f in failures)
+
+    def test_validate_data_range_column_not_found(self, engine):
+        """Range validation with missing column reports failure."""
+        from types import SimpleNamespace
+
+        config = SimpleNamespace(
+            not_empty=False,
+            no_nulls=[],
+            schema_validation=None,
+            ranges={"nonexistent": {"min": 0, "max": 10}},
+            allowed_values=None,
+        )
+        df = pd.DataFrame({"a": [1]})
+        failures = engine.validate_data(df, config)
+        assert len(failures) == 1
+        assert "not found for range validation" in failures[0]
+
+    def test_validate_data_allowed_values_column_not_found(self, engine):
+        """Allowed values validation with missing column reports failure."""
+        from types import SimpleNamespace
+
+        config = SimpleNamespace(
+            not_empty=False,
+            no_nulls=[],
+            schema_validation=None,
+            ranges=None,
+            allowed_values={"nonexistent": ["a", "b"]},
+        )
+        df = pd.DataFrame({"a": [1]})
+        failures = engine.validate_data(df, config)
+        assert len(failures) == 1
+        assert "not found for allowed values validation" in failures[0]

@@ -1263,3 +1263,141 @@ class TestPolarsUpsertAppendOnce:
 
         result = pl.read_parquet(tmp_path / "data.parquet")
         assert result["val"][0] == "updated"
+
+
+class TestPolarsExecuteOperationBranches:
+    """Tests for execute_operation branches (lines 561-698)."""
+
+    def test_drop_duplicates_lazyframe(self, polars_engine):
+        df = pl.DataFrame({"a": [1, 1, 2], "b": ["x", "x", "y"]}).lazy()
+        result = polars_engine.execute_operation("drop_duplicates", {"subset": ["a"]}, df)
+        assert isinstance(result, pl.LazyFrame)
+        collected = result.collect()
+        assert len(collected) == 2
+
+    def test_drop_duplicates_dataframe(self, polars_engine):
+        df = pl.DataFrame({"a": [1, 1, 2], "b": ["x", "x", "y"]})
+        result = polars_engine.execute_operation("drop_duplicates", {"subset": ["a"]}, df)
+        assert isinstance(result, pl.DataFrame)
+        assert len(result) == 2
+
+    def test_fillna_dict_value(self, polars_engine):
+        df = pl.DataFrame({"a": [1, None, 3], "b": [None, "hello", None]}).lazy()
+        result = polars_engine.execute_operation("fillna", {"value": {"a": 0, "b": "missing"}}, df)
+        collected = result.collect()
+        assert collected["a"].to_list() == [1, 0, 3]
+        assert collected["b"].to_list() == ["missing", "hello", "missing"]
+
+    def test_drop_columns(self, polars_engine):
+        df = pl.DataFrame({"a": [1], "b": [2], "c": [3]}).lazy()
+        result = polars_engine.execute_operation("drop", {"columns": ["b", "c"]}, df)
+        collected = result.collect()
+        assert collected.columns == ["a"]
+
+    def test_drop_labels(self, polars_engine):
+        df = pl.DataFrame({"a": [1], "b": [2], "c": [3]}).lazy()
+        result = polars_engine.execute_operation("drop", {"labels": ["c"]}, df)
+        collected = result.collect()
+        assert collected.columns == ["a", "b"]
+
+    def test_rename_columns(self, polars_engine):
+        df = pl.DataFrame({"old_name": [1, 2]}).lazy()
+        result = polars_engine.execute_operation(
+            "rename", {"columns": {"old_name": "new_name"}}, df
+        )
+        collected = result.collect()
+        assert collected.columns == ["new_name"]
+
+    def test_rename_mapper(self, polars_engine):
+        df = pl.DataFrame({"x": [1], "y": [2]}).lazy()
+        result = polars_engine.execute_operation(
+            "rename", {"mapper": {"x": "alpha", "y": "beta"}}, df
+        )
+        collected = result.collect()
+        assert collected.columns == ["alpha", "beta"]
+
+    def test_sample_n_dataframe(self, polars_engine):
+        df = pl.DataFrame({"a": list(range(100))})
+        result = polars_engine.execute_operation("sample", {"n": 10, "random_state": 42}, df)
+        assert isinstance(result, pl.DataFrame)
+        assert len(result) == 10
+
+    def test_sample_n_lazyframe(self, polars_engine):
+        df = pl.DataFrame({"a": list(range(100))}).lazy()
+        result = polars_engine.execute_operation("sample", {"n": 10, "random_state": 42}, df)
+        assert isinstance(result, pl.LazyFrame)
+        assert len(result.collect()) == 10
+
+    def test_sample_frac_dataframe(self, polars_engine):
+        df = pl.DataFrame({"a": list(range(100))})
+        result = polars_engine.execute_operation("sample", {"frac": 0.1, "random_state": 42}, df)
+        assert isinstance(result, pl.DataFrame)
+        assert len(result) == 10
+
+    def test_filter_passthrough(self, polars_engine):
+        df = pl.DataFrame({"a": [1, 2, 3]}).lazy()
+        result = polars_engine.execute_operation("filter", {}, df)
+        assert result.collect().equals(df.collect())
+
+    def test_registry_fallback_with_param_model(self, polars_engine):
+        from unittest.mock import MagicMock, patch
+
+        df = pl.DataFrame({"a": [1, 2]}).lazy()
+        mock_result_ctx = MagicMock()
+        mock_result_ctx.df = pl.DataFrame({"a": [10, 20]})
+
+        mock_func = MagicMock(return_value=mock_result_ctx)
+        mock_param_model = MagicMock(return_value=MagicMock())
+
+        with (
+            patch(
+                "odibi.registry.FunctionRegistry.has_function",
+                return_value=True,
+            ),
+            patch(
+                "odibi.registry.FunctionRegistry.get_function",
+                return_value=mock_func,
+            ),
+            patch(
+                "odibi.registry.FunctionRegistry.get_param_model",
+                return_value=mock_param_model,
+            ),
+        ):
+            result = polars_engine.execute_operation("custom_op", {"key": "val"}, df)
+
+        assert result.equals(pl.DataFrame({"a": [10, 20]}))
+        mock_param_model.assert_called_once_with(key="val")
+        mock_func.assert_called_once()
+
+    def test_registry_fallback_without_param_model(self, polars_engine):
+        from unittest.mock import MagicMock, patch
+
+        df = pl.DataFrame({"a": [1, 2]}).lazy()
+        mock_result_ctx = MagicMock()
+        mock_result_ctx.df = pl.DataFrame({"a": [99]})
+
+        mock_func = MagicMock(return_value=mock_result_ctx)
+
+        with (
+            patch(
+                "odibi.registry.FunctionRegistry.has_function",
+                return_value=True,
+            ),
+            patch(
+                "odibi.registry.FunctionRegistry.get_function",
+                return_value=mock_func,
+            ),
+            patch(
+                "odibi.registry.FunctionRegistry.get_param_model",
+                return_value=None,
+            ),
+        ):
+            result = polars_engine.execute_operation("custom_op", {"x": 1}, df)
+
+        assert result.equals(pl.DataFrame({"a": [99]}))
+        mock_func.assert_called_once()
+
+    def test_unknown_operation_returns_df(self, polars_engine):
+        df = pl.DataFrame({"a": [1, 2, 3]}).lazy()
+        result = polars_engine.execute_operation("nonexistent_op_xyz", {}, df)
+        assert result.collect().equals(df.collect())
