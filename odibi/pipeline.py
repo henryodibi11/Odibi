@@ -1868,6 +1868,13 @@ class PipelineManager:
         for pipeline_config in project_config.pipelines:
             pipeline_name = pipeline_config.pipeline
 
+            if pipeline_name in self._pipelines:
+                self._ctx.warning(
+                    f"Pipeline '{pipeline_name}' defined multiple times, "
+                    f"using last definition (environment override)",
+                    pipeline=pipeline_name,
+                )
+
             self._pipelines[pipeline_name] = Pipeline(
                 pipeline_config=pipeline_config,
                 engine=project_config.engine,

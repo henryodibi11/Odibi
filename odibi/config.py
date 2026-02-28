@@ -4479,6 +4479,7 @@ class ProjectConfig(BaseModel):
             "story",
             "lineage",
             "vars",
+            "pipelines",
         }
 
         for env_name, env_overrides in self.environments.items():

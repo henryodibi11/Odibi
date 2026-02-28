@@ -1,6 +1,6 @@
 # Managing Environments
 
-Odibi allows you to define a single pipeline configuration that adapts to different contexts (e.g., Local Development, Testing, Production) using the `environments` block. This prevents configuration drift and ensures your pipeline logic remains consistent while infrastructure details change.
+Odibi allows you to define pipeline configurations that adapt to different contexts (e.g., Local Development, Testing, Production). You can override infrastructure settings per environment, or even have completely different pipeline implementations per environment. This prevents configuration drift and lets you experiment freely in dev without risking production.
 
 ## How it Works
 
@@ -147,6 +147,126 @@ manager = PipelineManager.from_yaml("/dbfs/project.yaml", env=current_env)
 manager.run()
 ```
 
+## Per-Environment Pipelines
+
+One of the most powerful patterns is having **different pipeline implementations per environment**. This lets you experiment freely in dev without risking production.
+
+### Architecture: Environment-Owned Pipelines
+
+Instead of putting pipelines in `project.yaml`, keep the base config as shared infrastructure and let each environment own its pipelines:
+
+```
+my_project/
+├── project.yaml              # Shared config (no pipelines)
+├── env.dev.yaml              # Dev pipelines + local connections
+├── env.qat.yaml              # QAT pipelines + test connections
+├── env.prod.yaml             # Prod pipelines + cloud connections
+├── pipelines/
+│   ├── bronze_dev.yaml       # Dev: reads from local CSVs
+│   ├── bronze_qat.yaml       # QAT: reads from test database
+│   └── bronze_prod.yaml      # Prod: reads from ADLS
+```
+
+**Base config — shared infrastructure only:**
+```yaml
+# project.yaml
+project: Sales Analytics
+engine: pandas
+
+connections:
+  data_lake:
+    type: local
+    base_path: ./data
+
+story:
+  connection: data_lake
+  path: stories
+
+system:
+  connection: data_lake
+  path: _odibi_system
+```
+
+**Each environment imports its own pipelines:**
+```yaml
+# env.dev.yaml
+imports:
+  - pipelines/bronze_dev.yaml
+
+connections:
+  data_lake:
+    type: local
+    base_path: ./test_data
+```
+
+```yaml
+# env.prod.yaml
+imports:
+  - pipelines/bronze_prod.yaml
+
+engine: spark
+
+connections:
+  data_lake:
+    type: azure_adls
+    account_name: ${PROD_STORAGE_ACCOUNT}
+    container: bronze
+    credential: ${PROD_SAS_TOKEN}
+```
+
+**Run with the environment flag:**
+```bash
+odibi run project.yaml --env dev    # Loads env.dev.yaml → dev pipelines
+odibi run project.yaml --env prod   # Loads env.prod.yaml → prod pipelines
+```
+
+> **Note:** When using environment-owned pipelines, `--env` is required. Without it, the base config has no pipelines and validation will fail. This is intentional — it forces you to be explicit about which environment you're running.
+
+### Shared Pipelines with Environment-Specific Overrides
+
+If your pipeline logic is mostly the same and only connections/engine differ, keep pipelines in the base config and override infrastructure per environment:
+
+```yaml
+# project.yaml — pipelines defined here, shared across environments
+pipelines:
+  - pipeline: bronze_sales
+    nodes:
+      - name: ingest
+        read:
+          connection: data_lake
+          path: sales/
+
+environments:
+  prod:
+    engine: spark
+    connections:
+      data_lake:
+        type: azure_adls
+        account: prod_acc
+```
+
+### Duplicate Pipeline Names (Override Behavior)
+
+If both the base config and an environment file define a pipeline with the **same name**, the environment version wins (last definition takes precedence). A warning is logged so the override is traceable:
+
+```
+WARNING: Pipeline 'bronze' defined multiple times, using last definition (environment override)
+```
+
+This is useful when you want the same logical pipeline name (`bronze`) but completely different implementations per environment.
+
+### Environment Files Support Imports
+
+External `env.{env}.yaml` files are full YAML configs — they support `imports`, `${VAR}` substitution, `${vars.xxx}` references, and `${date:...}` expressions, just like the main config. This means you can organize per-environment pipelines into separate files and import them:
+
+```yaml
+# env.dev.yaml
+imports:
+  - pipelines/bronze_dev.yaml
+  - pipelines/silver_dev.yaml
+  - pipelines/gold_dev.yaml
+```
+
 ## Common Use Cases
 
 ### 1. Swapping Storage (Local vs. Cloud)
@@ -223,7 +343,34 @@ This enables queries across environments:
 SELECT * FROM meta_runs WHERE environment = 'prod' AND status = 'FAILED'
 ```
 
-### 6. Centralized SQL Server System Catalog
+### 6. Per-Environment Pipelines (Dev Sandbox)
+
+Break things in dev without touching prod. Each environment gets its own pipeline definitions:
+
+```yaml
+# env.dev.yaml — experiment freely
+imports:
+  - pipelines/bronze_dev.yaml   # reads from local test CSVs
+
+connections:
+  data_lake:
+    type: local
+    base_path: ./test_data
+```
+
+```yaml
+# env.prod.yaml — production pipelines
+imports:
+  - pipelines/bronze_prod.yaml  # reads from ADLS
+
+engine: spark
+connections:
+  data_lake:
+    type: azure_adls
+    account: ${PROD_ACCOUNT}
+```
+
+### 7. Centralized SQL Server System Catalog
 
 Store system metadata in a central SQL Server for unified observability:
 

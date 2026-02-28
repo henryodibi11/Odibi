@@ -225,6 +225,107 @@ class TestEnvironmentsOverride:
             config = load_yaml_with_env(main_path, env="prod")
             assert config["connections"]["data_lake"]["base_path"] == "/prod/data"
 
+    def test_external_env_file_adds_pipelines(self):
+        """Test that env.{env}.yaml can add pipelines via _deep_merge."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            main_content = """
+            pipelines:
+              - pipeline: shared_pipeline
+                nodes:
+                  - name: node1
+                    source: src1
+            """
+            env_content = """
+            pipelines:
+              - pipeline: dev_only_pipeline
+                nodes:
+                  - name: dev_node
+                    source: dev_src
+            """
+
+            main_path = os.path.join(tmpdir, "config.yaml")
+            env_path = os.path.join(tmpdir, "env.dev.yaml")
+
+            with open(main_path, "w") as f:
+                f.write(main_content)
+            with open(env_path, "w") as f:
+                f.write(env_content)
+
+            config = load_yaml_with_env(main_path, env="dev")
+            assert len(config["pipelines"]) == 2
+            names = [p["pipeline"] for p in config["pipelines"]]
+            assert "shared_pipeline" in names
+            assert "dev_only_pipeline" in names
+
+    def test_external_env_file_with_imports(self):
+        """Test that env.{env}.yaml can use imports to pull in pipeline files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            main_content = """
+            connections:
+              store:
+                type: local
+                base_path: ./data
+            """
+            pipeline_content = """
+            pipelines:
+              - pipeline: bronze_dev
+                nodes:
+                  - name: read_test_data
+                    source: test_csv
+            """
+            env_content = """
+            imports:
+              - pipelines/bronze_dev.yaml
+            """
+
+            os.makedirs(os.path.join(tmpdir, "pipelines"))
+            main_path = os.path.join(tmpdir, "config.yaml")
+            env_path = os.path.join(tmpdir, "env.dev.yaml")
+            pipe_path = os.path.join(tmpdir, "pipelines", "bronze_dev.yaml")
+
+            with open(main_path, "w") as f:
+                f.write(main_content)
+            with open(env_path, "w") as f:
+                f.write(env_content)
+            with open(pipe_path, "w") as f:
+                f.write(pipeline_content)
+
+            config = load_yaml_with_env(main_path, env="dev")
+            assert len(config["pipelines"]) == 1
+            assert config["pipelines"][0]["pipeline"] == "bronze_dev"
+
+    def test_external_env_file_duplicate_pipeline_replaces(self):
+        """Test that same-named pipeline in env file appends (last wins in PipelineManager)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            main_content = """
+            pipelines:
+              - pipeline: bronze
+                nodes:
+                  - name: prod_node
+                    source: prod_src
+            """
+            env_content = """
+            pipelines:
+              - pipeline: bronze
+                nodes:
+                  - name: dev_node
+                    source: dev_src
+            """
+
+            main_path = os.path.join(tmpdir, "config.yaml")
+            env_path = os.path.join(tmpdir, "env.dev.yaml")
+
+            with open(main_path, "w") as f:
+                f.write(main_content)
+            with open(env_path, "w") as f:
+                f.write(env_content)
+
+            config = load_yaml_with_env(main_path, env="dev")
+            # _deep_merge appends pipelines, so both are in the list
+            assert len(config["pipelines"]) == 2
+            # The dev version comes last (env override is merged after base)
+            assert config["pipelines"][1]["nodes"][0]["name"] == "dev_node"
+
 
 class TestVarsSubstitution:
     """Tests for ${vars.xxx} substitution."""
