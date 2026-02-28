@@ -2718,3 +2718,897 @@ class TestPathUtilities:
             warnings.simplefilter("always")
             engine._check_partitioning({})
             assert len(w) == 0
+
+
+# ========================
+# _read_file Advanced Format Tests
+# ========================
+class TestReadFileAdvancedFormats:
+    """Test _read_file advanced format paths (lines 907-1283)."""
+
+    # --- Custom reader ---
+    def test_custom_reader_called(self, engine, tmp_path):
+        """Custom reader registered via register_format is invoked."""
+        called_with = {}
+
+        def my_reader(path, **opts):
+            called_with["path"] = path
+            called_with["opts"] = opts
+            return pd.DataFrame({"x": [42]})
+
+        PandasEngine.register_format("myformat", reader=my_reader)
+        try:
+            conn = FakeConnectionNoStorage(tmp_path)
+            result = engine.read(conn, format="myformat", path="any.file")
+            assert len(result) == 1
+            assert result["x"][0] == 42
+            assert "path" in called_with
+        finally:
+            PandasEngine._custom_readers.pop("myformat", None)
+
+    # --- Glob patterns ---
+    def test_csv_glob_parallel_read(self, engine, tmp_path):
+        """CSV glob pattern reads multiple files in parallel."""
+        pd.DataFrame({"a": [1]}).to_csv(tmp_path / "f1.csv", index=False)
+        pd.DataFrame({"a": [2]}).to_csv(tmp_path / "f2.csv", index=False)
+        conn = FakeConnectionNoStorage(tmp_path)
+        result = engine.read(conn, format="csv", path="*.csv")
+        assert len(result) == 2
+
+    def test_csv_glob_no_match_raises(self, engine, tmp_path):
+        """CSV glob with no matches raises FileNotFoundError."""
+        conn = FakeConnectionNoStorage(tmp_path)
+        with pytest.raises(FileNotFoundError, match="No files matched"):
+            engine.read(conn, format="csv", path="*.xyz")
+
+    def test_json_glob_parallel_read(self, engine, tmp_path):
+        """JSON glob pattern reads multiple files in parallel."""
+        pd.DataFrame({"a": [1]}).to_json(tmp_path / "f1.json")
+        pd.DataFrame({"a": [2]}).to_json(tmp_path / "f2.json")
+        conn = FakeConnectionNoStorage(tmp_path)
+        result = engine.read(conn, format="json", path="*.json")
+        assert len(result) == 2
+
+    # --- CSV error retries ---
+    def test_csv_unicode_error_retry(self, engine, tmp_path):
+        """CSV UnicodeDecodeError retries with latin1 encoding."""
+        from unittest.mock import patch
+
+        csv_path = tmp_path / "data.csv"
+        csv_path.write_text("a\n1\n2")
+        conn = FakeConnectionNoStorage(tmp_path)
+
+        call_count = [0]
+        original_read_csv = pd.read_csv
+
+        def mock_read_csv(path, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise UnicodeDecodeError("utf-8", b"", 0, 1, "bad")
+            return original_read_csv(path, **kwargs)
+
+        with patch("pandas.read_csv", side_effect=mock_read_csv):
+            result = engine.read(conn, format="csv", path="data.csv")
+        assert len(result) == 2
+
+    def test_csv_parser_error_retry(self, engine, tmp_path):
+        """CSV ParserError retries with on_bad_lines='skip'."""
+        from unittest.mock import patch
+
+        csv_path = tmp_path / "data.csv"
+        csv_path.write_text("a\n1\n2")
+        conn = FakeConnectionNoStorage(tmp_path)
+
+        call_count = [0]
+        original_read_csv = pd.read_csv
+
+        def mock_read_csv(path, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise pd.errors.ParserError("bad line")
+            return original_read_csv(path, **kwargs)
+
+        with patch("pandas.read_csv", side_effect=mock_read_csv):
+            result = engine.read(conn, format="csv", path="data.csv")
+        assert len(result) == 2
+
+    def test_csv_unicode_then_parser_error_retry(self, engine, tmp_path):
+        """CSV UnicodeDecodeError then ParserError chains both retries."""
+        from unittest.mock import patch
+
+        csv_path = tmp_path / "data.csv"
+        csv_path.write_text("a\n1\n2")
+        conn = FakeConnectionNoStorage(tmp_path)
+
+        call_count = [0]
+        original_read_csv = pd.read_csv
+
+        def mock_read_csv(path, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise UnicodeDecodeError("utf-8", b"", 0, 1, "bad")
+            if call_count[0] == 2:
+                raise pd.errors.ParserError("bad line after encoding fix")
+            return original_read_csv(path, **kwargs)
+
+        with patch("pandas.read_csv", side_effect=mock_read_csv):
+            result = engine.read(conn, format="csv", path="data.csv")
+        assert len(result) == 2
+        assert call_count[0] == 3
+
+    # --- JSON read ---
+    def test_json_single_read(self, engine, tmp_path):
+        """Read a single JSON file."""
+        df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+        (tmp_path / "data.json").write_text(df.to_json())
+        conn = FakeConnectionNoStorage(tmp_path)
+        result = engine.read(conn, format="json", path="data.json")
+        assert len(result) == 2
+
+    # --- Parquet read ---
+    def test_parquet_read_single(self, engine, tmp_path):
+        """Read single parquet file."""
+        df = pd.DataFrame({"a": [1, 2]})
+        df.to_parquet(tmp_path / "data.parquet", index=False)
+        conn = FakeConnectionNoStorage(tmp_path)
+        result = engine.read(conn, format="parquet", path="data.parquet")
+        assert len(result) == 2
+        assert result.attrs.get("odibi_source_files") is not None
+
+    # --- Avro read ---
+    def test_avro_read_local(self, engine, tmp_path):
+        """Avro read from local file using fastavro."""
+        from unittest.mock import MagicMock, patch
+
+        mock_fastavro = MagicMock()
+        mock_fastavro.reader.return_value = iter(
+            [
+                {"id": 1, "name": "Alice"},
+                {"id": 2, "name": "Bob"},
+            ]
+        )
+
+        avro_path = tmp_path / "data.avro"
+        avro_path.write_bytes(b"dummy")
+        conn = FakeConnectionNoStorage(tmp_path)
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "fastavro":
+                return mock_fastavro
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            result = engine.read(conn, format="avro", path="data.avro")
+        assert len(result) == 2
+        assert list(result.columns) == ["id", "name"]
+
+    def test_avro_read_remote(self, engine, tmp_path):
+        """Avro read from remote URI uses fsspec."""
+        from unittest.mock import MagicMock, patch
+
+        mock_fastavro = MagicMock()
+        mock_fastavro.reader.return_value = iter([{"id": 1}])
+
+        mock_fsspec = MagicMock()
+        mock_file = MagicMock()
+        mock_file.__enter__ = MagicMock(return_value=mock_file)
+        mock_file.__exit__ = MagicMock(return_value=False)
+        mock_fsspec.open.return_value = mock_file
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "fastavro":
+                return mock_fastavro
+            if name == "fsspec":
+                return mock_fsspec
+            return real_import(name, *args, **kwargs)
+
+        class RemoteConn:
+            def get_path(self, p):
+                return f"abfss://container@account.dfs.core.windows.net/{p}"
+
+            def pandas_storage_options(self):
+                return {"account_key": "fake"}
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            result = engine.read(RemoteConn(), format="avro", path="data.avro")
+        assert len(result) == 1
+
+    def test_avro_import_error(self, engine, tmp_path):
+        """Avro read without fastavro raises ImportError."""
+        from unittest.mock import patch
+
+        conn = FakeConnectionNoStorage(tmp_path)
+        avro_path = tmp_path / "data.avro"
+        avro_path.write_bytes(b"dummy")
+
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "fastavro":
+                raise ImportError("No module named 'fastavro'")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            with pytest.raises(ImportError, match="fastavro"):
+                engine.read(conn, format="avro", path="data.avro")
+
+    # --- SQL read ---
+    def test_sql_read_schema_table(self, engine):
+        """SQL read parses schema.table correctly."""
+
+        class SqlConn:
+            def get_path(self, p):
+                return p
+
+            def read_table(self, table_name, schema="dbo"):
+                return pd.DataFrame(
+                    {
+                        "_schema": [schema],
+                        "_table": [table_name],
+                    }
+                )
+
+            def pandas_storage_options(self):
+                return {}
+
+        result = engine.read(SqlConn(), format="sql", table="myschema.mytable")
+        assert result["_schema"][0] == "myschema"
+        assert result["_table"][0] == "mytable"
+
+    def test_sql_read_default_schema(self, engine):
+        """SQL read defaults to dbo schema."""
+
+        class SqlConn:
+            def get_path(self, p):
+                return p
+
+            def read_table(self, table_name, schema="dbo"):
+                return pd.DataFrame({"schema": [schema]})
+
+            def pandas_storage_options(self):
+                return {}
+
+        result = engine.read(SqlConn(), format="sql", table="mytable")
+        assert result["schema"][0] == "dbo"
+
+    def test_sql_read_with_filter_pushdown(self, engine):
+        """SQL read with filter uses read_sql_query for pushdown."""
+        query_log = []
+
+        class SqlConn:
+            def get_path(self, p):
+                return p
+
+            def read_sql_query(self, query):
+                query_log.append(query)
+                return pd.DataFrame({"id": [1]})
+
+            def read_table(self, table_name, schema="dbo"):
+                return pd.DataFrame({"id": [1, 2, 3]})
+
+            def pandas_storage_options(self):
+                return {}
+
+        df = engine.read(
+            SqlConn(),
+            format="sql",
+            table="dbo.orders",
+            options={"filter": "[DateInserted] > '2025-01-01'"},
+        )
+        assert len(df) == 1
+        assert len(query_log) == 1
+        assert "WHERE" in query_log[0]
+        assert "[DateInserted]" in query_log[0]
+
+    def test_sql_read_no_sql_support_raises(self, engine):
+        """SQL read with connection without read_table raises ValueError."""
+
+        class BadConn:
+            def get_path(self, p):
+                return p
+
+            def pandas_storage_options(self):
+                return {}
+
+        with pytest.raises(ValueError, match="does not support SQL"):
+            engine.read(BadConn(), format="sql", table="t")
+
+    def test_sql_read_azure_sql_format(self, engine):
+        """SQL read with azure_sql format also works."""
+
+        class SqlConn:
+            def get_path(self, p):
+                return p
+
+            def read_table(self, table_name, schema="dbo"):
+                return pd.DataFrame({"val": [99]})
+
+            def pandas_storage_options(self):
+                return {}
+
+        result = engine.read(SqlConn(), format="azure_sql", table="tbl")
+        assert result["val"][0] == 99
+
+    # --- API read ---
+    def test_api_read_non_http_raises(self, engine):
+        """API read with non-HttpConnection raises ValueError."""
+
+        class BadConn:
+            def get_path(self, p):
+                return p
+
+            def pandas_storage_options(self):
+                return {}
+
+        with pytest.raises(ValueError, match="is not an HttpConnection"):
+            engine.read(BadConn(), format="api", path="/endpoint")
+
+    def test_api_read_success(self, engine):
+        """API read with HttpConnection calls create_api_fetcher."""
+        from unittest.mock import MagicMock, patch
+
+        mock_http = MagicMock()
+        mock_http.get_path.return_value = "/items"
+        mock_http.base_url = "https://api.example.com"
+        mock_http.headers = {"Authorization": "Bearer token"}
+        mock_http.pandas_storage_options.return_value = {}
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch_dataframe.return_value = pd.DataFrame({"id": [1, 2]})
+
+        with patch("odibi.engine.pandas_engine.isinstance", side_effect=lambda o, t: True):
+            pass  # isinstance mocking is tricky; use class-based approach
+
+        # Patch at module level so isinstance check passes
+        from odibi.connections import http as http_mod
+
+        original_class = http_mod.HttpConnection
+
+        with patch(
+            "odibi.connections.api_fetcher.create_api_fetcher",
+            return_value=mock_fetcher,
+        ) as mock_create:
+            # Make mock_http pass isinstance check
+            mock_http.__class__ = original_class
+            result = engine.read(mock_http, format="api", path="/items")
+            assert len(result) == 2
+            mock_create.assert_called_once()
+
+    # --- Streaming ---
+    def test_read_streaming_raises(self, engine, tmp_path):
+        """Streaming mode raises ValueError."""
+        conn = FakeConnectionNoStorage(tmp_path)
+        with pytest.raises(ValueError, match="Streaming is not supported"):
+            engine.read(conn, format="csv", path="f.csv", streaming=True)
+
+    # --- No path, no table ---
+    def test_read_no_path_no_table_raises(self, engine):
+        """Read without path or table raises ValueError."""
+        conn = FakeConnectionNoStorage(".")
+        with pytest.raises(ValueError):
+            engine.read(conn, format="csv")
+
+    # --- Unsupported format ---
+    def test_read_unsupported_format_raises(self, engine, tmp_path):
+        """Unsupported format raises ValueError."""
+        conn = FakeConnectionNoStorage(tmp_path)
+        with pytest.raises(ValueError, match="Unsupported format"):
+            engine.read(conn, format="netcdf", path="data.nc")
+
+
+# ========================
+# _resolve_path
+# ========================
+
+
+class TestResolvePath:
+    """Test _resolve_path helper method."""
+
+    def test_empty_path_raises(self, engine):
+        """Empty/None path raises ValueError."""
+        with pytest.raises(ValueError, match="path argument is required"):
+            engine._resolve_path(None, None)
+
+    def test_empty_string_raises(self, engine):
+        """Empty string path raises ValueError."""
+        with pytest.raises(ValueError, match="path argument is required"):
+            engine._resolve_path("", None)
+
+    def test_cloud_uri_unchanged(self, engine):
+        """Cloud URI returned as-is regardless of connection."""
+        uri = "abfss://container@acct.dfs.core.windows.net/file.csv"
+        assert engine._resolve_path(uri, None) == uri
+
+    def test_cloud_uri_with_connection_unchanged(self, engine, tmp_conn):
+        """Cloud URI not double-prefixed even with connection."""
+        uri = "s3://bucket/key/file.parquet"
+        assert engine._resolve_path(uri, tmp_conn) == uri
+
+    def test_connection_resolves_relative(self, engine, tmp_conn):
+        """Relative path resolved via connection.get_path."""
+        result = engine._resolve_path("data.csv", tmp_conn)
+        assert result.endswith("data.csv")
+        assert str(tmp_conn.base_path) in result
+
+    def test_no_connection_returns_path_as_is(self, engine):
+        """Without connection, path returned unchanged."""
+        assert engine._resolve_path("/absolute/path.csv", None) == "/absolute/path.csv"
+
+
+# ========================
+# _is_remote_uri
+# ========================
+
+
+class TestIsRemoteUri:
+    """Test _is_remote_uri helper method."""
+
+    def test_local_absolute_path(self, engine):
+        assert engine._is_remote_uri("/tmp/file.csv") is False
+
+    def test_relative_path(self, engine):
+        assert engine._is_remote_uri("data/file.csv") is False
+
+    def test_abfss_scheme(self, engine):
+        assert engine._is_remote_uri("abfss://container@account.dfs.core.windows.net/f") is True
+
+    def test_s3_scheme(self, engine):
+        assert engine._is_remote_uri("s3://bucket/key") is True
+
+    def test_gs_scheme(self, engine):
+        assert engine._is_remote_uri("gs://bucket/key") is True
+
+    def test_file_scheme_not_remote(self, engine):
+        assert engine._is_remote_uri("file:///tmp/file") is False
+
+    def test_windows_drive_not_remote(self, engine):
+        """Windows drive letter (e.g. D:\\data) is not remote."""
+        import os
+
+        if os.name == "nt":
+            assert engine._is_remote_uri("D:\\data\\file.csv") is False
+
+    def test_path_object(self, engine):
+        """Path object is converted to string and checked."""
+        assert engine._is_remote_uri(Path("/local/file.csv")) is False
+
+
+# ========================
+# _expand_remote_glob
+# ========================
+
+
+class TestExpandRemoteGlob:
+    """Test _expand_remote_glob with mocked fsspec."""
+
+    def test_expand_remote_glob_matches(self, engine):
+        from unittest.mock import MagicMock, patch
+
+        mock_fs = MagicMock()
+        mock_fs.glob.return_value = [
+            "container/path/f1.csv",
+            "container/path/f2.csv",
+        ]
+
+        with patch("fsspec.filesystem", return_value=mock_fs) as mock_fsspec:
+            result = engine._expand_remote_glob(
+                "abfss://container/path/*.csv",
+                storage_options={"account_key": "xyz"},
+            )
+
+        mock_fsspec.assert_called_once_with("abfss", account_key="xyz")
+        mock_fs.glob.assert_called_once_with("container/path/*.csv")
+        assert len(result) == 2
+        assert result[0] == "abfss://container/path/f1.csv"
+        assert result[1] == "abfss://container/path/f2.csv"
+
+    def test_expand_remote_glob_no_matches(self, engine):
+        from unittest.mock import MagicMock, patch
+
+        mock_fs = MagicMock()
+        mock_fs.glob.return_value = []
+
+        with patch("fsspec.filesystem", return_value=mock_fs):
+            result = engine._expand_remote_glob("abfss://container/*.xyz")
+
+        assert result == []
+
+    def test_expand_remote_glob_no_protocol(self, engine):
+        """Path without :// defaults to 'file' protocol."""
+        from unittest.mock import MagicMock, patch
+
+        mock_fs = MagicMock()
+        mock_fs.glob.return_value = ["/data/f1.csv"]
+
+        with patch("fsspec.filesystem", return_value=mock_fs) as mock_fsspec:
+            result = engine._expand_remote_glob("/data/*.csv")
+
+        mock_fsspec.assert_called_once_with("file")
+        assert result == ["file:///data/f1.csv"]
+
+
+# ========================
+# _read_parallel
+# ========================
+
+
+class TestReadParallel:
+    """Test _read_parallel thread-based reader."""
+
+    def test_parallel_read_multiple_files(self, engine, tmp_path):
+        """Reads multiple CSV files and concatenates."""
+        pd.DataFrame({"a": [1]}).to_csv(tmp_path / "f1.csv", index=False)
+        pd.DataFrame({"a": [2]}).to_csv(tmp_path / "f2.csv", index=False)
+        result = engine._read_parallel(
+            pd.read_csv,
+            [str(tmp_path / "f1.csv"), str(tmp_path / "f2.csv")],
+        )
+        assert len(result) == 2
+        assert sorted(result["a"].tolist()) == [1, 2]
+
+    def test_parallel_read_empty_list(self, engine):
+        """Empty file list returns empty DataFrame."""
+        result = engine._read_parallel(pd.read_csv, [])
+        assert result.empty
+
+
+# ========================
+# _read_excel_with_patterns
+# ========================
+
+
+class TestExcelPatterns:
+    """Test _read_excel_with_patterns with real Excel files (openpyxl)."""
+
+    def test_single_local_excel(self, engine, tmp_path):
+        """Read single Excel file without pattern."""
+        df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+        p = tmp_path / "data.xlsx"
+        df.to_excel(p, index=False)
+        result = engine._read_excel_with_patterns(str(p))
+        assert len(result) == 2
+        assert list(result.columns) == ["a", "b"]
+
+    def test_excel_add_source_file(self, engine, tmp_path):
+        """add_source_file adds _source_file column."""
+        df = pd.DataFrame({"a": [1]})
+        p = tmp_path / "data.xlsx"
+        df.to_excel(p, index=False)
+        result = engine._read_excel_with_patterns(str(p), add_source_file=True)
+        assert "_source_file" in result.columns
+        assert result["_source_file"].iloc[0] == "data.xlsx"
+
+    def test_excel_sheet_pattern(self, engine, tmp_path):
+        """Sheet pattern filters matching sheets."""
+        p = tmp_path / "multi.xlsx"
+        with pd.ExcelWriter(p) as writer:
+            pd.DataFrame({"a": [1]}).to_excel(writer, sheet_name="Sales_2024", index=False)
+            pd.DataFrame({"a": [2]}).to_excel(writer, sheet_name="Budget_2024", index=False)
+            pd.DataFrame({"a": [3]}).to_excel(writer, sheet_name="Notes", index=False)
+        result = engine._read_excel_with_patterns(str(p), sheet_pattern="*2024*")
+        assert len(result) == 2
+
+    def test_excel_no_matching_sheets(self, engine, tmp_path):
+        """No matching sheets returns empty DataFrame."""
+        p = tmp_path / "data.xlsx"
+        pd.DataFrame({"a": [1]}).to_excel(p, index=False)
+        result = engine._read_excel_with_patterns(str(p), sheet_pattern="*nonexistent*")
+        assert result.empty
+
+    def test_excel_glob_local(self, engine, tmp_path):
+        """Local glob pattern expands to multiple files."""
+        pd.DataFrame({"a": [1]}).to_excel(tmp_path / "f1.xlsx", index=False)
+        pd.DataFrame({"a": [2]}).to_excel(tmp_path / "f2.xlsx", index=False)
+        result = engine._read_excel_with_patterns(str(tmp_path / "*.xlsx"))
+        assert len(result) == 2
+
+    def test_excel_list_of_paths(self, engine, tmp_path):
+        """List of paths reads all files."""
+        pd.DataFrame({"a": [1]}).to_excel(tmp_path / "f1.xlsx", index=False)
+        pd.DataFrame({"a": [2]}).to_excel(tmp_path / "f2.xlsx", index=False)
+        paths = [str(tmp_path / "f1.xlsx"), str(tmp_path / "f2.xlsx")]
+        result = engine._read_excel_with_patterns(paths)
+        assert len(result) == 2
+
+    def test_excel_case_insensitive_pattern(self, engine, tmp_path):
+        """Case insensitive sheet matching (default)."""
+        p = tmp_path / "data.xlsx"
+        with pd.ExcelWriter(p) as writer:
+            pd.DataFrame({"a": [1]}).to_excel(writer, sheet_name="SALES", index=False)
+            pd.DataFrame({"a": [2]}).to_excel(writer, sheet_name="notes", index=False)
+        result = engine._read_excel_with_patterns(
+            str(p),
+            sheet_pattern="*sales*",
+            sheet_pattern_case_sensitive=False,
+        )
+        assert len(result) == 1
+
+    @pytest.mark.skipif(
+        __import__("os").name == "nt",
+        reason="fnmatch is case-insensitive on Windows",
+    )
+    def test_excel_case_sensitive_pattern(self, engine, tmp_path):
+        """Case-sensitive pattern does not match different case (non-Windows)."""
+        p = tmp_path / "data.xlsx"
+        with pd.ExcelWriter(p) as writer:
+            pd.DataFrame({"a": [1]}).to_excel(writer, sheet_name="SALES", index=False)
+        result = engine._read_excel_with_patterns(
+            str(p),
+            sheet_pattern="*sales*",
+            sheet_pattern_case_sensitive=True,
+        )
+        assert result.empty
+
+    def test_excel_multiple_patterns(self, engine, tmp_path):
+        """List of sheet patterns matches union."""
+        p = tmp_path / "multi.xlsx"
+        with pd.ExcelWriter(p) as writer:
+            pd.DataFrame({"a": [1]}).to_excel(writer, sheet_name="Sales", index=False)
+            pd.DataFrame({"a": [2]}).to_excel(writer, sheet_name="Budget", index=False)
+            pd.DataFrame({"a": [3]}).to_excel(writer, sheet_name="Notes", index=False)
+        result = engine._read_excel_with_patterns(str(p), sheet_pattern=["Sales", "Budget"])
+        assert len(result) == 2
+
+    def test_excel_source_file_and_sheet_with_pattern(self, engine, tmp_path):
+        """add_source_file includes both _source_file and _source_sheet."""
+        p = tmp_path / "data.xlsx"
+        with pd.ExcelWriter(p) as writer:
+            pd.DataFrame({"a": [1]}).to_excel(writer, sheet_name="Sales", index=False)
+        result = engine._read_excel_with_patterns(
+            str(p), sheet_pattern="Sales", add_source_file=True
+        )
+        assert "_source_file" in result.columns
+        assert "_source_sheet" in result.columns
+        assert result["_source_sheet"].iloc[0] == "Sales"
+
+    def test_excel_no_files_from_glob_raises(self, engine, tmp_path):
+        """Glob with no matches raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="No files matched"):
+            engine._read_excel_with_patterns(str(tmp_path / "nonexistent_*.xlsx"))
+
+    def test_excel_path_object(self, engine, tmp_path):
+        """Path object accepted as input."""
+        p = tmp_path / "data.xlsx"
+        pd.DataFrame({"a": [1]}).to_excel(p, index=False)
+        result = engine._read_excel_with_patterns(p)
+        assert len(result) == 1
+
+    def test_excel_fastexcel_path(self, engine, tmp_path):
+        """fastexcel path is used when available (mocked)."""
+        from unittest.mock import MagicMock, patch
+
+        p = tmp_path / "data.xlsx"
+        pd.DataFrame({"a": [1, 2]}).to_excel(p, index=False)
+
+        mock_ws = MagicMock()
+        mock_ws.to_pandas.return_value = pd.DataFrame({"a": [1, 2]})
+
+        mock_parser = MagicMock()
+        mock_parser.sheet_names = ["Sheet1"]
+        mock_parser.load_sheet_by_name.return_value = mock_ws
+
+        mock_fastexcel = MagicMock()
+        mock_fastexcel.read_excel.return_value = mock_parser
+
+        with patch.dict(sys.modules, {"fastexcel": mock_fastexcel}):
+            result = engine._read_excel_with_patterns(str(p))
+
+        assert len(result) == 2
+        mock_fastexcel.read_excel.assert_called_once()
+
+    def test_excel_fastexcel_failure_falls_back_to_openpyxl(self, engine, tmp_path):
+        """When fastexcel raises, falls back to openpyxl."""
+        from unittest.mock import MagicMock, patch
+
+        p = tmp_path / "data.xlsx"
+        pd.DataFrame({"a": [10, 20]}).to_excel(p, index=False)
+
+        mock_fastexcel = MagicMock()
+        mock_fastexcel.read_excel.side_effect = RuntimeError("fastexcel broke")
+
+        with patch.dict(sys.modules, {"fastexcel": mock_fastexcel}):
+            result = engine._read_excel_with_patterns(str(p))
+
+        assert len(result) == 2
+        assert list(result["a"]) == [10, 20]
+
+
+# ========================
+# _read_delta_with_duckdb (DuckDB Lake Fallback)
+# ========================
+
+
+class TestDuckDBLakeFallback:
+    """Test _read_delta_with_duckdb (DuckDB fallback for unsupported features)."""
+
+    def _make_ctx(self):
+        from unittest.mock import MagicMock
+
+        ctx = MagicMock()
+        return ctx
+
+    def test_duckdb_import_error(self, engine, monkeypatch):
+        """Missing duckdb raises ImportError."""
+        orig_import = builtins.__import__
+
+        def blocker(name, *args, **kwargs):
+            if name == "duckdb":
+                raise ImportError("no duckdb")
+            return orig_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", blocker)
+        with pytest.raises(ImportError, match="DuckDB is required"):
+            engine._read_delta_with_duckdb("/path", {}, None, None, None, self._make_ctx())
+
+    def test_duckdb_time_travel_raises(self, engine):
+        """Time travel with DuckDB raises NotImplementedError."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_duckdb = MagicMock()
+        mock_duckdb.connect.return_value = mock_conn
+
+        with patch.dict(sys.modules, {"duckdb": mock_duckdb}):
+            with pytest.raises(NotImplementedError, match="does not support time travel"):
+                engine._read_delta_with_duckdb(
+                    "/path",
+                    {},
+                    version=1,
+                    timestamp=None,
+                    post_read_query=None,
+                    ctx=self._make_ctx(),
+                )
+
+    def test_duckdb_time_travel_timestamp_raises(self, engine):
+        """Timestamp time travel also raises."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_duckdb = MagicMock()
+        mock_duckdb.connect.return_value = mock_conn
+
+        with patch.dict(sys.modules, {"duckdb": mock_duckdb}):
+            with pytest.raises(NotImplementedError, match="does not support time travel"):
+                engine._read_delta_with_duckdb(
+                    "/path",
+                    {},
+                    version=None,
+                    timestamp="2024-01-01",
+                    post_read_query=None,
+                    ctx=self._make_ctx(),
+                )
+
+    def test_duckdb_basic_read(self, engine):
+        """Basic DuckDB read without storage options."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchdf.return_value = pd.DataFrame({"id": [1, 2]})
+        mock_duckdb = MagicMock()
+        mock_duckdb.connect.return_value = mock_conn
+
+        with patch.dict(sys.modules, {"duckdb": mock_duckdb}):
+            result = engine._read_delta_with_duckdb(
+                "/my/table",
+                {},
+                version=None,
+                timestamp=None,
+                post_read_query=None,
+                ctx=self._make_ctx(),
+            )
+
+        assert len(result) == 2
+        # Verify INSTALL delta + LOAD delta were called
+        calls = [str(c) for c in mock_conn.execute.call_args_list]
+        assert any("INSTALL delta" in c for c in calls)
+        assert any("LOAD delta" in c for c in calls)
+        mock_conn.close.assert_called_once()
+
+    def test_duckdb_azure_account_key(self, engine):
+        """Azure storage options with account_key are configured."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchdf.return_value = pd.DataFrame({"x": [1]})
+        mock_duckdb = MagicMock()
+        mock_duckdb.connect.return_value = mock_conn
+
+        storage = {"account_name": "myacct", "account_key": "mykey123"}
+
+        with patch.dict(sys.modules, {"duckdb": mock_duckdb}):
+            engine._read_delta_with_duckdb(
+                "abfss://c@a/table",
+                storage,
+                version=None,
+                timestamp=None,
+                post_read_query=None,
+                ctx=self._make_ctx(),
+            )
+
+        all_sql = " ".join(str(c.args[0]) for c in mock_conn.execute.call_args_list if c.args)
+        assert "azure_storage_account_name" in all_sql
+        assert "azure_storage_account_key" in all_sql
+
+    def test_duckdb_azure_sas_token(self, engine):
+        """Azure SAS token (with leading ?) is stripped and configured."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchdf.return_value = pd.DataFrame({"x": [1]})
+        mock_duckdb = MagicMock()
+        mock_duckdb.connect.return_value = mock_conn
+
+        storage = {"account_name": "myacct", "sas_token": "?sv=2023&sig=abc"}
+
+        with patch.dict(sys.modules, {"duckdb": mock_duckdb}):
+            engine._read_delta_with_duckdb(
+                "abfss://c@a/table",
+                storage,
+                version=None,
+                timestamp=None,
+                post_read_query=None,
+                ctx=self._make_ctx(),
+            )
+
+        all_sql = " ".join(str(c.args[0]) for c in mock_conn.execute.call_args_list if c.args)
+        assert "azure_storage_sas_token" in all_sql
+        # Leading ? should be stripped
+        assert "?sv=" not in all_sql
+
+    def test_duckdb_aws_s3_config(self, engine):
+        """AWS S3 storage options are configured."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchdf.return_value = pd.DataFrame({"x": [1]})
+        mock_duckdb = MagicMock()
+        mock_duckdb.connect.return_value = mock_conn
+
+        storage = {
+            "AWS_ACCESS_KEY_ID": "AKID",
+            "AWS_SECRET_ACCESS_KEY": "SECRET",
+            "AWS_REGION": "us-east-1",
+        }
+
+        with patch.dict(sys.modules, {"duckdb": mock_duckdb}):
+            engine._read_delta_with_duckdb(
+                "s3://bucket/table",
+                storage,
+                version=None,
+                timestamp=None,
+                post_read_query=None,
+                ctx=self._make_ctx(),
+            )
+
+        all_sql = " ".join(str(c.args[0]) for c in mock_conn.execute.call_args_list if c.args)
+        assert "s3_access_key_id" in all_sql
+        assert "s3_secret_access_key" in all_sql
+        assert "s3_region" in all_sql
+
+    def test_duckdb_post_read_query(self, engine):
+        """Post-read query is applied to result."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchdf.return_value = pd.DataFrame(
+            {"id": [1, 2, 3], "val": [10, 20, 30]}
+        )
+        mock_duckdb = MagicMock()
+        mock_duckdb.connect.return_value = mock_conn
+
+        with patch.dict(sys.modules, {"duckdb": mock_duckdb}):
+            result = engine._read_delta_with_duckdb(
+                "/table",
+                {},
+                version=None,
+                timestamp=None,
+                post_read_query="val > 15",
+                ctx=self._make_ctx(),
+            )
+
+        assert len(result) == 2
+        assert all(v > 15 for v in result["val"])
