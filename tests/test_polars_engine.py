@@ -1,4 +1,5 @@
 import builtins
+import os
 
 import pytest
 
@@ -1401,3 +1402,294 @@ class TestPolarsExecuteOperationBranches:
         df = pl.DataFrame({"a": [1, 2, 3]}).lazy()
         result = polars_engine.execute_operation("nonexistent_op_xyz", {}, df)
         assert result.collect().equals(df.collect())
+
+
+class TestPolarsReadBranches:
+    """Tests for read() method branches (lines 108-256)."""
+
+    def test_read_csv_lazy(self, tmp_path, polars_engine):
+        """CSV read returns LazyFrame."""
+        pl.DataFrame({"a": [1, 2]}).write_csv(tmp_path / "data.csv")
+        conn = MockConnection()
+        result = polars_engine.read(conn, format="csv", path=str(tmp_path / "data.csv"))
+        assert isinstance(result, pl.LazyFrame)
+        assert result.collect().shape == (2, 1)
+
+    def test_read_parquet_lazy(self, tmp_path, polars_engine):
+        """Parquet read returns LazyFrame."""
+        pl.DataFrame({"a": [1, 2]}).write_parquet(tmp_path / "data.parquet")
+        conn = MockConnection()
+        result = polars_engine.read(conn, format="parquet", path=str(tmp_path / "data.parquet"))
+        assert isinstance(result, pl.LazyFrame)
+        assert result.collect().shape == (2, 1)
+
+    def test_read_json_ndjson_default(self, tmp_path, polars_engine):
+        """JSON read defaults to ndjson scan (json_lines=True by default)."""
+        pl.DataFrame({"a": [1, 2]}).write_ndjson(tmp_path / "data.ndjson")
+        conn = MockConnection()
+        result = polars_engine.read(conn, format="json", path=str(tmp_path / "data.ndjson"))
+        assert isinstance(result, pl.LazyFrame)
+        assert result.collect().shape == (2, 1)
+
+    def test_read_json_standard(self, tmp_path, polars_engine):
+        """JSON read with json_lines=False uses read_json().lazy().
+
+        Note: The source code does not pop 'json_lines' from options before
+        passing **options to read_json, so this path currently raises ValueError
+        due to the unexpected kwarg. This test documents that behavior.
+        """
+        import json as json_mod
+
+        data = [{"a": 1}, {"a": 2}]
+        with open(tmp_path / "data.json", "w") as f:
+            json_mod.dump(data, f)
+        conn = MockConnection()
+        with pytest.raises(ValueError, match="Failed to read"):
+            polars_engine.read(
+                conn,
+                format="json",
+                path=str(tmp_path / "data.json"),
+                options={"json_lines": False},
+            )
+
+    def test_read_no_path_no_table_raises(self, polars_engine):
+        """Read without path or table raises ValueError."""
+        conn = MockConnection()
+        with pytest.raises(ValueError, match="neither 'path' nor 'table'"):
+            polars_engine.read(conn, format="csv")
+
+    def test_read_table_without_connection_raises(self, polars_engine):
+        """Read with table but no connection raises ValueError."""
+        with pytest.raises(ValueError, match="connection is required"):
+            polars_engine.read(connection=None, format="csv", table="my_table")
+
+    def test_read_unsupported_format(self, tmp_path, polars_engine):
+        """Unsupported format raises ValueError."""
+        conn = MockConnection()
+        with pytest.raises(ValueError, match="Unsupported format"):
+            polars_engine.read(conn, format="xml", path=str(tmp_path / "data.xml"))
+
+    def test_read_nonexistent_file(self, polars_engine):
+        """Reading non-existent file raises ValueError on collect (lazy scan defers I/O)."""
+        conn = MockConnection()
+        # scan_csv is lazy; the error surfaces at collect time, not at read time.
+        result = polars_engine.read(conn, format="csv", path="/nonexistent/path.csv")
+        assert isinstance(result, pl.LazyFrame)
+        with pytest.raises(Exception):
+            result.collect()
+
+    def test_read_path_without_connection(self, tmp_path, polars_engine):
+        """Read with path and no connection uses path directly."""
+        pl.DataFrame({"x": [10, 20]}).write_parquet(tmp_path / "direct.parquet")
+        result = polars_engine.read(
+            connection=None, format="parquet", path=str(tmp_path / "direct.parquet")
+        )
+        assert isinstance(result, pl.LazyFrame)
+        assert result.collect()["x"].to_list() == [10, 20]
+
+    def test_read_table_with_connection(self, tmp_path, polars_engine):
+        """Read with table param resolves path via connection.get_path."""
+        pl.DataFrame({"v": [5]}).write_csv(tmp_path / "tbl.csv")
+        conn = MockConnection()
+        result = polars_engine.read(conn, format="csv", table=str(tmp_path / "tbl.csv"))
+        assert isinstance(result, pl.LazyFrame)
+        assert result.collect().shape == (1, 1)
+
+    def test_read_excel_delegates_to_pandas(self, tmp_path, polars_engine):
+        """Excel read delegates to PandasEngine._read_excel_with_patterns.
+
+        The source does ``from odibi.context import get_logging_context``
+        inside the excel branch. We inject it into odibi.context so the
+        import succeeds and then mock the pandas engine call.
+        """
+        import odibi.context as ctx_mod
+        from unittest.mock import MagicMock, patch
+
+        mock_ctx = MagicMock()
+        mock_ctx.with_context.return_value = mock_ctx
+        mock_pdf = pd.DataFrame({"col": [1, 2, 3]})
+
+        with (
+            patch.object(ctx_mod, "get_logging_context", create=True, new=lambda: mock_ctx),
+            patch(
+                "odibi.engine.pandas_engine.PandasEngine._read_excel_with_patterns",
+                return_value=mock_pdf,
+            ) as mock_read,
+        ):
+            conn = MockConnection()
+            result = polars_engine.read(conn, format="excel", path=str(tmp_path / "data.xlsx"))
+            mock_read.assert_called_once()
+            assert isinstance(result, pl.LazyFrame)
+            assert result.collect().shape == (3, 1)
+
+    def test_read_api_requires_http_connection(self, polars_engine):
+        """API read with non-HttpConnection raises ValueError.
+
+        The source does ``from odibi.context import get_logging_context``
+        inside the api branch. We inject it so the import succeeds and the
+        HttpConnection type-check can be reached.
+        """
+        import odibi.context as ctx_mod
+        from unittest.mock import MagicMock, patch
+
+        mock_ctx = MagicMock()
+        mock_ctx.with_context.return_value = mock_ctx
+
+        conn = MockConnection()
+        with patch.object(ctx_mod, "get_logging_context", create=True, new=lambda: mock_ctx):
+            with pytest.raises(ValueError, match="not an HttpConnection"):
+                polars_engine.read(conn, format="api", path="/endpoint")
+
+    def test_read_sql_filter_branch(self, polars_engine):
+        """SQL filter option triggers read_sql_query on connection."""
+        call_log = []
+
+        class SqlFilterConnection:
+            def read_table(self, table_name, schema="dbo"):
+                return pd.DataFrame({"a": [1]})
+
+            def read_sql_query(self, query):
+                call_log.append(query)
+                return pd.DataFrame({"a": [1, 2]})
+
+        conn = SqlFilterConnection()
+        result = polars_engine.read(
+            conn,
+            format="azure_sql",
+            table="Orders",
+            options={"filter": "status = 'active'"},
+        )
+        assert isinstance(result, pl.LazyFrame)
+        assert len(call_log) == 1
+        assert "WHERE status = 'active'" in call_log[0]
+
+    def test_read_csv_with_options(self, tmp_path, polars_engine):
+        """CSV read passes extra options to scan_csv."""
+        pl.DataFrame({"a": [1, 2], "b": [3, 4]}).write_csv(tmp_path / "data.csv", separator=";")
+        conn = MockConnection()
+        result = polars_engine.read(
+            conn,
+            format="csv",
+            path=str(tmp_path / "data.csv"),
+            options={"separator": ";"},
+        )
+        assert result.collect().shape == (2, 2)
+
+
+class TestPolarsWriteBranches:
+    """Tests for write() method branches (lines 258-357)."""
+
+    def test_write_parquet_eager(self, tmp_path, polars_engine):
+        """Write eager DataFrame as parquet."""
+        df = pl.DataFrame({"a": [1, 2]})
+        conn = MockConnection()
+        polars_engine.write(df, conn, format="parquet", path=str(tmp_path / "out.parquet"))
+        assert (tmp_path / "out.parquet").exists()
+        assert pl.read_parquet(tmp_path / "out.parquet").shape == (2, 1)
+
+    def test_write_parquet_lazy(self, tmp_path, polars_engine):
+        """Write LazyFrame as parquet using sink_parquet."""
+        df = pl.DataFrame({"a": [1, 2]}).lazy()
+        conn = MockConnection()
+        polars_engine.write(df, conn, format="parquet", path=str(tmp_path / "out.parquet"))
+        assert (tmp_path / "out.parquet").exists()
+        assert pl.read_parquet(tmp_path / "out.parquet").shape == (2, 1)
+
+    def test_write_csv_eager(self, tmp_path, polars_engine):
+        """Write eager DataFrame as CSV."""
+        df = pl.DataFrame({"a": [1, 2]})
+        conn = MockConnection()
+        polars_engine.write(df, conn, format="csv", path=str(tmp_path / "out.csv"))
+        assert (tmp_path / "out.csv").exists()
+        assert pl.read_csv(tmp_path / "out.csv").shape == (2, 1)
+
+    def test_write_csv_lazy(self, tmp_path, polars_engine):
+        """Write LazyFrame as CSV using sink_csv."""
+        df = pl.DataFrame({"a": [1, 2]}).lazy()
+        conn = MockConnection()
+        polars_engine.write(df, conn, format="csv", path=str(tmp_path / "out.csv"))
+        assert (tmp_path / "out.csv").exists()
+        assert pl.read_csv(tmp_path / "out.csv").shape == (2, 1)
+
+    def test_write_json_eager(self, tmp_path, polars_engine):
+        """Write eager DataFrame as ndjson."""
+        df = pl.DataFrame({"a": [1, 2]})
+        conn = MockConnection()
+        polars_engine.write(df, conn, format="json", path=str(tmp_path / "out.json"))
+        assert (tmp_path / "out.json").exists()
+
+    def test_write_json_lazy(self, tmp_path, polars_engine):
+        """Write LazyFrame as ndjson using sink_ndjson."""
+        df = pl.DataFrame({"a": [1, 2]}).lazy()
+        conn = MockConnection()
+        polars_engine.write(df, conn, format="json", path=str(tmp_path / "out.json"))
+        assert (tmp_path / "out.json").exists()
+
+    def test_write_no_path_no_table_raises(self, polars_engine):
+        """Write without path or table raises ValueError."""
+        df = pl.DataFrame({"a": [1]})
+        conn = MockConnection()
+        with pytest.raises(ValueError, match="neither 'path' nor 'table'"):
+            polars_engine.write(df, conn, format="csv")
+
+    def test_write_table_without_connection_raises(self, polars_engine):
+        """Write with table but no connection raises ValueError."""
+        df = pl.DataFrame({"a": [1]})
+        with pytest.raises(ValueError, match="connection is required"):
+            polars_engine.write(df, connection=None, format="csv", table="my_table")
+
+    def test_write_unsupported_format(self, tmp_path, polars_engine):
+        """Unsupported write format raises ValueError."""
+        df = pl.DataFrame({"a": [1]})
+        conn = MockConnection()
+        with pytest.raises(ValueError, match="Unsupported write format"):
+            polars_engine.write(df, conn, format="xml", path=str(tmp_path / "out.xml"))
+
+    def test_write_path_no_connection(self, tmp_path, polars_engine):
+        """Write with path and no connection uses path directly."""
+        df = pl.DataFrame({"a": [1, 2]})
+        polars_engine.write(
+            df, connection=None, format="parquet", path=str(tmp_path / "out.parquet")
+        )
+        assert (tmp_path / "out.parquet").exists()
+
+    def test_write_table_with_connection(self, tmp_path, polars_engine):
+        """Write with table param resolves path via connection.get_path."""
+        df = pl.DataFrame({"a": [1]})
+        conn = MockConnection()
+        polars_engine.write(df, conn, format="csv", table=str(tmp_path / "tbl.csv"))
+        assert (tmp_path / "tbl.csv").exists()
+
+    def test_write_returns_none(self, tmp_path, polars_engine):
+        """Write returns None for non-delta formats."""
+        df = pl.DataFrame({"a": [1]})
+        conn = MockConnection()
+        result = polars_engine.write(df, conn, format="parquet", path=str(tmp_path / "out.parquet"))
+        assert result is None
+
+    def test_write_creates_parent_dirs(self, tmp_path, polars_engine):
+        """Write creates parent directories if they don't exist."""
+        df = pl.DataFrame({"a": [1]})
+        conn = MockConnection()
+        nested_path = str(tmp_path / "sub" / "dir" / "out.parquet")
+        polars_engine.write(df, conn, format="parquet", path=nested_path)
+        assert os.path.exists(nested_path)
+
+    def test_write_upsert_non_dlt_delegates(self, tmp_path, polars_engine):
+        """Upsert mode for non-delta-lake format calls _handle_generic_upsert."""
+        existing = pl.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [2, 3], "val": ["B_up", "c_new"]})
+        conn = MockConnection()
+        polars_engine.write(
+            new_data,
+            conn,
+            format="parquet",
+            path=str(tmp_path / "data.parquet"),
+            mode="upsert",
+            options={"keys": ["id"]},
+        )
+        result = pl.read_parquet(tmp_path / "data.parquet")
+        assert len(result) == 3
+        assert set(result["id"].to_list()) == {1, 2, 3}

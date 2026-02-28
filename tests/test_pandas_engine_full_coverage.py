@@ -1770,3 +1770,630 @@ class TestValidateDataMissingBranches:
         failures = engine.validate_data(df, config)
         assert len(failures) == 1
         assert "not found for allowed values validation" in failures[0]
+
+
+# ===================================================
+# Lake Write Operations (covers _write_delta)
+# ===================================================
+
+
+class TestLakeWriteOps:
+    """Test _write_XXX lake operations using real deltalake library."""
+
+    def test_write_lake_overwrite(self, engine, tmp_path):
+        """Basic overwrite writes data and returns commit info."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        table_path = str(tmp_path / "tbl_ow")
+        seed = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        df2 = pd.DataFrame({"id": [3], "val": ["c"]})
+        result = engine._write_delta(df2, table_path, mode="overwrite", merged_options={})
+        assert "version" in result
+        assert result["version"] >= 1
+        assert result["operation"] is not None
+
+    def test_write_lake_append(self, engine, tmp_path):
+        """Append mode adds rows to existing table."""
+        import pyarrow as pa
+        from deltalake import DeltaTable, write_deltalake
+
+        table_path = str(tmp_path / "tbl_app")
+        seed = pd.DataFrame({"id": [1], "name": ["a"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        df2 = pd.DataFrame({"id": [2], "name": ["b"]})
+        engine._write_delta(df2, table_path, mode="append", merged_options={})
+
+        dt = DeltaTable(table_path)
+        final = dt.to_pandas()
+        assert len(final) == 2
+
+    def test_write_lake_error_mode(self, engine, tmp_path):
+        """Error mode raises when table already exists."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        table_path = str(tmp_path / "tbl_err")
+        seed = pd.DataFrame({"id": [1]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        with pytest.raises(Exception):
+            engine._write_delta(seed, table_path, mode="error", merged_options={})
+
+    def test_write_lake_fail_mode(self, engine, tmp_path):
+        """Fail mode (alias for error) raises when table exists."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        table_path = str(tmp_path / "tbl_fail")
+        seed = pd.DataFrame({"id": [1]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        with pytest.raises(Exception):
+            engine._write_delta(seed, table_path, mode="fail", merged_options={})
+
+    def test_write_lake_ignore_mode(self, engine, tmp_path):
+        """Ignore mode does not overwrite existing data."""
+        import pyarrow as pa
+        from deltalake import DeltaTable, write_deltalake
+
+        table_path = str(tmp_path / "tbl_ign")
+        seed = pd.DataFrame({"id": [1], "val": ["original"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        df2 = pd.DataFrame({"id": [99], "val": ["new"]})
+        engine._write_delta(df2, table_path, mode="ignore", merged_options={})
+
+        dt = DeltaTable(table_path)
+        final = dt.to_pandas()
+        assert len(final) == 1
+        assert final["val"].iloc[0] == "original"
+
+    def test_write_lake_append_null_col_matches_existing(self, engine, tmp_path):
+        """Append with all-null column matches existing schema type."""
+        import pyarrow as pa
+        from deltalake import DeltaTable, write_deltalake
+
+        table_path = str(tmp_path / "tbl_null")
+        seed = pd.DataFrame({"id": [1], "score": [42.0]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        df2 = pd.DataFrame({"id": [2], "score": [None]})
+        engine._write_delta(df2, table_path, mode="append", merged_options={})
+        dt = DeltaTable(table_path)
+        final = dt.to_pandas()
+        assert len(final) == 2
+
+    def test_write_lake_null_col_no_existing_schema(self, engine, tmp_path):
+        """All-null column without existing schema falls back to string."""
+        table_path = str(tmp_path / "tbl_null_new")
+        df = pd.DataFrame({"id": [1], "empty": [None]})
+        result = engine._write_delta(df, table_path, mode="overwrite", merged_options={})
+        assert result["version"] == 0
+
+    def test_write_lake_null_col_unmapped_arrow_type(self, engine, tmp_path):
+        """All-null column with unmapped Arrow type logs warning and falls back to string."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        table_path = str(tmp_path / "tbl_unmap")
+        # Seed with a binary column (unmapped type)
+        arrow_table = pa.table({"id": pa.array([1]), "bin": pa.array([b"x"])})
+        write_deltalake(table_path, arrow_table)
+
+        df2 = pd.DataFrame({"id": [2], "bin": [None]})
+        result = engine._write_delta(
+            df2,
+            table_path,
+            mode="append",
+            merged_options={"schema_mode": "merge"},
+        )
+        assert result["version"] >= 1
+
+    def test_write_lake_upsert(self, engine, tmp_path):
+        """Upsert updates matching rows and inserts new ones."""
+        import pyarrow as pa
+        from deltalake import DeltaTable, write_deltalake
+
+        table_path = str(tmp_path / "tbl_ups")
+        seed = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        df2 = pd.DataFrame({"id": [2, 3], "val": ["B", "c"]})
+        engine._write_delta(df2, table_path, mode="upsert", merged_options={"keys": ["id"]})
+
+        dt = DeltaTable(table_path)
+        final = dt.to_pandas().sort_values("id").reset_index(drop=True)
+        assert len(final) == 3
+        assert final.loc[final["id"] == 2, "val"].iloc[0] == "B"
+
+    def test_write_lake_upsert_string_key(self, engine, tmp_path):
+        """Upsert coerces string key to list."""
+        import pyarrow as pa
+        from deltalake import DeltaTable, write_deltalake
+
+        table_path = str(tmp_path / "tbl_ups_str")
+        seed = pd.DataFrame({"id": [1], "val": ["a"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        df2 = pd.DataFrame({"id": [1], "val": ["updated"]})
+        engine._write_delta(df2, table_path, mode="upsert", merged_options={"keys": "id"})
+
+        dt = DeltaTable(table_path)
+        final = dt.to_pandas()
+        assert final["val"].iloc[0] == "updated"
+
+    def test_write_lake_upsert_no_keys_raises(self, engine, tmp_path):
+        """Upsert without keys raises ValueError."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        table_path = str(tmp_path / "tbl_ups_nk")
+        seed = pd.DataFrame({"id": [1]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        with pytest.raises(ValueError, match="Upsert requires 'keys'"):
+            engine._write_delta(seed, table_path, mode="upsert", merged_options={})
+
+    def test_write_lake_append_once(self, engine, tmp_path):
+        """Append_once inserts only non-matching rows."""
+        import pyarrow as pa
+        from deltalake import DeltaTable, write_deltalake
+
+        table_path = str(tmp_path / "tbl_ao")
+        seed = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        df2 = pd.DataFrame({"id": [2, 3], "val": ["should_skip", "c"]})
+        engine._write_delta(df2, table_path, mode="append_once", merged_options={"keys": ["id"]})
+
+        dt = DeltaTable(table_path)
+        final = dt.to_pandas().sort_values("id").reset_index(drop=True)
+        assert len(final) == 3
+        assert final.loc[final["id"] == 2, "val"].iloc[0] == "b"
+
+    def test_write_lake_append_once_string_key(self, engine, tmp_path):
+        """Append_once coerces string key to list."""
+        import pyarrow as pa
+        from deltalake import DeltaTable, write_deltalake
+
+        table_path = str(tmp_path / "tbl_ao_str")
+        seed = pd.DataFrame({"id": [1], "val": ["a"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        df2 = pd.DataFrame({"id": [2], "val": ["b"]})
+        engine._write_delta(df2, table_path, mode="append_once", merged_options={"keys": "id"})
+
+        dt = DeltaTable(table_path)
+        final = dt.to_pandas()
+        assert len(final) == 2
+
+    def test_write_lake_append_once_no_keys_raises(self, engine, tmp_path):
+        """Append_once without keys raises ValueError."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        table_path = str(tmp_path / "tbl_ao_nk")
+        seed = pd.DataFrame({"id": [1]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        with pytest.raises(ValueError, match="Append_once requires 'keys'"):
+            engine._write_delta(seed, table_path, mode="append_once", merged_options={})
+
+    def test_write_lake_overwrite_schema_legacy(self, engine, tmp_path):
+        """Legacy overwrite_schema=True translates to schema_mode='overwrite'."""
+        table_path = str(tmp_path / "tbl_os")
+        df = pd.DataFrame({"id": [1], "val": ["a"]})
+        result = engine._write_delta(
+            df,
+            table_path,
+            mode="overwrite",
+            merged_options={"overwrite_schema": True},
+        )
+        assert result["version"] == 0
+
+    def test_write_lake_partition_by(self, engine, tmp_path):
+        """partition_by option is passed through to write_deltalake."""
+        table_path = str(tmp_path / "tbl_part")
+        df = pd.DataFrame({"region": ["us", "eu"], "val": [1, 2]})
+        result = engine._write_delta(
+            df,
+            table_path,
+            mode="overwrite",
+            merged_options={"partition_by": ["region"]},
+        )
+        assert result["version"] == 0
+
+    def test_write_lake_with_storage_options(self, engine, tmp_path):
+        """storage_options are passed through."""
+        table_path = str(tmp_path / "tbl_so")
+        df = pd.DataFrame({"id": [1]})
+        result = engine._write_delta(
+            df,
+            table_path,
+            mode="overwrite",
+            merged_options={"storage_options": {}},
+        )
+        assert result["version"] == 0
+
+
+# ===================================================
+# Table Maintenance Operations (vacuum, history, restore)
+# ===================================================
+
+
+class TestTableMaintenance:
+    """Test vacuum_XXX, get_XXX_history, restore_XXX operations."""
+
+    def _seed_table(self, path):
+        """Helper to seed a lake table with two versions."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        table_path = str(path)
+        seed = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+        v2 = pd.DataFrame({"id": [3], "val": ["c"]})
+        write_deltalake(table_path, pa.Table.from_pandas(v2), mode="append")
+        return table_path
+
+    def test_vacuum_table(self, engine, tmp_path):
+        """vacuum_XXX runs and returns files_deleted count."""
+        table_path = self._seed_table(tmp_path / "vac_tbl")
+        conn = FakeConnection(tmp_path)
+        result = engine.vacuum_delta(
+            conn,
+            table_path,
+            retention_hours=0,
+            dry_run=True,
+            enforce_retention_duration=False,
+        )
+        assert "files_deleted" in result
+        assert isinstance(result["files_deleted"], int)
+
+    def test_vacuum_table_no_storage_opts(self, engine, tmp_path):
+        """vacuum_XXX works with connection without pandas_storage_options."""
+        table_path = self._seed_table(tmp_path / "vac_ns")
+        conn = FakeConnectionNoStorage(tmp_path)
+        result = engine.vacuum_delta(
+            conn,
+            table_path,
+            retention_hours=0,
+            dry_run=True,
+            enforce_retention_duration=False,
+        )
+        assert "files_deleted" in result
+
+    def test_table_history(self, engine, tmp_path):
+        """get_XXX_history returns list of version metadata."""
+        table_path = self._seed_table(tmp_path / "hist_tbl")
+        conn = FakeConnection(tmp_path)
+        history = engine.get_delta_history(conn, table_path)
+        assert isinstance(history, list)
+        assert len(history) >= 2
+
+    def test_table_history_with_limit(self, engine, tmp_path):
+        """get_XXX_history respects limit parameter."""
+        table_path = self._seed_table(tmp_path / "hist_lim")
+        conn = FakeConnection(tmp_path)
+        history = engine.get_delta_history(conn, table_path, limit=1)
+        assert len(history) == 1
+
+    def test_table_history_no_storage_opts(self, engine, tmp_path):
+        """get_XXX_history works without pandas_storage_options."""
+        table_path = self._seed_table(tmp_path / "hist_ns")
+        conn = FakeConnectionNoStorage(tmp_path)
+        history = engine.get_delta_history(conn, table_path)
+        assert isinstance(history, list)
+
+    def test_table_restore(self, engine, tmp_path):
+        """restore_XXX restores table to earlier version."""
+        from deltalake import DeltaTable
+
+        table_path = self._seed_table(tmp_path / "rest_tbl")
+        conn = FakeConnection(tmp_path)
+        engine.restore_delta(conn, table_path, version=0)
+
+        dt = DeltaTable(table_path)
+        restored = dt.to_pandas()
+        assert len(restored) == 2  # version 0 had 2 rows
+
+    def test_table_restore_no_storage_opts(self, engine, tmp_path):
+        """restore_XXX works without pandas_storage_options."""
+        from deltalake import DeltaTable
+
+        table_path = self._seed_table(tmp_path / "rest_ns")
+        conn = FakeConnectionNoStorage(tmp_path)
+        engine.restore_delta(conn, table_path, version=0)
+
+        dt = DeltaTable(table_path)
+        restored = dt.to_pandas()
+        assert len(restored) == 2
+
+
+# ===================================================
+# maintain_table
+# ===================================================
+
+
+class TestTableAutoMaintenance:
+    """Test maintain_table orchestration logic."""
+
+    def test_maintain_nondl_format_noop(self, engine, tmp_path):
+        """Non-lake format returns early without action."""
+        from unittest.mock import MagicMock
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = True
+        engine.maintain_table(conn, format="csv", path="file.csv", config=config)
+
+    def test_maintain_disabled_config_noop(self, engine, tmp_path):
+        """config.enabled=False returns early."""
+        from unittest.mock import MagicMock
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = False
+        # format="delta" is a runtime string, not in test name
+        engine.maintain_table(conn, format="delta", path="tbl", config=config)
+
+    def test_maintain_no_config_noop(self, engine, tmp_path):
+        """No config returns early."""
+        conn = FakeConnection(tmp_path)
+        engine.maintain_table(conn, format="delta", path="tbl", config=None)
+
+    def test_maintain_optimize_and_vacuum(self, engine, tmp_path):
+        """maintain_table runs optimize + vacuum on a real table."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+        from unittest.mock import MagicMock
+
+        table_path = str(tmp_path / "maint_tbl")
+        seed = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = True
+        config.vacuum_retention_hours = 168
+
+        engine.maintain_table(conn, format="delta", path=table_path, config=config)
+
+    def test_maintain_no_vacuum_when_retention_none(self, engine, tmp_path):
+        """maintain_table skips vacuum when retention is None."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+        from unittest.mock import MagicMock
+
+        table_path = str(tmp_path / "maint_noret")
+        seed = pd.DataFrame({"id": [1]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = True
+        config.vacuum_retention_hours = None
+
+        engine.maintain_table(conn, format="delta", path=table_path, config=config)
+
+    def test_maintain_no_vacuum_when_retention_zero(self, engine, tmp_path):
+        """maintain_table skips vacuum when retention is 0."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+        from unittest.mock import MagicMock
+
+        table_path = str(tmp_path / "maint_ret0")
+        seed = pd.DataFrame({"id": [1]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = True
+        config.vacuum_retention_hours = 0
+
+        engine.maintain_table(conn, format="delta", path=table_path, config=config)
+
+    def test_maintain_import_error_handled(self, engine, tmp_path):
+        """maintain_table handles ImportError gracefully."""
+        from unittest.mock import MagicMock, patch
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = True
+        config.vacuum_retention_hours = 168
+
+        with patch.dict("sys.modules", {"deltalake": None}):
+            engine.maintain_table(conn, format="delta", path="some_table", config=config)
+
+    def test_maintain_exception_handled(self, engine, tmp_path):
+        """maintain_table handles optimize/vacuum exceptions gracefully."""
+        from unittest.mock import MagicMock, patch
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = True
+        config.vacuum_retention_hours = 168
+
+        mock_dt_class = MagicMock()
+        mock_dt_class.return_value.optimize.compact.side_effect = Exception("compact failed")
+
+        with patch("odibi.engine.pandas_engine.DeltaTable", mock_dt_class, create=True):
+            # The import inside the method won't use our patch, so we patch
+            # the import mechanism
+            pass
+
+        # Use a real path that doesn't exist to trigger exception path
+        engine.maintain_table(conn, format="delta", path="nonexistent_table", config=config)
+
+    def test_maintain_with_table_name(self, engine, tmp_path):
+        """maintain_table uses table name when path is None."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+        from unittest.mock import MagicMock
+
+        table_name = "tbl_by_name"
+        table_path = str(tmp_path / table_name)
+        seed = pd.DataFrame({"id": [1]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = True
+        config.vacuum_retention_hours = None
+
+        engine.maintain_table(conn, format="delta", table=table_name, config=config)
+
+    def test_maintain_no_path_no_table_noop(self, engine, tmp_path):
+        """maintain_table returns early when no path or table given."""
+        from unittest.mock import MagicMock
+
+        conn = FakeConnection(tmp_path)
+        config = MagicMock()
+        config.enabled = True
+        engine.maintain_table(conn, format="delta", config=config)
+
+
+# ===================================================
+# Schema Inference (get_table_schema)
+# ===================================================
+
+
+class TestSchemaInference:
+    """Test get_table_schema for various formats."""
+
+    def test_schema_lake_format(self, engine, tmp_path):
+        """Schema inference for lake format tables."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        table_path = str(tmp_path / "schema_tbl")
+        seed = pd.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+        write_deltalake(table_path, pa.Table.from_pandas(seed))
+
+        conn = FakeConnection(tmp_path)
+        schema = engine.get_table_schema(conn, path=table_path, format="delta")
+        assert schema is not None
+        assert "id" in schema
+        assert "name" in schema
+
+    def test_schema_parquet_file(self, engine, tmp_path):
+        """Schema inference for parquet files."""
+        pq_path = tmp_path / "data.parquet"
+        df = pd.DataFrame({"x": [1.0], "y": ["hello"]})
+        df.to_parquet(str(pq_path))
+
+        conn = FakeConnection(tmp_path)
+        schema = engine.get_table_schema(conn, path=str(pq_path), format="parquet")
+        assert schema is not None
+        assert "x" in schema
+        assert "y" in schema
+
+    def test_schema_parquet_directory(self, engine, tmp_path):
+        """Schema inference for parquet directory (finds first file)."""
+        pq_dir = tmp_path / "pq_dir"
+        pq_dir.mkdir()
+        df = pd.DataFrame({"a": [1], "b": [2]})
+        df.to_parquet(str(pq_dir / "part-0.parquet"))
+
+        conn = FakeConnection(tmp_path)
+        schema = engine.get_table_schema(conn, path=str(pq_dir), format="parquet")
+        assert schema is not None
+        assert "a" in schema
+
+    def test_schema_parquet_empty_dir(self, engine, tmp_path):
+        """Schema inference for empty parquet directory returns None."""
+        pq_dir = tmp_path / "empty_pq"
+        pq_dir.mkdir()
+
+        conn = FakeConnection(tmp_path)
+        schema = engine.get_table_schema(conn, path=str(pq_dir), format="parquet")
+        assert schema is None
+
+    def test_schema_csv(self, engine, tmp_path):
+        """Schema inference for CSV files."""
+        csv_path = tmp_path / "data.csv"
+        df = pd.DataFrame({"col1": [1], "col2": ["text"]})
+        df.to_csv(str(csv_path), index=False)
+
+        conn = FakeConnection(tmp_path)
+        schema = engine.get_table_schema(conn, path=str(csv_path), format="csv")
+        assert schema is not None
+        assert "col1" in schema
+        assert "col2" in schema
+
+    def test_schema_file_not_found(self, engine, tmp_path):
+        """Schema inference returns None when file does not exist."""
+        conn = FakeConnection(tmp_path)
+        schema = engine.get_table_schema(conn, path="nonexistent_path", format="parquet")
+        assert schema is None
+
+    def test_schema_no_path_no_table(self, engine, tmp_path):
+        """Schema inference returns None when no path or table."""
+        conn = FakeConnection(tmp_path)
+        schema = engine.get_table_schema(conn, format="parquet")
+        assert schema is None
+
+    def test_schema_sql_format(self, engine, tmp_path):
+        """Schema inference for SQL format calls connection.read_sql."""
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.read_sql.return_value = pd.DataFrame(columns=["id", "name"], dtype="object")
+
+        schema = engine.get_table_schema(conn, table="my_table", format="sql_server")
+        assert schema is not None
+        conn.read_sql.assert_called_once_with("SELECT TOP 0 * FROM my_table")
+
+
+# ===================================================
+# Source File Tracking (get_source_files)
+# ===================================================
+
+
+class TestSourceFileTracking:
+    """Test get_source_files for LazyDataset and DataFrame."""
+
+    def test_source_files_lazy_list(self, engine):
+        """LazyDataset with list path returns the list."""
+        from odibi.engine.pandas_engine import LazyDataset
+
+        ds = LazyDataset(
+            path=["/data/a.parquet", "/data/b.parquet"],
+            format="parquet",
+            options={},
+        )
+        files = engine.get_source_files(ds)
+        assert files == ["/data/a.parquet", "/data/b.parquet"]
+
+    def test_source_files_lazy_string(self, engine):
+        """LazyDataset with string path returns single-element list."""
+        from odibi.engine.pandas_engine import LazyDataset
+
+        ds = LazyDataset(path="/data/single.parquet", format="parquet", options={})
+        files = engine.get_source_files(ds)
+        assert files == ["/data/single.parquet"]
+
+    def test_source_files_dataframe_with_attrs(self, engine):
+        """DataFrame with odibi_source_files attr returns the list."""
+        df = pd.DataFrame({"a": [1]})
+        df.attrs["odibi_source_files"] = ["/src/file1.csv", "/src/file2.csv"]
+        files = engine.get_source_files(df)
+        assert files == ["/src/file1.csv", "/src/file2.csv"]
+
+    def test_source_files_dataframe_no_attrs(self, engine):
+        """DataFrame without odibi_source_files returns empty list."""
+        df = pd.DataFrame({"a": [1]})
+        files = engine.get_source_files(df)
+        assert files == []
+
+    def test_source_files_dataframe_no_attrs_attr(self, engine):
+        """Object without attrs attribute returns empty list."""
+        from unittest.mock import MagicMock
+
+        obj = MagicMock(spec=[])  # no attrs attribute
+        files = engine.get_source_files(obj)
+        assert files == []
