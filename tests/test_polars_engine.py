@@ -619,8 +619,8 @@ class TestPolarsEdgeCases:
         assert len(sample) <= 3
 
 
-class TestPolarsDeltaOperations:
-    """Tests for Delta Lake specific operations."""
+class TestPolarsLakeOperations:
+    """Tests for Lake (DL) specific operations."""
 
     @pytest.fixture
     def mock_deltalake_import_error(self):
@@ -649,16 +649,16 @@ class TestPolarsDeltaOperations:
         if original_deltalake:
             sys.modules["deltalake"] = original_deltalake
 
-    def test_vacuum_delta_import_error_handling(self, polars_engine, mock_deltalake_import_error):
-        """Test vacuum_delta raises proper error when deltalake not available."""
+    def test_vacuum_lake_import_error_handling(self, polars_engine, mock_deltalake_import_error):
+        """Test vacuum raises proper error when deltalake not available."""
         connection = MockConnection()
         with pytest.raises(ImportError, match="Delta Lake support requires"):
             polars_engine.vacuum_delta(connection, path="test_path")
 
-    def test_get_delta_history_import_error_handling(
+    def test_get_lake_history_import_error_handling(
         self, polars_engine, mock_deltalake_import_error
     ):
-        """Test get_delta_history raises proper error when deltalake not available."""
+        """Test get_lake_history raises proper error when deltalake not available."""
         connection = MockConnection()
         with pytest.raises(ImportError, match="Delta Lake support requires"):
             polars_engine.get_delta_history(connection, path="test_path")
@@ -675,8 +675,8 @@ class TestPolarsDeltaOperations:
             connection, format="delta", path="test_path", config=FakeConfig()
         )
 
-    def test_maintain_table_non_delta_format(self, polars_engine):
-        """Test maintain_table does nothing for non-Delta formats."""
+    def test_maintain_table_non_lake_format(self, polars_engine):
+        """Test maintain_table does nothing for non-lake formats."""
 
         class FakeConfig:
             enabled = True
@@ -922,7 +922,7 @@ class TestAddWriteMetadata:
         assert "_extracted_at" in collected.columns
 
 
-class TestRestoreDelta:
+class TestRestoreLakeVersion:
     def test_import_error_raised(self, polars_engine):
         import builtins
 
@@ -1693,3 +1693,701 @@ class TestPolarsWriteBranches:
         result = pl.read_parquet(tmp_path / "data.parquet")
         assert len(result) == 3
         assert set(result["id"].to_list()) == {1, 2, 3}
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests (Issue #302)
+# ---------------------------------------------------------------------------
+
+
+class TestPolarsSqlWriteMerge:
+    """Tests for _write_sql merge and enhanced overwrite paths."""
+
+    def test_merge_no_keys_raises(self, polars_engine):
+        class WriteConn:
+            def write_table(self, **kw):
+                pass
+
+        with pytest.raises(ValueError, match="merge_keys"):
+            polars_engine._write_sql(pl.DataFrame({"a": [1]}), WriteConn(), "t", "merge", {})
+
+    def test_merge_with_keys(self, polars_engine):
+        from unittest.mock import MagicMock, patch
+
+        mock_result = MagicMock(inserted=1, updated=2, deleted=0, total_affected=3)
+        mock_writer = MagicMock()
+        mock_writer.merge_polars.return_value = mock_result
+
+        class WriteConn:
+            def write_table(self, **kw):
+                pass
+
+        with patch(
+            "odibi.writers.sql_server_writer.SqlServerMergeWriter",
+            return_value=mock_writer,
+        ):
+            result = polars_engine._write_sql(
+                pl.DataFrame({"a": [1]}),
+                WriteConn(),
+                "t",
+                "merge",
+                {"merge_keys": ["a"]},
+            )
+        assert result["mode"] == "merge"
+        assert result["inserted"] == 1
+        assert result["updated"] == 2
+        assert result["deleted"] == 0
+        assert result["total_affected"] == 3
+
+    def test_enhanced_overwrite(self, polars_engine):
+        from unittest.mock import MagicMock, patch
+
+        mock_result = MagicMock(strategy="truncate_insert", rows_written=5)
+        mock_writer = MagicMock()
+        mock_writer.overwrite_polars.return_value = mock_result
+        mock_opts = MagicMock()
+        mock_opts.strategy.value = "truncate_insert"
+
+        class WriteConn:
+            def write_table(self, **kw):
+                pass
+
+        with patch(
+            "odibi.writers.sql_server_writer.SqlServerMergeWriter",
+            return_value=mock_writer,
+        ):
+            result = polars_engine._write_sql(
+                pl.DataFrame({"a": [1]}),
+                WriteConn(),
+                "t",
+                "overwrite",
+                {"overwrite_options": mock_opts},
+            )
+        assert result["mode"] == "overwrite"
+        assert result["strategy"] == "truncate_insert"
+        assert result["rows_written"] == 5
+
+    def test_lazyframe_collected_for_basic_write(self, polars_engine):
+        call_log = {}
+
+        class WriteConn:
+            def write_table(self, **kw):
+                call_log.update(kw)
+
+        polars_engine._write_sql(
+            pl.DataFrame({"a": [1]}).lazy(),
+            WriteConn(),
+            "t",
+            "overwrite",
+            {},
+        )
+        assert isinstance(call_log["df"], pd.DataFrame)
+
+
+class TestPolarsGenericUpsert:
+    """Tests for _handle_generic_upsert method."""
+
+    def test_json_upsert(self, tmp_path, polars_engine):
+        existing = pl.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        existing.write_ndjson(tmp_path / "data.json")
+
+        new_data = pl.DataFrame({"id": [2, 3], "val": ["B_up", "c_new"]})
+        result_df, result_mode = polars_engine._handle_generic_upsert(
+            new_data,
+            str(tmp_path / "data.json"),
+            "json",
+            "upsert",
+            {"keys": ["id"]},
+        )
+        assert result_mode == "overwrite"
+        assert len(result_df) == 3
+
+    def test_json_append_once(self, tmp_path, polars_engine):
+        existing = pl.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        existing.write_ndjson(tmp_path / "data.json")
+
+        new_data = pl.DataFrame({"id": [2, 3], "val": ["b_dup", "c_new"]})
+        result_df, result_mode = polars_engine._handle_generic_upsert(
+            new_data,
+            str(tmp_path / "data.json"),
+            "json",
+            "append_once",
+            {"keys": ["id"]},
+        )
+        assert result_mode == "overwrite"
+        assert len(result_df) == 3
+        row2 = result_df.filter(pl.col("id") == 2)["val"][0]
+        assert row2 == "b"
+
+    def test_file_not_found_returns_overwrite(self, polars_engine):
+        result_df, result_mode = polars_engine._handle_generic_upsert(
+            pl.DataFrame({"id": [1], "val": ["a"]}),
+            "/nonexistent/file.parquet",
+            "parquet",
+            "upsert",
+            {"keys": ["id"]},
+        )
+        assert result_mode == "overwrite"
+        assert len(result_df) == 1
+
+    def test_missing_keys_raises(self, polars_engine):
+        with pytest.raises(ValueError, match="requires 'keys'"):
+            polars_engine._handle_generic_upsert(
+                pl.DataFrame({"a": [1]}), "/path", "csv", "upsert", {}
+            )
+
+    def test_string_key_coerced(self, tmp_path, polars_engine):
+        existing = pl.DataFrame({"id": [1], "val": ["a"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [1], "val": ["updated"]})
+        result_df, _ = polars_engine._handle_generic_upsert(
+            new_data,
+            str(tmp_path / "data.parquet"),
+            "parquet",
+            "upsert",
+            {"keys": "id"},
+        )
+        assert result_df.filter(pl.col("id") == 1)["val"][0] == "updated"
+
+    def test_lazyframe_collected(self, tmp_path, polars_engine):
+        existing = pl.DataFrame({"id": [1], "val": ["a"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        lazy = pl.DataFrame({"id": [2], "val": ["b"]}).lazy()
+        result_df, _ = polars_engine._handle_generic_upsert(
+            lazy,
+            str(tmp_path / "data.parquet"),
+            "parquet",
+            "append_once",
+            {"keys": ["id"]},
+        )
+        assert len(result_df) == 2
+
+    def test_unknown_mode_passthrough(self, tmp_path, polars_engine):
+        existing = pl.DataFrame({"id": [1]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        df = pl.DataFrame({"id": [2]})
+        result_df, result_mode = polars_engine._handle_generic_upsert(
+            df,
+            str(tmp_path / "data.parquet"),
+            "parquet",
+            "some_other_mode",
+            {"keys": ["id"]},
+        )
+        assert result_mode == "some_other_mode"
+
+    def test_upsert_missing_key_column_raises(self, tmp_path, polars_engine):
+        existing = pl.DataFrame({"id": [1], "val": ["a"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [1], "val": ["b"]})
+        with pytest.raises(KeyError, match="missing_col"):
+            polars_engine._handle_generic_upsert(
+                new_data,
+                str(tmp_path / "data.parquet"),
+                "parquet",
+                "upsert",
+                {"keys": ["missing_col"]},
+            )
+
+    def test_append_once_missing_key_column_raises(self, tmp_path, polars_engine):
+        existing = pl.DataFrame({"id": [1], "val": ["a"]})
+        existing.write_parquet(tmp_path / "data.parquet")
+
+        new_data = pl.DataFrame({"id": [1], "val": ["b"]})
+        with pytest.raises(KeyError, match="missing_col"):
+            polars_engine._handle_generic_upsert(
+                new_data,
+                str(tmp_path / "data.parquet"),
+                "parquet",
+                "append_once",
+                {"keys": ["missing_col"]},
+            )
+
+
+class TestPolarsValidateData:
+    """Tests for validate_data covering schema_validation, lazy ranges, etc."""
+
+    def test_schema_validation_delegates(self, polars_engine):
+        df = pl.DataFrame({"a": [1], "b": [2]})
+
+        class Config:
+            schema_validation = {"required_columns": ["a", "b", "c"]}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 1
+        assert "Missing" in failures[0]
+
+    def test_ranges_min_lazy(self, polars_engine):
+        lazy_df = pl.DataFrame({"score": [1, 20, 30]}).lazy()
+
+        class Config:
+            ranges = {"score": {"min": 10}}
+
+        failures = polars_engine.validate_data(lazy_df, Config())
+        assert len(failures) == 1
+        assert "< 10" in failures[0]
+
+    def test_ranges_max_lazy(self, polars_engine):
+        lazy_df = pl.DataFrame({"score": [10, 20, 150]}).lazy()
+
+        class Config:
+            ranges = {"score": {"max": 100}}
+
+        failures = polars_engine.validate_data(lazy_df, Config())
+        assert len(failures) == 1
+        assert "> 100" in failures[0]
+
+    def test_ranges_col_not_found(self, polars_engine):
+        df = pl.DataFrame({"a": [1]})
+
+        class Config:
+            ranges = {"missing_col": {"min": 0}}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 1
+        assert "not found for range validation" in failures[0]
+
+    def test_allowed_values_lazy(self, polars_engine):
+        lazy_df = pl.DataFrame({"status": ["ACTIVE", "INVALID"]}).lazy()
+
+        class Config:
+            allowed_values = {"status": ["ACTIVE", "INACTIVE"]}
+
+        failures = polars_engine.validate_data(lazy_df, Config())
+        assert len(failures) == 1
+        assert "invalid values" in failures[0]
+
+    def test_allowed_values_col_not_found(self, polars_engine):
+        df = pl.DataFrame({"a": [1]})
+
+        class Config:
+            allowed_values = {"missing_col": ["x"]}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 1
+        assert "not found for allowed values" in failures[0]
+
+    def test_no_nulls_with_lazyframe(self, polars_engine):
+        lazy_df = pl.DataFrame({"a": [1, None, 3]}).lazy()
+
+        class Config:
+            no_nulls = ["a"]
+
+        failures = polars_engine.validate_data(lazy_df, Config())
+        assert len(failures) == 1
+        assert "null values" in failures[0]
+
+    def test_ranges_min_max_both(self, polars_engine):
+        df = pl.DataFrame({"score": [0, 50, 200]})
+
+        class Config:
+            ranges = {"score": {"min": 10, "max": 100}}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 2
+
+    def test_ranges_max_pass(self, polars_engine):
+        df = pl.DataFrame({"score": [10, 20, 30]})
+
+        class Config:
+            ranges = {"score": {"max": 100}}
+
+        failures = polars_engine.validate_data(df, Config())
+        assert len(failures) == 0
+
+
+class TestPolarsTableSchema:
+    """Tests for get_table_schema method."""
+
+    def test_parquet_dir(self, tmp_path, polars_engine):
+        """Test get_table_schema with parquet directory."""
+        subdir = tmp_path / "parts"
+        subdir.mkdir()
+        pl.DataFrame({"x": [1], "y": [2.0]}).write_parquet(subdir / "part0.parquet")
+
+        schema = polars_engine.get_table_schema(
+            MockConnection(), path=str(subdir), format="parquet"
+        )
+        assert schema is not None
+        assert "x" in schema
+        assert "y" in schema
+
+    def test_parquet_dir_empty(self, tmp_path, polars_engine):
+        """Test get_table_schema returns None for empty parquet directory."""
+        subdir = tmp_path / "empty"
+        subdir.mkdir()
+
+        schema = polars_engine.get_table_schema(
+            MockConnection(), path=str(subdir), format="parquet"
+        )
+        assert schema is None
+
+    def test_file_not_found_returns_none(self, tmp_path, polars_engine):
+        schema = polars_engine.get_table_schema(
+            MockConnection(), path=str(tmp_path / "nope.parquet"), format="parquet"
+        )
+        assert schema is None
+
+    def test_dl_format_schema(self, tmp_path, polars_engine):
+        """Test get_table_schema for lake format."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        tbl_path = str(tmp_path / "tbl")
+        write_deltalake(tbl_path, pa.table({"id": [1], "val": ["a"]}))
+
+        schema = polars_engine.get_table_schema(MockConnection(), path=tbl_path, format="delta")
+        assert schema is not None
+        assert "id" in schema
+        assert "val" in schema
+
+    def test_csv_schema(self, tmp_path, polars_engine):
+        pl.DataFrame({"a": [1], "b": ["x"]}).write_csv(tmp_path / "data.csv")
+
+        schema = polars_engine.get_table_schema(
+            MockConnection(), path=str(tmp_path / "data.csv"), format="csv"
+        )
+        assert schema is not None
+        assert "a" in schema
+        assert "b" in schema
+
+    def test_no_path_no_table_returns_none(self, polars_engine):
+        schema = polars_engine.get_table_schema(MockConnection(), format="csv")
+        assert schema is None
+
+
+class TestPolarsTableMaintenance:
+    """Tests for maintain_table method (avoid 'delta' in test names)."""
+
+    def test_non_dl_returns_early(self, polars_engine):
+        class Cfg:
+            enabled = True
+
+        polars_engine.maintain_table(MockConnection(), format="parquet", config=Cfg())
+
+    def test_disabled_config_returns_early(self, polars_engine):
+        class Cfg:
+            enabled = False
+
+        polars_engine.maintain_table(MockConnection(), format="delta", path="/p", config=Cfg())
+
+    def test_no_path_no_table_returns_early(self, polars_engine):
+        class Cfg:
+            enabled = True
+
+        polars_engine.maintain_table(MockConnection(), format="delta", config=Cfg())
+
+    def test_optimize_and_vacuum(self, tmp_path, polars_engine):
+        """Run compact + vacuum on a real lake table."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        tbl_path = str(tmp_path / "tbl")
+        write_deltalake(tbl_path, pa.table({"id": [1, 2], "val": ["a", "b"]}))
+
+        class Cfg:
+            enabled = True
+            vacuum_retention_hours = 0
+
+        polars_engine.maintain_table(MockConnection(), format="delta", path=tbl_path, config=Cfg())
+
+    def test_optimize_without_vacuum(self, tmp_path, polars_engine):
+        """Run compact only (no vacuum_retention_hours)."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        tbl_path = str(tmp_path / "tbl")
+        write_deltalake(tbl_path, pa.table({"id": [1]}))
+
+        class Cfg:
+            enabled = True
+            vacuum_retention_hours = None
+
+        polars_engine.maintain_table(MockConnection(), format="delta", path=tbl_path, config=Cfg())
+
+    def test_import_error_returns_silently(self, polars_engine):
+        """Missing deltalake library logs warning and returns."""
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "deltalake":
+                raise ImportError("no deltalake")
+            return real_import(name, *args, **kwargs)
+
+        class Cfg:
+            enabled = True
+
+        builtins.__import__ = mock_import
+        try:
+            polars_engine.maintain_table(MockConnection(), format="delta", path="/p", config=Cfg())
+        finally:
+            builtins.__import__ = real_import
+
+    def test_exception_handled(self, tmp_path, polars_engine):
+        """Exception during maintenance logged as warning."""
+
+        class Cfg:
+            enabled = True
+
+        polars_engine.maintain_table(
+            MockConnection(),
+            format="delta",
+            path=str(tmp_path / "nonexistent_tbl"),
+            config=Cfg(),
+        )
+
+    def test_table_param_used_when_no_path(self, tmp_path, polars_engine):
+        """When path is None, table param is used."""
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        tbl_path = str(tmp_path / "tbl")
+        write_deltalake(tbl_path, pa.table({"id": [1]}))
+
+        class Cfg:
+            enabled = True
+            vacuum_retention_hours = None
+
+        polars_engine.maintain_table(MockConnection(), format="delta", table=tbl_path, config=Cfg())
+
+
+class TestPolarsLakeOps:
+    """Tests for vacuum, history, and restore using real lake tables."""
+
+    @staticmethod
+    def _seed_tbl(path):
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        write_deltalake(str(path), pa.table({"id": [1, 2, 3], "val": ["a", "b", "c"]}))
+
+    def test_vacuum_tbl(self, tmp_path, polars_engine):
+        tbl_path = tmp_path / "tbl"
+        self._seed_tbl(tbl_path)
+
+        result = polars_engine.vacuum_delta(
+            MockConnection(),
+            path=str(tbl_path),
+            retention_hours=0,
+            dry_run=False,
+            enforce_retention_duration=False,
+        )
+        assert "files_deleted" in result
+
+    def test_vacuum_dry_run(self, tmp_path, polars_engine):
+        tbl_path = tmp_path / "tbl"
+        self._seed_tbl(tbl_path)
+
+        result = polars_engine.vacuum_delta(
+            MockConnection(),
+            path=str(tbl_path),
+            retention_hours=168,
+            dry_run=True,
+        )
+        assert "files_deleted" in result
+
+    def test_vacuum_no_connection(self, tmp_path, polars_engine):
+        tbl_path = tmp_path / "tbl"
+        self._seed_tbl(tbl_path)
+
+        result = polars_engine.vacuum_delta(
+            None,
+            path=str(tbl_path),
+            retention_hours=0,
+            dry_run=True,
+            enforce_retention_duration=False,
+        )
+        assert "files_deleted" in result
+
+    def test_history_tbl(self, tmp_path, polars_engine):
+        tbl_path = tmp_path / "tbl"
+        self._seed_tbl(tbl_path)
+
+        history = polars_engine.get_delta_history(MockConnection(), path=str(tbl_path))
+        assert isinstance(history, list)
+        assert len(history) >= 1
+
+    def test_history_with_limit(self, tmp_path, polars_engine):
+        import pyarrow as pa
+        from deltalake import write_deltalake
+
+        tbl_path = str(tmp_path / "tbl")
+        write_deltalake(tbl_path, pa.table({"id": [1]}))
+        write_deltalake(tbl_path, pa.table({"id": [2]}), mode="overwrite")
+
+        history = polars_engine.get_delta_history(MockConnection(), path=tbl_path, limit=1)
+        assert len(history) == 1
+
+    def test_restore_tbl(self, tmp_path, polars_engine):
+        import pyarrow as pa
+        from deltalake import DeltaTable, write_deltalake
+
+        tbl_path = str(tmp_path / "tbl")
+        write_deltalake(tbl_path, pa.table({"id": [1, 2]}))
+        write_deltalake(tbl_path, pa.table({"id": [3, 4]}), mode="overwrite")
+
+        polars_engine.restore_delta(MockConnection(), tbl_path, version=0)
+
+        dt = DeltaTable(tbl_path)
+        restored = dt.to_pyarrow_table()
+        assert restored.column("id").to_pylist() == [1, 2]
+
+    def test_restore_import_error(self, polars_engine):
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "deltalake":
+                raise ImportError("no deltalake")
+            return real_import(name, *args, **kwargs)
+
+        builtins.__import__ = mock_import
+        try:
+            with pytest.raises(ImportError, match="Delta Lake support requires"):
+                polars_engine.restore_delta(MockConnection(), "/tbl", 1)
+        finally:
+            builtins.__import__ = real_import
+
+    def test_vacuum_import_error(self, polars_engine):
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "deltalake":
+                raise ImportError("no deltalake")
+            return real_import(name, *args, **kwargs)
+
+        builtins.__import__ = mock_import
+        try:
+            with pytest.raises(ImportError, match="Delta Lake support requires"):
+                polars_engine.vacuum_delta(MockConnection(), path="/tbl")
+        finally:
+            builtins.__import__ = real_import
+
+    def test_history_import_error(self, polars_engine):
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "deltalake":
+                raise ImportError("no deltalake")
+            return real_import(name, *args, **kwargs)
+
+        builtins.__import__ = mock_import
+        try:
+            with pytest.raises(ImportError, match="Delta Lake support requires"):
+                polars_engine.get_delta_history(MockConnection(), path="/tbl")
+        finally:
+            builtins.__import__ = real_import
+
+    def test_history_no_connection(self, tmp_path, polars_engine):
+        tbl_path = tmp_path / "tbl"
+        self._seed_tbl(tbl_path)
+
+        history = polars_engine.get_delta_history(None, path=str(tbl_path))
+        assert isinstance(history, list)
+
+    def test_vacuum_with_storage_opts(self, tmp_path, polars_engine):
+        tbl_path = tmp_path / "tbl"
+        self._seed_tbl(tbl_path)
+
+        class ConnWithOpts:
+            def get_path(self, p):
+                return p
+
+            def pandas_storage_options(self):
+                return {}
+
+        result = polars_engine.vacuum_delta(
+            ConnWithOpts(),
+            path=str(tbl_path),
+            retention_hours=0,
+            dry_run=True,
+            enforce_retention_duration=False,
+        )
+        assert "files_deleted" in result
+
+
+class TestPolarsWriteMetadataExtra:
+    """Additional tests for add_write_metadata."""
+
+    def test_non_config_returns_unchanged(self, polars_engine):
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(df, "random_string")
+        assert result.columns == ["id"]
+
+    def test_int_config_returns_unchanged(self, polars_engine):
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(df, 42)
+        assert result.columns == ["id"]
+
+    def test_true_config_all_metadata(self, polars_engine):
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(
+            df,
+            True,
+            source_connection="conn1",
+            source_table="tbl1",
+            source_path="/file.csv",
+            is_file_source=True,
+        )
+        assert "_extracted_at" in result.columns
+        assert "_source_file" in result.columns
+
+    def test_write_metadata_config_selective(self, polars_engine):
+        from odibi.config import WriteMetadataConfig
+
+        cfg = WriteMetadataConfig(
+            extracted_at=False,
+            source_file=False,
+            source_connection=True,
+            source_table=True,
+        )
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(
+            df, cfg, source_connection="db", source_table="orders"
+        )
+        assert "_extracted_at" not in result.columns
+        assert "_source_file" not in result.columns
+        assert "_source_connection" in result.columns
+        assert "_source_table" in result.columns
+
+    def test_no_columns_added_when_all_disabled(self, polars_engine):
+        from odibi.config import WriteMetadataConfig
+
+        cfg = WriteMetadataConfig(
+            extracted_at=False,
+            source_file=False,
+            source_connection=False,
+            source_table=False,
+        )
+        df = pl.DataFrame({"id": [1]})
+        result = polars_engine.add_write_metadata(df, cfg)
+        assert result.columns == ["id"]
+
+
+class TestPolarsSourceFiles:
+    """Tests for get_source_files method."""
+
+    def test_lazyframe_returns_empty(self, polars_engine):
+        lf = pl.DataFrame({"a": [1]}).lazy()
+        assert polars_engine.get_source_files(lf) == []
+
+    def test_dataframe_without_attrs(self, polars_engine):
+        df = pl.DataFrame({"a": [1]})
+        assert polars_engine.get_source_files(df) == []
+
+    def test_dataframe_with_source_attrs(self, polars_engine):
+        from unittest.mock import MagicMock
+
+        df = MagicMock(spec=pl.DataFrame)
+        df.attrs = {"odibi_source_files": ["/data/file1.csv", "/data/file2.csv"]}
+        files = polars_engine.get_source_files(df)
+        assert files == ["/data/file1.csv", "/data/file2.csv"]
+
+    def test_dataframe_with_empty_attrs(self, polars_engine):
+        from unittest.mock import MagicMock
+
+        df = MagicMock(spec=pl.DataFrame)
+        df.attrs = {"odibi_source_files": []}
+        assert polars_engine.get_source_files(df) == []

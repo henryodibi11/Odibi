@@ -2397,3 +2397,324 @@ class TestSourceFileTracking:
         obj = MagicMock(spec=[])  # no attrs attribute
         files = engine.get_source_files(obj)
         assert files == []
+
+
+# ---------------------------------------------------------------------------
+# SQL write paths (_write_sql) – Issue #299
+# ---------------------------------------------------------------------------
+
+
+class TestSqlWritePaths:
+    """Test _write_sql method."""
+
+    def test_no_write_table_raises(self, engine):
+        class NoWriteConn:
+            pass
+
+        with pytest.raises(ValueError, match="does not support SQL"):
+            engine._write_sql(pd.DataFrame({"a": [1]}), NoWriteConn(), "t", "overwrite", {})
+
+    def test_no_table_raises(self, engine):
+        class WriteConn:
+            def write_table(self, **kw):
+                pass
+
+        with pytest.raises(ValueError, match="requires 'table'"):
+            engine._write_sql(pd.DataFrame({"a": [1]}), WriteConn(), None, "overwrite", {})
+
+    def test_merge_no_keys_raises(self, engine):
+        class WriteConn:
+            def write_table(self, **kw):
+                pass
+
+        with pytest.raises(ValueError, match="merge_keys"):
+            engine._write_sql(pd.DataFrame({"a": [1]}), WriteConn(), "t", "merge", {})
+
+    def test_merge_with_keys(self, engine):
+        from unittest.mock import MagicMock, patch
+
+        mock_result = MagicMock(inserted=1, updated=2, deleted=0, total_affected=3)
+        mock_writer = MagicMock()
+        mock_writer.merge_pandas.return_value = mock_result
+
+        class WriteConn:
+            def write_table(self, **kw):
+                pass
+
+        with patch(
+            "odibi.writers.sql_server_writer.SqlServerMergeWriter",
+            return_value=mock_writer,
+        ):
+            result = engine._write_sql(
+                pd.DataFrame({"a": [1]}),
+                WriteConn(),
+                "t",
+                "merge",
+                {"merge_keys": ["a"]},
+            )
+        assert result["mode"] == "merge"
+        assert result["inserted"] == 1
+
+    def test_enhanced_overwrite(self, engine):
+        from unittest.mock import MagicMock, patch
+
+        mock_result = MagicMock(strategy="truncate_insert", rows_written=5)
+        mock_writer = MagicMock()
+        mock_writer.overwrite_pandas.return_value = mock_result
+        mock_opts = MagicMock()
+        mock_opts.strategy.value = "truncate_insert"
+
+        class WriteConn:
+            def write_table(self, **kw):
+                pass
+
+        with patch(
+            "odibi.writers.sql_server_writer.SqlServerMergeWriter",
+            return_value=mock_writer,
+        ):
+            result = engine._write_sql(
+                pd.DataFrame({"a": [1]}),
+                WriteConn(),
+                "t",
+                "overwrite",
+                {"overwrite_options": mock_opts},
+            )
+        assert result["mode"] == "overwrite"
+        assert result["rows_written"] == 5
+
+    def test_basic_write_schema_table(self, engine):
+        call_log = {}
+
+        class WriteConn:
+            def write_table(self, **kw):
+                call_log.update(kw)
+
+        engine._write_sql(
+            pd.DataFrame({"a": [1]}),
+            WriteConn(),
+            "myschema.mytable",
+            "overwrite",
+            {},
+        )
+        assert call_log["schema"] == "myschema"
+        assert call_log["table_name"] == "mytable"
+        assert call_log["if_exists"] == "replace"
+
+    def test_basic_write_default_schema(self, engine):
+        call_log = {}
+
+        class WriteConn:
+            def write_table(self, **kw):
+                call_log.update(kw)
+
+        engine._write_sql(pd.DataFrame({"a": [1]}), WriteConn(), "mytable", "overwrite", {})
+        assert call_log["schema"] == "dbo"
+
+    def test_append_mode(self, engine):
+        call_log = {}
+
+        class WriteConn:
+            def write_table(self, **kw):
+                call_log.update(kw)
+
+        engine._write_sql(pd.DataFrame({"a": [1]}), WriteConn(), "t", "append", {})
+        assert call_log["if_exists"] == "append"
+
+    def test_fail_mode(self, engine):
+        call_log = {}
+
+        class WriteConn:
+            def write_table(self, **kw):
+                call_log.update(kw)
+
+        engine._write_sql(pd.DataFrame({"a": [1]}), WriteConn(), "t", "fail", {})
+        assert call_log["if_exists"] == "fail"
+
+    def test_chunksize_from_options(self, engine):
+        call_log = {}
+
+        class WriteConn:
+            def write_table(self, **kw):
+                call_log.update(kw)
+
+        engine._write_sql(
+            pd.DataFrame({"a": [1]}),
+            WriteConn(),
+            "t",
+            "overwrite",
+            {"chunksize": 500},
+        )
+        assert call_log["chunksize"] == 500
+
+
+# ---------------------------------------------------------------------------
+# Generic upsert (_handle_generic_upsert) – Issue #299
+# ---------------------------------------------------------------------------
+
+
+class TestGenericUpsert:
+    """Test _handle_generic_upsert method."""
+
+    def test_no_keys_raises(self, engine):
+        with pytest.raises(ValueError, match="requires 'keys'"):
+            engine._handle_generic_upsert(pd.DataFrame({"a": [1]}), "/f", "csv", "upsert", {})
+
+    def test_upsert_csv(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        p = str(tmp_path / "data.csv")
+        existing.to_csv(p, index=False)
+        new_df = pd.DataFrame({"id": [2, 3], "val": ["B", "c"]})
+        result_df, mode = engine._handle_generic_upsert(
+            new_df, p, "csv", "upsert", {"keys": ["id"]}
+        )
+        assert mode == "overwrite"
+        assert len(result_df) == 3
+
+    def test_append_once_csv_returns_append(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        p = str(tmp_path / "data.csv")
+        existing.to_csv(p, index=False)
+        new_df = pd.DataFrame({"id": [2, 3], "val": ["dup", "new"]})
+        result_df, mode = engine._handle_generic_upsert(
+            new_df, p, "csv", "append_once", {"keys": ["id"]}
+        )
+        assert mode == "append"
+        assert len(result_df) == 1  # only id=3
+
+    def test_append_once_parquet_returns_overwrite(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        p = str(tmp_path / "data.parquet")
+        existing.to_parquet(p, index=False)
+        new_df = pd.DataFrame({"id": [2, 3], "val": ["dup", "new"]})
+        result_df, mode = engine._handle_generic_upsert(
+            new_df, p, "parquet", "append_once", {"keys": ["id"]}
+        )
+        assert mode == "overwrite"
+        assert len(result_df) == 3
+
+    def test_file_not_found_returns_overwrite(self, engine):
+        df = pd.DataFrame({"id": [1]})
+        result_df, mode = engine._handle_generic_upsert(
+            df, "/no/such/file.csv", "csv", "upsert", {"keys": ["id"]}
+        )
+        assert mode == "overwrite"
+
+    def test_string_key_coerced(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1], "val": ["a"]})
+        p = str(tmp_path / "data.csv")
+        existing.to_csv(p, index=False)
+        new_df = pd.DataFrame({"id": [1], "val": ["updated"]})
+        result_df, mode = engine._handle_generic_upsert(new_df, p, "csv", "upsert", {"keys": "id"})
+        assert mode == "overwrite"
+
+    def test_upsert_missing_key_column(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1]})
+        p = str(tmp_path / "data.csv")
+        existing.to_csv(p, index=False)
+        with pytest.raises(KeyError, match="not found"):
+            engine._handle_generic_upsert(
+                pd.DataFrame({"other": [1]}),
+                p,
+                "csv",
+                "upsert",
+                {"keys": ["id"]},
+            )
+
+    def test_append_once_missing_key_column(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1]})
+        p = str(tmp_path / "data.csv")
+        existing.to_csv(p, index=False)
+        with pytest.raises(KeyError, match="not found"):
+            engine._handle_generic_upsert(
+                pd.DataFrame({"other": [1]}),
+                p,
+                "csv",
+                "append_once",
+                {"keys": ["id"]},
+            )
+
+    def test_unknown_mode_passthrough(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1]})
+        p = str(tmp_path / "data.csv")
+        existing.to_csv(p, index=False)
+        result_df, mode = engine._handle_generic_upsert(
+            pd.DataFrame({"id": [2]}), p, "csv", "custom", {"keys": ["id"]}
+        )
+        assert mode == "custom"
+
+    def test_json_format(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        p = str(tmp_path / "data.json")
+        existing.to_json(p)
+        new_df = pd.DataFrame({"id": [2, 3], "val": ["B", "c"]})
+        result_df, mode = engine._handle_generic_upsert(
+            new_df, p, "json", "upsert", {"keys": ["id"]}
+        )
+        assert mode == "overwrite"
+
+    def test_append_once_json_returns_append(self, engine, tmp_path):
+        existing = pd.DataFrame({"id": [1, 2], "val": ["a", "b"]})
+        p = str(tmp_path / "data.json")
+        existing.to_json(p)
+        new_df = pd.DataFrame({"id": [2, 3], "val": ["dup", "new"]})
+        result_df, mode = engine._handle_generic_upsert(
+            new_df, p, "json", "append_once", {"keys": ["id"]}
+        )
+        assert mode == "append"  # json returns append like csv
+
+
+# ---------------------------------------------------------------------------
+# Path utilities (_is_local_path, _ensure_directory, _check_partitioning)
+# ---------------------------------------------------------------------------
+
+
+class TestPathUtilities:
+    """Test _is_local_path, _ensure_directory, _check_partitioning."""
+
+    def test_local_path_unix(self, engine):
+        assert engine._is_local_path("/tmp/file.csv") is True
+
+    def test_local_path_relative(self, engine):
+        assert engine._is_local_path("data/file.csv") is True
+
+    def test_remote_abfss(self, engine):
+        assert engine._is_local_path("abfss://container@account/file") is False
+
+    def test_remote_s3(self, engine):
+        assert engine._is_local_path("s3://bucket/key") is False
+
+    def test_windows_drive(self, engine):
+        assert engine._is_local_path("D:\\data\\file.csv") is True
+
+    def test_file_scheme(self, engine):
+        assert engine._is_local_path("file:///tmp/file.csv") is True
+
+    def test_ensure_directory_creates(self, engine, tmp_path):
+        target = str(tmp_path / "sub" / "dir" / "file.csv")
+        engine._ensure_directory(target)
+        assert (tmp_path / "sub" / "dir").is_dir()
+
+    def test_check_partitioning_warns(self, engine):
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            engine._check_partitioning({"partition_by": ["col1"]})
+            assert len(w) == 1
+            assert "partitioning" in str(w[0].message).lower()
+
+    def test_check_partitioning_partitionby_key(self, engine):
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            engine._check_partitioning({"partitionBy": ["col1"]})
+            assert len(w) == 1
+
+    def test_check_partitioning_no_key_no_warn(self, engine):
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            engine._check_partitioning({})
+            assert len(w) == 0
