@@ -1055,7 +1055,81 @@ params:
 
 ---
 
-### 6.7 API Fetching (REST APIs)
+### 6.7 Environment Overrides
+
+Odibi supports per-environment configuration so the same project adapts to dev, QAT, and prod without code changes.
+
+#### Two Override Mechanisms
+
+**1. Inline `environments:` block** — simple overrides inside your main YAML:
+```yaml
+engine: pandas
+environments:
+  prod:
+    engine: spark
+    connections:
+      data_lake:
+        type: azure_adls
+        account: ${PROD_ACCOUNT}
+```
+
+**2. External `env.{env}.yaml` files** — auto-discovered from the same directory:
+```
+my_project/
+├── project.yaml          # Base config
+├── env.dev.yaml          # Merged when --env dev
+├── env.prod.yaml         # Merged when --env prod
+```
+
+External files support `imports`, `${VAR}` substitution, and all other YAML features.
+
+#### Overrideable Fields
+
+Both mechanisms can override: `engine`, `connections`, `system`, `performance`, `logging`, `retry`, `alerts`, `story`, `lineage`, `vars`, `pipelines`.
+
+#### Per-Environment Pipelines
+
+Each environment can own its own pipelines via imports in external env files:
+
+```yaml
+# env.dev.yaml
+imports:
+  - pipelines/bronze_dev.yaml
+connections:
+  data_lake: { type: local, base_path: ./test_data }
+
+# env.prod.yaml
+imports:
+  - pipelines/bronze_prod.yaml
+engine: spark
+connections:
+  data_lake: { type: azure_adls, account: ${PROD_ACCOUNT} }
+```
+
+When the base config has no pipelines, `--env` is required — this forces intentional environment selection.
+
+#### Merge Order
+
+1. Load main YAML and process `imports`
+2. Apply inline `environments:{env}:` block
+3. Load `env.{env}.yaml` and process its `imports`
+4. Deep-merge on top (dicts=recursive, pipelines=appended, scalars=overwritten)
+5. Substitute `${vars.xxx}` and `${date:...}`
+
+#### Usage
+
+```python
+manager = PipelineManager.from_yaml("project.yaml", env="prod")
+```
+```bash
+odibi run project.yaml --env prod
+```
+
+📖 **Full documentation:** [Environment Configuration Guide](guides/environments.md)
+
+---
+
+### 6.8 API Fetching (REST APIs)
 
 Read data from REST APIs with pagination, retries, and rate limiting.
 
