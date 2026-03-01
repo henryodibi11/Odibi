@@ -480,3 +480,52 @@ in your ability to express those thoughts in Python without assistance.
 This program closes that gap. One phase at a time. One exercise at a time.
 
 Start with Phase 1. Open the notebook. Write the code.
+
+---
+
+## Next Step: Learning the Real Odibi Codebase
+
+Now that you've completed the learning program, the next step is to read and understand
+the real Odibi codebase module by module. Work through these in order — each layer builds
+on the previous one.
+
+### Layer 1 — Vocabulary & Building Blocks (start here)
+
+| # | Module | Lines | Why |
+|---|--------|-------|-----|
+| 1 | `enums.py` | 5 | Tiny — defines key enumerations used everywhere |
+| 2 | `constants.py` | 12 | Global constants referenced across modules |
+| 3 | `exceptions.py` | 237 | All custom errors — tells you what can go wrong |
+| 4 | `config.py` | 3,749 | **The heart** — all Pydantic models that define YAML configs. Read this thoroughly; everything else consumes these models |
+
+### Layer 2 — Core Runtime
+
+| # | Module | Lines | Why |
+|---|--------|-------|-----|
+| 5 | `registry.py` | 210 | How transformers/patterns get registered & discovered |
+| 6 | `plugins.py` | 63 | Plugin loading mechanism (small, extends registry) |
+| 7 | `references.py` | 120 | Column/table reference resolution |
+| 8 | `context.py` | 428 | Runtime context passed through the pipeline |
+| 9 | `node.py` | 3,376 | **A single pipeline node** — loading, transforming, validating, writing. Major file |
+
+### Layer 3 — Orchestration
+
+| # | Module | Lines | Why |
+|---|--------|-------|-----|
+| 10 | `graph.py` | 397 | DAG dependency resolution between nodes |
+| 11 | `pipeline.py` | 2,464 | **The orchestrator** — ties nodes, graph, context together and runs everything |
+| 12 | `project.py` | 464 | Multi-pipeline project management |
+
+### Layer 4 — Metadata & Advanced
+
+| # | Module | Lines | Why |
+|---|--------|-------|-----|
+| 13 | `lineage.py` | 426 | OpenLineage tracking |
+| 14 | `catalog.py` | 3,570 | System catalog — metadata store for all datasets |
+| 15 | `catalog_sync.py` | 1,137 | Syncing catalog to external systems |
+| 16 | `derived_updater.py` | 1,841 | Cascading updates to derived/downstream datasets |
+| 17 | `introspect.py` | 1,045 | Self-documentation / schema generation |
+
+### Then explore the sub-packages
+
+`connections/` → `engine/` → `transformers/` → `patterns/` → `validation/` → `writers/` → `semantics/`
