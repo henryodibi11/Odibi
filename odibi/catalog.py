@@ -1515,7 +1515,7 @@ class CatalogManager:
                         "path": output_info.get("path"),
                         "format": output_info.get("format", "delta"),
                         "table_name": output_info.get("register_table"),
-                        "last_run": None,
+                        "last_run": datetime(1970, 1, 1, tzinfo=timezone.utc),
                         "row_count": None,
                     }
                 )
