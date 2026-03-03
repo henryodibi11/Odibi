@@ -174,6 +174,9 @@ class Pipeline:
         self._story_future = None
         self._story_executor = None
 
+        # Track async sync thread for flush_sync()
+        self._sync_thread = None
+
         # Create logging context for this pipeline
         self._ctx = create_logging_context(
             pipeline_id=pipeline_config.pipeline,
@@ -1323,6 +1326,26 @@ class Pipeline:
             self._story_future = None
             self._story_executor = None
 
+    def flush_sync(self, timeout: float = 120.0) -> None:
+        """Wait for any pending async catalog sync to complete.
+
+        Args:
+            timeout: Maximum seconds to wait for sync
+        """
+        if self._sync_thread is None or not self._sync_thread.is_alive():
+            return
+
+        try:
+            self._sync_thread.join(timeout=timeout)
+            if self._sync_thread.is_alive():
+                self._ctx.warning(f"Catalog sync did not complete within {timeout}s")
+            else:
+                self._ctx.debug("Async catalog sync completed")
+        except Exception as e:
+            self._ctx.warning(f"Error waiting for catalog sync: {e}")
+        finally:
+            self._sync_thread = None
+
     def _send_alerts(self, event: str, results: PipelineResults) -> None:
         """Send alerts for a specific event.
 
@@ -1585,7 +1608,7 @@ class Pipeline:
             )
 
             if sync_config.async_sync:
-                syncer.sync_async()
+                self._sync_thread = syncer.sync_async()
                 self._ctx.debug(f"Catalog sync started async to {target_conn_name}")
             else:
                 results = syncer.sync()
@@ -2244,6 +2267,12 @@ class PipelineManager:
             except Exception as e:
                 self._ctx.warning(f"Failed to generate combined lineage: {e}")
 
+        # Wait for any pending async catalog syncs to complete
+        for name in pipeline_names:
+            pipeline = self._pipelines[name]
+            if hasattr(pipeline, 'flush_sync'):
+                pipeline.flush_sync()
+
         if len(pipeline_names) == 1:
             return results[pipeline_names[0]]
         else:
@@ -2823,9 +2852,9 @@ class PipelineManager:
         """Resolve a user-friendly identifier to a full table path.
 
         Accepts:
-        - Relative path: "bronze/OEE/vw_OSMPerformanceOEE"
-        - Registered table: "test.vw_OSMPerformanceOEE"
-        - Node name: "opsvisdata_vw_OSMPerformanceOEE"
+        - Relative path: "bronze/project/test"
+        - Registered table: "test.test"
+        - Node name: "project_test"
         - Full path: "abfss://..." (used as-is)
 
         Args:

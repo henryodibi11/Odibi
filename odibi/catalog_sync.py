@@ -857,10 +857,11 @@ class CatalogSyncer:
 
         return results
 
-    def sync_async(self, tables: Optional[List[str]] = None) -> None:
-        """Fire and forget sync - runs in background thread."""
+    def sync_async(self, tables: Optional[List[str]] = None) -> threading.Thread:
+        """Start sync in background thread. Returns the thread for optional joining."""
         thread = threading.Thread(target=self.sync, args=(tables,), daemon=True)
         thread.start()
+        return thread
 
     def _sync_to_sql_server(self, table: str) -> Dict[str, Any]:
         """Sync a single table to SQL Server."""
