@@ -1203,96 +1203,122 @@ class CatalogSyncer:
             return df.to_dicts()
         return []
 
+    def _sanitize_value(self, v: Any) -> Any:
+        """Convert a single record value to a SQL-safe format."""
+        if v is None:
+            return None
+        if isinstance(v, (dict, list)):
+            return json.dumps(v, default=str)
+        if isinstance(v, datetime):
+            return v.isoformat()
+        if isinstance(v, float) and (v != v):  # NaN != NaN
+            return None
+        if isinstance(v, str) and v in ("NaT", "None", "nan", "NaN", "<NA>"):
+            return None
+        if pd is not None:
+            try:
+                if pd.isna(v):
+                    return None
+            except (TypeError, ValueError):
+                pass
+            if hasattr(pd, "_libs") and hasattr(pd._libs, "tslibs"):
+                from pandas._libs.tslibs.nattype import NaTType
+
+                if isinstance(v, NaTType):
+                    return None
+        return v
+
     def _insert_to_sql_server(self, table: str, schema: str, records: List[Dict[str, Any]]) -> None:
-        """Upsert records to SQL Server table using MERGE."""
+        """Upsert records to SQL Server table using batched multi-row MERGE.
+
+        Builds multi-row MERGE statements (up to ~100 rows each) and executes
+        all batches within a single database transaction to minimise round-trips.
+        """
         if not records:
             return
 
-        # Get column names from first record
         columns = list(records[0].keys())
-
-        # Get primary key columns for this table
         pk_columns = TABLE_PRIMARY_KEYS.get(table, [])
 
-        if pk_columns:
-            # Build MERGE statement for upsert
-            on_clause = " AND ".join([f"target.[{col}] = source.[{col}]" for col in pk_columns])
-            update_cols = [col for col in columns if col not in pk_columns]
-            update_set = ", ".join([f"target.[{col}] = source.[{col}]" for col in update_cols])
-            source_select = ", ".join([f":{col} AS [{col}]" for col in columns])
-            column_list = ", ".join([f"[{col}]" for col in columns])
-            source_values = ", ".join([f"source.[{col}]" for col in columns])
+        # Sanitize all records up-front
+        safe_records = [
+            {k: self._sanitize_value(v) for k, v in record.items()} for record in records
+        ]
 
-            sql = f"""
-            MERGE INTO [{schema}].[{table}] AS target
-            USING (SELECT {source_select}) AS source
-            ON {on_clause}
-            WHEN MATCHED THEN UPDATE SET {update_set}
-            WHEN NOT MATCHED THEN INSERT ({column_list}) VALUES ({source_values});
-            """
-        else:
-            # Fallback to INSERT for tables without defined PKs
-            placeholders = ", ".join([f":{col}" for col in columns])
-            column_list = ", ".join([f"[{col}]" for col in columns])
-            sql = f"INSERT INTO [{schema}].[{table}] ({column_list}) VALUES ({placeholders})"
+        # SQL Server limit: 2100 params per statement
+        max_rows_per_stmt = max(1, 2100 // max(len(columns), 1))
+        batch_size = min(100, max_rows_per_stmt)
 
-        # Batch upsert with deadlock retry
-        batch_size = 1000
+        column_list = ", ".join([f"[{col}]" for col in columns])
         deadlock_retries = 3
-        for i in range(0, len(records), batch_size):
-            batch = records[i : i + batch_size]
-            for record in batch:
-                # Convert values to SQL-safe format
-                safe_record = {}
-                for k, v in record.items():
-                    if v is None:
-                        safe_record[k] = None
-                    elif isinstance(v, (dict, list)):
-                        safe_record[k] = json.dumps(v, default=str)
-                    elif isinstance(v, datetime):
-                        safe_record[k] = v.isoformat()
-                    elif isinstance(v, float) and (v != v):  # NaN check (NaN != NaN)
-                        safe_record[k] = None
-                    elif isinstance(v, str) and v in ("NaT", "None", "nan", "NaN", "<NA>"):
-                        # Handle stringified null-like values
-                        safe_record[k] = None
-                    elif pd is not None:
-                        # Handle pandas NA values (NaT, NA, NaN, etc.)
-                        try:
-                            if pd.isna(v):
-                                safe_record[k] = None
-                                continue
-                        except (TypeError, ValueError):
-                            pass
-                        # Check for NaTType explicitly
-                        if hasattr(pd, "_libs") and hasattr(pd._libs, "tslibs"):
-                            from pandas._libs.tslibs.nattype import NaTType
 
-                            if isinstance(v, NaTType):
-                                safe_record[k] = None
-                                continue
-                        safe_record[k] = v
-                    else:
-                        safe_record[k] = v
+        from sqlalchemy import text
 
-                for attempt in range(deadlock_retries + 1):
-                    try:
-                        self.target.execute(sql, safe_record)
-                        break
-                    except Exception as e:
-                        err_str = str(e)
-                        is_deadlock = "deadlock" in err_str.lower() or "40001" in err_str
-                        if is_deadlock and attempt < deadlock_retries:
-                            wait = (0.5 * (2**attempt)) + random.uniform(0, 0.5)
-                            time.sleep(wait)
-                        elif is_deadlock:
-                            logger.warning(
-                                f"Deadlock after {deadlock_retries} retries for {table}: {e}"
+        engine = self.target.get_engine()
+
+        for attempt in range(deadlock_retries + 1):
+            try:
+                with engine.begin() as conn:
+                    for i in range(0, len(safe_records), batch_size):
+                        batch = safe_records[i : i + batch_size]
+                        params = {}
+
+                        if pk_columns:
+                            # Multi-row MERGE via VALUES clause
+                            value_rows = []
+                            for row_idx, rec in enumerate(batch):
+                                row_params = []
+                                for col in columns:
+                                    pname = f"{col}_{row_idx}"
+                                    params[pname] = rec.get(col)
+                                    row_params.append(f":{pname}")
+                                value_rows.append(f"({', '.join(row_params)})")
+
+                            values_clause = ", ".join(value_rows)
+                            on_clause = " AND ".join(
+                                [f"target.[{c}] = source.[{c}]" for c in pk_columns]
                             )
-                            break
+                            update_cols = [c for c in columns if c not in pk_columns]
+                            update_set = ", ".join(
+                                [f"target.[{c}] = source.[{c}]" for c in update_cols]
+                            )
+                            source_values = ", ".join([f"source.[{c}]" for c in columns])
+
+                            sql = f"""
+                            MERGE INTO [{schema}].[{table}] AS target
+                            USING (VALUES {values_clause}) AS source ({column_list})
+                            ON {on_clause}
+                            WHEN MATCHED THEN UPDATE SET {update_set}
+                            WHEN NOT MATCHED THEN INSERT ({column_list})
+                                VALUES ({source_values});
+                            """
                         else:
-                            logger.debug(f"Upsert error for record in {table}: {e}")
-                            break
+                            # Multi-row INSERT
+                            value_rows = []
+                            for row_idx, rec in enumerate(batch):
+                                row_params = []
+                                for col in columns:
+                                    pname = f"{col}_{row_idx}"
+                                    params[pname] = rec.get(col)
+                                    row_params.append(f":{pname}")
+                                value_rows.append(f"({', '.join(row_params)})")
+
+                            values_clause = ", ".join(value_rows)
+                            sql = f"INSERT INTO [{schema}].[{table}] ({column_list}) VALUES {values_clause}"
+
+                        conn.execute(text(sql), params)
+                break  # Success — exit retry loop
+            except Exception as e:
+                err_str = str(e)
+                is_deadlock = "deadlock" in err_str.lower() or "40001" in err_str
+                if is_deadlock and attempt < deadlock_retries:
+                    wait = (0.5 * (2**attempt)) + random.uniform(0, 0.5)
+                    time.sleep(wait)
+                elif is_deadlock:
+                    logger.warning(f"Deadlock after {deadlock_retries} retries for {table}: {e}")
+                else:
+                    logger.debug(f"Upsert error for {table}: {e}")
+                    break
 
     def purge_sql_tables(self, days: int = 90) -> Dict[str, Any]:
         """
