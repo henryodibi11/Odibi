@@ -1024,19 +1024,33 @@ class CatalogSyncer:
                 return candidate
         return None
 
+    @staticmethod
+    def _normalize_tz(df_col: Any, dt: datetime) -> datetime:
+        """Match dt tzinfo to df_col dtype to avoid tz-naive vs tz-aware errors.
+
+        .toPandas() produces tz-naive timestamps while stored sync timestamps
+        and cutoff datetimes are tz-aware (UTC). All values are UTC regardless.
+        """
+        col_is_tz_aware = hasattr(df_col.dtype, "tz") and df_col.dtype.tz is not None
+        if col_is_tz_aware and dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        if not col_is_tz_aware and dt.tzinfo is not None:
+            return dt.replace(tzinfo=None)
+        return dt
+
     def _apply_incremental_filter(self, df: Any, table: str) -> Any:
         """Filter DataFrame to only include new records for incremental sync."""
         time_col = self._get_time_column(df)
         last_sync = self._get_last_sync_timestamp(table)
 
         if last_sync and time_col:
-            df = df[df[time_col] > last_sync]
+            df = df[df[time_col] > self._normalize_tz(df[time_col], last_sync)]
         elif last_sync and "date" in df.columns:
             df = df[df["date"] > last_sync.date()]
         elif self.config.sync_last_days:
             cutoff = datetime.now(timezone.utc) - timedelta(days=self.config.sync_last_days)
             if time_col:
-                df = df[df[time_col] > cutoff]
+                df = df[df[time_col] > self._normalize_tz(df[time_col], cutoff)]
             elif "date" in df.columns:
                 df = df[df["date"] > cutoff.date()]
 
@@ -1049,14 +1063,15 @@ class CatalogSyncer:
         time_col = self._get_time_column(df)
         last_sync = self._get_last_sync_timestamp(table)
 
+        # Strip tzinfo — Spark TimestampType is tz-naive (UTC assumed).
         if last_sync and time_col:
-            df = df.filter(col(time_col) > last_sync)
+            df = df.filter(col(time_col) > last_sync.replace(tzinfo=None))
         elif last_sync and "date" in df.columns:
             df = df.filter(col("date") > last_sync.date())
         elif self.config.sync_last_days:
             cutoff = datetime.now(timezone.utc) - timedelta(days=self.config.sync_last_days)
             if time_col:
-                df = df.filter(col(time_col) > cutoff)
+                df = df.filter(col(time_col) > cutoff.replace(tzinfo=None))
             elif "date" in df.columns:
                 df = df.filter(col("date") > cutoff.date())
 
