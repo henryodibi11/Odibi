@@ -1326,7 +1326,7 @@ class Pipeline:
             self._story_future = None
             self._story_executor = None
 
-    def flush_sync(self, timeout: float = 120.0) -> None:
+    def flush_sync(self, timeout: float = 300.0) -> None:
         """Wait for any pending async catalog sync to complete.
 
         Args:
