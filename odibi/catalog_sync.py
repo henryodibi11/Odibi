@@ -355,13 +355,20 @@ SQL_SERVER_VIEWS = {
             a.success_rate_7d,
             a.last_run_at,
             l.last_run_status,
+            s.freshness_sla,
+            s.freshness_sla_minutes,
             DATEDIFF(HOUR, a.last_run_at, GETUTCDATE()) as hours_since_last_run,
             CASE
                 WHEN l.last_run_status = 'FAILURE' THEN 'RED'
                 WHEN a.success_rate_7d < 0.90 THEN 'RED'
                 WHEN a.runs_7d = 0 THEN 'RED'
                 WHEN a.success_rate_7d < 1.0 THEN 'AMBER'
-                WHEN DATEDIFF(HOUR, a.last_run_at, GETUTCDATE()) > 48 THEN 'AMBER'
+                WHEN s.freshness_sla_minutes IS NOT NULL
+                     AND DATEDIFF(MINUTE, a.last_run_at, GETUTCDATE()) > s.freshness_sla_minutes
+                     THEN 'AMBER'
+                WHEN s.freshness_sla_minutes IS NULL
+                     AND DATEDIFF(HOUR, a.last_run_at, GETUTCDATE()) > 48
+                     THEN 'AMBER'
                 ELSE 'GREEN'
             END as health_status,
             CASE
@@ -369,7 +376,12 @@ SQL_SERVER_VIEWS = {
                 WHEN a.success_rate_7d < 0.90 THEN 'Success rate below 90%'
                 WHEN a.runs_7d = 0 THEN 'No runs in 7 days'
                 WHEN a.success_rate_7d < 1.0 THEN CAST(a.failure_7d AS VARCHAR) + ' failure(s) in 7d'
-                WHEN DATEDIFF(HOUR, a.last_run_at, GETUTCDATE()) > 48 THEN 'No run in 48+ hours'
+                WHEN s.freshness_sla_minutes IS NOT NULL
+                     AND DATEDIFF(MINUTE, a.last_run_at, GETUTCDATE()) > s.freshness_sla_minutes
+                     THEN 'Exceeded SLA (' + s.freshness_sla + ')'
+                WHEN s.freshness_sla_minutes IS NULL
+                     AND DATEDIFF(HOUR, a.last_run_at, GETUTCDATE()) > 48
+                     THEN 'No run in 48+ hours'
                 ELSE '100% success'
             END as health_reason
         FROM agg a
@@ -377,6 +389,10 @@ SQL_SERVER_VIEWS = {
           ON a.project = l.project
          AND a.pipeline_name = l.pipeline_name
          AND a.environment = l.environment
+        LEFT JOIN [{schema}].[meta_sla_status] s
+          ON a.project = s.project_name
+         AND a.pipeline_name = s.pipeline_name
+         AND a.environment = s.environment
     """,
     "vw_exec_overview": """
         CREATE OR ALTER VIEW [{schema}].[vw_exec_overview] AS
@@ -456,24 +472,43 @@ SQL_SERVER_VIEWS = {
     "vw_table_freshness": """
         CREATE OR ALTER VIEW [{schema}].[vw_table_freshness] AS
         SELECT
-            project,
-            environment,
-            table_name,
-            updated_at,
-            DATEDIFF(HOUR, updated_at, GETUTCDATE()) as hours_since_update,
+            t.project,
+            t.environment,
+            t.table_name,
+            t.updated_at,
+            DATEDIFF(HOUR, t.updated_at, GETUTCDATE()) as hours_since_update,
+            s.freshness_sla,
+            s.freshness_sla_minutes,
             CASE
-                WHEN updated_at IS NULL THEN 'Unknown'
-                WHEN DATEDIFF(HOUR, updated_at, GETUTCDATE()) <= 6 THEN 'Fresh'
-                WHEN DATEDIFF(HOUR, updated_at, GETUTCDATE()) <= 24 THEN 'Warning'
+                WHEN t.updated_at IS NULL THEN 'Unknown'
+                WHEN s.freshness_sla_minutes IS NOT NULL
+                     AND DATEDIFF(MINUTE, t.updated_at, GETUTCDATE()) <= s.freshness_sla_minutes * 0.5
+                     THEN 'Fresh'
+                WHEN s.freshness_sla_minutes IS NOT NULL
+                     AND DATEDIFF(MINUTE, t.updated_at, GETUTCDATE()) <= s.freshness_sla_minutes
+                     THEN 'Warning'
+                WHEN s.freshness_sla_minutes IS NOT NULL THEN 'Stale'
+                WHEN DATEDIFF(HOUR, t.updated_at, GETUTCDATE()) <= 6 THEN 'Fresh'
+                WHEN DATEDIFF(HOUR, t.updated_at, GETUTCDATE()) <= 24 THEN 'Warning'
                 ELSE 'Stale'
             END as freshness_status,
             CASE
-                WHEN updated_at IS NULL THEN 'RED'
-                WHEN DATEDIFF(HOUR, updated_at, GETUTCDATE()) <= 6 THEN 'GREEN'
-                WHEN DATEDIFF(HOUR, updated_at, GETUTCDATE()) <= 24 THEN 'AMBER'
+                WHEN t.updated_at IS NULL THEN 'RED'
+                WHEN s.freshness_sla_minutes IS NOT NULL
+                     AND DATEDIFF(MINUTE, t.updated_at, GETUTCDATE()) <= s.freshness_sla_minutes * 0.5
+                     THEN 'GREEN'
+                WHEN s.freshness_sla_minutes IS NOT NULL
+                     AND DATEDIFF(MINUTE, t.updated_at, GETUTCDATE()) <= s.freshness_sla_minutes
+                     THEN 'AMBER'
+                WHEN s.freshness_sla_minutes IS NOT NULL THEN 'RED'
+                WHEN DATEDIFF(HOUR, t.updated_at, GETUTCDATE()) <= 6 THEN 'GREEN'
+                WHEN DATEDIFF(HOUR, t.updated_at, GETUTCDATE()) <= 24 THEN 'AMBER'
                 ELSE 'RED'
             END as freshness_rag
-        FROM [{schema}].[meta_tables]
+        FROM [{schema}].[meta_tables] t
+        LEFT JOIN [{schema}].[meta_sla_status] s
+          ON t.project = s.project_name
+         AND t.environment = s.environment
     """,
     "vw_pipeline_sla_status": """
         CREATE OR ALTER VIEW [{schema}].[vw_pipeline_sla_status] AS
@@ -519,7 +554,9 @@ SQL_SERVER_VIEWS = {
             END as sla_rag
         FROM latest l
         LEFT JOIN [{schema}].[meta_sla_status] s
-          ON l.pipeline_name = s.pipeline_name
+          ON l.project = s.project_name
+         AND l.pipeline_name = s.pipeline_name
+         AND l.environment = s.environment
         LEFT JOIN [{schema}].[dim_pipeline_context] c
           ON l.project = c.project
          AND l.pipeline_name = c.pipeline_name
@@ -550,7 +587,7 @@ SQL_SERVER_VIEWS = {
                     ORDER BY timestamp DESC
                 ) as rn
             FROM [{schema}].[meta_failures]
-            WHERE timestamp >= DATEADD(day, -2, GETUTCDATE())
+            WHERE timestamp >= DATEADD(day, -7, GETUTCDATE())
         ),
         context_info AS (
             SELECT project, pipeline_name, environment, business_criticality, business_owner, business_process
