@@ -82,6 +82,19 @@ repos:
         description: Scans for private keys and secrets
 
   # ============================================================================
+  # DOCS SYNC - Auto-regenerate yaml_schema.md when config models change
+  # ============================================================================
+  - repo: local
+    hooks:
+      - id: sync-yaml-schema-docs
+        name: Regenerate yaml_schema.md
+        description: Keeps docs/reference/yaml_schema.md in sync with Pydantic models
+        entry: python odibi/introspect.py
+        language: system
+        files: ^odibi/.*\.py$
+        pass_filenames: false
+
+  # ============================================================================
   # PYTHON LINTING AND FORMATTING
   # Ruff - Extremely fast Python linter and formatter (replaces flake8, pylint, isort, black)
   # ============================================================================

@@ -156,7 +156,7 @@ class TestSyncCommand:
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_sync_no_system_config(self, mock_manager_class, mock_load_ext, caplog):
+    def test_sync_no_system_config(self, mock_manager_class, mock_load_ext, capfd):
         """Should fail if system catalog not configured."""
         args = Mock()
         args.config = "test.yaml"
@@ -171,11 +171,12 @@ class TestSyncCommand:
         result = _sync_command(args)
 
         assert result == 1
-        assert "not configured" in caplog.text
+        captured = capfd.readouterr()
+        assert "not configured" in captured.err or "not configured" in captured.out
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_sync_no_sync_from_config(self, mock_manager_class, mock_load_ext, caplog):
+    def test_sync_no_sync_from_config(self, mock_manager_class, mock_load_ext, capfd):
         """Should fail if sync_from not configured."""
         args = Mock()
         args.config = "test.yaml"
@@ -193,7 +194,10 @@ class TestSyncCommand:
         result = _sync_command(args)
 
         assert result == 1
-        assert "No sync_from configured" in caplog.text
+        captured = capfd.readouterr()
+        assert (
+            "No sync_from configured" in captured.err or "No sync_from configured" in captured.out
+        )
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
@@ -270,7 +274,7 @@ class TestSyncCommand:
 
     @patch("odibi.cli.system.load_extensions")
     @patch("odibi.cli.system.PipelineManager")
-    def test_sync_exception_handling(self, mock_manager_class, mock_load_ext, caplog):
+    def test_sync_exception_handling(self, mock_manager_class, mock_load_ext, capfd):
         """Should handle exceptions gracefully."""
         args = Mock()
         args.config = "test.yaml"
@@ -281,7 +285,8 @@ class TestSyncCommand:
         result = _sync_command(args)
 
         assert result == 1
-        assert "failed" in caplog.text
+        captured = capfd.readouterr()
+        assert "failed" in captured.err or "failed" in captured.out
 
 
 class TestRebuildSummariesCommand:

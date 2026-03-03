@@ -1310,6 +1310,7 @@ write:
 | **zorder_by** | List[str] | No | `PydanticUndefined` | List of columns to Z-Order by. Improves read performance for high-cardinality columns used in filters/joins (Delta only). |
 | **table_properties** | Dict[str, str] | No | `PydanticUndefined` | Delta table properties. Overrides global performance.delta_table_properties. Example: {'delta.columnMapping.mode': 'name'} to allow special characters in column names. |
 | **merge_schema** | bool | No | `False` | Allow schema evolution (mergeSchema option in Delta) |
+| **overwrite_schema** | bool | No | `False` | Allow schema overwrite on mode=overwrite (overwriteSchema option in Delta). Use when the incoming schema differs from the existing table schema. |
 | **first_run_query** | Optional[str] | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
 | **auto_optimize** | bool \| [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
@@ -2561,6 +2562,26 @@ case_when:
 #### `cast_columns` (CastColumnsParams) {#castcolumnsparams}
 Casts specific columns to new types while keeping others intact.
 
+Normalizes common type aliases (int->INTEGER, str->STRING, float->DOUBLE)
+and passes through complex SQL types as-is (e.g., ARRAY<STRING>).
+
+Args:
+    context: Current execution context with dataframe
+    params: Cast configuration with column-to-type mapping
+
+Returns:
+    New context with columns cast to specified types
+
+Example:
+    Cast columns using simple type aliases and complex SQL types:
+    ```yaml
+    cast_columns:
+      casts:
+        age: "int"
+        salary: "double"
+        tags: "ARRAY<STRING>"
+    ```
+
 Configuration for column type casting.
 
 Example:
@@ -2606,7 +2627,25 @@ clean_text:
 ---
 #### `coalesce_columns` (CoalesceColumnsParams) {#coalescecolumnsparams}
 Returns the first non-null value from a list of columns.
-Useful for fallback/priority scenarios.
+
+Useful for fallback/priority scenarios where you want to use the first available
+value from multiple columns (e.g., primary phone, backup phone, home phone).
+
+Args:
+    context: Current execution context with dataframe
+    params: Coalesce configuration (columns list, output name, drop source option)
+
+Returns:
+    New context with coalesced column added
+
+Example:
+    Create a primary phone column from multiple fallback options:
+    ```yaml
+    coalesce_columns:
+      columns: ["mobile_phone", "work_phone", "home_phone"]
+      output_col: "primary_phone"
+      drop_source: true
+    ```
 
 Configuration for coalescing columns (first non-null value).
 
@@ -2936,7 +2975,25 @@ limit:
 ---
 #### `normalize_column_names` (NormalizeColumnNamesParams) {#normalizecolumnnamesparams}
 Normalizes column names to a consistent style.
-Useful for cleaning up messy source data with spaces, mixed case, or special characters.
+
+Useful for cleaning up messy source data with spaces, mixed case, or special
+characters. Converts names like "First Name" or "firstName" to "first_name".
+
+Args:
+    context: Current execution context with dataframe
+    params: Normalization configuration (style, lowercase, special char handling)
+
+Returns:
+    New context with standardized column names
+
+Example:
+    Convert all columns to lowercase snake_case:
+    ```yaml
+    normalize_column_names:
+      style: "snake_case"
+      lowercase: true
+      remove_special: true
+    ```
 
 Configuration for normalizing column names.
 
@@ -3009,7 +3066,27 @@ rename_columns:
 ---
 #### `replace_values` (ReplaceValuesParams) {#replacevaluesparams}
 Replaces values in specified columns according to the mapping.
-Supports replacing to NULL.
+
+Supports replacing specific values with new values or NULL. Useful for data
+standardization (e.g., "N/A" -> NULL, "Unknown" -> NULL).
+
+Args:
+    context: Current execution context with dataframe
+    params: Replacement configuration (columns and value mapping)
+
+Returns:
+    New context with replaced values
+
+Example:
+    Standardize missing value indicators:
+    ```yaml
+    replace_values:
+      columns: ["status", "category"]
+      mapping:
+        "N/A": null
+        "Unknown": null
+        "PENDING": "pending"
+    ```
 
 Configuration for bulk value replacement.
 
@@ -3151,6 +3228,29 @@ split_part:
 ---
 #### `trim_whitespace` (TrimWhitespaceParams) {#trimwhitespaceparams}
 Trims leading and trailing whitespace from string columns.
+
+If no columns are specified, applies to all columns (SQL TRIM handles
+non-strings gracefully). Useful for cleaning up data from sources with
+inconsistent spacing.
+
+Args:
+    context: Current execution context with dataframe
+    params: Trim configuration (optional column list)
+
+Returns:
+    New context with trimmed string columns
+
+Example:
+    Trim specific columns:
+    ```yaml
+    trim_whitespace:
+      columns: ["name", "address", "city"]
+    ```
+
+    Trim all string columns:
+    ```yaml
+    trim_whitespace: {}
+    ```
 
 Configuration for trimming whitespace from string columns.
 
@@ -3360,6 +3460,22 @@ params:
 ### 📂 Warehousing Patterns
 
 #### AuditColumnsConfig {#auditcolumnsconfig}
+Configuration for automatic audit timestamp columns during merge operations.
+
+Attributes:
+    created_col: Column to set only on first insert (e.g., "created_at")
+    updated_col: Column to update on every merge operation (e.g., "updated_at")
+
+At least one of created_col or updated_col must be specified.
+
+Example:
+    ```yaml
+    audit_cols:
+      created_col: "created_at"
+      updated_col: "updated_at"
+    ```
+
+
 [Back to Catalog](#nodeconfig)
 
 | Field | Type | Required | Default | Description |
@@ -3493,7 +3609,14 @@ transform:
 #### `scd2` (SCD2Params) {#scd2params}
 Implements SCD Type 2 Logic.
 
-Returns the FULL history dataset (to be written via Overwrite).
+SCD2 is self-contained: it writes directly to the target table on all
+engines and code paths. No separate write: block is needed.
+
+On Spark with use_delta_merge=True (default), uses an optimized Delta
+MERGE that only touches changed rows. The legacy path reads the full
+target, computes the union, and overwrites. Both write directly.
+
+On Pandas, writes directly to the target file (parquet or CSV).
 
 Parameters for SCD Type 2 (Slowly Changing Dimensions) transformer.
 
@@ -3529,10 +3652,22 @@ params:
 **How it works:**
 1. **Match**: Finds existing records using `keys`.
 2. **Compare**: Checks `track_cols` to see if data changed.
-3. **Close**: If changed, updates the old record's `valid_to` to the new effective time.
-4. **Insert**: Adds a new record with `valid_from` (renamed from `effective_time_col`), `valid_to = NULL`, and `is_current = true`.
+3. **Close**: If changed, updates the old record's `end_time_col` to the new `effective_time_col`.
+4. **Insert**: Adds a new record with `start_time_col` (renamed from `effective_time_col`)
+   as the version start, open-ended `end_time_col`, and `is_current = true`.
 
-**Note:** SCD2 is self-contained — it writes directly to the target table on all engines. No `write:` block is needed.
+The ``effective_time_col`` value is copied into a new ``start_time_col`` column
+(default: ``valid_from``) in the target, giving each version a complete time window:
+``[valid_from, valid_to)``. The original source column is preserved.
+
+**Note:** SCD2 is self-contained — it writes directly to the target table on all
+engines. No separate ``write:`` block is needed in your pipeline YAML.
+
+On Spark with Delta targets, uses an optimized Delta MERGE by default
+(``use_delta_merge: true``). Set ``use_delta_merge: false`` to use the legacy
+full-overwrite approach (still self-contained, just slower for large tables).
+
+On Pandas, writes directly to the target file (parquet or CSV).
 
 [Back to Catalog](#nodeconfig)
 
@@ -3544,10 +3679,13 @@ params:
 | **keys** | List[str] | Yes | - | Natural keys to identify unique entities |
 | **track_cols** | List[str] | Yes | - | Columns to monitor for changes |
 | **effective_time_col** | str | Yes | - | Source column indicating when the change occurred. |
-| **start_time_col** | str | No | `valid_from` | Name of the start timestamp column in target. The effective_time_col is renamed to this. |
+| **start_time_col** | str | No | `valid_from` | Name of the start timestamp column in the target. The effective_time_col value is copied to this column. |
 | **end_time_col** | str | No | `valid_to` | Name of the end timestamp column |
 | **current_flag_col** | str | No | `is_current` | Name of the current record flag column |
 | **delete_col** | Optional[str] | No | - | Column indicating soft deletion (boolean) |
+| **use_delta_merge** | bool | No | `True` | Use Delta Lake MERGE for Spark engine (faster for large tables). Falls back to full overwrite if target is not Delta format. |
+| **register_table** | Optional[str] | No | - | Register as Unity Catalog/metastore table after write (e.g., 'silver.dim_customers'). Spark only. |
+| **vacuum_hours** | Optional[int] | No | - | Hours to retain for VACUUM after SCD2 write (Spark only). Set to 168 for 7 days. None disables VACUUM. |
 
 ---
 ### 📂 Manufacturing & IoT

@@ -2270,7 +2270,7 @@ class PipelineManager:
         # Wait for any pending async catalog syncs to complete
         for name in pipeline_names:
             pipeline = self._pipelines[name]
-            if hasattr(pipeline, 'flush_sync'):
+            if hasattr(pipeline, "flush_sync"):
                 pipeline.flush_sync()
 
         if len(pipeline_names) == 1:

@@ -883,12 +883,22 @@ class CatalogSyncer:
             if df is None or (hasattr(df, "empty") and df.empty):
                 return {"success": True, "rows": 0, "message": "No data to sync"}
 
+            total_rows = len(df) if hasattr(df, "__len__") else df.count()
+
             # Apply date filter for incremental mode
             if self.config.mode == "incremental":
                 df = self._apply_incremental_filter(df, table)
 
             # Get row count before conversion
             row_count = len(df) if hasattr(df, "__len__") else df.count()
+
+            self._ctx.info(
+                f"Syncing {table}: {row_count}/{total_rows} rows (mode={self.config.mode})",
+                table=table,
+                total_rows=total_rows,
+                filtered_rows=row_count,
+            )
+
             if row_count == 0:
                 return {"success": True, "rows": 0, "message": "No new data"}
 
@@ -1001,17 +1011,30 @@ class CatalogSyncer:
 
         return None
 
+    def _get_time_column(self, df: Any) -> Optional[str]:
+        """Find the best timestamp column for incremental filtering.
+
+        Checks columns in priority order: timestamp, created_at, updated_at, date.
+        """
+        cols = list(df.columns) if hasattr(df, "columns") else []
+        for candidate in ("timestamp", "created_at", "updated_at"):
+            if candidate in cols:
+                return candidate
+        return None
+
     def _apply_incremental_filter(self, df: Any, table: str) -> Any:
         """Filter DataFrame to only include new records for incremental sync."""
-        # Get last sync timestamp
+        time_col = self._get_time_column(df)
         last_sync = self._get_last_sync_timestamp(table)
 
-        if last_sync and "timestamp" in df.columns:
-            df = df[df["timestamp"] > last_sync]
+        if last_sync and time_col:
+            df = df[df[time_col] > last_sync]
+        elif last_sync and "date" in df.columns:
+            df = df[df["date"] > last_sync.date()]
         elif self.config.sync_last_days:
             cutoff = datetime.now(timezone.utc) - timedelta(days=self.config.sync_last_days)
-            if "timestamp" in df.columns:
-                df = df[df["timestamp"] > cutoff]
+            if time_col:
+                df = df[df[time_col] > cutoff]
             elif "date" in df.columns:
                 df = df[df["date"] > cutoff.date()]
 
@@ -1021,14 +1044,17 @@ class CatalogSyncer:
         """Filter Spark DataFrame for incremental sync."""
         from pyspark.sql.functions import col
 
+        time_col = self._get_time_column(df)
         last_sync = self._get_last_sync_timestamp(table)
 
-        if last_sync and "timestamp" in df.columns:
-            df = df.filter(col("timestamp") > last_sync)
+        if last_sync and time_col:
+            df = df.filter(col(time_col) > last_sync)
+        elif last_sync and "date" in df.columns:
+            df = df.filter(col("date") > last_sync.date())
         elif self.config.sync_last_days:
             cutoff = datetime.now(timezone.utc) - timedelta(days=self.config.sync_last_days)
-            if "timestamp" in df.columns:
-                df = df.filter(col("timestamp") > cutoff)
+            if time_col:
+                df = df.filter(col(time_col) > cutoff)
             elif "date" in df.columns:
                 df = df.filter(col("date") > cutoff.date())
 
