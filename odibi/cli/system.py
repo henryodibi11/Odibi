@@ -131,12 +131,12 @@ def _sync_command(args) -> int:
         project_config = manager.config
 
         if not project_config.system:
-            logger.error("System Catalog not configured. Add 'system' section to config.")
+            print("Error: System Catalog not configured. Add 'system' section to config.")
             return 1
 
         if not project_config.system.sync_from:
-            logger.error(
-                "No sync_from configured in system config. "
+            print(
+                "Error: No sync_from configured in system config. "
                 "Add 'sync_from' section with connection and path."
             )
             return 1
@@ -181,7 +181,7 @@ def _sync_command(args) -> int:
         return 0
 
     except Exception as e:
-        logger.error(f"Sync failed: {e}")
+        print(f"Error: Sync failed: {e}")
         return 1
 
 

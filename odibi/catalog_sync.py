@@ -7,7 +7,9 @@ or another blob storage (for cross-region backup).
 
 import json
 import logging
+import random
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -1219,8 +1221,9 @@ class CatalogSyncer:
             column_list = ", ".join([f"[{col}]" for col in columns])
             sql = f"INSERT INTO [{schema}].[{table}] ({column_list}) VALUES ({placeholders})"
 
-        # Batch upsert
+        # Batch upsert with deadlock retry
         batch_size = 1000
+        deadlock_retries = 3
         for i in range(0, len(records), batch_size):
             batch = records[i : i + batch_size]
             for record in batch:
@@ -1256,10 +1259,25 @@ class CatalogSyncer:
                         safe_record[k] = v
                     else:
                         safe_record[k] = v
-                try:
-                    self.target.execute(sql, safe_record)
-                except Exception as e:
-                    logger.debug(f"Upsert error for record: {e}")
+
+                for attempt in range(deadlock_retries + 1):
+                    try:
+                        self.target.execute(sql, safe_record)
+                        break
+                    except Exception as e:
+                        err_str = str(e)
+                        is_deadlock = "deadlock" in err_str.lower() or "40001" in err_str
+                        if is_deadlock and attempt < deadlock_retries:
+                            wait = (0.5 * (2**attempt)) + random.uniform(0, 0.5)
+                            time.sleep(wait)
+                        elif is_deadlock:
+                            logger.warning(
+                                f"Deadlock after {deadlock_retries} retries for {table}: {e}"
+                            )
+                            break
+                        else:
+                            logger.debug(f"Upsert error for record in {table}: {e}")
+                            break
 
     def purge_sql_tables(self, days: int = 90) -> Dict[str, Any]:
         """
