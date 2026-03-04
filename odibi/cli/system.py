@@ -74,6 +74,28 @@ def add_system_parser(subparsers):
         help="Max age for stale CLAIMED entries (default: DerivedUpdater.MAX_CLAIM_AGE_MINUTES)",
     )
 
+    # odibi system optimize
+    optimize_parser = system_subparsers.add_parser(
+        "optimize",
+        help="Compact small files and vacuum old versions in system Delta tables",
+    )
+    optimize_parser.add_argument("config", help="Path to YAML config file")
+    optimize_parser.add_argument(
+        "--env", default=None, help="Environment to apply overrides (e.g., dev, qat, prod)"
+    )
+    optimize_parser.add_argument(
+        "--tables",
+        nargs="+",
+        default=None,
+        help="Specific tables to optimize (default: all)",
+    )
+    optimize_parser.add_argument(
+        "--retention-hours",
+        type=int,
+        default=168,
+        help="VACUUM retention in hours (default: 168 = 7 days)",
+    )
+
     # odibi system cleanup
     cleanup_parser = system_subparsers.add_parser(
         "cleanup",
@@ -99,12 +121,14 @@ def system_command(args):
         print("\nAvailable commands:")
         print("  sync              Sync system data from source to target backend")
         print("  rebuild-summaries Recompute derived tables from fact tables")
+        print("  optimize          Compact and vacuum system Delta tables")
         print("  cleanup           Delete records older than retention period")
         return 1
 
     command_map = {
         "sync": _sync_command,
         "rebuild-summaries": _rebuild_summaries_command,
+        "optimize": _optimize_command,
         "cleanup": _cleanup_command,
     }
 
@@ -299,6 +323,63 @@ def _rebuild_summaries_command(args) -> int:
     except Exception as e:
         logger.error(f"Rebuild failed: {e}")
         raise
+
+
+def _optimize_command(args) -> int:
+    """Compact small files and vacuum old versions in system Delta tables."""
+    try:
+        config_path = Path(args.config).resolve()
+
+        load_extensions(config_path.parent)
+        if config_path.parent.parent != config_path.parent:
+            load_extensions(config_path.parent.parent)
+        if config_path.parent != Path.cwd():
+            load_extensions(Path.cwd())
+
+        manager = PipelineManager.from_yaml(args.config, environment=getattr(args, "env", None))
+        project_config = manager.config
+
+        if not project_config.system:
+            print("Error: System Catalog not configured. Add 'system' section to config.")
+            return 1
+
+        catalog = manager.get_catalog()
+        if catalog is None:
+            print("Error: CatalogManager not available")
+            return 1
+
+        tables = args.tables
+        retention = args.retention_hours
+
+        table_list = tables or list(catalog.tables.keys())
+        print(f"Optimizing {len(table_list)} system tables (vacuum retention: {retention}h)...")
+        for t in table_list:
+            print(f"  - {t}")
+
+        results = catalog.optimize(tables=tables, vacuum_retention_hours=retention)
+
+        ok = sum(1 for r in results.values() if r.get("success"))
+        print(f"\nOptimization complete: {ok}/{len(results)} tables")
+        for table, result in results.items():
+            if result.get("success"):
+                engine = result.get("engine", "")
+                details = []
+                if result.get("zorder"):
+                    details.append(f"zorder={result['zorder']}")
+                if result.get("files_compacted"):
+                    details.append(f"compacted={result['files_compacted']}")
+                if result.get("files_vacuumed"):
+                    details.append(f"vacuumed={result['files_vacuumed']}")
+                extra = f" ({', '.join(details)})" if details else ""
+                print(f"  ✓ {table} [{engine}]{extra}")
+            else:
+                print(f"  ✗ {table}: {result.get('error', 'unknown error')}")
+
+        return 0
+
+    except Exception as e:
+        print(f"Error: Optimization failed: {e}")
+        return 1
 
 
 def _cleanup_command(args) -> int:

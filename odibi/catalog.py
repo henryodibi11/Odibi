@@ -3721,32 +3721,105 @@ class CatalogManager:
 
         return downstream
 
-    def optimize(self) -> None:
-        """
-        Runs VACUUM and OPTIMIZE (Z-Order) on meta_runs.
-        Spark-only feature.
-        """
-        if not self.spark:
-            return
+    # Best Z-ORDER column per table (for Spark OPTIMIZE)
+    _ZORDER_COLUMNS: Dict[str, str] = {
+        "meta_runs": "timestamp",
+        "meta_pipeline_runs": "created_at",
+        "meta_node_runs": "created_at",
+        "meta_tables": "updated_at",
+        "meta_failures": "timestamp",
+        "meta_sla_status": "updated_at",
+        "meta_patterns": "timestamp",
+        "meta_metrics": "timestamp",
+        "meta_pipelines": "pipeline_name",
+        "meta_nodes": "node_name",
+        "meta_schemas": "table_name",
+        "meta_lineage": "source_table",
+        "meta_outputs": "table_name",
+        "meta_observability_errors": "timestamp",
+        "meta_derived_applied_runs": "run_id",
+        "meta_daily_stats": "date",
+        "meta_pipeline_health": "pipeline_name",
+    }
 
+    def optimize(
+        self,
+        tables: Optional[List[str]] = None,
+        vacuum_retention_hours: int = 168,
+    ) -> Dict[str, Any]:
+        """Run OPTIMIZE (compaction) and VACUUM on system catalog Delta tables.
+
+        Works with both Spark (OPTIMIZE + ZORDER + VACUUM) and Pandas/delta-rs
+        (compact + vacuum).
+
+        Args:
+            tables: Tables to optimise. Defaults to all registered tables.
+            vacuum_retention_hours: Hours of history to retain (default 168 = 7 days).
+
+        Returns:
+            Dict mapping table name to result dict with success/error/details.
+        """
+        target_tables = tables or list(self.tables.keys())
+        results: Dict[str, Any] = {}
+
+        logger.info(
+            f"Starting Catalog Optimization on {len(target_tables)} tables "
+            f"(vacuum_retention={vacuum_retention_hours}h)..."
+        )
+
+        for table in target_tables:
+            path = self.tables.get(table)
+            if not path:
+                results[table] = {"success": False, "error": "Unknown table"}
+                continue
+            try:
+                if self.spark:
+                    result = self._optimize_spark(table, path, vacuum_retention_hours)
+                elif self.engine:
+                    result = self._optimize_deltars(table, path, vacuum_retention_hours)
+                else:
+                    result = {"success": False, "error": "No engine available"}
+                results[table] = result
+            except Exception as e:
+                logger.warning(f"Optimization failed for {table}: {e}")
+                results[table] = {"success": False, "error": str(e)}
+
+        ok = sum(1 for r in results.values() if r.get("success"))
+        logger.info(f"Catalog Optimization completed: {ok}/{len(target_tables)} tables.")
+        return results
+
+    def _optimize_spark(self, table: str, path: str, retention_hours: int) -> Dict[str, Any]:
+        """OPTIMIZE + ZORDER + VACUUM a single table via Spark SQL."""
+        zorder_col = self._ZORDER_COLUMNS.get(table)
+        if zorder_col:
+            self.spark.sql(f"OPTIMIZE delta.`{path}` ZORDER BY ({zorder_col})")
+        else:
+            self.spark.sql(f"OPTIMIZE delta.`{path}`")
+        self.spark.sql(f"VACUUM delta.`{path}` RETAIN {retention_hours} HOURS")
+        return {"success": True, "engine": "spark", "zorder": zorder_col}
+
+    def _optimize_deltars(self, table: str, path: str, retention_hours: int) -> Dict[str, Any]:
+        """Compact + vacuum a single table via delta-rs."""
         try:
-            logger.info("Starting Catalog Optimization...")
+            from deltalake import DeltaTable
+        except ImportError:
+            return {"success": False, "error": "deltalake library not installed"}
 
-            # 1. meta_runs
-            # VACUUM: Remove files older than 7 days (Spark requires check disable or careful setting)
-            # Note: default retention check might block < 168 hours.
-            # We'll use RETAIN 168 HOURS (7 days) to be safe.
-            self.spark.sql(f"VACUUM delta.`{self.tables['meta_runs']}` RETAIN 168 HOURS")
+        storage_opts = self._get_storage_options() or None
+        try:
+            dt = DeltaTable(path, storage_options=storage_opts)
+        except Exception:
+            return {"success": False, "error": f"Table not found at {path}"}
 
-            # OPTIMIZE: Z-ORDER BY timestamp (for range queries)
-            # We also have 'pipeline_name' and 'date' as partitions.
-            # Z-Ordering by timestamp helps within the partitions.
-            self.spark.sql(f"OPTIMIZE delta.`{self.tables['meta_runs']}` ZORDER BY (timestamp)")
+        compact = dt.optimize.compact()
+        vacuum = dt.vacuum(retention_hours=retention_hours, dry_run=False)
 
-            logger.info("Catalog Optimization completed successfully.")
-
-        except Exception as e:
-            logger.warning(f"Catalog Optimization failed: {e}")
+        return {
+            "success": True,
+            "engine": "delta-rs",
+            "files_compacted": len(compact.get("add", [])) if isinstance(compact, dict) else 0,
+            "files_vacuumed": len(vacuum) if vacuum else 0,
+        }
 
     # -------------------------------------------------------------------------
     # Phase 3.6: Metrics Logging
