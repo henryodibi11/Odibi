@@ -7,48 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-03-04
+
 ### Added
 
-- **JDBC Bulk Copy Protocol (5-10x Faster SQL Server Writes)**: All SQL Server writes now use `useBulkCopyForBatchInsert=true` by default. This enables Microsoft's JDBC bulk copy protocol for significantly faster writes with zero configuration. Works with Azure SQL Database, Azure SQL Managed Instance, Azure Synapse, and on-prem SQL Server.
-
-- **File-Based Bulk Copy for Azure Synapse/SQL Server 2022+**: New `bulk_copy` option for maximum performance (10-50x faster) with very large datasets:
-  - `bulk_copy: true` - Enable file-based bulk loading via ADLS staging
-  - `staging_connection` - ADLS connection for staging Parquet files
-  - `staging_path` - Custom staging path (default: `odibi_staging/bulk`)
-  - `external_data_source` - SQL Server external data source name
-  - `keep_staging_files` - Retain staging files for debugging
-  - `auto_setup` - Auto-create SQL Server credential and external data source
-
-- **Auto-Setup for Bulk Copy**: When `auto_setup: true`, odibi automatically creates:
-  - Database master key (if needed)
-  - Database scoped credential (based on ADLS auth: account_key, SAS, or MSI)
-  - External data source pointing to staging location
-
-- **Organized Staging Paths**: File-based bulk copy staging files are organized by context:
-  ```
-  odibi_staging/bulk/{project}/{pipeline}/{node}/{uuid}.parquet
-  ```
-  (Parquet format for Synapse/SQL Server 2022+ compatibility)
+- **Per-environment pipeline overrides**: Define different pipeline configurations per environment (`env.dev.yaml`, `env.prod.yaml`) with `--env` flag support
+- **Catalog `optimize()` for all system tables**: `catalog.optimize()` now covers all system tables (nodes, pipelines, lineage, etc.) + new `odibi system optimize` CLI command
+- **`vacuum_hours` parameter for SCD2 transformer**: Run Delta Lake VACUUM after SCD2 operations to clean up old files (#294)
+- **`register_table` parameter for SCD2 transformer**: Register SCD2 output as Unity Catalog table
+- **SCD2 `valid_from` preservation**: SCD2 now copies `effective_time_col` to `valid_from` instead of renaming, preserving the original column
+- **Polars `upsert`/`append_once` write modes**: Full engine parity — Polars now supports upsert and append_once (#255)
+- **fastexcel/calamine for Excel reading**: 5-10x faster Excel reads when available, added as core dependency
+- **5,500+ tests**: Massive test coverage expansion — from ~2,700 to 5,500+ tests across all modules
+- **Power user cheatsheet**: 1,600+ line printable reference with decision trees, worksheets, and YAML templates for every configuration option
+- **Developer cheatsheet**: Quick-reference guide for contributors
+- **Bronze `append_once` strategy guide**: Documented maturity progression, key selection, and Bronze-to-Silver change log pattern
+- **Comprehensive docstrings**: Google-style docstrings added across all engines, patterns, CLI, catalog, and transformers
+- **Type hints**: Added to pipeline.py, CLI modules, and transformers
+- **Learning program**: 10-phase Python + Odibi curriculum with 426 exercises and sample datasets
 
 ### Changed
 
-- **Default batch size**: SQL Server writes now use 10,000 row batches by default (configurable via `batch_size`)
+- **Batched MERGE in catalog sync**: ~100x fewer SQL round-trips for catalog synchronization
+- **Thread-safe context and pipeline buffers**: PandasContext and pipeline buffers are now thread-safe (#246)
+- **Thread-safe catalog cache**: Cache methods protected with lock (#275)
+- **Streaming parquet append**: Avoids OOM for large streaming writes (#280)
+- **Replaced `datetime.utcnow()`**: All usages migrated to `datetime.now(timezone.utc)`
+- **`register_standard_library` is now idempotent**: Safe to call multiple times without duplicate registrations
 
 ### Fixed
 
-- **Azure SQL Database detection**: Bulk copy (`bulk_copy: true`) now detects Azure SQL Database and raises a clear error, since file-based bulk loading is only supported on Azure Synapse and SQL Server 2022+. Users automatically get the JDBC bulk copy protocol (5-10x faster) without any configuration.
-
-- **JDBC bulk copy column ordering**: DataFrame columns are now automatically reordered to match target table column order before writing. This fixes NULL values appearing when using `useBulkCopyForBatchInsert` with existing tables that have different column ordering than the DataFrame.
-
-- **exclude_columns now respected during auto_create_table**: When using `auto_create_table: true` with `exclude_columns`, the excluded columns are now filtered out before table creation. Previously, excluded columns would still be created in the target table.
-
-- **Incremental merge now uses direct JDBC read for hash comparison**: The `incremental: true` option now reads target hashes via Spark JDBC instead of fetching all rows to the driver. This eliminates driver memory bottleneck and dramatically reduces the number of Spark jobs for large tables.
+- **40+ bug fixes** across all engines, catalog, validation, and transformers including:
+  - SCD2 Delta MERGE now inserts new version rows for changed keys
+  - SCD2 timezone-aware timestamps and float/NaN handling (#188, #248)
+  - Delta version lookup and schema evolution (#214, #247)
+  - Spark empty DataFrame crash, cross-pipeline cycle detection (#257, #272)
+  - Polars premature collect and timezone-naive timestamps (#274)
+  - Engine-aware column quoting in `replace_values` and `rename_columns`
+  - Excel reader: restore real nulls after `dtype=str`, handle YAML dtype
+  - Databricks/notebook: handle missing stderr fd
+  - Catalog sync: deadlock retry, incremental filter, tz-naive comparisons
+  - Catalog views: respect `freshness_sla`, fix join issues
+  - Async catalog sync: prevent daemon thread exit from killing sync
+  - Pattern bugs: ambiguous SK column in fact join, aggregation format parity
+  - DataFrame index reset before `write_deltalake` to prevent schema mismatch
+  - Union `by_name` fallback for Spark < 3.5
+  - `pivot` function: `avg` → `mean` mapping for Pandas compatibility
+  - `join` function: `full` → `outer` mapping for Pandas compatibility
+  - Disabled nodes (`enabled: false`) now correctly skipped during execution
+  - Quarantine: parent directory creation for pandas writes
 
 ### Documentation
 
-- Updated `docs/features/bulk_copy.md` with two-tier performance optimization:
-  - Tier 1: JDBC Bulk Copy Protocol (default, all databases, 5-10x faster)
-  - Tier 2: File-Based Bulk Copy (Synapse/SQL Server 2022+ only, 10-50x faster)
+- Power user cheatsheet with printable worksheets and 8 decision trees
+- Developer cheatsheet for contributors  
+- Bronze `append_once` strategy guide (maturity progression, key selection, change log pattern)
+- Incremental merge strategy documentation for aggregation pattern
+- SCD2: audit columns, orphan handling, grain validation, incremental patterns
+- Timezone troubleshooting section
+- Custom functions reference guide
+- Quarantine configuration docs for all patterns
+- 5 previously undocumented transformers now documented
 
 ## [2.15.4] - 2026-01-27
 
@@ -89,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -- After (fixed): wraps as subquery
 SELECT * FROM (
   SELECT ... FROM table WHERE existing_condition
-) AS _sql_file_subquery 
+) AS _sql_file_subquery
 WHERE ReportDate >= '2025-10-26'
 ```
 
@@ -131,7 +150,7 @@ Solves the recurring problem of AI tools generating incorrect Odibi YAML by prov
 programmatic generation that uses the actual Pydantic models.
 
 - **New MCP Tool**: `generate_sql_pipeline` - Generate correct YAML for SQL database ingestion
-  - Uses correct schema: `read:` with `format: sql` and `query:` 
+  - Uses correct schema: `read:` with `format: sql` and `query:`
   - Sanitizes node names to alphanumeric + underscore
   - Creates proper top-level `pipelines:` key for imported files
   - Takes discovered tables from `discover_database` or `list_tables`
@@ -152,7 +171,7 @@ programmatic generation that uses the actual Pydantic models.
 - **BREAKING FIX**: Corrected `CRITICAL_CONTEXT` in knowledge.py
   - Was: "ALWAYS_USE inputs: / outputs:" - **WRONG**
   - Now: "ALWAYS_USE read: / write: / query:" - **CORRECT**
-  
+
 - Updated `get_yaml_structure` to show correct examples:
   - `read:` / `write:` instead of `inputs:` / `outputs:`
   - `query:` inside `read:` block instead of `sql:`

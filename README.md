@@ -115,7 +115,7 @@ pipelines:
 | **Validation & Contracts** | Fail-fast checks, quarantine bad rows |
 | **Multi-Engine** | Pandas, Polars, and Spark — same config across all engines |
 | **Production Ready** | Retry, alerting, secrets, Delta Lake support |
-| **Battle-Tested** | 2700+ tests ensure reliability and correctness |
+| **Battle-Tested** | 5500+ tests ensure reliability and correctness |
 
 ---
 
