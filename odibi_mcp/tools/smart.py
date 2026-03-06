@@ -629,7 +629,7 @@ def _transform_catalog_to_map_response(
 
 
 def profile_source(
-    connection: str | dict, path: str, max_attempts: int = 5
+    connection: str | dict, path: str, max_attempts: int = 5, use_cache: bool = True
 ) -> ProfileSourceResponse:
     """
     Profile a data source - delegates to core conn.profile().
@@ -647,11 +647,20 @@ def profile_source(
             }
         path: Path to the source (e.g., "schema.table" for SQL, "folder/file.csv" for storage)
         max_attempts: Max attempts for CSV encoding/delimiter detection (kept for compatibility)
+        use_cache: Use cached profile if available (default: True)
     """
     from odibi_mcp.context import resolve_connection
     from odibi.discovery.types import TableProfile
+    from odibi_mcp.tools.profile_cache import get_cached_profile, cache_profile
 
     conn_name = connection if isinstance(connection, str) else "inline"
+
+    # Check cache first
+    if use_cache:
+        cached = get_cached_profile(conn_name, path)
+        if cached:
+            logger.info(f"Using cached profile for {conn_name}:{path}")
+            return ProfileSourceResponse(**cached)
 
     try:
         conn, conn_name = resolve_connection(connection)
@@ -662,7 +671,13 @@ def profile_source(
         profile = TableProfile(**profile_dict)
 
         # Transform core response to MCP contract
-        return _transform_profile_to_mcp_response(profile, conn_name, path)
+        response = _transform_profile_to_mcp_response(profile, conn_name, path)
+
+        # Cache the result
+        if use_cache:
+            cache_profile(conn_name, path, response.model_dump())
+
+        return response
 
     except NotImplementedError as e:
         logger.warning(f"Connection {conn_name} doesn't support profiling: {e}")

@@ -1192,6 +1192,8 @@ NEXT ACTIONS (pick one):
             name="profile_source",
             description="""📊 PROFILE a file or SQL table to get schema, sample data, and ready-to-use config.
 
+⚡ PERFORMANCE: Results are CACHED for 24 hours. Re-profiling the same source is instant.
+
 WHEN TO USE:
 - After map_environment finds files you want to onboard
 - When you know the exact file path or table name
@@ -1204,6 +1206,14 @@ WHAT YOU GET:
 - candidate_keys: likely primary key columns
 - candidate_watermarks: likely incremental loading columns
 - ready_for: pre-filled dict for generate_bronze_node()
+
+TIMING (first profile):
+- Local files: < 1 second
+- ADLS files: 2-10 seconds (network + download)
+- SQL tables: 3-15 seconds (query + schema analysis)
+- Large CSVs: 10-30 seconds (encoding detection)
+
+Subsequent calls: < 100ms (cached)
 
 EXAMPLES:
   profile_source("raw_adls", "raw data/sales/orders.csv")
