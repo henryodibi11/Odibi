@@ -193,3 +193,5 @@ servers/
 # MkDocs build output
 site/
 github_logs/  
+tests/mcp/  
+# MCP tests require openai package 
