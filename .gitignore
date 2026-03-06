@@ -192,3 +192,4 @@ servers/
 
 # MkDocs build output
 site/
+github_logs/  
