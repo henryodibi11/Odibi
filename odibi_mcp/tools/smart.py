@@ -690,7 +690,9 @@ def profile_source(
 
         # Cache the result
         if use_cache:
-            cache_profile(conn_name, path, response.model_dump())
+            from dataclasses import asdict
+
+            cache_profile(conn_name, path, asdict(response))
 
         return response
 
