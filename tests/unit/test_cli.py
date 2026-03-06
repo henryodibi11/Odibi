@@ -114,7 +114,7 @@ def test_cli_scaffold_project_command(tmp_path):
             mock_pm.return_value = mock_instance
 
             with patch("pathlib.Path.exists", return_value=False):
-                with patch("pathlib.Path.write_text") as mock_write:
+                with patch("pathlib.Path.write_text"):
                     exit_code = main()
 
     assert exit_code == 0
