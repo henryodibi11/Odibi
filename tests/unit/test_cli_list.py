@@ -14,6 +14,18 @@ from odibi.cli.list_cmd import (
     list_patterns_command,
     list_transformers_command,
 )
+from odibi.registry import FunctionRegistry
+from odibi.transformers import register_standard_library
+
+
+@pytest.fixture(autouse=True)
+def ensure_registry_initialized():
+    """Ensure FunctionRegistry is initialized for all tests in this module."""
+    FunctionRegistry.clear()
+    register_standard_library()
+    yield
+    # Clean up after test
+    FunctionRegistry.clear()
 
 
 class TestListTransformers:

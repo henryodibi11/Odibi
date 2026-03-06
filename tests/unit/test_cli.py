@@ -76,10 +76,8 @@ pipelines:
 """)
 
     with patch.object(sys, "argv", ["odibi", "validate", str(yaml_file)]):
-        with patch("odibi.pipeline.PipelineManager") as mock_pm:
-            mock_instance = MagicMock()
-            mock_instance.validate_yaml.return_value = {"valid": True, "errors": []}
-            mock_pm.return_value = mock_instance
+        with patch("odibi.validate.pipeline.validate_yaml") as mock_validate:
+            mock_validate.return_value = {"valid": True, "errors": []}
 
             exit_code = main()
 
@@ -92,13 +90,11 @@ def test_cli_validate_command_invalid_file(tmp_path):
     yaml_file.write_text("invalid: yaml: content:")
 
     with patch.object(sys, "argv", ["odibi", "validate", str(yaml_file)]):
-        with patch("odibi.pipeline.PipelineManager") as mock_pm:
-            mock_instance = MagicMock()
-            mock_instance.validate_yaml.return_value = {
+        with patch("odibi.validate.pipeline.validate_yaml") as mock_validate:
+            mock_validate.return_value = {
                 "valid": False,
                 "errors": [{"field_path": "project", "message": "Missing required field"}],
             }
-            mock_pm.return_value = mock_instance
 
             exit_code = main()
 
