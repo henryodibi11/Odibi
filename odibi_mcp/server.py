@@ -1133,20 +1133,30 @@ BEHAVIOR - BE PERSISTENT:
 3. Keep drilling until you find actual files (CSV, Parquet, Excel, JSON)
 4. NEVER stop at the first level if you only see folders
 
+FILTERING OPTIONS (use when you hit 500 limit or need specific files):
+- path: Scope to specific folder/schema
+- pattern: Filter by glob (*.csv, fact_*, sales_2024_*)
+- limit: Increase from 500 if needed
+
 DECISION TREE:
-- See folders only? → DRILL DEEPER: map_environment(conn, "folder_name")
+- See folders only? → DRILL DEEPER: map_environment(conn, path="folder_name")
 - See files? → PROFILE THEM: profile_source(conn, "folder/file.csv")
-- See mixed? → Profile the files, drill into remaining folders
+- Hit 500 limit? → Use path/pattern to narrow: map_environment(conn, path="raw", pattern="*.csv")
+- Too many results? → Filter by pattern: map_environment(conn, pattern="fact_*")
 - SQL connection? → You'll get schemas/tables → profile_source(conn, "Schema.Table")
 
 EXAMPLES:
-  map_environment("raw_adls", "")           # Start at root
-  map_environment("raw_adls", "raw data")   # Drill into folder
-  map_environment("raw_adls", "raw data/sales")  # Drill deeper
-  map_environment("wwi", "")                # SQL: shows schemas + tables
+  map_environment("raw_adls")                           # Start at root
+  map_environment("raw_adls", path="raw data")          # Drill into folder
+  map_environment("raw_adls", pattern="*.csv")          # Only CSV files (all folders)
+  map_environment("raw_adls", path="raw", pattern="sales_*")  # Scope + filter
+  map_environment("wwi", path="dbo")                    # SQL: only dbo schema
+  map_environment("wwi", pattern="fact_*")              # Only fact tables
+  map_environment("raw_adls", limit=2000)               # Increase limit
 
 NEXT ACTIONS (pick one):
-- Folder shows subfolders → map_environment(conn, "path/to/subfolder")
+- Folder shows subfolders → map_environment(conn, path="path/to/subfolder")
+- Hit limit → Narrow scope: map_environment(conn, path="folder", pattern="*.csv")
 - Found files → profile_source(conn, "path/to/file.csv")
 - Want to download → download_file(conn, "path/to/file", "./local.parquet")
 - SQL table → profile_source(conn, "Schema.TableName")
@@ -1162,7 +1172,17 @@ NEXT ACTIONS (pick one):
                     "path": {
                         "type": "string",
                         "default": "",
-                        "description": "Path to explore. '' for root. 'folder/subfolder' to drill deeper.",
+                        "description": "Path to explore. '' for root. For storage: 'folder/subfolder'. For SQL: schema name like 'dbo'.",
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Filter by glob pattern. Examples: '*.csv', 'fact_*', 'sales_*.parquet'. Works on file/table names.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 500,
+                        "description": "Max datasets to return. Increase if you hit the limit and need more results.",
                     },
                 },
                 "required": ["connection"],
