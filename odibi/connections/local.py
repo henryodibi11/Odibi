@@ -215,7 +215,11 @@ class LocalConnection(BaseConnection):
             return []
 
     def discover_catalog(
-        self, include_schema: bool = False, include_stats: bool = False, limit: int = 200
+        self,
+        include_schema: bool = False,
+        include_stats: bool = False,
+        limit: int = 200,
+        recursive: bool = True,
     ) -> Dict[str, Any]:
         """Discover datasets in local filesystem.
 
@@ -223,6 +227,7 @@ class LocalConnection(BaseConnection):
             include_schema: Sample files and infer schema
             include_stats: Include row counts and stats
             limit: Maximum datasets to return
+            recursive: Recursively scan all subfolders (default: True)
 
         Returns:
             CatalogSummary dict
@@ -249,7 +254,13 @@ class LocalConnection(BaseConnection):
             files = []
             formats = {}
 
-            for item in self.base_path.iterdir():
+            # Use rglob for recursive or iterdir for shallow
+            if recursive:
+                items_to_scan = list(self.base_path.rglob("*"))
+            else:
+                items_to_scan = list(self.base_path.iterdir())
+
+            for item in items_to_scan:
                 if len(folders) + len(files) >= limit:
                     break
 

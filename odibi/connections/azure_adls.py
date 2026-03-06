@@ -638,7 +638,11 @@ class AzureADLS(BaseConnection):
             return []
 
     def discover_catalog(
-        self, include_schema: bool = False, include_stats: bool = False, limit: int = 200
+        self,
+        include_schema: bool = False,
+        include_stats: bool = False,
+        limit: int = 200,
+        recursive: bool = True,
     ) -> Dict[str, Any]:
         """Discover datasets in ADLS container.
 
@@ -646,6 +650,7 @@ class AzureADLS(BaseConnection):
             include_schema: Sample files and infer schema
             include_stats: Include row counts and stats
             limit: Maximum datasets to return
+            recursive: Recursively scan all subfolders (default: True)
 
         Returns:
             CatalogSummary dict
@@ -667,7 +672,24 @@ class AzureADLS(BaseConnection):
             files = []
             formats = {}
 
-            for entry in fs.ls(base_path, detail=True):
+            # Use walk for recursive or ls for shallow
+            if recursive:
+                entries_to_scan = []
+                for root, dirs, file_names in fs.walk(base_path, maxdepth=None, detail=True):
+                    # Add directories
+                    for dir_name, dir_info in dirs.items():
+                        entries_to_scan.append(
+                            {"name": dir_info["name"], "type": "directory", **dir_info}
+                        )
+                    # Add files
+                    for file_name, file_info in file_names.items():
+                        entries_to_scan.append(
+                            {"name": file_info["name"], "type": "file", **file_info}
+                        )
+            else:
+                entries_to_scan = fs.ls(base_path, detail=True)
+
+            for entry in entries_to_scan:
                 if len(folders) + len(files) >= limit:
                     break
 

@@ -477,8 +477,10 @@ def map_environment(connection: str | dict, path: str = "") -> MapEnvironmentRes
         conn, conn_name = resolve_connection(connection)
         logger.info(f"map_environment: delegating to {conn_name}.discover_catalog()")
 
-        # Call core's discover_catalog with stats
-        catalog_dict = conn.discover_catalog(include_schema=True, include_stats=True, limit=200)
+        # Call core's discover_catalog with stats and recursive=True for deep scanning
+        catalog_dict = conn.discover_catalog(
+            include_schema=True, include_stats=True, limit=500, recursive=True
+        )
         catalog = CatalogSummary(**catalog_dict)
 
         # Transform core response to MCP contract

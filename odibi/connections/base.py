@@ -31,7 +31,11 @@ class BaseConnection(ABC):
     # ============ DISCOVERY API (Optional - Override in Subclasses) ============
 
     def discover_catalog(
-        self, include_schema: bool = False, include_stats: bool = False, limit: int = 200
+        self,
+        include_schema: bool = False,
+        include_stats: bool = False,
+        limit: int = 200,
+        recursive: bool = True,
     ) -> Dict[str, Any]:
         """Discover available datasets (tables/files) in this connection.
 
@@ -39,6 +43,7 @@ class BaseConnection(ABC):
             include_schema: Include column schemas
             include_stats: Include row counts and stats
             limit: Max datasets to return per namespace
+            recursive: Recursively scan all subfolders/schemas (default: True)
 
         Returns:
             CatalogSummary dict with datasets

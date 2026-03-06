@@ -28,10 +28,10 @@ connections:
     username: ${SQL_USER}
     password: ${SQL_PASSWORD}
 
-  # Local filesystem for testing
+  # Local filesystem for testing (uses sample cache with pre-loaded datasets)
   local:
     type: local
-    base_path: ./data
+    base_path: ./.odibi/source_cache
 
   # Projects data (for story/system access)
   projects_local:
