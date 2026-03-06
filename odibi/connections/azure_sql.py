@@ -819,6 +819,9 @@ class AzureSQL(BaseConnection):
         include_schema: bool = False,
         include_stats: bool = False,
         limit: Optional[int] = None,
+        recursive: bool = True,
+        path: str = "",
+        pattern: str = "",
     ) -> Dict:
         """Discover all datasets in the database.
 
@@ -826,6 +829,9 @@ class AzureSQL(BaseConnection):
             include_schema: If True, include column information for each table
             include_stats: If True, include row counts and stats
             limit: Maximum number of datasets per schema
+            recursive: Ignored for SQL (schemas are flat)
+            path: Scope to specific schema (e.g. "dbo", "sales")
+            pattern: Filter table names by pattern (e.g. "fact_*", "*_2024")
 
         Returns:
             CatalogSummary dict with schemas and tables
@@ -844,16 +850,38 @@ class AzureSQL(BaseConnection):
             limit=limit,
         )
 
-        schemas = self.list_schemas()
+        # Filter schemas if path is specified (path = schema name for SQL)
+        all_schemas = self.list_schemas()
+        if path:
+            schemas = [s for s in all_schemas if s == path]
+            if not schemas:
+                ctx.warning(f"Schema not found: {path}")
+                return CatalogSummary(
+                    connection_name=f"{self.server}/{self.database}",
+                    connection_type="azure_sql",
+                    schemas=[],
+                    tables=[],
+                    total_datasets=0,
+                    next_step=f"Schema '{path}' not found. Available: {', '.join(all_schemas)}",
+                ).model_dump()
+        else:
+            schemas = all_schemas
+
         all_tables = []
+        import fnmatch
+
+        has_pattern = bool(pattern)
 
         for schema in schemas:
             tables = self.list_tables(schema)
 
-            if limit:
-                tables = tables[:limit]
-
             for table_info in tables:
+                # Apply pattern filter to table name
+                if has_pattern and not fnmatch.fnmatch(table_info["name"], pattern):
+                    continue
+
+                if limit and len(all_tables) >= limit:
+                    break
                 dataset = DatasetRef(
                     name=table_info["name"],
                     namespace=table_info["schema"],
