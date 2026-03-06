@@ -1513,6 +1513,193 @@ Everything else (transformer info, validation types, enums) is already introspec
 
 ---
 
+## 19. Deep Validation Gaps — The `Dict[str, Any]` Problem
+
+This is the most critical section. The design's promise is "Pydantic validates everything." But there are two massive holes where Pydantic accepts **anything** and real validation only happens at runtime during pipeline execution. If the MCP tools don't fill these holes, agents will produce YAML that passes `validate_pipeline` but blows up when you run it.
+
+### 19.1 Gap: `NodeConfig.params` Is a Free Dict
+
+```python
+# odibi/config.py line 3601
+params: Dict[str, Any] = Field(default_factory=dict, description="Parameters for transformer")
+```
+
+When a node uses a pattern (e.g., `transformer: "scd2"`), the pattern-specific parameters go into `params` as a free dict. Pydantic will accept literally anything:
+
+```yaml
+# This passes Pydantic validation but will crash at runtime
+- name: my_scd2_node
+  transformer: scd2
+  params:
+    completely_wrong_key: "garbage"
+    # Missing required: keys, target
+```
+
+**Where real validation happens:** `SCD2Pattern.validate()` in `odibi/patterns/scd2.py` checks `if not self.params.get("keys")` — but this only runs during `PipelineManager.run()`, not during YAML validation.
+
+**Fix for MCP tools:** `apply_pattern_template` and `validate_pipeline` must **also** validate params against pattern requirements. Two approaches:
+
+**Approach A (with Section 18.1 metadata):** Use the `required_params` class attribute:
+```python
+from odibi.patterns import _PATTERNS
+
+def validate_pattern_params(pattern_name: str, params: dict) -> list[dict]:
+    errors = []
+    cls = _PATTERNS.get(pattern_name)
+    if not cls:
+        return [{"code": "UNKNOWN_PATTERN", "message": f"Unknown pattern: {pattern_name}"}]
+    for param_name, description in cls.required_params.items():
+        if param_name not in params:
+            errors.append({
+                "field_path": f"params.{param_name}",
+                "code": "PATTERN_REQUIRES",
+                "message": f"Pattern '{pattern_name}' requires '{param_name}': {description}",
+                "fix": f"Add '{param_name}' to params"
+            })
+    return errors
+```
+
+**Approach B (instantiate and call validate):** Construct a dummy Pattern instance and call `validate()`:
+```python
+def validate_pattern_params(pattern_name: str, params: dict, node_name: str) -> list[dict]:
+    from odibi.patterns import get_pattern_class
+    from odibi.config import NodeConfig
+
+    cls = get_pattern_class(pattern_name)
+    # Build minimal NodeConfig for validation
+    dummy_config = NodeConfig(name=node_name, transformer=pattern_name, params=params)
+    try:
+        instance = cls(engine=None, config=dummy_config)
+        instance.validate()
+        return []
+    except ValueError as e:
+        return [{"code": "PATTERN_VALIDATION_FAILED", "message": str(e)}]
+```
+
+**Recommendation:** Use **both**. Approach A for fast structured errors in `list_patterns`. Approach B as a belt-and-suspenders check in `apply_pattern_template` before rendering YAML.
+
+### 19.2 Gap: `TransformStep.params` Is a Free Dict
+
+```python
+# odibi/config.py line 1618
+params: Dict[str, Any] = Field(default_factory=dict, description="Parameters to pass to function or operation.")
+```
+
+Same problem. An agent can write:
+```yaml
+transform:
+  steps:
+    - function: deduplicate
+      params:
+        nonexistent_param: true
+        # Missing required: columns
+```
+
+Pydantic accepts it. The error only surfaces at runtime when `FunctionRegistry.validate_params()` is called.
+
+**Fix:** MCP tools must call `FunctionRegistry.validate_params(function_name, params)` during construction. This already exists and works:
+
+```python
+# In configure_transform or apply_pattern_template:
+for step in steps:
+    if step.get("function"):
+        fname = step["function"]
+        if not FunctionRegistry.has_function(fname):
+            errors.append({"code": "UNKNOWN_TRANSFORMER", "message": f"'{fname}' not registered"})
+        else:
+            try:
+                FunctionRegistry.validate_params(fname, step.get("params", {}))
+            except ValueError as e:
+                errors.append({
+                    "code": "INVALID_TRANSFORMER_PARAMS",
+                    "field_path": f"transform.steps[{i}].params",
+                    "message": str(e),
+                    "fix": f"Use list_transformers to see required params for '{fname}'"
+                })
+```
+
+### 19.3 Gap: Connection Name Validation Is Deferred
+
+The design has `check_connections` as an **opt-in flag** on `validate_pipeline`. But if an agent provides a connection name that doesn't exist, the pipeline will fail at runtime.
+
+**Fix:** Make it **always-on** when a project context is loaded. The MCP server already has `MCPProjectContext.connections` with all initialized connections:
+
+```python
+# In validate_pipeline, always check if context is available:
+ctx = get_project_context()
+if ctx:
+    for node in pipeline_nodes:
+        read_conn = node.get("read", {}).get("connection")
+        if read_conn and read_conn not in ctx.connections:
+            errors.append({
+                "code": "UNKNOWN_CONNECTION",
+                "field_path": f"nodes[{i}].read.connection",
+                "message": f"Connection '{read_conn}' not found",
+                "allowed_values": list(ctx.connections.keys()),
+                "fix": f"Use one of: {', '.join(ctx.connections.keys())}"
+            })
+```
+
+In `apply_pattern_template` and `configure_read`/`configure_write`, validate connection names eagerly (not deferred to render).
+
+### 19.4 Gap: `transformer` vs `transform.steps` Interaction
+
+`NodeConfig` has two separate transform mechanisms:
+- `transformer: str` + `params: Dict` — runs a single registered function (used by patterns like SCD2)
+- `transform.steps: List[TransformStep]` — runs a chain of fine-grained steps
+
+The docstring says: *"Runs after 'transformer' if both are present."* But agents won't know this. If an agent sets both, the behavior is implicit.
+
+**Fix:** MCP tools should:
+1. In `apply_pattern_template`: if a pattern sets `transformer`, and the user also provides `transforms`, set both and include a warning: "Pattern transformer runs first, then transform steps."
+2. In `configure_transform`: if the node already has a `transformer` set, warn the agent.
+
+### 19.5 Gap: `depends_on` Referencing Non-Existent Nodes
+
+In Phase 2's builder, if `add_node("B", depends_on=["A"])` is called but node "A" hasn't been added yet, the tool should either:
+- Error immediately ("Node 'A' not found in pipeline")
+- Or defer validation to `render_pipeline_yaml` (allows out-of-order construction)
+
+**Recommendation:** Defer to render, but validate the full DAG at render time:
+- All `depends_on` references resolve to existing nodes
+- No circular dependencies
+- Topological sort succeeds
+
+### 19.6 Gap: `ReadConfig.format` Accepts `Union[ReadFormat, str]`
+
+```python
+format: Union[ReadFormat, str] = Field(...)
+```
+
+This means Pydantic accepts **any string** as format, not just the enum values. An agent could pass `format: "xlsx"` or `format: "text"` and Pydantic wouldn't catch it.
+
+**Fix:** MCP tools should constrain to `ReadFormat` enum values only:
+```python
+"format": {
+    "type": "string",
+    "enum": _enum_values(ReadFormat),  # ["csv", "parquet", "delta", "json", "sql", "api"]
+}
+```
+
+Note: `ReadFormat` has `api` but NOT `excel` or `avro` — the doc was wrong about those. Tools must use the actual enum, not a guessed list.
+
+### 19.7 Summary of Validation Layers
+
+The MCP tools must implement **three layers of validation**, because Pydantic alone is not enough:
+
+| Layer | What It Catches | Who Does It Today | MCP Tool Must Do It? |
+|-------|----------------|-------------------|---------------------|
+| **Pydantic schema** | Wrong types, missing required fields, unknown keys | `config.py` models | ✅ Yes (round-trip validation) |
+| **Pattern params** | Missing `keys`, `target`, `natural_key`, etc. | `Pattern.validate()` at runtime | ✅ **YES — new** |
+| **Transformer params** | Missing/wrong params for registered functions | `FunctionRegistry.validate_params()` at runtime | ✅ **YES — new** |
+| **Connection existence** | Connection name not in project | `PipelineManager` at runtime | ✅ **YES — new** |
+| **DAG integrity** | Circular deps, missing node references | `PipelineManager` at runtime | ✅ **YES — new** (Phase 2) |
+| **Format enum** | Invalid format strings like "xlsx" | `ReadFormat` enum (but config accepts `str` fallback) | ✅ **YES — constrain in MCP schema** |
+
+**Bottom line:** Pydantic validation is necessary but not sufficient. The MCP tools must replicate the runtime validation checks that currently only happen inside `PipelineManager.run()`. Without this, agents produce YAML that "validates" but crashes.
+
+---
+
 ## Appendix A: Full MCP Tool Registry (Target State)
 
 ### Phase 1 Tools (New)
@@ -1586,7 +1773,7 @@ These are the enum values that MCP input schemas must constrain:
 | `DeleteDetectionMode` | `none`, `snapshot_diff`, `sql_compare` |
 | `AlertType` | `webhook`, `slack`, `teams`, `teams_workflow` |
 | `ErrorStrategy` | `fail_fast`, `fail_later` |
-| Read/Write `format` | `csv`, `parquet`, `json`, `delta`, `sql`, `excel`, `avro` |
+| Read/Write `format` | **Introspect from `ReadFormat` enum** — currently: `csv`, `parquet`, `delta`, `json`, `sql`, `api` (NOT `excel`/`avro` — those are NOT in the enum) |
 | Pipeline `layer` | `bronze`, `silver`, `gold` |
 | Pipeline `pattern` | `dimension`, `fact`, `scd2`, `merge`, `aggregation`, `date_dimension` |
 | Validation `type` | **Introspect from `get_args(TestConfig)`** — currently: `not_null`, `unique`, `accepted_values`, `row_count`, `custom_sql`, `range`, `regex_match`, `volume_drop`, `schema_contract`, `distribution_contract`, `freshness_contract` |
