@@ -1,0 +1,31 @@
+﻿2026-03-06T19:41:29.9681166Z ##[group]Run actions/setup-python@v5
+2026-03-06T19:41:29.9681534Z with:
+2026-03-06T19:41:29.9682146Z   python-version: 3.11
+2026-03-06T19:41:29.9682401Z   cache: pip
+2026-03-06T19:41:29.9682652Z   cache-dependency-path: pyproject.toml
+2026-03-06T19:41:29.9682955Z   check-latest: false
+2026-03-06T19:41:29.9683349Z   token: ***
+2026-03-06T19:41:29.9683575Z   update-environment: true
+2026-03-06T19:41:29.9684114Z   allow-prereleases: false
+2026-03-06T19:41:29.9684377Z   freethreaded: false
+2026-03-06T19:41:29.9684608Z ##[endgroup]
+2026-03-06T19:41:30.1492506Z ##[group]Installed versions
+2026-03-06T19:41:30.1978108Z Successfully set up CPython (3.11.14)
+2026-03-06T19:41:30.1979180Z ##[endgroup]
+2026-03-06T19:41:30.2453218Z [command]/opt/hostedtoolcache/Python/3.11.14/x64/bin/pip cache dir
+2026-03-06T19:41:31.9462645Z /home/runner/.cache/pip
+2026-03-06T19:41:32.1774761Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.14-pip-d63cb290ee9ae1e66180652a066a8e45b06a7b6e11c1c2bfc70d6e0fee577bfa
+2026-03-06T19:41:33.3467074Z Received 113246208 of 1411889705 (8.0%), 108.0 MBs/sec
+2026-03-06T19:41:34.3996768Z Received 268435456 of 1411889705 (19.0%), 124.6 MBs/sec
+2026-03-06T19:41:35.4029755Z Received 402653184 of 1411889705 (28.5%), 125.6 MBs/sec
+2026-03-06T19:41:36.4063609Z Received 603979776 of 1411889705 (42.8%), 141.8 MBs/sec
+2026-03-06T19:41:37.4068171Z Received 788529152 of 1411889705 (55.8%), 148.6 MBs/sec
+2026-03-06T19:41:38.4405993Z Received 939524096 of 1411889705 (66.5%), 147.0 MBs/sec
+2026-03-06T19:41:39.4446479Z Received 1073741824 of 1411889705 (76.0%), 144.2 MBs/sec
+2026-03-06T19:41:40.4456551Z Received 1241513984 of 1411889705 (87.9%), 146.2 MBs/sec
+2026-03-06T19:41:41.4474889Z Received 1388314624 of 1411889705 (98.3%), 145.5 MBs/sec
+2026-03-06T19:41:41.5563470Z Received 1411889705 of 1411889705 (100.0%), 146.2 MBs/sec
+2026-03-06T19:41:41.5566939Z Cache Size: ~1346 MB (1411889705 B)
+2026-03-06T19:41:41.5687590Z [command]/usr/bin/tar -xf /home/runner/work/_temp/c42635b0-61c2-4cb2-b42c-f7fcb7cf9775/cache.tzst -P -C /home/runner/work/Odibi/Odibi --use-compress-program unzstd
+2026-03-06T19:41:43.9032814Z Cache restored successfully
+2026-03-06T19:41:44.1866575Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.14-pip-d63cb290ee9ae1e66180652a066a8e45b06a7b6e11c1c2bfc70d6e0fee577bfa

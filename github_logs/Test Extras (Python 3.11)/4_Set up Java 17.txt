@@ -1,0 +1,34 @@
+﻿2026-03-06T19:41:44.2198417Z ##[group]Run actions/setup-java@v4
+2026-03-06T19:41:44.2198897Z with:
+2026-03-06T19:41:44.2199222Z   distribution: temurin
+2026-03-06T19:41:44.2199598Z   java-version: 17
+2026-03-06T19:41:44.2199928Z   java-package: jdk
+2026-03-06T19:41:44.2200253Z   check-latest: false
+2026-03-06T19:41:44.2200587Z   server-id: github
+2026-03-06T19:41:44.2200926Z   server-username: GITHUB_ACTOR
+2026-03-06T19:41:44.2201332Z   server-password: GITHUB_TOKEN
+2026-03-06T19:41:44.2201927Z   overwrite-settings: true
+2026-03-06T19:41:44.2202310Z   job-status: success
+2026-03-06T19:41:44.2202819Z   token: ***
+2026-03-06T19:41:44.2203114Z env:
+2026-03-06T19:41:44.2203526Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:41:44.2204288Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.14/x64/lib/pkgconfig
+2026-03-06T19:41:44.2204989Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:41:44.2205611Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:41:44.2206193Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:41:44.2206830Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.14/x64/lib
+2026-03-06T19:41:44.2207366Z ##[endgroup]
+2026-03-06T19:41:44.4396910Z ##[group]Installed distributions
+2026-03-06T19:41:44.8151745Z Resolved Java 17.0.18+8 from tool-cache
+2026-03-06T19:41:44.8155048Z Setting Java 17.0.18+8 as the default
+2026-03-06T19:41:44.8167727Z Creating toolchains.xml for JDK version 17 from temurin
+2026-03-06T19:41:44.8247514Z Writing to /home/runner/.m2/toolchains.xml
+2026-03-06T19:41:44.8252048Z 
+2026-03-06T19:41:44.8252432Z Java configuration:
+2026-03-06T19:41:44.8252842Z   Distribution: temurin
+2026-03-06T19:41:44.8253241Z   Version: 17.0.18+8
+2026-03-06T19:41:44.8253791Z   Path: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-03-06T19:41:44.8254296Z 
+2026-03-06T19:41:44.8254748Z ##[endgroup]
+2026-03-06T19:41:44.8267676Z Creating settings.xml with server-id: github
+2026-03-06T19:41:44.8281364Z Writing to /home/runner/.m2/settings.xml

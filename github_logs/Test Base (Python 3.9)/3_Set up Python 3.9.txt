@@ -1,0 +1,58 @@
+﻿2026-03-06T19:41:28.5417488Z ##[group]Run actions/setup-python@v5
+2026-03-06T19:41:28.5418703Z with:
+2026-03-06T19:41:28.5419529Z   python-version: 3.9
+2026-03-06T19:41:28.5420447Z   cache: pip
+2026-03-06T19:41:28.5421390Z   cache-dependency-path: pyproject.toml
+2026-03-06T19:41:28.5422613Z   check-latest: false
+2026-03-06T19:41:28.5423803Z   token: ***
+2026-03-06T19:41:28.5424849Z   update-environment: true
+2026-03-06T19:41:28.5426173Z   allow-prereleases: false
+2026-03-06T19:41:28.5427216Z   freethreaded: false
+2026-03-06T19:41:28.5428144Z ##[endgroup]
+2026-03-06T19:41:28.7236256Z ##[group]Installed versions
+2026-03-06T19:41:28.7310881Z Version 3.9 was not found in the local cache
+2026-03-06T19:41:29.4384686Z Version 3.9 is available for downloading
+2026-03-06T19:41:29.4387287Z Download from "https://github.com/actions/python-versions/releases/download/3.9.25-19039189640/python-3.9.25-linux-24.04-x64.tar.gz"
+2026-03-06T19:41:30.1755635Z Extract downloaded archive
+2026-03-06T19:41:30.1858244Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/a7b4d78b-ff4a-4268-90e4-324188b41281 -f /home/runner/work/_temp/d8b5c5b9-ac7a-494f-ae68-14aafe54ad2c
+2026-03-06T19:41:31.5736318Z Execute installation script
+2026-03-06T19:41:31.5829668Z Check if Python hostedtoolcache folder exist...
+2026-03-06T19:41:31.5830301Z Create Python 3.9.25 folder
+2026-03-06T19:41:31.5844222Z Copy Python binaries to hostedtoolcache folder
+2026-03-06T19:41:32.1079081Z Create additional symlinks (Required for the UsePythonVersion Azure Pipelines task and the setup-python GitHub Action)
+2026-03-06T19:41:32.1125198Z Upgrading pip...
+2026-03-06T19:41:34.6058593Z Looking in links: /tmp/tmp_okf51br
+2026-03-06T19:41:34.6062609Z Requirement already satisfied: setuptools in /opt/hostedtoolcache/Python/3.9.25/x64/lib/python3.9/site-packages (79.0.1)
+2026-03-06T19:41:34.6067707Z Requirement already satisfied: pip in /opt/hostedtoolcache/Python/3.9.25/x64/lib/python3.9/site-packages (23.0.1)
+2026-03-06T19:41:35.8356042Z Collecting pip
+2026-03-06T19:41:35.8905083Z Downloading pip-26.0.1-py3-none-any.whl (1.8 MB)
+2026-03-06T19:41:35.9484942Z ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.8/1.8 MB 32.5 MB/s eta 0:00:00
+2026-03-06T19:41:35.9485527Z 
+2026-03-06T19:41:36.0093014Z Installing collected packages: pip
+2026-03-06T19:41:36.0104661Z Attempting uninstall: pip
+2026-03-06T19:41:36.0105166Z Found existing installation: pip 23.0.1
+2026-03-06T19:41:36.1991999Z Uninstalling pip-23.0.1:
+2026-03-06T19:41:36.2066600Z Successfully uninstalled pip-23.0.1
+2026-03-06T19:41:37.0244694Z Successfully installed pip-26.0.1
+2026-03-06T19:41:37.0777877Z Create complete file
+2026-03-06T19:41:37.0820521Z Successfully set up CPython (3.9.25)
+2026-03-06T19:41:37.0821384Z ##[endgroup]
+2026-03-06T19:41:37.1027466Z [command]/opt/hostedtoolcache/Python/3.9.25/x64/bin/pip cache dir
+2026-03-06T19:41:37.2700502Z /home/runner/.cache/pip
+2026-03-06T19:41:37.4514870Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.9.25-pip-d63cb290ee9ae1e66180652a066a8e45b06a7b6e11c1c2bfc70d6e0fee577bfa
+2026-03-06T19:41:38.6139589Z Received 96468992 of 2040262069 (4.7%), 91.9 MBs/sec
+2026-03-06T19:41:39.6143876Z Received 264241152 of 2040262069 (13.0%), 125.9 MBs/sec
+2026-03-06T19:41:40.6178512Z Received 402653184 of 2040262069 (19.7%), 127.8 MBs/sec
+2026-03-06T19:41:41.6183109Z Received 595591168 of 2040262069 (29.2%), 141.8 MBs/sec
+2026-03-06T19:41:42.6181065Z Received 788529152 of 2040262069 (38.6%), 150.2 MBs/sec
+2026-03-06T19:41:43.6181497Z Received 947912704 of 2040262069 (46.5%), 150.5 MBs/sec
+2026-03-06T19:41:44.6188418Z Received 1161822208 of 2040262069 (56.9%), 158.2 MBs/sec
+2026-03-06T19:41:45.6196757Z Received 1342177280 of 2040262069 (65.8%), 159.9 MBs/sec
+2026-03-06T19:41:46.6206702Z Received 1530920960 of 2040262069 (75.0%), 162.1 MBs/sec
+2026-03-06T19:41:47.6218694Z Received 1719664640 of 2040262069 (84.3%), 163.9 MBs/sec
+2026-03-06T19:41:48.6227564Z Received 1887436800 of 2040262069 (92.5%), 163.5 MBs/sec
+2026-03-06T19:41:49.5186237Z Received 2040262069 of 2040262069 (100.0%), 163.4 MBs/sec
+2026-03-06T19:41:49.5188046Z Cache Size: ~1946 MB (2040262069 B)
+2026-03-06T19:41:49.5307172Z [command]/usr/bin/tar -xf /home/runner/work/_temp/13a3133e-c215-445e-8725-fe34630cf788/cache.tzst -P -C /home/runner/work/Odibi/Odibi --use-compress-program unzstd
+2026-03-06T19:41:52.6378400Z Cache restored successfully
+2026-03-06T19:41:53.0099720Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.9.25-pip-d63cb290ee9ae1e66180652a066a8e45b06a7b6e11c1c2bfc70d6e0fee577bfa

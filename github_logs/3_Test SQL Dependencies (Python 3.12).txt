@@ -1,0 +1,722 @@
+﻿2026-03-06T19:41:25.7796011Z Current runner version: '2.332.0'
+2026-03-06T19:41:25.7822618Z ##[group]Runner Image Provisioner
+2026-03-06T19:41:25.7823463Z Hosted Compute Agent
+2026-03-06T19:41:25.7824132Z Version: 20260213.493
+2026-03-06T19:41:25.7824718Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-03-06T19:41:25.7825497Z Build Date: 2026-02-13T00:28:41Z
+2026-03-06T19:41:25.7826218Z Worker ID: {e0f0f722-9fcf-4abe-a1f8-7873faf4375b}
+2026-03-06T19:41:25.7826882Z Azure Region: eastus2
+2026-03-06T19:41:25.7827504Z ##[endgroup]
+2026-03-06T19:41:25.7828963Z ##[group]Operating System
+2026-03-06T19:41:25.7829596Z Ubuntu
+2026-03-06T19:41:25.7830225Z 24.04.3
+2026-03-06T19:41:25.7830858Z LTS
+2026-03-06T19:41:25.7831303Z ##[endgroup]
+2026-03-06T19:41:25.7831815Z ##[group]Runner Image
+2026-03-06T19:41:25.7832514Z Image: ubuntu-24.04
+2026-03-06T19:41:25.7833034Z Version: 20260302.42.1
+2026-03-06T19:41:25.7834349Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260302.42/images/ubuntu/Ubuntu2404-Readme.md
+2026-03-06T19:41:25.7835737Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260302.42
+2026-03-06T19:41:25.7836638Z ##[endgroup]
+2026-03-06T19:41:25.7837872Z ##[group]GITHUB_TOKEN Permissions
+2026-03-06T19:41:25.7840294Z Contents: read
+2026-03-06T19:41:25.7841077Z Metadata: read
+2026-03-06T19:41:25.7841579Z Packages: read
+2026-03-06T19:41:25.7842116Z ##[endgroup]
+2026-03-06T19:41:25.7845274Z Secret source: Actions
+2026-03-06T19:41:25.7846723Z Prepare workflow directory
+2026-03-06T19:41:25.8288496Z Prepare all required actions
+2026-03-06T19:41:25.8343094Z Getting action download info
+2026-03-06T19:41:26.1233879Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-03-06T19:41:26.2543525Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-03-06T19:41:26.4842648Z Complete job name: Test SQL Dependencies (Python 3.12)
+2026-03-06T19:41:26.5478793Z ##[group]Run actions/checkout@v4
+2026-03-06T19:41:26.5479601Z with:
+2026-03-06T19:41:26.5480172Z   repository: henryodibi11/Odibi
+2026-03-06T19:41:26.5480826Z   token: ***
+2026-03-06T19:41:26.5481218Z   ssh-strict: true
+2026-03-06T19:41:26.5481713Z   ssh-user: git
+2026-03-06T19:41:26.5482110Z   persist-credentials: true
+2026-03-06T19:41:26.5482545Z   clean: true
+2026-03-06T19:41:26.5482946Z   sparse-checkout-cone-mode: true
+2026-03-06T19:41:26.5483409Z   fetch-depth: 1
+2026-03-06T19:41:26.5483793Z   fetch-tags: false
+2026-03-06T19:41:26.5484180Z   show-progress: true
+2026-03-06T19:41:26.5484565Z   lfs: false
+2026-03-06T19:41:26.5484909Z   submodules: false
+2026-03-06T19:41:26.5485302Z   set-safe-directory: true
+2026-03-06T19:41:26.5486144Z ##[endgroup]
+2026-03-06T19:41:26.6583615Z Syncing repository: henryodibi11/Odibi
+2026-03-06T19:41:26.6585301Z ##[group]Getting Git version info
+2026-03-06T19:41:26.6585923Z Working directory is '/home/runner/work/Odibi/Odibi'
+2026-03-06T19:41:26.6586890Z [command]/usr/bin/git version
+2026-03-06T19:41:26.6653139Z git version 2.53.0
+2026-03-06T19:41:26.6677553Z ##[endgroup]
+2026-03-06T19:41:26.6692290Z Temporarily overriding HOME='/home/runner/work/_temp/abc1b2c3-9e55-43b8-bc85-a48214b734c8' before making global git config changes
+2026-03-06T19:41:26.6693742Z Adding repository directory to the temporary git global config as a safe directory
+2026-03-06T19:41:26.6705521Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Odibi/Odibi
+2026-03-06T19:41:26.6746833Z Deleting the contents of '/home/runner/work/Odibi/Odibi'
+2026-03-06T19:41:26.6750831Z ##[group]Initializing the repository
+2026-03-06T19:41:26.6754942Z [command]/usr/bin/git init /home/runner/work/Odibi/Odibi
+2026-03-06T19:41:26.6855288Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-03-06T19:41:26.6856524Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-03-06T19:41:26.6857429Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-03-06T19:41:26.6858440Z hint: call:
+2026-03-06T19:41:26.6858966Z hint:
+2026-03-06T19:41:26.6859919Z hint: 	git config --global init.defaultBranch <name>
+2026-03-06T19:41:26.6860803Z hint:
+2026-03-06T19:41:26.6861330Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-03-06T19:41:26.6862167Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-03-06T19:41:26.6862835Z hint:
+2026-03-06T19:41:26.6863189Z hint: 	git branch -m <name>
+2026-03-06T19:41:26.6863606Z hint:
+2026-03-06T19:41:26.6864153Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-03-06T19:41:26.6865272Z Initialized empty Git repository in /home/runner/work/Odibi/Odibi/.git/
+2026-03-06T19:41:26.6871182Z [command]/usr/bin/git remote add origin https://github.com/henryodibi11/Odibi
+2026-03-06T19:41:26.6907063Z ##[endgroup]
+2026-03-06T19:41:26.6907764Z ##[group]Disabling automatic garbage collection
+2026-03-06T19:41:26.6911777Z [command]/usr/bin/git config --local gc.auto 0
+2026-03-06T19:41:26.6944227Z ##[endgroup]
+2026-03-06T19:41:26.6945290Z ##[group]Setting up auth
+2026-03-06T19:41:26.6952110Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-03-06T19:41:26.6985397Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-03-06T19:41:26.7336212Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-03-06T19:41:26.7371160Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-03-06T19:41:26.7634911Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-03-06T19:41:26.7671062Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-03-06T19:41:26.7957935Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-03-06T19:41:26.7997618Z ##[endgroup]
+2026-03-06T19:41:26.8000285Z ##[group]Fetching the repository
+2026-03-06T19:41:26.8006773Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +fd91bb7693770cc957ca1c44eda9857893fffd38:refs/remotes/origin/main
+2026-03-06T19:41:27.4539542Z From https://github.com/henryodibi11/Odibi
+2026-03-06T19:41:27.4541439Z  * [new ref]         fd91bb7693770cc957ca1c44eda9857893fffd38 -> origin/main
+2026-03-06T19:41:27.4576977Z ##[endgroup]
+2026-03-06T19:41:27.4578011Z ##[group]Determining the checkout info
+2026-03-06T19:41:27.4582001Z ##[endgroup]
+2026-03-06T19:41:27.4585884Z [command]/usr/bin/git sparse-checkout disable
+2026-03-06T19:41:27.4633267Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-03-06T19:41:27.4664931Z ##[group]Checking out the ref
+2026-03-06T19:41:27.4669949Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-03-06T19:41:27.5443817Z Switched to a new branch 'main'
+2026-03-06T19:41:27.5445683Z branch 'main' set up to track 'origin/main'.
+2026-03-06T19:41:27.5493580Z ##[endgroup]
+2026-03-06T19:41:27.5497041Z [command]/usr/bin/git log -1 --format=%H
+2026-03-06T19:41:27.5521942Z fd91bb7693770cc957ca1c44eda9857893fffd38
+2026-03-06T19:41:27.5838144Z ##[group]Run actions/setup-python@v5
+2026-03-06T19:41:27.5839235Z with:
+2026-03-06T19:41:27.5840200Z   python-version: 3.12
+2026-03-06T19:41:27.5841105Z   cache: pip
+2026-03-06T19:41:27.5842008Z   cache-dependency-path: pyproject.toml
+2026-03-06T19:41:27.5843133Z   check-latest: false
+2026-03-06T19:41:27.5844298Z   token: ***
+2026-03-06T19:41:27.5845148Z   update-environment: true
+2026-03-06T19:41:27.5846140Z   allow-prereleases: false
+2026-03-06T19:41:27.5847109Z   freethreaded: false
+2026-03-06T19:41:27.5848005Z ##[endgroup]
+2026-03-06T19:41:27.7697360Z ##[group]Installed versions
+2026-03-06T19:41:27.8137030Z Successfully set up CPython (3.12.12)
+2026-03-06T19:41:27.8138649Z ##[endgroup]
+2026-03-06T19:41:27.8777241Z [command]/opt/hostedtoolcache/Python/3.12.12/x64/bin/pip cache dir
+2026-03-06T19:41:29.7623614Z /home/runner/.cache/pip
+2026-03-06T19:41:29.8749726Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.12.12-pip-d63cb290ee9ae1e66180652a066a8e45b06a7b6e11c1c2bfc70d6e0fee577bfa
+2026-03-06T19:41:30.9309485Z Received 222298112 of 3455107441 (6.4%), 212.0 MBs/sec
+2026-03-06T19:41:31.9314048Z Received 469762048 of 3455107441 (13.6%), 223.9 MBs/sec
+2026-03-06T19:41:32.9347353Z Received 704643072 of 3455107441 (20.4%), 223.7 MBs/sec
+2026-03-06T19:41:33.9463652Z Received 973078528 of 3455107441 (28.2%), 231.1 MBs/sec
+2026-03-06T19:41:34.9486638Z Received 1212153856 of 3455107441 (35.1%), 230.4 MBs/sec
+2026-03-06T19:41:35.9492367Z Received 1476395008 of 3455107441 (42.7%), 234.0 MBs/sec
+2026-03-06T19:41:36.9562294Z Received 1719664640 of 3455107441 (49.8%), 233.5 MBs/sec
+2026-03-06T19:41:37.9581382Z Received 1967128576 of 3455107441 (56.9%), 233.8 MBs/sec
+2026-03-06T19:41:38.9563551Z Received 2185232384 of 3455107441 (63.2%), 230.9 MBs/sec
+2026-03-06T19:41:40.0175536Z Received 2415919104 of 3455107441 (69.9%), 228.4 MBs/sec
+2026-03-06T19:41:41.0175076Z Received 2680160256 of 3455107441 (77.6%), 230.5 MBs/sec
+2026-03-06T19:41:42.0182864Z Received 2931818496 of 3455107441 (84.9%), 231.3 MBs/sec
+2026-03-06T19:41:43.0197482Z Received 3137339392 of 3455107441 (90.8%), 228.6 MBs/sec
+2026-03-06T19:41:44.0290525Z Received 3355443200 of 3455107441 (97.1%), 227.0 MBs/sec
+2026-03-06T19:41:44.4541929Z Received 3455107441 of 3455107441 (100.0%), 226.9 MBs/sec
+2026-03-06T19:41:44.4544145Z Cache Size: ~3295 MB (3455107441 B)
+2026-03-06T19:41:44.4709947Z [command]/usr/bin/tar -xf /home/runner/work/_temp/ee5f1feb-226a-469c-b125-22b33e236050/cache.tzst -P -C /home/runner/work/Odibi/Odibi --use-compress-program unzstd
+2026-03-06T19:41:51.0967924Z Cache restored successfully
+2026-03-06T19:41:51.7408629Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.12.12-pip-d63cb290ee9ae1e66180652a066a8e45b06a7b6e11c1c2bfc70d6e0fee577bfa
+2026-03-06T19:41:51.7624773Z ##[group]Run python -m pip install --upgrade pip
+2026-03-06T19:41:51.7625286Z [36;1mpython -m pip install --upgrade pip[0m
+2026-03-06T19:41:51.7625612Z [36;1mpip install -e .[sql,dev][0m
+2026-03-06T19:41:51.7688745Z shell: /usr/bin/bash -e {0}
+2026-03-06T19:41:51.7689024Z env:
+2026-03-06T19:41:51.7689311Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:41:51.7689770Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.12/x64/lib/pkgconfig
+2026-03-06T19:41:51.7690500Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:41:51.7690867Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:41:51.7691248Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:41:51.7691666Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.12/x64/lib
+2026-03-06T19:41:51.7692011Z ##[endgroup]
+2026-03-06T19:41:54.0110766Z Requirement already satisfied: pip in /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages (26.0.1)
+2026-03-06T19:41:54.9834600Z Obtaining file:///home/runner/work/Odibi/Odibi
+2026-03-06T19:41:54.9859949Z   Installing build dependencies: started
+2026-03-06T19:41:56.1961625Z   Installing build dependencies: finished with status 'done'
+2026-03-06T19:41:56.1967899Z   Checking if build backend supports build_editable: started
+2026-03-06T19:41:56.5825066Z   Checking if build backend supports build_editable: finished with status 'done'
+2026-03-06T19:41:56.5833971Z   Getting requirements to build editable: started
+2026-03-06T19:41:56.9639301Z   Getting requirements to build editable: finished with status 'done'
+2026-03-06T19:41:56.9648292Z   Preparing editable metadata (pyproject.toml): started
+2026-03-06T19:41:57.1868555Z   Preparing editable metadata (pyproject.toml): finished with status 'done'
+2026-03-06T19:41:57.3555026Z Collecting pydantic<3.0.0,>=2.0.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.3569966Z   Using cached pydantic-2.12.5-py3-none-any.whl.metadata (90 kB)
+2026-03-06T19:41:57.4069300Z Collecting pyyaml<7.0,>=6.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.4083780Z   Using cached pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+2026-03-06T19:41:57.5025617Z Collecting pandas<2.2.0,>=2.0.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.5040558Z   Using cached pandas-2.1.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (18 kB)
+2026-03-06T19:41:57.6749820Z Collecting numpy<2.0.0,>=1.24.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.6763846Z   Using cached numpy-1.26.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (61 kB)
+2026-03-06T19:41:57.7366647Z Collecting bottleneck<2.0.0,>=1.3.6 (from odibi==2.18.0)
+2026-03-06T19:41:57.7381099Z   Using cached bottleneck-1.6.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (8.2 kB)
+2026-03-06T19:41:57.7541882Z Collecting python-dotenv<2.0.0,>=1.0.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.7553974Z   Using cached python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)
+2026-03-06T19:41:57.7721386Z Collecting markdown2<3.0.0,>=2.4.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.7732778Z   Using cached markdown2-2.5.5-py3-none-any.whl.metadata (2.1 kB)
+2026-03-06T19:41:57.7884203Z Collecting Jinja2<4.0.0,>=3.1.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.7895729Z   Using cached jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+2026-03-06T19:41:57.8045110Z Collecting portalocker<3.0.0,>=2.7.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.8126317Z   Using cached portalocker-2.10.1-py3-none-any.whl.metadata (8.5 kB)
+2026-03-06T19:41:57.8967158Z Collecting pyarrow<17.0.0,>=14.0.0 (from odibi==2.18.0)
+2026-03-06T19:41:57.8980818Z   Using cached pyarrow-16.1.0-cp312-cp312-manylinux_2_28_x86_64.whl.metadata (3.0 kB)
+2026-03-06T19:41:58.4086144Z Collecting fastapi<1.0.0,>=0.100.0 (from odibi==2.18.0)
+2026-03-06T19:41:58.4099487Z   Using cached fastapi-0.135.1-py3-none-any.whl.metadata (30 kB)
+2026-03-06T19:41:58.6453439Z Collecting uvicorn<1.0.0,>=0.20.0 (from odibi==2.18.0)
+2026-03-06T19:41:58.6466042Z   Using cached uvicorn-0.41.0-py3-none-any.whl.metadata (6.7 kB)
+2026-03-06T19:41:58.8151492Z Collecting deltalake<0.30.0,>=0.18.0 (from odibi==2.18.0)
+2026-03-06T19:41:58.8166678Z   Using cached deltalake-0.25.5-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.5 kB)
+2026-03-06T19:41:58.8475213Z Collecting rich<14.0.0,>=13.0.0 (from odibi==2.18.0)
+2026-03-06T19:41:58.8487152Z   Using cached rich-13.9.4-py3-none-any.whl.metadata (18 kB)
+2026-03-06T19:41:58.8706272Z Collecting requests<3.0.0,>=2.28.0 (from odibi==2.18.0)
+2026-03-06T19:41:58.8718488Z   Using cached requests-2.32.5-py3-none-any.whl.metadata (4.9 kB)
+2026-03-06T19:41:58.9244713Z Collecting importlib_metadata>=4.0.0 (from odibi==2.18.0)
+2026-03-06T19:41:58.9258189Z   Using cached importlib_metadata-8.7.1-py3-none-any.whl.metadata (4.7 kB)
+2026-03-06T19:41:59.1893451Z Collecting duckdb<1.1.0,>=0.9.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.1907745Z   Using cached duckdb-1.0.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (762 bytes)
+2026-03-06T19:41:59.2076790Z Collecting openpyxl<4.0.0,>=3.1.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.2089210Z   Using cached openpyxl-3.1.5-py2.py3-none-any.whl.metadata (2.5 kB)
+2026-03-06T19:41:59.2300546Z Collecting fastexcel>=0.9.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.2312917Z   Using cached fastexcel-0.19.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (7.2 kB)
+2026-03-06T19:41:59.2508195Z Collecting fsspec>=2023.1.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.2520704Z   Using cached fsspec-2026.2.0-py3-none-any.whl.metadata (10 kB)
+2026-03-06T19:41:59.2867400Z Collecting pint<1.0.0,>=0.23 (from odibi==2.18.0)
+2026-03-06T19:41:59.2879701Z   Using cached pint-0.25.2-py3-none-any.whl.metadata (10 kB)
+2026-03-06T19:41:59.3373050Z Collecting pyodbc>=5.0.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.3386768Z   Using cached pyodbc-5.3.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-03-06T19:41:59.6020311Z Collecting sqlalchemy>=2.0.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.6035011Z   Using cached sqlalchemy-2.0.48-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (9.5 kB)
+2026-03-06T19:41:59.6344256Z Collecting pytest>=7.4.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.6357807Z   Using cached pytest-9.0.2-py3-none-any.whl.metadata (7.6 kB)
+2026-03-06T19:41:59.6518995Z Collecting pytest-cov>=4.1.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.6531853Z   Using cached pytest_cov-7.0.0-py3-none-any.whl.metadata (31 kB)
+2026-03-06T19:41:59.7016618Z Collecting black==25.11.0 (from odibi==2.18.0)
+2026-03-06T19:41:59.7031228Z   Using cached black-25.11.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (85 kB)
+2026-03-06T19:42:00.0173151Z Collecting ruff>=0.1.0 (from odibi==2.18.0)
+2026-03-06T19:42:00.0832706Z   Downloading ruff-0.15.5-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (26 kB)
+2026-03-06T19:42:00.1741188Z Collecting mypy>=1.5.0 (from odibi==2.18.0)
+2026-03-06T19:42:00.1755465Z   Using cached mypy-1.19.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.2 kB)
+2026-03-06T19:42:00.2028307Z Collecting pre-commit>=3.4.0 (from odibi==2.18.0)
+2026-03-06T19:42:00.2040696Z   Using cached pre_commit-4.5.1-py2.py3-none-any.whl.metadata (1.2 kB)
+2026-03-06T19:42:00.2191411Z Collecting pyspark>=3.4.0 (from odibi==2.18.0)
+2026-03-06T19:42:00.2192667Z   Using cached pyspark-4.1.1-py2.py3-none-any.whl
+2026-03-06T19:42:00.2437708Z Collecting delta-spark>=2.3.0 (from odibi==2.18.0)
+2026-03-06T19:42:00.2449929Z   Using cached delta_spark-4.1.0-py3-none-any.whl.metadata (1.9 kB)
+2026-03-06T19:42:00.2651093Z Collecting azure-identity>=1.14.0 (from odibi==2.18.0)
+2026-03-06T19:42:00.2663483Z   Using cached azure_identity-1.25.2-py3-none-any.whl.metadata (90 kB)
+2026-03-06T19:42:00.2844139Z Collecting azure-keyvault-secrets>=4.7.0 (from odibi==2.18.0)
+2026-03-06T19:42:00.2855995Z   Using cached azure_keyvault_secrets-4.10.0-py3-none-any.whl.metadata (18 kB)
+2026-03-06T19:42:00.3023886Z Collecting pandasql>=0.7.3 (from odibi==2.18.0)
+2026-03-06T19:42:00.3025028Z   Using cached pandasql-0.7.3-py3-none-any.whl
+2026-03-06T19:42:00.4187110Z Collecting mkdocs-material>=9.0.0 (from odibi==2.18.0)
+2026-03-06T19:42:00.4201794Z   Using cached mkdocs_material-9.7.4-py3-none-any.whl.metadata (19 kB)
+2026-03-06T19:42:00.4419083Z Collecting mkdocstrings>=0.20.0 (from mkdocstrings[python]>=0.20.0; extra == "dev"->odibi==2.18.0)
+2026-03-06T19:42:00.4431816Z   Using cached mkdocstrings-1.0.3-py3-none-any.whl.metadata (15 kB)
+2026-03-06T19:42:00.4618680Z Collecting click>=8.0.0 (from black==25.11.0->odibi==2.18.0)
+2026-03-06T19:42:00.4631436Z   Using cached click-8.3.1-py3-none-any.whl.metadata (2.6 kB)
+2026-03-06T19:42:00.4753858Z Collecting mypy-extensions>=0.4.3 (from black==25.11.0->odibi==2.18.0)
+2026-03-06T19:42:00.4766066Z   Using cached mypy_extensions-1.1.0-py3-none-any.whl.metadata (1.1 kB)
+2026-03-06T19:42:00.4918544Z Collecting packaging>=22.0 (from black==25.11.0->odibi==2.18.0)
+2026-03-06T19:42:00.4931110Z   Using cached packaging-26.0-py3-none-any.whl.metadata (3.3 kB)
+2026-03-06T19:42:00.5067018Z Collecting pathspec>=0.9.0 (from black==25.11.0->odibi==2.18.0)
+2026-03-06T19:42:00.5079144Z   Using cached pathspec-1.0.4-py3-none-any.whl.metadata (13 kB)
+2026-03-06T19:42:00.5281580Z Collecting platformdirs>=2 (from black==25.11.0->odibi==2.18.0)
+2026-03-06T19:42:00.5359493Z   Downloading platformdirs-4.9.4-py3-none-any.whl.metadata (4.7 kB)
+2026-03-06T19:42:00.5542949Z Collecting pytokens>=0.3.0 (from black==25.11.0->odibi==2.18.0)
+2026-03-06T19:42:00.5555962Z   Using cached pytokens-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+2026-03-06T19:42:00.5835962Z Collecting starlette>=0.46.0 (from fastapi<1.0.0,>=0.100.0->odibi==2.18.0)
+2026-03-06T19:42:00.5848816Z   Using cached starlette-0.52.1-py3-none-any.whl.metadata (6.3 kB)
+2026-03-06T19:42:00.6076771Z Collecting typing-extensions>=4.8.0 (from fastapi<1.0.0,>=0.100.0->odibi==2.18.0)
+2026-03-06T19:42:00.6089425Z   Using cached typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+2026-03-06T19:42:00.6230968Z Collecting typing-inspection>=0.4.2 (from fastapi<1.0.0,>=0.100.0->odibi==2.18.0)
+2026-03-06T19:42:00.6243370Z   Using cached typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+2026-03-06T19:42:00.6356743Z Collecting annotated-doc>=0.0.2 (from fastapi<1.0.0,>=0.100.0->odibi==2.18.0)
+2026-03-06T19:42:00.6369039Z   Using cached annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+2026-03-06T19:42:00.6848472Z Collecting MarkupSafe>=2.0 (from Jinja2<4.0.0,>=3.1.0->odibi==2.18.0)
+2026-03-06T19:42:00.6863198Z   Using cached markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-03-06T19:42:00.7005707Z Collecting et-xmlfile (from openpyxl<4.0.0,>=3.1.0->odibi==2.18.0)
+2026-03-06T19:42:00.7018211Z   Using cached et_xmlfile-2.0.0-py3-none-any.whl.metadata (2.7 kB)
+2026-03-06T19:42:00.7180685Z Collecting python-dateutil>=2.8.2 (from pandas<2.2.0,>=2.0.0->odibi==2.18.0)
+2026-03-06T19:42:00.7193045Z   Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+2026-03-06T19:42:00.7527822Z Collecting pytz>=2020.1 (from pandas<2.2.0,>=2.0.0->odibi==2.18.0)
+2026-03-06T19:42:00.7541326Z   Using cached pytz-2026.1.post1-py2.py3-none-any.whl.metadata (22 kB)
+2026-03-06T19:42:00.7727793Z Collecting tzdata>=2022.1 (from pandas<2.2.0,>=2.0.0->odibi==2.18.0)
+2026-03-06T19:42:00.7752043Z   Using cached tzdata-2025.3-py2.py3-none-any.whl.metadata (1.4 kB)
+2026-03-06T19:42:00.7889491Z Collecting flexcache>=0.3 (from pint<1.0.0,>=0.23->odibi==2.18.0)
+2026-03-06T19:42:00.7902210Z   Using cached flexcache-0.3-py3-none-any.whl.metadata (7.0 kB)
+2026-03-06T19:42:00.8022484Z Collecting flexparser>=0.4 (from pint<1.0.0,>=0.23->odibi==2.18.0)
+2026-03-06T19:42:00.8034901Z   Using cached flexparser-0.4-py3-none-any.whl.metadata (18 kB)
+2026-03-06T19:42:00.8247073Z Collecting annotated-types>=0.6.0 (from pydantic<3.0.0,>=2.0.0->odibi==2.18.0)
+2026-03-06T19:42:00.8259320Z   Using cached annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+2026-03-06T19:42:01.4498429Z Collecting pydantic-core==2.41.5 (from pydantic<3.0.0,>=2.0.0->odibi==2.18.0)
+2026-03-06T19:42:01.4512817Z   Using cached pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (7.3 kB)
+2026-03-06T19:42:01.5385736Z Collecting charset_normalizer<4,>=2 (from requests<3.0.0,>=2.28.0->odibi==2.18.0)
+2026-03-06T19:42:01.5465826Z   Downloading charset_normalizer-3.4.5-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (39 kB)
+2026-03-06T19:42:01.5696003Z Collecting idna<4,>=2.5 (from requests<3.0.0,>=2.28.0->odibi==2.18.0)
+2026-03-06T19:42:01.5708898Z   Using cached idna-3.11-py3-none-any.whl.metadata (8.4 kB)
+2026-03-06T19:42:01.5931475Z Collecting urllib3<3,>=1.21.1 (from requests<3.0.0,>=2.28.0->odibi==2.18.0)
+2026-03-06T19:42:01.5943688Z   Using cached urllib3-2.6.3-py3-none-any.whl.metadata (6.9 kB)
+2026-03-06T19:42:01.6141876Z Collecting certifi>=2017.4.17 (from requests<3.0.0,>=2.28.0->odibi==2.18.0)
+2026-03-06T19:42:01.6154134Z   Using cached certifi-2026.2.25-py3-none-any.whl.metadata (2.5 kB)
+2026-03-06T19:42:01.6318850Z Collecting markdown-it-py>=2.2.0 (from rich<14.0.0,>=13.0.0->odibi==2.18.0)
+2026-03-06T19:42:01.6330806Z   Using cached markdown_it_py-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+2026-03-06T19:42:01.6531002Z Collecting pygments<3.0.0,>=2.13.0 (from rich<14.0.0,>=13.0.0->odibi==2.18.0)
+2026-03-06T19:42:01.6543393Z   Using cached pygments-2.19.2-py3-none-any.whl.metadata (2.5 kB)
+2026-03-06T19:42:01.6702336Z Collecting h11>=0.8 (from uvicorn<1.0.0,>=0.20.0->odibi==2.18.0)
+2026-03-06T19:42:01.6714689Z   Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-03-06T19:42:01.6910986Z Collecting azure-core>=1.31.0 (from azure-identity>=1.14.0->odibi==2.18.0)
+2026-03-06T19:42:01.6923579Z   Using cached azure_core-1.38.2-py3-none-any.whl.metadata (48 kB)
+2026-03-06T19:42:01.8439220Z Collecting cryptography>=2.5 (from azure-identity>=1.14.0->odibi==2.18.0)
+2026-03-06T19:42:01.8453693Z   Using cached cryptography-46.0.5-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (5.7 kB)
+2026-03-06T19:42:01.8661599Z Collecting msal>=1.31.0 (from azure-identity>=1.14.0->odibi==2.18.0)
+2026-03-06T19:42:01.8674199Z   Using cached msal-1.35.1-py3-none-any.whl.metadata (11 kB)
+2026-03-06T19:42:01.8806791Z Collecting msal-extensions>=1.2.0 (from azure-identity>=1.14.0->odibi==2.18.0)
+2026-03-06T19:42:01.8818727Z   Using cached msal_extensions-1.3.1-py3-none-any.whl.metadata (7.8 kB)
+2026-03-06T19:42:01.8984753Z Collecting isodate>=0.6.1 (from azure-keyvault-secrets>=4.7.0->odibi==2.18.0)
+2026-03-06T19:42:01.8996546Z   Using cached isodate-0.7.2-py3-none-any.whl.metadata (11 kB)
+2026-03-06T19:42:01.9882981Z Collecting cffi>=2.0.0 (from cryptography>=2.5->azure-identity>=1.14.0->odibi==2.18.0)
+2026-03-06T19:42:01.9897272Z   Using cached cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.6 kB)
+2026-03-06T19:42:02.0035700Z Collecting pycparser (from cffi>=2.0.0->cryptography>=2.5->azure-identity>=1.14.0->odibi==2.18.0)
+2026-03-06T19:42:02.0047459Z   Using cached pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+2026-03-06T19:42:02.0344487Z Collecting zipp>=3.20 (from importlib_metadata>=4.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.0356789Z   Using cached zipp-3.23.0-py3-none-any.whl.metadata (3.6 kB)
+2026-03-06T19:42:02.0503798Z Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich<14.0.0,>=13.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.0515607Z   Using cached mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+2026-03-06T19:42:02.0677767Z Collecting babel>=2.10 (from mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.0689726Z   Using cached babel-2.18.0-py3-none-any.whl.metadata (2.2 kB)
+2026-03-06T19:42:02.0876244Z Collecting backrefs>=5.7.post1 (from mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.0888120Z   Using cached backrefs-6.2-py312-none-any.whl.metadata (3.0 kB)
+2026-03-06T19:42:02.1032053Z Collecting colorama>=0.4 (from mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.1043876Z   Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+2026-03-06T19:42:02.1216209Z Collecting markdown>=3.2 (from mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.1228300Z   Using cached markdown-3.10.2-py3-none-any.whl.metadata (5.1 kB)
+2026-03-06T19:42:02.1353210Z Collecting mkdocs-material-extensions>=1.3 (from mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.1365132Z   Using cached mkdocs_material_extensions-1.3.1-py3-none-any.whl.metadata (6.9 kB)
+2026-03-06T19:42:02.1515159Z Collecting mkdocs>=1.6 (from mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.1527068Z   Using cached mkdocs-1.6.1-py3-none-any.whl.metadata (6.0 kB)
+2026-03-06T19:42:02.1667064Z Collecting paginate>=0.5 (from mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.1678682Z   Using cached paginate-0.5.7-py2.py3-none-any.whl.metadata (11 kB)
+2026-03-06T19:42:02.2957834Z Collecting pymdown-extensions>=10.2 (from mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.2971290Z   Using cached pymdown_extensions-10.21-py3-none-any.whl.metadata (3.1 kB)
+2026-03-06T19:42:02.3156617Z Collecting ghp-import>=1.0 (from mkdocs>=1.6->mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.3168982Z   Using cached ghp_import-2.1.0-py3-none-any.whl.metadata (7.2 kB)
+2026-03-06T19:42:02.3328719Z Collecting mergedeep>=1.3.4 (from mkdocs>=1.6->mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.3340895Z   Using cached mergedeep-1.3.4-py3-none-any.whl.metadata (4.3 kB)
+2026-03-06T19:42:02.3455221Z Collecting mkdocs-get-deps>=0.2.0 (from mkdocs>=1.6->mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.3467191Z   Using cached mkdocs_get_deps-0.2.0-py3-none-any.whl.metadata (4.0 kB)
+2026-03-06T19:42:02.3599870Z Collecting pyyaml-env-tag>=0.1 (from mkdocs>=1.6->mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.3611855Z   Using cached pyyaml_env_tag-1.1-py3-none-any.whl.metadata (5.5 kB)
+2026-03-06T19:42:02.4023156Z Collecting watchdog>=2.0 (from mkdocs>=1.6->mkdocs-material>=9.0.0->odibi==2.18.0)
+2026-03-06T19:42:02.4036607Z   Using cached watchdog-6.0.0-py3-none-manylinux2014_x86_64.whl.metadata (44 kB)
+2026-03-06T19:42:02.4298089Z Collecting mkdocs-autorefs>=1.4 (from mkdocstrings>=0.20.0->mkdocstrings[python]>=0.20.0; extra == "dev"->odibi==2.18.0)
+2026-03-06T19:42:02.4309192Z   Using cached mkdocs_autorefs-1.4.4-py3-none-any.whl.metadata (14 kB)
+2026-03-06T19:42:02.4583290Z Collecting mkdocstrings-python>=1.16.2 (from mkdocstrings[python]>=0.20.0; extra == "dev"->odibi==2.18.0)
+2026-03-06T19:42:02.4594540Z   Using cached mkdocstrings_python-2.0.3-py3-none-any.whl.metadata (12 kB)
+2026-03-06T19:42:02.4719608Z Collecting griffelib>=2.0 (from mkdocstrings-python>=1.16.2->mkdocstrings[python]>=0.20.0; extra == "dev"->odibi==2.18.0)
+2026-03-06T19:42:02.4730580Z   Using cached griffelib-2.0.0-py3-none-any.whl.metadata (1.3 kB)
+2026-03-06T19:42:02.4935627Z Collecting PyJWT<3,>=1.0.0 (from PyJWT[crypto]<3,>=1.0.0->msal>=1.31.0->azure-identity>=1.14.0->odibi==2.18.0)
+2026-03-06T19:42:02.4947002Z   Using cached pyjwt-2.11.0-py3-none-any.whl.metadata (4.0 kB)
+2026-03-06T19:42:02.6088886Z Collecting librt>=0.6.2 (from mypy>=1.5.0->odibi==2.18.0)
+2026-03-06T19:42:02.6102876Z   Using cached librt-0.8.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (1.3 kB)
+2026-03-06T19:42:02.6296836Z Collecting cfgv>=2.0.0 (from pre-commit>=3.4.0->odibi==2.18.0)
+2026-03-06T19:42:02.6308257Z   Using cached cfgv-3.5.0-py2.py3-none-any.whl.metadata (8.9 kB)
+2026-03-06T19:42:02.6643713Z Collecting identify>=1.0.0 (from pre-commit>=3.4.0->odibi==2.18.0)
+2026-03-06T19:42:02.6655710Z   Using cached identify-2.6.17-py2.py3-none-any.whl.metadata (4.4 kB)
+2026-03-06T19:42:02.6807755Z Collecting nodeenv>=0.11.1 (from pre-commit>=3.4.0->odibi==2.18.0)
+2026-03-06T19:42:02.6818680Z   Using cached nodeenv-1.10.0-py2.py3-none-any.whl.metadata (24 kB)
+2026-03-06T19:42:02.7162372Z Collecting virtualenv>=20.10.0 (from pre-commit>=3.4.0->odibi==2.18.0)
+2026-03-06T19:42:02.7174702Z   Using cached virtualenv-21.1.0-py3-none-any.whl.metadata (3.5 kB)
+2026-03-06T19:42:02.7380831Z Collecting py4j<0.10.9.10,>=0.10.9.7 (from pyspark>=3.4.0->odibi==2.18.0)
+2026-03-06T19:42:02.7392184Z   Using cached py4j-0.10.9.9-py2.py3-none-any.whl.metadata (1.3 kB)
+2026-03-06T19:42:02.7528204Z Collecting iniconfig>=1.0.1 (from pytest>=7.4.0->odibi==2.18.0)
+2026-03-06T19:42:02.7540347Z   Using cached iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)
+2026-03-06T19:42:02.7668724Z Collecting pluggy<2,>=1.5 (from pytest>=7.4.0->odibi==2.18.0)
+2026-03-06T19:42:02.7680926Z   Using cached pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+2026-03-06T19:42:03.0747891Z Collecting coverage>=7.10.6 (from coverage[toml]>=7.10.6->pytest-cov>=4.1.0->odibi==2.18.0)
+2026-03-06T19:42:03.0761980Z   Using cached coverage-7.13.4-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (8.5 kB)
+2026-03-06T19:42:03.0975289Z Collecting six>=1.5 (from python-dateutil>=2.8.2->pandas<2.2.0,>=2.0.0->odibi==2.18.0)
+2026-03-06T19:42:03.0986578Z   Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+2026-03-06T19:42:03.2073702Z Collecting greenlet>=1 (from sqlalchemy>=2.0.0->odibi==2.18.0)
+2026-03-06T19:42:03.2087474Z   Using cached greenlet-3.3.2-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (3.7 kB)
+2026-03-06T19:42:03.2298390Z Collecting anyio<5,>=3.6.2 (from starlette>=0.46.0->fastapi<1.0.0,>=0.100.0->odibi==2.18.0)
+2026-03-06T19:42:03.2309575Z   Using cached anyio-4.12.1-py3-none-any.whl.metadata (4.3 kB)
+2026-03-06T19:42:03.2519375Z Collecting distlib<1,>=0.3.7 (from virtualenv>=20.10.0->pre-commit>=3.4.0->odibi==2.18.0)
+2026-03-06T19:42:03.2530633Z   Using cached distlib-0.4.0-py2.py3-none-any.whl.metadata (5.2 kB)
+2026-03-06T19:42:03.2717521Z Collecting filelock<4,>=3.24.2 (from virtualenv>=20.10.0->pre-commit>=3.4.0->odibi==2.18.0)
+2026-03-06T19:42:03.2729081Z   Using cached filelock-3.25.0-py3-none-any.whl.metadata (2.0 kB)
+2026-03-06T19:42:03.2866401Z Collecting python-discovery>=1 (from virtualenv>=20.10.0->pre-commit>=3.4.0->odibi==2.18.0)
+2026-03-06T19:42:03.2877494Z   Using cached python_discovery-1.1.0-py3-none-any.whl.metadata (4.0 kB)
+2026-03-06T19:42:03.3017451Z Using cached black-25.11.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.7 MB)
+2026-03-06T19:42:03.3040334Z Using cached bottleneck-1.6.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (377 kB)
+2026-03-06T19:42:03.3053940Z Using cached deltalake-0.25.5-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (45.9 MB)
+2026-03-06T19:42:03.3384093Z Using cached duckdb-1.0.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (18.5 MB)
+2026-03-06T19:42:03.3525109Z Using cached fastapi-0.135.1-py3-none-any.whl (116 kB)
+2026-03-06T19:42:03.3536172Z Using cached jinja2-3.1.6-py3-none-any.whl (134 kB)
+2026-03-06T19:42:03.3547660Z Using cached markdown2-2.5.5-py3-none-any.whl (56 kB)
+2026-03-06T19:42:03.3558848Z Using cached numpy-1.26.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (18.0 MB)
+2026-03-06T19:42:03.3691768Z Using cached openpyxl-3.1.5-py2.py3-none-any.whl (250 kB)
+2026-03-06T19:42:03.3704104Z Using cached pandas-2.1.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (11.7 MB)
+2026-03-06T19:42:03.3794082Z Using cached pint-0.25.2-py3-none-any.whl (306 kB)
+2026-03-06T19:42:03.3806758Z Using cached portalocker-2.10.1-py3-none-any.whl (18 kB)
+2026-03-06T19:42:03.3817424Z Using cached pyarrow-16.1.0-cp312-cp312-manylinux_2_28_x86_64.whl (40.8 MB)
+2026-03-06T19:42:03.4110538Z Using cached pydantic-2.12.5-py3-none-any.whl (463 kB)
+2026-03-06T19:42:03.4124571Z Using cached pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+2026-03-06T19:42:03.4150639Z Using cached python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+2026-03-06T19:42:03.4161431Z Using cached pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+2026-03-06T19:42:03.4177591Z Using cached requests-2.32.5-py3-none-any.whl (64 kB)
+2026-03-06T19:42:03.4256042Z Downloading charset_normalizer-3.4.5-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (196 kB)
+2026-03-06T19:42:03.4470558Z Using cached idna-3.11-py3-none-any.whl (71 kB)
+2026-03-06T19:42:03.4481538Z Using cached rich-13.9.4-py3-none-any.whl (242 kB)
+2026-03-06T19:42:03.4493735Z Using cached pygments-2.19.2-py3-none-any.whl (1.2 MB)
+2026-03-06T19:42:03.4513133Z Using cached urllib3-2.6.3-py3-none-any.whl (131 kB)
+2026-03-06T19:42:03.4524618Z Using cached uvicorn-0.41.0-py3-none-any.whl (68 kB)
+2026-03-06T19:42:03.4535656Z Using cached annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+2026-03-06T19:42:03.4546133Z Using cached annotated_types-0.7.0-py3-none-any.whl (13 kB)
+2026-03-06T19:42:03.4556723Z Using cached azure_identity-1.25.2-py3-none-any.whl (191 kB)
+2026-03-06T19:42:03.4568478Z Using cached azure_core-1.38.2-py3-none-any.whl (217 kB)
+2026-03-06T19:42:03.4580430Z Using cached azure_keyvault_secrets-4.10.0-py3-none-any.whl (125 kB)
+2026-03-06T19:42:03.4591673Z Using cached certifi-2026.2.25-py3-none-any.whl (153 kB)
+2026-03-06T19:42:03.4603035Z Using cached click-8.3.1-py3-none-any.whl (108 kB)
+2026-03-06T19:42:03.4614313Z Using cached cryptography-46.0.5-cp311-abi3-manylinux_2_34_x86_64.whl (4.5 MB)
+2026-03-06T19:42:03.4656589Z Using cached cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (219 kB)
+2026-03-06T19:42:03.4668216Z Using cached delta_spark-4.1.0-py3-none-any.whl (43 kB)
+2026-03-06T19:42:03.4679398Z Using cached fastexcel-0.19.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.4 MB)
+2026-03-06T19:42:03.4713549Z Using cached flexcache-0.3-py3-none-any.whl (13 kB)
+2026-03-06T19:42:03.4724003Z Using cached flexparser-0.4-py3-none-any.whl (27 kB)
+2026-03-06T19:42:03.4734372Z Using cached fsspec-2026.2.0-py3-none-any.whl (202 kB)
+2026-03-06T19:42:03.4746042Z Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+2026-03-06T19:42:03.4756790Z Using cached importlib_metadata-8.7.1-py3-none-any.whl (27 kB)
+2026-03-06T19:42:03.4767188Z Using cached isodate-0.7.2-py3-none-any.whl (22 kB)
+2026-03-06T19:42:03.4777690Z Using cached markdown_it_py-4.0.0-py3-none-any.whl (87 kB)
+2026-03-06T19:42:03.4788662Z Using cached mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+2026-03-06T19:42:03.4799870Z Using cached markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+2026-03-06T19:42:03.4810109Z Using cached mkdocs_material-9.7.4-py3-none-any.whl (9.3 MB)
+2026-03-06T19:42:03.4885879Z Using cached babel-2.18.0-py3-none-any.whl (10.2 MB)
+2026-03-06T19:42:03.4967344Z Using cached backrefs-6.2-py312-none-any.whl (398 kB)
+2026-03-06T19:42:03.4980781Z Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+2026-03-06T19:42:03.4991599Z Using cached markdown-3.10.2-py3-none-any.whl (108 kB)
+2026-03-06T19:42:03.5002706Z Using cached mkdocs-1.6.1-py3-none-any.whl (3.9 MB)
+2026-03-06T19:42:03.5039385Z Using cached ghp_import-2.1.0-py3-none-any.whl (11 kB)
+2026-03-06T19:42:03.5050114Z Using cached mergedeep-1.3.4-py3-none-any.whl (6.4 kB)
+2026-03-06T19:42:03.5060670Z Using cached mkdocs_get_deps-0.2.0-py3-none-any.whl (9.5 kB)
+2026-03-06T19:42:03.5071344Z Using cached mkdocs_material_extensions-1.3.1-py3-none-any.whl (8.7 kB)
+2026-03-06T19:42:03.5081654Z Using cached mkdocstrings-1.0.3-py3-none-any.whl (35 kB)
+2026-03-06T19:42:03.5092335Z Using cached mkdocs_autorefs-1.4.4-py3-none-any.whl (25 kB)
+2026-03-06T19:42:03.5102880Z Using cached mkdocstrings_python-2.0.3-py3-none-any.whl (104 kB)
+2026-03-06T19:42:03.5113818Z Using cached griffelib-2.0.0-py3-none-any.whl (142 kB)
+2026-03-06T19:42:03.5125064Z Using cached msal-1.35.1-py3-none-any.whl (119 kB)
+2026-03-06T19:42:03.5136472Z Using cached pyjwt-2.11.0-py3-none-any.whl (28 kB)
+2026-03-06T19:42:03.5146645Z Using cached msal_extensions-1.3.1-py3-none-any.whl (20 kB)
+2026-03-06T19:42:03.5157474Z Using cached mypy-1.19.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (13.6 MB)
+2026-03-06T19:42:03.5261001Z Using cached librt-0.8.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (224 kB)
+2026-03-06T19:42:03.5272644Z Using cached mypy_extensions-1.1.0-py3-none-any.whl (5.0 kB)
+2026-03-06T19:42:03.5283065Z Using cached packaging-26.0-py3-none-any.whl (74 kB)
+2026-03-06T19:42:03.5293957Z Using cached paginate-0.5.7-py2.py3-none-any.whl (13 kB)
+2026-03-06T19:42:03.5304377Z Using cached pathspec-1.0.4-py3-none-any.whl (55 kB)
+2026-03-06T19:42:03.5383994Z Downloading platformdirs-4.9.4-py3-none-any.whl (21 kB)
+2026-03-06T19:42:03.5418696Z Using cached pre_commit-4.5.1-py2.py3-none-any.whl (226 kB)
+2026-03-06T19:42:03.5430727Z Using cached cfgv-3.5.0-py2.py3-none-any.whl (7.4 kB)
+2026-03-06T19:42:03.5441386Z Using cached identify-2.6.17-py2.py3-none-any.whl (99 kB)
+2026-03-06T19:42:03.5452355Z Using cached nodeenv-1.10.0-py2.py3-none-any.whl (23 kB)
+2026-03-06T19:42:03.5462890Z Using cached pymdown_extensions-10.21-py3-none-any.whl (268 kB)
+2026-03-06T19:42:03.5475631Z Using cached pyodbc-5.3.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (340 kB)
+2026-03-06T19:42:03.5487982Z Using cached py4j-0.10.9.9-py2.py3-none-any.whl (203 kB)
+2026-03-06T19:42:03.5500403Z Using cached pytest-9.0.2-py3-none-any.whl (374 kB)
+2026-03-06T19:42:03.5513494Z Using cached pluggy-1.6.0-py3-none-any.whl (20 kB)
+2026-03-06T19:42:03.5524044Z Using cached iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+2026-03-06T19:42:03.5534386Z Using cached pytest_cov-7.0.0-py3-none-any.whl (22 kB)
+2026-03-06T19:42:03.5545401Z Using cached coverage-7.13.4-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (254 kB)
+2026-03-06T19:42:03.5557276Z Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+2026-03-06T19:42:03.5569413Z Using cached pytokens-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (269 kB)
+2026-03-06T19:42:03.5581677Z Using cached pytz-2026.1.post1-py2.py3-none-any.whl (510 kB)
+2026-03-06T19:42:03.5597075Z Using cached pyyaml_env_tag-1.1-py3-none-any.whl (4.7 kB)
+2026-03-06T19:42:03.5672406Z Downloading ruff-0.15.5-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (11.2 MB)
+2026-03-06T19:42:03.8664878Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.2/11.2 MB 39.8 MB/s  0:00:00
+2026-03-06T19:42:03.8678166Z Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+2026-03-06T19:42:03.8690578Z Using cached sqlalchemy-2.0.48-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.3 MB)
+2026-03-06T19:42:03.8728563Z Using cached greenlet-3.3.2-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (613 kB)
+2026-03-06T19:42:03.8745192Z Using cached starlette-0.52.1-py3-none-any.whl (74 kB)
+2026-03-06T19:42:03.8757147Z Using cached anyio-4.12.1-py3-none-any.whl (113 kB)
+2026-03-06T19:42:03.8769519Z Using cached typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+2026-03-06T19:42:03.8781366Z Using cached typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+2026-03-06T19:42:03.8793073Z Using cached tzdata-2025.3-py2.py3-none-any.whl (348 kB)
+2026-03-06T19:42:03.8807324Z Using cached virtualenv-21.1.0-py3-none-any.whl (5.8 MB)
+2026-03-06T19:42:03.8860919Z Using cached distlib-0.4.0-py2.py3-none-any.whl (469 kB)
+2026-03-06T19:42:03.8875875Z Using cached filelock-3.25.0-py3-none-any.whl (26 kB)
+2026-03-06T19:42:03.8887352Z Using cached python_discovery-1.1.0-py3-none-any.whl (30 kB)
+2026-03-06T19:42:03.8898732Z Using cached watchdog-6.0.0-py3-none-manylinux2014_x86_64.whl (79 kB)
+2026-03-06T19:42:03.8910645Z Using cached zipp-3.23.0-py3-none-any.whl (10 kB)
+2026-03-06T19:42:03.8922090Z Using cached et_xmlfile-2.0.0-py3-none-any.whl (18 kB)
+2026-03-06T19:42:03.8933329Z Using cached pycparser-3.0-py3-none-any.whl (48 kB)
+2026-03-06T19:42:04.3651255Z Building wheels for collected packages: odibi
+2026-03-06T19:42:04.3660175Z   Building editable for odibi (pyproject.toml): started
+2026-03-06T19:42:04.6474411Z   Building editable for odibi (pyproject.toml): finished with status 'done'
+2026-03-06T19:42:04.6480203Z   Created wheel for odibi: filename=odibi-2.18.0-0.editable-py3-none-any.whl size=10149 sha256=c339b158142967ca359326caf7657175212a3a7135730f57816f61a2bbbbe32a
+2026-03-06T19:42:04.6482142Z   Stored in directory: /tmp/pip-ephem-wheel-cache-xfwa9efm/wheels/c5/0a/42/3d22c8e82d8e2a75ec24aace8107d4f23ac2df38e306dcc306
+2026-03-06T19:42:04.6511624Z Successfully built odibi
+2026-03-06T19:42:04.9214080Z Installing collected packages: pytz, py4j, paginate, distlib, zipp, watchdog, urllib3, tzdata, typing-extensions, six, ruff, pyyaml, pytokens, python-dotenv, pyspark, pyodbc, PyJWT, pygments, pycparser, portalocker, pluggy, platformdirs, pathspec, packaging, numpy, nodeenv, mypy-extensions, mkdocs-material-extensions, mergedeep, mdurl, MarkupSafe, markdown2, markdown, librt, isodate, iniconfig, idna, identify, h11, griffelib, greenlet, fsspec, filelock, fastexcel, et-xmlfile, duckdb, coverage, colorama, click, charset_normalizer, cfgv, certifi, backrefs, babel, annotated-types, annotated-doc, uvicorn, typing-inspection, sqlalchemy, requests, pyyaml-env-tag, python-discovery, python-dateutil, pytest, pymdown-extensions, pydantic-core, pyarrow, openpyxl, mypy, mkdocs-get-deps, markdown-it-py, Jinja2, importlib_metadata, flexparser, flexcache, cffi, bottleneck, black, anyio, virtualenv, starlette, rich, pytest-cov, pydantic, pint, pandas, ghp-import, deltalake, delta-spark, cryptography, azure-core, pre-commit, pandasql, mkdocs, fastapi, azure-keyvault-secrets, odibi, msal, mkdocs-material, mkdocs-autorefs, msal-extensions, mkdocstrings, mkdocstrings-python, azure-identity
+2026-03-06T19:42:28.2952886Z 
+2026-03-06T19:42:28.3034071Z Successfully installed Jinja2-3.1.6 MarkupSafe-3.0.3 PyJWT-2.11.0 annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.12.1 azure-core-1.38.2 azure-identity-1.25.2 azure-keyvault-secrets-4.10.0 babel-2.18.0 backrefs-6.2 black-25.11.0 bottleneck-1.6.0 certifi-2026.2.25 cffi-2.0.0 cfgv-3.5.0 charset_normalizer-3.4.5 click-8.3.1 colorama-0.4.6 coverage-7.13.4 cryptography-46.0.5 delta-spark-4.1.0 deltalake-0.25.5 distlib-0.4.0 duckdb-1.0.0 et-xmlfile-2.0.0 fastapi-0.135.1 fastexcel-0.19.0 filelock-3.25.0 flexcache-0.3 flexparser-0.4 fsspec-2026.2.0 ghp-import-2.1.0 greenlet-3.3.2 griffelib-2.0.0 h11-0.16.0 identify-2.6.17 idna-3.11 importlib_metadata-8.7.1 iniconfig-2.3.0 isodate-0.7.2 librt-0.8.1 markdown-3.10.2 markdown-it-py-4.0.0 markdown2-2.5.5 mdurl-0.1.2 mergedeep-1.3.4 mkdocs-1.6.1 mkdocs-autorefs-1.4.4 mkdocs-get-deps-0.2.0 mkdocs-material-9.7.4 mkdocs-material-extensions-1.3.1 mkdocstrings-1.0.3 mkdocstrings-python-2.0.3 msal-1.35.1 msal-extensions-1.3.1 mypy-1.19.1 mypy-extensions-1.1.0 nodeenv-1.10.0 numpy-1.26.4 odibi-2.18.0 openpyxl-3.1.5 packaging-26.0 paginate-0.5.7 pandas-2.1.4 pandasql-0.7.3 pathspec-1.0.4 pint-0.25.2 platformdirs-4.9.4 pluggy-1.6.0 portalocker-2.10.1 pre-commit-4.5.1 py4j-0.10.9.9 pyarrow-16.1.0 pycparser-3.0 pydantic-2.12.5 pydantic-core-2.41.5 pygments-2.19.2 pymdown-extensions-10.21 pyodbc-5.3.0 pyspark-4.1.1 pytest-9.0.2 pytest-cov-7.0.0 python-dateutil-2.9.0.post0 python-discovery-1.1.0 python-dotenv-1.2.2 pytokens-0.4.1 pytz-2026.1.post1 pyyaml-6.0.3 pyyaml-env-tag-1.1 requests-2.32.5 rich-13.9.4 ruff-0.15.5 six-1.17.0 sqlalchemy-2.0.48 starlette-0.52.1 typing-extensions-4.15.0 typing-inspection-0.4.2 tzdata-2025.3 urllib3-2.6.3 uvicorn-0.41.0 virtualenv-21.1.0 watchdog-6.0.0 zipp-3.23.0
+2026-03-06T19:42:29.3106019Z ##[group]Run python -c "import pyodbc; print(f'pyodbc {pyodbc.version} OK')"
+2026-03-06T19:42:29.3106548Z [36;1mpython -c "import pyodbc; print(f'pyodbc {pyodbc.version} OK')"[0m
+2026-03-06T19:42:29.3107077Z [36;1mpython -c "import sqlalchemy; print(f'SQLAlchemy {sqlalchemy.__version__} OK')"[0m
+2026-03-06T19:42:29.3163376Z shell: /usr/bin/bash -e {0}
+2026-03-06T19:42:29.3163616Z env:
+2026-03-06T19:42:29.3163883Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:29.3164300Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.12/x64/lib/pkgconfig
+2026-03-06T19:42:29.3164695Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:29.3165047Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:29.3165402Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:29.3165747Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.12/x64/lib
+2026-03-06T19:42:29.3166052Z ##[endgroup]
+2026-03-06T19:42:29.3570949Z pyodbc 5.3.0 OK
+2026-03-06T19:42:29.9091002Z SQLAlchemy 2.0.48 OK
+2026-03-06T19:42:29.9455643Z ##[group]Run python -c "import markdown2; print(f'markdown2 {markdown2.__version__} OK')"
+2026-03-06T19:42:29.9456289Z [36;1mpython -c "import markdown2; print(f'markdown2 {markdown2.__version__} OK')"[0m
+2026-03-06T19:42:29.9456788Z [36;1mpython -c "import jinja2; print(f'Jinja2 {jinja2.__version__} OK')"[0m
+2026-03-06T19:42:29.9511001Z shell: /usr/bin/bash -e {0}
+2026-03-06T19:42:29.9511238Z env:
+2026-03-06T19:42:29.9511505Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:29.9511931Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.12/x64/lib/pkgconfig
+2026-03-06T19:42:29.9512330Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:29.9512679Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:29.9513036Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:29.9513391Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.12/x64/lib
+2026-03-06T19:42:29.9513693Z ##[endgroup]
+2026-03-06T19:42:30.0127124Z markdown2 2.5.5 OK
+2026-03-06T19:42:30.0890959Z Jinja2 3.1.6 OK
+2026-03-06T19:42:30.1033196Z ##[group]Run pytest -v
+2026-03-06T19:42:30.1033460Z [36;1mpytest -v[0m
+2026-03-06T19:42:30.1087305Z shell: /usr/bin/bash -e {0}
+2026-03-06T19:42:30.1087557Z env:
+2026-03-06T19:42:30.1087816Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:30.1088236Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.12/x64/lib/pkgconfig
+2026-03-06T19:42:30.1088645Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:30.1089002Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:30.1089360Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.12/x64
+2026-03-06T19:42:30.1089720Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.12/x64/lib
+2026-03-06T19:42:30.1090202Z ##[endgroup]
+2026-03-06T19:42:30.8269832Z ============================= test session starts ==============================
+2026-03-06T19:42:30.8271145Z platform linux -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0 -- /opt/hostedtoolcache/Python/3.12.12/x64/bin/python
+2026-03-06T19:42:30.8271945Z cachedir: .pytest_cache
+2026-03-06T19:42:30.8272329Z rootdir: /home/runner/work/Odibi/Odibi
+2026-03-06T19:42:30.8272976Z configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+2026-03-06T19:42:30.8273576Z testpaths: tests
+2026-03-06T19:42:30.8273897Z plugins: anyio-4.12.1, cov-7.0.0
+2026-03-06T19:42:42.3599487Z collecting ... collected 5455 items / 7 errors / 5 skipped
+2026-03-06T19:42:42.3600494Z 
+2026-03-06T19:42:42.3600720Z ==================================== ERRORS ====================================
+2026-03-06T19:42:42.3601384Z _____________ ERROR collecting tests/mcp/test_ai_full_knowledge.py _____________
+2026-03-06T19:42:42.3602324Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_ai_full_knowledge.py'.
+2026-03-06T19:42:42.3603212Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:42.3603753Z Traceback:
+2026-03-06T19:42:42.3604416Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:42.3605160Z     mod = import_path(
+2026-03-06T19:42:42.3605776Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:42.3606490Z     importlib.import_module(module_name)
+2026-03-06T19:42:42.3607123Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/importlib/__init__.py:90: in import_module
+2026-03-06T19:42:42.3607851Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:42.3608339Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:42.3608782Z <frozen importlib._bootstrap>:1387: in _gcd_import
+2026-03-06T19:42:42.3609170Z     ???
+2026-03-06T19:42:42.3609487Z <frozen importlib._bootstrap>:1360: in _find_and_load
+2026-03-06T19:42:42.3609870Z     ???
+2026-03-06T19:42:42.3610447Z <frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+2026-03-06T19:42:42.3610877Z     ???
+2026-03-06T19:42:42.3611184Z <frozen importlib._bootstrap>:935: in _load_unlocked
+2026-03-06T19:42:42.3611571Z     ???
+2026-03-06T19:42:42.3612208Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:42.3612947Z     exec(co, module.__dict__)
+2026-03-06T19:42:42.3613312Z tests/mcp/test_ai_full_knowledge.py:8: in <module>
+2026-03-06T19:42:42.3613715Z     from openai import OpenAI
+2026-03-06T19:42:42.3614074Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:42.3614616Z ___________ ERROR collecting tests/mcp/test_ai_with_mcp_resources.py ___________
+2026-03-06T19:42:42.3615504Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_ai_with_mcp_resources.py'.
+2026-03-06T19:42:42.3616354Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:42.3616824Z Traceback:
+2026-03-06T19:42:42.3617769Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:42.3618660Z     mod = import_path(
+2026-03-06T19:42:42.3619256Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:42.3619953Z     importlib.import_module(module_name)
+2026-03-06T19:42:42.3620732Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/importlib/__init__.py:90: in import_module
+2026-03-06T19:42:42.3621452Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:42.3621928Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:42.3622347Z <frozen importlib._bootstrap>:1387: in _gcd_import
+2026-03-06T19:42:42.3622725Z     ???
+2026-03-06T19:42:42.3623019Z <frozen importlib._bootstrap>:1360: in _find_and_load
+2026-03-06T19:42:42.3623399Z     ???
+2026-03-06T19:42:42.3623725Z <frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+2026-03-06T19:42:42.3624164Z     ???
+2026-03-06T19:42:42.3624451Z <frozen importlib._bootstrap>:935: in _load_unlocked
+2026-03-06T19:42:42.3624835Z     ???
+2026-03-06T19:42:42.3625440Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:42.3626166Z     exec(co, module.__dict__)
+2026-03-06T19:42:42.3626549Z tests/mcp/test_ai_with_mcp_resources.py:20: in <module>
+2026-03-06T19:42:42.3627049Z     from openai import OpenAI
+2026-03-06T19:42:42.3627429Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:42.3627996Z ____________ ERROR collecting tests/mcp/test_mcp_resources_real.py _____________
+2026-03-06T19:42:42.3628883Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_mcp_resources_real.py'.
+2026-03-06T19:42:42.3629710Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:42.3630331Z Traceback:
+2026-03-06T19:42:42.3630917Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:42.3631635Z     mod = import_path(
+2026-03-06T19:42:42.3632251Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:42.3632928Z     importlib.import_module(module_name)
+2026-03-06T19:42:42.3633557Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/importlib/__init__.py:90: in import_module
+2026-03-06T19:42:42.3634351Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:42.3634835Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:42.3635280Z <frozen importlib._bootstrap>:1387: in _gcd_import
+2026-03-06T19:42:42.3635672Z     ???
+2026-03-06T19:42:42.3635972Z <frozen importlib._bootstrap>:1360: in _find_and_load
+2026-03-06T19:42:42.3636354Z     ???
+2026-03-06T19:42:42.3636699Z <frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+2026-03-06T19:42:42.3637140Z     ???
+2026-03-06T19:42:42.3637430Z <frozen importlib._bootstrap>:935: in _load_unlocked
+2026-03-06T19:42:42.3637829Z     ???
+2026-03-06T19:42:42.3638461Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:42.3639250Z     exec(co, module.__dict__)
+2026-03-06T19:42:42.3639610Z tests/mcp/test_mcp_resources_real.py:12: in <module>
+2026-03-06T19:42:42.3640191Z     from openai import OpenAI
+2026-03-06T19:42:42.3640560Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:42.3641113Z _______________ ERROR collecting tests/mcp/test_phase1_agent.py ________________
+2026-03-06T19:42:42.3641958Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_phase1_agent.py'.
+2026-03-06T19:42:42.3642824Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:42.3643294Z Traceback:
+2026-03-06T19:42:42.3643879Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:42.3644821Z     mod = import_path(
+2026-03-06T19:42:42.3645612Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:42.3646312Z     importlib.import_module(module_name)
+2026-03-06T19:42:42.3646940Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/importlib/__init__.py:90: in import_module
+2026-03-06T19:42:42.3647683Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:42.3648167Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:42.3648590Z <frozen importlib._bootstrap>:1387: in _gcd_import
+2026-03-06T19:42:42.3648974Z     ???
+2026-03-06T19:42:42.3649273Z <frozen importlib._bootstrap>:1360: in _find_and_load
+2026-03-06T19:42:42.3649654Z     ???
+2026-03-06T19:42:42.3650225Z <frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+2026-03-06T19:42:42.3650655Z     ???
+2026-03-06T19:42:42.3650929Z <frozen importlib._bootstrap>:935: in _load_unlocked
+2026-03-06T19:42:42.3651294Z     ???
+2026-03-06T19:42:42.3651915Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:42.3652652Z     exec(co, module.__dict__)
+2026-03-06T19:42:42.3652992Z tests/mcp/test_phase1_agent.py:14: in <module>
+2026-03-06T19:42:42.3653390Z     from openai import OpenAI
+2026-03-06T19:42:42.3653747Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:42.3654300Z ___________ ERROR collecting tests/mcp/test_phase1_comprehensive.py ____________
+2026-03-06T19:42:42.3655174Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_phase1_comprehensive.py'.
+2026-03-06T19:42:42.3656002Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:42.3656461Z Traceback:
+2026-03-06T19:42:42.3657037Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:42.3657717Z     mod = import_path(
+2026-03-06T19:42:42.3658318Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:42.3659011Z     importlib.import_module(module_name)
+2026-03-06T19:42:42.3659641Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/importlib/__init__.py:90: in import_module
+2026-03-06T19:42:42.3660895Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:42.3685011Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:42.3685496Z <frozen importlib._bootstrap>:1387: in _gcd_import
+2026-03-06T19:42:42.3685885Z     ???
+2026-03-06T19:42:42.3686226Z <frozen importlib._bootstrap>:1360: in _find_and_load
+2026-03-06T19:42:42.3686639Z     ???
+2026-03-06T19:42:42.3686983Z <frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+2026-03-06T19:42:42.3687412Z     ???
+2026-03-06T19:42:42.3687710Z <frozen importlib._bootstrap>:935: in _load_unlocked
+2026-03-06T19:42:42.3688095Z     ???
+2026-03-06T19:42:42.3688807Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:42.3689564Z     exec(co, module.__dict__)
+2026-03-06T19:42:42.3689939Z tests/mcp/test_phase1_comprehensive.py:15: in <module>
+2026-03-06T19:42:42.3690574Z     from openai import OpenAI
+2026-03-06T19:42:42.3690945Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:42.3691508Z ___________ ERROR collecting tests/mcp/test_phase2_comprehensive.py ____________
+2026-03-06T19:42:42.3692397Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_phase2_comprehensive.py'.
+2026-03-06T19:42:42.3693233Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:42.3693688Z Traceback:
+2026-03-06T19:42:42.3694268Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:42.3694937Z     mod = import_path(
+2026-03-06T19:42:42.3695794Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:42.3696674Z     importlib.import_module(module_name)
+2026-03-06T19:42:42.3697301Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/importlib/__init__.py:90: in import_module
+2026-03-06T19:42:42.3698005Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:42.3698463Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:42.3698893Z <frozen importlib._bootstrap>:1387: in _gcd_import
+2026-03-06T19:42:42.3699264Z     ???
+2026-03-06T19:42:42.3699552Z <frozen importlib._bootstrap>:1360: in _find_and_load
+2026-03-06T19:42:42.3699939Z     ???
+2026-03-06T19:42:42.3700441Z <frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+2026-03-06T19:42:42.3700867Z     ???
+2026-03-06T19:42:42.3701152Z <frozen importlib._bootstrap>:935: in _load_unlocked
+2026-03-06T19:42:42.3701532Z     ???
+2026-03-06T19:42:42.3702140Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:42.3702931Z     exec(co, module.__dict__)
+2026-03-06T19:42:42.3703325Z tests/mcp/test_phase2_comprehensive.py:14: in <module>
+2026-03-06T19:42:42.3703748Z     from openai import OpenAI
+2026-03-06T19:42:42.3704109Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:42.3704647Z _______________ ERROR collecting tests/mcp/test_phase3_smart.py ________________
+2026-03-06T19:42:42.3705464Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_phase3_smart.py'.
+2026-03-06T19:42:42.3706240Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:42.3706682Z Traceback:
+2026-03-06T19:42:42.3707249Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:42.3707940Z     mod = import_path(
+2026-03-06T19:42:42.3708539Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:42.3709247Z     importlib.import_module(module_name)
+2026-03-06T19:42:42.3709853Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/importlib/__init__.py:90: in import_module
+2026-03-06T19:42:42.3710772Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:42.3711232Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:42.3711648Z <frozen importlib._bootstrap>:1387: in _gcd_import
+2026-03-06T19:42:42.3712029Z     ???
+2026-03-06T19:42:42.3712327Z <frozen importlib._bootstrap>:1360: in _find_and_load
+2026-03-06T19:42:42.3712706Z     ???
+2026-03-06T19:42:42.3713025Z <frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+2026-03-06T19:42:42.3713449Z     ???
+2026-03-06T19:42:42.3713725Z <frozen importlib._bootstrap>:935: in _load_unlocked
+2026-03-06T19:42:42.3714095Z     ???
+2026-03-06T19:42:42.3714699Z /opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:42.3715447Z     exec(co, module.__dict__)
+2026-03-06T19:42:42.3715782Z tests/mcp/test_phase3_smart.py:9: in <module>
+2026-03-06T19:42:42.3716162Z     from openai import OpenAI
+2026-03-06T19:42:42.8579304Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:42.8579911Z =========================== short test summary info ============================
+2026-03-06T19:42:42.8580714Z ERROR tests/mcp/test_ai_full_knowledge.py
+2026-03-06T19:42:42.8581150Z ERROR tests/mcp/test_ai_with_mcp_resources.py
+2026-03-06T19:42:42.8581581Z ERROR tests/mcp/test_mcp_resources_real.py
+2026-03-06T19:42:42.8581963Z ERROR tests/mcp/test_phase1_agent.py
+2026-03-06T19:42:42.8582350Z ERROR tests/mcp/test_phase1_comprehensive.py
+2026-03-06T19:42:42.8582766Z ERROR tests/mcp/test_phase2_comprehensive.py
+2026-03-06T19:42:42.8583150Z ERROR tests/mcp/test_phase3_smart.py
+2026-03-06T19:42:42.8583619Z !!!!!!!!!!!!!!!!!!! Interrupted: 7 errors during collection !!!!!!!!!!!!!!!!!!!!
+2026-03-06T19:42:42.8584728Z ======================== 5 skipped, 7 errors in 11.54s =========================
+2026-03-06T19:42:43.3331367Z ##[error]Process completed with exit code 2.
+2026-03-06T19:42:43.3439156Z Post job cleanup.
+2026-03-06T19:42:43.4411957Z [command]/usr/bin/git version
+2026-03-06T19:42:43.4449687Z git version 2.53.0
+2026-03-06T19:42:43.4491633Z Temporarily overriding HOME='/home/runner/work/_temp/7ade55bb-c2b8-4600-ae06-f2859192a85d' before making global git config changes
+2026-03-06T19:42:43.4492849Z Adding repository directory to the temporary git global config as a safe directory
+2026-03-06T19:42:43.4504987Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Odibi/Odibi
+2026-03-06T19:42:43.4542492Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-03-06T19:42:43.4577870Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-03-06T19:42:43.4847723Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-03-06T19:42:43.4872603Z http.https://github.com/.extraheader
+2026-03-06T19:42:43.4885563Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-03-06T19:42:43.4923620Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-03-06T19:42:43.5191541Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-03-06T19:42:43.5224989Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-03-06T19:42:43.5604230Z Cleaning up orphan processes

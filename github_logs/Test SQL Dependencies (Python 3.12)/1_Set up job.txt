@@ -1,0 +1,32 @@
+﻿2026-03-06T19:41:25.7795099Z Current runner version: '2.332.0'
+2026-03-06T19:41:25.7822591Z ##[group]Runner Image Provisioner
+2026-03-06T19:41:25.7823459Z Hosted Compute Agent
+2026-03-06T19:41:25.7824129Z Version: 20260213.493
+2026-03-06T19:41:25.7824714Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-03-06T19:41:25.7825493Z Build Date: 2026-02-13T00:28:41Z
+2026-03-06T19:41:25.7826212Z Worker ID: {e0f0f722-9fcf-4abe-a1f8-7873faf4375b}
+2026-03-06T19:41:25.7826879Z Azure Region: eastus2
+2026-03-06T19:41:25.7827501Z ##[endgroup]
+2026-03-06T19:41:25.7828952Z ##[group]Operating System
+2026-03-06T19:41:25.7829592Z Ubuntu
+2026-03-06T19:41:25.7830222Z 24.04.3
+2026-03-06T19:41:25.7830853Z LTS
+2026-03-06T19:41:25.7831299Z ##[endgroup]
+2026-03-06T19:41:25.7831812Z ##[group]Runner Image
+2026-03-06T19:41:25.7832510Z Image: ubuntu-24.04
+2026-03-06T19:41:25.7833030Z Version: 20260302.42.1
+2026-03-06T19:41:25.7834037Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260302.42/images/ubuntu/Ubuntu2404-Readme.md
+2026-03-06T19:41:25.7835730Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260302.42
+2026-03-06T19:41:25.7836634Z ##[endgroup]
+2026-03-06T19:41:25.7837867Z ##[group]GITHUB_TOKEN Permissions
+2026-03-06T19:41:25.7840267Z Contents: read
+2026-03-06T19:41:25.7841070Z Metadata: read
+2026-03-06T19:41:25.7841574Z Packages: read
+2026-03-06T19:41:25.7842112Z ##[endgroup]
+2026-03-06T19:41:25.7845248Z Secret source: Actions
+2026-03-06T19:41:25.7846713Z Prepare workflow directory
+2026-03-06T19:41:25.8288446Z Prepare all required actions
+2026-03-06T19:41:25.8343066Z Getting action download info
+2026-03-06T19:41:26.1233842Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-03-06T19:41:26.2543495Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-03-06T19:41:26.4842612Z Complete job name: Test SQL Dependencies (Python 3.12)

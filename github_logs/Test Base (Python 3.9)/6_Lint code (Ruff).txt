@@ -1,0 +1,321 @@
+﻿2026-03-06T19:42:43.9797764Z ##[group]Run ruff check odibi/ tests/
+2026-03-06T19:42:43.9798130Z [36;1mruff check odibi/ tests/[0m
+2026-03-06T19:42:43.9849124Z shell: /usr/bin/bash -e {0}
+2026-03-06T19:42:43.9849383Z env:
+2026-03-06T19:42:43.9849648Z   pythonLocation: /opt/hostedtoolcache/Python/3.9.25/x64
+2026-03-06T19:42:43.9850076Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.9.25/x64/lib/pkgconfig
+2026-03-06T19:42:43.9850513Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.25/x64
+2026-03-06T19:42:43.9850910Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.25/x64
+2026-03-06T19:42:43.9851293Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.25/x64
+2026-03-06T19:42:43.9851671Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.9.25/x64/lib
+2026-03-06T19:42:43.9851981Z ##[endgroup]
+2026-03-06T19:42:44.1022827Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1023699Z  --> tests/mcp/test_ai_full_knowledge.py:8:1
+2026-03-06T19:42:44.1024198Z   |
+2026-03-06T19:42:44.1024730Z 6 | load_dotenv(Path(".env"), override=True)
+2026-03-06T19:42:44.1025212Z 7 |
+2026-03-06T19:42:44.1025508Z 8 | from openai import OpenAI
+2026-03-06T19:42:44.1025893Z   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1026326Z 9 | from odibi_mcp.resources import read_resource
+2026-03-06T19:42:44.1026821Z   |
+2026-03-06T19:42:44.1026979Z 
+2026-03-06T19:42:44.1027150Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1027732Z   --> tests/mcp/test_ai_full_knowledge.py:9:1
+2026-03-06T19:42:44.1028200Z    |
+2026-03-06T19:42:44.1028500Z  8 | from openai import OpenAI
+2026-03-06T19:42:44.1028961Z  9 | from odibi_mcp.resources import read_resource
+2026-03-06T19:42:44.1029501Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1029898Z 10 |
+2026-03-06T19:42:44.1030239Z 11 | # Load FULL resources (as MCP would provide)
+2026-03-06T19:42:44.1030698Z    |
+2026-03-06T19:42:44.1031123Z 
+2026-03-06T19:42:44.1031239Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1031565Z   --> tests/mcp/test_ai_with_mcp_resources.py:20:1
+2026-03-06T19:42:44.1031843Z    |
+2026-03-06T19:42:44.1032032Z 18 | load_dotenv(Path(".env"), override=True)
+2026-03-06T19:42:44.1032285Z 19 |
+2026-03-06T19:42:44.1032461Z 20 | from openai import OpenAI
+2026-03-06T19:42:44.1032680Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1033107Z 21 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1033654Z 22 | from odibi_mcp.resources import get_resources, read_resource
+2026-03-06T19:42:44.1033969Z    |
+2026-03-06T19:42:44.1034058Z 
+2026-03-06T19:42:44.1034158Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1034701Z   --> tests/mcp/test_ai_with_mcp_resources.py:21:1
+2026-03-06T19:42:44.1034979Z    |
+2026-03-06T19:42:44.1035146Z 20 | from openai import OpenAI
+2026-03-06T19:42:44.1035574Z 21 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1036091Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1036480Z 22 | from odibi_mcp.resources import get_resources, read_resource
+2026-03-06T19:42:44.1036788Z    |
+2026-03-06T19:42:44.1036878Z 
+2026-03-06T19:42:44.1036976Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1037270Z   --> tests/mcp/test_ai_with_mcp_resources.py:22:1
+2026-03-06T19:42:44.1037529Z    |
+2026-03-06T19:42:44.1037695Z 20 | from openai import OpenAI
+2026-03-06T19:42:44.1038116Z 21 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1038628Z 22 | from odibi_mcp.resources import get_resources, read_resource
+2026-03-06T19:42:44.1039026Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1039301Z    |
+2026-03-06T19:42:44.1039386Z 
+2026-03-06T19:42:44.1039490Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1039796Z   --> tests/mcp/test_discovery_real_connections.py:13:1
+2026-03-06T19:42:44.1040272Z    |
+2026-03-06T19:42:44.1040460Z 11 | load_dotenv(Path(".env"), override=True)
+2026-03-06T19:42:44.1040710Z 12 |
+2026-03-06T19:42:44.1040915Z 13 | from odibi.connections.azure_sql import AzureSQL
+2026-03-06T19:42:44.1041213Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1041512Z 14 | from odibi.connections.azure_adls import AzureADLS
+2026-03-06T19:42:44.1041855Z 15 | from odibi.connections.local import LocalConnection
+2026-03-06T19:42:44.1042137Z    |
+2026-03-06T19:42:44.1042221Z 
+2026-03-06T19:42:44.1042320Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1042620Z   --> tests/mcp/test_discovery_real_connections.py:14:1
+2026-03-06T19:42:44.1042885Z    |
+2026-03-06T19:42:44.1043103Z 13 | from odibi.connections.azure_sql import AzureSQL
+2026-03-06T19:42:44.1043471Z 14 | from odibi.connections.azure_adls import AzureADLS
+2026-03-06T19:42:44.1043767Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1044070Z 15 | from odibi.connections.local import LocalConnection
+2026-03-06T19:42:44.1044598Z    |
+2026-03-06T19:42:44.1044698Z 
+2026-03-06T19:42:44.1044798Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1045111Z   --> tests/mcp/test_discovery_real_connections.py:15:1
+2026-03-06T19:42:44.1045397Z    |
+2026-03-06T19:42:44.1045607Z 13 | from odibi.connections.azure_sql import AzureSQL
+2026-03-06T19:42:44.1045938Z 14 | from odibi.connections.azure_adls import AzureADLS
+2026-03-06T19:42:44.1046278Z 15 | from odibi.connections.local import LocalConnection
+2026-03-06T19:42:44.1046619Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1046854Z    |
+2026-03-06T19:42:44.1046943Z 
+2026-03-06T19:42:44.1047039Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1047331Z   --> tests/mcp/test_mcp_resources_real.py:12:1
+2026-03-06T19:42:44.1047734Z    |
+2026-03-06T19:42:44.1047921Z 10 | load_dotenv(Path(".env"), override=True)
+2026-03-06T19:42:44.1048169Z 11 |
+2026-03-06T19:42:44.1048331Z 12 | from openai import OpenAI
+2026-03-06T19:42:44.1048558Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1048779Z 13 | from odibi_mcp import server
+2026-03-06T19:42:44.1048996Z    |
+2026-03-06T19:42:44.1049082Z 
+2026-03-06T19:42:44.1049178Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1049466Z   --> tests/mcp/test_mcp_resources_real.py:13:1
+2026-03-06T19:42:44.1049720Z    |
+2026-03-06T19:42:44.1049883Z 12 | from openai import OpenAI
+2026-03-06T19:42:44.1050110Z 13 | from odibi_mcp import server
+2026-03-06T19:42:44.1050333Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1050529Z    |
+2026-03-06T19:42:44.1050618Z 
+2026-03-06T19:42:44.1050715Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1050988Z   --> tests/mcp/test_phase1_agent.py:14:1
+2026-03-06T19:42:44.1051225Z    |
+2026-03-06T19:42:44.1051405Z 12 | load_dotenv(Path(".env"), override=True)
+2026-03-06T19:42:44.1051658Z 13 |
+2026-03-06T19:42:44.1051822Z 14 | from openai import OpenAI
+2026-03-06T19:42:44.1052030Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1052451Z 15 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1053000Z 16 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1053292Z    |
+2026-03-06T19:42:44.1053382Z 
+2026-03-06T19:42:44.1053477Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1053917Z   --> tests/mcp/test_phase1_agent.py:15:1
+2026-03-06T19:42:44.1054504Z    |
+2026-03-06T19:42:44.1054791Z 14 | from openai import OpenAI
+2026-03-06T19:42:44.1055536Z 15 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1056441Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1057094Z 16 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1057634Z    |
+2026-03-06T19:42:44.1057784Z 
+2026-03-06T19:42:44.1057957Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1058685Z   --> tests/mcp/test_phase1_agent.py:16:1
+2026-03-06T19:42:44.1059114Z    |
+2026-03-06T19:42:44.1059475Z 14 | from openai import OpenAI
+2026-03-06T19:42:44.1060243Z 15 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1061138Z 16 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1061474Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1061725Z    |
+2026-03-06T19:42:44.1061814Z 
+2026-03-06T19:42:44.1061929Z E722 Do not use bare `except`
+2026-03-06T19:42:44.1062175Z   --> tests/mcp/test_phase1_agent.py:76:5
+2026-03-06T19:42:44.1062417Z    |
+2026-03-06T19:42:44.1062601Z 74 |         selected_pattern = rec["pattern"]
+2026-03-06T19:42:44.1063151Z 75 |         print(f"\n  ✓ Pattern selected: {selected_pattern}")
+2026-03-06T19:42:44.1063456Z 76 |     except:
+2026-03-06T19:42:44.1063631Z    |     ^^^^^^
+2026-03-06T19:42:44.1063854Z 77 |         print("  [ERROR] Agent didn't return valid JSON")
+2026-03-06T19:42:44.1064152Z 78 |         return False
+2026-03-06T19:42:44.1064597Z    |
+2026-03-06T19:42:44.1064743Z 
+2026-03-06T19:42:44.1064895Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1065347Z   --> tests/mcp/test_phase1_comprehensive.py:15:1
+2026-03-06T19:42:44.1065619Z    |
+2026-03-06T19:42:44.1065804Z 13 | load_dotenv(Path(".env"), override=True)
+2026-03-06T19:42:44.1066059Z 14 |
+2026-03-06T19:42:44.1066230Z 15 | from openai import OpenAI
+2026-03-06T19:42:44.1066450Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1066860Z 16 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1067384Z 17 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1067679Z    |
+2026-03-06T19:42:44.1067936Z 
+2026-03-06T19:42:44.1068064Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1068364Z   --> tests/mcp/test_phase1_comprehensive.py:16:1
+2026-03-06T19:42:44.1068633Z    |
+2026-03-06T19:42:44.1068795Z 15 | from openai import OpenAI
+2026-03-06T19:42:44.1069211Z 16 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1069719Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1070096Z 17 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1070385Z    |
+2026-03-06T19:42:44.1070473Z 
+2026-03-06T19:42:44.1070570Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1070858Z   --> tests/mcp/test_phase1_comprehensive.py:17:1
+2026-03-06T19:42:44.1071112Z    |
+2026-03-06T19:42:44.1071278Z 15 | from openai import OpenAI
+2026-03-06T19:42:44.1071692Z 16 | from odibi_mcp.tools.construction import list_transformers, list_patterns, apply_pattern_template
+2026-03-06T19:42:44.1072203Z 17 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1072520Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1072768Z 18 |
+2026-03-06T19:42:44.1072934Z 19 | # Test results tracking
+2026-03-06T19:42:44.1073131Z    |
+2026-03-06T19:42:44.1073219Z 
+2026-03-06T19:42:44.1073316Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1073605Z   --> tests/mcp/test_phase2_comprehensive.py:14:1
+2026-03-06T19:42:44.1073860Z    |
+2026-03-06T19:42:44.1074046Z 12 | load_dotenv(Path(".env"), override=True)
+2026-03-06T19:42:44.1074492Z 13 |
+2026-03-06T19:42:44.1074754Z 14 | from openai import OpenAI
+2026-03-06T19:42:44.1074978Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1075212Z 15 | from odibi_mcp.tools.builder import (
+2026-03-06T19:42:44.1075474Z 16 |     create_pipeline,
+2026-03-06T19:42:44.1075665Z    |
+2026-03-06T19:42:44.1075753Z 
+2026-03-06T19:42:44.1075849Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1076146Z   --> tests/mcp/test_phase2_comprehensive.py:15:1
+2026-03-06T19:42:44.1076399Z    |
+2026-03-06T19:42:44.1076567Z 14 |   from openai import OpenAI
+2026-03-06T19:42:44.1076962Z 15 | / from odibi_mcp.tools.builder import (
+2026-03-06T19:42:44.1077222Z 16 | |     create_pipeline,
+2026-03-06T19:42:44.1077430Z 17 | |     add_node,
+2026-03-06T19:42:44.1077620Z 18 | |     configure_read,
+2026-03-06T19:42:44.1077822Z 19 | |     configure_write,
+2026-03-06T19:42:44.1078032Z 20 | |     configure_transform,
+2026-03-06T19:42:44.1078275Z 21 | |     get_pipeline_state,
+2026-03-06T19:42:44.1078506Z 22 | |     render_pipeline_yaml,
+2026-03-06T19:42:44.1078728Z 23 | |     list_sessions,
+2026-03-06T19:42:44.1078929Z 24 | |     discard_pipeline,
+2026-03-06T19:42:44.1079133Z 25 | | )
+2026-03-06T19:42:44.1079291Z    | |_^
+2026-03-06T19:42:44.1079524Z 26 |   from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1079829Z    |
+2026-03-06T19:42:44.1079922Z 
+2026-03-06T19:42:44.1080024Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1080325Z   --> tests/mcp/test_phase2_comprehensive.py:26:1
+2026-03-06T19:42:44.1080591Z    |
+2026-03-06T19:42:44.1080755Z 24 |     discard_pipeline,
+2026-03-06T19:42:44.1080959Z 25 | )
+2026-03-06T19:42:44.1081192Z 26 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1081525Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1081773Z 27 |
+2026-03-06T19:42:44.1081925Z 28 | # Test tracking
+2026-03-06T19:42:44.1082103Z    |
+2026-03-06T19:42:44.1082188Z 
+2026-03-06T19:42:44.1082454Z E712 Avoid equality comparisons to `True`; use `result["read_configured"]:` for truth checks
+2026-03-06T19:42:44.1082931Z    --> tests/mcp/test_phase2_comprehensive.py:161:12
+2026-03-06T19:42:44.1083208Z     |
+2026-03-06T19:42:44.1083365Z 159 |     )
+2026-03-06T19:42:44.1083523Z 160 |
+2026-03-06T19:42:44.1083714Z 161 |     assert result["read_configured"] == True
+2026-03-06T19:42:44.1084121Z     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1084597Z 162 |
+2026-03-06T19:42:44.1084891Z 163 |     discard_pipeline(sid)
+2026-03-06T19:42:44.1085134Z     |
+2026-03-06T19:42:44.1085347Z help: Replace with `result["read_configured"]`
+2026-03-06T19:42:44.1085543Z 
+2026-03-06T19:42:44.1085785Z E712 Avoid equality comparisons to `True`; use `result["write_configured"]:` for truth checks
+2026-03-06T19:42:44.1086255Z    --> tests/mcp/test_phase2_comprehensive.py:201:12
+2026-03-06T19:42:44.1086532Z     |
+2026-03-06T19:42:44.1086687Z 199 |     )
+2026-03-06T19:42:44.1086840Z 200 |
+2026-03-06T19:42:44.1087034Z 201 |     assert result["write_configured"] == True
+2026-03-06T19:42:44.1087318Z     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1087549Z 202 |
+2026-03-06T19:42:44.1087717Z 203 |     discard_pipeline(sid)
+2026-03-06T19:42:44.1087928Z     |
+2026-03-06T19:42:44.1088119Z help: Replace with `result["write_configured"]`
+2026-03-06T19:42:44.1088321Z 
+2026-03-06T19:42:44.1088604Z E712 Avoid equality comparisons to `True`; use `result["transform_configured"]:` for truth checks
+2026-03-06T19:42:44.1089079Z    --> tests/mcp/test_phase2_comprehensive.py:225:12
+2026-03-06T19:42:44.1089355Z     |
+2026-03-06T19:42:44.1089502Z 223 |     )
+2026-03-06T19:42:44.1089659Z 224 |
+2026-03-06T19:42:44.1089866Z 225 |     assert result["transform_configured"] == True
+2026-03-06T19:42:44.1090161Z     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1090428Z 226 |     assert result["step_count"] == 2
+2026-03-06T19:42:44.1090675Z     |
+2026-03-06T19:42:44.1090875Z help: Replace with `result["transform_configured"]`
+2026-03-06T19:42:44.1091083Z 
+2026-03-06T19:42:44.1091297Z E712 Avoid equality comparisons to `True`; use `result["discarded"]:` for truth checks
+2026-03-06T19:42:44.1091734Z    --> tests/mcp/test_phase2_comprehensive.py:366:12
+2026-03-06T19:42:44.1092002Z     |
+2026-03-06T19:42:44.1092175Z 364 |     result = discard_pipeline(sid)
+2026-03-06T19:42:44.1092414Z 365 |
+2026-03-06T19:42:44.1092601Z 366 |     assert result["discarded"] == True
+2026-03-06T19:42:44.1092853Z     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1093262Z 367 |     assert result["nodes_discarded"] == 1
+2026-03-06T19:42:44.1093511Z     |
+2026-03-06T19:42:44.1093685Z help: Replace with `result["discarded"]`
+2026-03-06T19:42:44.1093865Z 
+2026-03-06T19:42:44.1094118Z E712 Avoid equality comparisons to `True`; use `result.get("write_configured"):` for truth checks
+2026-03-06T19:42:44.1094863Z    --> tests/mcp/test_phase2_comprehensive.py:609:20
+2026-03-06T19:42:44.1095140Z     |
+2026-03-06T19:42:44.1095399Z 607 |                 sid, "test_node", "dst", "delta", path="out", mode=mode, keys=keys
+2026-03-06T19:42:44.1095744Z 608 |             )
+2026-03-06T19:42:44.1096042Z 609 |             assert result.get("write_configured") == True, f"Mode {mode} failed"
+2026-03-06T19:42:44.1096458Z     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1096710Z 610 |
+2026-03-06T19:42:44.1096892Z 611 |         discard_pipeline(sid)
+2026-03-06T19:42:44.1097116Z     |
+2026-03-06T19:42:44.1097314Z help: Replace with `result.get("write_configured")`
+2026-03-06T19:42:44.1097531Z 
+2026-03-06T19:42:44.1097628Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1097906Z   --> tests/mcp/test_phase3_smart.py:9:1
+2026-03-06T19:42:44.1098140Z    |
+2026-03-06T19:42:44.1098328Z  7 | load_dotenv(Path(".env"), override=True)
+2026-03-06T19:42:44.1098580Z  8 |
+2026-03-06T19:42:44.1098747Z  9 | from openai import OpenAI
+2026-03-06T19:42:44.1098967Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1099336Z 10 | from odibi_mcp.tools.phase3_smart import suggest_pipeline, create_ingestion_pipeline
+2026-03-06T19:42:44.1099817Z 11 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1100111Z    |
+2026-03-06T19:42:44.1100200Z 
+2026-03-06T19:42:44.1100296Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1100595Z   --> tests/mcp/test_phase3_smart.py:10:1
+2026-03-06T19:42:44.1100976Z    |
+2026-03-06T19:42:44.1101143Z  9 | from openai import OpenAI
+2026-03-06T19:42:44.1101517Z 10 | from odibi_mcp.tools.phase3_smart import suggest_pipeline, create_ingestion_pipeline
+2026-03-06T19:42:44.1101959Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1102321Z 11 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1102617Z    |
+2026-03-06T19:42:44.1102701Z 
+2026-03-06T19:42:44.1102800Z E402 Module level import not at top of file
+2026-03-06T19:42:44.1103066Z   --> tests/mcp/test_phase3_smart.py:11:1
+2026-03-06T19:42:44.1103304Z    |
+2026-03-06T19:42:44.1103470Z  9 | from openai import OpenAI
+2026-03-06T19:42:44.1103831Z 10 | from odibi_mcp.tools.phase3_smart import suggest_pipeline, create_ingestion_pipeline
+2026-03-06T19:42:44.1104484Z 11 | from odibi_mcp.tools.validation import validate_pipeline
+2026-03-06T19:42:44.1104970Z    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:44.1105233Z 12 |
+2026-03-06T19:42:44.1105394Z 13 | tests_passed = 0
+2026-03-06T19:42:44.1105585Z    |
+2026-03-06T19:42:44.1105669Z 
+2026-03-06T19:42:44.1105826Z F841 Local variable `mock_write` is assigned to but never used
+2026-03-06T19:42:44.1106145Z    --> tests/unit/test_cli.py:117:58
+2026-03-06T19:42:44.1106376Z     |
+2026-03-06T19:42:44.1106624Z 116 |             with patch("pathlib.Path.exists", return_value=False):
+2026-03-06T19:42:44.1107018Z 117 |                 with patch("pathlib.Path.write_text") as mock_write:
+2026-03-06T19:42:44.1107364Z     |                                                          ^^^^^^^^^^
+2026-03-06T19:42:44.1107653Z 118 |                     exit_code = main()
+2026-03-06T19:42:44.1107887Z     |
+2026-03-06T19:42:44.1108105Z help: Remove assignment to unused variable `mock_write`
+2026-03-06T19:42:44.1108328Z 
+2026-03-06T19:42:44.1108401Z Found 29 errors.
+2026-03-06T19:42:44.1108731Z No fixes available (6 hidden fixes can be enabled with the `--unsafe-fixes` option).
+2026-03-06T19:42:44.1117869Z ##[error]Process completed with exit code 1.

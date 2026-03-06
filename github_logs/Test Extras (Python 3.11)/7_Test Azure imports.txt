@@ -1,0 +1,16 @@
+﻿2026-03-06T19:42:31.4367656Z ##[group]Run python -c "from odibi.connections.azure_adls import AzureADLS; print('✅ Azure ADLS imports successfully')"
+2026-03-06T19:42:31.4369223Z [36;1mpython -c "from odibi.connections.azure_adls import AzureADLS; print('✅ Azure ADLS imports successfully')"[0m
+2026-03-06T19:42:31.4370626Z [36;1mpython -c "from odibi.connections.azure_sql import AzureSQL; print('✅ Azure SQL imports successfully')"[0m
+2026-03-06T19:42:31.4445141Z shell: /usr/bin/bash -e {0}
+2026-03-06T19:42:31.4445559Z env:
+2026-03-06T19:42:31.4445997Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:42:31.4446763Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.14/x64/lib/pkgconfig
+2026-03-06T19:42:31.4447519Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:42:31.4448181Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:42:31.4448864Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:42:31.4449528Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.14/x64/lib
+2026-03-06T19:42:31.4450314Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-03-06T19:42:31.4451173Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-03-06T19:42:31.4452132Z ##[endgroup]
+2026-03-06T19:42:32.5224249Z ✅ Azure ADLS imports successfully
+2026-03-06T19:42:33.7088582Z ✅ Azure SQL imports successfully

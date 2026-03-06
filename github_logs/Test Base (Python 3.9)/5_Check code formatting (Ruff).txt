@@ -1,0 +1,12 @@
+﻿2026-03-06T19:42:43.8148228Z ##[group]Run ruff format --check odibi/ tests/
+2026-03-06T19:42:43.8148614Z [36;1mruff format --check odibi/ tests/[0m
+2026-03-06T19:42:43.8198244Z shell: /usr/bin/bash -e {0}
+2026-03-06T19:42:43.8198496Z env:
+2026-03-06T19:42:43.8198756Z   pythonLocation: /opt/hostedtoolcache/Python/3.9.25/x64
+2026-03-06T19:42:43.8199193Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.9.25/x64/lib/pkgconfig
+2026-03-06T19:42:43.8199615Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.25/x64
+2026-03-06T19:42:43.8199980Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.25/x64
+2026-03-06T19:42:43.8200355Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.25/x64
+2026-03-06T19:42:43.8200743Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.9.25/x64/lib
+2026-03-06T19:42:43.8201088Z ##[endgroup]
+2026-03-06T19:42:43.9752735Z 418 files already formatted

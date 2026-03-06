@@ -1,0 +1,33 @@
+﻿2026-03-06T19:41:25.8067931Z Current runner version: '2.332.0'
+2026-03-06T19:41:25.8104463Z ##[group]Runner Image Provisioner
+2026-03-06T19:41:25.8105975Z Hosted Compute Agent
+2026-03-06T19:41:25.8106965Z Version: 20260213.493
+2026-03-06T19:41:25.8108056Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-03-06T19:41:25.8109301Z Build Date: 2026-02-13T00:28:41Z
+2026-03-06T19:41:25.8110899Z Worker ID: {9404fc23-52c8-4d9d-aba4-e439d2f0202a}
+2026-03-06T19:41:25.8112068Z Azure Region: eastus2
+2026-03-06T19:41:25.8113036Z ##[endgroup]
+2026-03-06T19:41:25.8115431Z ##[group]Operating System
+2026-03-06T19:41:25.8116379Z Ubuntu
+2026-03-06T19:41:25.8117370Z 24.04.3
+2026-03-06T19:41:25.8118287Z LTS
+2026-03-06T19:41:25.8119100Z ##[endgroup]
+2026-03-06T19:41:25.8120247Z ##[group]Runner Image
+2026-03-06T19:41:25.8121246Z Image: ubuntu-24.04
+2026-03-06T19:41:25.8122028Z Version: 20260302.42.1
+2026-03-06T19:41:25.8123889Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260302.42/images/ubuntu/Ubuntu2404-Readme.md
+2026-03-06T19:41:25.8126864Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260302.42
+2026-03-06T19:41:25.8128488Z ##[endgroup]
+2026-03-06T19:41:25.8130555Z ##[group]GITHUB_TOKEN Permissions
+2026-03-06T19:41:25.8133568Z Contents: read
+2026-03-06T19:41:25.8134452Z Metadata: read
+2026-03-06T19:41:25.8135330Z Packages: read
+2026-03-06T19:41:25.8136578Z ##[endgroup]
+2026-03-06T19:41:25.8139447Z Secret source: Actions
+2026-03-06T19:41:25.8140941Z Prepare workflow directory
+2026-03-06T19:41:25.8623258Z Prepare all required actions
+2026-03-06T19:41:25.8678751Z Getting action download info
+2026-03-06T19:41:26.1472472Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-03-06T19:41:26.3212695Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-03-06T19:41:26.4805949Z Download action repository 'codecov/codecov-action@v3' (SHA:ab904c41d6ece82784817410c45d8b8c02684457)
+2026-03-06T19:41:26.8465494Z Complete job name: Test Base (Python 3.11)

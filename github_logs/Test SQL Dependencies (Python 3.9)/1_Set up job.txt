@@ -1,0 +1,32 @@
+﻿2026-03-06T19:41:26.5784219Z Current runner version: '2.332.0'
+2026-03-06T19:41:26.5809165Z ##[group]Runner Image Provisioner
+2026-03-06T19:41:26.5810272Z Hosted Compute Agent
+2026-03-06T19:41:26.5811017Z Version: 20260213.493
+2026-03-06T19:41:26.5811692Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-03-06T19:41:26.5812358Z Build Date: 2026-02-13T00:28:41Z
+2026-03-06T19:41:26.5813120Z Worker ID: {92dfc197-b0be-471a-8b05-7f8d876eddde}
+2026-03-06T19:41:26.5813836Z Azure Region: westus
+2026-03-06T19:41:26.5814336Z ##[endgroup]
+2026-03-06T19:41:26.5815891Z ##[group]Operating System
+2026-03-06T19:41:26.5816532Z Ubuntu
+2026-03-06T19:41:26.5817017Z 24.04.3
+2026-03-06T19:41:26.5817430Z LTS
+2026-03-06T19:41:26.5818024Z ##[endgroup]
+2026-03-06T19:41:26.5818495Z ##[group]Runner Image
+2026-03-06T19:41:26.5819030Z Image: ubuntu-24.04
+2026-03-06T19:41:26.5819688Z Version: 20260302.42.1
+2026-03-06T19:41:26.5820970Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260302.42/images/ubuntu/Ubuntu2404-Readme.md
+2026-03-06T19:41:26.5822731Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260302.42
+2026-03-06T19:41:26.5823635Z ##[endgroup]
+2026-03-06T19:41:26.5824827Z ##[group]GITHUB_TOKEN Permissions
+2026-03-06T19:41:26.5826628Z Contents: read
+2026-03-06T19:41:26.5827162Z Metadata: read
+2026-03-06T19:41:26.5827814Z Packages: read
+2026-03-06T19:41:26.5828287Z ##[endgroup]
+2026-03-06T19:41:26.5830747Z Secret source: Actions
+2026-03-06T19:41:26.5831637Z Prepare workflow directory
+2026-03-06T19:41:26.6182429Z Prepare all required actions
+2026-03-06T19:41:26.6242024Z Getting action download info
+2026-03-06T19:41:27.0817071Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-03-06T19:41:27.2018901Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-03-06T19:41:27.3976906Z Complete job name: Test SQL Dependencies (Python 3.9)

@@ -1,0 +1,202 @@
+﻿2026-03-06T19:42:33.8704248Z ##[group]Run pytest -v -k "extras" --cov=odibi --cov-report=term-missing
+2026-03-06T19:42:33.8705146Z [36;1mpytest -v -k "extras" --cov=odibi --cov-report=term-missing[0m
+2026-03-06T19:42:33.8778540Z shell: /usr/bin/bash -e {0}
+2026-03-06T19:42:33.8778943Z env:
+2026-03-06T19:42:33.8779377Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:42:33.8780150Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.14/x64/lib/pkgconfig
+2026-03-06T19:42:33.8781227Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:42:33.8782193Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:42:33.8782874Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+2026-03-06T19:42:33.8783564Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.14/x64/lib
+2026-03-06T19:42:33.8784320Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-03-06T19:42:33.8785180Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-03-06T19:42:33.8785896Z ##[endgroup]
+2026-03-06T19:42:35.0028223Z ============================= test session starts ==============================
+2026-03-06T19:42:35.0029309Z platform linux -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/hostedtoolcache/Python/3.11.14/x64/bin/python
+2026-03-06T19:42:35.0030260Z cachedir: .pytest_cache
+2026-03-06T19:42:35.0030663Z rootdir: /home/runner/work/Odibi/Odibi
+2026-03-06T19:42:35.0031345Z configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+2026-03-06T19:42:35.0032357Z testpaths: tests
+2026-03-06T19:42:35.0032744Z plugins: anyio-4.12.1, cov-7.0.0
+2026-03-06T19:42:53.7279249Z collecting ... collected 5656 items / 7 errors / 5652 deselected / 4 skipped / 4 selected
+2026-03-06T19:42:53.7279966Z 
+2026-03-06T19:42:53.7280211Z ==================================== ERRORS ====================================
+2026-03-06T19:42:53.7280988Z _____________ ERROR collecting tests/mcp/test_ai_full_knowledge.py _____________
+2026-03-06T19:42:53.7282399Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_ai_full_knowledge.py'.
+2026-03-06T19:42:53.7283456Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:53.7284043Z Traceback:
+2026-03-06T19:42:53.7284804Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:53.7285675Z     mod = import_path(
+2026-03-06T19:42:53.7286471Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:53.7287310Z     importlib.import_module(module_name)
+2026-03-06T19:42:53.7288118Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/importlib/__init__.py:126: in import_module
+2026-03-06T19:42:53.7289003Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:53.7289575Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:53.7290079Z <frozen importlib._bootstrap>:1204: in _gcd_import
+2026-03-06T19:42:53.7290547Z     ???
+2026-03-06T19:42:53.7290923Z <frozen importlib._bootstrap>:1176: in _find_and_load
+2026-03-06T19:42:53.7291382Z     ???
+2026-03-06T19:42:53.7291982Z <frozen importlib._bootstrap>:1147: in _find_and_load_unlocked
+2026-03-06T19:42:53.7292500Z     ???
+2026-03-06T19:42:53.7292845Z <frozen importlib._bootstrap>:690: in _load_unlocked
+2026-03-06T19:42:53.7293303Z     ???
+2026-03-06T19:42:53.7294034Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:53.7294932Z     exec(co, module.__dict__)
+2026-03-06T19:42:53.7295369Z tests/mcp/test_ai_full_knowledge.py:8: in <module>
+2026-03-06T19:42:53.7295864Z     from openai import OpenAI
+2026-03-06T19:42:53.7296303Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:53.7296968Z ___________ ERROR collecting tests/mcp/test_ai_with_mcp_resources.py ___________
+2026-03-06T19:42:53.7298015Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_ai_with_mcp_resources.py'.
+2026-03-06T19:42:53.7299534Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:53.7300086Z Traceback:
+2026-03-06T19:42:53.7300783Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:53.7301761Z     mod = import_path(
+2026-03-06T19:42:53.7302499Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:53.7303701Z     importlib.import_module(module_name)
+2026-03-06T19:42:53.7304444Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/importlib/__init__.py:126: in import_module
+2026-03-06T19:42:53.7305318Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:53.7305889Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:53.7306383Z <frozen importlib._bootstrap>:1204: in _gcd_import
+2026-03-06T19:42:53.7306863Z     ???
+2026-03-06T19:42:53.7307262Z <frozen importlib._bootstrap>:1176: in _find_and_load
+2026-03-06T19:42:53.7307753Z     ???
+2026-03-06T19:42:53.7308195Z <frozen importlib._bootstrap>:1147: in _find_and_load_unlocked
+2026-03-06T19:42:53.7308730Z     ???
+2026-03-06T19:42:53.7309089Z <frozen importlib._bootstrap>:690: in _load_unlocked
+2026-03-06T19:42:53.7309567Z     ???
+2026-03-06T19:42:53.7310283Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:53.7311174Z     exec(co, module.__dict__)
+2026-03-06T19:42:53.7311839Z tests/mcp/test_ai_with_mcp_resources.py:20: in <module>
+2026-03-06T19:42:53.7312336Z     from openai import OpenAI
+2026-03-06T19:42:53.7312797Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:53.7313408Z ____________ ERROR collecting tests/mcp/test_mcp_resources_real.py _____________
+2026-03-06T19:42:53.7314368Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_mcp_resources_real.py'.
+2026-03-06T19:42:53.7315280Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:53.7315801Z Traceback:
+2026-03-06T19:42:53.7316439Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:53.7317203Z     mod = import_path(
+2026-03-06T19:42:53.7317867Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:53.7318624Z     importlib.import_module(module_name)
+2026-03-06T19:42:53.7319296Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/importlib/__init__.py:126: in import_module
+2026-03-06T19:42:53.7320078Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:53.7320601Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:53.7321058Z <frozen importlib._bootstrap>:1204: in _gcd_import
+2026-03-06T19:42:53.7321467Z     ???
+2026-03-06T19:42:53.7321952Z <frozen importlib._bootstrap>:1176: in _find_and_load
+2026-03-06T19:42:53.7322373Z     ???
+2026-03-06T19:42:53.7322751Z <frozen importlib._bootstrap>:1147: in _find_and_load_unlocked
+2026-03-06T19:42:53.7323208Z     ???
+2026-03-06T19:42:53.7323532Z <frozen importlib._bootstrap>:690: in _load_unlocked
+2026-03-06T19:42:53.7323956Z     ???
+2026-03-06T19:42:53.7324598Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:53.7325389Z     exec(co, module.__dict__)
+2026-03-06T19:42:53.7325778Z tests/mcp/test_mcp_resources_real.py:12: in <module>
+2026-03-06T19:42:53.7326233Z     from openai import OpenAI
+2026-03-06T19:42:53.7326628Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:53.7327219Z _______________ ERROR collecting tests/mcp/test_phase1_agent.py ________________
+2026-03-06T19:42:53.7328111Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_phase1_agent.py'.
+2026-03-06T19:42:53.7329202Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:53.7329683Z Traceback:
+2026-03-06T19:42:53.7330312Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:53.7331063Z     mod = import_path(
+2026-03-06T19:42:53.7331882Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:53.7333399Z     importlib.import_module(module_name)
+2026-03-06T19:42:53.7334095Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/importlib/__init__.py:126: in import_module
+2026-03-06T19:42:53.7334898Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:53.7335425Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:53.7335892Z <frozen importlib._bootstrap>:1204: in _gcd_import
+2026-03-06T19:42:53.7336308Z     ???
+2026-03-06T19:42:53.7336655Z <frozen importlib._bootstrap>:1176: in _find_and_load
+2026-03-06T19:42:53.7337106Z     ???
+2026-03-06T19:42:53.7337470Z <frozen importlib._bootstrap>:1147: in _find_and_load_unlocked
+2026-03-06T19:42:53.7337936Z     ???
+2026-03-06T19:42:53.7338280Z <frozen importlib._bootstrap>:690: in _load_unlocked
+2026-03-06T19:42:53.7338704Z     ???
+2026-03-06T19:42:53.7339378Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:53.7340226Z     exec(co, module.__dict__)
+2026-03-06T19:42:53.7340616Z tests/mcp/test_phase1_agent.py:14: in <module>
+2026-03-06T19:42:53.7341077Z     from openai import OpenAI
+2026-03-06T19:42:53.7341481Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:53.7342274Z ___________ ERROR collecting tests/mcp/test_phase1_comprehensive.py ____________
+2026-03-06T19:42:53.7343218Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_phase1_comprehensive.py'.
+2026-03-06T19:42:53.7344122Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:53.7344643Z Traceback:
+2026-03-06T19:42:53.7345285Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:53.7346062Z     mod = import_path(
+2026-03-06T19:42:53.7346720Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:53.7347489Z     importlib.import_module(module_name)
+2026-03-06T19:42:53.7348174Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/importlib/__init__.py:126: in import_module
+2026-03-06T19:42:53.7348963Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:53.7349481Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:53.7349934Z <frozen importlib._bootstrap>:1204: in _gcd_import
+2026-03-06T19:42:53.7350345Z     ???
+2026-03-06T19:42:53.7350665Z <frozen importlib._bootstrap>:1176: in _find_and_load
+2026-03-06T19:42:53.7351097Z     ???
+2026-03-06T19:42:53.7351458Z <frozen importlib._bootstrap>:1147: in _find_and_load_unlocked
+2026-03-06T19:42:53.7352091Z     ???
+2026-03-06T19:42:53.7352420Z <frozen importlib._bootstrap>:690: in _load_unlocked
+2026-03-06T19:42:53.7352825Z     ???
+2026-03-06T19:42:53.7353476Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:53.7354249Z     exec(co, module.__dict__)
+2026-03-06T19:42:53.7354661Z tests/mcp/test_phase1_comprehensive.py:15: in <module>
+2026-03-06T19:42:53.7355112Z     from openai import OpenAI
+2026-03-06T19:42:53.7355514Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:53.7356152Z ___________ ERROR collecting tests/mcp/test_phase2_comprehensive.py ____________
+2026-03-06T19:42:53.7357102Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_phase2_comprehensive.py'.
+2026-03-06T19:42:53.7358017Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:53.7358715Z Traceback:
+2026-03-06T19:42:53.7359345Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:53.7360088Z     mod = import_path(
+2026-03-06T19:42:53.7360743Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:53.7361541Z     importlib.import_module(module_name)
+2026-03-06T19:42:53.7362603Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/importlib/__init__.py:126: in import_module
+2026-03-06T19:42:53.7363406Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:53.7363919Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:53.7364385Z <frozen importlib._bootstrap>:1204: in _gcd_import
+2026-03-06T19:42:53.7364787Z     ???
+2026-03-06T19:42:53.7365107Z <frozen importlib._bootstrap>:1176: in _find_and_load
+2026-03-06T19:42:53.7365524Z     ???
+2026-03-06T19:42:53.7365894Z <frozen importlib._bootstrap>:1147: in _find_and_load_unlocked
+2026-03-06T19:42:53.7366357Z     ???
+2026-03-06T19:42:53.7366662Z <frozen importlib._bootstrap>:690: in _load_unlocked
+2026-03-06T19:42:53.7367062Z     ???
+2026-03-06T19:42:53.7367705Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:53.7368487Z     exec(co, module.__dict__)
+2026-03-06T19:42:53.7368915Z tests/mcp/test_phase2_comprehensive.py:14: in <module>
+2026-03-06T19:42:53.7369377Z     from openai import OpenAI
+2026-03-06T19:42:53.7369769Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:53.7370366Z _______________ ERROR collecting tests/mcp/test_phase3_smart.py ________________
+2026-03-06T19:42:53.7371247Z ImportError while importing test module '/home/runner/work/Odibi/Odibi/tests/mcp/test_phase3_smart.py'.
+2026-03-06T19:42:53.7372273Z Hint: make sure your test modules/packages have valid Python names.
+2026-03-06T19:42:53.7372775Z Traceback:
+2026-03-06T19:42:53.7373411Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/python.py:507: in importtestmodule
+2026-03-06T19:42:53.7374164Z     mod = import_path(
+2026-03-06T19:42:53.7374809Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/pathlib.py:587: in import_path
+2026-03-06T19:42:53.7375581Z     importlib.import_module(module_name)
+2026-03-06T19:42:53.7376265Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/importlib/__init__.py:126: in import_module
+2026-03-06T19:42:53.7377058Z     return _bootstrap._gcd_import(name[level:], package, level)
+2026-03-06T19:42:53.7377626Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-06T19:42:53.7378108Z <frozen importlib._bootstrap>:1204: in _gcd_import
+2026-03-06T19:42:53.7378520Z     ???
+2026-03-06T19:42:53.7378844Z <frozen importlib._bootstrap>:1176: in _find_and_load
+2026-03-06T19:42:53.7379248Z     ???
+2026-03-06T19:42:53.7379601Z <frozen importlib._bootstrap>:1147: in _find_and_load_unlocked
+2026-03-06T19:42:53.7380075Z     ???
+2026-03-06T19:42:53.7380381Z <frozen importlib._bootstrap>:690: in _load_unlocked
+2026-03-06T19:42:53.7380788Z     ???
+2026-03-06T19:42:53.7381511Z /opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+2026-03-06T19:42:53.7382437Z     exec(co, module.__dict__)
+2026-03-06T19:42:53.7382820Z tests/mcp/test_phase3_smart.py:9: in <module>
+2026-03-06T19:42:53.7383245Z     from openai import OpenAI
+2026-03-06T19:42:54.3193963Z E   ModuleNotFoundError: No module named 'openai'
+2026-03-06T19:42:54.3194689Z =========================== short test summary info ============================
+2026-03-06T19:42:54.3195314Z ERROR tests/mcp/test_ai_full_knowledge.py
+2026-03-06T19:42:54.3195837Z ERROR tests/mcp/test_ai_with_mcp_resources.py
+2026-03-06T19:42:54.3196364Z ERROR tests/mcp/test_mcp_resources_real.py
+2026-03-06T19:42:54.3196851Z ERROR tests/mcp/test_phase1_agent.py
+2026-03-06T19:42:54.3197786Z ERROR tests/mcp/test_phase1_comprehensive.py
+2026-03-06T19:42:54.3198310Z ERROR tests/mcp/test_phase2_comprehensive.py
+2026-03-06T19:42:54.3198801Z ERROR tests/mcp/test_phase3_smart.py
+2026-03-06T19:42:54.3199391Z !!!!!!!!!!!!!!!!!!! Interrupted: 7 errors during collection !!!!!!!!!!!!!!!!!!!!
+2026-03-06T19:42:54.3200145Z ================ 4 skipped, 5652 deselected, 7 errors in 18.73s ================
+2026-03-06T19:42:54.8780994Z ##[error]Process completed with exit code 2.
