@@ -24,6 +24,7 @@ class FolderInfo:
     pattern: Optional[str] = None
     formats: Dict[str, int] = field(default_factory=dict)
     sample_files: List[str] = field(default_factory=list)
+    is_folder: bool = False  # True if this represents a directory, False if files
 
 
 @dataclass
@@ -106,9 +107,9 @@ class OdibiSuggestions:
     suggested_pattern: Optional[str] = None  # "dimension", "fact", "scd2", "aggregation"
     pattern_reason: Optional[str] = None
     suggested_transformers: List[TransformerSuggestion] = field(default_factory=list)
-    incremental_hint: Optional[
-        Dict[str, str]
-    ] = None  # {"column": "ModifiedDate", "type": "timestamp"}
+    incremental_hint: Optional[Dict[str, str]] = (
+        None  # {"column": "ModifiedDate", "type": "timestamp"}
+    )
     partition_hint: Optional[List[str]] = None  # Columns good for partitioning
     decisions_needed: List[DecisionHint] = field(default_factory=list)
 

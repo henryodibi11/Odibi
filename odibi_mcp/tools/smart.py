@@ -552,47 +552,61 @@ def _transform_catalog_to_map_response(
                 suggested_sources.append(f"{schema_name}.{t}")
 
     else:
-        # Storage connection - group by folder
-        folder_map: Dict[str, List[str]] = {}
-        format_counts: Dict[str, int] = {}
+        # Storage connection - show folders and files
 
+        # Add folders to structure
+        if catalog.folders:
+            for folder in catalog.folders:
+                folder_info = FolderInfo(
+                    path=folder.name,
+                    file_count=0,  # We don't know until we drill in
+                    pattern="[FOLDER]",
+                    formats={},
+                    sample_files=[],
+                    is_folder=True,
+                )
+                structure.append(folder_info)
+
+                # Suggest drilling into folders
+                suggested_sources.append(folder.name)
+
+        # Add files to structure (grouped by parent folder if any)
         if catalog.files:
+            folder_map: Dict[str, List[str]] = {}
+
             for file in catalog.files:
                 folder = file.namespace or "(root)"
                 if folder not in folder_map:
                     folder_map[folder] = []
                 folder_map[folder].append(file.name)
 
-                # Track formats
-                if file.format:
-                    format_counts[file.format] = format_counts.get(file.format, 0) + 1
+            for folder_name, files in folder_map.items():
+                # Group files by format
+                folder_formats: Dict[str, int] = {}
+                for f in files:
+                    ext = Path(f).suffix.lower().lstrip(".") or "unknown"
+                    folder_formats[ext] = folder_formats.get(ext, 0) + 1
 
-        for folder_name, files in folder_map.items():
-            # Group files by format
-            folder_formats: Dict[str, int] = {}
-            for f in files:
-                ext = Path(f).suffix.lower().lstrip(".") or "unknown"
-                folder_formats[ext] = folder_formats.get(ext, 0) + 1
+                pattern = _detect_pattern(files)
 
-            pattern = _detect_pattern(files)
-
-            folder_info = FolderInfo(
-                path=folder_name,
-                file_count=len(files),
-                pattern=pattern,
-                formats=folder_formats,
-                sample_files=files[:5],
-            )
-            structure.append(folder_info)
-
-            # Add first 3 files to suggested sources
-            for f in files[:3]:
-                full_file_path = (
-                    f"{path}/{folder_name}/{f}" if folder_name != "(root)" else f"{path}/{f}"
+                folder_info = FolderInfo(
+                    path=folder_name,
+                    file_count=len(files),
+                    pattern=pattern,
+                    formats=folder_formats,
+                    sample_files=files[:5],
+                    is_folder=False,
                 )
-                full_file_path = full_file_path.strip("/")
-                if full_file_path not in suggested_sources:
-                    suggested_sources.append(full_file_path)
+                structure.append(folder_info)
+
+                # Add first 3 files to suggested sources
+                for f in files[:3]:
+                    full_file_path = (
+                        f"{path}/{folder_name}/{f}" if folder_name != "(root)" else f"{path}/{f}"
+                    )
+                    full_file_path = full_file_path.strip("/")
+                    if full_file_path not in suggested_sources:
+                        suggested_sources.append(full_file_path)
 
     # Generate recommendations
     recommendations = list(catalog.suggestions) if catalog.suggestions else []
